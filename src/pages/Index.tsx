@@ -17,7 +17,7 @@ const TrainingTab = lazy(() => import("@/components/TrainingTab"));
 const MoreTab = lazy(() => import("@/components/MoreTab"));
 const PostureTab = lazy(() => import("@/components/PostureTab"));
 const ConnectApps = lazy(() => import("@/components/ConnectApps"));
-const CommunityTab = lazy(() => import("@/components/CommunityTab"));
+const RewardsTab = lazy(() => import("@/components/RewardsTab"));
 const RaceTab = lazy(() => import("@/components/RaceTab"));
 
 type Tab = "training" | "posture" | "activities" | "more" | "community" | "races";

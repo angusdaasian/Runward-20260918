@@ -35,8 +35,8 @@ const Landing = () => {
       icon: Activity,
       title: isZh ? "健身應用整合" : "Fitness App Integration",
       desc: isZh
-        ? "連結 Strava 及 Apple Health，自動同步跑步記錄，查看詳細配速、心率及海拔圖表。"
-        : "Connect Strava & Apple Health to auto-sync your runs. View detailed pace, heart rate, and elevation charts.",
+        ? "連結 Strava、Apple Health、Garmin 等健身應用，自動同步跑步記錄，查看詳細配速、心率及海拔圖表。"
+        : "Connect to fitness apps such as Strava, Apple Health, Garmin and many others to auto-sync your runs. View detailed pace, heart rate, and elevation charts.",
       color: "from-orange-500 to-red-500",
       comingSoon: true,
     },

@@ -1,5 +1,5 @@
 import { useState, useEffect, lazy, Suspense } from "react";
-import { Activity, Dumbbell, Loader2, ScanEye, Shield, Users, Trophy } from "lucide-react";
+import { Activity, Dumbbell, Loader2, ScanEye, Shield, Award, Trophy } from "lucide-react";
 import { Lang, t } from "@/lib/i18n";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAdmin } from "@/hooks/use-admin";
@@ -17,7 +17,7 @@ const TrainingTab = lazy(() => import("@/components/TrainingTab"));
 const MoreTab = lazy(() => import("@/components/MoreTab"));
 const PostureTab = lazy(() => import("@/components/PostureTab"));
 const ConnectApps = lazy(() => import("@/components/ConnectApps"));
-const CommunityTab = lazy(() => import("@/components/CommunityTab"));
+const RewardsTab = lazy(() => import("@/components/RewardsTab"));
 const RaceTab = lazy(() => import("@/components/RaceTab"));
 
 type Tab = "training" | "posture" | "activities" | "more" | "community" | "races";
@@ -158,7 +158,7 @@ const Index = () => {
     { id: "activities", icon: Activity, labelKey: "activities" },
     { id: "training", icon: Dumbbell, labelKey: "training" },
     { id: "races", icon: Trophy, labelKey: "races" },
-    { id: "community", icon: Users, labelKey: "community" },
+    { id: "community", icon: Award, labelKey: "community" },
     { id: "posture", icon: ScanEye, labelKey: "posture" },
   ];
 
@@ -229,7 +229,7 @@ const Index = () => {
         )}
         {activeTab === "community" && (
           <Suspense fallback={<CommunitySkeleton />}>
-            <CommunityTab lang={lang} />
+            <RewardsTab lang={lang} />
           </Suspense>
         )}
       </div>

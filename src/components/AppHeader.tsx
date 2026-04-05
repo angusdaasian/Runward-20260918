@@ -96,7 +96,7 @@ interface AppHeaderProps {
   isGuest?: boolean;
 }
 
-const AppHeader = ({ lang, onNavigateSettings }: AppHeaderProps) => {
+const AppHeader = ({ lang, onNavigateSettings, isGuest }: AppHeaderProps) => {
   const { user } = useAuth();
   const [profile, setProfile] = useState(() =>
     _headerUserId === user?.id ? _headerProfile : null

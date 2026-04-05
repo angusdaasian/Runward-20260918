@@ -225,6 +225,14 @@ const Onboarding = ({
   useEffect(() => {
     if (user && !isSignInMode) {
       const signupInProgress = sessionStorage.getItem(ONBOARDING_SIGNUP_IN_PROGRESS_KEY) === "true";
+      // If on step 12 (email verification) and user just confirmed, advance to profile save flow
+      if (step === 12) {
+        setOnboardingUserId(user.id);
+        setSignupInProgress(true);
+        setIsAccountCreationInFlight(true);
+        setStep(11);
+        return;
+      }
       if (signupInProgress || isAccountCreationInFlight || (step >= 8 && step <= 11) || !!onboardingUserId) return;
 
       if (localStorage.getItem("onboarding_show_plan_prompt") === "true") {

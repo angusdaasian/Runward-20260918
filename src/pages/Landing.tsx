@@ -50,6 +50,14 @@ const Landing = () => {
       color: "from-blue-500 to-indigo-500",
     },
     {
+      icon: Award,
+      title: isZh ? "排名賽季 & 獎勵" : "Ranked Seasons & Rewards",
+      desc: isZh
+        ? "每日簽到賺取 XP，攀升 Bronze 到 Diamond 的排名階梯。登上排行榜，頂尖跑者可贏取 App Store 兌換碼獎勵。"
+        : "Earn XP from daily check-ins and activity syncs. Climb ranks from Bronze to Diamond, compete on leaderboards, and win App Store redeem codes.",
+      color: "from-amber-500 to-yellow-500",
+    },
+    {
       icon: TrendingUp,
       title: isZh ? "表現分析" : "Performance Analytics",
       desc: isZh
@@ -80,7 +88,7 @@ const Landing = () => {
       desc: isZh
         ? "搜尋即將舉行的比賽，提交及分享你所在地區的賽事。"
         : "Discover upcoming races near you. Submit and share events with the running community.",
-      color: "from-amber-500 to-yellow-500",
+      color: "from-rose-500 to-pink-500",
     },
   ];
 

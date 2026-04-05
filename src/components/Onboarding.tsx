@@ -150,6 +150,11 @@ const Onboarding = ({
   const [signInPassword, setSignInPassword] = useState("");
   const [otpCode, setOtpCode] = useState("");
   const [verifyingOtp, setVerifyingOtp] = useState(false);
+  const [forgotPasswordMode, setForgotPasswordMode] = useState<"idle" | "email" | "code" | "newpass">("idle");
+  const [resetEmail, setResetEmail] = useState("");
+  const [resetOtp, setResetOtp] = useState("");
+  const [resetNewPassword, setResetNewPassword] = useState("");
+  const [resetConfirmPassword, setResetConfirmPassword] = useState("");
 
   const setSignupInProgress = (active: boolean) => {
     if (active) {

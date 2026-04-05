@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import {
   Activity, BarChart3, Zap, Target, Globe, Timer, Trophy,
   Users, ChevronRight, Smartphone, Star, TrendingUp, Camera,
-  MapPin, Calculator, Heart, CheckCircle2
+  MapPin, Calculator, Heart, CheckCircle2, Award, Flame
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { Lang, t } from "@/lib/i18n";
@@ -50,6 +50,14 @@ const Landing = () => {
       color: "from-blue-500 to-indigo-500",
     },
     {
+      icon: Award,
+      title: isZh ? "排名賽季 & 獎勵" : "Ranked Seasons & Rewards",
+      desc: isZh
+        ? "每日簽到賺取 XP，攀升 Bronze 到 Diamond 的排名階梯。登上排行榜，頂尖跑者可贏取 App Store 兌換碼獎勵。"
+        : "Earn XP from daily check-ins and activity syncs. Climb ranks from Bronze to Diamond, compete on leaderboards, and win App Store redeem codes.",
+      color: "from-amber-500 to-yellow-500",
+    },
+    {
       icon: TrendingUp,
       title: isZh ? "表現分析" : "Performance Analytics",
       desc: isZh
@@ -80,7 +88,7 @@ const Landing = () => {
       desc: isZh
         ? "搜尋即將舉行的比賽，提交及分享你所在地區的賽事。"
         : "Discover upcoming races near you. Submit and share events with the running community.",
-      color: "from-amber-500 to-yellow-500",
+      color: "from-rose-500 to-pink-500",
     },
   ];
 
@@ -157,8 +165,8 @@ const Landing = () => {
 
           <p className={`mt-5 text-lg md:text-xl text-muted-foreground leading-relaxed max-w-2xl mx-auto transition-all duration-700 delay-200 ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}>
             {isZh
-              ? "健身應用同步、AI 訓練計劃、跑姿分析、跑步計算器 — 跑得更聰明，盡在一個應用。"
-              : "Fitness app sync, AI training plans, posture analysis, running calculator — run smarter, all in one app."}
+              ? "健身應用同步、AI 訓練計劃、跑姿分析、排名賽季獎勵 — 跑得更聰明，盡在一個應用。"
+              : "Fitness app sync, AI training plans, posture analysis, ranked seasons & rewards — run smarter, all in one app."}
           </p>
 
           <div className={`mt-8 flex flex-col sm:flex-row items-center justify-center gap-4 transition-all duration-700 delay-300 ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}>

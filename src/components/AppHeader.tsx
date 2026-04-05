@@ -7,19 +7,23 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Skeleton } from "@/components/ui/skeleton";
 
+import { getRankFromXP, formatRank, getTierColor, type RankTier } from "@/lib/ranks";
+import { RANK_EMBLEMS } from "@/lib/rankEmblems";
+import { Progress } from "@/components/ui/progress";
+
 // Module-level cache — survives across remounts/tab switches
-let _headerProfile: { display_name: string | null; avatar_url: string | null } | null = null;
+let _headerProfile: { display_name: string | null; avatar_url: string | null; monthly_xp: number; rank_tier: string; division: string } | null = null;
 let _headerUserId: string | null = null;
 let _fetchPromise: Promise<void> | null = null;
 
 /** Eagerly fetch profile into cache. Call as early as possible (e.g. when user is known). */
 export function preloadHeaderProfile(userId: string) {
-  if (_headerUserId === userId && _headerProfile) return; // already cached
-  if (_fetchPromise) return; // already in flight
+  if (_headerUserId === userId && _headerProfile) return;
+  if (_fetchPromise) return;
   _fetchPromise = Promise.resolve(
     supabase
       .from("profiles")
-      .select("display_name, avatar_url")
+      .select("display_name, avatar_url, monthly_xp, rank_tier, division")
       .eq("user_id", userId)
       .single()
   ).then(({ data }) => {
@@ -32,8 +36,15 @@ export function preloadHeaderProfile(userId: string) {
 }
 
 /** Update the header cache externally (called from ProfileSection on save) */
-export function updateHeaderCache(profile: { display_name: string | null; avatar_url: string | null }, userId: string) {
-  _headerProfile = profile;
+export function updateHeaderCache(profile: { display_name: string | null; avatar_url: string | null; monthly_xp?: number; rank_tier?: string; division?: string }, userId: string) {
+  _headerProfile = {
+    ..._headerProfile,
+    display_name: profile.display_name,
+    avatar_url: profile.avatar_url,
+    monthly_xp: profile.monthly_xp ?? _headerProfile?.monthly_xp ?? 0,
+    rank_tier: profile.rank_tier ?? _headerProfile?.rank_tier ?? "Bronze",
+    division: profile.division ?? _headerProfile?.division ?? "V",
+  };
   _headerUserId = userId;
 }
 
@@ -163,7 +174,28 @@ const AppHeader = ({ lang, onNavigateSettings, isGuest }: AppHeaderProps) => {
               <AvatarImage src={isGuest ? undefined : (profile?.avatar_url || undefined)} />
               <AvatarFallback className="text-lg font-display bg-primary/10 text-primary">{initials}</AvatarFallback>
             </Avatar>
-            <h1 className="font-display text-lg font-bold text-foreground">{name}</h1>
+            <div className="flex flex-col">
+              <h1 className="font-display text-lg font-bold text-foreground leading-tight">{name}</h1>
+              {!isGuest && profile && (() => {
+                const rankInfo = getRankFromXP(profile.monthly_xp ?? 0);
+                const pct = Math.min(100, (rankInfo.xpInCurrentDivision / rankInfo.xpToNextDivision) * 100);
+                const tier = rankInfo.tier;
+                return (
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <img src={RANK_EMBLEMS[tier] || RANK_EMBLEMS.Bronze} alt={tier} className="w-4 h-4 object-contain" />
+                    <span className="text-[10px] font-semibold" style={{ color: getTierColor(tier) }}>
+                      {formatRank(rankInfo.tier, rankInfo.division)}
+                    </span>
+                    <div className="w-16 h-1.5 rounded-full bg-muted overflow-hidden">
+                      <div
+                        className="h-full rounded-full transition-all duration-500"
+                        style={{ width: `${pct}%`, backgroundColor: getTierColor(tier) }}
+                      />
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
           </>
         )}
       </div>

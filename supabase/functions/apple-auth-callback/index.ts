@@ -85,7 +85,7 @@ Deno.serve(async (req) => {
 
     if (error) {
       console.error("[apple-auth-callback] signInWithIdToken error:", error);
-      const errorRedirect = new URL(redirectUri.startsWith("http") ? redirectUri : `https://speed-guide-pro.lovable.app${redirectUri}`);
+      const errorRedirect = new URL(redirectUri.startsWith("http") ? redirectUri : `https://pacecalculator.fun${redirectUri}`);
       errorRedirect.pathname = "/callback/apple";
       errorRedirect.searchParams.set("error", error.message);
       return new Response(null, {

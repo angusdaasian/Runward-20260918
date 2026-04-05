@@ -1,4 +1,4 @@
-import { Info, Zap, Flame, Trophy, ArrowDown } from "lucide-react";
+import { Info, Zap, Flame, Trophy, ArrowDown, Activity } from "lucide-react";
 import { Lang } from "@/lib/i18n";
 
 interface Props {
@@ -18,6 +18,11 @@ const XpExplainer = ({ lang }: Props) => {
       icon: <Flame size={14} className="text-orange-500" />,
       label: isZh ? "連續 7 天簽到獎勵" : "7-Day Streak Bonus",
       value: "+300 XP",
+    },
+    {
+      icon: <Activity size={14} className="text-emerald-500" />,
+      label: isZh ? "運動同步（Strava/Garmin）" : "Activity Sync (Strava/Garmin)",
+      value: isZh ? "(公里×10)+(分鐘×5)" : "(km×10)+(min×5)",
     },
     {
       icon: <ArrowDown size={14} className="text-destructive" />,

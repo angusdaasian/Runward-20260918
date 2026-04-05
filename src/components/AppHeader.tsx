@@ -36,8 +36,15 @@ export function preloadHeaderProfile(userId: string) {
 }
 
 /** Update the header cache externally (called from ProfileSection on save) */
-export function updateHeaderCache(profile: { display_name: string | null; avatar_url: string | null }, userId: string) {
-  _headerProfile = profile;
+export function updateHeaderCache(profile: { display_name: string | null; avatar_url: string | null; monthly_xp?: number; rank_tier?: string; division?: string }, userId: string) {
+  _headerProfile = {
+    ..._headerProfile,
+    display_name: profile.display_name,
+    avatar_url: profile.avatar_url,
+    monthly_xp: profile.monthly_xp ?? _headerProfile?.monthly_xp ?? 0,
+    rank_tier: profile.rank_tier ?? _headerProfile?.rank_tier ?? "Bronze",
+    division: profile.division ?? _headerProfile?.division ?? "V",
+  };
   _headerUserId = userId;
 }
 

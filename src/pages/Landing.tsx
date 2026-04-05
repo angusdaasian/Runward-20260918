@@ -55,6 +55,7 @@ const Landing = () => {
         ? "追蹤你的訓練分數，查看訓練負荷趨勢，每次跑步後獲得 AI 分析。"
         : "Track your Training Score, view training load trends, and receive AI-powered workout analysis after every run.",
       color: "from-emerald-500 to-green-500",
+      comingSoon: true,
     },
     {
       icon: Camera,

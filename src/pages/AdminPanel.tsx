@@ -12,6 +12,7 @@ import AnnouncementManager from "@/components/admin/AnnouncementManager";
 import FeedbackManager from "@/components/admin/FeedbackManager";
 import RaceManager from "@/components/admin/RaceManager";
 import PendingRaceManager from "@/components/admin/PendingRaceManager";
+import RewardCodeManager from "@/components/admin/RewardCodeManager";
 
 interface UserRow {
   user_id: string;

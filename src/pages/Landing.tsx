@@ -38,6 +38,7 @@ const Landing = () => {
         ? "自動同步你的跑步記錄，查看每次活動的詳細配速、心率及海拔圖表。"
         : "Auto-sync your runs with Strava. View detailed pace, heart rate, and elevation charts for every activity.",
       color: "from-orange-500 to-red-500",
+      comingSoon: true,
     },
     {
       icon: Target,

@@ -178,7 +178,7 @@ const Index = () => {
       )}
       {/* Shared header across all tabs */}
       {activeTab !== "more" || !showConnectApps ? (
-        <AppHeader lang={lang} onNavigateSettings={handleNavigateSettings} />
+        <AppHeader lang={lang} onNavigateSettings={handleNavigateSettings} isGuest={isGuest} />
       ) : null}
       <div className="flex-1 overflow-y-auto relative" style={{ paddingBottom: 'calc(5rem + var(--safe-area-bottom, 0px))' }}>
         {langSwitching && (

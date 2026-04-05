@@ -93,9 +93,10 @@ const AnnouncementBell = ({ lang }: { lang: Lang }) => {
 interface AppHeaderProps {
   lang: Lang;
   onNavigateSettings: () => void;
+  isGuest?: boolean;
 }
 
-const AppHeader = ({ lang, onNavigateSettings }: AppHeaderProps) => {
+const AppHeader = ({ lang, onNavigateSettings, isGuest }: AppHeaderProps) => {
   const { user } = useAuth();
   const [profile, setProfile] = useState(() =>
     _headerUserId === user?.id ? _headerProfile : null
@@ -144,13 +145,14 @@ const AppHeader = ({ lang, onNavigateSettings }: AppHeaderProps) => {
     return () => clearInterval(interval);
   }, [user]);
 
-  const name = profile?.display_name || (lang === "zh" ? "跑者" : "Runner");
+  const guestName = lang === "zh" ? "訪客" : "Guest";
+  const name = isGuest ? guestName : (profile?.display_name || (lang === "zh" ? "跑者" : "Runner"));
   const initials = name[0].toUpperCase();
 
   return (
     <div className="flex items-center justify-between px-5 pt-4 pb-2 w-full max-w-lg mx-auto">
       <div className="flex items-center gap-3">
-        {!profile ? (
+        {!isGuest && !profile ? (
           <>
             <Skeleton className="h-12 w-12 rounded-full" />
             <Skeleton className="h-5 w-24" />
@@ -158,7 +160,7 @@ const AppHeader = ({ lang, onNavigateSettings }: AppHeaderProps) => {
         ) : (
           <>
             <Avatar className="h-12 w-12">
-              <AvatarImage src={profile.avatar_url || undefined} />
+              <AvatarImage src={isGuest ? undefined : (profile?.avatar_url || undefined)} />
               <AvatarFallback className="text-lg font-display bg-primary/10 text-primary">{initials}</AvatarFallback>
             </Avatar>
             <h1 className="font-display text-lg font-bold text-foreground">{name}</h1>

@@ -342,11 +342,13 @@ export type Database = {
         Row: {
           age: number | null
           avatar_url: string | null
+          check_in_streak: number
           created_at: string
           display_name: string | null
           division: string
           id: string
           is_premium: boolean
+          last_check_in_date: string | null
           last_login: string | null
           lifetime_xp: number
           monthly_xp: number
@@ -362,11 +364,13 @@ export type Database = {
         Insert: {
           age?: number | null
           avatar_url?: string | null
+          check_in_streak?: number
           created_at?: string
           display_name?: string | null
           division?: string
           id?: string
           is_premium?: boolean
+          last_check_in_date?: string | null
           last_login?: string | null
           lifetime_xp?: number
           monthly_xp?: number
@@ -382,11 +386,13 @@ export type Database = {
         Update: {
           age?: number | null
           avatar_url?: string | null
+          check_in_streak?: number
           created_at?: string
           display_name?: string | null
           division?: string
           id?: string
           is_premium?: boolean
+          last_check_in_date?: string | null
           last_login?: string | null
           lifetime_xp?: number
           monthly_xp?: number

@@ -69,8 +69,8 @@ const Landing = () => {
       icon: Calculator,
       title: isZh ? "跑步計算器" : "Running Calculator",
       desc: isZh
-        ? "計算你的 VDOT 跑步分數、訓練配速、等效比賽時間。"
-        : "Calculate your VDOT Running Score, training paces, and equivalent race times across all distances.",
+        ? "計算你的跑步分數、訓練配速、等效比賽時間。"
+        : "Calculate your Running Score, training paces, and equivalent race times across all distances.",
       color: "from-cyan-500 to-teal-500",
     },
     {

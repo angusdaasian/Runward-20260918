@@ -93,6 +93,7 @@ const AnnouncementBell = ({ lang }: { lang: Lang }) => {
 interface AppHeaderProps {
   lang: Lang;
   onNavigateSettings: () => void;
+  isGuest?: boolean;
 }
 
 const AppHeader = ({ lang, onNavigateSettings }: AppHeaderProps) => {

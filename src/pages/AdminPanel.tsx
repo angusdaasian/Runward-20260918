@@ -216,9 +216,9 @@ const AdminPanel = () => {
         </Card>
 
         <AnnouncementManager />
+        <RewardCodeManager />
         <RaceManager />
         <PendingRaceManager />
-        <FeedbackManager />
         <FeedbackManager />
       </div>
     </div>

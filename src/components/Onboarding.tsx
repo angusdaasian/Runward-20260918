@@ -921,6 +921,30 @@ const Onboarding = ({
         <p className={`text-red-400 text-sm text-center ${password && password.length > 0 && password.length < 6 ? "visible" : "invisible"}`}>{t("passwordMinLength", lang)}</p>
       </div>
 
+      {/* Step 12: Email verification */}
+      <div hidden={step !== 12} className="space-y-6">
+        <div className="flex flex-col items-center justify-center min-h-[300px]">
+          <Mail size={48} className="text-white mb-6" />
+          <h2 className="text-2xl font-bold text-white text-center">
+            {lang === "zh" ? "請驗證你的電子郵件" : "Check your email"}
+          </h2>
+          <p className="text-sm text-white/60 text-center mt-3 max-w-xs">
+            {lang === "zh"
+              ? `我們已發送驗證連結到 ${email}。請點擊連結以完成註冊。`
+              : `We've sent a verification link to ${email}. Please click the link to complete your signup.`}
+          </p>
+          <Button
+            onClick={() => {
+              supabase.auth.resend({ type: "signup", email, options: { emailRedirectTo: window.location.origin } });
+              toast({ title: lang === "zh" ? "已重新發送" : "Resent", description: lang === "zh" ? "驗證信已重新寄出" : "Verification email resent" });
+            }}
+            variant="outline"
+            className="mt-6 rounded-xl border-white/30 text-white bg-white/10 hover:bg-white/20"
+          >
+            {lang === "zh" ? "重新發送驗證信" : "Resend verification email"}
+          </Button>
+        </div>
+
       {/* Step 11: Creating account loading */}
       <div hidden={step !== 11} className="space-y-6">
         <div className="flex flex-col items-center justify-center min-h-[300px]">

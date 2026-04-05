@@ -157,10 +157,10 @@ const AppHeader = ({ lang, onNavigateSettings, isGuest }: AppHeaderProps) => {
             <Skeleton className="h-12 w-12 rounded-full" />
             <Skeleton className="h-5 w-24" />
           </>
-        ) : isGuest ? (
+        ) : (
           <>
             <Avatar className="h-12 w-12">
-              <AvatarImage src={profile.avatar_url || undefined} />
+              <AvatarImage src={isGuest ? undefined : (profile?.avatar_url || undefined)} />
               <AvatarFallback className="text-lg font-display bg-primary/10 text-primary">{initials}</AvatarFallback>
             </Avatar>
             <h1 className="font-display text-lg font-bold text-foreground">{name}</h1>

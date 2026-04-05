@@ -8,6 +8,7 @@ import { Link, useLocation } from "react-router-dom";
 import { Lang, t } from "@/lib/i18n";
 import appStoreBadge from "@/assets/app-store-badge.png";
 import appIcon from "@/assets/app-icon.png";
+import poweredByStrava from "@/assets/powered-by-strava.png";
 
 const APP_STORE_URL = "https://apps.apple.com/us/app/runward/id6761060757";
 
@@ -335,6 +336,11 @@ const Landing = () => {
           </div>
         </div>
       </footer>
+
+      {/* ─── Powered by Strava ─── */}
+      <div className="flex justify-center py-4 bg-background">
+        <img src={poweredByStrava} alt="Powered by Strava" className="h-8 opacity-60" />
+      </div>
     </div>
   );
 };

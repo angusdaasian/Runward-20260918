@@ -60,7 +60,7 @@ Deno.serve(async (req) => {
 
     if (!id_token) {
       console.error("[apple-auth-callback] Missing id_token");
-      const errorRedirect = new URL(redirectUri.startsWith("http") ? redirectUri : `https://speed-guide-pro.lovable.app${redirectUri}`);
+      const errorRedirect = new URL(redirectUri.startsWith("http") ? redirectUri : `https://pacecalculator.fun${redirectUri}`);
       errorRedirect.pathname = "/callback/apple";
       errorRedirect.searchParams.set("error", "missing_id_token");
       return new Response(null, {
@@ -85,7 +85,7 @@ Deno.serve(async (req) => {
 
     if (error) {
       console.error("[apple-auth-callback] signInWithIdToken error:", error);
-      const errorRedirect = new URL(redirectUri.startsWith("http") ? redirectUri : `https://speed-guide-pro.lovable.app${redirectUri}`);
+      const errorRedirect = new URL(redirectUri.startsWith("http") ? redirectUri : `https://pacecalculator.fun${redirectUri}`);
       errorRedirect.pathname = "/callback/apple";
       errorRedirect.searchParams.set("error", error.message);
       return new Response(null, {
@@ -114,7 +114,7 @@ Deno.serve(async (req) => {
     }
 
     // Redirect back to the frontend with tokens in the hash
-    const baseUrl = redirectUri.startsWith("http") ? redirectUri : `https://speed-guide-pro.lovable.app`;
+    const baseUrl = redirectUri.startsWith("http") ? redirectUri : `https://pacecalculator.fun`;
     const successRedirect = new URL("/callback/apple", baseUrl);
     const hashParams = new URLSearchParams({
       access_token: data.session?.access_token || "",
@@ -135,7 +135,7 @@ Deno.serve(async (req) => {
     return new Response(null, {
       status: 302,
       headers: {
-        Location: `https://speed-guide-pro.lovable.app/callback/apple?error=internal_error`,
+        Location: `https://pacecalculator.fun/callback/apple?error=internal_error`,
       },
     });
   }

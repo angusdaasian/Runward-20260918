@@ -31,9 +31,10 @@ const MyProgress = ({ lang }: Props) => {
       if (data) setProfile(data);
 
       const { data: rw } = await supabase
-        .from("season_rewards")
+        .from("reward_codes")
         .select("*")
         .eq("user_id", user.id)
+        .eq("is_assigned", true)
         .order("created_at", { ascending: false })
         .limit(5);
       if (rw) setRewards(rw);

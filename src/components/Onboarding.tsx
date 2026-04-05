@@ -61,7 +61,7 @@ function getImprovementPct(score: number): number {
 
 // Steps: 0=first-time?, 1=name, 2=welcome-anim, 3=gender, 4=age, 5=run-freq,
 //        6=estimated-time, 7=before-after, 8=email, 9=password, 10=want-plan
-type OnboardingStep = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11;
+type OnboardingStep = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12;
 
 const OnboardingBgWrapper = ({ children, showOverlay = true }: { children: ReactNode; showOverlay?: boolean }) => (
   <div className="relative min-h-screen flex flex-col">
@@ -225,6 +225,14 @@ const Onboarding = ({
   useEffect(() => {
     if (user && !isSignInMode) {
       const signupInProgress = sessionStorage.getItem(ONBOARDING_SIGNUP_IN_PROGRESS_KEY) === "true";
+      // If on step 12 (email verification) and user just confirmed, advance to profile save flow
+      if (step === 12) {
+        setOnboardingUserId(user.id);
+        setSignupInProgress(true);
+        setIsAccountCreationInFlight(true);
+        setStep(11);
+        return;
+      }
       if (signupInProgress || isAccountCreationInFlight || (step >= 8 && step <= 11) || !!onboardingUserId) return;
 
       if (localStorage.getItem("onboarding_show_plan_prompt") === "true") {
@@ -313,6 +321,18 @@ const Onboarding = ({
       setSaving(false);
       setIsAccountCreationInFlight(false);
       setStep(9);
+      return;
+    }
+
+    // If email confirmation is required, session will be null
+    if (authData.user && !authData.session) {
+      setSignupInProgress(false);
+      setSaving(false);
+      setIsAccountCreationInFlight(false);
+      setOnboardingUserId(authData.user.id);
+      localStorage.setItem("onboarding_show_plan_prompt", "true");
+      saveOnboardingDataToStorage();
+      setStep(12); // Show "check your email" screen
       return;
     }
 
@@ -907,6 +927,31 @@ const Onboarding = ({
         </div>
         <p className={`text-red-400 text-sm text-center ${password && confirmPassword && password !== confirmPassword ? "visible" : "invisible"}`}>{t("passwordsDoNotMatch", lang)}</p>
         <p className={`text-red-400 text-sm text-center ${password && password.length > 0 && password.length < 6 ? "visible" : "invisible"}`}>{t("passwordMinLength", lang)}</p>
+      </div>
+
+      {/* Step 12: Email verification */}
+      <div hidden={step !== 12} className="space-y-6">
+        <div className="flex flex-col items-center justify-center min-h-[300px]">
+          <Mail size={48} className="text-white mb-6" />
+          <h2 className="text-2xl font-bold text-white text-center">
+            {lang === "zh" ? "請驗證你的電子郵件" : "Check your email"}
+          </h2>
+          <p className="text-sm text-white/60 text-center mt-3 max-w-xs">
+            {lang === "zh"
+              ? `我們已發送驗證連結到 ${email}。請點擊連結以完成註冊。`
+              : `We've sent a verification link to ${email}. Please click the link to complete your signup.`}
+          </p>
+          <Button
+            onClick={() => {
+              supabase.auth.resend({ type: "signup", email, options: { emailRedirectTo: window.location.origin } });
+              toast({ title: lang === "zh" ? "已重新發送" : "Resent", description: lang === "zh" ? "驗證信已重新寄出" : "Verification email resent" });
+            }}
+            variant="outline"
+            className="mt-6 rounded-xl border-white/30 text-white bg-white/10 hover:bg-white/20"
+          >
+            {lang === "zh" ? "重新發送驗證信" : "Resend verification email"}
+          </Button>
+        </div>
       </div>
 
       {/* Step 11: Creating account loading */}

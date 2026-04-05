@@ -102,6 +102,9 @@ const RewardsTab = ({ lang }: Props) => {
         {/* Leaderboards */}
         <LeaderboardTabs lang={lang} />
 
+        {/* XP System Explanation */}
+        <XpExplainer lang={lang} />
+
         {!user && (
           <div className="text-center py-8">
             <p className="text-sm text-muted-foreground">

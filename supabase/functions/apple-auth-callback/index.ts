@@ -135,7 +135,7 @@ Deno.serve(async (req) => {
     return new Response(null, {
       status: 302,
       headers: {
-        Location: `https://speed-guide-pro.lovable.app/callback/apple?error=internal_error`,
+        Location: `https://pacecalculator.fun/callback/apple?error=internal_error`,
       },
     });
   }

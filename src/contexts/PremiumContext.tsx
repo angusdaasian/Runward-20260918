@@ -106,34 +106,31 @@ export const PremiumProvider = ({ children }: { children: ReactNode }) => {
   const activatePremium = async (planType: "monthly" | "yearly" | "code_annual"): Promise<boolean> => {
     if (!user) return false;
     setLoading(true);
-    const now = new Date();
-    const expires = new Date(now);
-    if (planType === "monthly") {
-      expires.setMonth(expires.getMonth() + 1);
-    } else {
-      expires.setFullYear(expires.getFullYear() + 1);
-    }
 
-    const { error } = await supabase.from("premium_subscriptions").upsert(
-      {
-        user_id: user.id,
-        plan: planType,
-        activated_at: now.toISOString(),
-        expires_at: expires.toISOString(),
-      },
-      { onConflict: "user_id" }
-    );
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+      if (!token) { setLoading(false); return false; }
 
-    setLoading(false);
-    if (!error) {
-      setIsPremium(true);
-      setExpiresAt(expires);
-      setPlan(planType);
-      setRcEntitlement("premium");
-      notifyPurchaseListeners();
-      return true;
+      const { data, error } = await supabase.functions.invoke("activate-subscription", {
+        headers: { Authorization: `Bearer ${token}` },
+        body: { plan: planType },
+      });
+
+      setLoading(false);
+      if (!error && data?.success) {
+        setIsPremium(true);
+        setExpiresAt(new Date(data.expires_at));
+        setPlan(planType);
+        setRcEntitlement("premium");
+        notifyPurchaseListeners();
+        return true;
+      }
+      return false;
+    } catch {
+      setLoading(false);
+      return false;
     }
-    return false;
   };
 
   return (

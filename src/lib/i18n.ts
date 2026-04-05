@@ -291,6 +291,15 @@ const translations = {
     onboardingCreatingAccount: "建立帳戶中...",
     onboardingWelcomeBack: "歡迎回來！",
     onboardingSignInDesc: "登入你的帳戶",
+    forgotPassword: "忘記密碼？",
+    resetPassword: "重設密碼",
+    resetPasswordDesc: "輸入你的電郵，我們會發送驗證碼給你。",
+    sendResetCode: "發送重設驗證碼",
+    resetCodeSent: "請查看你的電郵以獲取6位數驗證碼。",
+    newPassword: "新密碼",
+    confirmNewPassword: "確認新密碼",
+    resetPasswordSuccess: "密碼重設成功！你現在可以登入了。",
+    enterResetCode: "輸入6位數驗證碼",
   },
 } as const;
 

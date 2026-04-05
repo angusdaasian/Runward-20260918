@@ -322,9 +322,11 @@ const Landing = () => {
       {/* ─── Footer ─── */}
       <footer className="px-6 py-8 border-t border-border">
         <div className="max-w-4xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-muted-foreground">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             <img src={appIcon} alt="" className="h-5 w-5 rounded" />
             <span>© {new Date().getFullYear()} {isZh ? "向前跑" : "Runward"}. {isZh ? "保留所有權利。" : "All rights reserved."}</span>
+            <span className="text-border">|</span>
+            <img src={poweredByStrava} alt="Powered by Strava" className="h-5" />
           </div>
           <div className="flex gap-6">
             <Link to="/privacy" state={{ from: currentRoute }} className="hover:text-foreground transition-colors">
@@ -336,11 +338,6 @@ const Landing = () => {
           </div>
         </div>
       </footer>
-
-      {/* ─── Powered by Strava ─── */}
-      <div className="flex justify-center py-4 bg-background">
-        <img src={poweredByStrava} alt="Powered by Strava" className="h-8 opacity-60" />
-      </div>
     </div>
   );
 };

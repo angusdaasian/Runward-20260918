@@ -38,6 +38,7 @@ const Landing = () => {
         ? "自動同步你的跑步記錄，查看每次活動的詳細配速、心率及海拔圖表。"
         : "Auto-sync your runs with Strava. View detailed pace, heart rate, and elevation charts for every activity.",
       color: "from-orange-500 to-red-500",
+      comingSoon: true,
     },
     {
       icon: Target,
@@ -54,6 +55,7 @@ const Landing = () => {
         ? "追蹤你的訓練分數，查看訓練負荷趨勢，每次跑步後獲得 AI 分析。"
         : "Track your Training Score, view training load trends, and receive AI-powered workout analysis after every run.",
       color: "from-emerald-500 to-green-500",
+      comingSoon: true,
     },
     {
       icon: Camera,
@@ -89,8 +91,8 @@ const Landing = () => {
     },
     {
       step: "02",
-      title: isZh ? "連結 Strava" : "Connect Strava",
-      desc: isZh ? "一鍵同步你所有跑步記錄" : "Sync all your running activities in one tap",
+      title: isZh ? "設定個人資料" : "Set Up Your Profile",
+      desc: isZh ? "輸入你的跑步資料，讓 AI 了解你的水平" : "Enter your running data so AI understands your level",
     },
     {
       step: "03",
@@ -207,8 +209,13 @@ const Landing = () => {
             {features.map((f, i) => (
               <div
                 key={i}
-                className="group relative p-6 rounded-2xl bg-card border border-border hover:border-primary/30 shadow-sm hover:shadow-lg transition-all duration-300"
+                className={`group relative p-6 rounded-2xl bg-card border border-border hover:border-primary/30 shadow-sm hover:shadow-lg transition-all duration-300 ${f.comingSoon ? "opacity-75" : ""}`}
               >
+                {f.comingSoon && (
+                  <span className="absolute top-4 right-4 px-2 py-0.5 rounded-full bg-muted text-muted-foreground text-[10px] font-semibold uppercase tracking-wide">
+                    {isZh ? "即將推出" : "Coming Soon"}
+                  </span>
+                )}
                 <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${f.color} flex items-center justify-center mb-4 shadow-sm group-hover:scale-110 transition-transform duration-300`}>
                   <f.icon size={22} className="text-white" />
                 </div>

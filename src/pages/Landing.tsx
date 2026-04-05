@@ -33,10 +33,10 @@ const Landing = () => {
   const features = [
     {
       icon: Activity,
-      title: isZh ? "Strava 整合" : "Strava Integration",
+      title: isZh ? "健身應用整合" : "Fitness App Integration",
       desc: isZh
-        ? "自動同步你的跑步記錄，查看每次活動的詳細配速、心率及海拔圖表。"
-        : "Auto-sync your runs with Strava. View detailed pace, heart rate, and elevation charts for every activity.",
+        ? "連結 Strava 及 Apple Health，自動同步跑步記錄，查看詳細配速、心率及海拔圖表。"
+        : "Connect Strava & Apple Health to auto-sync your runs. View detailed pace, heart rate, and elevation charts.",
       color: "from-orange-500 to-red-500",
       comingSoon: true,
     },
@@ -156,8 +156,8 @@ const Landing = () => {
 
           <p className={`mt-5 text-lg md:text-xl text-muted-foreground leading-relaxed max-w-2xl mx-auto transition-all duration-700 delay-200 ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}>
             {isZh
-              ? "Strava 同步、AI 訓練計劃、跑姿分析、跑步計算器 — 跑得更聰明，盡在一個應用。"
-              : "Strava sync, AI training plans, posture analysis, running calculator — run smarter, all in one app."}
+              ? "健身應用同步、AI 訓練計劃、跑姿分析、跑步計算器 — 跑得更聰明，盡在一個應用。"
+              : "Fitness app sync, AI training plans, posture analysis, running calculator — run smarter, all in one app."}
           </p>
 
           <div className={`mt-8 flex flex-col sm:flex-row items-center justify-center gap-4 transition-all duration-700 delay-300 ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}>
@@ -176,7 +176,7 @@ const Landing = () => {
         <div className="max-w-5xl mx-auto grid grid-cols-3 divide-x divide-border">
           {[
             { icon: Heart, value: isZh ? "AI 教練" : "AI Coach", label: isZh ? "個人化訓練" : "Personalized" },
-            { icon: Activity, value: "Strava", label: isZh ? "自動同步" : "Auto Sync" },
+            { icon: Activity, value: isZh ? "健身同步" : "Fitness Sync", label: isZh ? "即將推出" : "Coming Soon" },
             { icon: Star, value: isZh ? "免費" : "Free", label: isZh ? "基礎功能" : "Core Features" },
           ].map((stat, i) => (
             <div key={i} className="flex flex-col items-center py-6 px-4 text-center">

@@ -344,8 +344,14 @@ export type Database = {
           avatar_url: string | null
           created_at: string
           display_name: string | null
+          division: string
           id: string
+          is_premium: boolean
+          last_login: string | null
+          lifetime_xp: number
+          monthly_xp: number
           onboarding_completed: boolean
+          rank_tier: string
           runs_per_week: number | null
           sex: string | null
           training_score: number | null
@@ -358,8 +364,14 @@ export type Database = {
           avatar_url?: string | null
           created_at?: string
           display_name?: string | null
+          division?: string
           id?: string
+          is_premium?: boolean
+          last_login?: string | null
+          lifetime_xp?: number
+          monthly_xp?: number
           onboarding_completed?: boolean
+          rank_tier?: string
           runs_per_week?: number | null
           sex?: string | null
           training_score?: number | null
@@ -372,8 +384,14 @@ export type Database = {
           avatar_url?: string | null
           created_at?: string
           display_name?: string | null
+          division?: string
           id?: string
+          is_premium?: boolean
+          last_login?: string | null
+          lifetime_xp?: number
+          monthly_xp?: number
           onboarding_completed?: boolean
+          rank_tier?: string
           runs_per_week?: number | null
           sex?: string | null
           training_score?: number | null
@@ -425,6 +443,33 @@ export type Database = {
           source?: string | null
           updated_at?: string
           website_url?: string | null
+        }
+        Relationships: []
+      }
+      season_rewards: {
+        Row: {
+          claimed_at: string | null
+          created_at: string
+          id: string
+          month_year: string
+          promo_code: string
+          user_id: string
+        }
+        Insert: {
+          claimed_at?: string | null
+          created_at?: string
+          id?: string
+          month_year: string
+          promo_code: string
+          user_id: string
+        }
+        Update: {
+          claimed_at?: string | null
+          created_at?: string
+          id?: string
+          month_year?: string
+          promo_code?: string
+          user_id?: string
         }
         Relationships: []
       }
@@ -613,7 +658,39 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      leaderboard_view: {
+        Row: {
+          avatar_url: string | null
+          display_name: string | null
+          division: string | null
+          is_premium: boolean | null
+          lifetime_xp: number | null
+          monthly_xp: number | null
+          rank_tier: string | null
+          user_id: string | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          display_name?: string | null
+          division?: string | null
+          is_premium?: boolean | null
+          lifetime_xp?: number | null
+          monthly_xp?: number | null
+          rank_tier?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          avatar_url?: string | null
+          display_name?: string | null
+          division?: string | null
+          is_premium?: boolean | null
+          lifetime_xp?: number | null
+          monthly_xp?: number | null
+          rank_tier?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       get_posture_averages: {

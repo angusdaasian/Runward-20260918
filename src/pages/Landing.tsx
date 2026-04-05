@@ -91,8 +91,8 @@ const Landing = () => {
     },
     {
       step: "02",
-      title: isZh ? "連結 Strava" : "Connect Strava",
-      desc: isZh ? "一鍵同步你所有跑步記錄" : "Sync all your running activities in one tap",
+      title: isZh ? "設定個人資料" : "Set Up Your Profile",
+      desc: isZh ? "輸入你的跑步資料，讓 AI 了解你的水平" : "Enter your running data so AI understands your level",
     },
     {
       step: "03",

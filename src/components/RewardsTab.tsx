@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Lang } from "@/lib/i18n";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
-import { getRankFromXP, getSeasonCountdown } from "@/lib/ranks";
+import { getRankFromXP } from "@/lib/ranks";
 import FadeIn from "@/components/ui/FadeIn";
 import HeroSection from "@/components/rewards/HeroSection";
 import DailyCheckIn from "@/components/rewards/DailyCheckIn";
@@ -10,6 +10,7 @@ import ClaimRewards from "@/components/rewards/ClaimRewards";
 import LeaderboardTabs from "@/components/rewards/LeaderboardTabs";
 import RankUpOverlay from "@/components/rewards/RankUpOverlay";
 import XpExplainer from "@/components/rewards/XpExplainer";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import type { RankTier } from "@/lib/ranks";
 
 interface Props {
@@ -77,7 +78,7 @@ const RewardsTab = ({ lang }: Props) => {
   return (
     <>
       <FadeIn className="px-5 pt-4 max-w-lg mx-auto pb-24 space-y-5">
-        {/* Hero — Rank Emblem + Progress */}
+        {/* Hero — always visible */}
         <HeroSection
           lang={lang}
           monthlyXp={profile?.monthly_xp ?? 0}
@@ -85,33 +86,42 @@ const RewardsTab = ({ lang }: Props) => {
           rankInfo={rankInfo}
         />
 
-        {/* Daily Check-in */}
-        {user && (
-          <DailyCheckIn
-            lang={lang}
-            userId={user.id}
-            lastLogin={profile?.last_login ?? null}
-            currentXp={profile?.monthly_xp ?? 0}
-            onXpGain={handleXpGain}
-          />
-        )}
+        {/* Sub-tabs: Rewards | Leaderboards */}
+        <Tabs defaultValue="rewards" className="w-full">
+          <TabsList className="w-full grid grid-cols-2">
+            <TabsTrigger value="rewards">
+              {lang === "zh" ? "獎勵" : "Rewards"}
+            </TabsTrigger>
+            <TabsTrigger value="leaderboards">
+              {lang === "zh" ? "排行榜" : "Leaderboards"}
+            </TabsTrigger>
+          </TabsList>
 
-        {/* Claim Rewards */}
-        {user && <ClaimRewards lang={lang} userId={user.id} />}
+          <TabsContent value="rewards" className="space-y-5 mt-4">
+            {user && (
+              <DailyCheckIn
+                lang={lang}
+                userId={user.id}
+                lastLogin={profile?.last_login ?? null}
+                currentXp={profile?.monthly_xp ?? 0}
+                onXpGain={handleXpGain}
+              />
+            )}
+            {user && <ClaimRewards lang={lang} userId={user.id} />}
+            <XpExplainer lang={lang} />
+            {!user && (
+              <div className="text-center py-8">
+                <p className="text-sm text-muted-foreground">
+                  {lang === "zh" ? "請登入以參與排名賽季" : "Sign in to join the Ranked Season"}
+                </p>
+              </div>
+            )}
+          </TabsContent>
 
-        {/* Leaderboards */}
-        <LeaderboardTabs lang={lang} />
-
-        {/* XP System Explanation */}
-        <XpExplainer lang={lang} />
-
-        {!user && (
-          <div className="text-center py-8">
-            <p className="text-sm text-muted-foreground">
-              {lang === "zh" ? "請登入以參與排名賽季" : "Sign in to join the Ranked Season"}
-            </p>
-          </div>
-        )}
+          <TabsContent value="leaderboards" className="mt-4">
+            <LeaderboardTabs lang={lang} />
+          </TabsContent>
+        </Tabs>
       </FadeIn>
 
       <RankUpOverlay

@@ -1,4 +1,4 @@
-project_id = "lytxngfhbspbezqfflmu"
+project_id = "kbghvclwhxnjeskdodeh"
 
 [functions.strava-webhook]
 verify_jwt = false

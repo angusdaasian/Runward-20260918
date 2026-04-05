@@ -1,14 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 
-function generatePromoCode(): string {
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  let code = "RW-";
-  for (let i = 0; i < 8; i++) {
-    code += chars[Math.floor(Math.random() * chars.length)];
-  }
-  return code;
-}
-
 Deno.serve(async (req) => {
   try {
     const supabase = createClient(
@@ -39,31 +30,42 @@ Deno.serve(async (req) => {
       .limit(3);
 
     const winners = [...(premiumTop || []), ...(freeTop || [])];
+    let codesAssigned = 0;
 
-    // Generate promo codes for winners
-    const rewards = winners.map((w) => ({
-      user_id: w.user_id,
-      month_year: monthYear,
-      promo_code: generatePromoCode(),
-    }));
+    // Assign available reward codes to winners
+    for (const winner of winners) {
+      // Find an unassigned code
+      const { data: availableCode } = await supabase
+        .from("reward_codes")
+        .select("id")
+        .eq("is_assigned", false)
+        .eq("type", "premium_win")
+        .limit(1)
+        .single();
 
-    if (rewards.length > 0) {
-      const { error: insertErr } = await supabase
-        .from("season_rewards")
-        .upsert(rewards, { onConflict: "user_id,month_year" });
-      if (insertErr) console.error("Insert rewards error:", insertErr);
+      if (!availableCode) break; // No more codes available
+
+      await supabase
+        .from("reward_codes")
+        .update({
+          is_assigned: true,
+          user_id: winner.user_id,
+          month_year: monthYear,
+          assigned_at: new Date().toISOString(),
+        })
+        .eq("id", availableCode.id);
+
+      codesAssigned++;
     }
 
-    // Reset all monthly_xp to 0 and update rank tiers
-    const { error: resetErr } = await supabase
+    // Reset all monthly_xp to 0 and reset ranks
+    await supabase
       .from("profiles")
       .update({ monthly_xp: 0, rank_tier: "Bronze", division: "V" })
-      .gt("monthly_xp", -1); // update all
-
-    if (resetErr) console.error("Reset error:", resetErr);
+      .gt("monthly_xp", -1);
 
     return new Response(
-      JSON.stringify({ success: true, rewards_given: rewards.length, month: monthYear }),
+      JSON.stringify({ success: true, codes_assigned: codesAssigned, month: monthYear }),
       { headers: { "Content-Type": "application/json" } }
     );
   } catch (err) {

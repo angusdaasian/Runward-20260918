@@ -446,30 +446,36 @@ export type Database = {
         }
         Relationships: []
       }
-      season_rewards: {
+      reward_codes: {
         Row: {
-          claimed_at: string | null
+          assigned_at: string | null
+          code_string: string
           created_at: string
           id: string
-          month_year: string
-          promo_code: string
-          user_id: string
+          is_assigned: boolean
+          month_year: string | null
+          type: string
+          user_id: string | null
         }
         Insert: {
-          claimed_at?: string | null
+          assigned_at?: string | null
+          code_string: string
           created_at?: string
           id?: string
-          month_year: string
-          promo_code: string
-          user_id: string
+          is_assigned?: boolean
+          month_year?: string | null
+          type?: string
+          user_id?: string | null
         }
         Update: {
-          claimed_at?: string | null
+          assigned_at?: string | null
+          code_string?: string
           created_at?: string
           id?: string
-          month_year?: string
-          promo_code?: string
-          user_id?: string
+          is_assigned?: boolean
+          month_year?: string | null
+          type?: string
+          user_id?: string | null
         }
         Relationships: []
       }

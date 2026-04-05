@@ -69,8 +69,8 @@ const Landing = () => {
       icon: Calculator,
       title: isZh ? "跑步計算器" : "Running Calculator",
       desc: isZh
-        ? "計算你的 VDOT 跑步分數、訓練配速、等效比賽時間。"
-        : "Calculate your VDOT Running Score, training paces, and equivalent race times across all distances.",
+        ? "計算你的跑步分數、訓練配速、等效比賽時間。"
+        : "Calculate your Running Score, training paces, and equivalent race times across all distances.",
       color: "from-cyan-500 to-teal-500",
     },
     {
@@ -156,8 +156,8 @@ const Landing = () => {
 
           <p className={`mt-5 text-lg md:text-xl text-muted-foreground leading-relaxed max-w-2xl mx-auto transition-all duration-700 delay-200 ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}>
             {isZh
-              ? "Strava 同步、AI 訓練計劃、跑姿分析、VDOT 計算器 — 跑得更聰明，盡在一個應用。"
-              : "Strava sync, AI training plans, posture analysis, VDOT calculator — run smarter, all in one app."}
+              ? "Strava 同步、AI 訓練計劃、跑姿分析、跑步計算器 — 跑得更聰明，盡在一個應用。"
+              : "Strava sync, AI training plans, posture analysis, running calculator — run smarter, all in one app."}
           </p>
 
           <div className={`mt-8 flex flex-col sm:flex-row items-center justify-center gap-4 transition-all duration-700 delay-300 ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}>

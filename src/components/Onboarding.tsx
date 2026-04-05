@@ -61,7 +61,7 @@ function getImprovementPct(score: number): number {
 
 // Steps: 0=first-time?, 1=name, 2=welcome-anim, 3=gender, 4=age, 5=run-freq,
 //        6=estimated-time, 7=before-after, 8=email, 9=password, 10=want-plan
-type OnboardingStep = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11;
+type OnboardingStep = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12;
 
 const OnboardingBgWrapper = ({ children, showOverlay = true }: { children: ReactNode; showOverlay?: boolean }) => (
   <div className="relative min-h-screen flex flex-col">

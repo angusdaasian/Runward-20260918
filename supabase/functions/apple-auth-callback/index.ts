@@ -114,7 +114,7 @@ Deno.serve(async (req) => {
     }
 
     // Redirect back to the frontend with tokens in the hash
-    const baseUrl = redirectUri.startsWith("http") ? redirectUri : `https://speed-guide-pro.lovable.app`;
+    const baseUrl = redirectUri.startsWith("http") ? redirectUri : `https://pacecalculator.fun`;
     const successRedirect = new URL("/callback/apple", baseUrl);
     const hashParams = new URLSearchParams({
       access_token: data.session?.access_token || "",

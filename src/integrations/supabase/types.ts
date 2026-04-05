@@ -77,6 +77,81 @@ export type Database = {
         }
         Relationships: []
       }
+      apple_health_activities: {
+        Row: {
+          average_heartrate: number | null
+          average_speed: number
+          created_at: string
+          distance: number
+          elapsed_time: number
+          id: string
+          max_heartrate: number | null
+          max_speed: number
+          moving_time: number
+          name: string
+          source: string | null
+          sport_type: string
+          start_date: string
+          total_elevation_gain: number
+          user_id: string
+        }
+        Insert: {
+          average_heartrate?: number | null
+          average_speed?: number
+          created_at?: string
+          distance?: number
+          elapsed_time?: number
+          id?: string
+          max_heartrate?: number | null
+          max_speed?: number
+          moving_time?: number
+          name: string
+          source?: string | null
+          sport_type?: string
+          start_date: string
+          total_elevation_gain?: number
+          user_id: string
+        }
+        Update: {
+          average_heartrate?: number | null
+          average_speed?: number
+          created_at?: string
+          distance?: number
+          elapsed_time?: number
+          id?: string
+          max_heartrate?: number | null
+          max_speed?: number
+          moving_time?: number
+          name?: string
+          source?: string | null
+          sport_type?: string
+          start_date?: string
+          total_elevation_gain?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
+      apple_health_connections: {
+        Row: {
+          created_at: string
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       free_training_plans: {
         Row: {
           created_at: string

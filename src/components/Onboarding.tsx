@@ -303,6 +303,23 @@ const Onboarding = ({
     handleAppleSignIn();
   };
 
+  const handleGoogleSignIn = async () => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: window.location.origin,
+      },
+    });
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    }
+  };
+
+  const handleGoogleSignUp = () => {
+    saveOnboardingDataToStorage();
+    handleGoogleSignIn();
+  };
+
   const handleCreateAccount = async () => {
     if (password.length < 6) {
       toast({ title: "Error", description: t("passwordMinLength", lang), variant: "destructive" });

@@ -45,15 +45,26 @@ Deno.serve(async (req) => {
 
       if (!availableCode) break; // No more codes available
 
-      await supabase
+      // Move code to used_codes table
+      const { data: codeData } = await supabase
         .from("reward_codes")
-        .update({
-          is_assigned: true,
+        .select("*")
+        .eq("id", availableCode.id)
+        .single();
+
+      if (codeData) {
+        await supabase.from("used_codes").insert({
+          original_code_id: codeData.id,
+          code_string: codeData.code_string,
+          type: codeData.type,
           user_id: winner.user_id,
           month_year: monthYear,
           assigned_at: new Date().toISOString(),
-        })
-        .eq("id", availableCode.id);
+        });
+
+        // Remove from reward_codes
+        await supabase.from("reward_codes").delete().eq("id", availableCode.id);
+      }
 
       codesAssigned++;
     }

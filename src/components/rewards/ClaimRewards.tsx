@@ -23,10 +23,9 @@ const ClaimRewards = ({ lang, userId }: Props) => {
   useEffect(() => {
     const fetch = async () => {
       const { data } = await supabase
-        .from("reward_codes")
+        .from("used_codes")
         .select("id, code_string, month_year")
         .eq("user_id", userId)
-        .eq("is_assigned", true)
         .order("created_at", { ascending: false })
         .limit(5);
       if (data) setRewards(data as RewardCode[]);

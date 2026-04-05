@@ -9,6 +9,7 @@ import DailyCheckIn from "@/components/rewards/DailyCheckIn";
 import ClaimRewards from "@/components/rewards/ClaimRewards";
 import LeaderboardTabs from "@/components/rewards/LeaderboardTabs";
 import RankUpOverlay from "@/components/rewards/RankUpOverlay";
+import XpExplainer from "@/components/rewards/XpExplainer";
 import type { RankTier } from "@/lib/ranks";
 
 interface Props {

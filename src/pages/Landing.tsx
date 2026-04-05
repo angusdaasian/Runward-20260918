@@ -336,6 +336,11 @@ const Landing = () => {
           </div>
         </div>
       </footer>
+
+      {/* ─── Powered by Strava ─── */}
+      <div className="flex justify-center py-4 bg-background">
+        <img src={poweredByStrava} alt="Powered by Strava" className="h-8 opacity-60" />
+      </div>
     </div>
   );
 };

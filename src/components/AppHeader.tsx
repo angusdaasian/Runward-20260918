@@ -174,7 +174,28 @@ const AppHeader = ({ lang, onNavigateSettings, isGuest }: AppHeaderProps) => {
               <AvatarImage src={isGuest ? undefined : (profile?.avatar_url || undefined)} />
               <AvatarFallback className="text-lg font-display bg-primary/10 text-primary">{initials}</AvatarFallback>
             </Avatar>
-            <h1 className="font-display text-lg font-bold text-foreground">{name}</h1>
+            <div className="flex flex-col">
+              <h1 className="font-display text-lg font-bold text-foreground leading-tight">{name}</h1>
+              {!isGuest && profile && (() => {
+                const rankInfo = getRankFromXP(profile.monthly_xp ?? 0);
+                const pct = Math.min(100, (rankInfo.xpInCurrentDivision / rankInfo.xpToNextDivision) * 100);
+                const tier = rankInfo.tier;
+                return (
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <img src={RANK_EMBLEMS[tier] || RANK_EMBLEMS.Bronze} alt={tier} className="w-4 h-4 object-contain" />
+                    <span className="text-[10px] font-semibold" style={{ color: getTierColor(tier) }}>
+                      {formatRank(rankInfo.tier, rankInfo.division)}
+                    </span>
+                    <div className="w-16 h-1.5 rounded-full bg-muted overflow-hidden">
+                      <div
+                        className="h-full rounded-full transition-all duration-500"
+                        style={{ width: `${pct}%`, backgroundColor: getTierColor(tier) }}
+                      />
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
           </>
         )}
       </div>

@@ -5,7 +5,7 @@ import { Lang, t } from "@/lib/i18n";
 import appStoreBadge from "@/assets/app-store-badge.png";
 import appIcon from "@/assets/app-icon.png";
 
-const APP_STORE_URL = "https://apps.apple.com/app/id0000000000"; // Replace with real App Store URL
+const APP_STORE_URL = "https://apps.apple.com/us/app/runward/id6761060757";
 
 const Landing = () => {
   const location = useLocation();

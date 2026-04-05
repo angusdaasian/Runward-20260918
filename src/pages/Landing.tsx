@@ -209,8 +209,13 @@ const Landing = () => {
             {features.map((f, i) => (
               <div
                 key={i}
-                className="group relative p-6 rounded-2xl bg-card border border-border hover:border-primary/30 shadow-sm hover:shadow-lg transition-all duration-300"
+                className={`group relative p-6 rounded-2xl bg-card border border-border hover:border-primary/30 shadow-sm hover:shadow-lg transition-all duration-300 ${f.comingSoon ? "opacity-75" : ""}`}
               >
+                {f.comingSoon && (
+                  <span className="absolute top-4 right-4 px-2 py-0.5 rounded-full bg-muted text-muted-foreground text-[10px] font-semibold uppercase tracking-wide">
+                    {isZh ? "即將推出" : "Coming Soon"}
+                  </span>
+                )}
                 <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${f.color} flex items-center justify-center mb-4 shadow-sm group-hover:scale-110 transition-transform duration-300`}>
                   <f.icon size={22} className="text-white" />
                 </div>

@@ -150,6 +150,11 @@ const Onboarding = ({
   const [signInPassword, setSignInPassword] = useState("");
   const [otpCode, setOtpCode] = useState("");
   const [verifyingOtp, setVerifyingOtp] = useState(false);
+  const [forgotPasswordMode, setForgotPasswordMode] = useState<"idle" | "email" | "code" | "newpass">("idle");
+  const [resetEmail, setResetEmail] = useState("");
+  const [resetOtp, setResetOtp] = useState("");
+  const [resetNewPassword, setResetNewPassword] = useState("");
+  const [resetConfirmPassword, setResetConfirmPassword] = useState("");
 
   const setSignupInProgress = (active: boolean) => {
     if (active) {
@@ -396,10 +401,170 @@ const Onboarding = ({
     });
   };
 
+  const handleForgotPasswordSendCode = async () => {
+    if (!resetEmail) return;
+    setSaving(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    setSaving(false);
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+      return;
+    }
+    setForgotPasswordMode("code");
+  };
+
+  const handleResetPasswordVerify = async () => {
+    if (resetNewPassword.length < 6) {
+      toast({ title: "Error", description: t("passwordMinLength", lang), variant: "destructive" });
+      return;
+    }
+    if (resetNewPassword !== resetConfirmPassword) {
+      toast({ title: "Error", description: t("passwordsDoNotMatch", lang), variant: "destructive" });
+      return;
+    }
+    setSaving(true);
+    // Verify OTP to get a session
+    const { error: otpError } = await supabase.auth.verifyOtp({
+      email: resetEmail,
+      token: resetOtp,
+      type: "recovery",
+    });
+    if (otpError) {
+      toast({ title: "Error", description: otpError.message, variant: "destructive" });
+      setSaving(false);
+      return;
+    }
+    // Now update the password
+    const { error: updateError } = await supabase.auth.updateUser({ password: resetNewPassword });
+    setSaving(false);
+    if (updateError) {
+      toast({ title: "Error", description: updateError.message, variant: "destructive" });
+      return;
+    }
+    toast({ title: "✅", description: t("resetPasswordSuccess", lang) });
+    // Sign out so user can sign in fresh
+    await supabase.auth.signOut();
+    setForgotPasswordMode("idle");
+    setResetEmail("");
+    setResetOtp("");
+    setResetNewPassword("");
+    setResetConfirmPassword("");
+  };
+
   const labels = sexLabels(lang);
 
   // ---- SIGN IN MODE ----
   if (isSignInMode) {
+    // Forgot password sub-flow
+    if (forgotPasswordMode !== "idle") {
+      return (
+        <OnboardingBgWrapper>
+          <div className="flex-1 flex flex-col px-6 pt-16 pb-8">
+            <div className="text-center mb-8">
+              <img src={gingrunLogo} alt="RunWard" width={80} height={80} className="mx-auto mb-3" />
+              <h1 className="text-2xl font-bold text-white">{t("resetPassword", lang)}</h1>
+              <p className="text-white/70 text-sm mt-1">
+                {forgotPasswordMode === "email" && t("resetPasswordDesc", lang)}
+                {forgotPasswordMode === "code" && t("resetCodeSent", lang)}
+                {forgotPasswordMode === "newpass" && t("enterResetCode", lang)}
+              </p>
+            </div>
+
+            <div className="space-y-3 max-w-sm mx-auto w-full">
+              {forgotPasswordMode === "email" && (
+                <>
+                  <Input
+                    type="email"
+                    placeholder={t("email", lang)}
+                    value={resetEmail}
+                    onChange={(e) => setResetEmail(e.target.value)}
+                    className="bg-white/10 border-white/20 text-white placeholder:text-white/50"
+                  />
+                  <Button
+                    onClick={handleForgotPasswordSendCode}
+                    disabled={saving || !resetEmail}
+                    className="w-full h-12 rounded-xl bg-white text-black hover:bg-white/90"
+                  >
+                    {saving ? t("onboardingSaving", lang) : t("sendResetCode", lang)}
+                  </Button>
+                </>
+              )}
+
+              {forgotPasswordMode === "code" && (
+                <>
+                  <div className="flex justify-center">
+                    <InputOTP maxLength={6} value={resetOtp} onChange={setResetOtp}>
+                      <InputOTPGroup>
+                        {[0, 1, 2, 3, 4, 5].map((i) => (
+                          <InputOTPSlot key={i} index={i} className="bg-white/10 border-white/20 text-white" />
+                        ))}
+                      </InputOTPGroup>
+                    </InputOTP>
+                  </div>
+                  <Button
+                    onClick={() => setForgotPasswordMode("newpass")}
+                    disabled={resetOtp.length !== 6}
+                    className="w-full h-12 rounded-xl bg-white text-black hover:bg-white/90"
+                  >
+                    {t("onboardingNext", lang)}
+                  </Button>
+                  <button
+                    onClick={handleForgotPasswordSendCode}
+                    className="text-white/70 text-sm hover:text-white transition-colors w-full text-center"
+                  >
+                    {lang === "zh" ? "重新發送驗證碼" : "Resend code"}
+                  </button>
+                </>
+              )}
+
+              {forgotPasswordMode === "newpass" && (
+                <>
+                  <Input
+                    type="password"
+                    placeholder={t("newPassword", lang)}
+                    value={resetNewPassword}
+                    onChange={(e) => setResetNewPassword(e.target.value)}
+                    className="bg-white/10 border-white/20 text-white placeholder:text-white/50"
+                  />
+                  <Input
+                    type="password"
+                    placeholder={t("confirmNewPassword", lang)}
+                    value={resetConfirmPassword}
+                    onChange={(e) => setResetConfirmPassword(e.target.value)}
+                    className="bg-white/10 border-white/20 text-white placeholder:text-white/50"
+                  />
+                  <Button
+                    onClick={handleResetPasswordVerify}
+                    disabled={saving || resetNewPassword.length < 6}
+                    className="w-full h-12 rounded-xl bg-white text-black hover:bg-white/90"
+                  >
+                    {saving ? t("onboardingSaving", lang) : t("resetPassword", lang)}
+                  </Button>
+                </>
+              )}
+            </div>
+
+            <div className="mt-6 text-center">
+              <button
+                onClick={() => {
+                  setForgotPasswordMode("idle");
+                  setResetOtp("");
+                  setResetNewPassword("");
+                  setResetConfirmPassword("");
+                }}
+                className="text-white/70 text-sm hover:text-white transition-colors"
+              >
+                <ChevronLeft size={14} className="inline mr-1" />
+                {t("onboardingBack", lang)}
+              </button>
+            </div>
+          </div>
+        </OnboardingBgWrapper>
+      );
+    }
+
     return (
       <OnboardingBgWrapper>
         <div className="flex-1 flex flex-col px-6 pt-16 pb-8">
@@ -458,6 +623,19 @@ const Onboarding = ({
               onChange={(e) => setSignInPassword(e.target.value)}
               className="bg-white/10 border-white/20 text-white placeholder:text-white/50"
             />
+
+            <div className="text-right">
+              <button
+                onClick={() => {
+                  setForgotPasswordMode("email");
+                  setResetEmail(signInEmail);
+                }}
+                className="text-white/70 text-xs hover:text-white transition-colors"
+              >
+                {t("forgotPassword", lang)}
+              </button>
+            </div>
+
             <Button
               onClick={handleSignIn}
               disabled={saving || !signInEmail || !signInPassword}

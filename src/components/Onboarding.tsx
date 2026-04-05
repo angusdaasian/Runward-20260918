@@ -6,7 +6,8 @@ import { useDespiaPurchases } from "@/hooks/use-despia-purchases";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Mail, Eye, EyeOff, Ticket } from "lucide-react";
+import { ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Mail, Eye, EyeOff, Ticket, ShieldCheck } from "lucide-react";
+import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { Lang, t } from "@/lib/i18n";
 import { calculateRunningScore, predictTime, formatTime } from "@/lib/vdot";
 import gingrunLogo from "@/assets/gingrun-logo.png";
@@ -147,6 +148,8 @@ const Onboarding = ({
   // Sign-in mode fields
   const [signInEmail, setSignInEmail] = useState("");
   const [signInPassword, setSignInPassword] = useState("");
+  const [otpCode, setOtpCode] = useState("");
+  const [verifyingOtp, setVerifyingOtp] = useState(false);
 
   const setSignupInProgress = (active: boolean) => {
     if (active) {
@@ -929,28 +932,68 @@ const Onboarding = ({
         <p className={`text-red-400 text-sm text-center ${password && password.length > 0 && password.length < 6 ? "visible" : "invisible"}`}>{t("passwordMinLength", lang)}</p>
       </div>
 
-      {/* Step 12: Email verification */}
+      {/* Step 12: Email OTP verification */}
       <div hidden={step !== 12} className="space-y-6">
         <div className="flex flex-col items-center justify-center min-h-[300px]">
-          <Mail size={48} className="text-white mb-6" />
+          <ShieldCheck size={48} className="text-white mb-6" />
           <h2 className="text-2xl font-bold text-white text-center">
-            {lang === "zh" ? "請驗證你的電子郵件" : "Check your email"}
+            {lang === "zh" ? "輸入驗證碼" : "Enter verification code"}
           </h2>
           <p className="text-sm text-white/60 text-center mt-3 max-w-xs">
             {lang === "zh"
-              ? `我們已發送驗證連結到 ${email}。請點擊連結以完成註冊。`
-              : `We've sent a verification link to ${email}. Please click the link to complete your signup.`}
+              ? `我們已發送 6 位數驗證碼到 ${email}`
+              : `We've sent a 6-digit code to ${email}`}
           </p>
+          <div className="mt-6">
+            <InputOTP maxLength={6} value={otpCode} onChange={setOtpCode}>
+              <InputOTPGroup>
+                <InputOTPSlot index={0} className="bg-white/10 border-white/30 text-white text-lg" />
+                <InputOTPSlot index={1} className="bg-white/10 border-white/30 text-white text-lg" />
+                <InputOTPSlot index={2} className="bg-white/10 border-white/30 text-white text-lg" />
+                <InputOTPSlot index={3} className="bg-white/10 border-white/30 text-white text-lg" />
+                <InputOTPSlot index={4} className="bg-white/10 border-white/30 text-white text-lg" />
+                <InputOTPSlot index={5} className="bg-white/10 border-white/30 text-white text-lg" />
+              </InputOTPGroup>
+            </InputOTP>
+          </div>
           <Button
-            onClick={() => {
-              supabase.auth.resend({ type: "signup", email, options: { emailRedirectTo: window.location.origin } });
-              toast({ title: lang === "zh" ? "已重新發送" : "Resent", description: lang === "zh" ? "驗證信已重新寄出" : "Verification email resent" });
+            onClick={async () => {
+              if (otpCode.length !== 6) return;
+              setVerifyingOtp(true);
+              const { data, error } = await supabase.auth.verifyOtp({
+                email,
+                token: otpCode,
+                type: "signup",
+              });
+              setVerifyingOtp(false);
+              if (error) {
+                toast({ title: "Error", description: error.message, variant: "destructive" });
+                setOtpCode("");
+                return;
+              }
+              if (data.user) {
+                setOnboardingUserId(data.user.id);
+                setSignupInProgress(true);
+                setIsAccountCreationInFlight(true);
+                setStep(11);
+              }
             }}
-            variant="outline"
-            className="mt-6 rounded-xl border-white/30 text-white bg-white/10 hover:bg-white/20"
+            disabled={otpCode.length !== 6 || verifyingOtp}
+            className="mt-4 w-full max-w-[250px] h-12 rounded-xl bg-white text-black hover:bg-white/90 font-semibold"
           >
-            {lang === "zh" ? "重新發送驗證信" : "Resend verification email"}
+            {verifyingOtp
+              ? (lang === "zh" ? "驗證中..." : "Verifying...")
+              : (lang === "zh" ? "驗證" : "Verify")}
           </Button>
+          <button
+            onClick={() => {
+              supabase.auth.resend({ type: "signup", email });
+              toast({ title: lang === "zh" ? "已重新發送" : "Resent", description: lang === "zh" ? "驗證碼已重新寄出" : "Verification code resent" });
+            }}
+            className="mt-3 text-sm text-white/50 hover:text-white transition-colors"
+          >
+            {lang === "zh" ? "重新發送驗證碼" : "Resend code"}
+          </button>
         </div>
       </div>
 

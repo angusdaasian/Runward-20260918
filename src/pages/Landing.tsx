@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import {
   Activity, BarChart3, Zap, Target, Globe, Timer, Trophy,
   Users, ChevronRight, Smartphone, Star, TrendingUp, Camera,
-  MapPin, Calculator, Heart, CheckCircle2
+  MapPin, Calculator, Heart, CheckCircle2, Award, Flame
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { Lang, t } from "@/lib/i18n";

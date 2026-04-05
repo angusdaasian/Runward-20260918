@@ -132,7 +132,7 @@ const MyProgress = ({ lang }: Props) => {
               <div key={r.id} className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">{r.month_year}</span>
                 <code className="bg-muted px-2 py-0.5 rounded text-xs font-mono">
-                  {r.promo_code}
+                  {r.code_string}
                 </code>
               </div>
             ))}

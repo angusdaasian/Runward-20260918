@@ -145,7 +145,8 @@ const AppHeader = ({ lang, onNavigateSettings, isGuest }: AppHeaderProps) => {
     return () => clearInterval(interval);
   }, [user]);
 
-  const name = profile?.display_name || (lang === "zh" ? "跑者" : "Runner");
+  const guestName = lang === "zh" ? "訪客" : "Guest";
+  const name = isGuest ? guestName : (profile?.display_name || (lang === "zh" ? "跑者" : "Runner"));
   const initials = name[0].toUpperCase();
 
   return (

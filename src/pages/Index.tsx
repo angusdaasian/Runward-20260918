@@ -158,7 +158,7 @@ const Index = () => {
     { id: "activities", icon: Activity, labelKey: "activities" },
     { id: "training", icon: Dumbbell, labelKey: "training" },
     { id: "races", icon: Trophy, labelKey: "races" },
-    { id: "community", icon: Users, labelKey: "community" },
+    { id: "community", icon: Award, labelKey: "community" },
     { id: "posture", icon: ScanEye, labelKey: "posture" },
   ];
 

@@ -72,7 +72,7 @@ const HeroSection = ({ lang, monthlyXp, lifetimeXp, rankInfo }: Props) => {
             <span>{formatRank(tier, division)}</span>
             <span>{rankInfo?.xpInCurrentDivision ?? 0} / {rankInfo?.xpToNextDivision ?? 2000}</span>
           </div>
-          <div className="h-2.5 bg-white/5 rounded-full overflow-hidden">
+          <div className="h-2.5 bg-muted rounded-full overflow-hidden">
             <div
               className="h-full rounded-full transition-all duration-700 ease-out relative"
               style={{

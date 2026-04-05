@@ -148,6 +148,8 @@ const Onboarding = ({
   // Sign-in mode fields
   const [signInEmail, setSignInEmail] = useState("");
   const [signInPassword, setSignInPassword] = useState("");
+  const [otpCode, setOtpCode] = useState("");
+  const [verifyingOtp, setVerifyingOtp] = useState(false);
 
   const setSignupInProgress = (active: boolean) => {
     if (active) {

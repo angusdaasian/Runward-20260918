@@ -17,7 +17,7 @@ const shatterVariants = {
     scale: 1,
     opacity: 1,
     filter: "blur(0px)",
-    transition: { type: "spring", stiffness: 150, damping: 12, delay: 0.2 },
+    transition: { type: "spring" as const, stiffness: 150, damping: 12, delay: 0.2 },
   },
   exit: {
     scale: 0.5,

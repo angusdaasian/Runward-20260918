@@ -229,7 +229,7 @@ const Index = () => {
         )}
         {activeTab === "community" && (
           <Suspense fallback={<CommunitySkeleton />}>
-            <CommunityTab lang={lang} />
+            <RewardsTab lang={lang} />
           </Suspense>
         )}
       </div>

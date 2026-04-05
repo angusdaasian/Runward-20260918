@@ -176,7 +176,7 @@ const Landing = () => {
         <div className="max-w-5xl mx-auto grid grid-cols-3 divide-x divide-border">
           {[
             { icon: Heart, value: isZh ? "AI 教練" : "AI Coach", label: isZh ? "個人化訓練" : "Personalized" },
-            { icon: Activity, value: "Strava", label: isZh ? "自動同步" : "Auto Sync" },
+            { icon: Activity, value: isZh ? "健身同步" : "Fitness Sync", label: isZh ? "即將推出" : "Coming Soon" },
             { icon: Star, value: isZh ? "免費" : "Free", label: isZh ? "基礎功能" : "Core Features" },
           ].map((stat, i) => (
             <div key={i} className="flex flex-col items-center py-6 px-4 text-center">

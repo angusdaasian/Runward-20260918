@@ -316,6 +316,18 @@ const Onboarding = ({
       return;
     }
 
+    // If email confirmation is required, session will be null
+    if (authData.user && !authData.session) {
+      setSignupInProgress(false);
+      setSaving(false);
+      setIsAccountCreationInFlight(false);
+      setOnboardingUserId(authData.user.id);
+      localStorage.setItem("onboarding_show_plan_prompt", "true");
+      saveOnboardingDataToStorage();
+      setStep(12); // Show "check your email" screen
+      return;
+    }
+
     if (authData.user) {
       setOnboardingUserId(authData.user.id);
       localStorage.setItem("onboarding_show_plan_prompt", "true");

@@ -326,7 +326,7 @@ const Landing = () => {
             <img src={appIcon} alt="" className="h-5 w-5 rounded" />
             <span>© {new Date().getFullYear()} {isZh ? "向前跑" : "Runward"}. {isZh ? "保留所有權利。" : "All rights reserved."}</span>
             <span className="text-border">|</span>
-            <img src={poweredByStrava} alt="Powered by Strava" className="h-5 rounded-sm bg-white px-1" />
+            <img src={poweredByStrava} alt="Powered by Strava" className="h-5 rounded-sm px-1" style={{ backgroundColor: '#F7F7F7' }} />
           </div>
           <div className="flex gap-6">
             <Link to="/privacy" state={{ from: currentRoute }} className="hover:text-foreground transition-colors">

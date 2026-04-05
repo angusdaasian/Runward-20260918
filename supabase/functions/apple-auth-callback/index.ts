@@ -60,7 +60,7 @@ Deno.serve(async (req) => {
 
     if (!id_token) {
       console.error("[apple-auth-callback] Missing id_token");
-      const errorRedirect = new URL(redirectUri.startsWith("http") ? redirectUri : `https://speed-guide-pro.lovable.app${redirectUri}`);
+      const errorRedirect = new URL(redirectUri.startsWith("http") ? redirectUri : `https://pacecalculator.fun${redirectUri}`);
       errorRedirect.pathname = "/callback/apple";
       errorRedirect.searchParams.set("error", "missing_id_token");
       return new Response(null, {

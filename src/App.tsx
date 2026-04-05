@@ -3,23 +3,39 @@ import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { PremiumProvider } from "@/contexts/PremiumContext";
+import { AuthProvider } from "@/contexts/AuthContext";
+import { isNativeApp } from "@/lib/nativeDetection";
 import Index from "./pages/Index.tsx";
 import NotFound from "./pages/NotFound.tsx";
+import AdminPanel from "./pages/AdminPanel.tsx";
+import AppleCallback from "./pages/AppleCallback.tsx";
+import Support from "./pages/Support.tsx";
+import Privacy from "./pages/Privacy.tsx";
+import Landing from "./pages/Landing.tsx";
 
 const queryClient = new QueryClient();
+const native = isNativeApp();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Index />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
+      <AuthProvider>
+        <PremiumProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <Routes>
+              <Route path="/" element={native ? <Index /> : <Landing />} />
+              <Route path="/callback/apple" element={<AppleCallback />} />
+              <Route path="/admin" element={<AdminPanel />} />
+              <Route path="/support" element={<Support />} />
+              <Route path="/privacy" element={<Privacy />} />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </BrowserRouter>
+        </PremiumProvider>
+      </AuthProvider>
     </TooltipProvider>
   </QueryClientProvider>
 );

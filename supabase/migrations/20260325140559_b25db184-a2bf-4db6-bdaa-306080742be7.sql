@@ -1,0 +1,1 @@
+ALTER TABLE public.premium_subscriptions ADD COLUMN rc_entitlement text NOT NULL DEFAULT 'premium';

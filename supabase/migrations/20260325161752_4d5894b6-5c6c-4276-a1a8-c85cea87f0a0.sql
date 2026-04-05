@@ -1,0 +1,1 @@
+ALTER TABLE public.premium_subscriptions DROP CONSTRAINT IF EXISTS premium_subscriptions_plan_check;

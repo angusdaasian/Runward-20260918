@@ -1,0 +1,7 @@
+project_id = "lytxngfhbspbezqfflmu"
+
+[functions.strava-webhook]
+verify_jwt = false
+
+[functions.scrape-races]
+verify_jwt = false

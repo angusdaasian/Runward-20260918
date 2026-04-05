@@ -1,0 +1,1 @@
+ALTER TABLE public.announcements ADD COLUMN title_zh text, ADD COLUMN message_zh text;

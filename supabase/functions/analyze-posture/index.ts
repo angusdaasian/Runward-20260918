@@ -1,0 +1,194 @@
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+};
+
+serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+
+  try {
+    const { frames, lang, translate, existingResult } = await req.json();
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+
+    const isZh = lang === "zh";
+
+    // --- Translation mode ---
+    if (translate && existingResult) {
+      const targetLang = isZh ? "Traditional Chinese (Hong Kong)" : "English";
+      const translatePrompt = `Translate the following running posture analysis result into ${targetLang}. Keep the exact same JSON structure, only translate the text fields (feedback, strengths, improvements, summary). Do NOT change any numeric scores. Respond with JSON ONLY, no other text.
+
+${JSON.stringify(existingResult)}`;
+
+      const tlResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "google/gemini-3-flash-preview",
+          messages: [
+            { role: "user", content: translatePrompt },
+          ],
+        }),
+      });
+
+      if (!tlResp.ok) {
+        const t = await tlResp.text();
+        console.error("Translation error:", tlResp.status, t);
+        return new Response(JSON.stringify({ error: "Translation failed" }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const tlData = await tlResp.json();
+      const tlContent = tlData.choices?.[0]?.message?.content || "";
+      let tlParsed;
+      try {
+        tlParsed = JSON.parse(tlContent.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim());
+      } catch {
+        console.error("Failed to parse translation:", tlContent);
+        return new Response(JSON.stringify({ error: "Failed to parse translation" }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      return new Response(JSON.stringify(tlParsed), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // --- Analysis mode ---
+    if (!frames || !Array.isArray(frames) || frames.length === 0) {
+      return new Response(JSON.stringify({ error: "No frames provided" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const systemPrompt = isZh
+      ? `你是一位專業的跑步姿勢分析教練。分析提供的跑步影片截圖，評估跑步姿勢。
+
+你必須以 **JSON 格式** 回覆，格式如下（不要包含其他文字，只回傳 JSON）：
+
+{
+  "overall_score": <1-100的數字>,
+  "sections": {
+    "head": { "score": <1-100>, "feedback": "頭部姿勢分析..." },
+    "shoulder": { "score": <1-100>, "feedback": "肩膀姿勢分析..." },
+    "upper_limb": { "score": <1-100>, "feedback": "上肢擺動分析..." },
+    "torso": { "score": <1-100>, "feedback": "軀幹姿勢分析..." },
+    "lower_limb": { "score": <1-100>, "feedback": "下肢著地分析..." }
+  },
+  "strengths": ["優點1", "優點2"],
+  "improvements": ["改善建議1", "改善建議2"],
+  "summary": "整體摘要文字..."
+}
+
+請用繁體中文撰寫 feedback、strengths、improvements 和 summary。分數要根據實際姿勢客觀評估。`
+      : `You are an expert running posture analysis coach. Analyze the provided video frames of a runner's form and evaluate their running posture.
+
+You MUST respond in **JSON format only** (no other text, just the JSON):
+
+{
+  "overall_score": <number 1-100>,
+  "sections": {
+    "head": { "score": <1-100>, "feedback": "Head position analysis..." },
+    "shoulder": { "score": <1-100>, "feedback": "Shoulder analysis..." },
+    "upper_limb": { "score": <1-100>, "feedback": "Arm swing analysis..." },
+    "torso": { "score": <1-100>, "feedback": "Torso posture analysis..." },
+    "lower_limb": { "score": <1-100>, "feedback": "Foot strike and leg analysis..." }
+  },
+  "strengths": ["strength 1", "strength 2"],
+  "improvements": ["improvement 1", "improvement 2"],
+  "summary": "Overall summary text..."
+}
+
+Scores should be objective based on actual posture observed. Be specific in feedback.`;
+
+    const imageContent = frames.map((frame: string) => ({
+      type: "image_url",
+      image_url: { url: frame },
+    }));
+
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-3-flash-preview",
+        messages: [
+          { role: "system", content: systemPrompt },
+          {
+            role: "user",
+            content: [
+              { type: "text", text: isZh ? "請分析這些跑步姿勢截圖並以 JSON 格式回覆：" : "Analyze these running form frames and respond in JSON format:" },
+              ...imageContent,
+            ],
+          },
+        ],
+      }),
+    });
+
+    if (!response.ok) {
+      if (response.status === 429) {
+        return new Response(JSON.stringify({ error: isZh ? "請求過於頻繁，請稍後再試" : "Rate limited, please try again later." }), {
+          status: 429,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      if (response.status === 402) {
+        return new Response(JSON.stringify({ error: isZh ? "額度不足，請充值" : "Payment required, please add credits." }), {
+          status: 402,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const t = await response.text();
+      console.error("AI gateway error:", response.status, t);
+      return new Response(JSON.stringify({ error: "AI gateway error" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const data = await response.json();
+    const content = data.choices?.[0]?.message?.content || "";
+    
+    let parsed;
+    try {
+      const jsonMatch = content.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+      parsed = JSON.parse(jsonMatch);
+    } catch {
+      console.error("Failed to parse AI JSON response:", content);
+      parsed = {
+        overall_score: 0,
+        sections: {
+          head: { score: 0, feedback: content },
+          shoulder: { score: 0, feedback: "" },
+          upper_limb: { score: 0, feedback: "" },
+          torso: { score: 0, feedback: "" },
+          lower_limb: { score: 0, feedback: "" },
+        },
+        strengths: [],
+        improvements: [],
+        summary: content,
+      };
+    }
+    return new Response(JSON.stringify(parsed), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  } catch (e) {
+    console.error("posture analysis error:", e);
+    return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+});

@@ -1,0 +1,386 @@
+import { ChevronRight, Crown, Globe, BookOpen, Check, ScanEye, Lock, KeyRound, Clock, Shield, Info, LifeBuoy, Mail, ShieldCheck, Smartphone, Moon, Sun, LogOut, Gift, Ticket } from "lucide-react";
+import { Lang, t } from "@/lib/i18n";
+import { useState, useEffect } from "react";
+import { SettingsSkeleton } from "@/components/ui/PageSkeleton";
+import { usePremium } from "@/contexts/PremiumContext";
+import { useAuth } from "@/contexts/AuthContext";
+import { useLocation, useNavigate } from "react-router-dom";
+import ProfileSection from "@/components/ProfileSection";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { useDespiaPurchases } from "@/hooks/use-despia-purchases";
+
+interface Props {
+  lang: Lang;
+  setLang: (l: Lang) => void;
+  onLoginRequest?: () => void;
+  onNavigateConnectApps?: () => void;
+}
+
+const definitions = [
+  { nameKey: "Easy" as const, nameZhKey: "輕鬆跑", defKey: "easyDef" as const },
+  { nameKey: "Marathon" as const, nameZhKey: "馬拉松配速", defKey: "marathonDef" as const },
+  { nameKey: "Threshold" as const, nameZhKey: "乳酸閾值", defKey: "thresholdDef" as const },
+  { nameKey: "Interval" as const, nameZhKey: "間歇訓練", defKey: "intervalDef" as const },
+  { nameKey: "Repetition" as const, nameZhKey: "重複訓練", defKey: "repetitionDef" as const },
+];
+
+function formatCountdown(expiresAt: Date): string {
+  const now = new Date();
+  const diff = expiresAt.getTime() - now.getTime();
+  if (diff <= 0) return "Expired";
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+  const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+  if (days > 0) return `${days}d ${hours}h`;
+  const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+  return `${hours}h ${mins}m`;
+}
+
+const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps }: Props) => {
+  // Mandatory skeleton on every mount
+  const [skeletonDone, setSkeletonDone] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => setSkeletonDone(true), 400);
+    return () => clearTimeout(timer);
+  }, []);
+
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [showDefs, setShowDefs] = useState(false);
+  const { isPremium, expiresAt, plan, rcEntitlement } = usePremium();
+  const { user, signOut } = useAuth();
+  const { launchPaywall, redeemOfferCode } = useDespiaPurchases();
+
+  const [showLoginPrompt, setShowLoginPrompt] = useState(false);
+  const [showRedeemDialog, setShowRedeemDialog] = useState(false);
+  const [offerCode, setOfferCode] = useState("");
+  const [countdown, setCountdown] = useState("");
+  const { refreshSubscription } = usePremium();
+  const currentRoute = `${location.pathname}${location.search}`;
+  const [darkMode, setDarkMode] = useState(() => {
+    return localStorage.getItem("app_theme") === "dark" || document.documentElement.classList.contains("dark");
+  });
+
+  useEffect(() => {
+    if (darkMode) {
+      document.documentElement.classList.add("dark");
+      localStorage.setItem("app_theme", "dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+      localStorage.setItem("app_theme", "light");
+    }
+  }, [darkMode]);
+
+  // Update countdown every minute
+  useEffect(() => {
+    if (!isPremium || !expiresAt) return;
+    setCountdown(formatCountdown(expiresAt));
+    const interval = setInterval(() => {
+      setCountdown(formatCountdown(expiresAt));
+    }, 60000);
+    return () => clearInterval(interval);
+  }, [isPremium, expiresAt]);
+
+  const handleUpgradeClick = () => {
+    if (!user) {
+      setShowLoginPrompt(true);
+    } else {
+      launchPaywall("default", lang === "zh" ? "zh_Hant" : "en");
+    }
+  };
+
+
+
+
+  if (!skeletonDone) return <SettingsSkeleton />;
+
+  return (
+    <div className="px-5 pt-2 max-w-lg mx-auto">
+      <div className="space-y-3">
+        {user && <ProfileSection lang={lang} />}
+
+        {/* Dark Mode - right after profile/sign-in */}
+        <div className="bg-card border border-border rounded-xl p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              {darkMode ? <Moon size={20} className="text-primary" /> : <Sun size={20} className="text-primary" />}
+              <span className="font-medium text-foreground">{lang === "zh" ? "深色模式" : "Dark Mode"}</span>
+            </div>
+            <button
+              onClick={() => setDarkMode(!darkMode)}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${darkMode ? "bg-primary" : "bg-input"}`}
+            >
+              <span className={`inline-block h-5 w-5 rounded-full bg-background shadow-lg transition-transform ${darkMode ? "translate-x-5" : "translate-x-0.5"}`} />
+            </button>
+          </div>
+        </div>
+
+        {!user && (
+          <button
+            onClick={onLoginRequest}
+            className="w-full bg-card border border-border rounded-xl p-4 flex items-center gap-3 text-primary"
+          >
+            <KeyRound size={20} />
+            <span className="font-medium">{lang === "zh" ? "登入 / 註冊" : "Sign In / Sign Up"}</span>
+          </button>
+        )}
+
+        {/* Training Definitions */}
+        <button
+          onClick={() => setShowDefs(!showDefs)}
+          className="w-full bg-card border border-border rounded-xl p-4 flex items-center justify-between"
+        >
+          <div className="flex items-center gap-3">
+            <BookOpen size={20} className="text-primary" />
+            <span className="font-medium text-foreground">{t("trainingDefinitions", lang)}</span>
+          </div>
+          <ChevronRight size={18} className={`text-muted-foreground transition-transform ${showDefs ? "rotate-90" : ""}`} />
+        </button>
+
+        {showDefs && (
+          <div className="space-y-2 pl-2">
+            {definitions.map((def) => (
+              <div key={def.nameKey} className="bg-accent rounded-lg p-3">
+                <h3 className="font-display font-semibold text-sm text-foreground mb-1">
+                  {lang === "zh" ? def.nameZhKey : def.nameKey}
+                </h3>
+                <p className="text-xs text-muted-foreground leading-relaxed">{t(def.defKey, lang)}</p>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Premium */}
+        <div className="bg-card border border-border rounded-xl p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Crown size={20} className="text-warning" />
+              <div>
+                <span className="font-medium text-foreground block">{t("upgradePremium", lang)}</span>
+                <span className="text-xs text-muted-foreground flex items-center gap-1">
+                  <ScanEye size={12} />
+                  {t("unlockPosture", lang)}
+                </span>
+              </div>
+            </div>
+            {isPremium ? (
+              <div className="text-right">
+                <span className="bg-success/15 text-success px-3 py-1 rounded-lg text-xs font-semibold flex items-center gap-1">
+                  <Check size={12} />
+                  {(() => {
+                    const isLifetime = expiresAt && (expiresAt.getFullYear() - new Date().getFullYear()) > 50;
+                    if (isLifetime || plan?.includes("lifetime") || plan === "NON_RENEWING_PURCHASE")
+                      return lang === "zh" ? "終身" : "Lifetime";
+                    if (plan === "monthly" || plan?.includes("monthly"))
+                      return lang === "zh" ? "月費" : "Monthly";
+                    if (plan === "code_annual")
+                      return lang === "zh" ? "年費（代碼）" : "Annual (Code)";
+                    return lang === "zh" ? "年費" : "Yearly";
+                  })()}
+                </span>
+                {expiresAt && (expiresAt.getFullYear() - new Date().getFullYear()) <= 50 && (
+                  <span className="text-[10px] text-muted-foreground flex items-center gap-1 mt-1 justify-end">
+                    <Clock size={10} />
+                    {countdown}
+                  </span>
+                )}
+              </div>
+            ) : (
+              <button
+                onClick={handleUpgradeClick}
+                className="bg-primary text-primary-foreground px-4 py-1.5 rounded-lg text-sm font-semibold"
+              >
+                {t("upgrade", lang)}
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Current Entitlement */}
+        {isPremium && rcEntitlement && (
+          <div className="bg-card border border-border rounded-xl p-4">
+            <div className="flex items-center gap-3 mb-2">
+              <Shield size={20} className="text-primary" />
+              <span className="font-medium text-foreground">
+                {lang === "zh" ? "當前權益" : "Current Entitlement"}
+              </span>
+            </div>
+            <div className="bg-accent rounded-lg p-3 space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-muted-foreground">{lang === "zh" ? "權益" : "Entitlement"}</span>
+                <span className="text-sm font-semibold text-foreground capitalize">{rcEntitlement}</span>
+              </div>
+              {plan && (
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-muted-foreground">{lang === "zh" ? "方案" : "Plan"}</span>
+                  <span className="text-sm text-foreground">
+                    {plan.includes("monthly") ? (lang === "zh" ? "月費" : "Monthly")
+                      : plan === "code_annual" ? (lang === "zh" ? "年費（代碼）" : "Annual (Code)")
+                      : plan.includes("annual") || plan.includes("yearly") ? (lang === "zh" ? "年費" : "Annual")
+                      : plan.includes("lifetime") ? (lang === "zh" ? "終身" : "Lifetime")
+                      : plan}
+                  </span>
+                </div>
+              )}
+              {expiresAt && (
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-muted-foreground">{lang === "zh" ? "到期" : "Expires"}</span>
+                  <span className="text-sm text-foreground">{expiresAt.toLocaleDateString()}</span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Redeem Offer Code */}
+        {user && !isPremium && (
+          <button
+            onClick={() => setShowRedeemDialog(true)}
+            className="w-full bg-card border border-border rounded-xl p-4 flex items-center justify-between"
+          >
+            <div className="flex items-center gap-3">
+              <Ticket size={20} className="text-primary" />
+              <span className="font-medium text-foreground">
+                {lang === "zh" ? "兌換優惠代碼" : "Redeem Offer Code"}
+              </span>
+            </div>
+            <ChevronRight size={18} className="text-muted-foreground" />
+          </button>
+        )}
+        {/* Language */}
+        <div className="bg-card border border-border rounded-xl p-4">
+          <div className="flex items-center gap-3 mb-3">
+            <Globe size={20} className="text-primary" />
+            <span className="font-medium text-foreground">{t("language", lang)}</span>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setLang("en")}
+              className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${lang === "en" ? "bg-primary text-primary-foreground" : "bg-accent text-foreground"}`}
+            >
+              {t("english", lang)}
+            </button>
+            <button
+              onClick={() => setLang("zh")}
+              className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${lang === "zh" ? "bg-primary text-primary-foreground" : "bg-accent text-foreground"}`}
+            >
+              {t("chinese", lang)}
+            </button>
+          </div>
+        </div>
+        {/* Connect to Fitness Apps */}
+        {user && (
+          <button
+            onClick={onNavigateConnectApps}
+            className="w-full bg-card border border-border rounded-xl p-4 flex items-center justify-between"
+          >
+            <div className="flex items-center gap-3">
+              <Smartphone size={20} className="text-primary" />
+              <span className="font-medium text-foreground">{t("connectFitnessApps", lang)}</span>
+            </div>
+            <ChevronRight size={18} className="text-muted-foreground" />
+          </button>
+        )}
+
+        {/* About Us */}
+        <button
+          onClick={() => navigate("/support", { state: { from: currentRoute } })}
+          className="w-full bg-card border border-border rounded-xl p-4 flex items-center justify-between"
+        >
+          <div className="flex items-center gap-3">
+            <LifeBuoy size={20} className="text-primary" />
+            <span className="font-medium text-foreground">{lang === "zh" ? "支援與幫助" : "Support"}</span>
+          </div>
+          <ChevronRight size={18} className="text-muted-foreground" />
+        </button>
+
+        {/* Privacy Policy */}
+        <button
+          onClick={() => navigate("/privacy", { state: { from: currentRoute } })}
+          className="w-full bg-card border border-border rounded-xl p-4 flex items-center justify-between"
+        >
+          <div className="flex items-center gap-3">
+            <ShieldCheck size={20} className="text-primary" />
+            <span className="font-medium text-foreground">{lang === "zh" ? "隱私權政策" : "Privacy Policy"}</span>
+          </div>
+          <ChevronRight size={18} className="text-muted-foreground" />
+        </button>
+
+        {/* Sign Out - at the very bottom */}
+        {user && (
+          <button
+            onClick={signOut}
+            className="w-full bg-card border border-border rounded-xl p-4 flex items-center gap-3 text-destructive mt-4"
+          >
+            <LogOut size={20} />
+            <span className="font-medium">{lang === "zh" ? "登出" : "Sign Out"}</span>
+          </button>
+        )}
+      </div>
+
+      {/* Login Prompt Dialog */}
+      <Dialog open={showLoginPrompt} onOpenChange={setShowLoginPrompt}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Lock size={18} />
+              {lang === "zh" ? "需要登入" : "Login Required"}
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            {lang === "zh" ? "請先登入或註冊以升級至高級版。" : "Please sign in or create an account to upgrade to Premium."}
+          </p>
+          <Button onClick={() => { setShowLoginPrompt(false); onLoginRequest?.(); }} className="w-full">
+            {lang === "zh" ? "登入 / 註冊" : "Sign In / Sign Up"}
+          </Button>
+        </DialogContent>
+      </Dialog>
+
+      {/* Redeem Offer Code Dialog */}
+      <Dialog open={showRedeemDialog} onOpenChange={(open) => { setShowRedeemDialog(open); if (!open) setOfferCode(""); }}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Ticket size={18} />
+              {lang === "zh" ? "輸入優惠代碼" : "Enter Offer Code"}
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            {lang === "zh"
+              ? "輸入您的優惠代碼，我們將引導您前往 App Store 完成兌換。"
+              : "Enter your offer code and we'll take you to the App Store to complete redemption."}
+          </p>
+          <Input
+            value={offerCode}
+            onChange={(e) => setOfferCode(e.target.value.toUpperCase())}
+            placeholder={lang === "zh" ? "輸入代碼" : "Enter code"}
+            className="text-center text-lg tracking-widest font-mono"
+            autoFocus
+          />
+          <Button
+            onClick={() => {
+              if (offerCode.trim()) {
+                redeemOfferCode(offerCode.trim(), lang);
+                setShowRedeemDialog(false);
+                setOfferCode("");
+              }
+            }}
+            disabled={!offerCode.trim()}
+            className="w-full"
+          >
+            {lang === "zh" ? "兌換" : "Redeem"}
+          </Button>
+        </DialogContent>
+      </Dialog>
+
+    </div>
+  );
+};
+
+export default MoreTab;

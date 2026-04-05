@@ -27,7 +27,7 @@ const HeroSection = ({ lang, monthlyXp, lifetimeXp, rankInfo }: Props) => {
   }, []);
 
   return (
-    <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#0c0c1d] to-[#1a1a2e] border border-white/5 p-5">
+    <div className="relative overflow-hidden rounded-2xl bg-card border border-border p-5">
       {/* Shimmer effect for Diamond */}
       {isDiamond && (
         <div className="absolute inset-0 pointer-events-none overflow-hidden">

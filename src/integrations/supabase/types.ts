@@ -644,6 +644,42 @@ export type Database = {
         }
         Relationships: []
       }
+      used_codes: {
+        Row: {
+          assigned_at: string | null
+          code_string: string
+          created_at: string
+          id: string
+          month_year: string | null
+          original_code_id: string | null
+          type: string
+          used_at: string
+          user_id: string
+        }
+        Insert: {
+          assigned_at?: string | null
+          code_string: string
+          created_at?: string
+          id?: string
+          month_year?: string | null
+          original_code_id?: string | null
+          type?: string
+          used_at?: string
+          user_id: string
+        }
+        Update: {
+          assigned_at?: string | null
+          code_string?: string
+          created_at?: string
+          id?: string
+          month_year?: string | null
+          original_code_id?: string | null
+          type?: string
+          used_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           id: string

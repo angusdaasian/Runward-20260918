@@ -609,6 +609,15 @@ const Onboarding = ({
             <p className="text-white/70 text-sm mt-1">{t("onboardingSignInDesc", lang)}</p>
           </div>
 
+          {/* Migration notice */}
+          <div className="max-w-sm mx-auto w-full mb-4 p-3 rounded-xl bg-amber-500/15 border border-amber-500/30 text-center">
+            <p className="text-amber-200 text-xs leading-relaxed">
+              {lang === "zh"
+                ? "⚠️ 我們已遷移至新伺服器。如果你是現有用戶，請使用「忘記密碼」重設密碼，或重新註冊帳號。"
+                : "⚠️ We've migrated to a new server. If you're a returning user, please use \"Forgot Password\" to reset your password, or re-register your account."}
+            </p>
+          </div>
+
           <div className="space-y-3 max-w-sm mx-auto w-full">
             <button
               onClick={handleAppleSignIn}

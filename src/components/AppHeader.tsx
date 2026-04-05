@@ -7,19 +7,23 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Skeleton } from "@/components/ui/skeleton";
 
+import { getRankFromXP, formatRank, getTierColor, type RankTier } from "@/lib/ranks";
+import { RANK_EMBLEMS } from "@/lib/rankEmblems";
+import { Progress } from "@/components/ui/progress";
+
 // Module-level cache — survives across remounts/tab switches
-let _headerProfile: { display_name: string | null; avatar_url: string | null } | null = null;
+let _headerProfile: { display_name: string | null; avatar_url: string | null; monthly_xp: number; rank_tier: string; division: string } | null = null;
 let _headerUserId: string | null = null;
 let _fetchPromise: Promise<void> | null = null;
 
 /** Eagerly fetch profile into cache. Call as early as possible (e.g. when user is known). */
 export function preloadHeaderProfile(userId: string) {
-  if (_headerUserId === userId && _headerProfile) return; // already cached
-  if (_fetchPromise) return; // already in flight
+  if (_headerUserId === userId && _headerProfile) return;
+  if (_fetchPromise) return;
   _fetchPromise = Promise.resolve(
     supabase
       .from("profiles")
-      .select("display_name, avatar_url")
+      .select("display_name, avatar_url, monthly_xp, rank_tier, division")
       .eq("user_id", userId)
       .single()
   ).then(({ data }) => {

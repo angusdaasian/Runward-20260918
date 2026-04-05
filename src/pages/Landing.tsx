@@ -214,8 +214,27 @@ const Landing = () => {
             </p>
           </div>
 
+          {/* Featured card — Ranked Seasons */}
+          {(() => {
+            const featured = features[2]; // Ranked Seasons & Rewards
+            return (
+              <div className="group relative p-8 md:p-10 rounded-2xl bg-gradient-to-br from-amber-500/10 via-card to-card border border-amber-500/20 hover:border-amber-500/40 shadow-sm hover:shadow-xl transition-all duration-300 mb-8">
+                <div className="grid md:grid-cols-[auto_1fr] gap-6 items-center">
+                  <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${featured.color} flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300`}>
+                    <featured.icon size={28} className="text-white" />
+                  </div>
+                  <div>
+                    <h3 className="font-display text-xl font-bold mb-2">{featured.title}</h3>
+                    <p className="text-sm text-muted-foreground leading-relaxed max-w-2xl">{featured.desc}</p>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Remaining 6 features in a clean 3×2 grid */}
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {features.map((f, i) => (
+            {features.filter((_, i) => i !== 2).map((f, i) => (
               <div
                 key={i}
                 className={`group relative p-6 rounded-2xl bg-card border border-border hover:border-primary/30 shadow-sm hover:shadow-lg transition-all duration-300 ${f.comingSoon ? "opacity-75" : ""}`}

@@ -1,5 +1,5 @@
 import { useState, useEffect, lazy, Suspense } from "react";
-import { Activity, Dumbbell, Loader2, ScanEye, Shield, Users, Trophy } from "lucide-react";
+import { Activity, Dumbbell, Loader2, ScanEye, Shield, Award, Trophy } from "lucide-react";
 import { Lang, t } from "@/lib/i18n";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAdmin } from "@/hooks/use-admin";

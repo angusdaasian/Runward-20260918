@@ -152,12 +152,12 @@ const AppHeader = ({ lang, onNavigateSettings, isGuest }: AppHeaderProps) => {
   return (
     <div className="flex items-center justify-between px-5 pt-4 pb-2 w-full max-w-lg mx-auto">
       <div className="flex items-center gap-3">
-        {!profile ? (
+        {!isGuest && !profile ? (
           <>
             <Skeleton className="h-12 w-12 rounded-full" />
             <Skeleton className="h-5 w-24" />
           </>
-        ) : (
+        ) : isGuest ? (
           <>
             <Avatar className="h-12 w-12">
               <AvatarImage src={profile.avatar_url || undefined} />

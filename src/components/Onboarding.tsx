@@ -277,9 +277,8 @@ const Onboarding = ({
   };
 
   const handleAppleSignIn = () => {
-    const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
     const redirectUri = window.location.origin;
-    const startUrl = `https://${projectId}.supabase.co/functions/v1/apple-auth-start?redirect_uri=${encodeURIComponent(redirectUri)}`;
+    const startUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/apple-auth-start?redirect_uri=${encodeURIComponent(redirectUri)}`;
     window.location.href = startUrl;
   };
 

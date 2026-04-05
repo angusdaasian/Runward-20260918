@@ -21,7 +21,7 @@ const XpExplainer = ({ lang }: Props) => {
     },
     {
       icon: <Activity size={14} className="text-emerald-500" />,
-      label: isZh ? "運動同步（Strava/Garmin）" : "Activity Sync (Strava/Garmin)",
+      label: isZh ? "運動同步（Strava/Garmin/Coros）(即將推出)" : "Activity Sync (Strava/Garmin/Coros)(Coming Soon)",
       value: isZh ? "(公里×10)+(分鐘×5)" : "(km×10)+(min×5)",
     },
     {
@@ -40,18 +40,14 @@ const XpExplainer = ({ lang }: Props) => {
     <div className="rounded-xl border border-border bg-card/50 p-4">
       <div className="flex items-center gap-2 mb-3">
         <Info size={14} className="text-muted-foreground" />
-        <h3 className="text-xs font-bold text-foreground">
-          {isZh ? "XP 系統說明" : "How XP Works"}
-        </h3>
+        <h3 className="text-xs font-bold text-foreground">{isZh ? "XP 系統說明" : "How XP Works"}</h3>
       </div>
       <div className="space-y-2">
         {items.map((item, i) => (
           <div key={i} className="flex items-center gap-2.5 text-xs">
             {item.icon}
             <span className="text-muted-foreground flex-1">{item.label}</span>
-            {item.value && (
-              <span className="font-bold text-foreground">{item.value}</span>
-            )}
+            {item.value && <span className="font-bold text-foreground">{item.value}</span>}
           </div>
         ))}
       </div>

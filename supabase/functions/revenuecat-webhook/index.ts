@@ -30,7 +30,7 @@ const LOG_ONLY_EVENTS = [
   "INVOICE_ISSUANCE",
 ];
 
-const WEBHOOK_AUTH_KEY = "Acka090215!";
+const WEBHOOK_AUTH_KEY = Deno.env.get("WEBHOOK_AUTH_KEY");
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {

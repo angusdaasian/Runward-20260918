@@ -27,7 +27,7 @@ const HeroSection = ({ lang, monthlyXp, lifetimeXp, rankInfo }: Props) => {
   }, []);
 
   return (
-    <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#0c0c1d] to-[#1a1a2e] border border-white/5 p-5">
+    <div className="relative overflow-hidden rounded-2xl bg-card border border-border p-5">
       {/* Shimmer effect for Diamond */}
       {isDiamond && (
         <div className="absolute inset-0 pointer-events-none overflow-hidden">
@@ -72,7 +72,7 @@ const HeroSection = ({ lang, monthlyXp, lifetimeXp, rankInfo }: Props) => {
             <span>{formatRank(tier, division)}</span>
             <span>{rankInfo?.xpInCurrentDivision ?? 0} / {rankInfo?.xpToNextDivision ?? 2000}</span>
           </div>
-          <div className="h-2.5 bg-white/5 rounded-full overflow-hidden">
+          <div className="h-2.5 bg-muted rounded-full overflow-hidden">
             <div
               className="h-full rounded-full transition-all duration-700 ease-out relative"
               style={{

@@ -278,7 +278,7 @@ const Landing = () => {
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-primary text-primary-foreground font-semibold hover:bg-primary/90 transition-colors"
                 >
-                  {isZh ? "開始免費試用" : "Start Free Trial"}
+                  {isZh ? "下載應用，立即體驗進階版" : "Get the App & Try Premium"}
                   <ChevronRight size={16} />
                 </a>
               </div>

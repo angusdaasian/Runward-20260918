@@ -97,6 +97,30 @@ async function computeTrainingScore(supabase: any, userId: string, env: string) 
   return avgScore;
 }
 
+async function awardActivityXP(supabase: any, userId: string, distanceMeters: number, movingTimeSeconds: number) {
+  const km = distanceMeters / 1000;
+  const minutes = movingTimeSeconds / 60;
+  const xp = Math.round(km * 10) + Math.round(minutes * 5);
+  if (xp <= 0) return;
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('monthly_xp, lifetime_xp')
+    .eq('user_id', userId)
+    .single();
+
+  if (profile) {
+    await supabase
+      .from('profiles')
+      .update({
+        monthly_xp: profile.monthly_xp + xp,
+        lifetime_xp: profile.lifetime_xp + xp,
+      })
+      .eq('user_id', userId);
+    console.log(`Awarded ${xp} XP to user ${userId} (${km.toFixed(1)}km, ${minutes.toFixed(0)}min)`);
+  }
+}
+
 async function syncActivityById(
   supabase: any,
   accessToken: string,
@@ -115,6 +139,13 @@ async function syncActivityById(
   }
 
   const act = await res.json();
+
+  // Check if activity already exists (avoid double XP on updates)
+  const { data: existing } = await supabase
+    .from('strava_activities')
+    .select('id')
+    .eq('strava_id', act.id)
+    .single();
 
   await supabase
     .from('strava_activities')
@@ -135,6 +166,11 @@ async function syncActivityById(
       summary_polyline: act.map?.summary_polyline || null,
       environment: env,
     }, { onConflict: 'strava_id' });
+
+  // Award XP only for new activities (not updates)
+  if (!existing) {
+    await awardActivityXP(supabase, userId, act.distance || 0, act.moving_time || 0);
+  }
 
   await computeTrainingScore(supabase, userId, env);
 }

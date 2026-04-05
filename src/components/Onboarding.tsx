@@ -944,6 +944,7 @@ const Onboarding = ({
             {lang === "zh" ? "重新發送驗證信" : "Resend verification email"}
           </Button>
         </div>
+      </div>
 
       {/* Step 11: Creating account loading */}
       <div hidden={step !== 11} className="space-y-6">

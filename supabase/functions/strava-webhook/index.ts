@@ -121,6 +121,66 @@ async function awardActivityXP(supabase: any, userId: string, distanceMeters: nu
   }
 }
 
+async function sendActivityNotification(
+  supabase: any,
+  userId: string,
+  distanceMeters: number,
+  movingTimeSeconds: number,
+  xpGained: number,
+  trainingScore: number
+) {
+  try {
+    // Check if user has notifications enabled
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('activity_notifications')
+      .eq('user_id', userId)
+      .single();
+
+    if (!profile?.activity_notifications) {
+      console.log(`Notifications disabled for user ${userId}, skipping`);
+      return;
+    }
+
+    const onesignalAppId = Deno.env.get("ONESIGNAL_APP_ID");
+    const onesignalApiKey = Deno.env.get("ONESIGNAL_REST_API_KEY");
+    if (!onesignalAppId || !onesignalApiKey) {
+      console.log("OneSignal not configured, skipping notification");
+      return;
+    }
+
+    const km = (distanceMeters / 1000).toFixed(2);
+    const totalMin = Math.floor(movingTimeSeconds / 60);
+    const hours = Math.floor(totalMin / 60);
+    const mins = totalMin % 60;
+    const secs = movingTimeSeconds % 60;
+    const timeStr = hours > 0
+      ? `${hours}h${String(mins).padStart(2, '0')}m${String(secs).padStart(2, '0')}s`
+      : `${mins}m${String(secs).padStart(2, '0')}s`;
+
+    const message = `You ran ${km}km in ${timeStr}. You earned ${xpGained} XP! Your Training Score: ${trainingScore}.`;
+
+    const res = await fetch("https://onesignal.com/api/v1/notifications", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Basic ${onesignalApiKey}`,
+      },
+      body: JSON.stringify({
+        app_id: onesignalAppId,
+        include_external_user_ids: [userId],
+        headings: { en: "Run Completed! 🏃‍♂️" },
+        contents: { en: message },
+      }),
+    });
+
+    const result = await res.json();
+    console.log(`[push-notification] sent to ${userId}:`, JSON.stringify(result));
+  } catch (err) {
+    console.error("[push-notification] Error:", err);
+  }
+}
+
 async function syncActivityById(
   supabase: any,
   accessToken: string,

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Lang } from "@/lib/i18n";
 import { useAuth } from "@/contexts/AuthContext";
+import { usePremium } from "@/contexts/PremiumContext";
 import { supabase } from "@/integrations/supabase/client";
 import { getRankFromXP } from "@/lib/ranks";
 import FadeIn from "@/components/ui/FadeIn";
@@ -19,6 +20,8 @@ interface Props {
 
 const RewardsTab = ({ lang }: Props) => {
   const { user } = useAuth();
+  const { isPremium, onPurchaseConfirmed } = usePremium();
+  const [leaderboardKey, setLeaderboardKey] = useState(0);
   const [profile, setProfile] = useState<{
     monthly_xp: number;
     lifetime_xp: number;
@@ -43,6 +46,14 @@ const RewardsTab = ({ lang }: Props) => {
   }, [user]);
 
   useEffect(() => { fetchProfile(); }, [fetchProfile]);
+
+  // Refresh leaderboard when user becomes premium
+  useEffect(() => {
+    const unsub = onPurchaseConfirmed(() => {
+      setLeaderboardKey(k => k + 1);
+    });
+    return unsub;
+  }, [onPurchaseConfirmed]);
 
   const handleXpGain = useCallback((newXp: number) => {
     if (!profile) return;
@@ -117,7 +128,7 @@ const RewardsTab = ({ lang }: Props) => {
           </TabsContent>
 
           <TabsContent value="leaderboards" className="mt-4">
-            <LeaderboardTabs lang={lang} />
+            <LeaderboardTabs lang={lang} refreshKey={leaderboardKey} />
           </TabsContent>
         </Tabs>
       </FadeIn>

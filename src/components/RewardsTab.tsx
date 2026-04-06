@@ -78,15 +78,7 @@ const RewardsTab = ({ lang }: Props) => {
   return (
     <>
       <FadeIn className="px-5 pt-4 max-w-lg mx-auto pb-24 space-y-5">
-        {/* Hero — always visible */}
-        <HeroSection
-          lang={lang}
-          monthlyXp={profile?.monthly_xp ?? 0}
-          lifetimeXp={profile?.lifetime_xp ?? 0}
-          rankInfo={rankInfo}
-        />
-
-        {/* Sub-tabs: Rewards | Leaderboards */}
+        {/* Sub-tabs: Rewards | Leaderboards — at the top */}
         <Tabs defaultValue="rewards" className="w-full">
           <TabsList className="w-full grid grid-cols-2">
             <TabsTrigger value="rewards">
@@ -98,6 +90,12 @@ const RewardsTab = ({ lang }: Props) => {
           </TabsList>
 
           <TabsContent value="rewards" className="space-y-5 mt-4">
+            <HeroSection
+              lang={lang}
+              monthlyXp={profile?.monthly_xp ?? 0}
+              lifetimeXp={profile?.lifetime_xp ?? 0}
+              rankInfo={rankInfo}
+            />
             {user && (
               <DailyCheckIn
                 lang={lang}

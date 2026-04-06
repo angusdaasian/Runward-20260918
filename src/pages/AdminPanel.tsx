@@ -13,6 +13,7 @@ import FeedbackManager from "@/components/admin/FeedbackManager";
 import RaceManager from "@/components/admin/RaceManager";
 import PendingRaceManager from "@/components/admin/PendingRaceManager";
 import RewardCodeManager from "@/components/admin/RewardCodeManager";
+import NotificationManager from "@/components/admin/NotificationManager";
 
 interface UserRow {
   user_id: string;
@@ -215,6 +216,7 @@ const AdminPanel = () => {
           </CardContent>
         </Card>
 
+        <NotificationManager />
         <AnnouncementManager />
         <RewardCodeManager />
         <RaceManager />

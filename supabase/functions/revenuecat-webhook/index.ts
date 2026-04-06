@@ -151,6 +151,9 @@ Deno.serve(async (req) => {
         });
       }
 
+      // Sync profiles.is_premium
+      await supabase.from("profiles").update({ is_premium: false }).eq("user_id", appUserId);
+
       console.log(`Subscription removed: user=${appUserId}, event=${eventType}`);
     } else if (LOG_ONLY_EVENTS.includes(eventType)) {
       // CANCELLATION: auto-renew off but access continues until expires_at

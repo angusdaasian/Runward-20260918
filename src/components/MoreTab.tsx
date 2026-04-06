@@ -340,42 +340,13 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps }: Props
             <button
               onClick={async () => {
                 try {
-                  const onesignal = (window as any).OneSignal;
-
-                  // Web / JS SDK path
-                  if (onesignal?.Notifications) {
-                    const perm = onesignal.Notifications.permission;
-                    console.log("[Push] Current OneSignal permission:", perm);
-
-                    if (perm === true || perm === "granted") {
-                      console.log("[Push] Already granted — no popup needed");
-                      toast({ title: lang === "zh" ? "推送通知已啟用" : "Push notifications already enabled" });
-                      return;
-                    }
-
-                    if (perm === "provisional") {
-                      console.log("[Push] OneSignal permission is provisional");
-                    }
-
-                    if (perm === "denied") {
-                      console.log("[Push] Permission denied — user must enable in iOS Settings");
-                      toast({ title: lang === "zh" ? "通知已被拒絕" : "Notifications denied", description: lang === "zh" ? "請在 iOS 設定中手動啟用" : "Please enable in iOS Settings > Notifications", variant: "destructive" });
-                      return;
-                    }
-
-                    console.log("[Push] Requesting permission via OneSignal JS SDK...");
-                    await onesignal.Notifications.requestPermission();
-                    return;
-                  }
-
-                  // Native Despia path
-                  console.log("[Push] OneSignal JS SDK not found, using Despia native push registration...");
+                  console.log("[Push] Requesting push permission via Despia native...");
                   await despia("registerpush://");
                   console.log("[Push] Sent despia registerpush://");
 
                   if (user?.id) {
                     await despia(`setonesignalplayerid://?user_id=${user.id}`);
-                    console.log("[Push] Re-linked OneSignal external user ID:", user.id);
+                    console.log("[Push] Linked OneSignal external_id:", user.id);
                   }
 
                   toast({

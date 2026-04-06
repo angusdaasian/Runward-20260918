@@ -98,9 +98,31 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps }: Props
     }
   };
 
+  // Load notification preference
+  useEffect(() => {
+    if (!user) return;
+    const load = async () => {
+      const { data } = await supabase
+        .from("profiles")
+        .select("activity_notifications")
+        .eq("user_id", user.id)
+        .single();
+      if (data) setActivityNotifications(data.activity_notifications);
+    };
+    load();
+  }, [user]);
 
-
-
+  const toggleActivityNotifications = async () => {
+    if (!user || notifLoading) return;
+    setNotifLoading(true);
+    const newVal = !activityNotifications;
+    setActivityNotifications(newVal);
+    await supabase
+      .from("profiles")
+      .update({ activity_notifications: newVal } as any)
+      .eq("user_id", user.id);
+    setNotifLoading(false);
+  };
   if (!skeletonDone) return <SettingsSkeleton />;
 
   return (

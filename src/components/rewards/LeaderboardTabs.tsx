@@ -42,7 +42,7 @@ const LeaderboardTabs = ({ lang, refreshKey = 0 }: Props) => {
       setLoading(false);
     };
     fetch();
-  }, [league]);
+  }, [league, refreshKey]);
 
   const rewardZone = league === "premium" ? 10 : 3;
 

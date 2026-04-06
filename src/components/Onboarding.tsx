@@ -293,7 +293,7 @@ const Onboarding = ({
   };
 
   const handleAppleSignIn = () => {
-    const redirectUri = window.location.origin;
+    const redirectUri = "https://pacecalculator.fun";
     const startUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/apple-auth-start?redirect_uri=${encodeURIComponent(redirectUri)}`;
     window.location.href = startUrl;
   };

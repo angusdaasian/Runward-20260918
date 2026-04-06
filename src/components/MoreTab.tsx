@@ -58,6 +58,7 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps }: Props
   const [showDefs, setShowDefs] = useState(false);
   const { isPremium, expiresAt, plan, rcEntitlement } = usePremium();
   const { user, signOut } = useAuth();
+  const { toast } = useToast();
   const { launchPaywall, redeemOfferCode } = useDespiaPurchases();
 
   const [showLoginPrompt, setShowLoginPrompt] = useState(false);

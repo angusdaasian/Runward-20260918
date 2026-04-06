@@ -128,7 +128,7 @@ const RewardsTab = ({ lang }: Props) => {
           </TabsContent>
 
           <TabsContent value="leaderboards" className="mt-4">
-            <LeaderboardTabs lang={lang} />
+            <LeaderboardTabs lang={lang} refreshKey={leaderboardKey} />
           </TabsContent>
         </Tabs>
       </FadeIn>

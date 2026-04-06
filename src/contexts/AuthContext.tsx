@@ -79,7 +79,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
-      if (session?.user) preloadHeaderProfile(session.user.id);
+      if (session?.user) {
+        preloadHeaderProfile(session.user.id);
+        try {
+          despia(`setonesignalplayerid://?user_id=${session.user.id}`);
+        } catch (e) {
+          console.warn("[Push] Failed to set OneSignal player ID:", e);
+        }
+      }
       // For warm resumes, resolve immediately since user was just here
       // For cold starts, add small delay for auth state to settle
       if (isWarmResume) {

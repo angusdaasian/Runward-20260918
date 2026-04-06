@@ -69,15 +69,16 @@ Deno.serve(async (req) => {
 
     const userIds = Array.isArray(external_user_id) ? external_user_id : [external_user_id];
 
-    const response = await fetch("https://onesignal.com/api/v1/notifications", {
+    const response = await fetch("https://api.onesignal.com/notifications", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Basic ${onesignalApiKey}`,
+        "Authorization": `Key ${onesignalApiKey}`,
       },
       body: JSON.stringify({
         app_id: onesignalAppId,
-        include_external_user_ids: userIds,
+        target_channel: "push",
+        include_aliases: { external_id: userIds },
         headings: { en: title },
         contents: { en: message },
       }),

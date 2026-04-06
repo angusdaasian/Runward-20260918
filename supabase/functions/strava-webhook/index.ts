@@ -228,11 +228,21 @@ async function syncActivityById(
     }, { onConflict: 'strava_id' });
 
   // Award XP only for new activities (not updates)
+  const distance = act.distance || 0;
+  const movingTime = act.moving_time || 0;
   if (!existing) {
-    await awardActivityXP(supabase, userId, act.distance || 0, act.moving_time || 0);
+    await awardActivityXP(supabase, userId, distance, movingTime);
   }
 
-  await computeTrainingScore(supabase, userId, env);
+  const trainingScore = await computeTrainingScore(supabase, userId, env);
+
+  // Send push notification for new activities
+  if (!existing) {
+    const km = distance / 1000;
+    const minutes = movingTime / 60;
+    const xpGained = Math.round(km * 10) + Math.round(minutes * 5);
+    await sendActivityNotification(supabase, userId, distance, movingTime, xpGained, Math.round(trainingScore));
+  }
 }
 
 serve(async (req) => {

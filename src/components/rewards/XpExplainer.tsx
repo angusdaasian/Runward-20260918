@@ -22,7 +22,7 @@ const XpExplainer = ({ lang }: Props) => {
     {
       icon: <Activity size={14} className="text-emerald-500" />,
       label: isZh ? "運動同步（Strava/Garmin/Coros）(即將推出)" : "Activity Sync (Strava/Garmin/Coros)(Coming Soon)",
-      value: isZh ? "(公里×10)+(分鐘×5)" : "(km×10)+(min×5)",
+      value: isZh ? "(公里×20)+(分鐘×10)+(分數×5)" : "(km×20)+(min×10)+(score×5)",
     },
     {
       icon: <ArrowDown size={14} className="text-destructive" />,

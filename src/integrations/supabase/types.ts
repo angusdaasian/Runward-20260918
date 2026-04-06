@@ -340,6 +340,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          activity_notifications: boolean
           age: number | null
           avatar_url: string | null
           check_in_streak: number
@@ -362,6 +363,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          activity_notifications?: boolean
           age?: number | null
           avatar_url?: string | null
           check_in_streak?: number
@@ -384,6 +386,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          activity_notifications?: boolean
           age?: number | null
           avatar_url?: string | null
           check_in_streak?: number

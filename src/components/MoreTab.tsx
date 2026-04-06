@@ -1,7 +1,8 @@
-import { ChevronRight, Crown, Globe, BookOpen, Check, ScanEye, Lock, KeyRound, Clock, Shield, Info, LifeBuoy, Mail, ShieldCheck, Smartphone, Moon, Sun, LogOut, Gift, Ticket } from "lucide-react";
+import { ChevronRight, Crown, Globe, BookOpen, Check, ScanEye, Lock, KeyRound, Clock, Shield, Info, LifeBuoy, Mail, ShieldCheck, Smartphone, Moon, Sun, LogOut, Gift, Ticket, Bell } from "lucide-react";
 import { Lang, t } from "@/lib/i18n";
 import { useState, useEffect } from "react";
 import { SettingsSkeleton } from "@/components/ui/PageSkeleton";
+import { supabase } from "@/integrations/supabase/client";
 import { usePremium } from "@/contexts/PremiumContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -61,6 +62,8 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps }: Props
   const [showRedeemDialog, setShowRedeemDialog] = useState(false);
   const [offerCode, setOfferCode] = useState("");
   const [countdown, setCountdown] = useState("");
+  const [activityNotifications, setActivityNotifications] = useState(true);
+  const [notifLoading, setNotifLoading] = useState(false);
   const { refreshSubscription } = usePremium();
   const currentRoute = `${location.pathname}${location.search}`;
   const [darkMode, setDarkMode] = useState(() => {
@@ -95,9 +98,31 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps }: Props
     }
   };
 
+  // Load notification preference
+  useEffect(() => {
+    if (!user) return;
+    const load = async () => {
+      const { data } = await supabase
+        .from("profiles")
+        .select("activity_notifications")
+        .eq("user_id", user.id)
+        .single();
+      if (data) setActivityNotifications(data.activity_notifications);
+    };
+    load();
+  }, [user]);
 
-
-
+  const toggleActivityNotifications = async () => {
+    if (!user || notifLoading) return;
+    setNotifLoading(true);
+    const newVal = !activityNotifications;
+    setActivityNotifications(newVal);
+    await supabase
+      .from("profiles")
+      .update({ activity_notifications: newVal } as any)
+      .eq("user_id", user.id);
+    setNotifLoading(false);
+  };
   if (!skeletonDone) return <SettingsSkeleton />;
 
   return (
@@ -288,7 +313,30 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps }: Props
           </button>
         )}
 
-        {/* About Us */}
+        {/* Activity Push Notifications */}
+        {user && (
+          <div className="bg-card border border-border rounded-xl p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Bell size={20} className="text-primary" />
+                <span className="font-medium text-foreground">
+                  {lang === "zh" ? "活動推送通知" : "Activity Notifications"}
+                </span>
+              </div>
+              <button
+                onClick={toggleActivityNotifications}
+                disabled={notifLoading}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${activityNotifications ? "bg-primary" : "bg-input"}`}
+              >
+                <span className={`inline-block h-5 w-5 rounded-full bg-background shadow-lg transition-transform ${activityNotifications ? "translate-x-5" : "translate-x-0.5"}`} />
+              </button>
+            </div>
+            <p className="text-xs text-muted-foreground mt-1 ml-8">
+              {lang === "zh" ? "跑步完成後接收 XP 通知" : "Get notified when a run is synced with XP earned"}
+            </p>
+          </div>
+        )}
+
         <button
           onClick={() => navigate("/support", { state: { from: currentRoute } })}
           className="w-full bg-card border border-border rounded-xl p-4 flex items-center justify-between"

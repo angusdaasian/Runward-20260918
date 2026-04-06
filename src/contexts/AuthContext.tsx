@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, ReactNode } from "react
 import { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { preloadHeaderProfile } from "@/components/AppHeader";
+import despia from "despia-native";
 
 const LAST_ACTIVE_KEY = "runward_last_active";
 const WARM_RESUME_MS = 5 * 60 * 1000; // 5 minutes
@@ -64,13 +65,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       (_event, session) => {
         setSession(session);
         setLoading(false);
-        if (session?.user) preloadHeaderProfile(session.user.id);
+        if (session?.user) {
+          preloadHeaderProfile(session.user.id);
+          // Register OneSignal player ID with the user's Supabase UID
+          try {
+            despia(`setonesignalplayerid://?user_id=${session.user.id}`);
+          } catch (e) {
+            console.warn("[Push] Failed to set OneSignal player ID:", e);
+          }
+        }
       }
     );
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
-      if (session?.user) preloadHeaderProfile(session.user.id);
+      if (session?.user) {
+        preloadHeaderProfile(session.user.id);
+        try {
+          despia(`setonesignalplayerid://?user_id=${session.user.id}`);
+        } catch (e) {
+          console.warn("[Push] Failed to set OneSignal player ID:", e);
+        }
+      }
       // For warm resumes, resolve immediately since user was just here
       // For cold starts, add small delay for auth state to settle
       if (isWarmResume) {

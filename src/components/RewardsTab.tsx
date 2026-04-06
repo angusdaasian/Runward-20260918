@@ -20,6 +20,8 @@ interface Props {
 
 const RewardsTab = ({ lang }: Props) => {
   const { user } = useAuth();
+  const { isPremium, onPurchaseConfirmed } = usePremium();
+  const [leaderboardKey, setLeaderboardKey] = useState(0);
   const [profile, setProfile] = useState<{
     monthly_xp: number;
     lifetime_xp: number;

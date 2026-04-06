@@ -62,6 +62,8 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps }: Props
   const [showRedeemDialog, setShowRedeemDialog] = useState(false);
   const [offerCode, setOfferCode] = useState("");
   const [countdown, setCountdown] = useState("");
+  const [activityNotifications, setActivityNotifications] = useState(true);
+  const [notifLoading, setNotifLoading] = useState(false);
   const { refreshSubscription } = usePremium();
   const currentRoute = `${location.pathname}${location.search}`;
   const [darkMode, setDarkMode] = useState(() => {

@@ -292,10 +292,17 @@ const Onboarding = ({
     setSaving(false);
   };
 
-  const handleAppleSignIn = () => {
-    const redirectUri = "https://pacecalculator.fun";
-    const startUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/apple-auth-start?redirect_uri=${encodeURIComponent(redirectUri)}`;
-    window.location.href = startUrl;
+  const handleAppleSignIn = async () => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "apple",
+      options: {
+        redirectTo: "https://pacecalculator.fun",
+      },
+    });
+    if (error) {
+      console.error("[AppleSignIn] Error:", error);
+      toast({ title: "Apple Sign-In failed", description: error.message, variant: "destructive" });
+    }
   };
 
   const handleAppleSignUp = () => {

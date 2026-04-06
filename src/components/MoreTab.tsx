@@ -313,7 +313,30 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps }: Props
           </button>
         )}
 
-        {/* About Us */}
+        {/* Activity Push Notifications */}
+        {user && (
+          <div className="bg-card border border-border rounded-xl p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Bell size={20} className="text-primary" />
+                <span className="font-medium text-foreground">
+                  {lang === "zh" ? "活動推送通知" : "Activity Notifications"}
+                </span>
+              </div>
+              <button
+                onClick={toggleActivityNotifications}
+                disabled={notifLoading}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${activityNotifications ? "bg-primary" : "bg-input"}`}
+              >
+                <span className={`inline-block h-5 w-5 rounded-full bg-background shadow-lg transition-transform ${activityNotifications ? "translate-x-5" : "translate-x-0.5"}`} />
+              </button>
+            </div>
+            <p className="text-xs text-muted-foreground mt-1 ml-8">
+              {lang === "zh" ? "跑步完成後接收 XP 通知" : "Get notified when a run is synced with XP earned"}
+            </p>
+          </div>
+        )}
+
         <button
           onClick={() => navigate("/support", { state: { from: currentRoute } })}
           className="w-full bg-card border border-border rounded-xl p-4 flex items-center justify-between"

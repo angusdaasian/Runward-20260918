@@ -7,6 +7,7 @@ import { RANK_EMBLEMS } from "@/lib/rankEmblems";
 
 interface Props {
   lang: Lang;
+  refreshKey?: number;
 }
 
 type League = "premium" | "free";

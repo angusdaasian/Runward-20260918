@@ -94,7 +94,10 @@ export const PremiumProvider = ({ children }: { children: ReactNode }) => {
       setExpiresAt(new Date(data.expires_at));
       setPlan(data.plan);
       setRcEntitlement(data.rc_entitlement || "premium");
-      if (wasNotPremium) notifyPurchaseListeners();
+      if (wasNotPremium) {
+        await supabase.from("profiles").update({ is_premium: true }).eq("user_id", user.id);
+        notifyPurchaseListeners();
+      }
       return true;
     } else {
       setIsPremium(false);

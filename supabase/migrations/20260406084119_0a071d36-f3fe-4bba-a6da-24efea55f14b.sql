@@ -1,0 +1,1 @@
+ALTER TABLE public.profiles ADD COLUMN activity_notifications boolean NOT NULL DEFAULT true;

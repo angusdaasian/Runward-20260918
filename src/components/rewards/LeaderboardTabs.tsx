@@ -22,7 +22,7 @@ interface LeaderboardEntry {
   is_premium: boolean;
 }
 
-const LeaderboardTabs = ({ lang }: Props) => {
+const LeaderboardTabs = ({ lang, refreshKey = 0 }: Props) => {
   const [league, setLeague] = useState<League>("premium");
   const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(true);

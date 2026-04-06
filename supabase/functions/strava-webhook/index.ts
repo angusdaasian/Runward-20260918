@@ -97,10 +97,10 @@ async function computeTrainingScore(supabase: any, userId: string, env: string) 
   return avgScore;
 }
 
-async function awardActivityXP(supabase: any, userId: string, distanceMeters: number, movingTimeSeconds: number) {
+async function awardActivityXP(supabase: any, userId: string, distanceMeters: number, movingTimeSeconds: number, trainingScore: number) {
   const km = distanceMeters / 1000;
   const minutes = movingTimeSeconds / 60;
-  const xp = Math.round(km * 10) + Math.round(minutes * 5);
+  const xp = Math.round(km * 20) + Math.round(minutes * 10) + Math.round(trainingScore * 5);
   if (xp <= 0) return;
 
   const { data: profile } = await supabase

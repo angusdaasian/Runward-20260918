@@ -97,10 +97,10 @@ async function computeTrainingScore(supabase: any, userId: string, env: string) 
   return avgScore;
 }
 
-async function awardActivityXP(supabase: any, userId: string, distanceMeters: number, movingTimeSeconds: number) {
+async function awardActivityXP(supabase: any, userId: string, distanceMeters: number, movingTimeSeconds: number, trainingScore: number) {
   const km = distanceMeters / 1000;
   const minutes = movingTimeSeconds / 60;
-  const xp = Math.round(km * 10) + Math.round(minutes * 5);
+  const xp = Math.round(km * 20) + Math.round(minutes * 10) + Math.round(trainingScore * 5);
   if (xp <= 0) return;
 
   const { data: profile } = await supabase
@@ -227,20 +227,21 @@ async function syncActivityById(
       environment: env,
     }, { onConflict: 'strava_id' });
 
-  // Award XP only for new activities (not updates)
+  // Compute training score first (needed for XP calculation)
   const distance = act.distance || 0;
   const movingTime = act.moving_time || 0;
-  if (!existing) {
-    await awardActivityXP(supabase, userId, distance, movingTime);
-  }
-
   const trainingScore = await computeTrainingScore(supabase, userId, env);
+
+  // Award XP only for new activities (not updates)
+  if (!existing) {
+    await awardActivityXP(supabase, userId, distance, movingTime, Math.round(trainingScore));
+  }
 
   // Send push notification for new activities
   if (!existing) {
     const km = distance / 1000;
     const minutes = movingTime / 60;
-    const xpGained = Math.round(km * 10) + Math.round(minutes * 5);
+    const xpGained = Math.round(km * 20) + Math.round(minutes * 10) + Math.round(trainingScore * 5);
     await sendActivityNotification(supabase, userId, distance, movingTime, xpGained, Math.round(trainingScore));
   }
 }

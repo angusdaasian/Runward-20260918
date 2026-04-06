@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Lang } from "@/lib/i18n";
 import { useAuth } from "@/contexts/AuthContext";
+import { usePremium } from "@/contexts/PremiumContext";
 import { supabase } from "@/integrations/supabase/client";
 import { getRankFromXP } from "@/lib/ranks";
 import FadeIn from "@/components/ui/FadeIn";

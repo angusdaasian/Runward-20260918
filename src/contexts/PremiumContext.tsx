@@ -61,13 +61,19 @@ export const PremiumProvider = ({ children }: { children: ReactNode }) => {
         const rcRes = await supabase.functions.invoke("check-revenuecat-status", {
           headers: { Authorization: `Bearer ${token}` },
         });
-        if (rcRes.data?.isPremium) {
+    if (rcRes.data?.isPremium) {
           const wasNotPremium = !isPremium;
           setIsPremium(true);
           setExpiresAt(new Date(rcRes.data.expiresAt));
           setPlan(rcRes.data.plan);
           setRcEntitlement(rcRes.data.rcEntitlement || "premium");
-          if (wasNotPremium) notifyPurchaseListeners();
+          if (wasNotPremium) {
+            // Sync profiles.is_premium flag
+            if (user) {
+              await supabase.from("profiles").update({ is_premium: true }).eq("user_id", user.id);
+            }
+            notifyPurchaseListeners();
+          }
           return true;
         }
       }

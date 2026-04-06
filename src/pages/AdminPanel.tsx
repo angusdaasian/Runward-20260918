@@ -216,6 +216,7 @@ const AdminPanel = () => {
           </CardContent>
         </Card>
 
+        <NotificationManager />
         <AnnouncementManager />
         <RewardCodeManager />
         <RaceManager />

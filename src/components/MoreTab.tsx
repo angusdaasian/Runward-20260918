@@ -1,5 +1,7 @@
 import { ChevronRight, Crown, Globe, BookOpen, Check, ScanEye, Lock, KeyRound, Clock, Shield, Info, LifeBuoy, Mail, ShieldCheck, Smartphone, Moon, Sun, LogOut, Gift, Ticket, Bell } from "lucide-react";
 import { Lang, t } from "@/lib/i18n";
+import { useToast } from "@/hooks/use-toast";
+import despia from "despia-native";
 import { useState, useEffect } from "react";
 import { SettingsSkeleton } from "@/components/ui/PageSkeleton";
 import { supabase } from "@/integrations/supabase/client";

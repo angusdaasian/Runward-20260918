@@ -132,6 +132,9 @@ export const PremiumProvider = ({ children }: { children: ReactNode }) => {
         setExpiresAt(new Date(data.expires_at));
         setPlan(planType);
         setRcEntitlement("premium");
+        if (user) {
+          await supabase.from("profiles").update({ is_premium: true }).eq("user_id", user.id);
+        }
         notifyPurchaseListeners();
         return true;
       }

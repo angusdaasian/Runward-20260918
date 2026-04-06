@@ -132,6 +132,9 @@ Deno.serve(async (req) => {
         });
       }
 
+      // Sync profiles.is_premium
+      await supabase.from("profiles").update({ is_premium: true }).eq("user_id", appUserId);
+
       console.log(`Subscription activated: user=${appUserId}, plan=${effectiveProductId}, entitlement=${rcEntitlement}, trial=${isTrialPeriod}, event=${eventType}`);
     } else if (INACTIVE_EVENTS.includes(eventType)) {
       // EXPIRATION and BILLING_ISSUE = access should be revoked

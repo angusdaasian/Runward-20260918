@@ -2,6 +2,7 @@ import { ChevronRight, Crown, Globe, BookOpen, Check, ScanEye, Lock, KeyRound, C
 import { Lang, t } from "@/lib/i18n";
 import { useState, useEffect } from "react";
 import { SettingsSkeleton } from "@/components/ui/PageSkeleton";
+import { supabase } from "@/integrations/supabase/client";
 import { usePremium } from "@/contexts/PremiumContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLocation, useNavigate } from "react-router-dom";

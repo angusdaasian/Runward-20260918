@@ -1,13 +1,1 @@
 project_id = "kbghvclwhxnjeskdodeh"
-
-[functions.strava-webhook]
-verify_jwt = false
-
-[functions.scrape-races]
-verify_jwt = false
-
-[functions.apply-xp-decay]
-verify_jwt = false
-
-[functions.reset-season]
-verify_jwt = false

@@ -1,5 +1,7 @@
 import { ChevronRight, Crown, Globe, BookOpen, Check, ScanEye, Lock, KeyRound, Clock, Shield, Info, LifeBuoy, Mail, ShieldCheck, Smartphone, Moon, Sun, LogOut, Gift, Ticket, Bell } from "lucide-react";
 import { Lang, t } from "@/lib/i18n";
+import { useToast } from "@/hooks/use-toast";
+import despia from "despia-native";
 import { useState, useEffect } from "react";
 import { SettingsSkeleton } from "@/components/ui/PageSkeleton";
 import { supabase } from "@/integrations/supabase/client";
@@ -56,6 +58,7 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps }: Props
   const [showDefs, setShowDefs] = useState(false);
   const { isPremium, expiresAt, plan, rcEntitlement } = usePremium();
   const { user, signOut } = useAuth();
+  const { toast } = useToast();
   const { launchPaywall, redeemOfferCode } = useDespiaPurchases();
 
   const [showLoginPrompt, setShowLoginPrompt] = useState(false);
@@ -334,6 +337,40 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps }: Props
             <p className="text-xs text-muted-foreground mt-1 ml-8">
               {lang === "zh" ? "跑步完成後接收 XP 通知" : "Get notified when a run is synced with XP earned"}
             </p>
+            <button
+              onClick={() => {
+                try {
+                  // Check current permission state via OneSignal JS SDK if available
+                  const onesignal = (window as any).OneSignal;
+                  if (onesignal?.Notifications) {
+                    const perm = onesignal.Notifications.permission;
+                    console.log("[Push] Current OneSignal permission:", perm);
+                    if (perm === true) {
+                      console.log("[Push] Already granted — no popup needed");
+                      toast({ title: lang === "zh" ? "推送通知已啟用" : "Push notifications already enabled" });
+                      return;
+                    }
+                    if (perm === "denied") {
+                      console.log("[Push] Permission denied — user must enable in iOS Settings");
+                      toast({ title: lang === "zh" ? "通知已被拒絕" : "Notifications denied", description: lang === "zh" ? "請在 iOS 設定中手動啟用" : "Please enable in iOS Settings > Notifications", variant: "destructive" });
+                      return;
+                    }
+                    console.log("[Push] Requesting permission via OneSignal...");
+                    onesignal.Notifications.requestPermission();
+                  } else {
+                    console.log("[Push] OneSignal JS SDK not found, trying despia bridge...");
+                    // Fallback: use despia bridge to trigger native prompt
+                    despia("onesignal://prompt-permission");
+                    console.log("[Push] Sent despia onesignal://prompt-permission");
+                  }
+                } catch (e) {
+                  console.warn("[Push] Error requesting permission:", e);
+                }
+              }}
+              className="mt-2 ml-8 text-xs font-medium text-primary hover:underline"
+            >
+              {lang === "zh" ? "📲 啟用推送通知" : "📲 Enable Push Notifications"}
+            </button>
           </div>
         )}
 

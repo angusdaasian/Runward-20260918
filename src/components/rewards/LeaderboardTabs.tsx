@@ -7,6 +7,7 @@ import { RANK_EMBLEMS } from "@/lib/rankEmblems";
 
 interface Props {
   lang: Lang;
+  refreshKey?: number;
 }
 
 type League = "premium" | "free";
@@ -21,7 +22,7 @@ interface LeaderboardEntry {
   is_premium: boolean;
 }
 
-const LeaderboardTabs = ({ lang }: Props) => {
+const LeaderboardTabs = ({ lang, refreshKey = 0 }: Props) => {
   const [league, setLeague] = useState<League>("premium");
   const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -41,7 +42,7 @@ const LeaderboardTabs = ({ lang }: Props) => {
       setLoading(false);
     };
     fetch();
-  }, [league]);
+  }, [league, refreshKey]);
 
   const rewardZone = league === "premium" ? 10 : 3;
 

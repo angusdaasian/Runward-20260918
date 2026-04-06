@@ -47,6 +47,14 @@ const RewardsTab = ({ lang }: Props) => {
 
   useEffect(() => { fetchProfile(); }, [fetchProfile]);
 
+  // Refresh leaderboard when user becomes premium
+  useEffect(() => {
+    const unsub = onPurchaseConfirmed(() => {
+      setLeaderboardKey(k => k + 1);
+    });
+    return unsub;
+  }, [onPurchaseConfirmed]);
+
   const handleXpGain = useCallback((newXp: number) => {
     if (!profile) return;
     const oldRank = getRankFromXP(profile.monthly_xp);

@@ -102,10 +102,22 @@ async function scrapeHKRaces(firecrawlKey: string, aiKey: string): Promise<RaceD
 
   const prompt = `Extract road running races from this Hong Kong sports timetable.
 
+IMPORTANT: The page has a "距離" (distance) column for each race. Use it to determine the category:
+- If distances include "全馬", "42K", "Marathon" → category = "Full Marathon"
+- If distances include "半馬", "21K", "HM" → category = "Half Marathon"  
+- If distances include "10K" → category = "10K"
+- If distances include "5K" → category = "5K"
+- If distances include "3K" → category = "3K"
+- If a race has MULTIPLE distances (e.g. "3, 6, 10K" or "10K, 半馬, 全馬"), use the LONGEST distance as the category.
+- If distances include "100km" or anything over 42K → category = "Ultramarathon"
+- Only use "Road Race" if no specific distance info is available.
+
+Also capture the raw distance text (e.g. "3, 6, 10K" or "10K, 半馬, 全馬") in the description field so users can see all available distances.
+
 CONTENT:
 ${md.substring(0, 30000)}
 
-Return JSON array with: name, race_date (YYYY-MM-DD), city: "Hong Kong", country: "Hong Kong", category ("Full Marathon"/"Half Marathon"/"10K"/"5K"/"Road Race"), website_url or null, description: null, source: "fitz_hk".
+Return JSON array with: name, race_date (YYYY-MM-DD), city: "Hong Kong", country: "Hong Kong", category (use rules above), website_url or null, description (the raw distance text like "3K, 5K, 10K" or null), source: "fitz_hk".
 Only ROAD RUNNING. Only races on or after ${TODAY}. Return ONLY JSON array.`;
 
   const content = await callAI(aiKey, "Extract HK race data. Return only valid JSON array.", prompt);

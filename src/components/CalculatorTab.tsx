@@ -71,6 +71,7 @@ const ROAD_DISTANCES = [
 ];
 
 const TRACK_DISTANCES = [
+  { label: "400m", labelZh: "400米", meters: 400 },
   { label: "1500m", labelZh: "1500米", meters: 1500 },
   { label: "1 Mile", labelZh: "1英里", meters: 1609.34 },
   { label: "3K", labelZh: "3公里", meters: 3000 },

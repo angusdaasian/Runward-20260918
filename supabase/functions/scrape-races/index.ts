@@ -171,7 +171,6 @@ ${chunk}`;
 async function deduplicateWithAI(races: RaceData[], aiKey: string): Promise<RaceData[]> {
   if (races.length <= 5) return races;
 
-  // First pass: simple key-based dedup
   const seen = new Map<string, RaceData>();
   for (const race of races) {
     const key = `${race.name.toLowerCase().replace(/[^a-z0-9]/g, "")}_${race.race_date}_${race.category}`;
@@ -179,7 +178,6 @@ async function deduplicateWithAI(races: RaceData[], aiKey: string): Promise<Race
   }
   let deduped = Array.from(seen.values());
 
-  // Second pass: AI-powered fuzzy dedup in batches
   if (deduped.length > 10) {
     const raceList = deduped.map((r, i) => `${i}: "${r.name}" | ${r.race_date} | ${r.city}, ${r.country} | ${r.category}`).join("\n");
 
@@ -201,6 +199,51 @@ Return ONLY a JSON array of integers, e.g. [0, 1, 3, 5, 7]`;
   }
 
   return deduped;
+}
+
+async function verifyCategoriesWithAI(races: RaceData[], aiKey: string): Promise<RaceData[]> {
+  if (races.length === 0) return races;
+
+  // Process in batches of 30
+  const result: RaceData[] = [];
+  for (let i = 0; i < races.length; i += 30) {
+    const batch = races.slice(i, i + 30);
+    const raceList = batch.map((r, idx) => `${idx}: "${r.name}" | ${r.race_date} | ${r.city}, ${r.country} | current: ${r.category} | desc: ${r.description || "none"}`).join("\n");
+
+    const prompt = `Verify and correct the category for each race below. Many races offer multiple distances (e.g. a marathon event may also have half marathon, 10K, 5K).
+
+Rules:
+- Use the LONGEST distance as the primary category
+- Valid categories: "Full Marathon", "Half Marathon", "Ultramarathon", "10K", "5K", "3K", "Road Race"
+- If the name contains "Marathon" or "馬拉松" and no other info, assume "Full Marathon"
+- If description shows multiple distances like "3K, 5K, 10K, HM, FM", use "Full Marathon" (the longest)
+- Keep "Road Race" only if truly unknown distance
+
+Return a JSON array of objects: [{"index": 0, "category": "Full Marathon"}, ...]
+Only include entries where the category should CHANGE. If all are correct, return [].
+
+RACES:
+${raceList}`;
+
+    try {
+      const content = await callAI(aiKey, "Verify race categories. Return only JSON array.", prompt);
+      const changes: { index: number; category: string }[] = JSON.parse(content);
+      const changeMap = new Map(changes.map(c => [c.index, c.category]));
+      for (let j = 0; j < batch.length; j++) {
+        const race = { ...batch[j] };
+        if (changeMap.has(j)) {
+          console.log(`Category fix: "${race.name}" ${race.category} → ${changeMap.get(j)}`);
+          race.category = changeMap.get(j)!;
+        }
+        result.push(race);
+      }
+    } catch {
+      console.error("Category verification failed for batch, keeping originals");
+      result.push(...batch);
+    }
+  }
+
+  return result;
 }
 
 Deno.serve(async (req) => {

@@ -301,6 +301,11 @@ Deno.serve(async (req) => {
     allRaces = await deduplicateWithAI(allRaces, LOVABLE_API_KEY);
     console.log(`After dedup: ${allRaces.length} races`);
 
+    // Verify categories with AI
+    console.log("Verifying categories with AI...");
+    allRaces = await verifyCategoriesWithAI(allRaces, LOVABLE_API_KEY);
+    console.log("Category verification complete");
+
     // Clear and insert
     const sourceMap: Record<string, string[]> = {
       japan: ["flyareyou_japan"],

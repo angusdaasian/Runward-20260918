@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import { ArrowLeftRight, RotateCcw, AlertTriangle } from "lucide-react";
 import { Lang, t } from "@/lib/i18n";
 import { calculateRunningScore, inputDistances } from "@/lib/vdot";
@@ -18,41 +18,35 @@ interface Props {
 }
 
 type PaceUnit = "km" | "mi";
+type InputMode = "time" | "pace";
 const MI_TO_KM = 1.609344;
 const KM_TO_MI = 1 / MI_TO_KM;
 
-// World records in seconds (men's records as absolute floor)
 const WORLD_RECORDS: Record<string, number> = {
-  "1500":    206,    // 3:26
-  "1609.34": 223,    // 3:43 (mile)
-  "3000":    440,    // 7:20
-  "5000":    755,    // 12:35
-  "10000":   1571,   // 26:11
-  "15000":   2404,   // 40:04
-  "21097.5": 3451,   // 57:31
-  "42195":   7235,   // 2:00:35
+  "1500":    206,
+  "1609.34": 223,
+  "3000":    440,
+  "5000":    755,
+  "10000":   1571,
+  "15000":   2404,
+  "21097.5": 3451,
+  "42195":   7235,
 };
 
 function getWorldRecordSeconds(meters: number): number | null {
-  // Exact match
   const key = String(meters);
   if (WORLD_RECORDS[key]) return WORLD_RECORDS[key];
-
-  // Interpolate from known records using pace
   const distances = Object.keys(WORLD_RECORDS).map(Number).sort((a, b) => a - b);
   if (meters < distances[0]) {
-    // Extrapolate from shortest: use 1500m pace
     const wr = WORLD_RECORDS[String(distances[0])];
     const pace = wr / distances[0];
-    return Math.floor(meters * pace * 0.92); // faster for shorter
+    return Math.floor(meters * pace * 0.92);
   }
   if (meters > distances[distances.length - 1]) {
-    // Beyond marathon: extrapolate from marathon pace
     const wr = WORLD_RECORDS[String(distances[distances.length - 1])];
     const pace = wr / distances[distances.length - 1];
-    return Math.floor(meters * pace * 1.05); // slower for ultra
+    return Math.floor(meters * pace * 1.05);
   }
-  // Linear interpolation
   for (let i = 0; i < distances.length - 1; i++) {
     if (meters >= distances[i] && meters <= distances[i + 1]) {
       const ratio = (meters - distances[i]) / (distances[i + 1] - distances[i]);
@@ -103,9 +97,12 @@ const CalculatorTab = ({ score, setScore, lang, onCalculated }: Props) => {
   const [category, setCategory] = useState<DistanceCategory>("road");
   const [selectedMeters, setSelectedMeters] = useState(42195);
   const [customDistance, setCustomDistance] = useState("10");
+  const [inputMode, setInputMode] = useState<InputMode>("time");
   const [hours, setHours] = useState("3");
   const [minutes, setMinutes] = useState("45");
   const [seconds, setSeconds] = useState("0");
+  const [paceMin, setPaceMin] = useState("5");
+  const [paceSec, setPaceSec] = useState("20");
   const [paceUnit, setPaceUnit] = useState<PaceUnit>("km");
   const [worldRecordError, setWorldRecordError] = useState<string | null>(null);
 
@@ -119,12 +116,21 @@ const CalculatorTab = ({ score, setScore, lang, onCalculated }: Props) => {
     return selectedMeters;
   }, [category, customDistance, paceUnit, selectedMeters]);
 
+  // Compute total seconds from either time or pace
   const totalSeconds = useMemo(() => {
+    if (inputMode === "pace") {
+      const pm = parseInt(paceMin || "0");
+      const ps = parseInt(paceSec || "0");
+      const pacePerUnit = pm * 60 + ps;
+      const dist = getDistanceMeters();
+      const unitDist = paceUnit === "mi" ? 1609.34 : 1000;
+      return Math.round(pacePerUnit * (dist / unitDist));
+    }
     const h = parseInt(hours || "0");
     const m = parseInt(minutes || "0");
     const s = parseInt(seconds || "0");
     return h * 3600 + m * 60 + s;
-  }, [hours, minutes, seconds]);
+  }, [inputMode, hours, minutes, seconds, paceMin, paceSec, paceUnit, getDistanceMeters]);
 
   const paceDisplay = useMemo(() => {
     const dist = getDistanceMeters();
@@ -153,7 +159,6 @@ const CalculatorTab = ({ score, setScore, lang, onCalculated }: Props) => {
     const dist = getDistanceMeters();
     if (dist <= 0 || totalSeconds <= 0) return;
 
-    // World record check
     const wr = getWorldRecordSeconds(dist);
     if (wr && totalSeconds < wr) {
       const wrFormatted = formatFullTime(wr);
@@ -177,9 +182,12 @@ const CalculatorTab = ({ score, setScore, lang, onCalculated }: Props) => {
     setCategory("road");
     setSelectedMeters(42195);
     setCustomDistance("10");
+    setInputMode("time");
     setHours("3");
     setMinutes("45");
     setSeconds("0");
+    setPaceMin("5");
+    setPaceSec("20");
     setPaceUnit("km");
     setScore(null);
     setWorldRecordError(null);
@@ -284,54 +292,103 @@ const CalculatorTab = ({ score, setScore, lang, onCalculated }: Props) => {
         )}
       </div>
 
-      {/* Goal Time */}
+      {/* Input Mode Selector */}
       <div className="space-y-3">
-        <label className="text-sm font-medium text-foreground block">
-          {lang === "zh" ? "目標時間" : "Goal Time"}
-        </label>
-        <div className="flex items-center justify-center gap-2">
-          <div className="flex flex-col items-center">
-            <input
-              type="number"
-              value={hours}
-              onChange={(e) => { setHours(e.target.value); setWorldRecordError(null); }}
-              min="0"
-              max="99"
-              className="w-16 h-14 text-center text-2xl font-display font-bold bg-card border border-border rounded-xl text-foreground focus:outline-none focus:border-primary transition-colors"
-            />
-            <span className="text-[11px] text-muted-foreground mt-1">
-              {lang === "zh" ? "時" : "hr"}
-            </span>
-          </div>
-          <span className="text-2xl font-bold text-muted-foreground pb-5">:</span>
-          <div className="flex flex-col items-center">
-            <input
-              type="number"
-              value={minutes}
-              onChange={(e) => { setMinutes(e.target.value); setWorldRecordError(null); }}
-              min="0"
-              max="59"
-              className="w-16 h-14 text-center text-2xl font-display font-bold bg-card border border-border rounded-xl text-foreground focus:outline-none focus:border-primary transition-colors"
-            />
-            <span className="text-[11px] text-muted-foreground mt-1">
-              {lang === "zh" ? "分" : "min"}
-            </span>
-          </div>
-          <span className="text-2xl font-bold text-muted-foreground pb-5">:</span>
-          <div className="flex flex-col items-center">
-            <input
-              type="number"
-              value={seconds}
-              onChange={(e) => { setSeconds(e.target.value); setWorldRecordError(null); }}
-              min="0"
-              max="59"
-              className="w-16 h-14 text-center text-2xl font-display font-bold bg-card border border-border rounded-xl text-foreground focus:outline-none focus:border-primary transition-colors"
-            />
-            <span className="text-[11px] text-muted-foreground mt-1">
-              {lang === "zh" ? "秒" : "sec"}
-            </span>
-          </div>
+        <div className="flex items-center justify-between">
+          <label className="text-sm font-medium text-foreground">
+            {inputMode === "time"
+              ? (lang === "zh" ? "目標時間" : "Goal Time")
+              : (lang === "zh" ? "目標配速" : "Goal Pace")}
+          </label>
+          <Select value={inputMode} onValueChange={(v) => { setInputMode(v as InputMode); setWorldRecordError(null); }}>
+            <SelectTrigger className="w-[140px] h-9 text-sm bg-card border-border">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="time">{lang === "zh" ? "目標時間" : "Goal Time"}</SelectItem>
+              <SelectItem value="pace">{lang === "zh" ? "目標配速" : "Goal Pace"}</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
+
+        {inputMode === "time" ? (
+          <div className="flex items-center justify-center gap-2">
+            <div className="flex flex-col items-center">
+              <input
+                type="number"
+                value={hours}
+                onChange={(e) => { setHours(e.target.value); setWorldRecordError(null); }}
+                min="0"
+                max="99"
+                className="w-16 h-14 text-center text-2xl font-display font-bold bg-card border border-border rounded-xl text-foreground focus:outline-none focus:border-primary transition-colors"
+              />
+              <span className="text-[11px] text-muted-foreground mt-1">
+                {lang === "zh" ? "時" : "hr"}
+              </span>
+            </div>
+            <span className="text-2xl font-bold text-muted-foreground pb-5">:</span>
+            <div className="flex flex-col items-center">
+              <input
+                type="number"
+                value={minutes}
+                onChange={(e) => { setMinutes(e.target.value); setWorldRecordError(null); }}
+                min="0"
+                max="59"
+                className="w-16 h-14 text-center text-2xl font-display font-bold bg-card border border-border rounded-xl text-foreground focus:outline-none focus:border-primary transition-colors"
+              />
+              <span className="text-[11px] text-muted-foreground mt-1">
+                {lang === "zh" ? "分" : "min"}
+              </span>
+            </div>
+            <span className="text-2xl font-bold text-muted-foreground pb-5">:</span>
+            <div className="flex flex-col items-center">
+              <input
+                type="number"
+                value={seconds}
+                onChange={(e) => { setSeconds(e.target.value); setWorldRecordError(null); }}
+                min="0"
+                max="59"
+                className="w-16 h-14 text-center text-2xl font-display font-bold bg-card border border-border rounded-xl text-foreground focus:outline-none focus:border-primary transition-colors"
+              />
+              <span className="text-[11px] text-muted-foreground mt-1">
+                {lang === "zh" ? "秒" : "sec"}
+              </span>
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-center justify-center gap-2">
+            <div className="flex flex-col items-center">
+              <input
+                type="number"
+                value={paceMin}
+                onChange={(e) => { setPaceMin(e.target.value); setWorldRecordError(null); }}
+                min="0"
+                max="30"
+                className="w-20 h-14 text-center text-2xl font-display font-bold bg-card border border-border rounded-xl text-foreground focus:outline-none focus:border-primary transition-colors"
+              />
+              <span className="text-[11px] text-muted-foreground mt-1">
+                {lang === "zh" ? "分" : "min"}
+              </span>
+            </div>
+            <span className="text-2xl font-bold text-muted-foreground pb-5">:</span>
+            <div className="flex flex-col items-center">
+              <input
+                type="number"
+                value={paceSec}
+                onChange={(e) => { setPaceSec(e.target.value); setWorldRecordError(null); }}
+                min="0"
+                max="59"
+                className="w-20 h-14 text-center text-2xl font-display font-bold bg-card border border-border rounded-xl text-foreground focus:outline-none focus:border-primary transition-colors"
+              />
+              <span className="text-[11px] text-muted-foreground mt-1">
+                {lang === "zh" ? "秒" : "sec"}
+              </span>
+            </div>
+            <span className="text-lg text-muted-foreground font-medium pb-5">
+              /{paceUnit}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* World Record Warning */}

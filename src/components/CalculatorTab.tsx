@@ -1,7 +1,14 @@
-import { useState, useCallback } from "react";
-import { ChevronDown, Clock, ArrowLeftRight, RotateCcw } from "lucide-react";
+import { useState, useCallback, useMemo } from "react";
+import { ArrowLeftRight, RotateCcw, AlertTriangle } from "lucide-react";
 import { Lang, t } from "@/lib/i18n";
 import { calculateRunningScore, inputDistances } from "@/lib/vdot";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface Props {
   score: number | null;
@@ -14,99 +21,152 @@ type PaceUnit = "km" | "mi";
 const MI_TO_KM = 1.609344;
 const KM_TO_MI = 1 / MI_TO_KM;
 
-const CalculatorTab = ({ score, setScore, lang, onCalculated }: Props) => {
-  const [distanceIdx, setDistanceIdx] = useState(0);
-  const [showDropdown, setShowDropdown] = useState(false);
-  const [customDistance, setCustomDistance] = useState("0.4");
-  const [timeInput, setTimeInput] = useState("2:40");
-  const [paceInput, setPaceInput] = useState("");
-  const [paceUnit, setPaceUnit] = useState<PaceUnit>("km");
+// World records in seconds (men's records as absolute floor)
+const WORLD_RECORDS: Record<string, number> = {
+  "1500":    206,    // 3:26
+  "1609.34": 223,    // 3:43 (mile)
+  "3000":    440,    // 7:20
+  "5000":    755,    // 12:35
+  "10000":   1571,   // 26:11
+  "15000":   2404,   // 40:04
+  "21097.5": 3451,   // 57:31
+  "42195":   7235,   // 2:00:35
+};
 
-  const distanceOptions = [
-    { label: "Other", labelZh: "其他", meters: 0 },
-    ...inputDistances,
-  ];
+function getWorldRecordSeconds(meters: number): number | null {
+  // Exact match
+  const key = String(meters);
+  if (WORLD_RECORDS[key]) return WORLD_RECORDS[key];
+
+  // Interpolate from known records using pace
+  const distances = Object.keys(WORLD_RECORDS).map(Number).sort((a, b) => a - b);
+  if (meters < distances[0]) {
+    // Extrapolate from shortest: use 1500m pace
+    const wr = WORLD_RECORDS[String(distances[0])];
+    const pace = wr / distances[0];
+    return Math.floor(meters * pace * 0.92); // faster for shorter
+  }
+  if (meters > distances[distances.length - 1]) {
+    // Beyond marathon: extrapolate from marathon pace
+    const wr = WORLD_RECORDS[String(distances[distances.length - 1])];
+    const pace = wr / distances[distances.length - 1];
+    return Math.floor(meters * pace * 1.05); // slower for ultra
+  }
+  // Linear interpolation
+  for (let i = 0; i < distances.length - 1; i++) {
+    if (meters >= distances[i] && meters <= distances[i + 1]) {
+      const ratio = (meters - distances[i]) / (distances[i + 1] - distances[i]);
+      const paceA = WORLD_RECORDS[String(distances[i])] / distances[i];
+      const paceB = WORLD_RECORDS[String(distances[i + 1])] / distances[i + 1];
+      const pace = paceA + ratio * (paceB - paceA);
+      return Math.floor(meters * pace);
+    }
+  }
+  return null;
+}
+
+type DistanceCategory = "road" | "track" | "custom";
+
+const ROAD_DISTANCES = [
+  { label: "5K", labelZh: "5公里", meters: 5000 },
+  { label: "10K", labelZh: "10公里", meters: 10000 },
+  { label: "15K", labelZh: "15公里", meters: 15000 },
+  { label: "10 Mile", labelZh: "10英里", meters: 16093.4 },
+  { label: "Half Marathon", labelZh: "半馬拉松", meters: 21097.5 },
+  { label: "Marathon", labelZh: "馬拉松", meters: 42195 },
+];
+
+const TRACK_DISTANCES = [
+  { label: "1500m", labelZh: "1500米", meters: 1500 },
+  { label: "1 Mile", labelZh: "1英里", meters: 1609.34 },
+  { label: "3K", labelZh: "3公里", meters: 3000 },
+  { label: "5K", labelZh: "5公里", meters: 5000 },
+  { label: "10K", labelZh: "10公里", meters: 10000 },
+];
+
+const formatTimeSec = (totalSeconds: number): string => {
+  const m = Math.floor(totalSeconds / 60);
+  const s = Math.round(totalSeconds % 60);
+  if (m === 0) return `${s}`;
+  return `${m}:${s.toString().padStart(2, "0")}`;
+};
+
+const formatFullTime = (totalSeconds: number): string => {
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  const s = Math.round(totalSeconds % 60);
+  if (h > 0) return `${h}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+  return `${m}:${s.toString().padStart(2, "0")}`;
+};
+
+const CalculatorTab = ({ score, setScore, lang, onCalculated }: Props) => {
+  const [category, setCategory] = useState<DistanceCategory>("road");
+  const [selectedMeters, setSelectedMeters] = useState(42195);
+  const [customDistance, setCustomDistance] = useState("10");
+  const [hours, setHours] = useState("3");
+  const [minutes, setMinutes] = useState("45");
+  const [seconds, setSeconds] = useState("0");
+  const [paceUnit, setPaceUnit] = useState<PaceUnit>("km");
+  const [worldRecordError, setWorldRecordError] = useState<string | null>(null);
+
+  const distancesForCategory = category === "road" ? ROAD_DISTANCES : category === "track" ? TRACK_DISTANCES : [];
 
   const getDistanceMeters = useCallback((): number => {
-    if (distanceIdx === 0) {
+    if (category === "custom") {
       const val = parseFloat(customDistance || "0");
       return paceUnit === "mi" ? val * MI_TO_KM * 1000 : val * 1000;
     }
-    return distanceOptions[distanceIdx].meters;
-  }, [distanceIdx, customDistance, paceUnit, distanceOptions]);
+    return selectedMeters;
+  }, [category, customDistance, paceUnit, selectedMeters]);
 
-  const parseTime = (input: string): number => {
-    const parts = input.split(":").map((p) => parseInt(p || "0"));
-    if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
-    if (parts.length === 2) return parts[0] * 60 + parts[1];
-    return parts[0];
-  };
+  const totalSeconds = useMemo(() => {
+    const h = parseInt(hours || "0");
+    const m = parseInt(minutes || "0");
+    const s = parseInt(seconds || "0");
+    return h * 3600 + m * 60 + s;
+  }, [hours, minutes, seconds]);
 
-  const formatTimeSec = (totalSeconds: number): string => {
-    const m = Math.floor(totalSeconds / 60);
-    const s = Math.round(totalSeconds % 60);
-    if (m === 0) return `${s}`;
-    return `${m}:${s.toString().padStart(2, "0")}`;
-  };
-
-  // Compute pace string from time + distance
-  const computePace = (): string => {
+  const paceDisplay = useMemo(() => {
     const dist = getDistanceMeters();
-    const secs = parseTime(timeInput);
-    if (dist <= 0 || secs <= 0) return "";
+    if (dist <= 0 || totalSeconds <= 0) return "--:--";
     const unitDist = paceUnit === "mi" ? 1609.34 : 1000;
-    const pacePerUnit = secs / (dist / unitDist);
+    const pacePerUnit = totalSeconds / (dist / unitDist);
     return formatTimeSec(pacePerUnit);
-  };
+  }, [getDistanceMeters, totalSeconds, paceUnit]);
 
-  // When time changes, update pace display
-  const handleTimeChange = (val: string) => {
-    setTimeInput(val);
-    // Clear manual pace so it recalculates
-    setPaceInput("");
-  };
-
-  // When pace changes, update time
-  const handlePaceChange = (val: string) => {
-    setPaceInput(val);
-    const paceSecs = parseTime(val);
+  const distanceDisplay = useMemo(() => {
     const dist = getDistanceMeters();
-    if (paceSecs <= 0 || dist <= 0) return;
-    const unitDist = paceUnit === "mi" ? 1609.34 : 1000;
-    const totalSecs = paceSecs * (dist / unitDist);
-    // Format time
-    const h = Math.floor(totalSecs / 3600);
-    const m = Math.floor((totalSecs % 3600) / 60);
-    const s = Math.round(totalSecs % 60);
-    if (h > 0) {
-      setTimeInput(`${h}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`);
-    } else {
-      setTimeInput(`${m}:${s.toString().padStart(2, "0")}`);
-    }
-  };
+    if (paceUnit === "mi") return `${(dist / 1609.34).toFixed(1)} mi`;
+    return `${(dist / 1000).toFixed(1)} km`;
+  }, [getDistanceMeters, paceUnit]);
 
-  // Toggle unit and convert custom distance
   const toggleUnit = () => {
     const newUnit = paceUnit === "km" ? "mi" : "km";
-    if (distanceIdx === 0) {
+    if (category === "custom") {
       const val = parseFloat(customDistance || "0");
-      if (newUnit === "mi") {
-        setCustomDistance((val * KM_TO_MI).toFixed(2));
-      } else {
-        setCustomDistance((val * MI_TO_KM).toFixed(2));
-      }
+      setCustomDistance(newUnit === "mi" ? (val * KM_TO_MI).toFixed(2) : (val * MI_TO_KM).toFixed(2));
     }
     setPaceUnit(newUnit);
-    setPaceInput(""); // recalculate
   };
-
-  const displayPace = paceInput || computePace() || "0:00";
 
   const handleCalculate = () => {
     const dist = getDistanceMeters();
-    const secs = parseTime(timeInput);
-    if (dist <= 0 || secs <= 0) return;
-    const result = calculateRunningScore(dist, secs);
+    if (dist <= 0 || totalSeconds <= 0) return;
+
+    // World record check
+    const wr = getWorldRecordSeconds(dist);
+    if (wr && totalSeconds < wr) {
+      const wrFormatted = formatFullTime(wr);
+      setWorldRecordError(
+        lang === "zh"
+          ? `此時間快於世界紀錄 (${wrFormatted})，請輸入合理時間。`
+          : `This time is faster than the world record (${wrFormatted}). Please enter a realistic time.`
+      );
+      return;
+    }
+    setWorldRecordError(null);
+
+    const result = calculateRunningScore(dist, totalSeconds);
     const rounded = Math.round(result * 10) / 10;
     if (rounded <= 0) return;
     setScore(rounded);
@@ -114,128 +174,176 @@ const CalculatorTab = ({ score, setScore, lang, onCalculated }: Props) => {
   };
 
   const handleReset = () => {
-    setDistanceIdx(0);
-    setCustomDistance("0.4");
-    setTimeInput("2:40");
-    setPaceInput("");
+    setCategory("road");
+    setSelectedMeters(42195);
+    setCustomDistance("10");
+    setHours("3");
+    setMinutes("45");
+    setSeconds("0");
     setPaceUnit("km");
     setScore(null);
+    setWorldRecordError(null);
   };
 
+  const handleDistanceSelect = (meters: number) => {
+    setSelectedMeters(meters);
+    setWorldRecordError(null);
+  };
 
   return (
-    <div className="px-5 pt-4 max-w-lg mx-auto">
-      <p className="text-sm text-muted-foreground mb-4">
-        {t("instruction", lang)}
-      </p>
-
-      {/* Form */}
-      <div className="bg-card rounded-2xl border border-border p-5 space-y-5">
-        {/* Distance Dropdown */}
-        <div className="relative">
-          <label className="text-xs text-muted-foreground mb-1 block">{t("distance", lang)}</label>
+    <div className="px-5 pt-4 max-w-lg mx-auto space-y-5">
+      {/* Result Display */}
+      <div className="bg-card rounded-2xl border border-border p-5 text-center space-y-1">
+        <div className="flex items-center justify-end mb-2">
           <button
-            onClick={() => setShowDropdown(!showDropdown)}
-            className="w-full flex items-center justify-between bg-card border border-border rounded-lg px-4 py-3 text-foreground text-base"
+            onClick={toggleUnit}
+            className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors bg-muted/50 px-3 py-1.5 rounded-full"
           >
-            <span>
-              {lang === "zh"
-                ? distanceOptions[distanceIdx].labelZh
-                : distanceOptions[distanceIdx].label}
-            </span>
-            <ChevronDown size={18} className="text-muted-foreground" />
+            {paceUnit} <ArrowLeftRight size={14} />
           </button>
-          {showDropdown && (
-            <div className="absolute z-10 left-0 right-0 mt-1 bg-card border border-border rounded-lg shadow-lg max-h-60 overflow-y-auto">
-              {distanceOptions.map((d, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => {
-                    setDistanceIdx(idx);
-                    setShowDropdown(false);
-                    setPaceInput("");
-                  }}
-                  className={`w-full text-left px-4 py-2.5 text-sm hover:bg-accent transition-colors ${
-                    idx === distanceIdx ? "text-primary font-semibold" : "text-foreground"
-                  }`}
-                >
-                  {lang === "zh" ? d.labelZh : d.label}
-                </button>
-              ))}
-            </div>
-          )}
+        </div>
+        <p className="text-4xl font-display font-bold text-foreground tracking-tight">
+          {totalSeconds > 0 ? formatFullTime(totalSeconds) : "0:00"}
+        </p>
+        <p className="text-lg font-semibold text-primary">
+          {paceDisplay} /{paceUnit}
+        </p>
+        <p className="text-sm text-muted-foreground">{distanceDisplay}</p>
+      </div>
+
+      {/* Distance Section */}
+      <div className="space-y-3">
+        <label className="text-sm font-medium text-foreground block">
+          {t("distance", lang)}
+        </label>
+
+        {/* Category Tabs */}
+        <div className="flex gap-1 bg-muted/50 p-1 rounded-lg">
+          {(["road", "track", "custom"] as DistanceCategory[]).map((cat) => (
+            <button
+              key={cat}
+              onClick={() => {
+                setCategory(cat);
+                setWorldRecordError(null);
+              }}
+              className={`flex-1 py-2 text-sm font-medium rounded-md transition-colors ${
+                category === cat
+                  ? "bg-card text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {cat === "road"
+                ? lang === "zh" ? "公路" : "Road"
+                : cat === "track"
+                ? lang === "zh" ? "田徑" : "Track"
+                : lang === "zh" ? "自訂" : "Custom"}
+            </button>
+          ))}
         </div>
 
-        {/* Custom Distance (shown when "Other") */}
-        {distanceIdx === 0 && (
-          <div>
-            <label className="text-xs text-muted-foreground mb-1 block">
-              {t("distance", lang)}
-            </label>
-            <div className="flex items-center border border-border rounded-lg px-4 py-3">
-              <input
-                type="number"
-                value={customDistance}
-                onChange={(e) => {
-                  setCustomDistance(e.target.value);
-                  setPaceInput("");
-                }}
-                className="flex-1 bg-transparent text-foreground text-base focus:outline-none"
-                step="0.1"
-                min="0"
-              />
+        {/* Distance Grid or Custom Input */}
+        {category === "custom" ? (
+          <div className="flex items-center border border-border rounded-xl px-4 py-3 bg-card">
+            <input
+              type="number"
+              value={customDistance}
+              onChange={(e) => {
+                setCustomDistance(e.target.value);
+                setWorldRecordError(null);
+              }}
+              className="flex-1 bg-transparent text-foreground text-base focus:outline-none"
+              step="0.1"
+              min="0"
+              placeholder={paceUnit === "mi" ? "miles" : "km"}
+            />
+            <span className="text-sm text-muted-foreground font-medium">{paceUnit}</span>
+          </div>
+        ) : (
+          <div className="grid grid-cols-3 gap-2">
+            {distancesForCategory.map((d) => (
               <button
-                onClick={toggleUnit}
-                className="flex items-center gap-1 text-muted-foreground text-sm ml-2 hover:text-foreground transition-colors"
+                key={d.meters}
+                onClick={() => handleDistanceSelect(d.meters)}
+                className={`py-3 px-2 rounded-xl text-center transition-all border ${
+                  selectedMeters === d.meters
+                    ? "border-primary bg-primary/5 text-primary font-semibold"
+                    : "border-border bg-card text-foreground hover:border-primary/40"
+                }`}
               >
-                <span className="font-medium">{paceUnit}</span>
-                <ArrowLeftRight size={16} />
+                <span className="text-sm font-medium block">
+                  {lang === "zh" ? d.labelZh : d.label}
+                </span>
+                <span className="text-[11px] text-muted-foreground">
+                  {paceUnit === "mi"
+                    ? `${(d.meters / 1609.34).toFixed(1)} mi`
+                    : `${(d.meters / 1000).toFixed(1)} km`}
+                </span>
               </button>
-            </div>
+            ))}
           </div>
         )}
+      </div>
 
-        {/* Time */}
-        <div>
-          <label className="text-xs text-muted-foreground mb-1 block">{t("time", lang)}</label>
-          <div className="flex items-center border border-border rounded-lg px-4 py-3">
+      {/* Goal Time */}
+      <div className="space-y-3">
+        <label className="text-sm font-medium text-foreground block">
+          {lang === "zh" ? "目標時間" : "Goal Time"}
+        </label>
+        <div className="flex items-center justify-center gap-2">
+          <div className="flex flex-col items-center">
             <input
-              type="text"
-              value={timeInput}
-              onChange={(e) => handleTimeChange(e.target.value)}
-              placeholder="mm:ss or h:mm:ss"
-              className="flex-1 bg-transparent text-foreground text-base focus:outline-none"
+              type="number"
+              value={hours}
+              onChange={(e) => { setHours(e.target.value); setWorldRecordError(null); }}
+              min="0"
+              max="99"
+              className="w-16 h-14 text-center text-2xl font-display font-bold bg-card border border-border rounded-xl text-foreground focus:outline-none focus:border-primary transition-colors"
             />
-            <Clock size={18} className="text-muted-foreground" />
+            <span className="text-[11px] text-muted-foreground mt-1">
+              {lang === "zh" ? "時" : "hr"}
+            </span>
           </div>
-        </div>
-
-        {/* Pace (editable) */}
-        <div>
-          <label className="text-xs text-muted-foreground mb-1 block">
-            {lang === "zh" ? "配速" : "Pace"}
-          </label>
-          <div className="flex items-center border border-border rounded-lg px-4 py-3">
+          <span className="text-2xl font-bold text-muted-foreground pb-5">:</span>
+          <div className="flex flex-col items-center">
             <input
-              type="text"
-              value={displayPace}
-              onChange={(e) => handlePaceChange(e.target.value)}
-              placeholder="m:ss"
-              className="flex-1 bg-transparent text-foreground text-base focus:outline-none"
+              type="number"
+              value={minutes}
+              onChange={(e) => { setMinutes(e.target.value); setWorldRecordError(null); }}
+              min="0"
+              max="59"
+              className="w-16 h-14 text-center text-2xl font-display font-bold bg-card border border-border rounded-xl text-foreground focus:outline-none focus:border-primary transition-colors"
             />
-            <button
-              onClick={toggleUnit}
-              className="flex items-center gap-1 text-muted-foreground text-sm hover:text-foreground transition-colors"
-            >
-              <span className="font-medium">/ {paceUnit}</span>
-              <ArrowLeftRight size={14} />
-            </button>
+            <span className="text-[11px] text-muted-foreground mt-1">
+              {lang === "zh" ? "分" : "min"}
+            </span>
+          </div>
+          <span className="text-2xl font-bold text-muted-foreground pb-5">:</span>
+          <div className="flex flex-col items-center">
+            <input
+              type="number"
+              value={seconds}
+              onChange={(e) => { setSeconds(e.target.value); setWorldRecordError(null); }}
+              min="0"
+              max="59"
+              className="w-16 h-14 text-center text-2xl font-display font-bold bg-card border border-border rounded-xl text-foreground focus:outline-none focus:border-primary transition-colors"
+            />
+            <span className="text-[11px] text-muted-foreground mt-1">
+              {lang === "zh" ? "秒" : "sec"}
+            </span>
           </div>
         </div>
       </div>
 
+      {/* World Record Warning */}
+      {worldRecordError && (
+        <div className="flex items-start gap-2 bg-destructive/10 border border-destructive/20 rounded-xl px-4 py-3">
+          <AlertTriangle size={18} className="text-destructive shrink-0 mt-0.5" />
+          <p className="text-sm text-destructive">{worldRecordError}</p>
+        </div>
+      )}
+
       {/* Actions */}
-      <div className="flex items-center justify-center gap-6 mt-6">
+      <div className="flex items-center justify-center gap-6 pt-1">
         <button
           onClick={handleReset}
           className="flex flex-col items-center gap-1 text-muted-foreground"
@@ -253,31 +361,6 @@ const CalculatorTab = ({ score, setScore, lang, onCalculated }: Props) => {
           {t("calculate", lang)}
         </button>
       </div>
-
-    </div>
-  );
-};
-
-const QUOTES = [
-  { en: "The miracle isn't that I finished. The miracle is that I had the courage to start.", zh: "奇蹟不是我跑完了，而是我有勇氣起跑。", author: "John Bingham" },
-  { en: "Run when you can, walk if you have to, crawl if you must; just never give up.", zh: "能跑就跑，必要時走，實在不行就爬；但永遠不要放棄。", author: "Dean Karnazes" },
-  { en: "It's very hard in the beginning to understand that the whole idea is not to beat the other runners. Eventually you learn that the competition is against the little voice inside you.", zh: "一開始很難理解，跑步的意義不是擊敗別人，最終你會明白，真正的對手是內心那個想放棄的聲音。", author: "George Sheehan" },
-  { en: "I run because if I didn't, I'd be sluggish and glum and spend too much time on the couch.", zh: "我跑步，因為如果不跑，我會變得懶散、沮喪，整天躺在沙發上。", author: "Harvey Mackay" },
-  { en: "Running is nothing more than a series of arguments between the part of your brain that wants to stop and the part that wants to keep going.", zh: "跑步不過是大腦中想停下來和想繼續跑的兩個聲音之間的爭論。", author: "Unknown" },
-  { en: "There is no finish line. The journey is the destination.", zh: "沒有終點線，旅程本身就是目的地。", author: "Unknown" },
-  { en: "Every morning in Africa, a gazelle wakes up. It knows it must outrun the fastest lion or it will be killed.", zh: "在非洲，每天早上一隻瞪羚醒來，牠知道必須跑得比最快的獅子快，否則就會被吃掉。", author: "African Proverb" },
-  { en: "Pain is temporary. Quitting lasts forever.", zh: "痛苦是暫時的，放棄卻是永遠的。", author: "Lance Armstrong" },
-];
-
-const RunningQuote = ({ lang }: { lang: Lang }) => {
-  const [idx] = useState(() => Math.floor(Math.random() * QUOTES.length));
-  const q = QUOTES[idx];
-  return (
-    <div className="text-center space-y-2 py-4 border-t border-border">
-      <p className="text-sm italic text-muted-foreground leading-relaxed">
-        "{lang === "zh" ? q.zh : q.en}"
-      </p>
-      <p className="text-xs text-muted-foreground/70">— {q.author}</p>
     </div>
   );
 };

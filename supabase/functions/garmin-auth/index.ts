@@ -74,12 +74,13 @@ async function garminLogin(
   const cookies: Record<string, string> = {};
 
   function extractCookies(resp: Response) {
-    for (const [key, value] of resp.headers.entries()) {
-      if (key.toLowerCase() === "set-cookie") {
-        const parts = value.split(";")[0].split("=");
-        if (parts.length >= 2) {
-          cookies[parts[0].trim()] = parts.slice(1).join("=").trim();
-        }
+    // Deno's Headers.entries() collapses Set-Cookie headers.
+    // Use getSetCookie() which returns all Set-Cookie values as an array.
+    const setCookieHeaders = resp.headers.getSetCookie?.() ?? [];
+    for (const value of setCookieHeaders) {
+      const parts = value.split(";")[0].split("=");
+      if (parts.length >= 2) {
+        cookies[parts[0].trim()] = parts.slice(1).join("=").trim();
       }
     }
   }
@@ -110,26 +111,32 @@ async function garminLogin(
   });
 
   // Step 1: Initialize SSO session
+  console.log("[garmin-auth] Step 1: Init SSO session");
   const embedResp = await fetch(`${SSO}/embed?${ssoEmbedParams}`, {
     headers: { "User-Agent": USER_AGENT },
     redirect: "manual",
   });
   extractCookies(embedResp);
   await embedResp.text(); // consume body
+  console.log("[garmin-auth] Step 1 done, cookies:", Object.keys(cookies).join(", "));
 
   // Step 2: Get CSRF token from signin page
+  console.log("[garmin-auth] Step 2: Get CSRF token");
   const signinResp = await fetch(`${SSO}/signin?${signinParams}`, {
     headers: { "User-Agent": USER_AGENT, Cookie: cookieHeader() },
     redirect: "manual",
   });
   extractCookies(signinResp);
   const signinHtml = await signinResp.text();
+  console.log("[garmin-auth] Step 2 done, status:", signinResp.status, "html length:", signinHtml.length);
 
   const csrfMatch = signinHtml.match(/name="_csrf"\s+value="(.+?)"/);
   if (!csrfMatch) {
+    console.error("[garmin-auth] CSRF not found. First 500 chars:", signinHtml.substring(0, 500));
     throw new Error("Could not find CSRF token in Garmin SSO response");
   }
   const csrfToken = csrfMatch[1];
+  console.log("[garmin-auth] CSRF token found");
 
   // Step 3: Submit login form
   const loginBody = new URLSearchParams({

@@ -9,7 +9,9 @@ import {
   Activity,
   ChevronDown,
   ChevronRight,
+  HelpCircle,
 } from "lucide-react";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Lang, t } from "@/lib/i18n";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";

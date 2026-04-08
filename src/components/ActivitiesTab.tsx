@@ -9,7 +9,9 @@ import {
   Activity,
   ChevronDown,
   ChevronRight,
+  HelpCircle,
 } from "lucide-react";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Lang, t } from "@/lib/i18n";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -98,7 +100,7 @@ const TodayStats = ({ lang, healthStats }: { lang: Lang; healthStats: HealthStat
       label: lang === "zh" ? "距離" : "Distance",
       value: stats.walkRunDistanceKm > 0 ? `${stats.walkRunDistanceKm}` : "--",
       unit: "km",
-      tooltip: lang === "zh" ? "今日步行與跑步的總距離" : "Total distance walked and ran today",
+      tooltip: lang === "zh" ? "今日跑步與步行的總距離" : "Today's Running and Walking Distance",
     },
     {
       emoji: "🛏️",
@@ -120,9 +122,16 @@ const TodayStats = ({ lang, healthStats }: { lang: Lang; healthStats: HealthStat
               <span className="text-base">{card.emoji}</span>
               <span className="text-xs font-medium text-muted-foreground">{card.label}</span>
               {card.tooltip && (
-                <span className="text-muted-foreground cursor-help text-[10px]" title={card.tooltip}>
-                  ❓
-                </span>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button className="text-muted-foreground hover:text-foreground transition-colors">
+                      <HelpCircle size={12} />
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent side="top" className="text-xs w-auto max-w-[200px] p-2">
+                    {card.tooltip}
+                  </PopoverContent>
+                </Popover>
               )}
             </div>
             <div className="flex items-baseline gap-1">

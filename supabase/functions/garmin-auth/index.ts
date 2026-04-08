@@ -63,6 +63,24 @@ function buildOAuth1Header(params: Record<string, string>): string {
 }
 
 // --- SSO Login Flow ---
+interface GarminAuthDiagnostics {
+  stage?: string;
+  status?: number;
+  htmlLength?: number;
+  cookieNames?: string[];
+  title?: string;
+}
+
+class GarminAuthError extends Error {
+  diagnostics: GarminAuthDiagnostics;
+
+  constructor(message: string, diagnostics: GarminAuthDiagnostics = {}) {
+    super(message);
+    this.name = "GarminAuthError";
+    this.diagnostics = diagnostics;
+  }
+}
+
 async function garminLogin(
   email: string,
   password: string,
@@ -70,17 +88,25 @@ async function garminLogin(
   oauth2Token: any;
   displayName: string;
 }> {
-  // Use a cookie jar approach with manual cookie tracking
   const cookies: Record<string, string> = {};
 
   function extractCookies(resp: Response) {
-    // Deno's Headers.entries() collapses Set-Cookie headers.
-    // Use getSetCookie() which returns all Set-Cookie values as an array.
-    const setCookieHeaders = resp.headers.getSetCookie?.() ?? [];
-    for (const value of setCookieHeaders) {
-      const parts = value.split(";")[0].split("=");
-      if (parts.length >= 2) {
-        cookies[parts[0].trim()] = parts.slice(1).join("=").trim();
+    const combinedSetCookie = resp.headers.get("set-cookie");
+    const discreteSetCookies = resp.headers.getSetCookie?.() ?? [];
+    const cookieStrings =
+      discreteSetCookies.length > 0
+        ? discreteSetCookies
+        : combinedSetCookie
+          ? (combinedSetCookie.match(/(?:^|, )[^=;,\s]+=[^;]*(?:;[^,]*(?:(?!,\s[^=;,\s]+=)[^,])*)?/g) ?? [])
+          : [];
+
+    for (const cookieString of cookieStrings) {
+      const firstPart = cookieString.split(";")[0];
+      const eqIndex = firstPart.indexOf("=");
+      if (eqIndex > 0) {
+        const name = firstPart.slice(0, eqIndex).trim();
+        const value = firstPart.slice(eqIndex + 1).trim();
+        if (name) cookies[name] = value;
       }
     }
   }
@@ -110,17 +136,15 @@ async function garminLogin(
     redirectAfterAccountCreationUrl: SSO_EMBED,
   });
 
-  // Step 1: Initialize SSO session
   console.log("[garmin-auth] Step 1: Init SSO session");
   const embedResp = await fetch(`${SSO}/embed?${ssoEmbedParams}`, {
     headers: { "User-Agent": USER_AGENT },
     redirect: "manual",
   });
   extractCookies(embedResp);
-  await embedResp.text(); // consume body
+  await embedResp.text();
   console.log("[garmin-auth] Step 1 done, cookies:", Object.keys(cookies).join(", "));
 
-  // Step 2: Get CSRF token from signin page
   console.log("[garmin-auth] Step 2: Get CSRF token");
   const signinResp = await fetch(`${SSO}/signin?${signinParams}`, {
     headers: { "User-Agent": USER_AGENT, Cookie: cookieHeader() },
@@ -130,10 +154,14 @@ async function garminLogin(
   const signinHtml = await signinResp.text();
   console.log("[garmin-auth] Step 2 done, status:", signinResp.status, "html length:", signinHtml.length);
 
-  const csrfMatch = signinHtml.match(/name="_csrf"\s+value="(.+?)"/);
+  const csrfMatch = typeof signinHtml === "string" ? signinHtml.match(/name="_csrf"\s+value="(.+?)"/) : null;
   if (!csrfMatch) {
-    console.error("[garmin-auth] CSRF not found. First 500 chars:", signinHtml.substring(0, 500));
-    throw new Error("Could not find CSRF token in Garmin SSO response");
+    throw new GarminAuthError("Could not find CSRF token in Garmin SSO response", {
+      stage: "csrf",
+      status: signinResp.status,
+      htmlLength: typeof signinHtml === "string" ? signinHtml.length : 0,
+      cookieNames: Object.keys(cookies),
+    });
   }
   const csrfToken = csrfMatch[1];
   console.log("[garmin-auth] CSRF token found");
@@ -160,22 +188,38 @@ async function garminLogin(
   extractCookies(loginResp);
   const loginHtml = await loginResp.text();
 
-  // Check for MFA or failure
-  const titleMatch = loginHtml.match(/<title>(.+?)<\/title>/);
+  const titleMatch = typeof loginHtml === "string" ? loginHtml.match(/<title>(.+?)<\/title>/) : null;
   const title = titleMatch ? titleMatch[1] : "";
 
   if (title.includes("MFA")) {
-    throw new Error("MFA_REQUIRED: Garmin account has MFA enabled. Please disable MFA temporarily or contact support.");
+    throw new GarminAuthError(
+      "MFA_REQUIRED: Garmin account has MFA enabled. Please disable MFA temporarily or contact support.",
+      {
+        stage: "login",
+        status: loginResp.status,
+        title,
+        htmlLength: typeof loginHtml === "string" ? loginHtml.length : 0,
+      },
+    );
   }
 
   if (title !== "Success") {
-    throw new Error(`Login failed: ${title || "Invalid credentials"}`);
+    throw new GarminAuthError(`Login failed: ${title || "Invalid credentials"}`, {
+      stage: "login",
+      status: loginResp.status,
+      title,
+      htmlLength: typeof loginHtml === "string" ? loginHtml.length : 0,
+    });
   }
 
-  // Step 4: Extract ticket
-  const ticketMatch = loginHtml.match(/embed\?ticket=([^"]+)"/);
+  const ticketMatch = typeof loginHtml === "string" ? loginHtml.match(/embed\?ticket=([^"]+)"/) : null;
   if (!ticketMatch) {
-    throw new Error("Could not find login ticket in response");
+    throw new GarminAuthError("Could not find login ticket in response", {
+      stage: "ticket",
+      status: loginResp.status,
+      title,
+      htmlLength: typeof loginHtml === "string" ? loginHtml.length : 0,
+    });
   }
   const ticket = ticketMatch[1];
 
@@ -367,7 +411,8 @@ Deno.serve(async (req) => {
   } catch (err) {
     console.error("[garmin-auth] Error:", err);
     const message = err instanceof Error ? err.message : "Unknown error";
-    return new Response(JSON.stringify({ error: message }), {
+    const diagnostics = err instanceof GarminAuthError ? err.diagnostics : undefined;
+    return new Response(JSON.stringify({ error: message, diagnostics }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

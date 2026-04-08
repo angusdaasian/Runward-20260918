@@ -160,13 +160,13 @@ const Landing = () => {
           {/* Right — hero phones */}
           <div className={`relative flex justify-center items-end gap-4 transition-all duration-700 delay-200 ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}>
             <div className="relative -rotate-6 translate-y-4">
-              <IPhoneFrame src={trainingScreenshot} alt="Training" className="w-[180px] md:w-[210px]" />
+              <IPhoneFrame src={zh ? trainingScreenshotZh : trainingScreenshot} alt="Training" className="w-[180px] md:w-[210px]" />
             </div>
             <div className="relative z-10">
-              <IPhoneFrame src={rewardsScreenshot} alt="Rewards" className="w-[200px] md:w-[240px]" />
+              <IPhoneFrame src={zh ? rewardsScreenshotZh : rewardsScreenshot} alt="Rewards" className="w-[200px] md:w-[240px]" />
             </div>
             <div className="relative rotate-6 translate-y-4">
-              <IPhoneFrame src={racesScreenshot} alt="Races" className="w-[180px] md:w-[210px]" />
+              <IPhoneFrame src={zh ? racesScreenshotZh : racesScreenshot} alt="Races" className="w-[180px] md:w-[210px]" />
             </div>
           </div>
         </div>

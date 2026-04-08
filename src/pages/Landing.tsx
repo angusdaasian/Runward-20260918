@@ -14,6 +14,12 @@ import racesScreenshot from "@/assets/screenshots/races.png";
 import postureScreenshot from "@/assets/screenshots/posture.png";
 import calculatorScreenshot from "@/assets/screenshots/calculator.png";
 
+import rewardsScreenshotZh from "@/assets/screenshots/rewards-zh.png";
+import trainingScreenshotZh from "@/assets/screenshots/training-zh.png";
+import racesScreenshotZh from "@/assets/screenshots/races-zh.png";
+import postureScreenshotZh from "@/assets/screenshots/posture-zh.png";
+import calculatorScreenshotZh from "@/assets/screenshots/calculator-zh.png";
+
 const APP_STORE_URL = "https://apps.apple.com/us/app/runward/id6761060757";
 
 type Lang = "en" | "zh";

@@ -10,6 +10,7 @@ import { useAuth } from "@/contexts/AuthContext";
 interface Race {
   id: string;
   name: string;
+  name_zh: string | null;
   race_date: string;
   city: string;
   country: string;
@@ -22,6 +23,7 @@ interface Race {
 
 interface GroupedRace {
   name: string;
+  name_zh: string | null;
   race_date: string;
   city: string;
   country: string;
@@ -253,6 +255,7 @@ const RaceTab = ({ lang }: Props) => {
         if (r.name.length > existing.name.length && /[a-zA-Z]/.test(r.name)) {
           existing.name = r.name;
         }
+        if (!existing.name_zh && (r as any).name_zh) existing.name_zh = (r as any).name_zh;
         if (!existing.website_url && r.website_url) existing.website_url = r.website_url;
         if ((r.description?.length ?? 0) > (existing.description?.length ?? 0)) existing.description = r.description;
         existing.city = loc.city;
@@ -260,6 +263,7 @@ const RaceTab = ({ lang }: Props) => {
       } else {
         map.set(key, {
           name: r.name,
+          name_zh: (r as any).name_zh || null,
           race_date: r.race_date,
           city: loc.city,
           country: loc.country,
@@ -291,6 +295,7 @@ const RaceTab = ({ lang }: Props) => {
         const q = search.toLowerCase();
         if (
           !r.name.toLowerCase().includes(q) &&
+          !(r.name_zh || "").toLowerCase().includes(q) &&
           !r.city.toLowerCase().includes(q) &&
           !r.country.toLowerCase().includes(q)
         )
@@ -575,7 +580,9 @@ const RaceTab = ({ lang }: Props) => {
               className="bg-card border border-border rounded-xl overflow-hidden"
             >
               <div className={`${catColor} px-4 py-2.5`}>
-                <h3 className="font-bold text-white text-sm uppercase tracking-wide">{race.name}</h3>
+                <h3 className="font-bold text-white text-sm uppercase tracking-wide">
+                  {lang === "zh" && race.name_zh ? race.name_zh : race.name}
+                </h3>
               </div>
               <div className="p-4 space-y-2">
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">

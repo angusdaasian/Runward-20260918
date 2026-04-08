@@ -1,4 +1,4 @@
-// scrape-races v2
+// scrape-races v3 – bilingual (name + name_zh)
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.100.0";
 
 const corsHeaders = {
@@ -19,6 +19,7 @@ const SOURCES = {
 
 interface RaceRaw {
   name: string;
+  name_zh: string | null;
   race_date: string;
   city: string;
   country: string;
@@ -30,6 +31,7 @@ interface RaceRaw {
 
 interface RaceRow {
   name: string;
+  name_zh: string | null;
   race_date: string;
   city: string;
   country: string;
@@ -136,6 +138,7 @@ function normRace(race: RaceRaw): RaceRaw {
   return {
     ...race,
     name: ws(race.name),
+    name_zh: race.name_zh ? ws(race.name_zh) : null,
     city: loc.city,
     country: loc.country,
     description: race.description ? ws(race.description) : null,
@@ -211,8 +214,12 @@ function mergeRaces(a: RaceRaw, b: RaceRaw): RaceRaw {
   ]);
   const englishNames = [a.name, b.name].filter((n) => /[a-zA-Z]/.test(n)).sort((x, y) => y.length - x.length);
   const name = englishNames[0] || (a.name.length >= b.name.length ? a.name : b.name);
+  // Merge name_zh: prefer the one that has Chinese characters
+  const zhNames = [a.name_zh, b.name_zh].filter(Boolean) as string[];
+  const name_zh = zhNames[0] || null;
   return normRace({
     name,
+    name_zh,
     race_date: a.race_date,
     city: a.city || b.city,
     country: a.country || b.country,
@@ -244,6 +251,7 @@ function expandRaces(rawRaces: RaceRaw[]): RaceRow[] {
     for (const cat of race.categories) {
       rows.push({
         name: race.name,
+        name_zh: race.name_zh,
         race_date: race.race_date,
         city: race.city,
         country: race.country,
@@ -307,7 +315,7 @@ async function scrapeFlyAreYou(
   for (const chunk of chunks) {
     const prompt = `Extract all running races/marathons from this page content.
 For each race extract:
-- name: the race name
+- name: the race name (in English)
 - race_date: date in YYYY-MM-DD format. Skip if no date found.
 - city: the city where the race takes place
 - country: full country name (e.g. "Japan", "United States", "Hong Kong", "China", "Macau")
@@ -330,6 +338,7 @@ ${chunk}`;
         ...valid.map((r: any) =>
           normRace({
             ...r,
+            name_zh: null,
             source: sourceLabel,
             categories: Array.isArray(r.categories) ? r.categories : [r.category || "Road Race"],
           }),
@@ -359,8 +368,13 @@ You MUST split these into a "categories" array with EVERY distance mapped as fol
 - "23K" → "Half Marathon"
 - "42K" or "全馬" or "FM" → "Full Marathon"
 - "100km" or anything over 42K → "Ultramarathon"
+
+For each race also extract a Chinese name ("name_zh") from the 比賽 column (the original Chinese text).
+And an English name ("name") — translate the Chinese race name to English if no English name is visible.
+
 Return JSON array with:
-- name: race name (from 比賽 column)
+- name: English race name
+- name_zh: Chinese race name (from 比賽 column)
 - race_date: YYYY-MM-DD (year from section header, date from 日期 column like "4.11" → "2026-04-11")
 - city: "Hong Kong"
 - country: "Hong Kong"
@@ -373,7 +387,7 @@ CONTENT:
 ${md.substring(0, 30000)}`;
   const content = await callAI(
     aiKey,
-    "Extract race data with ALL distances as categories array. Return only valid JSON array.",
+    "Extract race data with ALL distances as categories array and both English and Chinese names. Return only valid JSON array.",
     prompt,
   );
   console.log(`HK AI response preview: ${content.substring(0, 500)}`);
@@ -387,14 +401,14 @@ ${md.substring(0, 30000)}`;
         const categories = aiCats || parseDistanceText(desc);
         return normRace({
           ...r,
+          name_zh: r.name_zh || null,
           source: "fitz_hk",
           city: "Hong Kong",
           country: "Hong Kong",
           categories: categories.length > 0 ? categories : [r.category || "Road Race"],
         });
       });
-    for (const r of results)
-      console.log(`  HK race: "${r.name}" → [${r.categories.join(", ")}] (desc: ${r.description})`);
+    for (const r of results) console.log(`  HK race: "${r.name}" (zh: "${r.name_zh}") → [${r.categories.join(", ")}]`);
     return results;
   } catch (e) {
     console.error("HK parse failed:", e);
@@ -411,7 +425,7 @@ async function scrapeChinaRaces(firecrawlKey: string, aiKey: string): Promise<Ra
   for (const chunk of chunks) {
     const prompt = `Extract road running races from this World Athletics calendar for China.
 For each race extract:
-- name: the race/competition name
+- name: the race/competition name in English
 - race_date: date in YYYY-MM-DD format. Skip if no date.
 - city: the city in China
 - country: "China"
@@ -433,6 +447,7 @@ ${chunk}`;
         ...valid.map((r: any) =>
           normRace({
             ...r,
+            name_zh: null,
             source: "world_athletics_china",
             country: "China",
             categories: Array.isArray(r.categories) ? r.categories : [r.category || "Road Race"],
@@ -447,7 +462,6 @@ ${chunk}`;
 }
 
 async function scrapeTaiwanRaces(firecrawlKey: string, aiKey: string): Promise<RaceRaw[]> {
-  // Scrape both English and Chinese versions
   const [mdEn, mdZh] = await Promise.all([
     scrapeWithFirecrawl(SOURCES.taiwan_en, firecrawlKey),
     scrapeWithFirecrawl(SOURCES.taiwan_zh, firecrawlKey),
@@ -458,11 +472,12 @@ async function scrapeTaiwanRaces(firecrawlKey: string, aiKey: string): Promise<R
 
   const prompt = `You are parsing a Taiwan race calendar from taipeimarathon.org.tw. The data is in a table with columns: Race Event, Date, Location, Distance, Organizer, Deadline.
 Both English and Chinese versions of the SAME page are provided. They list the SAME races — do NOT create duplicates.
-Use the ENGLISH name when available. If only Chinese name exists, use it.
 
-For EACH race:
-- name: race name (prefer English)
-- race_date: YYYY-MM-DD. The year is 2025 or 2026 depending on context (month headers like "4月" = April). Use the date from the "Date" column (e.g. "04/11" → use month/day with the year from the section).
+For EACH race, extract BOTH the English name AND Chinese name:
+- name: English race name (from the English version)
+- name_zh: Chinese race name (from the Chinese version). Match them by date + position in the table.
+
+- race_date: YYYY-MM-DD. The year is 2025 or 2026 depending on context (month headers like "4月" = April). Use the date from the "Date" column.
 - city: city/location in Taiwan (e.g. "Taipei", "Yilan", "Pingtung")
 - country: "Taiwan"
 - categories: array of ALL distance categories. Parse the "Distance" column:
@@ -481,7 +496,7 @@ ${CATEGORIES_INSTRUCTION}
 - source: "taipei_marathon_tw"
 
 Only include races with dates on or after ${TODAY}. Skip events labeled as "Activity", "Triathlon", "接力賽" (relay). Focus on running races.
-IMPORTANT: The English and Chinese tables have the SAME races. Output each race ONCE.
+IMPORTANT: The English and Chinese tables have the SAME races. Output each race ONCE with both name and name_zh.
 Return ONLY a valid JSON array.
 
 CONTENT:
@@ -500,13 +515,13 @@ ${combined}`;
         const categories = aiCats || parseDistanceText(desc);
         return normRace({
           ...r,
+          name_zh: r.name_zh || null,
           source: "taipei_marathon_tw",
           country: "Taiwan",
           categories: categories.length > 0 ? categories : [r.category || "Road Race"],
         });
       });
-    for (const r of results)
-      console.log(`  TW race: "${r.name}" → [${r.categories.join(", ")}] (desc: ${r.description})`);
+    for (const r of results) console.log(`  TW race: "${r.name}" (zh: "${r.name_zh}") → [${r.categories.join(", ")}]`);
     return results;
   } catch (e) {
     console.error("Taiwan parse failed:", e);
@@ -561,59 +576,116 @@ ${raceList.substring(0, 20000)}`;
 async function verifyCategoriesWithAI(races: RaceRaw[], aiKey: string): Promise<RaceRaw[]> {
   if (races.length === 0) return races;
   const result: RaceRaw[] = [];
-  for (let i = 0; i < races.length; i += 30) {
-    const batch = races.slice(i, i + 30).map(normRace);
+  for (let i = 0; i < races.length; i += 40) {
+    const batch = races.slice(i, i + 40).map(normRace);
     const raceList = batch
       .map(
         (r, idx) =>
-          `${idx}: "${r.name}" | ${r.race_date} | ${r.city}, ${r.country} | categories: [${r.categories.join(", ")}] | desc: ${r.description || "none"}`,
+          `${idx}: "${r.name}" | ${r.city}, ${r.country} | cats: [${r.categories.join(", ")}] | desc: ${r.description || "none"}`,
       )
       .join("\n");
-    const prompt = `Verify and correct the categories for each race below. Each race should list ALL distances it offers.
-Rules:
-- Valid categories: "Full Marathon", "Half Marathon", "Ultramarathon", "10K", "5K", "3K", "1K", "Road Race"
-- If description shows "3K, 5K, 10K, HM, FM", categories should be ["3K", "5K", "10K", "Half Marathon", "Full Marathon"]
-- Remove "Road Race" if specific distances are known
-Return a JSON array: [{"index": 0, "categories": ["Full Marathon", "Half Marathon", "10K"]}, ...]
-Only include entries where categories should CHANGE. If all are correct, return [].
+    const prompt = `You are a running race expert. Review each race and ensure ALL distance categories are captured.
+RULES:
+1. Many major races offer MULTIPLE distances (e.g. "Tokyo Marathon" → Full Marathon + 10K; most city marathons → Full + Half)
+2. Use your KNOWLEDGE of well-known races to ADD missing categories
+3. Parse description: "1, 3, 10K" = three categories: 1K, 3K, 10K
+4. If name has "Marathon" but only "Road Race" → add "Full Marathon" or "Half Marathon"
+5. Valid: "Full Marathon","Half Marathon","Ultramarathon","10K","5K","3K","1K","Road Race"
+6. Remove "Road Race" if specific distance known
+Return JSON array: [{"index":0,"categories":["Full Marathon","Half Marathon","10K"]},...]
+Only include races needing changes. Return [] if all correct.
 RACES:
 ${raceList}`;
     try {
-      const content = await callAI(aiKey, "Verify race categories. Return only JSON array.", prompt);
+      const content = await callAI(
+        aiKey,
+        "Verify race categories using your knowledge. Return only valid JSON array.",
+        prompt,
+      );
       const changes: { index: number; categories: string[] }[] = JSON.parse(content);
       const changeMap = new Map(changes.map((c) => [c.index, c.categories]));
       for (let j = 0; j < batch.length; j++) {
         const race = { ...batch[j] };
         if (changeMap.has(j)) {
-          const next = sanitizeCats(changeMap.get(j)!, race.description);
-          console.log(`Category fix: "${race.name}" [${race.categories.join(", ")}] → [${next.join(", ")}]`);
-          race.categories = next;
+          const merged = sortCats([...race.categories, ...changeMap.get(j)!]);
+          if (merged.join(",") !== race.categories.join(",")) {
+            console.log(`Cat fix: "${race.name}" [${race.categories.join(",")}] → [${merged.join(",")}]`);
+            race.categories = merged;
+          }
         }
         result.push(normRace(race));
       }
     } catch {
-      console.error("Category verification failed for batch, keeping originals");
+      console.error("Cat verify failed for batch, keeping originals");
       result.push(...batch.map(normRace));
     }
   }
   return result.map(normRace);
 }
 
-/* ── Cross-source dedup: after per-source insert, check ALL races in DB and merge duplicates ── */
+/* ── Translate race names to Chinese ── */
+
+async function translateNamesToZh(races: RaceRaw[], aiKey: string): Promise<RaceRaw[]> {
+  // Only translate races that don't already have name_zh
+  const needTranslation = races.filter((r) => !r.name_zh);
+  if (needTranslation.length === 0) return races;
+
+  console.log(`Translating ${needTranslation.length} race names to Chinese...`);
+  const result = [...races];
+
+  // Process in batches of 50
+  for (let i = 0; i < needTranslation.length; i += 50) {
+    const batch = needTranslation.slice(i, i + 50);
+    const nameList = batch.map((r, idx) => `${idx}: "${r.name}" (${r.city}, ${r.country})`).join("\n");
+    const prompt = `Translate these running race event names to Traditional Chinese (繁體中文).
+Use the official Chinese name if you know it (e.g. "Tokyo Marathon" → "東京馬拉松", "Standard Chartered Hong Kong Marathon" → "渣打香港馬拉松").
+If you don't know the official name, translate naturally.
+Return a JSON array: [{"index": 0, "name_zh": "中文名稱"}, ...]
+Include ALL races. Return ONLY valid JSON array.
+
+RACES:
+${nameList}`;
+    try {
+      const content = await callAI(
+        aiKey,
+        "Translate race names to Traditional Chinese. Return only valid JSON array.",
+        prompt,
+      );
+      const translations: { index: number; name_zh: string }[] = JSON.parse(content);
+      for (const t of translations) {
+        const originalRace = batch[t.index];
+        if (!originalRace) continue;
+        // Find this race in the result array and set name_zh
+        const resultIdx = result.findIndex(
+          (r) => r.name === originalRace.name && r.race_date === originalRace.race_date && !r.name_zh,
+        );
+        if (resultIdx >= 0 && t.name_zh) {
+          result[resultIdx] = { ...result[resultIdx], name_zh: ws(t.name_zh) };
+          console.log(`  Translated: "${originalRace.name}" → "${t.name_zh}"`);
+        }
+      }
+    } catch (e) {
+      console.error(`Translation batch failed:`, e);
+    }
+  }
+  return result;
+}
+
+/* ── Cross-source dedup ── */
 
 async function crossSourceDedup(supabase: any): Promise<{ merged: number; total: number }> {
   const { data: allRows } = await supabase
     .from("races")
-    .select("id, name, race_date, city, country, category, website_url, description, source")
+    .select("id, name, name_zh, race_date, city, country, category, website_url, description, source")
     .gte("race_date", TODAY);
 
   if (!allRows || allRows.length === 0) return { merged: 0, total: 0 };
 
-  // Group DB rows into RaceRaw
   const raceMap = new Map<string, RaceRaw>();
   for (const row of allRows) {
     const nr = normRace({
       name: row.name,
+      name_zh: row.name_zh || null,
       race_date: row.race_date,
       city: row.city,
       country: row.country,
@@ -630,13 +702,11 @@ async function crossSourceDedup(supabase: any): Promise<{ merged: number; total:
     }
   }
 
-  // Now do pairwise merge check (catches Chinese/English duplicates with different keys)
   const compressed = compressRaces(Array.from(raceMap.values()));
   const mergedCount = allRows.length - compressed.reduce((sum: number, r: RaceRaw) => sum + r.categories.length, 0);
 
   if (mergedCount > 0 || compressed.length < raceMap.size) {
     console.log(`Cross-source dedup: ${raceMap.size} grouped → ${compressed.length} unique races`);
-    // Delete all and reinsert
     const { error: delErr } = await supabase.from("races").delete().not("id", "is", null);
     if (delErr) throw new Error(`Cross-source dedup delete: ${delErr.message}`);
     const rows = expandRaces(compressed);
@@ -647,6 +717,7 @@ async function crossSourceDedup(supabase: any): Promise<{ merged: number; total:
         .insert(
           batch.map((r) => ({
             name: r.name,
+            name_zh: r.name_zh,
             race_date: r.race_date,
             city: r.city,
             country: r.country,
@@ -727,6 +798,11 @@ Deno.serve(async (req) => {
     allRawRaces = compressRaces(allRawRaces);
     console.log("Category verification complete");
 
+    // Translate names to Chinese for races that don't have name_zh yet
+    console.log("Translating race names to Chinese...");
+    allRawRaces = await translateNamesToZh(allRawRaces, LOVABLE_API_KEY);
+    console.log("Translation complete");
+
     const allRows = expandRaces(allRawRaces);
     console.log(`Expanded to ${allRows.length} rows from ${allRawRaces.length} races`);
 
@@ -755,6 +831,7 @@ Deno.serve(async (req) => {
           .insert(
             batch.map((r) => ({
               name: r.name,
+              name_zh: r.name_zh,
               race_date: r.race_date,
               city: r.city,
               country: r.country,
@@ -768,7 +845,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Only run cross-source dedup when scraping ALL sources (not per-source)
+    // Only run cross-source dedup when scraping ALL sources
     let dedupResult = { merged: 0, total: allRows.length };
     if (!sourceFilter) {
       console.log("Running cross-source dedup...");

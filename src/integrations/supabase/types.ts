@@ -419,6 +419,7 @@ export type Database = {
           description: string | null
           id: string
           name: string
+          name_zh: string | null
           race_date: string
           registration_info: string | null
           source: string | null
@@ -433,6 +434,7 @@ export type Database = {
           description?: string | null
           id?: string
           name: string
+          name_zh?: string | null
           race_date: string
           registration_info?: string | null
           source?: string | null
@@ -447,6 +449,7 @@ export type Database = {
           description?: string | null
           id?: string
           name?: string
+          name_zh?: string | null
           race_date?: string
           registration_info?: string | null
           source?: string | null

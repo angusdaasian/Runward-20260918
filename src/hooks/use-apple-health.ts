@@ -116,7 +116,7 @@ export function useAppleHealth(lang: Lang) {
       const stats = await readHealthData(1);
       await supabase
         .from("apple_health_connections")
-        .upsert({ user_id: user.id, connected_at: new Date().toISOString() }, { onConflict: "user_id" });
+        .upsert({ user_id: user.id, updated_at: new Date().toISOString() }, { onConflict: "user_id" });
       updateStats(stats);
       setSyncing(false);
       return true;

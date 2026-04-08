@@ -232,7 +232,7 @@ const RaceTab = ({ lang }: Props) => {
         .select("*")
         .gte("race_date", new Date().toISOString().split("T")[0])
         .order("race_date", { ascending: true });
-      setRaces((data as Race[]) || []);
+      setRaces((data as unknown as Race[]) || []);
       if (data && data.length > 0) {
         const latest = data.reduce((a: any, b: any) => (a.updated_at > b.updated_at ? a : b));
         setLastUpdated(latest.updated_at);

@@ -8,23 +8,20 @@ const corsHeaders = {
 
 // Events that grant/update access
 const ACTIVE_EVENTS = [
-  "INITIAL_PURCHASE",        // New subscription or one-time purchase
-  "NON_RENEWING_PURCHASE",   // One-time (consumable/non-consumable) purchase
-  "RENEWAL",                 // Subscription renewed
-  "UNCANCELLATION",          // User resubscribed before expiry
-  "SUBSCRIPTION_EXTENDED",   // Subscription extended (e.g. support grant)
-  "PRODUCT_CHANGE",          // Plan change (upgrade/downgrade/crossgrade)
+  "INITIAL_PURCHASE", // New subscription or one-time purchase
+  "NON_RENEWING_PURCHASE", // One-time (consumable/non-consumable) purchase
+  "RENEWAL", // Subscription renewed
+  "UNCANCELLATION", // User resubscribed before expiry
+  "SUBSCRIPTION_EXTENDED", // Subscription extended (e.g. support grant)
+  "PRODUCT_CHANGE", // Plan change (upgrade/downgrade/crossgrade)
 ];
 
 // Events that revoke access
-const INACTIVE_EVENTS = [
-  "EXPIRATION",
-  "BILLING_ISSUE",
-];
+const INACTIVE_EVENTS = ["EXPIRATION", "BILLING_ISSUE"];
 
 // Events we log but don't act on (cancellation means auto-renew off, NOT immediate revocation)
 const LOG_ONLY_EVENTS = [
-  "CANCELLATION",            // Auto-renew turned off; access continues until expiration
+  "CANCELLATION", // Auto-renew turned off; access continues until expiration
   "SUBSCRIBER_ALIAS",
   "TRANSFER",
   "INVOICE_ISSUANCE",
@@ -68,7 +65,9 @@ Deno.serve(async (req) => {
     // For PRODUCT_CHANGE, the new product info
     const newProductId: string | undefined = event.new_product_id;
 
-    console.log(`RevenueCat webhook: type=${eventType}, app_user_id=${appUserId}, product=${productId}, entitlements=${JSON.stringify(entitlementIds)}`);
+    console.log(
+      `RevenueCat webhook: type=${eventType}, app_user_id=${appUserId}, product=${productId}, entitlements=${JSON.stringify(entitlementIds)}`,
+    );
 
     if (!appUserId) {
       return new Response(JSON.stringify({ error: "No app_user_id" }), {
@@ -86,15 +85,10 @@ Deno.serve(async (req) => {
       });
     }
 
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    );
+    const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
     if (ACTIVE_EVENTS.includes(eventType)) {
-      const activatedAt = purchasedAtMs
-        ? new Date(purchasedAtMs).toISOString()
-        : new Date().toISOString();
+      const activatedAt = purchasedAtMs ? new Date(purchasedAtMs).toISOString() : new Date().toISOString();
 
       // For one-time purchases, there may be no expiration — set far future
       const expiresAt = expirationAtMs
@@ -102,27 +96,37 @@ Deno.serve(async (req) => {
         : new Date(Date.now() + 100 * 365 * 24 * 60 * 60 * 1000).toISOString(); // ~100 years for lifetime
 
       // Use the new product ID for PRODUCT_CHANGE, otherwise current product
-      const effectiveProductId = (eventType === "PRODUCT_CHANGE" && newProductId) 
-        ? newProductId 
-        : (productId || "unknown");
+      const effectiveProductId = eventType === "PRODUCT_CHANGE" && newProductId ? newProductId : productId || "unknown";
 
       // Determine entitlement — use first from entitlement_ids, default to "premium"
       const rcEntitlement = entitlementIds.length > 0 ? entitlementIds[0] : "premium";
 
-      const { error } = await supabase
+      // Revoke premium from any other user with the same plan (subscription transfer)
+      const { data: oldSubs } = await supabase
         .from("premium_subscriptions")
-        .upsert(
-          {
-            user_id: appUserId,
-            plan: effectiveProductId,
-            activated_at: activatedAt,
-            expires_at: expiresAt,
-            is_trial: isTrialPeriod,
-            rc_entitlement: rcEntitlement,
-            created_at: new Date().toISOString(),
-          },
-          { onConflict: "user_id" }
-        );
+        .select("user_id")
+        .eq("plan", effectiveProductId)
+        .neq("user_id", appUserId);
+
+      if (oldSubs && oldSubs.length > 0) {
+        const oldUserIds = oldSubs.map((s: any) => s.user_id);
+        await supabase.from("premium_subscriptions").delete().in("user_id", oldUserIds);
+        await supabase.from("profiles").update({ is_premium: false }).in("user_id", oldUserIds);
+        console.log(`Revoked premium from old users: ${oldUserIds.join(", ")}`);
+      }
+
+      const { error } = await supabase.from("premium_subscriptions").upsert(
+        {
+          user_id: appUserId,
+          plan: effectiveProductId,
+          activated_at: activatedAt,
+          expires_at: expiresAt,
+          is_trial: isTrialPeriod,
+          rc_entitlement: rcEntitlement,
+          created_at: new Date().toISOString(),
+        },
+        { onConflict: "user_id" },
+      );
 
       if (error) {
         console.error("Upsert error:", error);
@@ -135,13 +139,12 @@ Deno.serve(async (req) => {
       // Sync profiles.is_premium
       await supabase.from("profiles").update({ is_premium: true }).eq("user_id", appUserId);
 
-      console.log(`Subscription activated: user=${appUserId}, plan=${effectiveProductId}, entitlement=${rcEntitlement}, trial=${isTrialPeriod}, event=${eventType}`);
+      console.log(
+        `Subscription activated: user=${appUserId}, plan=${effectiveProductId}, entitlement=${rcEntitlement}, trial=${isTrialPeriod}, event=${eventType}`,
+      );
     } else if (INACTIVE_EVENTS.includes(eventType)) {
       // EXPIRATION and BILLING_ISSUE = access should be revoked
-      const { error } = await supabase
-        .from("premium_subscriptions")
-        .delete()
-        .eq("user_id", appUserId);
+      const { error } = await supabase.from("premium_subscriptions").delete().eq("user_id", appUserId);
 
       if (error) {
         console.error("Delete error:", error);

@@ -2,8 +2,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
 Deno.serve(async (req) => {
@@ -20,14 +19,11 @@ Deno.serve(async (req) => {
       });
     }
 
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_ANON_KEY")!,
-      { global: { headers: { Authorization: authHeader } } }
-    );
+    const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, {
+      global: { headers: { Authorization: authHeader } },
+    });
 
-    const { data: userData, error: userError } =
-      await supabase.auth.getUser();
+    const { data: userData, error: userError } = await supabase.auth.getUser();
     if (userError || !userData?.user) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
@@ -40,40 +36,30 @@ Deno.serve(async (req) => {
     const rcSecretKey = Deno.env.get("REVENUECAT_SECRET_KEY");
     if (!rcSecretKey) {
       console.error("REVENUECAT_SECRET_KEY not set");
-      return new Response(
-        JSON.stringify({ error: "Server configuration error" }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
+      return new Response(JSON.stringify({ error: "Server configuration error" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
-    const rcResponse = await fetch(
-      `https://api.revenuecat.com/v1/subscribers/${userId}`,
-      {
-        headers: {
-          Authorization: `Bearer ${rcSecretKey}`,
-          "Content-Type": "application/json",
-        },
-      }
-    );
+    const rcResponse = await fetch(`https://api.revenuecat.com/v1/subscribers/${userId}`, {
+      headers: {
+        Authorization: `Bearer ${rcSecretKey}`,
+        "Content-Type": "application/json",
+      },
+    });
 
     if (!rcResponse.ok) {
       if (rcResponse.status === 404) {
-        return new Response(
-          JSON.stringify({ isPremium: false, synced: false }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        return new Response(JSON.stringify({ isPremium: false, synced: false }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       }
       console.error("RevenueCat API error:", rcResponse.status, await rcResponse.text());
-      return new Response(
-        JSON.stringify({ error: "Failed to check subscription status" }),
-        {
-          status: 502,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
+      return new Response(JSON.stringify({ error: "Failed to check subscription status" }), {
+        status: 502,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     const rcData = await rcResponse.json();
@@ -127,45 +113,49 @@ Deno.serve(async (req) => {
       }
     }
 
-    const serviceClient = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    );
+    const serviceClient = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
     if (isActive && expiresAt && plan) {
-      const { error: upsertError } = await serviceClient
+      // Revoke premium from any other user with the same plan (subscription transfer)
+      const { data: oldSubs } = await serviceClient
         .from("premium_subscriptions")
-        .upsert(
-          {
-            user_id: userId,
-            plan,
-            activated_at: new Date().toISOString(),
-            expires_at: expiresAt,
-            rc_entitlement: rcEntitlement,
-          },
-          { onConflict: "user_id" }
-        );
+        .select("user_id")
+        .eq("plan", plan)
+        .neq("user_id", userId);
+
+      if (oldSubs && oldSubs.length > 0) {
+        const oldUserIds = oldSubs.map((s: any) => s.user_id);
+        await serviceClient.from("premium_subscriptions").delete().in("user_id", oldUserIds);
+        await serviceClient.from("profiles").update({ is_premium: false }).in("user_id", oldUserIds);
+        console.log(`Revoked premium from old users: ${oldUserIds.join(", ")}`);
+      }
+
+      const { error: upsertError } = await serviceClient.from("premium_subscriptions").upsert(
+        {
+          user_id: userId,
+          plan,
+          activated_at: new Date().toISOString(),
+          expires_at: expiresAt,
+          rc_entitlement: rcEntitlement,
+        },
+        { onConflict: "user_id" },
+      );
 
       if (upsertError) {
         console.error("Upsert error:", upsertError);
       }
 
-      return new Response(
-        JSON.stringify({ isPremium: true, plan, expiresAt, rcEntitlement, synced: true }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ isPremium: true, plan, expiresAt, rcEntitlement, synced: true }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     // Not active — clean up stale DB record if exists
-    await serviceClient
-      .from("premium_subscriptions")
-      .delete()
-      .eq("user_id", userId);
+    await serviceClient.from("premium_subscriptions").delete().eq("user_id", userId);
 
-    return new Response(
-      JSON.stringify({ isPremium: false, synced: true }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ isPremium: false, synced: true }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   } catch (err) {
     console.error("Error:", err);
     return new Response(JSON.stringify({ error: "Internal server error" }), {

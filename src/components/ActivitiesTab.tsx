@@ -98,7 +98,7 @@ const TodayStats = ({ lang, healthStats }: { lang: Lang; healthStats: HealthStat
       label: lang === "zh" ? "距離" : "Distance",
       value: stats.walkRunDistanceKm > 0 ? `${stats.walkRunDistanceKm}` : "--",
       unit: "km",
-      tooltip: lang === "zh" ? "今日步行與跑步的總距離" : "Total distance walked and ran today",
+      tooltip: lang === "zh" ? "今日跑步與步行的總距離" : "Today's Running and Walking Distance",
     },
     {
       emoji: "🛏️",

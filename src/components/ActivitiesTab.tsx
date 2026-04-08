@@ -122,9 +122,16 @@ const TodayStats = ({ lang, healthStats }: { lang: Lang; healthStats: HealthStat
               <span className="text-base">{card.emoji}</span>
               <span className="text-xs font-medium text-muted-foreground">{card.label}</span>
               {card.tooltip && (
-                <span className="text-muted-foreground cursor-help text-[10px]" title={card.tooltip}>
-                  ❓
-                </span>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button className="text-muted-foreground hover:text-foreground transition-colors">
+                      <HelpCircle size={12} />
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent side="top" className="text-xs w-auto max-w-[200px] p-2">
+                    {card.tooltip}
+                  </PopoverContent>
+                </Popover>
               )}
             </div>
             <div className="flex items-baseline gap-1">

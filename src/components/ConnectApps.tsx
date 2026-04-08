@@ -99,8 +99,8 @@ const ConnectApps = ({ lang, onBack }: Props) => {
       </p>
 
       <div className="space-y-3">
-        {/* Apple Health — temporarily disabled */}
-        <div className="bg-card border border-border rounded-xl p-4 opacity-50">
+        {/* Apple Health */}
+        <div className="bg-card border border-border rounded-xl p-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-lg bg-red-500/10 flex items-center justify-center">
@@ -115,9 +115,25 @@ const ConnectApps = ({ lang, onBack }: Props) => {
                 </span>
               </div>
             </div>
-            <span className="text-xs text-muted-foreground bg-muted px-3 py-1 rounded-full">
-              {t("comingSoon", lang)}
-            </span>
+            {appleHealthConnected ? (
+              <div className="flex items-center gap-2">
+                {appleHealth.syncing && <RefreshCw size={14} className="animate-spin text-muted-foreground" />}
+                <Check size={16} className="text-green-500" />
+                <button
+                  onClick={handleDisconnectAppleHealth}
+                  className="text-xs text-destructive hover:underline"
+                >
+                  {lang === "zh" ? "中斷" : "Disconnect"}
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={handleConnectAppleHealth}
+                className="text-xs font-medium text-primary-foreground bg-primary px-3 py-1 rounded-full"
+              >
+                {lang === "zh" ? "連結" : "Connect"}
+              </button>
+            )}
           </div>
         </div>
 

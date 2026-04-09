@@ -1,28 +1,37 @@
 
 
-## Fix Build Errors + Enable Apple Health + Add name_zh Column
+## Implement Garmin Connection via Railway API
 
-### Problem 1: RaceTab.tsx — `name_zh` missing from Supabase types
-The `races` table in the generated types file doesn't have `name_zh`. The migration to add `name_zh` to the `races` table needs to be created (it was done in the other Lovable project but not this one). After the migration runs, the types will regenerate. Meanwhile, fix the cast on line 235 to use `unknown` first.
+### Overview
+Add a Garmin login card to the ConnectApps page. Users enter their Garmin email/password, which gets authenticated via the Railway API. On success, store the session data in the existing `garmin_connections` table and show a connected state.
 
-**Fix**: 
-- Create a database migration: `ALTER TABLE public.races ADD COLUMN IF NOT EXISTS name_zh text;`
-- Change line 235 from `(data as Race[])` to `(data as unknown as Race[])`
+### Changes
 
-### Problem 2: use-apple-health.ts — `connected_at` not in types
-The `apple_health_connections` table Insert type only has `created_at`, `id`, `updated_at`, `user_id`. The code on line 119 passes `connected_at` which doesn't exist in the schema.
+**1. `src/components/ConnectApps.tsx`**
+- Replace the "ConnectIQ (Garmin)" coming-soon card with a functional Garmin card
+- Add state: `garminConnected`, `garminDisplayName`, `garminEmail`, `garminPassword`, `garminLoading`, `garminError`, `showGarminForm`
+- On mount, check `garmin_connections` table for existing connection (add to `checkConnections`)
+- When not connected: show a "Connect" button that reveals email/password form
+- On form submit: POST to `https://garmy-production.up.railway.app/auth` with `{ email, password }`
+- On success (`success: true`): upsert into `garmin_connections` with `session_data` stored in `access_token` (JSON stringified), set `garmin_display_name`, show success toast
+- On error (400/other): show toast with error message, display inline error
+- When connected: show "Connected as [display_name]" with disconnect button
+- Add disconnect handler: delete from `garmin_connections` where `user_id` matches
 
-**Fix**: Remove `connected_at` from the upsert — use `updated_at` instead:
-```typescript
-.upsert({ user_id: user.id, updated_at: new Date().toISOString() }, { onConflict: "user_id" });
-```
+**2. No DB migration needed** — `garmin_connections` table already exists with appropriate columns and RLS policies (authenticated users can manage their own connections).
 
-### Problem 3: Enable Apple Health in ConnectApps
-The ConnectApps component currently shows Apple Health as "Coming Soon" with `opacity-50`. Re-enable it with the connect/disconnect buttons (the functional code is already there but the UI is hardcoded to "coming soon").
+**3. Type casting** — Since `garmin_connections` may not be in the generated types file yet, use `.from("garmin_connections" as any)` or cast through `unknown` similar to the RaceTab pattern.
 
-### Changes Summary
-1. **Database migration** — Add `name_zh text` column to `races` table
-2. **`src/components/RaceTab.tsx`** line 235 — Cast through `unknown`
-3. **`src/hooks/use-apple-health.ts`** line 119 — Replace `connected_at` with `updated_at`
-4. **`src/components/ConnectApps.tsx`** — Re-enable Apple Health card with connect/disconnect functionality (remove opacity-50, remove "Coming Soon" badge, restore interactive buttons)
+### Security Notes
+- The Railway API call happens client-side (CORS must be enabled on the Railway backend)
+- Garmin credentials are never stored — only the session_data returned by the API
+- RLS policies already restrict users to their own garmin_connections rows
+
+### UI Details
+- Garmin card uses a teal/green accent color with a watch icon
+- Email input (type="email") + password input (type="password")
+- Loading spinner during auth
+- Error message shown below form inputs
+- Connected state shows display name + disconnect option
+- Bilingual support (EN/ZH) for all labels and messages
 

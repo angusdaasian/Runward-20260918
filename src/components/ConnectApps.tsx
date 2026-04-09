@@ -97,36 +97,14 @@ const ConnectApps = ({ lang, onBack }: Props) => {
     setGarminError("");
 
     try {
-      const res = await fetch("https://garmy-production.up.railway.app/auth", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: garminEmail, password: garminPassword }),
+      const { data, error } = await supabase.functions.invoke("garmin-auth", {
+        body: { email: garminEmail, password: garminPassword },
       });
 
-      const data = await res.json();
-
-      if (!res.ok || !data.success) {
-        const msg = data.error || data.message || (lang === "zh" ? "登入失敗" : "Login failed");
+      if (error || !data?.success) {
+        const msg = data?.error || error?.message || (lang === "zh" ? "登入失敗" : "Login failed");
         setGarminError(msg);
         toast.error(msg);
-        setGarminLoading(false);
-        return;
-      }
-
-      // Store session in garmin_connections
-      const { error: dbError } = await (supabase as any)
-        .from("garmin_connections")
-        .upsert({
-          user_id: user.id,
-          access_token: JSON.stringify(data.session_data),
-          garmin_display_name: data.display_name || garminEmail.split("@")[0],
-          expires_at: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
-          updated_at: new Date().toISOString(),
-        }, { onConflict: "user_id" });
-
-      if (dbError) {
-        console.error("Garmin DB error:", dbError);
-        toast.error(lang === "zh" ? "儲存連結失敗" : "Failed to save connection");
         setGarminLoading(false);
         return;
       }

@@ -2,11 +2,15 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
 Deno.serve(async (req) => {
+  // 1. Log the request for debugging in Supabase dashboard
+  const url = new URL(req.url);
+  console.log(`Request received: ${req.method} ${url.pathname}`);
+
+  // 2. Handle CORS preflight
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -29,7 +33,10 @@ Deno.serve(async (req) => {
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
     if (userError || !user) {
       return new Response(JSON.stringify({ error: "Invalid or expired token" }), {
         status: 401,
@@ -37,6 +44,7 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Parse request body
     const { email, password } = await req.json();
     if (!email || !password) {
       return new Response(JSON.stringify({ error: "Email and password are required" }), {
@@ -79,15 +87,16 @@ Deno.serve(async (req) => {
 
     const displayName = data.display_name || email.split("@")[0];
 
-    const { error: dbError } = await supabaseAdmin
-      .from("garmin_connections")
-      .upsert({
+    const { error: dbError } = await supabaseAdmin.from("garmin_connections").upsert(
+      {
         user_id: user.id,
         access_token: JSON.stringify(data.session_data),
         garmin_display_name: displayName,
         expires_at: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
         updated_at: new Date().toISOString(),
-      }, { onConflict: "user_id" });
+      },
+      { onConflict: "user_id" },
+    );
 
     if (dbError) {
       console.error("[garmin-auth] DB error:", dbError);
@@ -97,12 +106,15 @@ Deno.serve(async (req) => {
       });
     }
 
-    return new Response(JSON.stringify({
-      success: true,
-      display_name: displayName,
-    }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return new Response(
+      JSON.stringify({
+        success: true,
+        display_name: displayName,
+      }),
+      {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      },
+    );
   } catch (err) {
     console.error("[garmin-auth] Unexpected error:", err);
     return new Response(JSON.stringify({ error: "Internal server error" }), {

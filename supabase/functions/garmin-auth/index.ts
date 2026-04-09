@@ -6,19 +6,20 @@ const corsHeaders = {
 };
 
 Deno.serve(async (req) => {
-  // 1. Log the request for debugging in Supabase dashboard
+  // 1. Initial Request Logging (Visible in Supabase Logs tab)
   const url = new URL(req.url);
-  console.log(`Request received: ${req.method} ${url.pathname}`);
+  console.log(`[garmin-auth] Incoming: ${req.method} ${url.pathname}`);
 
-  // 2. Handle CORS preflight
+  // 2. Handle CORS Preflight
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    // Verify JWT - extract user from Authorization header
+    // 3. Verify JWT / User Identity
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
+      console.error("[garmin-auth] Error: Missing Authorization header");
       return new Response(JSON.stringify({ error: "Missing authorization header" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -37,14 +38,16 @@ Deno.serve(async (req) => {
       data: { user },
       error: userError,
     } = await supabase.auth.getUser();
+
     if (userError || !user) {
+      console.error("[garmin-auth] Error: Invalid token", userError);
       return new Response(JSON.stringify({ error: "Invalid or expired token" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Parse request body
+    // 4. Parse Garmin Credentials
     const { email, password } = await req.json();
     if (!email || !password) {
       return new Response(JSON.stringify({ error: "Email and password are required" }), {
@@ -53,15 +56,17 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Proxy to Railway API
+    // 5. Proxy to Railway API
     const railwayUrl = Deno.env.get("GARMIN_RAILWAY_URL");
     if (!railwayUrl) {
-      console.error("[garmin-auth] GARMIN_RAILWAY_URL secret not set");
+      console.error("[garmin-auth] Error: GARMIN_RAILWAY_URL secret not set");
       return new Response(JSON.stringify({ error: "Garmin service not configured" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    console.log(`[garmin-auth] Attempting login for ${email} via ${railwayUrl}/auth`);
 
     const railwayRes = await fetch(`${railwayUrl}/auth`, {
       method: "POST",
@@ -73,13 +78,14 @@ Deno.serve(async (req) => {
 
     if (!railwayRes.ok || !data.success) {
       const msg = data.error || data.message || "Garmin login failed";
+      console.warn(`[garmin-auth] Railway rejected login: ${msg}`);
       return new Response(JSON.stringify({ error: msg }), {
         status: railwayRes.status >= 400 ? railwayRes.status : 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Store session in garmin_connections using service role
+    // 6. Store Session in Database
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
       auth: { autoRefreshToken: false, persistSession: false },
@@ -99,12 +105,14 @@ Deno.serve(async (req) => {
     );
 
     if (dbError) {
-      console.error("[garmin-auth] DB error:", dbError);
-      return new Response(JSON.stringify({ error: "Failed to save connection" }), {
+      console.error("[garmin-auth] Database Upsert Error:", dbError);
+      return new Response(JSON.stringify({ error: "Failed to save Garmin connection" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    console.log(`[garmin-auth] Successfully connected Garmin for user: ${user.id}`);
 
     return new Response(
       JSON.stringify({
@@ -116,8 +124,8 @@ Deno.serve(async (req) => {
       },
     );
   } catch (err) {
-    console.error("[garmin-auth] Unexpected error:", err);
-    return new Response(JSON.stringify({ error: "Internal server error" }), {
+    console.error("[garmin-auth] Unexpected Crash:", err.message);
+    return new Response(JSON.stringify({ error: "Internal server error", details: err.message }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

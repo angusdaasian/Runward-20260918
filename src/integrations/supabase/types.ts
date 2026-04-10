@@ -188,6 +188,117 @@ export type Database = {
         }
         Relationships: []
       }
+      garmin_activities: {
+        Row: {
+          activity_name: string | null
+          activity_type: string | null
+          aerobic_te: number | null
+          anaerobic_te: number | null
+          average_hr: number | null
+          average_speed: number | null
+          avg_cadence: number | null
+          calories: number | null
+          created_at: string | null
+          distance_meters: number | null
+          duration_seconds: number | null
+          elevation_gain: number | null
+          garmin_activity_id: string
+          has_gps: boolean | null
+          id: string
+          max_hr: number | null
+          raw_json: Json | null
+          start_time: string | null
+          training_load: number | null
+          user_id: string
+          vo2max: number | null
+        }
+        Insert: {
+          activity_name?: string | null
+          activity_type?: string | null
+          aerobic_te?: number | null
+          anaerobic_te?: number | null
+          average_hr?: number | null
+          average_speed?: number | null
+          avg_cadence?: number | null
+          calories?: number | null
+          created_at?: string | null
+          distance_meters?: number | null
+          duration_seconds?: number | null
+          elevation_gain?: number | null
+          garmin_activity_id: string
+          has_gps?: boolean | null
+          id?: string
+          max_hr?: number | null
+          raw_json?: Json | null
+          start_time?: string | null
+          training_load?: number | null
+          user_id: string
+          vo2max?: number | null
+        }
+        Update: {
+          activity_name?: string | null
+          activity_type?: string | null
+          aerobic_te?: number | null
+          anaerobic_te?: number | null
+          average_hr?: number | null
+          average_speed?: number | null
+          avg_cadence?: number | null
+          calories?: number | null
+          created_at?: string | null
+          distance_meters?: number | null
+          duration_seconds?: number | null
+          elevation_gain?: number | null
+          garmin_activity_id?: string
+          has_gps?: boolean | null
+          id?: string
+          max_hr?: number | null
+          raw_json?: Json | null
+          start_time?: string | null
+          training_load?: number | null
+          user_id?: string
+          vo2max?: number | null
+        }
+        Relationships: []
+      }
+      garmin_connections: {
+        Row: {
+          access_token: string
+          created_at: string | null
+          expires_at: string
+          garmin_display_name: string | null
+          id: string
+          refresh_token: string | null
+          refresh_token_expires_at: string | null
+          token_type: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          access_token: string
+          created_at?: string | null
+          expires_at: string
+          garmin_display_name?: string | null
+          id?: string
+          refresh_token?: string | null
+          refresh_token_expires_at?: string | null
+          token_type?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          access_token?: string
+          created_at?: string | null
+          expires_at?: string
+          garmin_display_name?: string | null
+          id?: string
+          refresh_token?: string | null
+          refresh_token_expires_at?: string | null
+          token_type?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       pending_races: {
         Row: {
           ai_verification_result: string | null

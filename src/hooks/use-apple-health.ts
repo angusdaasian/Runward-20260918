@@ -10,6 +10,7 @@ const HEALTHKIT_READ_TYPES = [
   "HKQuantityTypeIdentifierActiveEnergyBurned",
   "HKQuantityTypeIdentifierStepCount",
   "HKQuantityTypeIdentifierDistanceWalkingRunning",
+  "HKWorkoutTypeIdentifier",
 ].join(",");
 
 export interface HealthStats {
@@ -54,6 +55,60 @@ function sumQuantitySamples(samples: any[]): number {
   return samples.reduce((sum: number, s: any) => sum + (s.value || s.quantity || 0), 0);
 }
 
+interface AppleHealthWorkout {
+  name: string;
+  sport_type: string;
+  distance: number;
+  moving_time: number;
+  elapsed_time: number;
+  total_elevation_gain: number;
+  start_date: string;
+  average_speed: number;
+  max_speed: number;
+  average_heartrate: number | null;
+  max_heartrate: number | null;
+  source: string;
+}
+
+function mapWorkoutType(hkType: string): string {
+  const map: Record<string, string> = {
+    HKWorkoutActivityTypeRunning: "Run",
+    HKWorkoutActivityTypeWalking: "Walk",
+    HKWorkoutActivityTypeHiking: "Hike",
+    HKWorkoutActivityTypeCycling: "Ride",
+    HKWorkoutActivityTypeSwimming: "Swim",
+    HKWorkoutActivityTypeTrailRunning: "TrailRun",
+  };
+  return map[hkType] || hkType?.replace("HKWorkoutActivityType", "") || "Run";
+}
+
+function parseWorkouts(samples: any[]): AppleHealthWorkout[] {
+  if (!Array.isArray(samples) || samples.length === 0) return [];
+  return samples
+    .filter((w) => w && (w.startDate || w.start_date))
+    .map((w) => {
+      const distance = w.totalDistance || w.distance || 0;
+      const duration = w.duration || w.moving_time || w.elapsed_time || 0;
+      const avgSpeed = duration > 0 ? distance / duration : 0;
+      return {
+        name: w.workoutActivityType
+          ? mapWorkoutType(w.workoutActivityType)
+          : w.name || "Workout",
+        sport_type: mapWorkoutType(w.workoutActivityType || w.sport_type || ""),
+        distance: Math.round(distance),
+        moving_time: Math.round(duration),
+        elapsed_time: Math.round(w.elapsed_time || duration),
+        total_elevation_gain: Math.round(w.totalElevationGain || w.total_elevation_gain || 0),
+        start_date: w.startDate || w.start_date,
+        average_speed: Math.round(avgSpeed * 100) / 100,
+        max_speed: w.max_speed || 0,
+        average_heartrate: w.averageHeartRate || w.average_heartrate || null,
+        max_heartrate: w.maxHeartRate || w.max_heartrate || null,
+        source: w.sourceName || w.source || "Apple Health",
+      };
+    });
+}
+
 // Module-level cache to persist across remounts (tab switches)
 let _cachedStats: HealthStats | null = null;
 let _cachedAt = 0;
@@ -64,7 +119,7 @@ export function useAppleHealth(lang: Lang) {
   const [syncing, setSyncing] = useState(false);
   const [healthStats, setHealthStats] = useState<HealthStats | null>(_cachedStats);
 
-  const readHealthData = useCallback(async (days = 1): Promise<HealthStats> => {
+  const readHealthData = useCallback(async (days = 1): Promise<{ stats: HealthStats; workouts: AppleHealthWorkout[] }> => {
     try {
       const result = await despia(
         `healthkit://read?types=${HEALTHKIT_READ_TYPES}&days=${days}`,
@@ -75,17 +130,16 @@ export function useAppleHealth(lang: Lang) {
 
       const data = result?.healthkitResponse || result || {};
 
-      // Despia returns keys matching the HealthKit type identifiers
       const sleepSamples = data.HKCategoryTypeIdentifierSleepAnalysis || data.sleepAnalysis || data.sleep || [];
       const calorieSamples = data.HKQuantityTypeIdentifierActiveEnergyBurned || [];
       const stepSamples = data.HKQuantityTypeIdentifierStepCount || [];
       const distanceSamples = data.HKQuantityTypeIdentifierDistanceWalkingRunning || [];
+      const workoutSamples = data.HKWorkoutTypeIdentifier || data.workouts || [];
 
       const rawCalories = Array.isArray(calorieSamples) ? sumQuantitySamples(calorieSamples) : (typeof calorieSamples === "number" ? calorieSamples : 0);
       const rawSteps = Array.isArray(stepSamples) ? sumQuantitySamples(stepSamples) : (typeof stepSamples === "number" ? stepSamples : 0);
       const rawDistance = Array.isArray(distanceSamples) ? sumQuantitySamples(distanceSamples) : (typeof distanceSamples === "number" ? distanceSamples : 0);
 
-      // HealthKit always returns distance in meters — convert to km
       const distanceKm = Math.round((rawDistance / 1000) * 100) / 100;
 
       const stats: HealthStats = {
@@ -95,11 +149,13 @@ export function useAppleHealth(lang: Lang) {
         walkRunDistanceKm: distanceKm,
       };
 
-      console.log("[AppleHealth] Parsed stats:", stats);
-      return stats;
+      const workouts = parseWorkouts(workoutSamples);
+
+      console.log("[AppleHealth] Parsed stats:", stats, "workouts:", workouts.length);
+      return { stats, workouts };
     } catch (err) {
       console.error("[AppleHealth] Read error:", err);
-      return { sleepMinutes: 0, caloriesBurned: 0, steps: 0, walkRunDistanceKm: 0 };
+      return { stats: { sleepMinutes: 0, caloriesBurned: 0, steps: 0, walkRunDistanceKm: 0 }, workouts: [] };
     }
   }, []);
 
@@ -109,15 +165,47 @@ export function useAppleHealth(lang: Lang) {
     setHealthStats(stats);
   }, []);
 
+  const saveWorkoutsToDb = useCallback(async (workouts: AppleHealthWorkout[]) => {
+    if (!user || workouts.length === 0) return;
+    try {
+      for (const w of workouts) {
+        await supabase
+          .from("apple_health_activities")
+          .upsert(
+            {
+              user_id: user.id,
+              name: w.name,
+              sport_type: w.sport_type,
+              distance: w.distance,
+              moving_time: w.moving_time,
+              elapsed_time: w.elapsed_time,
+              total_elevation_gain: w.total_elevation_gain,
+              start_date: w.start_date,
+              average_speed: w.average_speed,
+              max_speed: w.max_speed,
+              average_heartrate: w.average_heartrate,
+              max_heartrate: w.max_heartrate,
+              source: w.source,
+            },
+            { onConflict: "user_id,start_date" },
+          );
+      }
+      console.log(`[AppleHealth] Saved ${workouts.length} workouts to DB`);
+    } catch (err) {
+      console.error("[AppleHealth] Failed to save workouts:", err);
+    }
+  }, [user]);
+
   const connect = useCallback(async () => {
     if (!user) return false;
     setSyncing(true);
     try {
-      const stats = await readHealthData(1);
+      const { stats, workouts } = await readHealthData(30);
       await supabase
         .from("apple_health_connections")
         .upsert({ user_id: user.id, updated_at: new Date().toISOString() }, { onConflict: "user_id" });
       updateStats(stats);
+      await saveWorkoutsToDb(workouts);
       setSyncing(false);
       return true;
     } catch (err) {
@@ -126,7 +214,7 @@ export function useAppleHealth(lang: Lang) {
       setSyncing(false);
       return false;
     }
-  }, [user, lang, readHealthData, updateStats]);
+  }, [user, lang, readHealthData, updateStats, saveWorkoutsToDb]);
 
   const syncHealthData = useCallback(async () => {
     if (!user) return;
@@ -137,13 +225,14 @@ export function useAppleHealth(lang: Lang) {
     }
     setSyncing(true);
     try {
-      const stats = await readHealthData(1);
+      const { stats, workouts } = await readHealthData(7);
       updateStats(stats);
+      await saveWorkoutsToDb(workouts);
     } catch {
       console.warn("[AppleHealth] Sync failed");
     }
     setSyncing(false);
-  }, [user, readHealthData, updateStats]);
+  }, [user, readHealthData, updateStats, saveWorkoutsToDb]);
 
   const disconnect = useCallback(async () => {
     if (!user) return;

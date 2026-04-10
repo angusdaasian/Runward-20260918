@@ -104,7 +104,13 @@ export function useActivities() {
     gcTime: 10 * 60 * 1000,
   });
 
-  // Apple Health activities query removed - AH now provides health stats only, not workout activities
+  const appleHealthQuery = useQuery({
+    queryKey: ["apple-health-activities", user?.id],
+    queryFn: () => fetchAppleHealthActivities(user!.id),
+    enabled: !!user,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+  });
 
   const profileQuery = useQuery({
     queryKey: ["user-profile", user?.id],
@@ -128,13 +134,19 @@ export function useActivities() {
     staleTime: 5 * 60 * 1000,
   });
 
-  // Only Strava activities (Apple Health no longer syncs workout activities)
-  const mergedActivities = (activitiesQuery.data || [])
-    .sort((a, b) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime());
+  // Merge Strava + Apple Health activities, deduplicate by start_date proximity
+  const mergedActivities = useMemo(() => {
+    const strava = activitiesQuery.data || [];
+    const ah = appleHealthQuery.data || [];
+    const all = [...strava, ...ah];
+    // Sort by start_date descending
+    all.sort((a, b) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime());
+    return all;
+  }, [activitiesQuery.data, appleHealthQuery.data]);
 
   const invalidateAll = () => {
     queryClient.invalidateQueries({ queryKey: ["strava-activities", user?.id] });
-    
+    queryClient.invalidateQueries({ queryKey: ["apple-health-activities", user?.id] });
     queryClient.invalidateQueries({ queryKey: ["user-profile", user?.id] });
     queryClient.invalidateQueries({ queryKey: ["planned-workouts", user?.id] });
     queryClient.invalidateQueries({ queryKey: ["fitness-connection", user?.id] });
@@ -145,7 +157,7 @@ export function useActivities() {
     profile: profileQuery.data,
     connected: connectionQuery.data ?? false,
     plannedWorkouts: workoutsQuery.data || [],
-    loading: activitiesQuery.isLoading || profileQuery.isLoading || connectionQuery.isLoading,
+    loading: activitiesQuery.isLoading || appleHealthQuery.isLoading || profileQuery.isLoading || connectionQuery.isLoading,
     invalidateAll,
   };
 }

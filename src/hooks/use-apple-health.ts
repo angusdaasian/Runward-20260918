@@ -119,7 +119,7 @@ export function useAppleHealth(lang: Lang) {
   const [syncing, setSyncing] = useState(false);
   const [healthStats, setHealthStats] = useState<HealthStats | null>(_cachedStats);
 
-  const readHealthData = useCallback(async (days = 1): Promise<HealthStats> => {
+  const readHealthData = useCallback(async (days = 1): Promise<{ stats: HealthStats; workouts: AppleHealthWorkout[] }> => {
     try {
       const result = await despia(
         `healthkit://read?types=${HEALTHKIT_READ_TYPES}&days=${days}`,
@@ -130,17 +130,16 @@ export function useAppleHealth(lang: Lang) {
 
       const data = result?.healthkitResponse || result || {};
 
-      // Despia returns keys matching the HealthKit type identifiers
       const sleepSamples = data.HKCategoryTypeIdentifierSleepAnalysis || data.sleepAnalysis || data.sleep || [];
       const calorieSamples = data.HKQuantityTypeIdentifierActiveEnergyBurned || [];
       const stepSamples = data.HKQuantityTypeIdentifierStepCount || [];
       const distanceSamples = data.HKQuantityTypeIdentifierDistanceWalkingRunning || [];
+      const workoutSamples = data.HKWorkoutTypeIdentifier || data.workouts || [];
 
       const rawCalories = Array.isArray(calorieSamples) ? sumQuantitySamples(calorieSamples) : (typeof calorieSamples === "number" ? calorieSamples : 0);
       const rawSteps = Array.isArray(stepSamples) ? sumQuantitySamples(stepSamples) : (typeof stepSamples === "number" ? stepSamples : 0);
       const rawDistance = Array.isArray(distanceSamples) ? sumQuantitySamples(distanceSamples) : (typeof distanceSamples === "number" ? distanceSamples : 0);
 
-      // HealthKit always returns distance in meters — convert to km
       const distanceKm = Math.round((rawDistance / 1000) * 100) / 100;
 
       const stats: HealthStats = {
@@ -150,11 +149,13 @@ export function useAppleHealth(lang: Lang) {
         walkRunDistanceKm: distanceKm,
       };
 
-      console.log("[AppleHealth] Parsed stats:", stats);
-      return stats;
+      const workouts = parseWorkouts(workoutSamples);
+
+      console.log("[AppleHealth] Parsed stats:", stats, "workouts:", workouts.length);
+      return { stats, workouts };
     } catch (err) {
       console.error("[AppleHealth] Read error:", err);
-      return { sleepMinutes: 0, caloriesBurned: 0, steps: 0, walkRunDistanceKm: 0 };
+      return { stats: { sleepMinutes: 0, caloriesBurned: 0, steps: 0, walkRunDistanceKm: 0 }, workouts: [] };
     }
   }, []);
 

@@ -165,15 +165,47 @@ export function useAppleHealth(lang: Lang) {
     setHealthStats(stats);
   }, []);
 
+  const saveWorkoutsToDb = useCallback(async (workouts: AppleHealthWorkout[]) => {
+    if (!user || workouts.length === 0) return;
+    try {
+      for (const w of workouts) {
+        await supabase
+          .from("apple_health_activities")
+          .upsert(
+            {
+              user_id: user.id,
+              name: w.name,
+              sport_type: w.sport_type,
+              distance: w.distance,
+              moving_time: w.moving_time,
+              elapsed_time: w.elapsed_time,
+              total_elevation_gain: w.total_elevation_gain,
+              start_date: w.start_date,
+              average_speed: w.average_speed,
+              max_speed: w.max_speed,
+              average_heartrate: w.average_heartrate,
+              max_heartrate: w.max_heartrate,
+              source: w.source,
+            },
+            { onConflict: "user_id,start_date" },
+          );
+      }
+      console.log(`[AppleHealth] Saved ${workouts.length} workouts to DB`);
+    } catch (err) {
+      console.error("[AppleHealth] Failed to save workouts:", err);
+    }
+  }, [user]);
+
   const connect = useCallback(async () => {
     if (!user) return false;
     setSyncing(true);
     try {
-      const stats = await readHealthData(1);
+      const { stats, workouts } = await readHealthData(30);
       await supabase
         .from("apple_health_connections")
         .upsert({ user_id: user.id, updated_at: new Date().toISOString() }, { onConflict: "user_id" });
       updateStats(stats);
+      await saveWorkoutsToDb(workouts);
       setSyncing(false);
       return true;
     } catch (err) {
@@ -182,7 +214,7 @@ export function useAppleHealth(lang: Lang) {
       setSyncing(false);
       return false;
     }
-  }, [user, lang, readHealthData, updateStats]);
+  }, [user, lang, readHealthData, updateStats, saveWorkoutsToDb]);
 
   const syncHealthData = useCallback(async () => {
     if (!user) return;
@@ -193,13 +225,14 @@ export function useAppleHealth(lang: Lang) {
     }
     setSyncing(true);
     try {
-      const stats = await readHealthData(1);
+      const { stats, workouts } = await readHealthData(7);
       updateStats(stats);
+      await saveWorkoutsToDb(workouts);
     } catch {
       console.warn("[AppleHealth] Sync failed");
     }
     setSyncing(false);
-  }, [user, readHealthData, updateStats]);
+  }, [user, readHealthData, updateStats, saveWorkoutsToDb]);
 
   const disconnect = useCallback(async () => {
     if (!user) return;

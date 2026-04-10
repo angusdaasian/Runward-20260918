@@ -92,7 +92,9 @@ function parseWorkouts(samples: any[]): AppleHealthWorkout[] {
       const duration = w.duration || w.moving_time || w.elapsed_time || 0;
       const avgSpeed = duration > 0 ? distance / duration : 0;
       return {
-        name: w.workoutActivityType ? mapWorkoutType(w.workoutActivityType) : w.name || "Workout",
+        name: w.workoutActivityType
+          ? mapWorkoutType(w.workoutActivityType)
+          : w.name || "Workout",
         sport_type: mapWorkoutType(w.workoutActivityType || w.sport_type || ""),
         distance: Math.round(distance),
         moving_time: Math.round(duration),
@@ -118,59 +120,45 @@ export function useAppleHealth(lang: Lang) {
   const [syncing, setSyncing] = useState(false);
   const [healthStats, setHealthStats] = useState<HealthStats | null>(_cachedStats);
 
-  const readHealthData = useCallback(
-    async (days = 1): Promise<{ stats: HealthStats; workouts: AppleHealthWorkout[] }> => {
-      try {
-        const result = await despia(`healthkit://read?types=${HEALTHKIT_READ_TYPES}&days=${days}`, [
-          "healthkitResponse",
-        ]);
+  const readHealthData = useCallback(async (days = 1): Promise<{ stats: HealthStats; workouts: AppleHealthWorkout[] }> => {
+    try {
+      const result = await despia(
+        `healthkit://read?types=${HEALTHKIT_READ_TYPES}&days=${days}`,
+        ["healthkitResponse"],
+      );
 
-        console.log("[AppleHealth] Raw response:", JSON.stringify(result));
+      console.log("[AppleHealth] Raw response:", JSON.stringify(result));
 
-        const data = result?.healthkitResponse || result || {};
+      const data = result?.healthkitResponse || result || {};
 
-        const sleepSamples = data.HKCategoryTypeIdentifierSleepAnalysis || data.sleepAnalysis || data.sleep || [];
-        const calorieSamples = data.HKQuantityTypeIdentifierActiveEnergyBurned || [];
-        const stepSamples = data.HKQuantityTypeIdentifierStepCount || [];
-        const distanceSamples = data.HKQuantityTypeIdentifierDistanceWalkingRunning || [];
-        const workoutSamples = data.HKWorkoutTypeIdentifier || data.workouts || [];
+      const sleepSamples = data.HKCategoryTypeIdentifierSleepAnalysis || data.sleepAnalysis || data.sleep || [];
+      const calorieSamples = data.HKQuantityTypeIdentifierActiveEnergyBurned || [];
+      const stepSamples = data.HKQuantityTypeIdentifierStepCount || [];
+      const distanceSamples = data.HKQuantityTypeIdentifierDistanceWalkingRunning || [];
+      const workoutSamples = data.HKWorkoutTypeIdentifier || data.workouts || [];
 
-        const rawCalories = Array.isArray(calorieSamples)
-          ? sumQuantitySamples(calorieSamples)
-          : typeof calorieSamples === "number"
-            ? calorieSamples
-            : 0;
-        const rawSteps = Array.isArray(stepSamples)
-          ? sumQuantitySamples(stepSamples)
-          : typeof stepSamples === "number"
-            ? stepSamples
-            : 0;
-        const rawDistance = Array.isArray(distanceSamples)
-          ? sumQuantitySamples(distanceSamples)
-          : typeof distanceSamples === "number"
-            ? distanceSamples
-            : 0;
+      const rawCalories = Array.isArray(calorieSamples) ? sumQuantitySamples(calorieSamples) : (typeof calorieSamples === "number" ? calorieSamples : 0);
+      const rawSteps = Array.isArray(stepSamples) ? sumQuantitySamples(stepSamples) : (typeof stepSamples === "number" ? stepSamples : 0);
+      const rawDistance = Array.isArray(distanceSamples) ? sumQuantitySamples(distanceSamples) : (typeof distanceSamples === "number" ? distanceSamples : 0);
 
-        const distanceKm = Math.round((rawDistance / 1000) * 100) / 100;
+      const distanceKm = Math.round((rawDistance / 1000) * 100) / 100;
 
-        const stats: HealthStats = {
-          sleepMinutes: parseSleepMinutes(sleepSamples),
-          caloriesBurned: Math.round(rawCalories),
-          steps: Math.round(rawSteps),
-          walkRunDistanceKm: distanceKm,
-        };
+      const stats: HealthStats = {
+        sleepMinutes: parseSleepMinutes(sleepSamples),
+        caloriesBurned: Math.round(rawCalories),
+        steps: Math.round(rawSteps),
+        walkRunDistanceKm: distanceKm,
+      };
 
-        const workouts = parseWorkouts(workoutSamples);
+      const workouts = parseWorkouts(workoutSamples);
 
-        console.log("[AppleHealth] Parsed stats:", stats, "workouts:", workouts.length);
-        return { stats, workouts };
-      } catch (err) {
-        console.error("[AppleHealth] Read error:", err);
-        return { stats: { sleepMinutes: 0, caloriesBurned: 0, steps: 0, walkRunDistanceKm: 0 }, workouts: [] };
-      }
-    },
-    [],
-  );
+      console.log("[AppleHealth] Parsed stats:", stats, "workouts:", workouts.length);
+      return { stats, workouts };
+    } catch (err) {
+      console.error("[AppleHealth] Read error:", err);
+      return { stats: { sleepMinutes: 0, caloriesBurned: 0, steps: 0, walkRunDistanceKm: 0 }, workouts: [] };
+    }
+  }, []);
 
   const updateStats = useCallback((stats: HealthStats) => {
     _cachedStats = stats;
@@ -178,12 +166,13 @@ export function useAppleHealth(lang: Lang) {
     setHealthStats(stats);
   }, []);
 
-  const saveWorkoutsToDb = useCallback(
-    async (workouts: AppleHealthWorkout[]) => {
-      if (!user || workouts.length === 0) return;
-      try {
-        for (const w of workouts) {
-          await supabase.from("apple_health_activities").upsert(
+  const saveWorkoutsToDb = useCallback(async (workouts: AppleHealthWorkout[]) => {
+    if (!user || workouts.length === 0) return;
+    try {
+      for (const w of workouts) {
+        await supabase
+          .from("apple_health_activities")
+          .upsert(
             {
               user_id: user.id,
               name: w.name,
@@ -201,20 +190,19 @@ export function useAppleHealth(lang: Lang) {
             },
             { onConflict: "user_id,start_date" },
           );
-        }
-        console.log(`[AppleHealth] Saved ${workouts.length} workouts to DB`);
-      } catch (err) {
-        console.error("[AppleHealth] Failed to save workouts:", err);
       }
-    },
-    [user],
-  );
+      console.log(`[AppleHealth] Saved ${workouts.length} workouts to DB`);
+    } catch (err) {
+      console.error("[AppleHealth] Failed to save workouts:", err);
+    }
+  }, [user]);
 
   const requestAuthorization = useCallback(async () => {
     try {
-      const result = await despia(`healthkit://authorize?types=${HEALTHKIT_READ_TYPES}`, [
-        "healthkitAuthorizeResponse",
-      ]);
+      const result = await despia(
+        `healthkit://authorize?types=${HEALTHKIT_READ_TYPES}`,
+        ["healthkitAuthorizeResponse"],
+      );
       console.log("[AppleHealth] Authorization result:", JSON.stringify(result));
       return true;
     } catch (err) {

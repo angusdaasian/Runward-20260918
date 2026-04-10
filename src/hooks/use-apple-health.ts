@@ -197,10 +197,33 @@ export function useAppleHealth(lang: Lang) {
     }
   }, [user]);
 
+  const requestAuthorization = useCallback(async () => {
+    try {
+      const result = await despia(
+        `healthkit://authorize?types=${HEALTHKIT_READ_TYPES}`,
+        ["healthkitAuthorizeResponse"],
+      );
+      console.log("[AppleHealth] Authorization result:", JSON.stringify(result));
+      return true;
+    } catch (err) {
+      console.error("[AppleHealth] Authorization error:", err);
+      return false;
+    }
+  }, []);
+
   const connect = useCallback(async () => {
     if (!user) return false;
     setSyncing(true);
     try {
+      // Step 1: Explicitly request HealthKit permissions (including workouts)
+      const authorized = await requestAuthorization();
+      if (!authorized) {
+        toast.error(lang === "zh" ? "請在設定中開啟健康資料存取權限" : "Please enable Health access in Settings");
+        setSyncing(false);
+        return false;
+      }
+
+      // Step 2: Read health data + workouts (30 days on initial connect)
       const { stats, workouts } = await readHealthData(30);
       await supabase
         .from("apple_health_connections")
@@ -215,7 +238,7 @@ export function useAppleHealth(lang: Lang) {
       setSyncing(false);
       return false;
     }
-  }, [user, lang, readHealthData, updateStats, saveWorkoutsToDb]);
+  }, [user, lang, requestAuthorization, readHealthData, updateStats, saveWorkoutsToDb]);
 
   const syncHealthData = useCallback(async () => {
     if (!user) return;

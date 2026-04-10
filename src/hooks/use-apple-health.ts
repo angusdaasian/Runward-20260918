@@ -10,6 +10,7 @@ const HEALTHKIT_READ_TYPES = [
   "HKQuantityTypeIdentifierActiveEnergyBurned",
   "HKQuantityTypeIdentifierStepCount",
   "HKQuantityTypeIdentifierDistanceWalkingRunning",
+  "HKQuantityTypeIdentifierHeartRate",
   "HKWorkoutTypeIdentifier",
 ].join(",");
 

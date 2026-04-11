@@ -280,7 +280,7 @@ const ActivitiesTab = ({ lang }: Props) => {
       .then(({ data }) => {
         if (data) {
           setAhConnected(true);
-          if (!appleHealth.healthStats && !appleHealth.syncing) {
+          if (!appleHealth.syncing) {
             appleHealth.syncHealthData();
           }
         }
@@ -291,10 +291,15 @@ const ActivitiesTab = ({ lang }: Props) => {
   useEffect(() => {
     if (!user) return;
     const channel = supabase
-      .channel("strava-activities-realtime")
+      .channel("fitness-activities-realtime")
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "strava_activities", filter: `user_id=eq.${user.id}` },
+        () => invalidateAll(),
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "apple_health_activities", filter: `user_id=eq.${user.id}` },
         () => invalidateAll(),
       )
       .subscribe();

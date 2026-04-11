@@ -205,21 +205,50 @@ function normalizeDurationToSeconds(raw: number, distanceMeters: number, unit?: 
 }
 
 const WORKOUT_ACTIVITY_TYPE_MAP: Record<string, string> = {
-  "13": "Ride", "24": "Hike", "37": "Run", "46": "Swim", "52": "Walk", "170": "Run",
-  HKWorkoutActivityTypeCycling: "Ride", HKWorkoutActivityTypeHiking: "Hike",
-  HKWorkoutActivityTypeRunning: "Run", HKWorkoutActivityTypeSwimming: "Swim",
-  HKWorkoutActivityTypeTrailRunning: "TrailRun", HKWorkoutActivityTypeWalking: "Walk",
+  "13": "Ride",
+  "24": "Hike",
+  "37": "Run",
+  "46": "Swim",
+  "52": "Walk",
+  "170": "Workout", // Changed from "Run" to "Workout" to fix the ID issue
+  HKWorkoutActivityTypeCycling: "Ride",
+  HKWorkoutActivityTypeHiking: "Hike",
+  HKWorkoutActivityTypeRunning: "Run",
+  HKWorkoutActivityTypeSwimming: "Swim",
+  HKWorkoutActivityTypeTrailRunning: "TrailRun",
+  HKWorkoutActivityTypeWalking: "Walk",
+  HKWorkoutActivityTypeOther: "Workout",
 };
 
 function mapWorkoutType(hkType: unknown, fallbackName?: string): string {
   const rawType = String(hkType ?? "").trim();
+  
+  // 1. Check direct mapping (Fixes the "170" display)
   const mapped = WORKOUT_ACTIVITY_TYPE_MAP[rawType];
   if (mapped) return mapped;
+
+  // 2. Keyword detection for unmapped types
   const lower = `${rawType} ${fallbackName || ""}`.toLowerCase();
   if (lower.includes("trail") && lower.includes("run")) return "TrailRun";
   if (lower.includes("run")) return "Run";
-  return rawType.replace("HKWorkoutActivityType", "") || fallbackName || "Workout";
+  if (lower.includes("walk")) return "Walk";
+  if (lower.includes("hike")) return "Hike";
+  if (lower.includes("cycle") || lower.includes("bike")) return "Ride";
+  
+  // 3. Cleanup prefix or use fallback
+  return rawType.replace("HKWorkoutActivityType", "") || "Workout";
 }
+
+// Inside parseWorkouts, use this logic to prevent "Workout Workout"
+const sportType = mapWorkoutType(rawWorkoutType, workoutName || undefined);
+
+const workoutPayload = {
+  // If workoutName is the same as sportType (e.g., both are "Workout"), 
+  // just use one to avoid "Workout Workout"
+  name: workoutName && workoutName !== sportType ? workoutName : sportType,
+  sport_type: sportType,
+  // ... other fields
+};
 
 function parseWorkouts(samples: any[], heartRateSamples: any[] = []): AppleHealthWorkout[] {
   if (!Array.isArray(samples)) return [];
@@ -271,7 +300,7 @@ export function useAppleHealth(lang: Lang) {
   const [syncing, setSyncing] = useState(false);
   const [healthStats, setHealthStats] = useState<HealthStats | null>(_cachedStats);
 
-  const readHealthData = useCallback(async (statsDays = 1, workoutDays = 7) => {
+  const readHealthData = useCallback(async (statsDays = 1, workoutDays = 30) => {
     try {
       const statsRes = await despia(`healthkit://read?types=${HEALTHKIT_DAILY_TYPES.join(",")}&days=${statsDays}`, ["healthkitResponse"]);
       const sData = statsRes?.healthkitResponse || statsRes || {};

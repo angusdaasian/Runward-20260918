@@ -122,6 +122,7 @@ function getNumericValue(...values: unknown[]): number | null {
       const nested = value as Record<string, unknown>;
       const parsed = getNumericValue(
         nested.value,
+        nested.qty,
         nested.quantity,
         nested.doubleValue,
         nested.numericValue,
@@ -133,14 +134,244 @@ function getNumericValue(...values: unknown[]): number | null {
   return null;
 }
 
+interface QuantityMeasurement {
+  value: number | null;
+  unit: string | null;
+}
+
+const MEASUREMENT_VALUE_KEYS = [
+  "value",
+  "qty",
+  "quantity",
+  "doubleValue",
+  "numericValue",
+  "amount",
+  "average",
+  "avg",
+  "maximum",
+  "minimum",
+  "sum",
+];
+
+const MEASUREMENT_UNIT_KEYS = ["unit", "units", "measurementUnit"];
+
+function parseNumericString(value: string): number | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  const direct = Number(trimmed);
+  if (Number.isFinite(direct)) return direct;
+
+  const match = trimmed.match(/-?\d+(?:\.\d+)?/);
+  return match ? Number(match[0]) : null;
+}
+
+function extractMeasurement(field: unknown, depth = 0): QuantityMeasurement {
+  if (depth > 5 || field === null || field === undefined) {
+    return { value: null, unit: null };
+  }
+
+  if (typeof field === "number" && Number.isFinite(field)) {
+    return { value: field, unit: null };
+  }
+
+  if (typeof field === "string") {
+    return { value: parseNumericString(field), unit: null };
+  }
+
+  if (typeof field !== "object") {
+    return { value: null, unit: null };
+  }
+
+  const obj = field as Record<string, unknown>;
+  const unit =
+    MEASUREMENT_UNIT_KEYS.map((key) => obj[key]).find((value): value is string => typeof value === "string") || null;
+
+  for (const key of MEASUREMENT_VALUE_KEYS) {
+    if (!(key in obj)) continue;
+
+    const nested = extractMeasurement(obj[key], depth + 1);
+    if (nested.value !== null) {
+      return { value: nested.value, unit: unit || nested.unit };
+    }
+  }
+
+  return { value: null, unit };
+}
+
+function getPathValue(source: unknown, path: string[]): unknown {
+  let current = source;
+
+  for (const segment of path) {
+    if (!current || typeof current !== "object") return undefined;
+    current = (current as Record<string, unknown>)[segment];
+  }
+
+  return current;
+}
+
+function extractMeasurementFromPaths(source: unknown, paths: string[][]): QuantityMeasurement {
+  for (const path of paths) {
+    const measurement = extractMeasurement(getPathValue(source, path));
+    if (measurement.value !== null) return measurement;
+  }
+
+  return { value: null, unit: null };
+}
+
+function extractTextFromPaths(source: unknown, paths: string[][]): string | null {
+  for (const path of paths) {
+    const value = getPathValue(source, path);
+
+    if (typeof value === "string" && value.trim()) return value.trim();
+    if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  }
+
+  return null;
+}
+
+function extractDateStringFromPaths(source: unknown, paths: string[][]): string | null {
+  for (const path of paths) {
+    const value = getPathValue(source, path);
+
+    if (typeof value === "string" && value.trim()) return value.trim();
+    if (value instanceof Date && !Number.isNaN(value.getTime())) return value.toISOString();
+  }
+
+  return null;
+}
+
+function normalizeUnitToken(unit: string | null | undefined): string {
+  return (unit || "").trim().toLowerCase().replace(/\s+/g, "");
+}
+
+const WORKOUT_NAME_PATHS = [["name"], ["workoutName"], ["summary", "name"], ["Summary", "Name"]];
+
+const WORKOUT_ACTIVITY_TYPE_PATHS = [
+  ["workoutActivityType"],
+  ["activityType"],
+  ["workoutType"],
+  ["sport_type"],
+  ["ActivityType"],
+  ["summary", "activityType"],
+  ["Summary", "ActivityType"],
+];
+
+const WORKOUT_START_DATE_PATHS = [
+  ["startDate"],
+  ["start_date"],
+  ["start"],
+  ["StartDate"],
+  ["summary", "startDate"],
+  ["Summary", "StartDate"],
+];
+
+const WORKOUT_END_DATE_PATHS = [
+  ["endDate"],
+  ["end_date"],
+  ["end"],
+  ["Date"],
+  ["date"],
+  ["EndDate"],
+  ["summary", "endDate"],
+  ["Summary", "EndDate"],
+];
+
+const WORKOUT_DISTANCE_PATHS = [
+  ["totalDistance"],
+  ["total_distance"],
+  ["distance"],
+  ["totalDistanceMeters"],
+  ["distanceInMeters"],
+  ["summary", "totalDistance"],
+  ["Summary", "TotalDistance"],
+  ["Summary", "Distance"],
+];
+
+const WORKOUT_DURATION_PATHS = [
+  ["duration"],
+  ["durationInSeconds"],
+  ["totalDuration"],
+  ["totalDurationSeconds"],
+  ["moving_time"],
+  ["elapsed_time"],
+  ["Duration"],
+  ["summary", "duration"],
+  ["Summary", "Duration"],
+];
+
+const WORKOUT_AVG_SPEED_PATHS = [
+  ["averageSpeed"],
+  ["average_speed"],
+  ["avgSpeed"],
+  ["avg_speed"],
+  ["meanSpeed"],
+  ["speed"],
+  ["summary", "averageSpeed"],
+  ["Summary", "AverageSpeed"],
+];
+
+const WORKOUT_MAX_SPEED_PATHS = [["maxSpeed"], ["max_speed"], ["summary", "maxSpeed"], ["Summary", "MaxSpeed"]];
+
+const WORKOUT_AVG_HEART_RATE_PATHS = [
+  ["averageHeartRate"],
+  ["average_heartrate"],
+  ["avgHeartRate"],
+  ["averageHeartRateBpm"],
+  ["statistics", "HKQuantityTypeIdentifierHeartRate", "average"],
+  ["summary", "averageHeartRate"],
+  ["Summary", "AverageHeartRate"],
+];
+
+const WORKOUT_MAX_HEART_RATE_PATHS = [
+  ["maxHeartRate"],
+  ["max_heartrate"],
+  ["maxHR"],
+  ["maxHeartRateBpm"],
+  ["statistics", "HKQuantityTypeIdentifierHeartRate", "maximum"],
+  ["summary", "maxHeartRate"],
+  ["Summary", "MaxHeartRate"],
+];
+
+const WORKOUT_ELEVATION_PATHS = [
+  ["totalElevationGain"],
+  ["total_elevation_gain"],
+  ["elevationGain"],
+  ["elevation_gain"],
+  ["summary", "totalElevationGain"],
+  ["Summary", "TotalElevationGain"],
+];
+
+const WORKOUT_SOURCE_PATHS = [
+  ["sourceName"],
+  ["Source", "Name"],
+  ["source", "name"],
+  ["Device", "Name"],
+  ["device", "name"],
+  ["bundleIdentifier"],
+  ["Source", "Identifier"],
+  ["source"],
+  ["device"],
+];
+
 function getWorkoutWindow(workout: any) {
-  const startRaw = workout.startDate || workout.start_date || workout.start;
-  const endRaw = workout.endDate || workout.end_date || workout.end;
+  const startRaw = extractDateStringFromPaths(workout, WORKOUT_START_DATE_PATHS);
+  const endRaw = extractDateStringFromPaths(workout, WORKOUT_END_DATE_PATHS);
 
   const start = startRaw ? new Date(startRaw) : null;
   let end = endRaw ? new Date(endRaw) : null;
 
-  const duration = getNumericValue(workout.duration, workout.moving_time, workout.elapsed_time);
+  const distanceMeasurement = extractMeasurementFromPaths(workout, WORKOUT_DISTANCE_PATHS);
+  const distanceMeters =
+    distanceMeasurement.value === null
+      ? 0
+      : normalizeDistanceToMeters(distanceMeasurement.value, distanceMeasurement.unit);
+  const durationMeasurement = extractMeasurementFromPaths(workout, WORKOUT_DURATION_PATHS);
+  const duration =
+    durationMeasurement.value === null
+      ? null
+      : normalizeDurationToSeconds(durationMeasurement.value, distanceMeters, durationMeasurement.unit);
+
   if (!end && start && duration && duration > 0) {
     end = new Date(start.getTime() + duration * 1000);
   }
@@ -160,8 +391,9 @@ function getHeartRateStatsForWorkout(workout: any, samples: any[]) {
 
   const values = samples
     .map((sample) => {
-      const timestamp = sample.date || sample.startDate || sample.start_date || sample.start;
-      const value = getNumericValue(sample.value, sample.quantity);
+      const timestamp =
+        sample.date || sample.Date || sample.startDate || sample.StartDate || sample.start_date || sample.start;
+      const value = extractMeasurement(sample).value;
       if (!timestamp || value === null || value <= 0) return null;
 
       const sampleTime = new Date(timestamp).getTime();
@@ -216,81 +448,81 @@ function mapWorkoutType(hkType: unknown, fallbackName?: string): string {
 
 /**
  * Despia may return distance in km or meters depending on the HealthKit source.
- * Heuristic: if value < 200, it's likely km → convert to meters.
- * Real workouts rarely exceed 200 km but are often > 200 meters.
+ * Prefer explicit units when present, then fall back to the previous heuristic.
  */
-function normalizeDistanceToMeters(raw: number): number {
+function normalizeDistanceToMeters(raw: number, unit?: string | null): number {
   if (raw <= 0) return 0;
-  // If the value looks like km (< 200), convert to meters
+
+  const normalizedUnit = normalizeUnitToken(unit);
+  if (/^(m|meter|meters|metre|metres)$/.test(normalizedUnit)) return raw;
+  if (/^(km|kilometer|kilometers|kilometre|kilometres)$/.test(normalizedUnit)) return raw * 1000;
+  if (/^(mi|mile|miles)$/.test(normalizedUnit)) return raw * 1609.344;
+  if (/^(ft|foot|feet)$/.test(normalizedUnit)) return raw * 0.3048;
+
   if (raw < 200) return raw * 1000;
   return raw;
 }
 
 /**
  * Despia may return duration in seconds or minutes.
- * Heuristic: if value < 300 (~5 min in seconds but ~5 hours in minutes),
- * and the value seems too small for seconds, treat as minutes.
- * A more reliable check: if duration < 60 and distance > 500m, likely minutes.
+ * Prefer explicit units when present, then fall back to the previous heuristic.
  */
-function normalizeDurationToSeconds(raw: number, distanceMeters: number): number {
+function normalizeDurationToSeconds(raw: number, distanceMeters: number, unit?: string | null): number {
   if (raw <= 0) return 0;
-  // If duration looks like minutes (short value but meaningful distance),
-  // convert to seconds. Typical run: 20-120 minutes.
-  // If raw < 300 and distance > 500m, it's almost certainly minutes.
+
+  const normalizedUnit = normalizeUnitToken(unit);
+  if (/^(s|sec|secs|second|seconds)$/.test(normalizedUnit)) return raw;
+  if (/^(ms|millisecond|milliseconds)$/.test(normalizedUnit)) return raw / 1000;
+  if (/^(min|mins|minute|minutes)$/.test(normalizedUnit)) return raw * 60;
+  if (/^(h|hr|hrs|hour|hours)$/.test(normalizedUnit)) return raw * 3600;
+
   if (raw < 300 && distanceMeters > 500) return raw * 60;
-  // If raw is already > 300, it's likely already seconds (5+ minutes)
   return raw;
 }
 
 function extractQuantityValue(field: unknown): number | null {
-  if (field === null || field === undefined) return null;
-  if (typeof field === "number" && Number.isFinite(field)) return field;
-  if (typeof field === "string") {
-    const parsed = Number(field);
-    if (Number.isFinite(parsed)) return parsed;
+  return extractMeasurement(field).value;
+}
+
+function normalizeSpeedToMetersPerSecond(raw: number, unit?: string | null): number {
+  if (raw <= 0) return 0;
+
+  const normalizedUnit = normalizeUnitToken(unit);
+  if (!normalizedUnit) return raw;
+
+  if (/^(m\/s|meter\/second|meters\/second|metre\/second|metres\/second)$/.test(normalizedUnit)) return raw;
+  if (/^(km\/h|kmh|kmph|kph|kilometer\/hour|kilometers\/hour|kilometre\/hour|kilometres\/hour)$/.test(normalizedUnit)) {
+    return raw / 3.6;
   }
-  if (typeof field === "object" && field !== null) {
-    const obj = field as Record<string, unknown>;
-    // HKQuantity objects: {doubleValue, unit} or {value, unit} or {quantity}
-    return getNumericValue(obj.doubleValue, obj.value, obj.quantity, obj.numericValue, obj.amount);
-  }
-  return null;
+  if (/^(mi\/h|mph|mile\/hour|miles\/hour)$/.test(normalizedUnit)) return raw * 0.44704;
+  if (/^(min\/km|minperkm|minkm)$/.test(normalizedUnit)) return 1000 / (raw * 60);
+  if (/^(min\/mi|minpermi|minmi)$/.test(normalizedUnit)) return 1609.344 / (raw * 60);
+
+  return raw;
 }
 
 function parseWorkouts(samples: any[], heartRateSamples: any[] = []): AppleHealthWorkout[] {
   if (!Array.isArray(samples) || samples.length === 0) return [];
 
   return samples
-    .filter((w) => w && (w.startDate || w.start_date || w.start))
+    .filter((w) => w && extractDateStringFromPaths(w, WORKOUT_START_DATE_PATHS))
     .map((w) => {
       // Log each raw workout for debugging
       console.log("[AppleHealth] Raw workout object:", JSON.stringify(w));
 
-      const sportType = mapWorkoutType(
-        w.workoutActivityType ?? w.activityType ?? w.workoutType ?? w.sport_type,
-        w.name,
-      );
+      const workoutName = extractTextFromPaths(w, WORKOUT_NAME_PATHS);
+      const rawWorkoutType = extractTextFromPaths(w, WORKOUT_ACTIVITY_TYPE_PATHS);
 
-      // Extract raw distance - try multiple field names including HKQuantity objects
-      const rawDistance =
-        extractQuantityValue(w.totalDistance) ??
-        extractQuantityValue(w.total_distance) ??
-        extractQuantityValue(w.distance) ??
-        extractQuantityValue(w.totalDistanceMeters) ??
-        extractQuantityValue(w.distanceInMeters) ??
-        0;
+      const sportType = mapWorkoutType(rawWorkoutType, workoutName || undefined);
 
-      const distanceMeters = normalizeDistanceToMeters(rawDistance);
+      const distanceMeasurement = extractMeasurementFromPaths(w, WORKOUT_DISTANCE_PATHS);
+      const distanceMeters =
+        distanceMeasurement.value === null
+          ? 0
+          : normalizeDistanceToMeters(distanceMeasurement.value, distanceMeasurement.unit);
 
-      // Extract raw duration
-      const rawDuration =
-        extractQuantityValue(w.duration) ??
-        extractQuantityValue(w.durationInSeconds) ??
-        extractQuantityValue(w.totalDuration) ??
-        extractQuantityValue(w.totalDurationSeconds) ??
-        extractQuantityValue(w.moving_time) ??
-        extractQuantityValue(w.elapsed_time) ??
-        0;
+      const durationMeasurement = extractMeasurementFromPaths(w, WORKOUT_DURATION_PATHS);
+      const rawDuration = durationMeasurement.value ?? 0;
 
       // Also try computing from start/end if duration is 0
       let durationSeconds = rawDuration;
@@ -300,54 +532,47 @@ function parseWorkouts(samples: any[], heartRateSamples: any[] = []): AppleHealt
           durationSeconds = (window.end.getTime() - window.start.getTime()) / 1000;
         }
       }
-      durationSeconds = normalizeDurationToSeconds(durationSeconds, distanceMeters);
+      durationSeconds = normalizeDurationToSeconds(durationSeconds, distanceMeters, durationMeasurement.unit);
 
+      const derivedAverageSpeed = durationSeconds > 0 && distanceMeters > 0 ? distanceMeters / durationSeconds : 0;
+      const avgSpeedMeasurement = extractMeasurementFromPaths(w, WORKOUT_AVG_SPEED_PATHS);
+      const maxSpeedMeasurement = extractMeasurementFromPaths(w, WORKOUT_MAX_SPEED_PATHS);
       const avgSpeed =
-        extractQuantityValue(w.averageSpeed) ??
-        extractQuantityValue(w.average_speed) ??
-        extractQuantityValue(w.avgSpeed) ??
-        extractQuantityValue(w.meanSpeed) ??
-        (durationSeconds > 0 ? distanceMeters / durationSeconds : 0);
+        derivedAverageSpeed > 0
+          ? derivedAverageSpeed
+          : avgSpeedMeasurement.value === null
+            ? 0
+            : normalizeSpeedToMetersPerSecond(avgSpeedMeasurement.value, avgSpeedMeasurement.unit);
 
       const heartRateStats = getHeartRateStatsForWorkout(w, heartRateSamples);
-      const startDate = w.startDate || w.start_date || w.start;
+      const startDate = extractDateStringFromPaths(w, WORKOUT_START_DATE_PATHS) || "";
+
+      const avgHRMeasurement = extractMeasurementFromPaths(w, WORKOUT_AVG_HEART_RATE_PATHS);
+      const maxHRMeasurement = extractMeasurementFromPaths(w, WORKOUT_MAX_HEART_RATE_PATHS);
+      const elevationMeasurement = extractMeasurementFromPaths(w, WORKOUT_ELEVATION_PATHS);
 
       // Extract heart rate - also check nested statistics
-      const avgHR =
-        extractQuantityValue(w.averageHeartRate) ??
-        extractQuantityValue(w.average_heartrate) ??
-        extractQuantityValue(w.avgHeartRate) ??
-        extractQuantityValue(w.averageHeartRateBpm) ??
-        extractQuantityValue(w?.statistics?.HKQuantityTypeIdentifierHeartRate?.average) ??
-        heartRateStats.average;
+      const avgHR = avgHRMeasurement.value === null ? heartRateStats.average : Math.round(avgHRMeasurement.value);
 
-      const maxHR =
-        extractQuantityValue(w.maxHeartRate) ??
-        extractQuantityValue(w.max_heartrate) ??
-        extractQuantityValue(w.maxHR) ??
-        extractQuantityValue(w.maxHeartRateBpm) ??
-        extractQuantityValue(w?.statistics?.HKQuantityTypeIdentifierHeartRate?.maximum) ??
-        heartRateStats.max;
+      const maxHR = maxHRMeasurement.value === null ? heartRateStats.max : Math.round(maxHRMeasurement.value);
 
       const workout: AppleHealthWorkout = {
-        name: w.name || w.workoutName || `${sportType} Workout`,
+        name: workoutName || `${sportType} Workout`,
         sport_type: sportType,
         distance: Math.round(distanceMeters),
         moving_time: Math.round(durationSeconds),
         elapsed_time: Math.round(durationSeconds),
-        total_elevation_gain: Math.round(
-          extractQuantityValue(w.totalElevationGain) ??
-            extractQuantityValue(w.total_elevation_gain) ??
-            extractQuantityValue(w.elevationGain) ??
-            extractQuantityValue(w.elevation_gain) ??
-            0,
-        ),
+        total_elevation_gain: Math.round(elevationMeasurement.value ?? 0),
         start_date: startDate,
         average_speed: Math.round(avgSpeed * 100) / 100,
-        max_speed: extractQuantityValue(w.maxSpeed) ?? extractQuantityValue(w.max_speed) ?? 0,
+        max_speed:
+          maxSpeedMeasurement.value === null
+            ? 0
+            : Math.round(normalizeSpeedToMetersPerSecond(maxSpeedMeasurement.value, maxSpeedMeasurement.unit) * 100) /
+              100,
         average_heartrate: avgHR,
         max_heartrate: maxHR,
-        source: w.sourceName || w.source || w.device || w.bundleIdentifier || "Apple Health",
+        source: extractTextFromPaths(w, WORKOUT_SOURCE_PATHS) || "Apple Health",
       };
 
       console.log("[AppleHealth] Parsed workout:", JSON.stringify(workout));

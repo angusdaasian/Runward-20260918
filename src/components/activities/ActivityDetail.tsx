@@ -195,6 +195,16 @@ const ActivityDetail = ({ activity, lang, onBack, isPremium }: Props) => {
   useEffect(() => {
     const fetchStreams = async () => {
       setLoading(true);
+      if (!activity.strava_id || activity.strava_id <= 0) {
+        setStreams([]);
+        setSplits(null);
+        if (isPremium) {
+          await runAiAnalysis(null);
+        }
+        setLoading(false);
+        return;
+      }
+
       try {
         const { data, error } = await supabase.functions.invoke('strava-activity-streams', {
           body: { strava_id: activity.strava_id },
@@ -205,20 +215,20 @@ const ActivityDetail = ({ activity, lang, onBack, isPremium }: Props) => {
           setSplits(data.splits || null);
           // Auto-run AI analysis after streams are loaded
           if (isPremium) {
-            runAiAnalysis(data.splits || null);
+            await runAiAnalysis(data.splits || null);
           }
         } else if (isPremium) {
-          runAiAnalysis(null);
+          await runAiAnalysis(null);
         }
       } catch (err) {
         console.error('Error fetching streams:', err);
-        if (isPremium) runAiAnalysis(null);
+        if (isPremium) await runAiAnalysis(null);
       }
       setLoading(false);
     };
 
     fetchStreams();
-  }, [activity.strava_id]);
+  }, [activity.strava_id, isPremium]);
 
   // Process streams into chart data
   const chartData = useMemo(() => {

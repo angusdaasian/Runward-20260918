@@ -167,11 +167,16 @@ const ActivityCard = ({
         <div>
           <h3 className="font-medium text-foreground text-sm">{act.name}</h3>
           <span className="text-xs text-muted-foreground">
-            {new Date(act.start_date).toLocaleDateString(lang === "zh" ? "zh-TW" : "en-US", {
+170:             {new Date(act.start_date).toLocaleDateString(lang === "zh" ? "zh-TW" : "en-US", {
               year: "numeric",
               month: "short",
               day: "numeric",
               weekday: "short",
+            })}
+            {" "}
+            {new Date(act.start_date).toLocaleTimeString(lang === "zh" ? "zh-TW" : "en-US", {
+              hour: "2-digit",
+              minute: "2-digit",
             })}
           </span>
         </div>
@@ -275,7 +280,7 @@ const ActivitiesTab = ({ lang }: Props) => {
       .then(({ data }) => {
         if (data) {
           setAhConnected(true);
-          if (!appleHealth.healthStats && !appleHealth.syncing) {
+          if (!appleHealth.syncing) {
             appleHealth.syncHealthData();
           }
         }
@@ -286,10 +291,15 @@ const ActivitiesTab = ({ lang }: Props) => {
   useEffect(() => {
     if (!user) return;
     const channel = supabase
-      .channel("strava-activities-realtime")
+      .channel("fitness-activities-realtime")
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "strava_activities", filter: `user_id=eq.${user.id}` },
+        () => invalidateAll(),
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "apple_health_activities", filter: `user_id=eq.${user.id}` },
         () => invalidateAll(),
       )
       .subscribe();

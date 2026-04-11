@@ -35,7 +35,7 @@ const ConnectApps = ({ lang, onBack }: Props) => {
 
   // Auto-sync health data when connected
   useEffect(() => {
-    if (appleHealthConnected && !appleHealth.healthStats && !appleHealth.syncing) {
+    if (appleHealthConnected && !appleHealth.syncing) {
       appleHealth.syncHealthData();
     }
   }, [appleHealthConnected]);

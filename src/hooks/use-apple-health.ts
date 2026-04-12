@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { Lang } from "@/lib/i18n";
+import { remoteLog } from "@/lib/remoteLogger";
 
 // --- Constants & Types ---
 
@@ -14,9 +15,8 @@ const HEALTHKIT_DAILY_TYPES = [
   "HKQuantityTypeIdentifierDistanceWalkingRunning",
 ];
 
-const HEALTHKIT_WORKOUT_TYPES = ["HKWorkoutType", "HKWorkoutTypeIdentifier", "HKQuantityTypeIdentifierHeartRate"].join(
-  ",",
-);
+const HEALTHKIT_WORKOUT_TYPES = "HKWorkoutType,HKWorkoutTypeIdentifier";
+const HEALTHKIT_HR_TYPE = "HKQuantityTypeIdentifierHeartRate";
 
 export interface HealthStats {
   sleepMinutes: number;
@@ -72,10 +72,17 @@ function parseNumericString(value: string): number | null {
 }
 
 function extractMeasurement(field: unknown, depth = 0): QuantityMeasurement {
-  if (depth > 5 || field === null || field === undefined) return { value: null, unit: null };
+  if (depth > 6 || field === null || field === undefined) return { value: null, unit: null };
   if (typeof field === "number" && Number.isFinite(field)) return { value: field, unit: null };
   if (typeof field === "string") return { value: parseNumericString(field), unit: null };
   if (typeof field !== "object") return { value: null, unit: null };
+  if (Array.isArray(field)) {
+    for (const item of field) {
+      const nested = extractMeasurement(item, depth + 1);
+      if (nested.value !== null) return nested;
+    }
+    return { value: null, unit: null };
+  }
 
   const obj = field as Record<string, unknown>;
   const unit =
@@ -86,6 +93,14 @@ function extractMeasurement(field: unknown, depth = 0): QuantityMeasurement {
     const nested = extractMeasurement(obj[key], depth + 1);
     if (nested.value !== null) return { value: nested.value, unit: unit || nested.unit };
   }
+
+  for (const [key, value] of Object.entries(obj)) {
+    if (/quantity|measurement|heartrate|heart_rate|bpm|elevation/i.test(key)) {
+      const nested = extractMeasurement(value, depth + 1);
+      if (nested.value !== null) return { value: nested.value, unit: unit || nested.unit };
+    }
+  }
+
   return { value: null, unit };
 }
 
@@ -133,17 +148,43 @@ function sumQuantitySamples(samples: any[]): number {
   return samples.reduce((sum: number, s: any) => sum + (extractMeasurement(s).value || 0), 0);
 }
 
-function toSampleArray(value: unknown): any[] {
-  if (Array.isArray(value)) return value;
-  if (value && typeof value === "object") return [value];
-  return [];
+function toSampleArray(value: unknown, depth = 0): any[] {
+  if (depth > 4 || value === null || value === undefined) return [];
+  if (Array.isArray(value)) {
+    return value.flatMap((item) => toSampleArray(item, depth + 1));
+  }
+  if (typeof value !== "object") return [];
+
+  const obj = value as Record<string, unknown>;
+  const nestedCollectionKeys = [
+    "samples",
+    "data",
+    "results",
+    "records",
+    "items",
+    "entries",
+    "objects",
+    "value",
+    "quantity",
+  ];
+  const nestedCollections = nestedCollectionKeys.flatMap((key) => toSampleArray(obj[key], depth + 1));
+  if (nestedCollections.length > 0) return nestedCollections;
+
+  return [obj];
 }
 
 function mergeSampleArrays(data: Record<string, any>, keys: string[]): any[] {
   const sources = [data, data?.data, data?.healthkitResponse, data?.healthkitResponse?.data].filter(
     (source): source is Record<string, any> => !!source && typeof source === "object",
   );
-  const merged = keys.flatMap((key) => sources.flatMap((source) => toSampleArray(source[key])));
+  const merged = keys.flatMap((key) =>
+    sources.flatMap((source) => [
+      ...toSampleArray(source[key]),
+      ...toSampleArray(source?.samples?.[key]),
+      ...toSampleArray(source?.statistics?.[key]),
+      ...toSampleArray(source?.data?.[key]),
+    ]),
+  );
   return Array.from(
     new Map(
       merged.map((sample, index) => {
@@ -279,7 +320,15 @@ const WORKOUT_ELEVATION_PATHS = [
 ];
 const WORKOUT_SOURCE_PATHS = [["sourceName"], ["source", "name"], ["bundleIdentifier"]];
 
-const HEART_RATE_SAMPLE_KEYS = ["heartRate", "heart_rate", "bpm"];
+const HEART_RATE_SAMPLE_KEYS = [
+  "heartRate",
+  "heart_rate",
+  "bpm",
+  "quantity",
+  "averageQuantity",
+  "maximumQuantity",
+  "mostRecentQuantity",
+];
 const HEART_RATE_AVERAGE_KEYS = ["averageHeartRate", "average_heartrate", "avgHeartRate", "avg_heartrate"];
 const HEART_RATE_MAX_KEYS = ["maxHeartRate", "max_heartrate", "maximumHeartRate", "maximum_heartrate", "peakHeartRate"];
 const ELEVATION_KEYS = [
@@ -289,6 +338,9 @@ const ELEVATION_KEYS = [
   "elevationAscended",
   "elevationGain",
   "elevation_gain",
+  "HKMetadataKeyElevationAscended",
+  "sumQuantity",
+  "sum",
 ];
 
 // --- Specific Parsing Logic ---
@@ -322,13 +374,12 @@ function getHeartRateStatsForWorkout(workout: any, samples: any[]) {
   const window = getWorkoutWindow(workout);
   if (!window || !Array.isArray(samples) || samples.length === 0) return { average: null, max: null };
 
-  // 30-second buffer on both sides to capture third-party samples (Garmin, etc.)
-  // that may start slightly before/after the workout record
   const BUFFER_MS = 30_000;
   const windowStart = window.start.getTime() - BUFFER_MS;
   const windowEnd = window.end.getTime() + BUFFER_MS;
 
   const values = samples
+    .flatMap((sample) => toSampleArray(sample))
     .map((s) => {
       const timestamp = extractSampleTimestamp(s);
       const directMeasurement = extractMeasurement(s);
@@ -471,14 +522,37 @@ export function useAppleHealth(lang: Lang) {
 
   const readHealthData = useCallback(async (statsDays = 1, workoutDays = 30) => {
     try {
+      // Logger self-test: tiny ping to verify infrastructure works
+      const ping = await remoteLog("AppleHealth", "logger_ping", {
+        timestamp: new Date().toISOString(),
+        statsDays,
+        workoutDays,
+      });
+      console.log("[AppleHealth] logger_ping result:", ping);
+
+      // 1) Daily stats
       const statsRes = await despia(`healthkit://read?types=${HEALTHKIT_DAILY_TYPES.join(",")}&days=${statsDays}`, [
         "healthkitResponse",
       ]);
       const sData = statsRes?.healthkitResponse || statsRes || {};
+
+      // 2) Workout records (separate from HR)
       const workRes = await despia(`healthkit://read?types=${HEALTHKIT_WORKOUT_TYPES}&days=${workoutDays}`, [
         "healthkitResponse",
       ]);
       const wData = workRes?.healthkitResponse || workRes || {};
+
+      // 3) Heart rate samples — SEPARATE explicit request
+      let hrData: Record<string, any> = {};
+      try {
+        const hrRes = await despia(`healthkit://read?types=${HEALTHKIT_HR_TYPE}&days=${workoutDays}`, [
+          "healthkitResponse",
+        ]);
+        hrData = hrRes?.healthkitResponse || hrRes || {};
+        console.log("[AppleHealth] Separate HR read keys:", Object.keys(hrData));
+      } catch (hrErr) {
+        console.warn("[AppleHealth] Separate HR read failed, falling back to workout payload:", hrErr);
+      }
 
       const rawDist = sumQuantitySamples(sData.HKQuantityTypeIdentifierDistanceWalkingRunning || []);
       const distanceKm = rawDist < 500 ? rawDist : rawDist / 1000;
@@ -490,21 +564,70 @@ export function useAppleHealth(lang: Lang) {
         walkRunDistanceKm: Math.round(distanceKm * 100) / 100,
       };
 
-      const hrSamples = mergeSampleArrays(wData, ["HKQuantityTypeIdentifierHeartRate", "heartRate"]);
+      // Merge HR samples from both workout payload and separate HR read
+      const hrFromWorkout = mergeSampleArrays(wData, ["HKQuantityTypeIdentifierHeartRate", "heartRate"]);
+      const hrFromSeparate = mergeSampleArrays(hrData, ["HKQuantityTypeIdentifierHeartRate", "heartRate", "samples"]);
+      const hrSamples = [...hrFromWorkout, ...hrFromSeparate];
+
       const wSamples = mergeSampleArrays(wData, ["HKWorkoutType", "HKWorkoutTypeIdentifier"]);
-      console.log("[AppleHealth] HR samples:", hrSamples.length, "Workout samples:", wSamples.length);
+      console.log("[AppleHealth] Workout payload keys:", Object.keys(wData || {}));
+      console.log(
+        "[AppleHealth] HR from workout:",
+        hrFromWorkout.length,
+        "HR from separate:",
+        hrFromSeparate.length,
+        "Total HR:",
+        hrSamples.length,
+      );
+      console.log("[AppleHealth] Workout samples:", wSamples.length);
+
+      // Remote log: raw workout objects (first 5)
+      await remoteLog("AppleHealth", "raw_workout_samples", {
+        workoutPayloadKeys: Object.keys(wData || {}),
+        hrFromWorkoutCount: hrFromWorkout.length,
+        hrFromSeparateCount: hrFromSeparate.length,
+        totalHrSamples: hrSamples.length,
+        workoutSampleCount: wSamples.length,
+        rawWorkouts: wSamples.slice(0, 5),
+      });
+
+      // Remote log: HR samples snapshot
+      await remoteLog("AppleHealth", "hr_samples_snapshot", {
+        firstHrSamples: hrSamples.slice(0, 10),
+        hrPayloadKeys: Object.keys(hrData || {}),
+        hrPayloadExcerpt: JSON.stringify(hrData)?.substring(0, 3000),
+      });
+
+      // Debug: Log first 3 raw workout objects fully for inspection
+      wSamples.slice(0, 3).forEach((w, i) => {
+        console.log(`[AppleHealth] Raw workout[${i}] FULL:`, JSON.stringify(w)?.substring(0, 2000));
+      });
+
       if (hrSamples.length > 0) {
-        console.log("[AppleHealth] First HR sample:", JSON.stringify(hrSamples[0])?.substring(0, 500));
+        console.log("[AppleHealth] First HR sample:", JSON.stringify(hrSamples[0])?.substring(0, 800));
+      } else {
+        console.log("[AppleHealth] NO HR samples found in either payload");
+        console.log("[AppleHealth] Workout payload excerpt:", JSON.stringify(wData)?.substring(0, 1500));
+        console.log("[AppleHealth] HR payload excerpt:", JSON.stringify(hrData)?.substring(0, 1500));
       }
-      if (wSamples.length > 0) {
-        console.log("[AppleHealth] First workout keys:", Object.keys(wSamples[0]));
-        console.log(
-          "[AppleHealth] First workout statistics:",
-          JSON.stringify(wSamples[0]?.statistics)?.substring(0, 800),
-        );
-        console.log("[AppleHealth] First workout metadata:", JSON.stringify(wSamples[0]?.metadata)?.substring(0, 500));
-      }
+
       const workouts = parseWorkouts(wSamples, hrSamples);
+
+      // Remote log: parsed results
+      await remoteLog("AppleHealth", "parsed_workouts", {
+        count: workouts.length,
+        workouts: workouts.slice(0, 5).map((w) => ({
+          name: w.name,
+          sport_type: w.sport_type,
+          start_date: w.start_date,
+          average_heartrate: w.average_heartrate,
+          max_heartrate: w.max_heartrate,
+          total_elevation_gain: w.total_elevation_gain,
+          distance: w.distance,
+          source: w.source,
+        })),
+      });
+
       if (workouts.length > 0) {
         console.log(
           "[AppleHealth] First parsed workout HR:",

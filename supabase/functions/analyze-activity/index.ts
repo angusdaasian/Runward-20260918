@@ -3,9 +3,25 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
+
+const jsonHeaders = { ...corsHeaders, "Content-Type": "application/json" };
+
+function jsonResponse(body: Record<string, unknown>, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: jsonHeaders,
+  });
+}
+
+function asArray<T = any>(value: unknown): T[] {
+  return Array.isArray(value) ? value : [];
+}
+
+function isValidDate(value: Date) {
+  return !Number.isNaN(value.getTime());
+}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -13,51 +29,43 @@ serve(async (req) => {
   try {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return jsonResponse({ error: "Unauthorized" }, 401);
     }
 
-    const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-    const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
-    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const accessToken = authHeader.replace(/^Bearer\s+/i, "").trim();
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    if (!SUPABASE_URL) throw new Error("SUPABASE_URL is not configured");
+    if (!SUPABASE_SERVICE_ROLE_KEY) throw new Error("SUPABASE_SERVICE_ROLE_KEY is not configured");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
-    const userClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      global: { headers: { Authorization: authHeader } },
-    });
-    const {
-      data: { user },
-      error: userError,
-    } = await userClient.auth.getUser();
+    const serviceClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    const { data: { user }, error: userError } = await serviceClient.auth.getUser(accessToken);
     if (userError || !user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return jsonResponse({ error: "Unauthorized" }, 401);
     }
 
     const body = await req.json();
     const { activity, splits, lang, translate, activityDbId } = body;
     const isZh = lang === "zh";
-    const serviceClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
     // --- Translation mode ---
     if (translate && activityDbId) {
       // Fetch existing analysis
-      const { data: existing } = await serviceClient
+      const { data: existing, error: existingError } = await serviceClient
         .from("activity_analyses")
         .select("*")
         .eq("activity_id", activityDbId)
-        .single();
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (existingError) {
+        console.error("activity_analyses translate fetch error:", existingError);
+      }
 
       if (!existing) {
-        return new Response(JSON.stringify({ error: "No analysis found to translate" }), {
-          status: 404,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        return jsonResponse({ error: "No analysis found to translate" }, 404);
       }
 
       const targetField = isZh ? "analysis_zh" : "analysis_en";
@@ -65,17 +73,12 @@ serve(async (req) => {
 
       // Already have this translation
       if (existing[targetField]) {
-        return new Response(JSON.stringify({ analysis: existing[targetField] }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        return jsonResponse({ analysis: existing[targetField] });
       }
 
       const sourceText = existing[sourceField];
       if (!sourceText) {
-        return new Response(JSON.stringify({ error: "No source text to translate" }), {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        return jsonResponse({ error: "No source text to translate" }, 400);
       }
 
       const targetLang = isZh ? "Traditional Chinese (Hong Kong)" : "English";
@@ -88,20 +91,14 @@ serve(async (req) => {
         body: JSON.stringify({
           model: "google/gemini-3-flash-preview",
           messages: [
-            {
-              role: "user",
-              content: `Translate the following running workout analysis into ${targetLang}. Keep the Markdown formatting intact. Only translate, do not change the content.\n\n${sourceText}`,
-            },
+            { role: "user", content: `Translate the following running workout analysis into ${targetLang}. Keep the Markdown formatting intact. Only translate, do not change the content.\n\n${sourceText}` },
           ],
         }),
       });
 
       if (!tlResp.ok) {
         console.error("Translation error:", tlResp.status, await tlResp.text());
-        return new Response(JSON.stringify({ error: "Translation failed" }), {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        return jsonResponse({ error: "Translation failed" }, 500);
       }
 
       const tlData = await tlResp.json();
@@ -113,32 +110,30 @@ serve(async (req) => {
         .update({ [targetField]: translated })
         .eq("id", existing.id);
 
-      return new Response(JSON.stringify({ analysis: translated }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return jsonResponse({ analysis: translated });
     }
 
     // --- Analysis mode ---
     if (!activity || !activityDbId) {
-      return new Response(JSON.stringify({ error: "activity and activityDbId are required" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return jsonResponse({ error: "activity and activityDbId are required" }, 400);
     }
 
     // Check if analysis already exists
-    const { data: existingAnalysis } = await serviceClient
+    const { data: existingAnalysis, error: existingAnalysisError } = await serviceClient
       .from("activity_analyses")
       .select("*")
       .eq("activity_id", activityDbId)
-      .single();
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (existingAnalysisError) {
+      console.error("activity_analyses fetch error:", existingAnalysisError);
+    }
 
     if (existingAnalysis) {
       const field = isZh ? "analysis_zh" : "analysis_en";
       if (existingAnalysis[field]) {
-        return new Response(JSON.stringify({ analysis: existingAnalysis[field] }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        return jsonResponse({ analysis: existingAnalysis[field] });
       }
       // Has analysis in other language, trigger translation
       const otherField = isZh ? "analysis_en" : "analysis_zh";
@@ -154,48 +149,59 @@ serve(async (req) => {
           body: JSON.stringify({
             model: "google/gemini-3-flash-preview",
             messages: [
-              {
-                role: "user",
-                content: `Translate the following running workout analysis into ${targetLang}. Keep the Markdown formatting intact.\n\n${existingAnalysis[otherField]}`,
-              },
+              { role: "user", content: `Translate the following running workout analysis into ${targetLang}. Keep the Markdown formatting intact.\n\n${existingAnalysis[otherField]}` },
             ],
           }),
         });
         if (tlResp.ok) {
           const tlData = await tlResp.json();
           const translated = tlData.choices?.[0]?.message?.content || "";
-          await serviceClient
-            .from("activity_analyses")
-            .update({ [field]: translated })
-            .eq("id", existingAnalysis.id);
-          return new Response(JSON.stringify({ analysis: translated }), {
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
+          await serviceClient.from("activity_analyses").update({ [field]: translated }).eq("id", existingAnalysis.id);
+          return jsonResponse({ analysis: translated });
         }
       }
     }
 
     // Fetch user's active training plan
-    const { data: plans } = await userClient
+    const { data: plans, error: plansError } = await serviceClient
       .from("training_plans")
       .select("*")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
       .limit(1);
 
+    if (plansError) {
+      console.error("training_plans fetch error:", plansError);
+    }
+
     const plan = plans && plans.length > 0 ? plans[0] : null;
 
     const activityDate = new Date(activity.start_date);
+    const activityDateStr = typeof activity.start_date === "string" && activity.start_date
+      ? activity.start_date.split("T")[0]
+      : "Unknown";
     let planContext = "";
 
     if (plan) {
-      const planData = plan.plan_data as any;
+      const planData = asArray<any>(plan.plan_data);
       const raceDate = new Date(plan.race_date);
-      const planStartDate = planData?.[0]?.days?.[0]?.date
-        ? new Date(planData[0].days[0].date)
-        : new Date(raceDate.getTime() - plan.weeks * 7 * 24 * 60 * 60 * 1000);
+      const planStartSeed = asArray<any>(planData[0]?.days)[0]?.date;
+      const parsedPlanStartDate = planStartSeed ? new Date(planStartSeed) : null;
+      const fallbackPlanStartDate = isValidDate(raceDate) && Number.isFinite(Number(plan.weeks))
+        ? new Date(raceDate.getTime() - Number(plan.weeks) * 7 * 24 * 60 * 60 * 1000)
+        : null;
+      const planStartDate = parsedPlanStartDate && isValidDate(parsedPlanStartDate)
+        ? parsedPlanStartDate
+        : fallbackPlanStartDate && isValidDate(fallbackPlanStartDate)
+          ? fallbackPlanStartDate
+          : null;
 
-      if (activityDate < planStartDate) {
+      if (!planStartDate || !isValidDate(activityDate)) {
+        planContext = `The user is on a ${plan.distance} training plan (${plan.goal === "custom" ? "Custom" : plan.goal}).
+- Target finishing time: ${plan.target_time}
+- Race date: ${plan.race_date}
+Please analyze how this activity fits the user's training plan, pacing, effort, and progression.`;
+      } else if (activityDate < planStartDate) {
         planContext = `The user has an upcoming training plan:
 - Race type: ${plan.distance} (${plan.goal === "custom" ? "Custom plan" : plan.goal})
 - Target finishing time: ${plan.target_time}
@@ -206,20 +212,15 @@ serve(async (req) => {
 Please analyze how this activity benefits the user's preparation for their upcoming plan.`;
       } else {
         const diffMs = activityDate.getTime() - planStartDate.getTime();
-        const weekNumber = Math.floor(diffMs / (7 * 24 * 60 * 60 * 1000)) + 1;
+        const weekNumber = Math.max(1, Math.floor(diffMs / (7 * 24 * 60 * 60 * 1000)) + 1);
 
         let plannedWorkout = "";
-        if (Array.isArray(planData)) {
-          const weekData = planData.find((w: any) => w.week === weekNumber);
-          if (weekData?.days) {
-            const activityDayStr = activityDate.toISOString().split("T")[0];
-            const dayMatch = weekData.days.find((d: any) => d.date === activityDayStr);
-            if (dayMatch) {
-              plannedWorkout =
-                `Planned workout for this day: ${dayMatch.workout || dayMatch.description || "Rest"}` +
-                (dayMatch.distance ? ` (${dayMatch.distance} km)` : "");
-            }
-          }
+        const weekData = planData.find((w: any) => Number(w?.week) === weekNumber) ?? planData[weekNumber - 1];
+        const dayMatch = asArray<any>(weekData?.days).find((d: any) => d?.date === activityDateStr);
+        if (dayMatch) {
+          const plannedDistance = dayMatch.distance_km ?? dayMatch.distance;
+          plannedWorkout = `Planned workout for this day: ${dayMatch.workout || dayMatch.description || dayMatch.type || "Rest"}` +
+            (plannedDistance ? ` (${plannedDistance} km)` : "");
         }
 
         planContext = `The user is on a ${plan.distance} training plan (${plan.goal === "custom" ? "Custom" : plan.goal}).
@@ -230,8 +231,7 @@ ${plannedWorkout ? `- ${plannedWorkout}` : ""}
 Please analyze whether the user executed the planned workout correctly and provide feedback on pacing, effort, and adherence to the plan.`;
       }
     } else {
-      planContext =
-        "The user does not have an active training plan. Please analyze the workout quality based on the stats alone.";
+      planContext = "The user does not have an active training plan. Please analyze the workout quality based on the stats alone.";
     }
 
     const distKm = (activity.distance / 1000).toFixed(2);
@@ -240,16 +240,19 @@ Please analyze whether the user executed the planned workout correctly and provi
     const paceSec = Math.floor(paceSeconds % 60);
     const avgPace = `${paceMin}:${String(paceSec).padStart(2, "0")} /km`;
 
+    const activitySource = activity.source || "unknown";
+
     let statsText = `Activity: "${activity.name}"
-- Date: ${activityDate.toISOString().split("T")[0]}
+- Source: ${activitySource}
+- Date: ${activityDateStr}
 - Total Distance: ${distKm} km
 - Moving Time: ${Math.floor(activity.moving_time / 60)} min ${activity.moving_time % 60} sec
 - Average Pace: ${avgPace}
 - Total Elevation Gain: ${Math.round(activity.total_elevation_gain)} m`;
 
-    if (activity.average_heartrate)
-      statsText += `\n- Average Heart Rate: ${Math.round(activity.average_heartrate)} bpm`;
-    if (activity.max_heartrate) statsText += `\n- Max Heart Rate: ${Math.round(activity.max_heartrate)} bpm`;
+    // HR is optional bonus data — include if available but analysis should not depend on it
+    if (activity.average_heartrate) statsText += `\n- Average Heart Rate: ${Math.round(activity.average_heartrate)} bpm (optional data)`;
+    if (activity.max_heartrate) statsText += `\n- Max Heart Rate: ${Math.round(activity.max_heartrate)} bpm (optional data)`;
 
     if (splits && splits.length > 0) {
       statsText += "\n\nSplits (per km):";
@@ -258,13 +261,26 @@ Please analyze whether the user executed the planned workout correctly and provi
         const sm = Math.floor(sp / 60);
         const ss = Math.floor(sp % 60);
         statsText += `\n  km ${s.split}: ${sm}:${String(ss).padStart(2, "0")} /km`;
-        if (s.average_heartrate) statsText += ` | HR: ${Math.round(s.average_heartrate)} bpm`;
         statsText += ` | Elev: ${s.elevation_difference > 0 ? "+" : ""}${Math.round(s.elevation_difference)}m`;
       }
     }
 
     const systemPrompt = isZh
       ? `你是一位專業跑步教練 AI。根據提供的訓練計劃背景和活動數據，給出簡潔但深入的分析。回覆請用繁體中文。
+
+你的分析應主要基於以下核心指標：
+- 配速（平均配速、分段配速一致性）
+- 距離（是否完成計劃距離）
+- 時間（訓練時長是否合理）
+- 爬升（地形對配速的影響）
+
+如果有心率數據，可以作為額外參考，但不要因為缺少心率數據而影響分析質量。
+
+如果用戶有訓練計劃，重點比較：
+- 實際距離 vs 計劃距離
+- 實際配速 vs 計劃目標配速
+- 訓練類型是否符合計劃安排
+
 格式要求：用 Markdown 格式回覆，包含以下部分：
 ## 總評
 簡短評價這次訓練
@@ -280,6 +296,20 @@ Please analyze whether the user executed the planned workout correctly and provi
 
 保持簡潔實用，每個部分 2-3 點即可。`
       : `You are a professional running coach AI. Based on the training plan context and activity data provided, give a concise but insightful analysis.
+
+Your analysis should focus on these core metrics:
+- Pace (average pace, split consistency, appropriate effort level)
+- Distance (did the runner complete the intended distance?)
+- Duration (was the workout duration reasonable?)
+- Elevation (how did terrain affect pace?)
+
+If heart rate data is available, use it as supplementary context, but do NOT let missing HR data reduce your analysis quality. Many data sources (e.g. Apple Health) may not provide HR.
+
+If the user has a training plan, focus on plan adherence:
+- Actual distance vs planned distance
+- Actual pace vs target pace implied by race goal
+- Whether the workout type matches the plan's intent (easy run, tempo, intervals, long run, etc.)
+
 Format your reply in Markdown with these sections:
 ## Overall Assessment
 Brief evaluation of the workout
@@ -314,23 +344,14 @@ Keep it concise and actionable, 2-3 points per section.`;
 
     if (!response.ok) {
       if (response.status === 429) {
-        return new Response(JSON.stringify({ error: "Rate limited, please try again later." }), {
-          status: 429,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        return jsonResponse({ error: "Rate limited, please try again later." }, 429);
       }
       if (response.status === 402) {
-        return new Response(JSON.stringify({ error: "Payment required." }), {
-          status: 402,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        return jsonResponse({ error: "Payment required." }, 402);
       }
       const t = await response.text();
       console.error("AI gateway error:", response.status, t);
-      return new Response(JSON.stringify({ error: "AI gateway error" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return jsonResponse({ error: "AI gateway error" }, 500);
     }
 
     const data = await response.json();
@@ -347,16 +368,14 @@ Keep it concise and actionable, 2-3 points per section.`;
       upsertData.analysis_en = analysisText;
     }
 
-    await serviceClient.from("activity_analyses").upsert(upsertData, { onConflict: "activity_id" });
+    const { error: upsertError } = await serviceClient.from("activity_analyses").upsert(upsertData, { onConflict: "activity_id" });
+    if (upsertError) {
+      console.error("activity_analyses upsert error:", upsertError);
+    }
 
-    return new Response(JSON.stringify({ analysis: analysisText }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return jsonResponse({ analysis: analysisText });
   } catch (e) {
     console.error("analyze-activity error:", e);
-    return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return jsonResponse({ error: e instanceof Error ? e.message : "Unknown error" }, 500);
   }
 });

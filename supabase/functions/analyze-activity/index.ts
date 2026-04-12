@@ -3,7 +3,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
 serve(async (req) => {
@@ -13,7 +14,8 @@ serve(async (req) => {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
@@ -26,10 +28,14 @@ serve(async (req) => {
     const userClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
       global: { headers: { Authorization: authHeader } },
     });
-    const { data: { user }, error: userError } = await userClient.auth.getUser();
+    const {
+      data: { user },
+      error: userError,
+    } = await userClient.auth.getUser();
     if (userError || !user) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
@@ -49,7 +55,8 @@ serve(async (req) => {
 
       if (!existing) {
         return new Response(JSON.stringify({ error: "No analysis found to translate" }), {
-          status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 404,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
@@ -66,7 +73,8 @@ serve(async (req) => {
       const sourceText = existing[sourceField];
       if (!sourceText) {
         return new Response(JSON.stringify({ error: "No source text to translate" }), {
-          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
@@ -80,7 +88,10 @@ serve(async (req) => {
         body: JSON.stringify({
           model: "google/gemini-3-flash-preview",
           messages: [
-            { role: "user", content: `Translate the following running workout analysis into ${targetLang}. Keep the Markdown formatting intact. Only translate, do not change the content.\n\n${sourceText}` },
+            {
+              role: "user",
+              content: `Translate the following running workout analysis into ${targetLang}. Keep the Markdown formatting intact. Only translate, do not change the content.\n\n${sourceText}`,
+            },
           ],
         }),
       });
@@ -88,7 +99,8 @@ serve(async (req) => {
       if (!tlResp.ok) {
         console.error("Translation error:", tlResp.status, await tlResp.text());
         return new Response(JSON.stringify({ error: "Translation failed" }), {
-          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
@@ -109,7 +121,8 @@ serve(async (req) => {
     // --- Analysis mode ---
     if (!activity || !activityDbId) {
       return new Response(JSON.stringify({ error: "activity and activityDbId are required" }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
@@ -141,14 +154,20 @@ serve(async (req) => {
           body: JSON.stringify({
             model: "google/gemini-3-flash-preview",
             messages: [
-              { role: "user", content: `Translate the following running workout analysis into ${targetLang}. Keep the Markdown formatting intact.\n\n${existingAnalysis[otherField]}` },
+              {
+                role: "user",
+                content: `Translate the following running workout analysis into ${targetLang}. Keep the Markdown formatting intact.\n\n${existingAnalysis[otherField]}`,
+              },
             ],
           }),
         });
         if (tlResp.ok) {
           const tlData = await tlResp.json();
           const translated = tlData.choices?.[0]?.message?.content || "";
-          await serviceClient.from("activity_analyses").update({ [field]: translated }).eq("id", existingAnalysis.id);
+          await serviceClient
+            .from("activity_analyses")
+            .update({ [field]: translated })
+            .eq("id", existingAnalysis.id);
           return new Response(JSON.stringify({ analysis: translated }), {
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
@@ -196,7 +215,8 @@ Please analyze how this activity benefits the user's preparation for their upcom
             const activityDayStr = activityDate.toISOString().split("T")[0];
             const dayMatch = weekData.days.find((d: any) => d.date === activityDayStr);
             if (dayMatch) {
-              plannedWorkout = `Planned workout for this day: ${dayMatch.workout || dayMatch.description || "Rest"}` +
+              plannedWorkout =
+                `Planned workout for this day: ${dayMatch.workout || dayMatch.description || "Rest"}` +
                 (dayMatch.distance ? ` (${dayMatch.distance} km)` : "");
             }
           }
@@ -210,7 +230,8 @@ ${plannedWorkout ? `- ${plannedWorkout}` : ""}
 Please analyze whether the user executed the planned workout correctly and provide feedback on pacing, effort, and adherence to the plan.`;
       }
     } else {
-      planContext = "The user does not have an active training plan. Please analyze the workout quality based on the stats alone.";
+      planContext =
+        "The user does not have an active training plan. Please analyze the workout quality based on the stats alone.";
     }
 
     const distKm = (activity.distance / 1000).toFixed(2);
@@ -226,7 +247,8 @@ Please analyze whether the user executed the planned workout correctly and provi
 - Average Pace: ${avgPace}
 - Total Elevation Gain: ${Math.round(activity.total_elevation_gain)} m`;
 
-    if (activity.average_heartrate) statsText += `\n- Average Heart Rate: ${Math.round(activity.average_heartrate)} bpm`;
+    if (activity.average_heartrate)
+      statsText += `\n- Average Heart Rate: ${Math.round(activity.average_heartrate)} bpm`;
     if (activity.max_heartrate) statsText += `\n- Max Heart Rate: ${Math.round(activity.max_heartrate)} bpm`;
 
     if (splits && splits.length > 0) {
@@ -293,18 +315,21 @@ Keep it concise and actionable, 2-3 points per section.`;
     if (!response.ok) {
       if (response.status === 429) {
         return new Response(JSON.stringify({ error: "Rate limited, please try again later." }), {
-          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 429,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
       if (response.status === 402) {
         return new Response(JSON.stringify({ error: "Payment required." }), {
-          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 402,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
       const t = await response.text();
       console.error("AI gateway error:", response.status, t);
       return new Response(JSON.stringify({ error: "AI gateway error" }), {
-        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
@@ -330,7 +355,8 @@ Keep it concise and actionable, 2-3 points per section.`;
   } catch (e) {
     console.error("analyze-activity error:", e);
     return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }), {
-      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });

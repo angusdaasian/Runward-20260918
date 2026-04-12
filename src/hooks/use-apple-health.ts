@@ -1,369 +1,616 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { useState, useCallback } from "react";
+import despia from "despia-native";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "sonner";
+import { Lang } from "@/lib/i18n";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+// --- Constants & Types ---
+
+const HEALTHKIT_DAILY_TYPES = [
+  "HKCategoryTypeIdentifierSleepAnalysis",
+  "HKQuantityTypeIdentifierActiveEnergyBurned",
+  "HKQuantityTypeIdentifierStepCount",
+  "HKQuantityTypeIdentifierDistanceWalkingRunning",
+];
+
+const HEALTHKIT_WORKOUT_TYPES = ["HKWorkoutType", "HKWorkoutTypeIdentifier", "HKQuantityTypeIdentifierHeartRate"].join(
+  ",",
+);
+
+export interface HealthStats {
+  sleepMinutes: number;
+  caloriesBurned: number;
+  steps: number;
+  walkRunDistanceKm: number;
+}
+
+interface AppleHealthWorkout {
+  name: string;
+  sport_type: string;
+  distance: number;
+  moving_time: number;
+  elapsed_time: number;
+  total_elevation_gain: number;
+  start_date: string;
+  average_speed: number;
+  max_speed: number;
+  average_heartrate: number | null;
+  max_heartrate: number | null;
+  source: string;
+}
+
+interface QuantityMeasurement {
+  value: number | null;
+  unit: string | null;
+}
+
+const MEASUREMENT_VALUE_KEYS = [
+  "value",
+  "qty",
+  "quantity",
+  "doubleValue",
+  "numericValue",
+  "amount",
+  "average",
+  "avg",
+  "maximum",
+  "minimum",
+  "sum",
+];
+const MEASUREMENT_UNIT_KEYS = ["unit", "units", "measurementUnit"];
+
+// --- Utility Functions ---
+
+function parseNumericString(value: string): number | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const direct = Number(trimmed);
+  if (Number.isFinite(direct)) return direct;
+  const match = trimmed.match(/-?\d+(?:\.\d+)?/);
+  return match ? Number(match[0]) : null;
+}
+
+function extractMeasurement(field: unknown, depth = 0): QuantityMeasurement {
+  if (depth > 5 || field === null || field === undefined) return { value: null, unit: null };
+  if (typeof field === "number" && Number.isFinite(field)) return { value: field, unit: null };
+  if (typeof field === "string") return { value: parseNumericString(field), unit: null };
+  if (typeof field !== "object") return { value: null, unit: null };
+
+  const obj = field as Record<string, unknown>;
+  const unit =
+    MEASUREMENT_UNIT_KEYS.map((key) => obj[key]).find((value): value is string => typeof value === "string") || null;
+
+  for (const key of MEASUREMENT_VALUE_KEYS) {
+    if (!(key in obj)) continue;
+    const nested = extractMeasurement(obj[key], depth + 1);
+    if (nested.value !== null) return { value: nested.value, unit: unit || nested.unit };
+  }
+  return { value: null, unit };
+}
+
+function getPathValue(source: unknown, path: string[]): unknown {
+  let current = source;
+  for (const segment of path) {
+    if (!current || typeof current !== "object") return undefined;
+    current = (current as Record<string, unknown>)[segment];
+  }
+  return current;
+}
+
+function extractMeasurementFromPaths(source: unknown, paths: string[][]): QuantityMeasurement {
+  for (const path of paths) {
+    const measurement = extractMeasurement(getPathValue(source, path));
+    if (measurement.value !== null) return measurement;
+  }
+  return { value: null, unit: null };
+}
+
+function extractTextFromPaths(source: unknown, paths: string[][]): string | null {
+  for (const path of paths) {
+    const value = getPathValue(source, path);
+    if (typeof value === "string" && value.trim()) return value.trim();
+    if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  }
+  return null;
+}
+
+function extractDateStringFromPaths(source: unknown, paths: string[][]): string | null {
+  for (const path of paths) {
+    const value = getPathValue(source, path);
+    if (typeof value === "string" && value.trim()) return value.trim();
+    if (value instanceof Date && !Number.isNaN(value.getTime())) return value.toISOString();
+  }
+  return null;
+}
+
+function normalizeUnitToken(unit: string | null | undefined): string {
+  return (unit || "").trim().toLowerCase().replace(/\s+/g, "");
+}
+
+function sumQuantitySamples(samples: any[]): number {
+  if (!Array.isArray(samples) || samples.length === 0) return 0;
+  return samples.reduce((sum: number, s: any) => sum + (extractMeasurement(s).value || 0), 0);
+}
+
+function toSampleArray(value: unknown): any[] {
+  if (Array.isArray(value)) return value;
+  if (value && typeof value === "object") return [value];
+  return [];
+}
+
+function mergeSampleArrays(data: Record<string, any>, keys: string[]): any[] {
+  const sources = [data, data?.data, data?.healthkitResponse, data?.healthkitResponse?.data].filter(
+    (source): source is Record<string, any> => !!source && typeof source === "object",
+  );
+  const merged = keys.flatMap((key) => sources.flatMap((source) => toSampleArray(source[key])));
+  return Array.from(
+    new Map(
+      merged.map((sample, index) => {
+        const sampleKey = JSON.stringify([
+          sample?.id,
+          sample?.uuid,
+          sample?.startDate,
+          sample?.start_date,
+          sample?.start,
+          sample?.endDate,
+          sample?.end_date,
+          sample?.end,
+          sample?.date,
+          index,
+        ]);
+        return [sampleKey, sample];
+      }),
+    ).values(),
+  );
+}
+
+function extractMeasurementByCandidateKeys(
+  source: unknown,
+  candidateKeys: string[],
+  depth = 0,
+  seen = new WeakSet<object>(),
+): QuantityMeasurement {
+  if (depth > 6 || !source || typeof source !== "object") return { value: null, unit: null };
+
+  const obj = source as Record<string, unknown>;
+  if (seen.has(obj)) return { value: null, unit: null };
+  seen.add(obj);
+
+  for (const [key, value] of Object.entries(obj)) {
+    if (candidateKeys.includes(key)) {
+      const measurement = extractMeasurement(value);
+      if (measurement.value !== null) return measurement;
+    }
+  }
+
+  for (const value of Object.values(obj)) {
+    const nested = extractMeasurementByCandidateKeys(value, candidateKeys, depth + 1, seen);
+    if (nested.value !== null) return nested;
+  }
+
+  return { value: null, unit: null };
+}
+
+function extractSampleTimestamp(sample: unknown): string | null {
+  return extractDateStringFromPaths(sample, [
+    ["timestamp"],
+    ["date"],
+    ["startDate"],
+    ["start_date"],
+    ["start"],
+    ["endDate"],
+    ["end_date"],
+    ["end"],
+  ]);
+}
+
+// Path constants
+const WORKOUT_NAME_PATHS = [["name"], ["workoutName"], ["summary", "name"]];
+const WORKOUT_ACTIVITY_TYPE_PATHS = [["workoutActivityType"], ["activityType"], ["sport_type"]];
+const WORKOUT_START_DATE_PATHS = [["startDate"], ["start_date"], ["start"]];
+const WORKOUT_END_DATE_PATHS = [["endDate"], ["end_date"], ["end"], ["date"]];
+const WORKOUT_DISTANCE_PATHS = [["totalDistance"], ["total_distance"], ["distance"]];
+const WORKOUT_DURATION_PATHS = [["duration"], ["moving_time"], ["elapsed_time"]];
+const WORKOUT_AVG_HEART_RATE_PATHS = [
+  // Direct top-level keys
+  ["averageHeartRate"],
+  ["average_heartrate"],
+  ["avgHeartRate"],
+  ["avg_heartrate"],
+  // Nested under heartRate/heart_rate
+  ["heartRate", "average"],
+  ["heart_rate", "average"],
+  // Statistics nested paths
+  ["statistics", "heartRate", "average"],
+  ["statistics", "heart_rate", "average"],
+  ["statistics", "HKQuantityTypeIdentifierHeartRate", "average"],
+  // Garmin/Apple deeper statistics paths (averageQuantity.doubleValue)
+  ["statistics", "HKQuantityTypeIdentifierHeartRate", "averageQuantity"],
+  ["statistics", "HKQuantityTypeIdentifierHeartRate", "averageQuantity", "doubleValue"],
+  ["statistics", "HKQuantityTypeIdentifierHeartRate", "avg"],
+  // Metadata fallback (some third-party apps store HR here)
+  ["metadata", "HKMetadataKeyAverageHeartRate"],
+  ["metadata", "_HKPrivateMetadataKeyAverageHeartRate"],
+];
+const WORKOUT_MAX_HEART_RATE_PATHS = [
+  // Direct top-level keys
+  ["maxHeartRate"],
+  ["max_heartrate"],
+  ["maximumHeartRate"],
+  ["maximum_heartrate"],
+  // Nested under heartRate/heart_rate
+  ["heartRate", "maximum"],
+  ["heartRate", "max"],
+  ["heart_rate", "maximum"],
+  ["heart_rate", "max"],
+  // Statistics nested paths
+  ["statistics", "heartRate", "maximum"],
+  ["statistics", "heart_rate", "maximum"],
+  ["statistics", "HKQuantityTypeIdentifierHeartRate", "maximum"],
+  // Garmin/Apple deeper statistics paths (maximumQuantity.doubleValue)
+  ["statistics", "HKQuantityTypeIdentifierHeartRate", "maximumQuantity"],
+  ["statistics", "HKQuantityTypeIdentifierHeartRate", "maximumQuantity", "doubleValue"],
+  ["statistics", "HKQuantityTypeIdentifierHeartRate", "max"],
+  // Metadata fallback
+  ["metadata", "HKMetadataKeyMaximumHeartRate"],
+  ["metadata", "_HKPrivateMetadataKeyMaximumHeartRate"],
+];
+const WORKOUT_ELEVATION_PATHS = [
+  // Direct top-level keys
+  ["totalElevationGain"],
+  ["total_elevation_gain"],
+  ["totalElevationAscended"],
+  ["elevationAscended"],
+  ["elevationGain"],
+  ["elevation_gain"],
+  // Apple's official metadata key (HKMetadataKeyElevationAscended)
+  // Value is an HKQuantity stored as a number or nested object
+  ["metadata", "HKMetadataKeyElevationAscended"],
+  ["metadata", "HKMetadataKeyElevationAscended", "doubleValue"],
+  ["metadata", "HKMetadataKeyElevationAscended", "value"],
+  ["metadata", "HKMetadataKeyElevationAscended", "quantity"],
+  // Statistics nested paths
+  ["statistics", "elevationGain", "sum"],
+  ["statistics", "HKQuantityTypeIdentifierElevationAscended", "sum"],
+  ["statistics", "HKQuantityTypeIdentifierElevationAscended", "sumQuantity"],
+  ["statistics", "HKQuantityTypeIdentifierElevationAscended", "sumQuantity", "doubleValue"],
+  ["statistics", "HKQuantityTypeIdentifierFlightsClimbed", "sum"],
+];
+const WORKOUT_SOURCE_PATHS = [["sourceName"], ["source", "name"], ["bundleIdentifier"]];
+
+const HEART_RATE_SAMPLE_KEYS = ["heartRate", "heart_rate", "bpm"];
+const HEART_RATE_AVERAGE_KEYS = ["averageHeartRate", "average_heartrate", "avgHeartRate", "avg_heartrate"];
+const HEART_RATE_MAX_KEYS = ["maxHeartRate", "max_heartrate", "maximumHeartRate", "maximum_heartrate", "peakHeartRate"];
+const ELEVATION_KEYS = [
+  "totalElevationGain",
+  "total_elevation_gain",
+  "totalElevationAscended",
+  "elevationAscended",
+  "elevationGain",
+  "elevation_gain",
+];
+
+// --- Specific Parsing Logic ---
+
+function parseSleepMinutes(samples: any[]): number {
+  if (!Array.isArray(samples) || samples.length === 0) return 0;
+  let totalMinutes = 0;
+  for (const sample of samples) {
+    const start = sample.startDate || sample.start;
+    const end = sample.endDate || sample.end;
+    if (start && end) {
+      const diffMin = (new Date(end).getTime() - new Date(start).getTime()) / 60000;
+      if (diffMin > 0 && diffMin < 1440) totalMinutes += diffMin;
+    } else if (typeof sample.value === "number" && sample.value > 0) {
+      totalMinutes += sample.unit === "hr" || sample.unit === "hours" ? sample.value * 60 : sample.value;
+    }
+  }
+  return Math.round(totalMinutes);
+}
+
+function getWorkoutWindow(workout: any) {
+  const startRaw = extractDateStringFromPaths(workout, WORKOUT_START_DATE_PATHS);
+  const endRaw = extractDateStringFromPaths(workout, WORKOUT_END_DATE_PATHS);
+  const start = startRaw ? new Date(startRaw) : null;
+  const end = endRaw ? new Date(endRaw) : null;
+  if (!start || Number.isNaN(start.getTime()) || !end || Number.isNaN(end.getTime()) || end <= start) return null;
+  return { start, end };
+}
+
+function getHeartRateStatsForWorkout(workout: any, samples: any[]) {
+  const window = getWorkoutWindow(workout);
+  if (!window || !Array.isArray(samples) || samples.length === 0) return { average: null, max: null };
+
+  // 30-second buffer on both sides to capture third-party samples (Garmin, etc.)
+  // that may start slightly before/after the workout record
+  const BUFFER_MS = 30_000;
+  const windowStart = window.start.getTime() - BUFFER_MS;
+  const windowEnd = window.end.getTime() + BUFFER_MS;
+
+  const values = samples
+    .map((s) => {
+      const timestamp = extractSampleTimestamp(s);
+      const directMeasurement = extractMeasurement(s);
+      const nestedMeasurement =
+        directMeasurement.value !== null
+          ? directMeasurement
+          : extractMeasurementByCandidateKeys(s, HEART_RATE_SAMPLE_KEYS);
+      const val = nestedMeasurement.value;
+      if (!timestamp || val === null || val <= 0) return null;
+      const t = new Date(timestamp).getTime();
+      return t >= windowStart && t <= windowEnd ? val : null;
+    })
+    .filter((v): v is number => v !== null);
+  if (values.length === 0) return { average: null, max: null };
+  return {
+    average: Math.round(values.reduce((a, b) => a + b, 0) / values.length),
+    max: Math.round(Math.max(...values)),
+  };
+}
+
+function normalizeDistanceToMeters(raw: number, unit?: string | null): number {
+  if (raw <= 0) return 0;
+  const u = normalizeUnitToken(unit);
+  // HEURISTIC: Fixes 0.00km bug. If value is low (e.g. 15), convert KM to Meters.
+  if (/^(km|kilometer|kilometers)$/.test(u) || (!u && raw < 500)) return raw * 1000;
+  return raw;
+}
+
+function normalizeDurationToSeconds(raw: number, distanceMeters: number, unit?: string | null): number {
+  if (raw <= 0) return 0;
+  const u = normalizeUnitToken(unit);
+  // HEURISTIC: Fixes 0:00:00 bug. If value is low but distance is high, convert Min to Sec.
+  if (/^(min|mins|minute|minutes)$/.test(u) || (raw < 500 && distanceMeters > 500)) return raw * 60;
+  return raw;
+}
+
+const WORKOUT_ACTIVITY_TYPE_MAP: Record<string, string> = {
+  "13": "Ride",
+  "24": "Hike",
+  "37": "Run",
+  "46": "Swim",
+  "52": "Walk",
+  "170": "Workout", // Changed from "Run" to "Workout" to fix the ID issue
+  HKWorkoutActivityTypeCycling: "Ride",
+  HKWorkoutActivityTypeHiking: "Hike",
+  HKWorkoutActivityTypeRunning: "Run",
+  HKWorkoutActivityTypeSwimming: "Swim",
+  HKWorkoutActivityTypeTrailRunning: "TrailRun",
+  HKWorkoutActivityTypeWalking: "Walk",
+  HKWorkoutActivityTypeOther: "Workout",
 };
 
-const jsonHeaders = { ...corsHeaders, "Content-Type": "application/json" };
+function mapWorkoutType(hkType: unknown, fallbackName?: string): string {
+  const rawType = String(hkType ?? "").trim();
 
-function jsonResponse(body: Record<string, unknown>, status = 200) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: jsonHeaders,
-  });
+  // 1. Check direct mapping (Fixes the "170" display)
+  const mapped = WORKOUT_ACTIVITY_TYPE_MAP[rawType];
+  if (mapped) return mapped;
+
+  // 2. Keyword detection for unmapped types
+  const lower = `${rawType} ${fallbackName || ""}`.toLowerCase();
+  if (lower.includes("trail") && lower.includes("run")) return "TrailRun";
+  if (lower.includes("run")) return "Run";
+  if (lower.includes("walk")) return "Walk";
+  if (lower.includes("hike")) return "Hike";
+  if (lower.includes("cycle") || lower.includes("bike")) return "Ride";
+
+  // 3. Cleanup prefix or use fallback
+  return rawType.replace("HKWorkoutActivityType", "") || "Workout";
 }
 
-function asArray<T = any>(value: unknown): T[] {
-  return Array.isArray(value) ? value : [];
+function parseWorkouts(samples: any[], heartRateSamples: any[] = []): AppleHealthWorkout[] {
+  if (!Array.isArray(samples)) return [];
+  return samples
+    .filter((w) => w && extractDateStringFromPaths(w, WORKOUT_START_DATE_PATHS))
+    .map((w) => {
+      const workoutName = extractTextFromPaths(w, WORKOUT_NAME_PATHS);
+      const sportType = mapWorkoutType(extractTextFromPaths(w, WORKOUT_ACTIVITY_TYPE_PATHS), workoutName || undefined);
+      const dMeas = extractMeasurementFromPaths(w, WORKOUT_DISTANCE_PATHS);
+      const distanceMeters = normalizeDistanceToMeters(dMeas.value ?? 0, dMeas.unit);
+      const tMeas = extractMeasurementFromPaths(w, WORKOUT_DURATION_PATHS);
+      let durationSeconds = normalizeDurationToSeconds(tMeas.value ?? 0, distanceMeters, tMeas.unit);
+
+      if (durationSeconds <= 0) {
+        const window = getWorkoutWindow(w);
+        if (window) durationSeconds = (window.end.getTime() - window.start.getTime()) / 1000;
+      }
+
+      // Priority: 1) workout statistics object, 2) deep key search, 3) manual HR sample filtering
+      const avgHRDirect = extractMeasurementFromPaths(w, WORKOUT_AVG_HEART_RATE_PATHS);
+      const avgHRDeep =
+        avgHRDirect.value !== null ? avgHRDirect : extractMeasurementByCandidateKeys(w, HEART_RATE_AVERAGE_KEYS);
+      const maxHRDirect = extractMeasurementFromPaths(w, WORKOUT_MAX_HEART_RATE_PATHS);
+      const maxHRDeep =
+        maxHRDirect.value !== null ? maxHRDirect : extractMeasurementByCandidateKeys(w, HEART_RATE_MAX_KEYS);
+
+      // Only fall back to manual sample filtering if statistics didn't yield results
+      const heartStats =
+        avgHRDeep.value === null || maxHRDeep.value === null
+          ? getHeartRateStatsForWorkout(w, heartRateSamples)
+          : { average: null, max: null };
+
+      const avgHR = avgHRDeep.value !== null ? avgHRDeep : { value: heartStats.average, unit: null };
+      const maxHR = maxHRDeep.value !== null ? maxHRDeep : { value: heartStats.max, unit: null };
+      const elevationDirect = extractMeasurementFromPaths(w, WORKOUT_ELEVATION_PATHS);
+      const elevation =
+        elevationDirect.value !== null ? elevationDirect : extractMeasurementByCandidateKeys(w, ELEVATION_KEYS);
+
+      return {
+        name:
+          workoutName && workoutName !== sportType && !workoutName.toLowerCase().includes(sportType.toLowerCase())
+            ? workoutName
+            : sportType,
+        sport_type: sportType,
+        distance: Math.round(distanceMeters),
+        moving_time: Math.round(durationSeconds),
+        elapsed_time: Math.round(durationSeconds),
+        total_elevation_gain: Math.round(elevation.value ?? 0),
+        start_date: extractDateStringFromPaths(w, WORKOUT_START_DATE_PATHS) || "",
+        average_speed: durationSeconds > 0 ? Math.round((distanceMeters / durationSeconds) * 100) / 100 : 0,
+        max_speed: 0,
+        average_heartrate: avgHR.value !== null ? Math.round(avgHR.value) : heartStats.average,
+        max_heartrate: maxHR.value !== null ? Math.round(maxHR.value) : heartStats.max,
+        source: extractTextFromPaths(w, WORKOUT_SOURCE_PATHS) || "Apple Health",
+      };
+    })
+    .filter((w) => !!w.start_date);
 }
 
-function isValidDate(value: Date) {
-  return !Number.isNaN(value.getTime());
-}
+// --- Main Hook ---
 
-serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+let _cachedStats: HealthStats | null = null;
+let _cachedAt = 0;
+const CACHE_TTL = 5 * 60 * 1000;
 
-  try {
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return jsonResponse({ error: "Unauthorized" }, 401);
+export function useAppleHealth(lang: Lang) {
+  const { user } = useAuth();
+  const [syncing, setSyncing] = useState(false);
+  const [healthStats, setHealthStats] = useState<HealthStats | null>(_cachedStats);
+
+  const readHealthData = useCallback(async (statsDays = 1, workoutDays = 30) => {
+    try {
+      const statsRes = await despia(`healthkit://read?types=${HEALTHKIT_DAILY_TYPES.join(",")}&days=${statsDays}`, [
+        "healthkitResponse",
+      ]);
+      const sData = statsRes?.healthkitResponse || statsRes || {};
+      const workRes = await despia(`healthkit://read?types=${HEALTHKIT_WORKOUT_TYPES}&days=${workoutDays}`, [
+        "healthkitResponse",
+      ]);
+      const wData = workRes?.healthkitResponse || workRes || {};
+
+      const rawDist = sumQuantitySamples(sData.HKQuantityTypeIdentifierDistanceWalkingRunning || []);
+      const distanceKm = rawDist < 500 ? rawDist : rawDist / 1000;
+
+      const stats: HealthStats = {
+        sleepMinutes: parseSleepMinutes(sData.HKCategoryTypeIdentifierSleepAnalysis || []),
+        caloriesBurned: Math.round(sumQuantitySamples(sData.HKQuantityTypeIdentifierActiveEnergyBurned || [])),
+        steps: Math.round(sumQuantitySamples(sData.HKQuantityTypeIdentifierStepCount || [])),
+        walkRunDistanceKm: Math.round(distanceKm * 100) / 100,
+      };
+
+      const hrSamples = mergeSampleArrays(wData, ["HKQuantityTypeIdentifierHeartRate", "heartRate"]);
+      const wSamples = mergeSampleArrays(wData, ["HKWorkoutType", "HKWorkoutTypeIdentifier"]);
+      console.log("[AppleHealth] HR samples:", hrSamples.length, "Workout samples:", wSamples.length);
+      if (hrSamples.length > 0) {
+        console.log("[AppleHealth] First HR sample:", JSON.stringify(hrSamples[0])?.substring(0, 500));
+      }
+      if (wSamples.length > 0) {
+        console.log("[AppleHealth] First workout keys:", Object.keys(wSamples[0]));
+        console.log(
+          "[AppleHealth] First workout statistics:",
+          JSON.stringify(wSamples[0]?.statistics)?.substring(0, 800),
+        );
+        console.log("[AppleHealth] First workout metadata:", JSON.stringify(wSamples[0]?.metadata)?.substring(0, 500));
+      }
+      const workouts = parseWorkouts(wSamples, hrSamples);
+      if (workouts.length > 0) {
+        console.log(
+          "[AppleHealth] First parsed workout HR:",
+          workouts[0].average_heartrate,
+          workouts[0].max_heartrate,
+          "elev:",
+          workouts[0].total_elevation_gain,
+        );
+      }
+
+      return { stats, workouts };
+    } catch (err) {
+      console.error("[AppleHealth] Read error:", err);
+      return { stats: { sleepMinutes: 0, caloriesBurned: 0, steps: 0, walkRunDistanceKm: 0 }, workouts: [] };
     }
+  }, []);
 
-    const accessToken = authHeader.replace(/^Bearer\s+/i, "").trim();
-    const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
-    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!SUPABASE_URL) throw new Error("SUPABASE_URL is not configured");
-    if (!SUPABASE_SERVICE_ROLE_KEY) throw new Error("SUPABASE_SERVICE_ROLE_KEY is not configured");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+  const updateStats = useCallback((stats: HealthStats) => {
+    _cachedStats = stats;
+    _cachedAt = Date.now();
+    setHealthStats(stats);
+  }, []);
 
-    const serviceClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-    const {
-      data: { user },
-      error: userError,
-    } = await serviceClient.auth.getUser(accessToken);
-    if (userError || !user) {
-      return jsonResponse({ error: "Unauthorized" }, 401);
-    }
+  const saveWorkoutsToDb = useCallback(
+    async (workouts: AppleHealthWorkout[]) => {
+      if (!user || workouts.length === 0) return 0;
+      try {
+        const normalizedWorkouts = Array.from(
+          new Map(
+            workouts.map((w) => [
+              new Date(w.start_date).toISOString(),
+              { ...w, start_date: new Date(w.start_date).toISOString() },
+            ]),
+          ).values(),
+        );
+        const startDates = normalizedWorkouts.map((w) => w.start_date);
+        const { data: existingRows } = await supabase
+          .from("apple_health_activities")
+          .select("id, start_date")
+          .eq("user_id", user.id)
+          .in("start_date", startDates);
+        const existingMap = new Map((existingRows || []).map((r) => [new Date(r.start_date).toISOString(), r.id]));
 
-    const body = await req.json();
-    const { activity, splits, lang, translate, activityDbId } = body;
-    const isZh = lang === "zh";
+        const toInsert: any[] = [];
+        const toUpdate: any[] = [];
 
-    // --- Translation mode ---
-    if (translate && activityDbId) {
-      // Fetch existing analysis
-      const { data: existing, error: existingError } = await serviceClient
-        .from("activity_analyses")
-        .select("*")
-        .eq("activity_id", activityDbId)
-        .eq("user_id", user.id)
-        .maybeSingle();
-
-      if (existingError) {
-        console.error("activity_analyses translate fetch error:", existingError);
-      }
-
-      if (!existing) {
-        return jsonResponse({ error: "No analysis found to translate" }, 404);
-      }
-
-      const targetField = isZh ? "analysis_zh" : "analysis_en";
-      const sourceField = isZh ? "analysis_en" : "analysis_zh";
-
-      // Already have this translation
-      if (existing[targetField]) {
-        return jsonResponse({ analysis: existing[targetField] });
-      }
-
-      const sourceText = existing[sourceField];
-      if (!sourceText) {
-        return jsonResponse({ error: "No source text to translate" }, 400);
-      }
-
-      const targetLang = isZh ? "Traditional Chinese (Hong Kong)" : "English";
-      const tlResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "google/gemini-3-flash-preview",
-          messages: [
-            {
-              role: "user",
-              content: `Translate the following running workout analysis into ${targetLang}. Keep the Markdown formatting intact. Only translate, do not change the content.\n\n${sourceText}`,
-            },
-          ],
-        }),
-      });
-
-      if (!tlResp.ok) {
-        console.error("Translation error:", tlResp.status, await tlResp.text());
-        return jsonResponse({ error: "Translation failed" }, 500);
-      }
-
-      const tlData = await tlResp.json();
-      const translated = tlData.choices?.[0]?.message?.content || "";
-
-      // Save translation
-      await serviceClient
-        .from("activity_analyses")
-        .update({ [targetField]: translated })
-        .eq("id", existing.id);
-
-      return jsonResponse({ analysis: translated });
-    }
-
-    // --- Analysis mode ---
-    if (!activity || !activityDbId) {
-      return jsonResponse({ error: "activity and activityDbId are required" }, 400);
-    }
-
-    // Check if analysis already exists
-    const { data: existingAnalysis, error: existingAnalysisError } = await serviceClient
-      .from("activity_analyses")
-      .select("*")
-      .eq("activity_id", activityDbId)
-      .eq("user_id", user.id)
-      .maybeSingle();
-
-    if (existingAnalysisError) {
-      console.error("activity_analyses fetch error:", existingAnalysisError);
-    }
-
-    if (existingAnalysis) {
-      const field = isZh ? "analysis_zh" : "analysis_en";
-      if (existingAnalysis[field]) {
-        return jsonResponse({ analysis: existingAnalysis[field] });
-      }
-      // Has analysis in other language, trigger translation
-      const otherField = isZh ? "analysis_en" : "analysis_zh";
-      if (existingAnalysis[otherField]) {
-        // Translate inline
-        const targetLang = isZh ? "Traditional Chinese (Hong Kong)" : "English";
-        const tlResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${LOVABLE_API_KEY}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            model: "google/gemini-3-flash-preview",
-            messages: [
-              {
-                role: "user",
-                content: `Translate the following running workout analysis into ${targetLang}. Keep the Markdown formatting intact.\n\n${existingAnalysis[otherField]}`,
-              },
-            ],
-          }),
+        normalizedWorkouts.forEach((w) => {
+          const payload = { user_id: user.id, ...w };
+          const id = existingMap.get(w.start_date);
+          if (id) toUpdate.push({ id, ...payload });
+          else toInsert.push(payload);
         });
-        if (tlResp.ok) {
-          const tlData = await tlResp.json();
-          const translated = tlData.choices?.[0]?.message?.content || "";
-          await serviceClient
-            .from("activity_analyses")
-            .update({ [field]: translated })
-            .eq("id", existingAnalysis.id);
-          return jsonResponse({ analysis: translated });
-        }
+
+        if (toInsert.length > 0) await supabase.from("apple_health_activities").insert(toInsert);
+        if (toUpdate.length > 0)
+          await Promise.all(toUpdate.map((r) => supabase.from("apple_health_activities").update(r).eq("id", r.id)));
+        return toInsert.length + toUpdate.length;
+      } catch (err) {
+        console.error("[AppleHealth] Save error:", err);
+        return 0;
       }
+    },
+    [user],
+  );
+
+  const requestAuthorization = useCallback(async () => {
+    try {
+      await despia(`healthkit://read?types=${HEALTHKIT_DAILY_TYPES.join(",")}&days=1`, ["healthkitResponse"]);
+      return true;
+    } catch {
+      return false;
     }
+  }, []);
 
-    // Fetch user's active training plan
-    const { data: plans, error: plansError } = await serviceClient
-      .from("training_plans")
-      .select("*")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false })
-      .limit(1);
-
-    if (plansError) {
-      console.error("training_plans fetch error:", plansError);
+  const connect = useCallback(async () => {
+    if (!user) return false;
+    setSyncing(true);
+    const authorized = await requestAuthorization();
+    if (!authorized) {
+      toast.error(lang === "zh" ? "請開啟權限" : "Enable Health access");
+      setSyncing(false);
+      return false;
     }
+    const { stats, workouts } = await readHealthData(1, 30);
+    await supabase.from("apple_health_connections").upsert({ user_id: user.id, updated_at: new Date().toISOString() });
+    updateStats(stats);
+    await saveWorkoutsToDb(workouts);
+    setSyncing(false);
+    return true;
+  }, [user, lang, requestAuthorization, readHealthData, updateStats, saveWorkoutsToDb]);
 
-    const plan = plans && plans.length > 0 ? plans[0] : null;
+  const syncHealthData = useCallback(async () => {
+    if (!user || (_cachedStats && Date.now() - _cachedAt < CACHE_TTL)) return;
+    setSyncing(true);
+    const { stats, workouts } = await readHealthData(1, 7);
+    updateStats(stats);
+    await saveWorkoutsToDb(workouts);
+    setSyncing(false);
+  }, [user, readHealthData, updateStats, saveWorkoutsToDb]);
 
-    const activityDate = new Date(activity.start_date);
-    const activityDateStr =
-      typeof activity.start_date === "string" && activity.start_date ? activity.start_date.split("T")[0] : "Unknown";
-    let planContext = "";
+  const disconnect = useCallback(async () => {
+    if (!user) return;
+    await supabase.from("apple_health_connections").delete().eq("user_id", user.id);
+    _cachedStats = null;
+    setHealthStats(null);
+  }, [user]);
 
-    if (plan) {
-      const planData = asArray<any>(plan.plan_data);
-      const raceDate = new Date(plan.race_date);
-      const planStartSeed = asArray<any>(planData[0]?.days)[0]?.date;
-      const parsedPlanStartDate = planStartSeed ? new Date(planStartSeed) : null;
-      const fallbackPlanStartDate =
-        isValidDate(raceDate) && Number.isFinite(Number(plan.weeks))
-          ? new Date(raceDate.getTime() - Number(plan.weeks) * 7 * 24 * 60 * 60 * 1000)
-          : null;
-      const planStartDate =
-        parsedPlanStartDate && isValidDate(parsedPlanStartDate)
-          ? parsedPlanStartDate
-          : fallbackPlanStartDate && isValidDate(fallbackPlanStartDate)
-            ? fallbackPlanStartDate
-            : null;
-
-      if (!planStartDate || !isValidDate(activityDate)) {
-        planContext = `The user is on a ${plan.distance} training plan (${plan.goal === "custom" ? "Custom" : plan.goal}).
-- Target finishing time: ${plan.target_time}
-- Race date: ${plan.race_date}
-Please analyze how this activity fits the user's training plan, pacing, effort, and progression.`;
-      } else if (activityDate < planStartDate) {
-        planContext = `The user has an upcoming training plan:
-- Race type: ${plan.distance} (${plan.goal === "custom" ? "Custom plan" : plan.goal})
-- Target finishing time: ${plan.target_time}
-- Plan start date: ${planStartDate.toISOString().split("T")[0]}
-- Race date: ${plan.race_date}
-- Plan duration: ${plan.weeks} weeks
-- The plan has NOT started yet. This activity was done BEFORE the plan begins.
-Please analyze how this activity benefits the user's preparation for their upcoming plan.`;
-      } else {
-        const diffMs = activityDate.getTime() - planStartDate.getTime();
-        const weekNumber = Math.max(1, Math.floor(diffMs / (7 * 24 * 60 * 60 * 1000)) + 1);
-
-        let plannedWorkout = "";
-        const weekData = planData.find((w: any) => Number(w?.week) === weekNumber) ?? planData[weekNumber - 1];
-        const dayMatch = asArray<any>(weekData?.days).find((d: any) => d?.date === activityDateStr);
-        if (dayMatch) {
-          const plannedDistance = dayMatch.distance_km ?? dayMatch.distance;
-          plannedWorkout =
-            `Planned workout for this day: ${dayMatch.workout || dayMatch.description || dayMatch.type || "Rest"}` +
-            (plannedDistance ? ` (${plannedDistance} km)` : "");
-        }
-
-        planContext = `The user is on a ${plan.distance} training plan (${plan.goal === "custom" ? "Custom" : plan.goal}).
-- This is Week ${weekNumber} of a ${plan.weeks}-week plan.
-- Target finishing time: ${plan.target_time}
-- Race date: ${plan.race_date}
-${plannedWorkout ? `- ${plannedWorkout}` : ""}
-Please analyze whether the user executed the planned workout correctly and provide feedback on pacing, effort, and adherence to the plan.`;
-      }
-    } else {
-      planContext =
-        "The user does not have an active training plan. Please analyze the workout quality based on the stats alone.";
-    }
-
-    const distKm = (activity.distance / 1000).toFixed(2);
-    const paceSeconds = activity.average_speed > 0 ? 1000 / activity.average_speed : 0;
-    const paceMin = Math.floor(paceSeconds / 60);
-    const paceSec = Math.floor(paceSeconds % 60);
-    const avgPace = `${paceMin}:${String(paceSec).padStart(2, "0")} /km`;
-
-    let statsText = `Activity: "${activity.name}"
-- Date: ${activityDateStr}
-- Total Distance: ${distKm} km
-- Moving Time: ${Math.floor(activity.moving_time / 60)} min ${activity.moving_time % 60} sec
-- Average Pace: ${avgPace}
-- Total Elevation Gain: ${Math.round(activity.total_elevation_gain)} m`;
-
-    if (activity.average_heartrate)
-      statsText += `\n- Average Heart Rate: ${Math.round(activity.average_heartrate)} bpm`;
-    if (activity.max_heartrate) statsText += `\n- Max Heart Rate: ${Math.round(activity.max_heartrate)} bpm`;
-
-    if (splits && splits.length > 0) {
-      statsText += "\n\nSplits (per km):";
-      for (const s of splits) {
-        const sp = s.average_speed > 0 ? 1000 / s.average_speed : 0;
-        const sm = Math.floor(sp / 60);
-        const ss = Math.floor(sp % 60);
-        statsText += `\n  km ${s.split}: ${sm}:${String(ss).padStart(2, "0")} /km`;
-        if (s.average_heartrate) statsText += ` | HR: ${Math.round(s.average_heartrate)} bpm`;
-        statsText += ` | Elev: ${s.elevation_difference > 0 ? "+" : ""}${Math.round(s.elevation_difference)}m`;
-      }
-    }
-
-    const systemPrompt = isZh
-      ? `你是一位專業跑步教練 AI。根據提供的訓練計劃背景和活動數據，給出簡潔但深入的分析。回覆請用繁體中文。
-格式要求：用 Markdown 格式回覆，包含以下部分：
-## 總評
-簡短評價這次訓練
-
-## 優點
-列出做得好的地方
-
-## 需改善
-列出需要改善的地方
-
-## 建議
-給出具體的訓練建議
-
-保持簡潔實用，每個部分 2-3 點即可。`
-      : `You are a professional running coach AI. Based on the training plan context and activity data provided, give a concise but insightful analysis.
-Format your reply in Markdown with these sections:
-## Overall Assessment
-Brief evaluation of the workout
-
-## Strengths
-What went well
-
-## Areas to Improve
-What could be better
-
-## Recommendations
-Specific training advice
-
-Keep it concise and actionable, 2-3 points per section.`;
-
-    const userMessage = `${planContext}\n\n--- Activity Data ---\n${statsText}`;
-
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userMessage },
-        ],
-      }),
-    });
-
-    if (!response.ok) {
-      if (response.status === 429) {
-        return jsonResponse({ error: "Rate limited, please try again later." }, 429);
-      }
-      if (response.status === 402) {
-        return jsonResponse({ error: "Payment required." }, 402);
-      }
-      const t = await response.text();
-      console.error("AI gateway error:", response.status, t);
-      return jsonResponse({ error: "AI gateway error" }, 500);
-    }
-
-    const data = await response.json();
-    const analysisText = data.choices?.[0]?.message?.content || "";
-
-    // Save to DB in the appropriate language column
-    const upsertData: any = {
-      user_id: user.id,
-      activity_id: activityDbId,
-    };
-    if (isZh) {
-      upsertData.analysis_zh = analysisText;
-    } else {
-      upsertData.analysis_en = analysisText;
-    }
-
-    const { error: upsertError } = await serviceClient
-      .from("activity_analyses")
-      .upsert(upsertData, { onConflict: "activity_id" });
-    if (upsertError) {
-      console.error("activity_analyses upsert error:", upsertError);
-    }
-
-    return jsonResponse({ analysis: analysisText });
-  } catch (e) {
-    console.error("analyze-activity error:", e);
-    return jsonResponse({ error: e instanceof Error ? e.message : "Unknown error" }, 500);
-  }
-});
+  return { connect, disconnect, syncHealthData, syncing, healthStats, readHealthData, saveWorkoutsToDb };
+}

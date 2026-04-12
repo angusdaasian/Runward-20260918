@@ -378,8 +378,10 @@ function getHeartRateStatsForWorkout(workout: any, samples: any[]) {
   const windowStart = window.start.getTime() - BUFFER_MS;
   const windowEnd = window.end.getTime() + BUFFER_MS;
 
-  const values = samples
-    .flatMap((sample) => toSampleArray(sample))
+  const flatSamples = samples.flatMap((sample) => toSampleArray(sample));
+
+  // 1) Precise time-window matching (original logic)
+  const values = flatSamples
     .map((s) => {
       const timestamp = extractSampleTimestamp(s);
       const directMeasurement = extractMeasurement(s);
@@ -393,11 +395,38 @@ function getHeartRateStatsForWorkout(workout: any, samples: any[]) {
       return t >= windowStart && t <= windowEnd ? val : null;
     })
     .filter((v): v is number => v !== null);
-  if (values.length === 0) return { average: null, max: null };
-  return {
-    average: Math.round(values.reduce((a, b) => a + b, 0) / values.length),
-    max: Math.round(Math.max(...values)),
-  };
+
+  if (values.length > 0) {
+    return {
+      average: Math.round(values.reduce((a, b) => a + b, 0) / values.length),
+      max: Math.round(Math.max(...values)),
+    };
+  }
+
+  // 2) Fallback: match by same calendar day (UTC) for daily-averaged HR data
+  const workoutDateUTC = window.start.toISOString().slice(0, 10); // "YYYY-MM-DD"
+  const dayValues = flatSamples
+    .map((s) => {
+      const timestamp = extractSampleTimestamp(s);
+      const measurement = extractMeasurement(s);
+      const val =
+        measurement.value !== null
+          ? measurement.value
+          : extractMeasurementByCandidateKeys(s, HEART_RATE_SAMPLE_KEYS).value;
+      if (!timestamp || val === null || val <= 0) return null;
+      const sampleDateUTC = new Date(timestamp).toISOString().slice(0, 10);
+      return sampleDateUTC === workoutDateUTC ? val : null;
+    })
+    .filter((v): v is number => v !== null);
+
+  if (dayValues.length > 0) {
+    return {
+      average: Math.round(dayValues.reduce((a, b) => a + b, 0) / dayValues.length),
+      max: null, // daily averages don't give us a meaningful max
+    };
+  }
+
+  return { average: null, max: null };
 }
 
 function normalizeDistanceToMeters(raw: number, unit?: string | null): number {
@@ -545,7 +574,7 @@ export function useAppleHealth(lang: Lang) {
       // 3) Heart rate samples — SEPARATE explicit request
       let hrData: Record<string, any> = {};
       try {
-        const hrRes = await despia(`healthkit://read?types=${HEALTHKIT_HR_TYPE}&days=${workoutDays}`, [
+        const hrRes = await despia(`healthkit://read?types=${HEALTHKIT_HR_TYPE}&days=${Math.max(workoutDays, 60)}`, [
           "healthkitResponse",
         ]);
         hrData = hrRes?.healthkitResponse || hrRes || {};
@@ -673,17 +702,34 @@ export function useAppleHealth(lang: Lang) {
 
         const toInsert: any[] = [];
         const toUpdate: any[] = [];
+        const newActivities: { distance: number; moving_time: number; sport_type: string }[] = [];
 
         normalizedWorkouts.forEach((w) => {
           const payload = { user_id: user.id, ...w };
           const id = existingMap.get(w.start_date);
           if (id) toUpdate.push({ id, ...payload });
-          else toInsert.push(payload);
+          else {
+            toInsert.push(payload);
+            newActivities.push({ distance: w.distance, moving_time: w.moving_time, sport_type: w.sport_type });
+          }
         });
 
         if (toInsert.length > 0) await supabase.from("apple_health_activities").insert(toInsert);
         if (toUpdate.length > 0)
           await Promise.all(toUpdate.map((r) => supabase.from("apple_health_activities").update(r).eq("id", r.id)));
+
+        // Award XP, compute training score, and send notifications for new activities
+        if (newActivities.length > 0) {
+          try {
+            const { error: postSyncError } = await supabase.functions.invoke("apple-health-post-sync", {
+              body: { newActivities },
+            });
+            if (postSyncError) console.error("[AppleHealth] Post-sync error:", postSyncError);
+          } catch (err) {
+            console.error("[AppleHealth] Post-sync call failed:", err);
+          }
+        }
+
         return toInsert.length + toUpdate.length;
       } catch (err) {
         console.error("[AppleHealth] Save error:", err);

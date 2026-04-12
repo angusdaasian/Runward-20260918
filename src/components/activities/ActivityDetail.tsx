@@ -34,6 +34,7 @@ interface StravaActivity {
   average_heartrate: number | null;
   max_heartrate: number | null;
   summary_polyline: string | null;
+  source?: string;
 }
 
 interface Split {
@@ -71,7 +72,7 @@ function formatPace(avgSpeed: number): string {
 
 function speedToPace(speed: number): number {
   if (speed <= 0) return 0;
-  return 1000 / speed / 60; // minutes per km
+  return 1000 / speed / 60;
 }
 
 function formatPaceFromMinutes(minutes: number): string {
@@ -93,6 +94,9 @@ const StatBox = ({ icon: Icon, label, value, unit, iconColor }: {
 );
 
 const ActivityDetail = ({ activity, lang, onBack, isPremium }: Props) => {
+  const isAppleHealth = activity.source && activity.source !== "strava";
+  const dbTable = isAppleHealth ? "apple_health_activities" : "strava_activities";
+
   const [streams, setStreams] = useState<any[]>([]);
   const [splits, setSplits] = useState<Split[] | null>(null);
   const [loading, setLoading] = useState(true);
@@ -109,7 +113,7 @@ const ActivityDetail = ({ activity, lang, onBack, isPremium }: Props) => {
   const handleRename = async () => {
     if (!nameInput.trim() || nameInput === activityName) { setEditingName(false); return; }
     setSavingName(true);
-    const { error } = await supabase.from('strava_activities').update({ name: nameInput.trim() } as any).eq('id', activity.id);
+    const { error } = await supabase.from(dbTable).update({ name: nameInput.trim() } as any).eq('id', activity.id);
     if (error) {
       toast.error(lang === "zh" ? "重命名失敗" : "Failed to rename");
     } else {
@@ -122,11 +126,7 @@ const ActivityDetail = ({ activity, lang, onBack, isPremium }: Props) => {
 
   const handleDelete = async () => {
     setDeleting(true);
-    const { error } = await supabase
-      .from('strava_activities')
-      .delete()
-      .eq('id', activity.id);
-
+    const { error } = await supabase.from(dbTable).delete().eq('id', activity.id);
     if (error) {
       toast.error(lang === "zh" ? "刪除失敗" : "Failed to delete activity");
       setDeleting(false);
@@ -154,6 +154,7 @@ const ActivityDetail = ({ activity, lang, onBack, isPremium }: Props) => {
             max_speed: activity.max_speed,
             average_heartrate: activity.average_heartrate,
             max_heartrate: activity.max_heartrate,
+            source: activity.source || "strava",
           },
           splits: currentSplits || [],
           lang,
@@ -171,7 +172,6 @@ const ActivityDetail = ({ activity, lang, onBack, isPremium }: Props) => {
     setAiLoading(false);
   };
 
-  // Re-fetch in correct language when lang changes
   useEffect(() => {
     if (!isPremium || !aiAnalysis || lang === aiLang) return;
     setAiLoading(true);
@@ -195,12 +195,11 @@ const ActivityDetail = ({ activity, lang, onBack, isPremium }: Props) => {
   useEffect(() => {
     const fetchStreams = async () => {
       setLoading(true);
+      // Apple Health activities: no Strava streams, go straight to AI analysis
       if (!activity.strava_id || activity.strava_id <= 0) {
         setStreams([]);
         setSplits(null);
-        if (isPremium) {
-          await runAiAnalysis(null);
-        }
+        if (isPremium) await runAiAnalysis(null);
         setLoading(false);
         return;
       }
@@ -209,14 +208,10 @@ const ActivityDetail = ({ activity, lang, onBack, isPremium }: Props) => {
         const { data, error } = await supabase.functions.invoke('strava-activity-streams', {
           body: { strava_id: activity.strava_id },
         });
-
         if (!error && data) {
           setStreams(data.streams || []);
           setSplits(data.splits || null);
-          // Auto-run AI analysis after streams are loaded
-          if (isPremium) {
-            await runAiAnalysis(data.splits || null);
-          }
+          if (isPremium) await runAiAnalysis(data.splits || null);
         } else if (isPremium) {
           await runAiAnalysis(null);
         }
@@ -226,35 +221,25 @@ const ActivityDetail = ({ activity, lang, onBack, isPremium }: Props) => {
       }
       setLoading(false);
     };
-
     fetchStreams();
   }, [activity.strava_id, isPremium]);
 
-  // Process streams into chart data
   const chartData = useMemo(() => {
     if (!streams || streams.length === 0) return [];
-
     const timeStream = streams.find((s: any) => s.type === 'time');
     const distStream = streams.find((s: any) => s.type === 'distance');
     const hrStream = streams.find((s: any) => s.type === 'heartrate');
     const altStream = streams.find((s: any) => s.type === 'altitude');
     const velStream = streams.find((s: any) => s.type === 'velocity_smooth');
-
     if (!distStream) return [];
-
     const data: any[] = [];
-    const step = Math.max(1, Math.floor(distStream.data.length / 200)); // Sample ~200 points
-
+    const step = Math.max(1, Math.floor(distStream.data.length / 200));
     for (let i = 0; i < distStream.data.length; i += step) {
-      const point: any = {
-        distance_km: (distStream.data[i] / 1000).toFixed(2),
-      };
+      const point: any = { distance_km: (distStream.data[i] / 1000).toFixed(2) };
       if (timeStream) point.time = timeStream.data[i];
       if (hrStream) point.heartrate = hrStream.data[i];
       if (altStream) point.altitude = altStream.data[i];
-      if (velStream && velStream.data[i] > 0) {
-        point.pace = speedToPace(velStream.data[i]);
-      }
+      if (velStream && velStream.data[i] > 0) point.pace = speedToPace(velStream.data[i]);
       data.push(point);
     }
     return data;
@@ -272,7 +257,6 @@ const ActivityDetail = ({ activity, lang, onBack, isPremium }: Props) => {
     return tabs;
   }, [hasPace, hasHeartrate, hasAltitude, lang]);
 
-  // Auto-select first available chart
   useEffect(() => {
     if (chartTabs.length > 0 && !chartTabs.find(t => t.key === activeChart)) {
       setActiveChart(chartTabs[0].key);
@@ -283,9 +267,10 @@ const ActivityDetail = ({ activity, lang, onBack, isPremium }: Props) => {
     lang === "zh" ? "zh-TW" : "en-US",
     { year: "numeric", month: "long", day: "numeric", weekday: "long" }
   );
-
-  const avgPaceMin = speedToPace(activity.average_speed);
-  const maxPaceMin = speedToPace(activity.max_speed);
+  const timeStr = new Date(activity.start_date).toLocaleTimeString(
+    lang === "zh" ? "zh-TW" : "en-US",
+    { hour: "2-digit", minute: "2-digit" }
+  );
 
   return (
     <div className="px-5 pt-4 pb-8 max-w-lg mx-auto">
@@ -295,7 +280,6 @@ const ActivityDetail = ({ activity, lang, onBack, isPremium }: Props) => {
           <ArrowLeft size={16} />
           {lang === "zh" ? "返回" : "Back"}
         </button>
-
         <AlertDialog>
           <AlertDialogTrigger asChild>
             <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-destructive hover:bg-destructive/10 transition-colors">
@@ -305,22 +289,14 @@ const ActivityDetail = ({ activity, lang, onBack, isPremium }: Props) => {
           </AlertDialogTrigger>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>
-                {lang === "zh" ? "確認刪除活動？" : "Delete this activity?"}
-              </AlertDialogTitle>
+              <AlertDialogTitle>{lang === "zh" ? "確認刪除活動？" : "Delete this activity?"}</AlertDialogTitle>
               <AlertDialogDescription>
-                {lang === "zh"
-                  ? "此操作無法復原。活動資料將從資料庫中永久刪除。"
-                  : "This action cannot be undone. The activity data will be permanently deleted from the database."}
+                {lang === "zh" ? "此操作無法復原。活動資料將從資料庫中永久刪除。" : "This action cannot be undone. The activity data will be permanently deleted from the database."}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>{lang === "zh" ? "取消" : "Cancel"}</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={handleDelete}
-                disabled={deleting}
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              >
+              <AlertDialogAction onClick={handleDelete} disabled={deleting} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
                 {deleting ? (lang === "zh" ? "刪除中..." : "Deleting...") : (lang === "zh" ? "確認刪除" : "Delete")}
               </AlertDialogAction>
             </AlertDialogFooter>
@@ -348,7 +324,12 @@ const ActivityDetail = ({ activity, lang, onBack, isPremium }: Props) => {
             </button>
           </div>
         )}
-        <p className="text-sm text-muted-foreground mt-0.5">{dateStr}</p>
+        <p className="text-sm text-muted-foreground mt-0.5">{dateStr} {timeStr}</p>
+        {isAppleHealth && (
+          <span className="text-[10px] text-white bg-red-500 px-2 py-0.5 rounded-full mt-1 inline-block">
+            ❤️ {activity.source}
+          </span>
+        )}
       </div>
 
       {/* Map */}
@@ -365,19 +346,18 @@ const ActivityDetail = ({ activity, lang, onBack, isPremium }: Props) => {
         <StatBox icon={Zap} label={lang === "zh" ? "配速" : "Avg Pace"} value={formatPace(activity.average_speed)} unit="/km" />
       </div>
       <div className="grid grid-cols-3 gap-2 mb-4">
-        <StatBox icon={Timer} label={lang === "zh" ? "最快配速" : "Best Pace"} value={formatPace(activity.max_speed)} unit="/km" />
-        <StatBox icon={Mountain} label={lang === "zh" ? "爬升" : "Elevation"} value={Math.round(activity.total_elevation_gain).toString()} unit="m" />
         {activity.average_heartrate ? (
           <StatBox icon={Heart} label={lang === "zh" ? "平均心率" : "Avg HR"} value={Math.round(activity.average_heartrate).toString()} unit="bpm" iconColor="text-destructive" />
+        ) : (
+          <StatBox icon={Timer} label={lang === "zh" ? "總時間" : "Elapsed"} value={formatDuration(activity.elapsed_time)} />
+        )}
+        <StatBox icon={Mountain} label={lang === "zh" ? "爬升" : "Elevation"} value={Math.round(activity.total_elevation_gain).toString()} unit="m" />
+        {activity.max_heartrate ? (
+          <StatBox icon={Heart} label={lang === "zh" ? "最高心率" : "Max HR"} value={Math.round(activity.max_heartrate).toString()} unit="bpm" iconColor="text-destructive" />
         ) : (
           <StatBox icon={Clock} label={lang === "zh" ? "總時間" : "Elapsed"} value={formatDuration(activity.elapsed_time)} />
         )}
       </div>
-      {activity.max_heartrate && (
-        <div className="grid grid-cols-3 gap-2 mb-4">
-          <StatBox icon={Heart} label={lang === "zh" ? "最高心率" : "Max HR"} value={Math.round(activity.max_heartrate).toString()} unit="bpm" iconColor="text-destructive" />
-        </div>
-      )}
 
       {/* Charts */}
       {loading ? (
@@ -389,67 +369,40 @@ const ActivityDetail = ({ activity, lang, onBack, isPremium }: Props) => {
         </div>
       ) : chartData.length > 0 && chartTabs.length > 0 ? (
         <div className="bg-card border border-border rounded-xl p-4">
-          {/* Chart Tabs */}
           <div className="flex gap-1 mb-4">
             {chartTabs.map(tab => (
               <button
                 key={tab.key}
                 onClick={() => setActiveChart(tab.key)}
                 className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                  activeChart === tab.key
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted text-muted-foreground hover:bg-accent"
+                  activeChart === tab.key ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-accent"
                 }`}
               >
                 {tab.label}
               </button>
             ))}
           </div>
-
-          {/* Chart */}
           <div className="h-48">
             <ResponsiveContainer width="100%" height="100%">
               {activeChart === "pace" ? (
                 <LineChart data={chartData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis
-                    dataKey="distance_km"
-                    tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
-                    tickFormatter={(v) => `${Math.round(v)}`}
-                    label={{ value: "km", position: "insideBottomRight", offset: -5, fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
-                  />
-                  <YAxis
-                    reversed
-                    tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
-                    tickFormatter={(v) => formatPaceFromMinutes(v)}
-                    domain={['auto', 'auto']}
-                    label={{ value: "/km", angle: -90, position: "insideLeft", fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
-                  />
-                  <Tooltip
-                    contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }}
-                    formatter={(value: number) => [formatPaceFromMinutes(value), lang === "zh" ? "配速" : "Pace"]}
-                    labelFormatter={(v) => `${v} km`}
-                  />
+                  <XAxis dataKey="distance_km" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} tickFormatter={(v) => `${Math.round(v)}`}
+                    label={{ value: "km", position: "insideBottomRight", offset: -5, fontSize: 10, fill: "hsl(var(--muted-foreground))" }} />
+                  <YAxis reversed tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} tickFormatter={(v) => formatPaceFromMinutes(v)} domain={['auto', 'auto']}
+                    label={{ value: "/km", angle: -90, position: "insideLeft", fontSize: 10, fill: "hsl(var(--muted-foreground))" }} />
+                  <Tooltip contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }}
+                    formatter={(value: number) => [formatPaceFromMinutes(value), lang === "zh" ? "配速" : "Pace"]} labelFormatter={(v) => `${v} km`} />
                   <Line type="monotone" dataKey="pace" stroke="hsl(var(--primary))" strokeWidth={2} dot={false} />
                 </LineChart>
               ) : activeChart === "heartrate" ? (
                 <AreaChart data={chartData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis
-                    dataKey="distance_km"
-                    tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
-                    tickFormatter={(v) => `${Math.round(v)}`}
-                  />
-                  <YAxis
-                    tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
-                    domain={['auto', 'auto']}
-                    label={{ value: "bpm", angle: -90, position: "insideLeft", fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
-                  />
-                  <Tooltip
-                    contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }}
-                    formatter={(value: number) => [Math.round(value), "bpm"]}
-                    labelFormatter={(v) => `${v} km`}
-                  />
+                  <XAxis dataKey="distance_km" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} tickFormatter={(v) => `${Math.round(v)}`} />
+                  <YAxis tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} domain={['auto', 'auto']}
+                    label={{ value: "bpm", angle: -90, position: "insideLeft", fontSize: 10, fill: "hsl(var(--muted-foreground))" }} />
+                  <Tooltip contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }}
+                    formatter={(value: number) => [Math.round(value), "bpm"]} labelFormatter={(v) => `${v} km`} />
                   <defs>
                     <linearGradient id="hrGradient" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="hsl(var(--destructive))" stopOpacity={0.3} />
@@ -461,21 +414,11 @@ const ActivityDetail = ({ activity, lang, onBack, isPremium }: Props) => {
               ) : (
                 <AreaChart data={chartData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis
-                    dataKey="distance_km"
-                    tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
-                    tickFormatter={(v) => `${Math.round(v)}`}
-                  />
-                  <YAxis
-                    tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
-                    domain={['auto', 'auto']}
-                    label={{ value: "m", angle: -90, position: "insideLeft", fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
-                  />
-                  <Tooltip
-                    contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }}
-                    formatter={(value: number) => [`${Math.round(value)}m`, lang === "zh" ? "海拔" : "Altitude"]}
-                    labelFormatter={(v) => `${v} km`}
-                  />
+                  <XAxis dataKey="distance_km" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} tickFormatter={(v) => `${Math.round(v)}`} />
+                  <YAxis tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} domain={['auto', 'auto']}
+                    label={{ value: "m", angle: -90, position: "insideLeft", fontSize: 10, fill: "hsl(var(--muted-foreground))" }} />
+                  <Tooltip contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }}
+                    formatter={(value: number) => [`${Math.round(value)}m`, lang === "zh" ? "海拔" : "Altitude"]} labelFormatter={(v) => `${v} km`} />
                   <defs>
                     <linearGradient id="altGradient" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
@@ -497,7 +440,6 @@ const ActivityDetail = ({ activity, lang, onBack, isPremium }: Props) => {
             {lang === "zh" ? "每公里配速" : "Splits (per km)"}
           </h3>
           <div className="space-y-1">
-            {/* Header */}
             <div className="grid grid-cols-4 text-[10px] text-muted-foreground font-medium pb-1 border-b border-border">
               <span>km</span>
               <span className="text-center">{lang === "zh" ? "配速" : "Pace"}</span>
@@ -512,15 +454,9 @@ const ActivityDetail = ({ activity, lang, onBack, isPremium }: Props) => {
               return (
                 <div key={idx} className="grid grid-cols-4 text-xs py-1.5 border-b border-border/50 last:border-0">
                   <span className="font-medium text-foreground">{split.split}</span>
-                  <span className={`text-center font-semibold ${isFaster ? "text-green-500" : "text-foreground"}`}>
-                    {pace}
-                  </span>
-                  <span className="text-center text-muted-foreground">
-                    {split.elevation_difference > 0 ? "+" : ""}{Math.round(split.elevation_difference)}m
-                  </span>
-                  <span className="text-center text-muted-foreground">
-                    {split.average_heartrate ? Math.round(split.average_heartrate) : "--"}
-                  </span>
+                  <span className={`text-center font-semibold ${isFaster ? "text-green-500" : "text-foreground"}`}>{pace}</span>
+                  <span className="text-center text-muted-foreground">{split.elevation_difference > 0 ? "+" : ""}{Math.round(split.elevation_difference)}m</span>
+                  <span className="text-center text-muted-foreground">{split.average_heartrate ? Math.round(split.average_heartrate) : "--"}</span>
                 </div>
               );
             })}
@@ -537,14 +473,11 @@ const ActivityDetail = ({ activity, lang, onBack, isPremium }: Props) => {
           </h3>
           {!isPremium && <Lock size={14} className="text-muted-foreground" />}
         </div>
-
         {!isPremium ? (
           <div className="text-center py-6">
             <Lock size={24} className="mx-auto text-muted-foreground mb-2" />
             <p className="text-sm text-muted-foreground">
-              {lang === "zh"
-                ? "升級 Premium 以解鎖 AI 訓練分析"
-                : "Upgrade to Premium to unlock AI Workout Analysis"}
+              {lang === "zh" ? "升級 Premium 以解鎖 AI 訓練分析" : "Upgrade to Premium to unlock AI Workout Analysis"}
             </p>
           </div>
         ) : aiLoading ? (

@@ -133,8 +133,17 @@ function sumQuantitySamples(samples: any[]): number {
   return samples.reduce((sum: number, s: any) => sum + (extractMeasurement(s).value || 0), 0);
 }
 
+function toSampleArray(value: unknown): any[] {
+  if (Array.isArray(value)) return value;
+  if (value && typeof value === "object") return [value];
+  return [];
+}
+
 function mergeSampleArrays(data: Record<string, any>, keys: string[]): any[] {
-  const merged = keys.flatMap((key) => (Array.isArray(data[key]) ? data[key] : []));
+  const sources = [data, data?.data, data?.healthkitResponse, data?.healthkitResponse?.data].filter(
+    (source): source is Record<string, any> => !!source && typeof source === "object",
+  );
+  const merged = keys.flatMap((key) => sources.flatMap((source) => toSampleArray(source[key])));
   return Array.from(
     new Map(
       merged.map((sample, index) => {
@@ -156,6 +165,46 @@ function mergeSampleArrays(data: Record<string, any>, keys: string[]): any[] {
   );
 }
 
+function extractMeasurementByCandidateKeys(
+  source: unknown,
+  candidateKeys: string[],
+  depth = 0,
+  seen = new WeakSet<object>(),
+): QuantityMeasurement {
+  if (depth > 6 || !source || typeof source !== "object") return { value: null, unit: null };
+
+  const obj = source as Record<string, unknown>;
+  if (seen.has(obj)) return { value: null, unit: null };
+  seen.add(obj);
+
+  for (const [key, value] of Object.entries(obj)) {
+    if (candidateKeys.includes(key)) {
+      const measurement = extractMeasurement(value);
+      if (measurement.value !== null) return measurement;
+    }
+  }
+
+  for (const value of Object.values(obj)) {
+    const nested = extractMeasurementByCandidateKeys(value, candidateKeys, depth + 1, seen);
+    if (nested.value !== null) return nested;
+  }
+
+  return { value: null, unit: null };
+}
+
+function extractSampleTimestamp(sample: unknown): string | null {
+  return extractDateStringFromPaths(sample, [
+    ["timestamp"],
+    ["date"],
+    ["startDate"],
+    ["start_date"],
+    ["start"],
+    ["endDate"],
+    ["end_date"],
+    ["end"],
+  ]);
+}
+
 // Path constants
 const WORKOUT_NAME_PATHS = [["name"], ["workoutName"], ["summary", "name"]];
 const WORKOUT_ACTIVITY_TYPE_PATHS = [["workoutActivityType"], ["activityType"], ["sport_type"]];
@@ -164,23 +213,83 @@ const WORKOUT_END_DATE_PATHS = [["endDate"], ["end_date"], ["end"], ["date"]];
 const WORKOUT_DISTANCE_PATHS = [["totalDistance"], ["total_distance"], ["distance"]];
 const WORKOUT_DURATION_PATHS = [["duration"], ["moving_time"], ["elapsed_time"]];
 const WORKOUT_AVG_HEART_RATE_PATHS = [
+  // Direct top-level keys
   ["averageHeartRate"],
   ["average_heartrate"],
+  ["avgHeartRate"],
+  ["avg_heartrate"],
+  // Nested under heartRate/heart_rate
+  ["heartRate", "average"],
+  ["heart_rate", "average"],
+  // Statistics nested paths
+  ["statistics", "heartRate", "average"],
+  ["statistics", "heart_rate", "average"],
   ["statistics", "HKQuantityTypeIdentifierHeartRate", "average"],
+  // Garmin/Apple deeper statistics paths (averageQuantity.doubleValue)
+  ["statistics", "HKQuantityTypeIdentifierHeartRate", "averageQuantity"],
+  ["statistics", "HKQuantityTypeIdentifierHeartRate", "averageQuantity", "doubleValue"],
+  ["statistics", "HKQuantityTypeIdentifierHeartRate", "avg"],
+  // Metadata fallback (some third-party apps store HR here)
+  ["metadata", "HKMetadataKeyAverageHeartRate"],
+  ["metadata", "_HKPrivateMetadataKeyAverageHeartRate"],
 ];
 const WORKOUT_MAX_HEART_RATE_PATHS = [
+  // Direct top-level keys
   ["maxHeartRate"],
   ["max_heartrate"],
+  ["maximumHeartRate"],
+  ["maximum_heartrate"],
+  // Nested under heartRate/heart_rate
+  ["heartRate", "maximum"],
+  ["heartRate", "max"],
+  ["heart_rate", "maximum"],
+  ["heart_rate", "max"],
+  // Statistics nested paths
+  ["statistics", "heartRate", "maximum"],
+  ["statistics", "heart_rate", "maximum"],
   ["statistics", "HKQuantityTypeIdentifierHeartRate", "maximum"],
+  // Garmin/Apple deeper statistics paths (maximumQuantity.doubleValue)
+  ["statistics", "HKQuantityTypeIdentifierHeartRate", "maximumQuantity"],
+  ["statistics", "HKQuantityTypeIdentifierHeartRate", "maximumQuantity", "doubleValue"],
+  ["statistics", "HKQuantityTypeIdentifierHeartRate", "max"],
+  // Metadata fallback
+  ["metadata", "HKMetadataKeyMaximumHeartRate"],
+  ["metadata", "_HKPrivateMetadataKeyMaximumHeartRate"],
 ];
 const WORKOUT_ELEVATION_PATHS = [
+  // Direct top-level keys
   ["totalElevationGain"],
   ["total_elevation_gain"],
   ["totalElevationAscended"],
   ["elevationAscended"],
+  ["elevationGain"],
+  ["elevation_gain"],
+  // Apple's official metadata key (HKMetadataKeyElevationAscended)
+  // Value is an HKQuantity stored as a number or nested object
+  ["metadata", "HKMetadataKeyElevationAscended"],
+  ["metadata", "HKMetadataKeyElevationAscended", "doubleValue"],
+  ["metadata", "HKMetadataKeyElevationAscended", "value"],
+  ["metadata", "HKMetadataKeyElevationAscended", "quantity"],
+  // Statistics nested paths
+  ["statistics", "elevationGain", "sum"],
+  ["statistics", "HKQuantityTypeIdentifierElevationAscended", "sum"],
+  ["statistics", "HKQuantityTypeIdentifierElevationAscended", "sumQuantity"],
+  ["statistics", "HKQuantityTypeIdentifierElevationAscended", "sumQuantity", "doubleValue"],
   ["statistics", "HKQuantityTypeIdentifierFlightsClimbed", "sum"],
 ];
 const WORKOUT_SOURCE_PATHS = [["sourceName"], ["source", "name"], ["bundleIdentifier"]];
+
+const HEART_RATE_SAMPLE_KEYS = ["heartRate", "heart_rate", "bpm"];
+const HEART_RATE_AVERAGE_KEYS = ["averageHeartRate", "average_heartrate", "avgHeartRate", "avg_heartrate"];
+const HEART_RATE_MAX_KEYS = ["maxHeartRate", "max_heartrate", "maximumHeartRate", "maximum_heartrate", "peakHeartRate"];
+const ELEVATION_KEYS = [
+  "totalElevationGain",
+  "total_elevation_gain",
+  "totalElevationAscended",
+  "elevationAscended",
+  "elevationGain",
+  "elevation_gain",
+];
 
 // --- Specific Parsing Logic ---
 
@@ -212,13 +321,25 @@ function getWorkoutWindow(workout: any) {
 function getHeartRateStatsForWorkout(workout: any, samples: any[]) {
   const window = getWorkoutWindow(workout);
   if (!window || !Array.isArray(samples) || samples.length === 0) return { average: null, max: null };
+
+  // 30-second buffer on both sides to capture third-party samples (Garmin, etc.)
+  // that may start slightly before/after the workout record
+  const BUFFER_MS = 30_000;
+  const windowStart = window.start.getTime() - BUFFER_MS;
+  const windowEnd = window.end.getTime() + BUFFER_MS;
+
   const values = samples
     .map((s) => {
-      const timestamp = s.date || s.startDate || s.start;
-      const val = extractMeasurement(s).value;
+      const timestamp = extractSampleTimestamp(s);
+      const directMeasurement = extractMeasurement(s);
+      const nestedMeasurement =
+        directMeasurement.value !== null
+          ? directMeasurement
+          : extractMeasurementByCandidateKeys(s, HEART_RATE_SAMPLE_KEYS);
+      const val = nestedMeasurement.value;
       if (!timestamp || val === null || val <= 0) return null;
       const t = new Date(timestamp).getTime();
-      return t >= window.start.getTime() && t <= window.end.getTime() ? val : null;
+      return t >= windowStart && t <= windowEnd ? val : null;
     })
     .filter((v): v is number => v !== null);
   if (values.length === 0) return { average: null, max: null };
@@ -296,9 +417,25 @@ function parseWorkouts(samples: any[], heartRateSamples: any[] = []): AppleHealt
         if (window) durationSeconds = (window.end.getTime() - window.start.getTime()) / 1000;
       }
 
-      const heartStats = getHeartRateStatsForWorkout(w, heartRateSamples);
-      const avgHR = extractMeasurementFromPaths(w, WORKOUT_AVG_HEART_RATE_PATHS);
-      const maxHR = extractMeasurementFromPaths(w, WORKOUT_MAX_HEART_RATE_PATHS);
+      // Priority: 1) workout statistics object, 2) deep key search, 3) manual HR sample filtering
+      const avgHRDirect = extractMeasurementFromPaths(w, WORKOUT_AVG_HEART_RATE_PATHS);
+      const avgHRDeep =
+        avgHRDirect.value !== null ? avgHRDirect : extractMeasurementByCandidateKeys(w, HEART_RATE_AVERAGE_KEYS);
+      const maxHRDirect = extractMeasurementFromPaths(w, WORKOUT_MAX_HEART_RATE_PATHS);
+      const maxHRDeep =
+        maxHRDirect.value !== null ? maxHRDirect : extractMeasurementByCandidateKeys(w, HEART_RATE_MAX_KEYS);
+
+      // Only fall back to manual sample filtering if statistics didn't yield results
+      const heartStats =
+        avgHRDeep.value === null || maxHRDeep.value === null
+          ? getHeartRateStatsForWorkout(w, heartRateSamples)
+          : { average: null, max: null };
+
+      const avgHR = avgHRDeep.value !== null ? avgHRDeep : { value: heartStats.average, unit: null };
+      const maxHR = maxHRDeep.value !== null ? maxHRDeep : { value: heartStats.max, unit: null };
+      const elevationDirect = extractMeasurementFromPaths(w, WORKOUT_ELEVATION_PATHS);
+      const elevation =
+        elevationDirect.value !== null ? elevationDirect : extractMeasurementByCandidateKeys(w, ELEVATION_KEYS);
 
       return {
         name:
@@ -309,12 +446,12 @@ function parseWorkouts(samples: any[], heartRateSamples: any[] = []): AppleHealt
         distance: Math.round(distanceMeters),
         moving_time: Math.round(durationSeconds),
         elapsed_time: Math.round(durationSeconds),
-        total_elevation_gain: Math.round(extractMeasurementFromPaths(w, WORKOUT_ELEVATION_PATHS).value ?? 0),
+        total_elevation_gain: Math.round(elevation.value ?? 0),
         start_date: extractDateStringFromPaths(w, WORKOUT_START_DATE_PATHS) || "",
         average_speed: durationSeconds > 0 ? Math.round((distanceMeters / durationSeconds) * 100) / 100 : 0,
         max_speed: 0,
-        average_heartrate: avgHR.value ? Math.round(avgHR.value) : heartStats.average,
-        max_heartrate: maxHR.value ? Math.round(maxHR.value) : heartStats.max,
+        average_heartrate: avgHR.value !== null ? Math.round(avgHR.value) : heartStats.average,
+        max_heartrate: maxHR.value !== null ? Math.round(maxHR.value) : heartStats.max,
         source: extractTextFromPaths(w, WORKOUT_SOURCE_PATHS) || "Apple Health",
       };
     })
@@ -356,12 +493,16 @@ export function useAppleHealth(lang: Lang) {
       const hrSamples = mergeSampleArrays(wData, ["HKQuantityTypeIdentifierHeartRate", "heartRate"]);
       const wSamples = mergeSampleArrays(wData, ["HKWorkoutType", "HKWorkoutTypeIdentifier"]);
       console.log("[AppleHealth] HR samples:", hrSamples.length, "Workout samples:", wSamples.length);
+      if (hrSamples.length > 0) {
+        console.log("[AppleHealth] First HR sample:", JSON.stringify(hrSamples[0])?.substring(0, 500));
+      }
       if (wSamples.length > 0) {
         console.log("[AppleHealth] First workout keys:", Object.keys(wSamples[0]));
         console.log(
           "[AppleHealth] First workout statistics:",
-          JSON.stringify(wSamples[0]?.statistics)?.substring(0, 500),
+          JSON.stringify(wSamples[0]?.statistics)?.substring(0, 800),
         );
+        console.log("[AppleHealth] First workout metadata:", JSON.stringify(wSamples[0]?.metadata)?.substring(0, 500));
       }
       const workouts = parseWorkouts(wSamples, hrSamples);
       if (workouts.length > 0) {

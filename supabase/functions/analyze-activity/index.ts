@@ -3,8 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
 const jsonHeaders = { ...corsHeaders, "Content-Type": "application/json" };
@@ -42,10 +41,7 @@ serve(async (req) => {
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
     const serviceClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-    const {
-      data: { user },
-      error: userError,
-    } = await serviceClient.auth.getUser(accessToken);
+    const { data: { user }, error: userError } = await serviceClient.auth.getUser(accessToken);
     if (userError || !user) {
       return jsonResponse({ error: "Unauthorized" }, 401);
     }
@@ -95,10 +91,7 @@ serve(async (req) => {
         body: JSON.stringify({
           model: "google/gemini-3-flash-preview",
           messages: [
-            {
-              role: "user",
-              content: `Translate the following running workout analysis into ${targetLang}. Keep the Markdown formatting intact. Only translate, do not change the content.\n\n${sourceText}`,
-            },
+            { role: "user", content: `Translate the following running workout analysis into ${targetLang}. Keep the Markdown formatting intact. Only translate, do not change the content.\n\n${sourceText}` },
           ],
         }),
       });
@@ -156,20 +149,14 @@ serve(async (req) => {
           body: JSON.stringify({
             model: "google/gemini-3-flash-preview",
             messages: [
-              {
-                role: "user",
-                content: `Translate the following running workout analysis into ${targetLang}. Keep the Markdown formatting intact.\n\n${existingAnalysis[otherField]}`,
-              },
+              { role: "user", content: `Translate the following running workout analysis into ${targetLang}. Keep the Markdown formatting intact.\n\n${existingAnalysis[otherField]}` },
             ],
           }),
         });
         if (tlResp.ok) {
           const tlData = await tlResp.json();
           const translated = tlData.choices?.[0]?.message?.content || "";
-          await serviceClient
-            .from("activity_analyses")
-            .update({ [field]: translated })
-            .eq("id", existingAnalysis.id);
+          await serviceClient.from("activity_analyses").update({ [field]: translated }).eq("id", existingAnalysis.id);
           return jsonResponse({ analysis: translated });
         }
       }
@@ -190,8 +177,9 @@ serve(async (req) => {
     const plan = plans && plans.length > 0 ? plans[0] : null;
 
     const activityDate = new Date(activity.start_date);
-    const activityDateStr =
-      typeof activity.start_date === "string" && activity.start_date ? activity.start_date.split("T")[0] : "Unknown";
+    const activityDateStr = typeof activity.start_date === "string" && activity.start_date
+      ? activity.start_date.split("T")[0]
+      : "Unknown";
     let planContext = "";
 
     if (plan) {
@@ -199,16 +187,14 @@ serve(async (req) => {
       const raceDate = new Date(plan.race_date);
       const planStartSeed = asArray<any>(planData[0]?.days)[0]?.date;
       const parsedPlanStartDate = planStartSeed ? new Date(planStartSeed) : null;
-      const fallbackPlanStartDate =
-        isValidDate(raceDate) && Number.isFinite(Number(plan.weeks))
-          ? new Date(raceDate.getTime() - Number(plan.weeks) * 7 * 24 * 60 * 60 * 1000)
+      const fallbackPlanStartDate = isValidDate(raceDate) && Number.isFinite(Number(plan.weeks))
+        ? new Date(raceDate.getTime() - Number(plan.weeks) * 7 * 24 * 60 * 60 * 1000)
+        : null;
+      const planStartDate = parsedPlanStartDate && isValidDate(parsedPlanStartDate)
+        ? parsedPlanStartDate
+        : fallbackPlanStartDate && isValidDate(fallbackPlanStartDate)
+          ? fallbackPlanStartDate
           : null;
-      const planStartDate =
-        parsedPlanStartDate && isValidDate(parsedPlanStartDate)
-          ? parsedPlanStartDate
-          : fallbackPlanStartDate && isValidDate(fallbackPlanStartDate)
-            ? fallbackPlanStartDate
-            : null;
 
       if (!planStartDate || !isValidDate(activityDate)) {
         planContext = `The user is on a ${plan.distance} training plan (${plan.goal === "custom" ? "Custom" : plan.goal}).
@@ -233,8 +219,7 @@ Please analyze how this activity benefits the user's preparation for their upcom
         const dayMatch = asArray<any>(weekData?.days).find((d: any) => d?.date === activityDateStr);
         if (dayMatch) {
           const plannedDistance = dayMatch.distance_km ?? dayMatch.distance;
-          plannedWorkout =
-            `Planned workout for this day: ${dayMatch.workout || dayMatch.description || dayMatch.type || "Rest"}` +
+          plannedWorkout = `Planned workout for this day: ${dayMatch.workout || dayMatch.description || dayMatch.type || "Rest"}` +
             (plannedDistance ? ` (${plannedDistance} km)` : "");
         }
 
@@ -246,8 +231,7 @@ ${plannedWorkout ? `- ${plannedWorkout}` : ""}
 Please analyze whether the user executed the planned workout correctly and provide feedback on pacing, effort, and adherence to the plan.`;
       }
     } else {
-      planContext =
-        "The user does not have an active training plan. Please analyze the workout quality based on the stats alone.";
+      planContext = "The user does not have an active training plan. Please analyze the workout quality based on the stats alone.";
     }
 
     const distKm = (activity.distance / 1000).toFixed(2);
@@ -267,10 +251,8 @@ Please analyze whether the user executed the planned workout correctly and provi
 - Total Elevation Gain: ${Math.round(activity.total_elevation_gain)} m`;
 
     // HR is optional bonus data — include if available but analysis should not depend on it
-    if (activity.average_heartrate)
-      statsText += `\n- Average Heart Rate: ${Math.round(activity.average_heartrate)} bpm (optional data)`;
-    if (activity.max_heartrate)
-      statsText += `\n- Max Heart Rate: ${Math.round(activity.max_heartrate)} bpm (optional data)`;
+    if (activity.average_heartrate) statsText += `\n- Average Heart Rate: ${Math.round(activity.average_heartrate)} bpm (optional data)`;
+    if (activity.max_heartrate) statsText += `\n- Max Heart Rate: ${Math.round(activity.max_heartrate)} bpm (optional data)`;
 
     if (splits && splits.length > 0) {
       statsText += "\n\nSplits (per km):";
@@ -386,9 +368,7 @@ Keep it concise and actionable, 2-3 points per section.`;
       upsertData.analysis_en = analysisText;
     }
 
-    const { error: upsertError } = await serviceClient
-      .from("activity_analyses")
-      .upsert(upsertData, { onConflict: "activity_id" });
+    const { error: upsertError } = await serviceClient.from("activity_analyses").upsert(upsertData, { onConflict: "activity_id" });
     if (upsertError) {
       console.error("activity_analyses upsert error:", upsertError);
     }

@@ -355,7 +355,24 @@ export function useAppleHealth(lang: Lang) {
 
       const hrSamples = mergeSampleArrays(wData, ["HKQuantityTypeIdentifierHeartRate", "heartRate"]);
       const wSamples = mergeSampleArrays(wData, ["HKWorkoutType", "HKWorkoutTypeIdentifier"]);
+      console.log("[AppleHealth] HR samples:", hrSamples.length, "Workout samples:", wSamples.length);
+      if (wSamples.length > 0) {
+        console.log("[AppleHealth] First workout keys:", Object.keys(wSamples[0]));
+        console.log(
+          "[AppleHealth] First workout statistics:",
+          JSON.stringify(wSamples[0]?.statistics)?.substring(0, 500),
+        );
+      }
       const workouts = parseWorkouts(wSamples, hrSamples);
+      if (workouts.length > 0) {
+        console.log(
+          "[AppleHealth] First parsed workout HR:",
+          workouts[0].average_heartrate,
+          workouts[0].max_heartrate,
+          "elev:",
+          workouts[0].total_elevation_gain,
+        );
+      }
 
       return { stats, workouts };
     } catch (err) {

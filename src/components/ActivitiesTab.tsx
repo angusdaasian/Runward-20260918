@@ -11,6 +11,8 @@ import {
   ChevronRight,
   HelpCircle,
   RefreshCw,
+  Flame,
+  Timer,
 } from "lucide-react";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Lang, t } from "@/lib/i18n";
@@ -168,12 +170,13 @@ const ActivityCard = ({
         <div>
           <h3 className="font-medium text-foreground text-sm">{act.name}</h3>
           <span className="text-xs text-muted-foreground">
-            {new Date(act.start_date).toLocaleDateString(lang === "zh" ? "zh-TW" : "en-US", {
+{new Date(act.start_date).toLocaleDateString(lang === "zh" ? "zh-TW" : "en-US", {
               year: "numeric",
               month: "short",
               day: "numeric",
               weekday: "short",
-            })}{" "}
+            })}
+            {" "}
             {new Date(act.start_date).toLocaleTimeString(lang === "zh" ? "zh-TW" : "en-US", {
               hour: "2-digit",
               minute: "2-digit",
@@ -191,61 +194,122 @@ const ActivityCard = ({
       </div>
     </div>
 
-    <div className="grid grid-cols-3 gap-3 mt-3">
-      <div className="flex items-center gap-1.5">
-        <MapPin size={12} className="text-primary" />
-        <div>
-          <span className="text-xs text-muted-foreground block">{lang === "zh" ? "距離" : "Distance"}</span>
-          <span className="text-sm font-semibold text-foreground">{formatDistance(act.distance)} km</span>
+    {act.source && act.source !== "strava" ? (
+      /* Apple Health / non-Strava card layout */
+      <>
+        <div className="grid grid-cols-3 gap-3 mt-3">
+          <div className="flex items-center gap-1.5">
+            <MapPin size={12} className="text-primary" />
+            <div>
+              <span className="text-xs text-muted-foreground block">{lang === "zh" ? "距離" : "Distance"}</span>
+              <span className="text-sm font-semibold text-foreground">{formatDistance(act.distance)} km</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Clock size={12} className="text-primary" />
+            <div>
+              <span className="text-xs text-muted-foreground block">{lang === "zh" ? "時間" : "Time"}</span>
+              <span className="text-sm font-semibold text-foreground">{formatDuration(act.moving_time)}</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Zap size={12} className="text-primary" />
+            <div>
+              <span className="text-xs text-muted-foreground block">{lang === "zh" ? "配速" : "Pace"}</span>
+              <span className="text-sm font-semibold text-foreground">{formatPace(act.average_speed)} /km</span>
+            </div>
+          </div>
         </div>
-      </div>
-      <div className="flex items-center gap-1.5">
-        <Clock size={12} className="text-primary" />
-        <div>
-          <span className="text-xs text-muted-foreground block">{lang === "zh" ? "時間" : "Time"}</span>
-          <span className="text-sm font-semibold text-foreground">{formatDuration(act.moving_time)}</span>
+        <div className="grid grid-cols-3 gap-3 mt-2">
+          {score !== null && (
+            <div className="flex items-center gap-1.5">
+              <TrendingUp size={12} className="text-primary" />
+              <div>
+                <span className="text-xs text-muted-foreground block">{lang === "zh" ? "訓練分數" : "Score"}</span>
+                <span className="text-sm font-semibold text-foreground">{score}</span>
+              </div>
+            </div>
+          )}
+          {act.calories && act.calories > 0 && (
+            <div className="flex items-center gap-1.5">
+              <Flame size={12} className="text-destructive" />
+              <div>
+                <span className="text-xs text-muted-foreground block">{lang === "zh" ? "卡路里" : "Calories"}</span>
+                <span className="text-sm font-semibold text-foreground">{act.calories} kcal</span>
+              </div>
+            </div>
+          )}
+          {act.elapsed_time > 0 && act.elapsed_time !== act.moving_time && (
+            <div className="flex items-center gap-1.5">
+              <Timer size={12} className="text-primary" />
+              <div>
+                <span className="text-xs text-muted-foreground block">{lang === "zh" ? "總時間" : "Elapsed"}</span>
+                <span className="text-sm font-semibold text-foreground">{formatDuration(act.elapsed_time)}</span>
+              </div>
+            </div>
+          )}
         </div>
-      </div>
-      <div className="flex items-center gap-1.5">
-        <Zap size={12} className="text-primary" />
-        <div>
-          <span className="text-xs text-muted-foreground block">{lang === "zh" ? "配速" : "Pace"}</span>
-          <span className="text-sm font-semibold text-foreground">{formatPace(act.average_speed)} /km</span>
+      </>
+    ) : (
+      /* Strava card layout (unchanged) */
+      <>
+        <div className="grid grid-cols-3 gap-3 mt-3">
+          <div className="flex items-center gap-1.5">
+            <MapPin size={12} className="text-primary" />
+            <div>
+              <span className="text-xs text-muted-foreground block">{lang === "zh" ? "距離" : "Distance"}</span>
+              <span className="text-sm font-semibold text-foreground">{formatDistance(act.distance)} km</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Clock size={12} className="text-primary" />
+            <div>
+              <span className="text-xs text-muted-foreground block">{lang === "zh" ? "時間" : "Time"}</span>
+              <span className="text-sm font-semibold text-foreground">{formatDuration(act.moving_time)}</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Zap size={12} className="text-primary" />
+            <div>
+              <span className="text-xs text-muted-foreground block">{lang === "zh" ? "配速" : "Pace"}</span>
+              <span className="text-sm font-semibold text-foreground">{formatPace(act.average_speed)} /km</span>
+            </div>
+          </div>
         </div>
-      </div>
-    </div>
 
-    <div className="grid grid-cols-3 gap-3 mt-2">
-      {score !== null && (
-        <div className="flex items-center gap-1.5">
-          <TrendingUp size={12} className="text-primary" />
-          <div>
-            <span className="text-xs text-muted-foreground block">{lang === "zh" ? "訓練分數" : "Score"}</span>
-            <span className="text-sm font-semibold text-foreground">{score}</span>
-          </div>
+        <div className="grid grid-cols-3 gap-3 mt-2">
+          {score !== null && (
+            <div className="flex items-center gap-1.5">
+              <TrendingUp size={12} className="text-primary" />
+              <div>
+                <span className="text-xs text-muted-foreground block">{lang === "zh" ? "訓練分數" : "Score"}</span>
+                <span className="text-sm font-semibold text-foreground">{score}</span>
+              </div>
+            </div>
+          )}
+          {act.average_heartrate && (
+            <div className="flex items-center gap-1.5">
+              <Heart size={12} className="text-destructive" />
+              <div>
+                <span className="text-xs text-muted-foreground block">HR</span>
+                <span className="text-sm font-semibold text-foreground">{Math.round(act.average_heartrate)}</span>
+              </div>
+            </div>
+          )}
+          {act.total_elevation_gain > 0 && (
+            <div className="flex items-center gap-1.5">
+              <TrendingUp size={12} className="text-primary" />
+              <div>
+                <span className="text-xs text-muted-foreground block">{lang === "zh" ? "爬升" : "Elev"}</span>
+                <span className="text-sm font-semibold text-foreground">{Math.round(act.total_elevation_gain)}m</span>
+              </div>
+            </div>
+          )}
         </div>
-      )}
-      {act.average_heartrate && (
-        <div className="flex items-center gap-1.5">
-          <Heart size={12} className="text-destructive" />
-          <div>
-            <span className="text-xs text-muted-foreground block">HR</span>
-            <span className="text-sm font-semibold text-foreground">{Math.round(act.average_heartrate)}</span>
-          </div>
-        </div>
-      )}
-      {act.total_elevation_gain > 0 && (
-        <div className="flex items-center gap-1.5">
-          <TrendingUp size={12} className="text-primary" />
-          <div>
-            <span className="text-xs text-muted-foreground block">{lang === "zh" ? "爬升" : "Elev"}</span>
-            <span className="text-sm font-semibold text-foreground">{Math.round(act.total_elevation_gain)}m</span>
-          </div>
-        </div>
-      )}
-    </div>
 
-    {act.summary_polyline && <ActivityMap polyline={act.summary_polyline} />}
+        {act.summary_polyline && <ActivityMap polyline={act.summary_polyline} />}
+      </>
+    )}
   </div>
 );
 
@@ -380,7 +444,7 @@ const ActivitiesTab = ({ lang }: Props) => {
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
             >
               <RefreshCw size={14} className={resyncing ? "animate-spin" : ""} />
-              {resyncing ? (lang === "zh" ? "同步中..." : "Syncing...") : lang === "zh" ? "重新同步" : "Resync"}
+              {resyncing ? (lang === "zh" ? "同步中..." : "Syncing...") : (lang === "zh" ? "重新同步" : "Resync")}
             </button>
           )}
         </div>

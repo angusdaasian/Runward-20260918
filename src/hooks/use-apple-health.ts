@@ -45,7 +45,19 @@ interface QuantityMeasurement {
   unit: string | null;
 }
 
-const MEASUREMENT_VALUE_KEYS = ["value", "qty", "quantity", "doubleValue", "numericValue", "amount", "average", "avg", "maximum", "minimum", "sum"];
+const MEASUREMENT_VALUE_KEYS = [
+  "value",
+  "qty",
+  "quantity",
+  "doubleValue",
+  "numericValue",
+  "amount",
+  "average",
+  "avg",
+  "maximum",
+  "minimum",
+  "sum",
+];
 const MEASUREMENT_UNIT_KEYS = ["unit", "units", "measurementUnit"];
 
 // --- Utility Functions ---
@@ -66,7 +78,8 @@ function extractMeasurement(field: unknown, depth = 0): QuantityMeasurement {
   if (typeof field !== "object") return { value: null, unit: null };
 
   const obj = field as Record<string, unknown>;
-  const unit = MEASUREMENT_UNIT_KEYS.map((key) => obj[key]).find((value): value is string => typeof value === "string") || null;
+  const unit =
+    MEASUREMENT_UNIT_KEYS.map((key) => obj[key]).find((value): value is string => typeof value === "string") || null;
 
   for (const key of MEASUREMENT_VALUE_KEYS) {
     if (!(key in obj)) continue;
@@ -126,8 +139,16 @@ function mergeSampleArrays(data: Record<string, any>, keys: string[]): any[] {
     new Map(
       merged.map((sample, index) => {
         const sampleKey = JSON.stringify([
-          sample?.id, sample?.uuid, sample?.startDate, sample?.start_date, sample?.start,
-          sample?.endDate, sample?.end_date, sample?.end, sample?.date, index,
+          sample?.id,
+          sample?.uuid,
+          sample?.startDate,
+          sample?.start_date,
+          sample?.start,
+          sample?.endDate,
+          sample?.end_date,
+          sample?.end,
+          sample?.date,
+          index,
         ]);
         return [sampleKey, sample];
       }),
@@ -142,8 +163,16 @@ const WORKOUT_START_DATE_PATHS = [["startDate"], ["start_date"], ["start"]];
 const WORKOUT_END_DATE_PATHS = [["endDate"], ["end_date"], ["end"], ["date"]];
 const WORKOUT_DISTANCE_PATHS = [["totalDistance"], ["total_distance"], ["distance"]];
 const WORKOUT_DURATION_PATHS = [["duration"], ["moving_time"], ["elapsed_time"]];
-const WORKOUT_AVG_HEART_RATE_PATHS = [["averageHeartRate"], ["average_heartrate"], ["statistics", "HKQuantityTypeIdentifierHeartRate", "average"]];
-const WORKOUT_MAX_HEART_RATE_PATHS = [["maxHeartRate"], ["max_heartrate"], ["statistics", "HKQuantityTypeIdentifierHeartRate", "maximum"]];
+const WORKOUT_AVG_HEART_RATE_PATHS = [
+  ["averageHeartRate"],
+  ["average_heartrate"],
+  ["statistics", "HKQuantityTypeIdentifierHeartRate", "average"],
+];
+const WORKOUT_MAX_HEART_RATE_PATHS = [
+  ["maxHeartRate"],
+  ["max_heartrate"],
+  ["statistics", "HKQuantityTypeIdentifierHeartRate", "maximum"],
+];
 const WORKOUT_ELEVATION_PATHS = [["totalElevationGain"], ["total_elevation_gain"]];
 const WORKOUT_SOURCE_PATHS = [["sourceName"], ["source", "name"], ["bundleIdentifier"]];
 
@@ -159,7 +188,7 @@ function parseSleepMinutes(samples: any[]): number {
       const diffMin = (new Date(end).getTime() - new Date(start).getTime()) / 60000;
       if (diffMin > 0 && diffMin < 1440) totalMinutes += diffMin;
     } else if (typeof sample.value === "number" && sample.value > 0) {
-      totalMinutes += (sample.unit === "hr" || sample.unit === "hours") ? sample.value * 60 : sample.value;
+      totalMinutes += sample.unit === "hr" || sample.unit === "hours" ? sample.value * 60 : sample.value;
     }
   }
   return Math.round(totalMinutes);
@@ -177,15 +206,20 @@ function getWorkoutWindow(workout: any) {
 function getHeartRateStatsForWorkout(workout: any, samples: any[]) {
   const window = getWorkoutWindow(workout);
   if (!window || !Array.isArray(samples) || samples.length === 0) return { average: null, max: null };
-  const values = samples.map((s) => {
-    const timestamp = s.date || s.startDate || s.start;
-    const val = extractMeasurement(s).value;
-    if (!timestamp || val === null || val <= 0) return null;
-    const t = new Date(timestamp).getTime();
-    return (t >= window.start.getTime() && t <= window.end.getTime()) ? val : null;
-  }).filter((v): v is number => v !== null);
+  const values = samples
+    .map((s) => {
+      const timestamp = s.date || s.startDate || s.start;
+      const val = extractMeasurement(s).value;
+      if (!timestamp || val === null || val <= 0) return null;
+      const t = new Date(timestamp).getTime();
+      return t >= window.start.getTime() && t <= window.end.getTime() ? val : null;
+    })
+    .filter((v): v is number => v !== null);
   if (values.length === 0) return { average: null, max: null };
-  return { average: Math.round(values.reduce((a, b) => a + b, 0) / values.length), max: Math.round(Math.max(...values)) };
+  return {
+    average: Math.round(values.reduce((a, b) => a + b, 0) / values.length),
+    max: Math.round(Math.max(...values)),
+  };
 }
 
 function normalizeDistanceToMeters(raw: number, unit?: string | null): number {
@@ -222,7 +256,7 @@ const WORKOUT_ACTIVITY_TYPE_MAP: Record<string, string> = {
 
 function mapWorkoutType(hkType: unknown, fallbackName?: string): string {
   const rawType = String(hkType ?? "").trim();
-  
+
   // 1. Check direct mapping (Fixes the "170" display)
   const mapped = WORKOUT_ACTIVITY_TYPE_MAP[rawType];
   if (mapped) return mapped;
@@ -234,21 +268,11 @@ function mapWorkoutType(hkType: unknown, fallbackName?: string): string {
   if (lower.includes("walk")) return "Walk";
   if (lower.includes("hike")) return "Hike";
   if (lower.includes("cycle") || lower.includes("bike")) return "Ride";
-  
+
   // 3. Cleanup prefix or use fallback
   return rawType.replace("HKWorkoutActivityType", "") || "Workout";
 }
 
-// Inside parseWorkouts, use this logic to prevent "Workout Workout"
-const sportType = mapWorkoutType(rawWorkoutType, workoutName || undefined);
-
-const workoutPayload = {
-  // If workoutName is the same as sportType (e.g., both are "Workout"), 
-  // just use one to avoid "Workout Workout"
-  name: workoutName && workoutName !== sportType ? workoutName : sportType,
-  sport_type: sportType,
-  // ... other fields
-};
 
 function parseWorkouts(samples: any[], heartRateSamples: any[] = []): AppleHealthWorkout[] {
   if (!Array.isArray(samples)) return [];
@@ -272,7 +296,7 @@ function parseWorkouts(samples: any[], heartRateSamples: any[] = []): AppleHealt
       const maxHR = extractMeasurementFromPaths(w, WORKOUT_MAX_HEART_RATE_PATHS);
 
       return {
-        name: workoutName || `${sportType} Workout`,
+        name: workoutName && workoutName !== sportType && !workoutName.toLowerCase().includes(sportType.toLowerCase()) ? workoutName : sportType,
         sport_type: sportType,
         distance: Math.round(distanceMeters),
         moving_time: Math.round(durationSeconds),
@@ -302,9 +326,13 @@ export function useAppleHealth(lang: Lang) {
 
   const readHealthData = useCallback(async (statsDays = 1, workoutDays = 30) => {
     try {
-      const statsRes = await despia(`healthkit://read?types=${HEALTHKIT_DAILY_TYPES.join(",")}&days=${statsDays}`, ["healthkitResponse"]);
+      const statsRes = await despia(`healthkit://read?types=${HEALTHKIT_DAILY_TYPES.join(",")}&days=${statsDays}`, [
+        "healthkitResponse",
+      ]);
       const sData = statsRes?.healthkitResponse || statsRes || {};
-      const workRes = await despia(`healthkit://read?types=${HEALTHKIT_WORKOUT_TYPES}&days=${workoutDays}`, ["healthkitResponse"]);
+      const workRes = await despia(`healthkit://read?types=${HEALTHKIT_WORKOUT_TYPES}&days=${workoutDays}`, [
+        "healthkitResponse",
+      ]);
       const wData = workRes?.healthkitResponse || workRes || {};
 
       const rawDist = sumQuantitySamples(sData.HKQuantityTypeIdentifierDistanceWalkingRunning || []);
@@ -334,40 +362,55 @@ export function useAppleHealth(lang: Lang) {
     setHealthStats(stats);
   }, []);
 
-  const saveWorkoutsToDb = useCallback(async (workouts: AppleHealthWorkout[]) => {
-    if (!user || workouts.length === 0) return 0;
-    try {
-      const normalizedWorkouts = Array.from(
-        new Map(workouts.map((w) => [new Date(w.start_date).toISOString(), { ...w, start_date: new Date(w.start_date).toISOString() }])).values()
-      );
-      const startDates = normalizedWorkouts.map((w) => w.start_date);
-      const { data: existingRows } = await supabase.from("apple_health_activities").select("id, start_date").eq("user_id", user.id).in("start_date", startDates);
-      const existingMap = new Map((existingRows || []).map((r) => [new Date(r.start_date).toISOString(), r.id]));
+  const saveWorkoutsToDb = useCallback(
+    async (workouts: AppleHealthWorkout[]) => {
+      if (!user || workouts.length === 0) return 0;
+      try {
+        const normalizedWorkouts = Array.from(
+          new Map(
+            workouts.map((w) => [
+              new Date(w.start_date).toISOString(),
+              { ...w, start_date: new Date(w.start_date).toISOString() },
+            ]),
+          ).values(),
+        );
+        const startDates = normalizedWorkouts.map((w) => w.start_date);
+        const { data: existingRows } = await supabase
+          .from("apple_health_activities")
+          .select("id, start_date")
+          .eq("user_id", user.id)
+          .in("start_date", startDates);
+        const existingMap = new Map((existingRows || []).map((r) => [new Date(r.start_date).toISOString(), r.id]));
 
-      const toInsert: any[] = [];
-      const toUpdate: any[] = [];
+        const toInsert: any[] = [];
+        const toUpdate: any[] = [];
 
-      normalizedWorkouts.forEach((w) => {
-        const payload = { user_id: user.id, ...w };
-        const id = existingMap.get(w.start_date);
-        if (id) toUpdate.push({ id, ...payload });
-        else toInsert.push(payload);
-      });
+        normalizedWorkouts.forEach((w) => {
+          const payload = { user_id: user.id, ...w };
+          const id = existingMap.get(w.start_date);
+          if (id) toUpdate.push({ id, ...payload });
+          else toInsert.push(payload);
+        });
 
-      if (toInsert.length > 0) await supabase.from("apple_health_activities").insert(toInsert);
-      if (toUpdate.length > 0) await Promise.all(toUpdate.map((r) => supabase.from("apple_health_activities").update(r).eq("id", r.id)));
-      return toInsert.length + toUpdate.length;
-    } catch (err) {
-      console.error("[AppleHealth] Save error:", err);
-      return 0;
-    }
-  }, [user]);
+        if (toInsert.length > 0) await supabase.from("apple_health_activities").insert(toInsert);
+        if (toUpdate.length > 0)
+          await Promise.all(toUpdate.map((r) => supabase.from("apple_health_activities").update(r).eq("id", r.id)));
+        return toInsert.length + toUpdate.length;
+      } catch (err) {
+        console.error("[AppleHealth] Save error:", err);
+        return 0;
+      }
+    },
+    [user],
+  );
 
   const requestAuthorization = useCallback(async () => {
     try {
       await despia(`healthkit://read?types=${HEALTHKIT_DAILY_TYPES.join(",")}&days=1`, ["healthkitResponse"]);
       return true;
-    } catch { return false; }
+    } catch {
+      return false;
+    }
   }, []);
 
   const connect = useCallback(async () => {

@@ -38,6 +38,7 @@ interface AppleHealthWorkout {
   average_heartrate: number | null;
   max_heartrate: number | null;
   source: string;
+  calories: number | null;
 }
 
 interface QuantityMeasurement {
@@ -156,17 +157,7 @@ function toSampleArray(value: unknown, depth = 0): any[] {
   if (typeof value !== "object") return [];
 
   const obj = value as Record<string, unknown>;
-  const nestedCollectionKeys = [
-    "samples",
-    "data",
-    "results",
-    "records",
-    "items",
-    "entries",
-    "objects",
-    "value",
-    "quantity",
-  ];
+  const nestedCollectionKeys = ["samples", "data", "results", "records", "items", "entries", "objects", "value", "quantity"];
   const nestedCollections = nestedCollectionKeys.flatMap((key) => toSampleArray(obj[key], depth + 1));
   if (nestedCollections.length > 0) return nestedCollections;
 
@@ -248,7 +239,7 @@ function extractSampleTimestamp(sample: unknown): string | null {
 
 // Path constants
 const WORKOUT_NAME_PATHS = [["name"], ["workoutName"], ["summary", "name"]];
-const WORKOUT_ACTIVITY_TYPE_PATHS = [["workoutActivityType"], ["activityType"], ["sport_type"]];
+const WORKOUT_ACTIVITY_TYPE_PATHS = [["workoutActivityType"], ["activityType"], ["sport_type"], ["type"]];
 const WORKOUT_START_DATE_PATHS = [["startDate"], ["start_date"], ["start"]];
 const WORKOUT_END_DATE_PATHS = [["endDate"], ["end_date"], ["end"], ["date"]];
 const WORKOUT_DISTANCE_PATHS = [["totalDistance"], ["total_distance"], ["distance"]];
@@ -320,28 +311,10 @@ const WORKOUT_ELEVATION_PATHS = [
 ];
 const WORKOUT_SOURCE_PATHS = [["sourceName"], ["source", "name"], ["bundleIdentifier"]];
 
-const HEART_RATE_SAMPLE_KEYS = [
-  "heartRate",
-  "heart_rate",
-  "bpm",
-  "quantity",
-  "averageQuantity",
-  "maximumQuantity",
-  "mostRecentQuantity",
-];
+const HEART_RATE_SAMPLE_KEYS = ["heartRate", "heart_rate", "bpm", "quantity", "averageQuantity", "maximumQuantity", "mostRecentQuantity"];
 const HEART_RATE_AVERAGE_KEYS = ["averageHeartRate", "average_heartrate", "avgHeartRate", "avg_heartrate"];
 const HEART_RATE_MAX_KEYS = ["maxHeartRate", "max_heartrate", "maximumHeartRate", "maximum_heartrate", "peakHeartRate"];
-const ELEVATION_KEYS = [
-  "totalElevationGain",
-  "total_elevation_gain",
-  "totalElevationAscended",
-  "elevationAscended",
-  "elevationGain",
-  "elevation_gain",
-  "HKMetadataKeyElevationAscended",
-  "sumQuantity",
-  "sum",
-];
+const ELEVATION_KEYS = ["totalElevationGain", "total_elevation_gain", "totalElevationAscended", "elevationAscended", "elevationGain", "elevation_gain", "HKMetadataKeyElevationAscended", "sumQuantity", "sum"];
 
 // --- Specific Parsing Logic ---
 
@@ -385,10 +358,9 @@ function getHeartRateStatsForWorkout(workout: any, samples: any[]) {
     .map((s) => {
       const timestamp = extractSampleTimestamp(s);
       const directMeasurement = extractMeasurement(s);
-      const nestedMeasurement =
-        directMeasurement.value !== null
-          ? directMeasurement
-          : extractMeasurementByCandidateKeys(s, HEART_RATE_SAMPLE_KEYS);
+      const nestedMeasurement = directMeasurement.value !== null
+        ? directMeasurement
+        : extractMeasurementByCandidateKeys(s, HEART_RATE_SAMPLE_KEYS);
       const val = nestedMeasurement.value;
       if (!timestamp || val === null || val <= 0) return null;
       const t = new Date(timestamp).getTime();
@@ -409,10 +381,9 @@ function getHeartRateStatsForWorkout(workout: any, samples: any[]) {
     .map((s) => {
       const timestamp = extractSampleTimestamp(s);
       const measurement = extractMeasurement(s);
-      const val =
-        measurement.value !== null
-          ? measurement.value
-          : extractMeasurementByCandidateKeys(s, HEART_RATE_SAMPLE_KEYS).value;
+      const val = measurement.value !== null
+        ? measurement.value
+        : extractMeasurementByCandidateKeys(s, HEART_RATE_SAMPLE_KEYS).value;
       if (!timestamp || val === null || val <= 0) return null;
       const sampleDateUTC = new Date(timestamp).toISOString().slice(0, 10);
       return sampleDateUTC === workoutDateUTC ? val : null;
@@ -480,6 +451,7 @@ function mapWorkoutType(hkType: unknown, fallbackName?: string): string {
   return rawType.replace("HKWorkoutActivityType", "") || "Workout";
 }
 
+
 function parseWorkouts(samples: any[], heartRateSamples: any[] = []): AppleHealthWorkout[] {
   if (!Array.isArray(samples)) return [];
   return samples
@@ -499,29 +471,40 @@ function parseWorkouts(samples: any[], heartRateSamples: any[] = []): AppleHealt
 
       // Priority: 1) workout statistics object, 2) deep key search, 3) manual HR sample filtering
       const avgHRDirect = extractMeasurementFromPaths(w, WORKOUT_AVG_HEART_RATE_PATHS);
-      const avgHRDeep =
-        avgHRDirect.value !== null ? avgHRDirect : extractMeasurementByCandidateKeys(w, HEART_RATE_AVERAGE_KEYS);
+      const avgHRDeep = avgHRDirect.value !== null
+        ? avgHRDirect
+        : extractMeasurementByCandidateKeys(w, HEART_RATE_AVERAGE_KEYS);
       const maxHRDirect = extractMeasurementFromPaths(w, WORKOUT_MAX_HEART_RATE_PATHS);
-      const maxHRDeep =
-        maxHRDirect.value !== null ? maxHRDirect : extractMeasurementByCandidateKeys(w, HEART_RATE_MAX_KEYS);
+      const maxHRDeep = maxHRDirect.value !== null
+        ? maxHRDirect
+        : extractMeasurementByCandidateKeys(w, HEART_RATE_MAX_KEYS);
 
       // Only fall back to manual sample filtering if statistics didn't yield results
-      const heartStats =
-        avgHRDeep.value === null || maxHRDeep.value === null
-          ? getHeartRateStatsForWorkout(w, heartRateSamples)
-          : { average: null, max: null };
+      const heartStats = (avgHRDeep.value === null || maxHRDeep.value === null)
+        ? getHeartRateStatsForWorkout(w, heartRateSamples)
+        : { average: null, max: null };
 
       const avgHR = avgHRDeep.value !== null ? avgHRDeep : { value: heartStats.average, unit: null };
       const maxHR = maxHRDeep.value !== null ? maxHRDeep : { value: heartStats.max, unit: null };
       const elevationDirect = extractMeasurementFromPaths(w, WORKOUT_ELEVATION_PATHS);
-      const elevation =
-        elevationDirect.value !== null ? elevationDirect : extractMeasurementByCandidateKeys(w, ELEVATION_KEYS);
+      const elevation = elevationDirect.value !== null
+        ? elevationDirect
+        : extractMeasurementByCandidateKeys(w, ELEVATION_KEYS);
+
+      // Extract calories (totalEnergyBurned) from workout object
+      const caloriesPaths = [
+        ["totalEnergyBurned", "quantity"],
+        ["totalEnergyBurned", "doubleValue"],
+        ["totalEnergyBurned"],
+        ["energyBurned", "quantity"],
+        ["energyBurned"],
+        ["calories"],
+      ];
+      const calMeas = extractMeasurementFromPaths(w, caloriesPaths);
+      const rawCal = calMeas.value ?? (typeof w.totalEnergyBurned === "number" ? w.totalEnergyBurned : null);
 
       return {
-        name:
-          workoutName && workoutName !== sportType && !workoutName.toLowerCase().includes(sportType.toLowerCase())
-            ? workoutName
-            : sportType,
+        name: workoutName && workoutName !== sportType && !workoutName.toLowerCase().includes(sportType.toLowerCase()) ? workoutName : sportType,
         sport_type: sportType,
         distance: Math.round(distanceMeters),
         moving_time: Math.round(durationSeconds),
@@ -533,6 +516,7 @@ function parseWorkouts(samples: any[], heartRateSamples: any[] = []): AppleHealt
         average_heartrate: avgHR.value !== null ? Math.round(avgHR.value) : heartStats.average,
         max_heartrate: maxHR.value !== null ? Math.round(maxHR.value) : heartStats.max,
         source: extractTextFromPaths(w, WORKOUT_SOURCE_PATHS) || "Apple Health",
+        calories: rawCal !== null ? Math.round(rawCal) : null,
       };
     })
     .filter((w) => !!w.start_date);
@@ -600,14 +584,7 @@ export function useAppleHealth(lang: Lang) {
 
       const wSamples = mergeSampleArrays(wData, ["HKWorkoutType", "HKWorkoutTypeIdentifier"]);
       console.log("[AppleHealth] Workout payload keys:", Object.keys(wData || {}));
-      console.log(
-        "[AppleHealth] HR from workout:",
-        hrFromWorkout.length,
-        "HR from separate:",
-        hrFromSeparate.length,
-        "Total HR:",
-        hrSamples.length,
-      );
+      console.log("[AppleHealth] HR from workout:", hrFromWorkout.length, "HR from separate:", hrFromSeparate.length, "Total HR:", hrSamples.length);
       console.log("[AppleHealth] Workout samples:", wSamples.length);
 
       // Remote log: raw workout objects (first 5)
@@ -645,7 +622,7 @@ export function useAppleHealth(lang: Lang) {
       // Remote log: parsed results
       await remoteLog("AppleHealth", "parsed_workouts", {
         count: workouts.length,
-        workouts: workouts.slice(0, 5).map((w) => ({
+        workouts: workouts.slice(0, 5).map(w => ({
           name: w.name,
           sport_type: w.sport_type,
           start_date: w.start_date,
@@ -658,13 +635,7 @@ export function useAppleHealth(lang: Lang) {
       });
 
       if (workouts.length > 0) {
-        console.log(
-          "[AppleHealth] First parsed workout HR:",
-          workouts[0].average_heartrate,
-          workouts[0].max_heartrate,
-          "elev:",
-          workouts[0].total_elevation_gain,
-        );
+        console.log("[AppleHealth] First parsed workout HR:", workouts[0].average_heartrate, workouts[0].max_heartrate, "elev:", workouts[0].total_elevation_gain);
       }
 
       return { stats, workouts };

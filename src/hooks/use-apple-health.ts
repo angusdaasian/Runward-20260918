@@ -306,7 +306,7 @@ function parseWorkouts(samples: any[], heartRateSamples: any[] = []): AppleHealt
       const maxHR = extractMeasurementFromPaths(w, WORKOUT_MAX_HEART_RATE_PATHS);
 
       return {
-        name: workoutName || `${sportType} Workout`,
+        name: workoutName && workoutName !== sportType && !workoutName.toLowerCase().includes(sportType.toLowerCase()) ? workoutName : sportType,
         sport_type: sportType,
         distance: Math.round(distanceMeters),
         moving_time: Math.round(durationSeconds),

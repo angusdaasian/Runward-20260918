@@ -273,16 +273,6 @@ function mapWorkoutType(hkType: unknown, fallbackName?: string): string {
   return rawType.replace("HKWorkoutActivityType", "") || "Workout";
 }
 
-// Inside parseWorkouts, use this logic to prevent "Workout Workout"
-const sportType = mapWorkoutType(rawWorkoutType, workoutName || undefined);
-
-const workoutPayload = {
-  // If workoutName is the same as sportType (e.g., both are "Workout"),
-  // just use one to avoid "Workout Workout"
-  name: workoutName && workoutName !== sportType ? workoutName : sportType,
-  sport_type: sportType,
-  // ... other fields
-};
 
 function parseWorkouts(samples: any[], heartRateSamples: any[] = []): AppleHealthWorkout[] {
   if (!Array.isArray(samples)) return [];
@@ -306,7 +296,7 @@ function parseWorkouts(samples: any[], heartRateSamples: any[] = []): AppleHealt
       const maxHR = extractMeasurementFromPaths(w, WORKOUT_MAX_HEART_RATE_PATHS);
 
       return {
-        name: workoutName || `${sportType} Workout`,
+        name: workoutName && workoutName !== sportType && !workoutName.toLowerCase().includes(sportType.toLowerCase()) ? workoutName : sportType,
         sport_type: sportType,
         distance: Math.round(distanceMeters),
         moving_time: Math.round(durationSeconds),

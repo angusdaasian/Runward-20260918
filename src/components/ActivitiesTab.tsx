@@ -167,7 +167,7 @@ const ActivityCard = ({
         <div>
           <h3 className="font-medium text-foreground text-sm">{act.name}</h3>
           <span className="text-xs text-muted-foreground">
-170:             {new Date(act.start_date).toLocaleDateString(lang === "zh" ? "zh-TW" : "en-US", {
+{new Date(act.start_date).toLocaleDateString(lang === "zh" ? "zh-TW" : "en-US", {
               year: "numeric",
               month: "short",
               day: "numeric",

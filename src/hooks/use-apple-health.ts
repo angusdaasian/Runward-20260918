@@ -173,7 +173,13 @@ const WORKOUT_MAX_HEART_RATE_PATHS = [
   ["max_heartrate"],
   ["statistics", "HKQuantityTypeIdentifierHeartRate", "maximum"],
 ];
-const WORKOUT_ELEVATION_PATHS = [["totalElevationGain"], ["total_elevation_gain"]];
+const WORKOUT_ELEVATION_PATHS = [
+  ["totalElevationGain"],
+  ["total_elevation_gain"],
+  ["totalElevationAscended"],
+  ["elevationAscended"],
+  ["statistics", "HKQuantityTypeIdentifierFlightsClimbed", "sum"],
+];
 const WORKOUT_SOURCE_PATHS = [["sourceName"], ["source", "name"], ["bundleIdentifier"]];
 
 // --- Specific Parsing Logic ---
@@ -273,7 +279,6 @@ function mapWorkoutType(hkType: unknown, fallbackName?: string): string {
   return rawType.replace("HKWorkoutActivityType", "") || "Workout";
 }
 
-
 function parseWorkouts(samples: any[], heartRateSamples: any[] = []): AppleHealthWorkout[] {
   if (!Array.isArray(samples)) return [];
   return samples
@@ -296,7 +301,10 @@ function parseWorkouts(samples: any[], heartRateSamples: any[] = []): AppleHealt
       const maxHR = extractMeasurementFromPaths(w, WORKOUT_MAX_HEART_RATE_PATHS);
 
       return {
-        name: workoutName && workoutName !== sportType && !workoutName.toLowerCase().includes(sportType.toLowerCase()) ? workoutName : sportType,
+        name:
+          workoutName && workoutName !== sportType && !workoutName.toLowerCase().includes(sportType.toLowerCase())
+            ? workoutName
+            : sportType,
         sport_type: sportType,
         distance: Math.round(distanceMeters),
         moving_time: Math.round(durationSeconds),
@@ -446,5 +454,5 @@ export function useAppleHealth(lang: Lang) {
     setHealthStats(null);
   }, [user]);
 
-  return { connect, disconnect, syncHealthData, syncing, healthStats };
+  return { connect, disconnect, syncHealthData, syncing, healthStats, readHealthData, saveWorkoutsToDb };
 }

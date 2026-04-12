@@ -10,6 +10,7 @@ import {
   ChevronDown,
   ChevronRight,
   HelpCircle,
+  RefreshCw,
 } from "lucide-react";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Lang, t } from "@/lib/i18n";
@@ -167,13 +168,12 @@ const ActivityCard = ({
         <div>
           <h3 className="font-medium text-foreground text-sm">{act.name}</h3>
           <span className="text-xs text-muted-foreground">
-{new Date(act.start_date).toLocaleDateString(lang === "zh" ? "zh-TW" : "en-US", {
+            {new Date(act.start_date).toLocaleDateString(lang === "zh" ? "zh-TW" : "en-US", {
               year: "numeric",
               month: "short",
               day: "numeric",
               weekday: "short",
-            })}
-            {" "}
+            })}{" "}
             {new Date(act.start_date).toLocaleTimeString(lang === "zh" ? "zh-TW" : "en-US", {
               hour: "2-digit",
               minute: "2-digit",
@@ -328,6 +328,24 @@ const ActivitiesTab = ({ lang }: Props) => {
     return { activityScores: scores, averageScore: avg };
   }, [activities]);
 
+  const [resyncing, setResyncing] = useState(false);
+
+  const handleResync = useCallback(async () => {
+    if (!user || resyncing) return;
+    setResyncing(true);
+    try {
+      await supabase.from("apple_health_activities").delete().eq("user_id", user.id);
+      const { workouts } = await appleHealth.readHealthData(1, 60);
+      await appleHealth.saveWorkoutsToDb(workouts);
+      invalidateAll();
+      toast.success(lang === "zh" ? "已重新同步活動" : "Activities resynced successfully");
+    } catch (err) {
+      console.error("Resync error:", err);
+      toast.error(lang === "zh" ? "重新同步失敗" : "Resync failed");
+    }
+    setResyncing(false);
+  }, [user, resyncing, appleHealth, invalidateAll, lang]);
+
   if (loading || !skeletonDone) return <ActivityListSkeleton />;
 
   if (selectedActivity) {
@@ -346,13 +364,25 @@ const ActivitiesTab = ({ lang }: Props) => {
   if (showAllActivities) {
     return (
       <FadeIn className="px-5 pt-6 max-w-lg mx-auto pb-24">
-        <div className="flex items-center gap-3 mb-5">
-          <button onClick={() => setShowAllActivities(false)} className="p-1">
-            <ChevronDown size={24} className="text-foreground rotate-90" />
-          </button>
-          <h1 className="font-display text-xl font-bold text-foreground">
-            {lang === "zh" ? "所有活動" : "All Activities"}
-          </h1>
+        <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center gap-3">
+            <button onClick={() => setShowAllActivities(false)} className="p-1">
+              <ChevronDown size={24} className="text-foreground rotate-90" />
+            </button>
+            <h1 className="font-display text-xl font-bold text-foreground">
+              {lang === "zh" ? "所有活動" : "All Activities"}
+            </h1>
+          </div>
+          {ahConnected && (
+            <button
+              onClick={handleResync}
+              disabled={resyncing}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
+            >
+              <RefreshCw size={14} className={resyncing ? "animate-spin" : ""} />
+              {resyncing ? (lang === "zh" ? "同步中..." : "Syncing...") : lang === "zh" ? "重新同步" : "Resync"}
+            </button>
+          )}
         </div>
         <div className="space-y-3">
           {activities.map((act) => (

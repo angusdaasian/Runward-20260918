@@ -152,6 +152,33 @@ export type Database = {
         }
         Relationships: []
       }
+      debug_logs: {
+        Row: {
+          created_at: string | null
+          id: string
+          message: string
+          payload: Json | null
+          tag: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          message: string
+          payload?: Json | null
+          tag: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          message?: string
+          payload?: Json | null
+          tag?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       free_training_plans: {
         Row: {
           created_at: string

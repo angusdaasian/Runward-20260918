@@ -1,4 +1,4 @@
-import { ArrowLeft, Check, RefreshCw } from "lucide-react";
+import { ArrowLeft, Check, RefreshCw, Info } from "lucide-react";
 import { Lang, t } from "@/lib/i18n";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -12,22 +12,27 @@ interface Props {
   onBack: () => void;
 }
 
-
 const ConnectApps = ({ lang, onBack }: Props) => {
   const { user } = useAuth();
   const [stravaConnected, setStravaConnected] = useState(false);
   const [appleHealthConnected, setAppleHealthConnected] = useState(false);
+  const [garminConnected, setGarminConnected] = useState(false);
   const [loading, setLoading] = useState(true);
   const appleHealth = useAppleHealth(lang);
 
+  // Determine if any app is already connected
+  const hasConnection = stravaConnected || appleHealthConnected || garminConnected;
+
   const checkConnections = useCallback(async () => {
     if (!user) { setLoading(false); return; }
-    const [stravaRes, ahRes] = await Promise.all([
+    const [stravaRes, ahRes, garminRes] = await Promise.all([
       supabase.from("strava_connections").select("id").eq("user_id", user.id).maybeSingle(),
       supabase.from("apple_health_connections").select("id").eq("user_id", user.id).maybeSingle(),
+      supabase.from("garmin_connections").select("id").eq("user_id", user.id).maybeSingle(),
     ]);
     setStravaConnected(!!stravaRes.data);
     setAppleHealthConnected(!!ahRes.data);
+    setGarminConnected(!!garminRes.data);
     setLoading(false);
   }, [user]);
 
@@ -41,6 +46,10 @@ const ConnectApps = ({ lang, onBack }: Props) => {
   }, [appleHealthConnected]);
 
   const handleConnectAppleHealth = async () => {
+    if (hasConnection) {
+      toast.error(lang === "zh" ? "請先中斷現有連結再連接新的應用" : "Please disconnect the current app before connecting a new one");
+      return;
+    }
     const success = await appleHealth.connect();
     if (success) {
       setAppleHealthConnected(true);
@@ -54,6 +63,10 @@ const ConnectApps = ({ lang, onBack }: Props) => {
 
   const handleConnectStrava = async () => {
     if (!user) return;
+    if (hasConnection) {
+      toast.error(lang === "zh" ? "請先中斷現有連結再連接新的應用" : "Please disconnect the current app before connecting a new one");
+      return;
+    }
     const { data, error } = await supabase.functions.invoke("strava-auth", {
       body: { environment: getAppEnvironment() },
     });
@@ -79,8 +92,6 @@ const ConnectApps = ({ lang, onBack }: Props) => {
     { name: "COROS", icon: "⌚" },
   ];
 
-  
-
   return (
     <div className="px-5 pt-6 max-w-lg mx-auto pb-24">
       <div className="flex items-center gap-3 mb-6">
@@ -92,15 +103,25 @@ const ConnectApps = ({ lang, onBack }: Props) => {
         </h1>
       </div>
 
-      <p className="text-sm text-muted-foreground mb-6">
+      <p className="text-sm text-muted-foreground mb-3">
         {lang === "zh"
           ? "連結你的裝置和服務以自動同步訓練數據"
           : "Connect your devices and services to automatically sync training data"}
       </p>
 
+      {/* Single-app restriction notice */}
+      <div className="flex items-start gap-2 bg-muted/50 border border-border rounded-lg p-3 mb-6">
+        <Info size={16} className="text-muted-foreground mt-0.5 flex-shrink-0" />
+        <p className="text-xs text-muted-foreground">
+          {lang === "zh"
+            ? "你只能連接以下其中一個健身應用。如需更換，請先中斷現有連結。XP 和訓練分數只會從你連接的應用計算。"
+            : "You can only connect one fitness app at a time. To switch, disconnect the current one first. XP and training scores are calculated from your connected app only."}
+        </p>
+      </div>
+
       <div className="space-y-3">
         {/* Apple Health */}
-        <div className="bg-card border border-border rounded-xl p-4">
+        <div className={`bg-card border border-border rounded-xl p-4 ${hasConnection && !appleHealthConnected ? "opacity-50" : ""}`}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-lg bg-red-500/10 flex items-center justify-center">
@@ -129,7 +150,8 @@ const ConnectApps = ({ lang, onBack }: Props) => {
             ) : (
               <button
                 onClick={handleConnectAppleHealth}
-                className="text-xs font-medium text-primary-foreground bg-primary px-3 py-1 rounded-full"
+                disabled={hasConnection}
+                className={`text-xs font-medium px-3 py-1 rounded-full ${hasConnection ? "bg-muted text-muted-foreground cursor-not-allowed" : "text-primary-foreground bg-primary"}`}
               >
                 {lang === "zh" ? "連結" : "Connect"}
               </button>

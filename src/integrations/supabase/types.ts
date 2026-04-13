@@ -81,6 +81,7 @@ export type Database = {
         Row: {
           average_heartrate: number | null
           average_speed: number
+          calories: number | null
           created_at: string
           distance: number
           elapsed_time: number
@@ -98,6 +99,7 @@ export type Database = {
         Insert: {
           average_heartrate?: number | null
           average_speed?: number
+          calories?: number | null
           created_at?: string
           distance?: number
           elapsed_time?: number
@@ -115,6 +117,7 @@ export type Database = {
         Update: {
           average_heartrate?: number | null
           average_speed?: number
+          calories?: number | null
           created_at?: string
           distance?: number
           elapsed_time?: number
@@ -222,6 +225,7 @@ export type Database = {
           aerobic_te: number | null
           anaerobic_te: number | null
           average_hr: number | null
+          average_pace: number | null
           average_speed: number | null
           avg_cadence: number | null
           calories: number | null
@@ -230,14 +234,18 @@ export type Database = {
           duration_seconds: number | null
           elevation_gain: number | null
           garmin_activity_id: string
+          has_details: boolean
           has_gps: boolean | null
           id: string
+          laps: Json | null
           max_hr: number | null
           raw_json: Json | null
           start_time: string | null
+          summary_polyline: string | null
           training_load: number | null
           user_id: string
           vo2max: number | null
+          weather: Json | null
         }
         Insert: {
           activity_name?: string | null
@@ -245,6 +253,7 @@ export type Database = {
           aerobic_te?: number | null
           anaerobic_te?: number | null
           average_hr?: number | null
+          average_pace?: number | null
           average_speed?: number | null
           avg_cadence?: number | null
           calories?: number | null
@@ -253,14 +262,18 @@ export type Database = {
           duration_seconds?: number | null
           elevation_gain?: number | null
           garmin_activity_id: string
+          has_details?: boolean
           has_gps?: boolean | null
           id?: string
+          laps?: Json | null
           max_hr?: number | null
           raw_json?: Json | null
           start_time?: string | null
+          summary_polyline?: string | null
           training_load?: number | null
           user_id: string
           vo2max?: number | null
+          weather?: Json | null
         }
         Update: {
           activity_name?: string | null
@@ -268,6 +281,7 @@ export type Database = {
           aerobic_te?: number | null
           anaerobic_te?: number | null
           average_hr?: number | null
+          average_pace?: number | null
           average_speed?: number | null
           avg_cadence?: number | null
           calories?: number | null
@@ -276,14 +290,18 @@ export type Database = {
           duration_seconds?: number | null
           elevation_gain?: number | null
           garmin_activity_id?: string
+          has_details?: boolean
           has_gps?: boolean | null
           id?: string
+          laps?: Json | null
           max_hr?: number | null
           raw_json?: Json | null
           start_time?: string | null
+          summary_polyline?: string | null
           training_load?: number | null
           user_id?: string
           vo2max?: number | null
+          weather?: Json | null
         }
         Relationships: []
       }

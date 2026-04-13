@@ -96,8 +96,10 @@ const StatBox = ({ icon: Icon, label, value, unit, iconColor }: {
 );
 
 const ActivityDetail = ({ activity, lang, onBack, isPremium, trainingScore }: Props) => {
-  const isAppleHealth = activity.source && activity.source !== "strava";
-  const dbTable = isAppleHealth ? "apple_health_activities" : "strava_activities";
+  const isAppleHealth = activity.source === "Apple Health";
+  const isGarmin = activity.source === "Garmin";
+  const needsRpe = isAppleHealth || isGarmin;
+  const dbTable = isAppleHealth ? "apple_health_activities" : isGarmin ? "garmin_activities" : "strava_activities";
 
   const [streams, setStreams] = useState<any[]>([]);
   const [splits, setSplits] = useState<Split[] | null>(null);
@@ -223,14 +225,14 @@ const ActivityDetail = ({ activity, lang, onBack, isPremium, trainingScore }: Pr
     const fetchStreams = async () => {
       setLoading(true);
       // Apple Health activities: no Strava streams, show RPE prompt instead of auto-analyzing
-      if (isAppleHealth || !activity.strava_id || activity.strava_id <= 0) {
+      if (needsRpe || !activity.strava_id || activity.strava_id <= 0) {
         setStreams([]);
         setSplits(null);
         // Check if analysis already exists (cached)
         if (isPremium) {
           try {
             const { data } = await supabase.functions.invoke("analyze-activity", {
-              body: { activityDbId: activity.id, activity: { name: activityName, distance: activity.distance, moving_time: activity.moving_time, elapsed_time: activity.elapsed_time, total_elevation_gain: activity.total_elevation_gain, start_date: activity.start_date, average_speed: activity.average_speed, max_speed: activity.max_speed, source: activity.source || "Apple Health" }, splits: [], lang, checkCacheOnly: true },
+              body: { activityDbId: activity.id, activity: { name: activityName, distance: activity.distance, moving_time: activity.moving_time, elapsed_time: activity.elapsed_time, total_elevation_gain: activity.total_elevation_gain, start_date: activity.start_date, average_speed: activity.average_speed, max_speed: activity.max_speed, average_heartrate: activity.average_heartrate, max_heartrate: activity.max_heartrate, source: activity.source || "Apple Health" }, splits: [], lang, checkCacheOnly: true },
             });
             if (data?.analysis) {
               setAiAnalysis(data.analysis);
@@ -260,7 +262,7 @@ const ActivityDetail = ({ activity, lang, onBack, isPremium, trainingScore }: Pr
       setLoading(false);
     };
     fetchStreams();
-  }, [activity.strava_id, isPremium, isAppleHealth]);
+  }, [activity.strava_id, isPremium, needsRpe]);
 
   const chartData = useMemo(() => {
     if (!streams || streams.length === 0) return [];
@@ -370,13 +372,6 @@ const ActivityDetail = ({ activity, lang, onBack, isPremium, trainingScore }: Pr
         )}
       </div>
 
-      {/* Map */}
-      {activity.summary_polyline && (
-        <div className="mb-4">
-          <ActivityMap polyline={activity.summary_polyline} />
-        </div>
-      )}
-
       {/* Apple Health accuracy reminder */}
       {isAppleHealth && (
         <div className="flex items-start gap-2 bg-amber-500/10 border border-amber-500/20 rounded-lg p-3 mb-4">
@@ -392,6 +387,12 @@ const ActivityDetail = ({ activity, lang, onBack, isPremium, trainingScore }: Pr
       {/* Key Stats Grid */}
       {isAppleHealth ? (
         <>
+          {/* Map above stats for Apple Health (if polyline exists) */}
+          {activity.summary_polyline && (
+            <div className="mb-4">
+              <ActivityMap polyline={activity.summary_polyline} />
+            </div>
+          )}
           <div className="grid grid-cols-3 gap-2 mb-4">
             <StatBox icon={MapPin} label={lang === "zh" ? "距離" : "Distance"} value={(activity.distance / 1000).toFixed(2)} unit="km" />
             <StatBox icon={Clock} label={lang === "zh" ? "時間" : "Time"} value={formatDuration(activity.moving_time)} />
@@ -405,16 +406,23 @@ const ActivityDetail = ({ activity, lang, onBack, isPremium, trainingScore }: Pr
         </>
       ) : (
         <>
+          {/* Strava / Garmin / Coros: stats grid first, then map */}
           <div className="grid grid-cols-3 gap-2 mb-4">
             <StatBox icon={MapPin} label={lang === "zh" ? "距離" : "Distance"} value={(activity.distance / 1000).toFixed(2)} unit="km" />
             <StatBox icon={Clock} label={lang === "zh" ? "時間" : "Duration"} value={formatDuration(activity.moving_time)} />
             <StatBox icon={Zap} label={lang === "zh" ? "配速" : "Avg Pace"} value={formatPace(activity.average_speed)} unit="/km" />
           </div>
           <div className="grid grid-cols-3 gap-2 mb-4">
+            <StatBox icon={TrendingUp} label={lang === "zh" ? "訓練分數" : "Training Score"} value={trainingScore != null ? trainingScore.toString() : "--"} />
             <StatBox icon={Heart} label={lang === "zh" ? "平均心率" : "Avg HR"} value={activity.average_heartrate ? Math.round(activity.average_heartrate).toString() : "--"} unit="bpm" iconColor="text-destructive" />
             <StatBox icon={Mountain} label={lang === "zh" ? "爬升" : "Elevation"} value={Math.round(activity.total_elevation_gain).toString()} unit="m" />
-            <StatBox icon={Heart} label={lang === "zh" ? "最高心率" : "Max HR"} value={activity.max_heartrate ? Math.round(activity.max_heartrate).toString() : "--"} unit="bpm" iconColor="text-destructive" />
           </div>
+          {/* Map below stats grid */}
+          {activity.summary_polyline && (
+            <div className="mb-4">
+              <ActivityMap polyline={activity.summary_polyline} />
+            </div>
+          )}
         </>
       )}
 
@@ -539,7 +547,7 @@ const ActivityDetail = ({ activity, lang, onBack, isPremium, trainingScore }: Pr
               {lang === "zh" ? "升級 Premium 以解鎖 AI 訓練分析" : "Upgrade to Premium to unlock AI Workout Analysis"}
             </p>
           </div>
-        ) : isAppleHealth && !rpeSubmitted && !aiAnalysis ? (
+        ) : needsRpe && !rpeSubmitted && !aiAnalysis ? (
           /* RPE Input for Apple Health activities */
           <div className="py-2">
             <div className="bg-muted/50 rounded-lg p-3 mb-3">
@@ -595,7 +603,7 @@ const ActivityDetail = ({ activity, lang, onBack, isPremium, trainingScore }: Pr
               {lang === "zh" ? "無法獲取分析結果" : "Could not retrieve analysis"}
             </p>
             <button
-              onClick={() => isAppleHealth ? setRpeSubmitted(false) : runAiAnalysis(splits)}
+              onClick={() => needsRpe ? setRpeSubmitted(false) : runAiAnalysis(splits)}
               className="px-4 py-1.5 rounded-lg text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
             >
               {lang === "zh" ? "重試" : "Retry"}

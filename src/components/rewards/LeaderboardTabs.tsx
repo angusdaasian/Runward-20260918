@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Crown, Shield, Trophy } from "lucide-react";
 import { Lang } from "@/lib/i18n";
 import { supabase } from "@/integrations/supabase/client";
-import { formatRank, getTierColor, type RankTier } from "@/lib/ranks";
+import { getRankFromXP, formatRank, getTierColor, type RankTier } from "@/lib/ranks";
 import { RANK_EMBLEMS } from "@/lib/rankEmblems";
 
 interface Props {
@@ -104,7 +104,10 @@ const LeaderboardTabs = ({ lang, refreshKey = 0 }: Props) => {
           {entries.map((entry, idx) => {
             const rank = idx + 1;
             const inRewardZone = rank <= rewardZone;
-            const tier = entry.rank_tier as RankTier;
+            // Compute rank from XP directly instead of trusting stored rank_tier/division
+            const computedRank = getRankFromXP(entry.monthly_xp);
+            const tier = computedRank.tier;
+            const division = computedRank.division;
 
             return (
               <div
@@ -141,7 +144,7 @@ const LeaderboardTabs = ({ lang, refreshKey = 0 }: Props) => {
                     {entry.display_name || (lang === "zh" ? "匿名跑者" : "Anonymous")}
                   </p>
                   <p className="text-[10px] font-medium" style={{ color: getTierColor(tier) }}>
-                    {formatRank(entry.rank_tier, entry.division)}
+                    {formatRank(tier, division)}
                   </p>
                 </div>
 

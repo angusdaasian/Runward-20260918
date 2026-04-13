@@ -1,10 +1,11 @@
-import { ArrowLeft, Check, RefreshCw, Info } from "lucide-react";
+import { ArrowLeft, Check, RefreshCw, Info, Eye, EyeOff } from "lucide-react";
 import { Lang, t } from "@/lib/i18n";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 import { useAppleHealth } from "@/hooks/use-apple-health";
+import { useGarmin } from "@/hooks/use-garmin";
 import { getAppEnvironment } from "@/lib/environment";
 
 interface Props {
@@ -19,8 +20,14 @@ const ConnectApps = ({ lang, onBack }: Props) => {
   const [garminConnected, setGarminConnected] = useState(false);
   const [loading, setLoading] = useState(true);
   const appleHealth = useAppleHealth(lang);
+  const garmin = useGarmin(lang);
 
-  // Determine if any app is already connected
+  // Garmin login form state
+  const [showGarminForm, setShowGarminForm] = useState(false);
+  const [garminEmail, setGarminEmail] = useState("");
+  const [garminPassword, setGarminPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+
   const hasConnection = stravaConnected || appleHealthConnected || garminConnected;
 
   const checkConnections = useCallback(async () => {
@@ -38,7 +45,6 @@ const ConnectApps = ({ lang, onBack }: Props) => {
 
   useEffect(() => { checkConnections(); }, [checkConnections]);
 
-  // Auto-sync health data when connected
   useEffect(() => {
     if (appleHealthConnected && !appleHealth.syncing) {
       appleHealth.syncHealthData();
@@ -51,9 +57,7 @@ const ConnectApps = ({ lang, onBack }: Props) => {
       return;
     }
     const success = await appleHealth.connect();
-    if (success) {
-      setAppleHealthConnected(true);
-    }
+    if (success) setAppleHealthConnected(true);
   };
 
   const handleDisconnectAppleHealth = async () => {
@@ -87,8 +91,40 @@ const ConnectApps = ({ lang, onBack }: Props) => {
     }
   };
 
+  const handleConnectGarmin = async () => {
+    if (hasConnection) {
+      toast.error(lang === "zh" ? "請先中斷現有連結再連接新的應用" : "Please disconnect the current app before connecting a new one");
+      return;
+    }
+    setShowGarminForm(true);
+  };
+
+  const handleGarminLogin = async () => {
+    if (!garminEmail || !garminPassword) {
+      toast.error(lang === "zh" ? "請輸入帳號和密碼" : "Please enter email and password");
+      return;
+    }
+    const success = await garmin.connect(garminEmail, garminPassword);
+    if (success) {
+      setGarminConnected(true);
+      setShowGarminForm(false);
+      setGarminEmail("");
+      setGarminPassword("");
+      // Auto-sync after connecting
+      garmin.syncActivities();
+    }
+  };
+
+  const handleDisconnectGarmin = async () => {
+    const success = await garmin.disconnect();
+    if (success) setGarminConnected(false);
+  };
+
+  const handleSyncGarmin = async () => {
+    await garmin.syncActivities();
+  };
+
   const comingSoonApps = [
-    { name: "ConnectIQ (Garmin)", icon: "⌚" },
     { name: "COROS", icon: "⌚" },
   ];
 
@@ -109,7 +145,6 @@ const ConnectApps = ({ lang, onBack }: Props) => {
           : "Connect your devices and services to automatically sync training data"}
       </p>
 
-      {/* Single-app restriction notice */}
       <div className="flex items-start gap-2 bg-muted/50 border border-border rounded-lg p-3 mb-6">
         <Info size={16} className="text-muted-foreground mt-0.5 flex-shrink-0" />
         <p className="text-xs text-muted-foreground">
@@ -140,10 +175,7 @@ const ConnectApps = ({ lang, onBack }: Props) => {
               <div className="flex items-center gap-2">
                 {appleHealth.syncing && <RefreshCw size={14} className="animate-spin text-muted-foreground" />}
                 <Check size={16} className="text-green-500" />
-                <button
-                  onClick={handleDisconnectAppleHealth}
-                  className="text-xs text-destructive hover:underline"
-                >
+                <button onClick={handleDisconnectAppleHealth} className="text-xs text-destructive hover:underline">
                   {lang === "zh" ? "中斷" : "Disconnect"}
                 </button>
               </div>
@@ -157,6 +189,99 @@ const ConnectApps = ({ lang, onBack }: Props) => {
               </button>
             )}
           </div>
+        </div>
+
+        {/* Garmin Connect */}
+        <div className={`bg-card border border-border rounded-xl p-4 ${hasConnection && !garminConnected ? "opacity-50" : ""}`}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center text-lg">
+                ⌚
+              </div>
+              <div>
+                <span className="font-medium text-foreground block">Garmin Connect</span>
+                <span className="text-xs text-muted-foreground">
+                  {lang === "zh"
+                    ? "同步跑步數據、心率、海拔及訓練負荷"
+                    : "Sync runs, HR, elevation & training load"}
+                </span>
+              </div>
+            </div>
+            {garminConnected ? (
+              <div className="flex items-center gap-2">
+                {garmin.syncing && <RefreshCw size={14} className="animate-spin text-muted-foreground" />}
+                <button onClick={handleSyncGarmin} disabled={garmin.syncing} className="text-xs text-primary hover:underline">
+                  {lang === "zh" ? "同步" : "Sync"}
+                </button>
+                <Check size={16} className="text-green-500" />
+                <button onClick={handleDisconnectGarmin} className="text-xs text-destructive hover:underline">
+                  {lang === "zh" ? "中斷" : "Disconnect"}
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={handleConnectGarmin}
+                disabled={hasConnection || garmin.connecting}
+                className={`text-xs font-medium px-3 py-1 rounded-full ${hasConnection ? "bg-muted text-muted-foreground cursor-not-allowed" : "text-primary-foreground bg-primary"}`}
+              >
+                {garmin.connecting
+                  ? (lang === "zh" ? "連結中..." : "Connecting...")
+                  : (lang === "zh" ? "連結" : "Connect")}
+              </button>
+            )}
+          </div>
+
+          {/* Garmin login form */}
+          {showGarminForm && !garminConnected && (
+            <div className="mt-3 pt-3 border-t border-border space-y-2">
+              <input
+                type="email"
+                placeholder={lang === "zh" ? "Garmin 帳號 (Email)" : "Garmin Email"}
+                value={garminEmail}
+                onChange={(e) => setGarminEmail(e.target.value)}
+                className="w-full text-sm px-3 py-2 rounded-lg bg-background border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+              />
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  placeholder={lang === "zh" ? "密碼" : "Password"}
+                  value={garminPassword}
+                  onChange={(e) => setGarminPassword(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleGarminLogin()}
+                  className="w-full text-sm px-3 py-2 rounded-lg bg-background border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground"
+                >
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={handleGarminLogin}
+                  disabled={garmin.connecting}
+                  className="flex-1 text-xs font-medium px-3 py-2 rounded-lg text-primary-foreground bg-primary disabled:opacity-50"
+                >
+                  {garmin.connecting
+                    ? (lang === "zh" ? "登入中..." : "Signing in...")
+                    : (lang === "zh" ? "登入" : "Sign In")}
+                </button>
+                <button
+                  onClick={() => { setShowGarminForm(false); setGarminEmail(""); setGarminPassword(""); }}
+                  className="text-xs px-3 py-2 rounded-lg text-muted-foreground hover:text-foreground"
+                >
+                  {lang === "zh" ? "取消" : "Cancel"}
+                </button>
+              </div>
+              <p className="text-[10px] text-muted-foreground">
+                {lang === "zh"
+                  ? "你的憑證僅用於驗證，不會被儲存。"
+                  : "Your credentials are used for authentication only and are not stored."}
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Strava — temporarily disabled */}
@@ -183,10 +308,7 @@ const ConnectApps = ({ lang, onBack }: Props) => {
 
         {/* Coming Soon Apps */}
         {comingSoonApps.map((app) => (
-          <div
-            key={app.name}
-            className="bg-card border border-border rounded-xl p-4 opacity-50"
-          >
+          <div key={app.name} className="bg-card border border-border rounded-xl p-4 opacity-50">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center text-lg">

@@ -256,6 +256,8 @@ Please analyze whether the user executed the planned workout correctly and provi
     const avgPace = `${paceMin}:${String(paceSec).padStart(2, "0")} /km`;
 
     const activitySource = activity.source || "unknown";
+    const isAppleHealth = activitySource === "Apple Health";
+    const isGarmin = activitySource === "Garmin";
 
     let statsText = `Activity: "${activity.name}"
 - Source: ${activitySource}
@@ -274,9 +276,23 @@ Please analyze whether the user executed the planned workout correctly and provi
       statsText += `\n- Total Elevation Gain: ${Math.round(activity.total_elevation_gain)} m`;
     }
 
-    // HR is optional bonus data — include if available but analysis should not depend on it
-    if (activity.average_heartrate) statsText += `\n- Average Heart Rate: ${Math.round(activity.average_heartrate)} bpm (optional data)`;
-    if (activity.max_heartrate) statsText += `\n- Max Heart Rate: ${Math.round(activity.max_heartrate)} bpm (optional data)`;
+    // RPE from user input (Apple Health & Garmin activities)
+    if (typeof rpe === "number" && rpe >= 1 && rpe <= 10) {
+      statsText += `\n- RPE (Rate of Perceived Exertion): ${rpe}/10`;
+    }
+
+    // For Apple Health: only use pace, distance, RPE — skip HR and elevation
+    // For Garmin & Strava: include HR and elevation
+    if (!isAppleHealth) {
+      // Elevation — only include if meaningful
+      if (activity.total_elevation_gain > 0) {
+        statsText += `\n- Total Elevation Gain: ${Math.round(activity.total_elevation_gain)} m`;
+      }
+
+      // HR data
+      if (activity.average_heartrate) statsText += `\n- Average Heart Rate: ${Math.round(activity.average_heartrate)} bpm`;
+      if (activity.max_heartrate) statsText += `\n- Max Heart Rate: ${Math.round(activity.max_heartrate)} bpm`;
+    }
 
     if (splits && splits.length > 0) {
       statsText += "\n\nSplits (per km):";
@@ -285,7 +301,9 @@ Please analyze whether the user executed the planned workout correctly and provi
         const sm = Math.floor(sp / 60);
         const ss = Math.floor(sp % 60);
         statsText += `\n  km ${s.split}: ${sm}:${String(ss).padStart(2, "0")} /km`;
-        statsText += ` | Elev: ${s.elevation_difference > 0 ? "+" : ""}${Math.round(s.elevation_difference)}m`;
+        if (!isAppleHealth) {
+          statsText += ` | Elev: ${s.elevation_difference > 0 ? "+" : ""}${Math.round(s.elevation_difference)}m`;
+        }
       }
     }
 

@@ -266,6 +266,16 @@ Please analyze whether the user executed the planned workout correctly and provi
 - Moving Time: ${Math.floor(activity.moving_time / 60)} min ${activity.moving_time % 60} sec
 - Average Pace: ${avgPace}`;
 
+    // RPE from user input (Apple Health activities)
+    if (typeof rpe === "number" && rpe >= 1 && rpe <= 10) {
+      statsText += `\n- RPE (Rate of Perceived Exertion): ${rpe}/10`;
+    }
+
+    // Elevation — only include if meaningful
+    if (activity.total_elevation_gain > 0) {
+      statsText += `\n- Total Elevation Gain: ${Math.round(activity.total_elevation_gain)} m`;
+    }
+
     // RPE from user input (Apple Health & Garmin activities)
     if (typeof rpe === "number" && rpe >= 1 && rpe <= 10) {
       statsText += `\n- RPE (Rate of Perceived Exertion): ${rpe}/10`;
@@ -297,7 +307,7 @@ Please analyze whether the user executed the planned workout correctly and provi
       }
     }
 
-    const hasHrData = !isAppleHealth && (activity.average_heartrate || activity.max_heartrate);
+    const hasRpe = typeof rpe === "number" && rpe >= 1 && rpe <= 10;
 
     const systemPrompt = isZh
       ? `你是一位專業跑步教練 AI。根據提供的訓練計劃背景和活動數據，給出簡潔但深入的分析。回覆請用繁體中文。
@@ -306,12 +316,9 @@ Please analyze whether the user executed the planned workout correctly and provi
 - 配速（平均配速、分段配速一致性）
 - 距離（是否完成計劃距離）
 - 時間（訓練時長是否合理）
-${hasRpe ? `- RPE（用戶的自覺運動強度），用來判斷訓練強度是否合適` : ``}
-${hasHrData ? `- 心率（平均心率與最大心率，判斷有氧/無氧強度）` : ``}
-- 爬升（地形對配速的影響）
+${hasRpe ? `- RPE（用戶的自覺運動強度），用來判斷訓練強度是否合適` : `- 爬升（地形對配速的影響）`}
 
-${hasRpe ? `RPE 量表說明：1-3 = 輕鬆恢復跑，4-5 = 有氧輕鬆跑，6-7 = 節奏跑/乳酸閾值，8-9 = 間歇/高強度，10 = 全力衝刺。請根據 RPE 值判斷這次訓練的強度是否與配速和距離匹配，以及是否適合用戶的訓練計劃階段。` : ``}
-${hasHrData ? `請結合心率數據分析訓練強度區間，判斷用戶是否在正確的心率區間訓練。` : isAppleHealth ? `Apple Health 不提供心率和爬升數據，請不要因為缺少這些數據而影響分析質量。` : ``}
+${hasRpe ? `RPE 量表說明：1-3 = 輕鬆恢復跑，4-5 = 有氧輕鬆跑，6-7 = 節奏跑/乳酸閾值，8-9 = 間歇/高強度，10 = 全力衝刺。請根據 RPE 值判斷這次訓練的強度是否與配速和距離匹配，以及是否適合用戶的訓練計劃階段。` : `如果有心率數據，可以作為額外參考，但不要因為缺少心率數據而影響分析質量。`}
 
 如果用戶有訓練計劃，重點比較：
 - 實際距離 vs 計劃距離
@@ -339,12 +346,9 @@ Your analysis should focus on these core metrics:
 - Pace (average pace, split consistency, appropriate effort level)
 - Distance (did the runner complete the intended distance?)
 - Duration (was the workout duration reasonable?)
-${hasRpe ? `- RPE (Rate of Perceived Exertion) — use this to gauge whether the workout intensity was appropriate` : ``}
-${hasHrData ? `- Heart Rate (average and max HR to assess aerobic/anaerobic intensity zones)` : ``}
-- Elevation (how did terrain affect pace?)
+${hasRpe ? `- RPE (Rate of Perceived Exertion) — use this to gauge whether the workout intensity was appropriate` : `- Elevation (how did terrain affect pace?)`}
 
-${hasRpe ? `RPE Scale Reference: 1-3 = Easy recovery run, 4-5 = Aerobic easy run, 6-7 = Tempo/threshold effort, 8-9 = Intervals/high intensity, 10 = All-out sprint. Analyze whether the RPE matches the pace and distance, and whether the effort level is appropriate for the user's training plan stage.` : ``}
-${hasHrData ? `Use heart rate data to analyze training intensity zones and whether the runner was training in the correct HR zone for this workout type.` : isAppleHealth ? `Apple Health does not provide heart rate or elevation data. Do NOT let missing HR data reduce your analysis quality.` : ``}
+${hasRpe ? `RPE Scale Reference: 1-3 = Easy recovery run, 4-5 = Aerobic easy run, 6-7 = Tempo/threshold effort, 8-9 = Intervals/high intensity, 10 = All-out sprint. Analyze whether the RPE matches the pace and distance, and whether the effort level is appropriate for the user's training plan stage.` : `If heart rate data is available, use it as supplementary context, but do NOT let missing HR data reduce your analysis quality. Many data sources (e.g. Apple Health) may not provide HR.`}
 
 If the user has a training plan, focus on plan adherence:
 - Actual distance vs planned distance

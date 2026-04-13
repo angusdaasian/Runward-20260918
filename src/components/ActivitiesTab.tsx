@@ -421,6 +421,7 @@ const ActivitiesTab = ({ lang }: Props) => {
           setSelectedActivity(null);
         }}
         isPremium={isPremium}
+        trainingScore={profile?.training_score ?? undefined}
       />
     );
   }

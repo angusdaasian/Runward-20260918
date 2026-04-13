@@ -1141,7 +1141,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                               </div>
                             ) : (
                               <div className="flex-1 border-l-2 pl-3 py-2 cursor-pointer" style={{ borderColor: day.color || "hsl(var(--border))" }}
-                                onClick={() => { setEditingDayIdx(i); setEditDistance(day.distance_km?.toString() || ""); setEditPace(day.pace || ""); setEditDescription(localizeDescription(day, lang)); }}>
+                                onClick={() => { setEditingDayIdx(i); setEditDistance(day.distance_km?.toString() || ""); setEditPace(day.pace || ""); setEditDescription(day.description || ""); }}>
                                 <div className="bg-card border border-border rounded-lg p-3 hover:border-primary transition-colors">
                                   <div className="flex items-center justify-between">
                                     <span className="font-medium text-sm text-foreground">{localizeTitle(day.type, lang)}</span>
@@ -1382,7 +1382,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                 <Button className="w-full" onClick={() => {
                   if (editingDayIdx === null) return;
                   const updatedPlan = [...plan]; const week = { ...updatedPlan[currentWeekIdx] }; const days = [...week.days];
-                  days[editingDayIdx] = { ...days[editingDayIdx], distance_km: editDistance ? Number(editDistance) : days[editingDayIdx].distance_km, pace: editPace || days[editingDayIdx].pace, description: editDescription || days[editingDayIdx].description };
+                  days[editingDayIdx] = { ...days[editingDayIdx], distance_km: editDistance ? Number(editDistance) : days[editingDayIdx].distance_km, pace: editPace || days[editingDayIdx].pace, description: editDescription };
                   week.days = days; updatedPlan[currentWeekIdx] = week; setPlan(updatedPlan);
                   if (user && existingPlan) supabase.from("training_plans" as any).update({ plan_data: updatedPlan } as any).eq("id", existingPlan.id).then(() => {});
                   setEditingDayIdx(null);
@@ -1530,7 +1530,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                 <Button className="w-full" onClick={() => {
                   if (customEditingDayIdx === null) return;
                   const updatedPlan = [...customPlan]; const week = { ...updatedPlan[customWeekIdx] }; const days = [...week.days];
-                  days[customEditingDayIdx] = { ...days[customEditingDayIdx], distance_km: customEditDistance ? Number(customEditDistance) : days[customEditingDayIdx].distance_km, pace: customEditPace || days[customEditingDayIdx].pace, description: customEditDescription || days[customEditingDayIdx].description };
+                  days[customEditingDayIdx] = { ...days[customEditingDayIdx], distance_km: customEditDistance ? Number(customEditDistance) : days[customEditingDayIdx].distance_km, pace: customEditPace || days[customEditingDayIdx].pace, description: customEditDescription };
                   week.days = days; updatedPlan[customWeekIdx] = week; setCustomPlan(updatedPlan);
                   if (user && customExistingPlan) supabase.from("training_plans" as any).update({ plan_data: updatedPlan } as any).eq("id", customExistingPlan.id).then(() => {});
                   setCustomEditingDayIdx(null);

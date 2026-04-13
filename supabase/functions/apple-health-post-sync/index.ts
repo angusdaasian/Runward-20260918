@@ -26,40 +26,71 @@ function calculateVdot(distanceMeters: number, timeSeconds: number): number {
   return vo2Cost(velocity) / percentVO2(minutes);
 }
 
+const RANK_TIERS = ["Bronze", "Silver", "Gold", "Diamond"];
+const DIVISIONS = ["V", "IV", "III", "II", "I"];
+const XP_PER_DIVISION = 2000;
+
+function computeRankFromXP(monthlyXp: number) {
+  const divisionIndex = Math.min(
+    Math.floor(monthlyXp / XP_PER_DIVISION),
+    RANK_TIERS.length * DIVISIONS.length - 1
+  );
+  const tierIndex = Math.min(Math.floor(divisionIndex / DIVISIONS.length), RANK_TIERS.length - 1);
+  const divIndex = divisionIndex % DIVISIONS.length;
+  return { tier: RANK_TIERS[tierIndex], division: DIVISIONS[divIndex] };
+}
+
+function isCurrentMonth(dateStr: string): boolean {
+  const d = new Date(dateStr);
+  const now = new Date();
+  return d.getUTCFullYear() === now.getUTCFullYear() && d.getUTCMonth() === now.getUTCMonth();
+}
+
 const runningSportTypes = new Set([
   "Run",
   "TrailRun",
   "VirtualRun",
   "Treadmill",
+  "Workout",
 ]);
 
 async function computeTrainingScore(
   supabase: any,
   userId: string,
-  env: string
+  source: "apple_health" | "strava" | "garmin"
 ) {
-  // Fetch from both Strava and Apple Health
-  const [stravaRes, ahRes] = await Promise.all([
-    supabase
+  let query;
+  if (source === "apple_health") {
+    query = supabase
+      .from("apple_health_activities")
+      .select("moving_time, distance, sport_type, start_date")
+      .eq("user_id", userId)
+      .order("start_date", { ascending: false })
+      .limit(50);
+  } else if (source === "garmin") {
+    query = supabase
+      .from("garmin_activities")
+      .select("duration_seconds, distance_meters, activity_type, start_time")
+      .eq("user_id", userId)
+      .order("start_time", { ascending: false })
+      .limit(50);
+  } else {
+    const env = Deno.env.get("APP_ENVIRONMENT") || "dev";
+    query = supabase
       .from("strava_activities")
       .select("moving_time, distance, sport_type, start_date")
       .eq("user_id", userId)
       .eq("environment", env)
       .order("start_date", { ascending: false })
-      .limit(50),
-    supabase
-      .from("apple_health_activities")
-      .select("moving_time, distance, sport_type, start_date")
-      .eq("user_id", userId)
-      .order("start_date", { ascending: false })
-      .limit(50),
-  ]);
+      .limit(50);
+  }
 
-  const all = [...(stravaRes.data || []), ...(ahRes.data || [])];
-  all.sort(
-    (a: any, b: any) =>
-      new Date(b.start_date).getTime() - new Date(a.start_date).getTime()
-  );
+  const { data } = await query;
+  const all = (data || []).map((a: any) => ({
+    moving_time: a.moving_time ?? a.duration_seconds ?? 0,
+    distance: a.distance ?? a.distance_meters ?? 0,
+    sport_type: a.sport_type ?? a.activity_type ?? "Run",
+  }));
 
   const vdotScores: number[] = [];
   for (const act of all) {
@@ -90,20 +121,60 @@ async function computeTrainingScore(
   return Math.round(avgScore);
 }
 
-async function awardActivityXP(
+async function recalculateMonthlyXP(
   supabase: any,
   userId: string,
-  distanceMeters: number,
-  movingTimeSeconds: number,
-  trainingScore: number
+  trainingScore: number,
+  source: "apple_health" | "strava" | "garmin"
 ) {
-  const km = distanceMeters / 1000;
-  const minutes = movingTimeSeconds / 60;
-  const xp =
-    Math.round(km * 20) +
-    Math.round(minutes * 10) +
-    Math.round(trainingScore * 5);
-  if (xp <= 0) return 0;
+  // Get current month boundaries in UTC
+  const now = new Date();
+  const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString();
+  const monthEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1)).toISOString();
+
+  // Only fetch from the connected source
+  let query;
+  if (source === "apple_health") {
+    query = supabase
+      .from("apple_health_activities")
+      .select("distance, moving_time, sport_type")
+      .eq("user_id", userId)
+      .gte("start_date", monthStart)
+      .lt("start_date", monthEnd);
+  } else if (source === "garmin") {
+    query = supabase
+      .from("garmin_activities")
+      .select("distance_meters, duration_seconds, activity_type")
+      .eq("user_id", userId)
+      .gte("start_time", monthStart)
+      .lt("start_time", monthEnd);
+  } else {
+    const env = Deno.env.get("APP_ENVIRONMENT") || "dev";
+    query = supabase
+      .from("strava_activities")
+      .select("distance, moving_time, sport_type")
+      .eq("user_id", userId)
+      .eq("environment", env)
+      .gte("start_date", monthStart)
+      .lt("start_date", monthEnd);
+  }
+
+  const { data } = await query;
+  const allActivities = (data || []).map((a: any) => ({
+    distance: a.distance ?? a.distance_meters ?? 0,
+    moving_time: a.moving_time ?? a.duration_seconds ?? 0,
+  }));
+
+  let totalMonthlyXp = 0;
+  for (const act of allActivities) {
+    const km = (act.distance || 0) / 1000;
+    const minutes = (act.moving_time || 0) / 60;
+    const xp =
+      Math.round(km * 20) +
+      Math.round(minutes * 10) +
+      Math.round(trainingScore * 5);
+    if (xp > 0) totalMonthlyXp += xp;
+  }
 
   const { data: profile } = await supabase
     .from("profiles")
@@ -112,18 +183,27 @@ async function awardActivityXP(
     .single();
 
   if (profile) {
+    const oldMonthlyXp = profile.monthly_xp || 0;
+    const xpDelta = totalMonthlyXp - oldMonthlyXp;
+    const newLifetimeXp = Math.max(0, (profile.lifetime_xp || 0) + xpDelta);
+    const rank = computeRankFromXP(totalMonthlyXp);
+
     await supabase
       .from("profiles")
       .update({
-        monthly_xp: (profile.monthly_xp || 0) + xp,
-        lifetime_xp: (profile.lifetime_xp || 0) + xp,
+        monthly_xp: totalMonthlyXp,
+        lifetime_xp: newLifetimeXp,
+        rank_tier: rank.tier,
+        division: rank.division,
       })
       .eq("user_id", userId);
+
     console.log(
-      `Awarded ${xp} XP to user ${userId} (${km.toFixed(1)}km, ${minutes.toFixed(0)}min)`
+      `Recalculated monthly XP for ${userId}: ${oldMonthlyXp} → ${totalMonthlyXp} (${allActivities.length} activities) → ${rank.tier} ${rank.division}`
     );
   }
-  return xp;
+
+  return totalMonthlyXp;
 }
 
 async function sendActivityNotification(
@@ -220,31 +300,21 @@ serve(async (req) => {
       );
     }
 
-    // Determine environment from strava connection or default
-    const { data: stravaConn } = await supabase
-      .from("strava_connections")
-      .select("environment")
-      .eq("user_id", user.id)
-      .maybeSingle();
-    const env = stravaConn?.environment || Deno.env.get("APP_ENVIRONMENT") || "dev";
+    // This is the Apple Health post-sync — use apple_health as the single source
+    const source = "apple_health" as const;
 
-    // 1) Compute training score (from both Strava + Apple Health)
-    const trainingScore = await computeTrainingScore(supabase, user.id, env);
+    // 1) Compute training score from Apple Health only
+    const trainingScore = await computeTrainingScore(supabase, user.id, source);
 
-    // 2) Award XP and send notification for each new activity
-    let totalXp = 0;
+    // 2) Recalculate monthly XP from Apple Health current-month activities only
+    const totalXp = await recalculateMonthlyXP(supabase, user.id, trainingScore, source);
+
+    // 3) Send notifications for new running activities
     for (const act of newActivities) {
-      const xp = await awardActivityXP(
-        supabase,
-        user.id,
-        act.distance || 0,
-        act.moving_time || 0,
-        trainingScore
-      );
-      totalXp += xp;
-
-      // Send notification for each new running activity
-      if (runningSportTypes.has(act.sport_type)) {
+      if (runningSportTypes.has(act.sport_type) && isCurrentMonth(act.start_date || "")) {
+        const km = (act.distance || 0) / 1000;
+        const minutes = (act.moving_time || 0) / 60;
+        const xp = Math.round(km * 20) + Math.round(minutes * 10) + Math.round(trainingScore * 5);
         await sendActivityNotification(
           supabase,
           user.id,

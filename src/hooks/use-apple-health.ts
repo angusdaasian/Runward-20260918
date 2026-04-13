@@ -655,6 +655,15 @@ export function useAppleHealth(lang: Lang) {
     async (workouts: AppleHealthWorkout[]) => {
       if (!user || workouts.length === 0) return 0;
       try {
+        // Check if a fitness app (Strava/Garmin) is connected — if so, skip saving AH activities
+        const [stravaConn, garminConn] = await Promise.all([
+          supabase.from("strava_connections").select("id").eq("user_id", user.id).maybeSingle(),
+          supabase.from("garmin_connections").select("id").eq("user_id", user.id).maybeSingle(),
+        ]);
+        if (stravaConn.data || garminConn.data) {
+          console.log("[AppleHealth] Fitness app connected, skipping activity save (fitness app takes priority)");
+          return 0;
+        }
         const normalizedWorkouts = Array.from(
           new Map(
             workouts.map((w) => [

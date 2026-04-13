@@ -2,17 +2,18 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
 // VDOT calculation (Daniel's Running Formula)
 function percentVO2(minutes: number): number {
-  return 0.8 + 0.1894393 * Math.exp(-0.012778 * minutes) + 0.2989558 * Math.exp(-0.1932605 * minutes);
+  return 0.8 + 0.1894393 * Math.exp(-0.012778 * minutes) +
+    0.2989558 * Math.exp(-0.1932605 * minutes);
 }
 
 function vo2Cost(velocity: number): number {
-  return -4.6 + 0.182258 * velocity + 0.000104 * velocity * velocity;
+  return -4.60 + 0.182258 * velocity + 0.000104 * velocity * velocity;
 }
 
 function calculateVdot(distanceMeters: number, timeSeconds: number): number {
@@ -23,22 +24,41 @@ function calculateVdot(distanceMeters: number, timeSeconds: number): number {
   return vo2 / pct;
 }
 
-const runningSportTypes = new Set(["Run", "TrailRun", "VirtualRun", "Treadmill"]);
+const runningSportTypes = new Set(["Run", "TrailRun", "VirtualRun", "Treadmill", "Workout"]);
 
-async function refreshTokenIfNeeded(connection: any, supabase: any, clientId: string, clientSecret: string) {
+const RANK_TIERS = ["Bronze", "Silver", "Gold", "Diamond"];
+const DIVISIONS_LIST = ["V", "IV", "III", "II", "I"];
+const XP_PER_DIVISION = 2000;
+
+function computeRankFromXP(monthlyXp: number) {
+  const divisionIndex = Math.min(
+    Math.floor(monthlyXp / XP_PER_DIVISION),
+    RANK_TIERS.length * DIVISIONS_LIST.length - 1
+  );
+  const tierIndex = Math.min(Math.floor(divisionIndex / DIVISIONS_LIST.length), RANK_TIERS.length - 1);
+  const divIndex = divisionIndex % DIVISIONS_LIST.length;
+  return { tier: RANK_TIERS[tierIndex], division: DIVISIONS_LIST[divIndex] };
+}
+
+async function refreshTokenIfNeeded(
+  connection: any,
+  supabase: any,
+  clientId: string,
+  clientSecret: string
+) {
   const now = Math.floor(Date.now() / 1000);
   if (connection.expires_at > now + 60) {
     return connection.access_token;
   }
 
-  const res = await fetch("https://www.strava.com/oauth/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+  const res = await fetch('https://www.strava.com/oauth/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
       client_id: clientId,
       client_secret: clientSecret,
       refresh_token: connection.refresh_token,
-      grant_type: "refresh_token",
+      grant_type: 'refresh_token',
     }),
   });
 
@@ -46,14 +66,14 @@ async function refreshTokenIfNeeded(connection: any, supabase: any, clientId: st
   if (!res.ok) throw new Error(`Token refresh failed: ${JSON.stringify(data)}`);
 
   await supabase
-    .from("strava_connections")
+    .from('strava_connections')
     .update({
       access_token: data.access_token,
       refresh_token: data.refresh_token,
       expires_at: data.expires_at,
       updated_at: new Date().toISOString(),
     })
-    .eq("user_id", connection.user_id);
+    .eq('user_id', connection.user_id);
 
   return data.access_token;
 }
@@ -62,17 +82,17 @@ async function computeTrainingScore(supabase: any, userId: string, env: string) 
   // Fetch from both Strava and Apple Health activities
   const [stravaRes, ahRes] = await Promise.all([
     supabase
-      .from("strava_activities")
-      .select("moving_time, distance, sport_type, start_date")
-      .eq("user_id", userId)
-      .eq("environment", env)
-      .order("start_date", { ascending: false })
+      .from('strava_activities')
+      .select('moving_time, distance, sport_type, start_date')
+      .eq('user_id', userId)
+      .eq('environment', env)
+      .order('start_date', { ascending: false })
       .limit(50),
     supabase
-      .from("apple_health_activities")
-      .select("moving_time, distance, sport_type, start_date")
-      .eq("user_id", userId)
-      .order("start_date", { ascending: false })
+      .from('apple_health_activities')
+      .select('moving_time, distance, sport_type, start_date')
+      .eq('user_id', userId)
+      .order('start_date', { ascending: false })
       .limit(50),
   ]);
 
@@ -80,7 +100,7 @@ async function computeTrainingScore(supabase: any, userId: string, env: string) 
   all.sort((a: any, b: any) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime());
 
   if (all.length === 0) {
-    await supabase.from("profiles").update({ training_score: 0 }).eq("user_id", userId);
+    await supabase.from('profiles').update({ training_score: 0 }).eq('user_id', userId);
     return 0;
   }
 
@@ -95,43 +115,39 @@ async function computeTrainingScore(supabase: any, userId: string, env: string) 
     if (vdotScores.length >= 20) break;
   }
 
-  const avgScore =
-    vdotScores.length > 0 ? Math.round((vdotScores.reduce((a, b) => a + b, 0) / vdotScores.length) * 10) / 10 : 0;
+  const avgScore = vdotScores.length > 0
+    ? Math.round((vdotScores.reduce((a, b) => a + b, 0) / vdotScores.length) * 10) / 10
+    : 0;
 
-  await supabase
-    .from("profiles")
-    .update({ training_score: Math.round(avgScore) })
-    .eq("user_id", userId);
+  await supabase.from('profiles').update({ training_score: Math.round(avgScore) }).eq('user_id', userId);
   return avgScore;
 }
 
-async function awardActivityXP(
-  supabase: any,
-  userId: string,
-  distanceMeters: number,
-  movingTimeSeconds: number,
-  trainingScore: number,
-) {
+async function awardActivityXP(supabase: any, userId: string, distanceMeters: number, movingTimeSeconds: number, trainingScore: number) {
   const km = distanceMeters / 1000;
   const minutes = movingTimeSeconds / 60;
   const xp = Math.round(km * 20) + Math.round(minutes * 10) + Math.round(trainingScore * 5);
   if (xp <= 0) return;
 
   const { data: profile } = await supabase
-    .from("profiles")
-    .select("monthly_xp, lifetime_xp")
-    .eq("user_id", userId)
+    .from('profiles')
+    .select('monthly_xp, lifetime_xp')
+    .eq('user_id', userId)
     .single();
 
   if (profile) {
+    const newMonthlyXp = (profile.monthly_xp || 0) + xp;
+    const rank = computeRankFromXP(newMonthlyXp);
     await supabase
-      .from("profiles")
+      .from('profiles')
       .update({
-        monthly_xp: profile.monthly_xp + xp,
-        lifetime_xp: profile.lifetime_xp + xp,
+        monthly_xp: newMonthlyXp,
+        lifetime_xp: (profile.lifetime_xp || 0) + xp,
+        rank_tier: rank.tier,
+        division: rank.division,
       })
-      .eq("user_id", userId);
-    console.log(`Awarded ${xp} XP to user ${userId} (${km.toFixed(1)}km, ${minutes.toFixed(0)}min)`);
+      .eq('user_id', userId);
+    console.log(`Awarded ${xp} XP to user ${userId} (${km.toFixed(1)}km, ${minutes.toFixed(0)}min) → ${rank.tier} ${rank.division}`);
   }
 }
 
@@ -141,14 +157,14 @@ async function sendActivityNotification(
   distanceMeters: number,
   movingTimeSeconds: number,
   xpGained: number,
-  trainingScore: number,
+  trainingScore: number
 ) {
   try {
     // Check if user has notifications enabled
     const { data: profile } = await supabase
-      .from("profiles")
-      .select("activity_notifications")
-      .eq("user_id", userId)
+      .from('profiles')
+      .select('activity_notifications')
+      .eq('user_id', userId)
       .single();
 
     if (!profile?.activity_notifications) {
@@ -168,10 +184,9 @@ async function sendActivityNotification(
     const hours = Math.floor(totalMin / 60);
     const mins = totalMin % 60;
     const secs = movingTimeSeconds % 60;
-    const timeStr =
-      hours > 0
-        ? `${hours}h${String(mins).padStart(2, "0")}m${String(secs).padStart(2, "0")}s`
-        : `${mins}m${String(secs).padStart(2, "0")}s`;
+    const timeStr = hours > 0
+      ? `${hours}h${String(mins).padStart(2, '0')}m${String(secs).padStart(2, '0')}s`
+      : `${mins}m${String(secs).padStart(2, '0')}s`;
 
     const message = `You ran ${km}km in ${timeStr}. You earned ${xpGained} XP! Your Training Score: ${trainingScore}.`;
 
@@ -179,7 +194,7 @@ async function sendActivityNotification(
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Basic ${onesignalApiKey}`,
+        "Authorization": `Basic ${onesignalApiKey}`,
       },
       body: JSON.stringify({
         app_id: onesignalAppId,
@@ -196,10 +211,17 @@ async function sendActivityNotification(
   }
 }
 
-async function syncActivityById(supabase: any, accessToken: string, activityId: number, userId: string, env: string) {
-  const res = await fetch(`https://www.strava.com/api/v3/activities/${activityId}?include_all_efforts=false`, {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
+async function syncActivityById(
+  supabase: any,
+  accessToken: string,
+  activityId: number,
+  userId: string,
+  env: string
+) {
+  const res = await fetch(
+    `https://www.strava.com/api/v3/activities/${activityId}?include_all_efforts=false`,
+    { headers: { Authorization: `Bearer ${accessToken}` } }
+  );
 
   if (!res.ok) {
     console.error(`Failed to fetch activity ${activityId}: ${res.status}`);
@@ -209,14 +231,19 @@ async function syncActivityById(supabase: any, accessToken: string, activityId: 
   const act = await res.json();
 
   // Check if activity already exists (avoid double XP on updates)
-  const { data: existing } = await supabase.from("strava_activities").select("id").eq("strava_id", act.id).single();
+  const { data: existing } = await supabase
+    .from('strava_activities')
+    .select('id')
+    .eq('strava_id', act.id)
+    .single();
 
-  await supabase.from("strava_activities").upsert(
-    {
+  await supabase
+    .from('strava_activities')
+    .upsert({
       user_id: userId,
       strava_id: act.id,
       name: act.name,
-      sport_type: act.sport_type || act.type || "Run",
+      sport_type: act.sport_type || act.type || 'Run',
       distance: act.distance,
       moving_time: act.moving_time,
       elapsed_time: act.elapsed_time,
@@ -228,9 +255,7 @@ async function syncActivityById(supabase: any, accessToken: string, activityId: 
       max_heartrate: act.max_heartrate || null,
       summary_polyline: act.map?.summary_polyline || null,
       environment: env,
-    },
-    { onConflict: "strava_id" },
-  );
+    }, { onConflict: 'strava_id' });
 
   // Compute training score first (needed for XP calculation)
   const distance = act.distance || 0;
@@ -252,20 +277,20 @@ async function syncActivityById(supabase: any, accessToken: string, activityId: 
 }
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") {
+  if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
-  const VERIFY_TOKEN_DEV = Deno.env.get("STRAVA_WEBHOOK_VERIFY_TOKEN")!;
-  const VERIFY_TOKEN_PROD = Deno.env.get("STRAVA_WEBHOOK_VERIFY_TOKEN_PROD")!;
-  const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-  const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const VERIFY_TOKEN_DEV = Deno.env.get('STRAVA_WEBHOOK_VERIFY_TOKEN')!;
+  const VERIFY_TOKEN_PROD = Deno.env.get('STRAVA_WEBHOOK_VERIFY_TOKEN_PROD')!;
+  const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
+  const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
-  if (req.method === "GET") {
+  if (req.method === 'GET') {
     const url = new URL(req.url);
-    const mode = url.searchParams.get("hub.mode");
-    const token = url.searchParams.get("hub.verify_token");
-    const challenge = url.searchParams.get("hub.challenge");
+    const mode = url.searchParams.get('hub.mode');
+    const token = url.searchParams.get('hub.verify_token');
+    const challenge = url.searchParams.get('hub.challenge');
 
     const matchesDev = token === VERIFY_TOKEN_DEV;
     const matchesProd = token === VERIFY_TOKEN_PROD;
@@ -278,26 +303,26 @@ serve(async (req) => {
       challenge,
     });
 
-    if (mode === "subscribe" && (matchesDev || matchesProd)) {
-      const detectedEnv = matchesProd ? "prod" : "dev";
+    if (mode === 'subscribe' && (matchesDev || matchesProd)) {
+      const detectedEnv = matchesProd ? 'prod' : 'dev';
       console.log(`Webhook validated (env: ${detectedEnv})`);
       return new Response(JSON.stringify({ "hub.challenge": challenge }), {
         status: 200,
-        headers: { "Content-Type": "application/json" },
+        headers: { 'Content-Type': 'application/json' },
       });
     }
 
-    return new Response("Forbidden", { status: 403, headers: corsHeaders });
+    return new Response('Forbidden', { status: 403, headers: corsHeaders });
   }
 
-  if (req.method === "POST") {
+  if (req.method === 'POST') {
     try {
       const event = await req.json();
-      console.log("Strava webhook event:", JSON.stringify(event));
+      console.log('Strava webhook event:', JSON.stringify(event));
 
-      if (event.object_type !== "activity") {
+      if (event.object_type !== 'activity') {
         return new Response(JSON.stringify({ ok: true }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
 
@@ -305,43 +330,50 @@ serve(async (req) => {
 
       // Find the connection to determine which environment this athlete belongs to
       const { data: connection } = await supabase
-        .from("strava_connections")
-        .select("*")
-        .eq("strava_athlete_id", event.owner_id)
+        .from('strava_connections')
+        .select('*')
+        .eq('strava_athlete_id', event.owner_id)
         .single();
 
       if (!connection) {
-        console.log("No connection found for athlete:", event.owner_id);
+        console.log('No connection found for athlete:', event.owner_id);
         return new Response(JSON.stringify({ ok: true }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
 
       // Use the environment from the connection record (set during OAuth)
-      const connEnv = connection.environment || "dev";
-      const STRAVA_CLIENT_ID =
-        connEnv === "prod" ? Deno.env.get("STRAVA_CLIENT_ID_PROD")! : Deno.env.get("STRAVA_CLIENT_ID")!;
-      const STRAVA_CLIENT_SECRET =
-        connEnv === "prod" ? Deno.env.get("STRAVA_CLIENT_SECRET_PROD")! : Deno.env.get("STRAVA_CLIENT_SECRET")!;
+      const connEnv = connection.environment || 'dev';
+      const STRAVA_CLIENT_ID = connEnv === 'prod'
+        ? Deno.env.get('STRAVA_CLIENT_ID_PROD')!
+        : Deno.env.get('STRAVA_CLIENT_ID')!;
+      const STRAVA_CLIENT_SECRET = connEnv === 'prod'
+        ? Deno.env.get('STRAVA_CLIENT_SECRET_PROD')!
+        : Deno.env.get('STRAVA_CLIENT_SECRET')!;
 
-      if (event.aspect_type === "delete") {
-        await supabase.from("strava_activities").delete().eq("strava_id", event.object_id);
+      if (event.aspect_type === 'delete') {
+        await supabase
+          .from('strava_activities')
+          .delete()
+          .eq('strava_id', event.object_id);
         await computeTrainingScore(supabase, connection.user_id, connEnv);
       } else {
-        const accessToken = await refreshTokenIfNeeded(connection, supabase, STRAVA_CLIENT_ID, STRAVA_CLIENT_SECRET);
+        const accessToken = await refreshTokenIfNeeded(
+          connection, supabase, STRAVA_CLIENT_ID, STRAVA_CLIENT_SECRET
+        );
         await syncActivityById(supabase, accessToken, event.object_id, connection.user_id, connEnv);
       }
 
       return new Response(JSON.stringify({ ok: true }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     } catch (error: unknown) {
-      console.error("Webhook error:", error);
+      console.error('Webhook error:', error);
       return new Response(JSON.stringify({ ok: true }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
   }
 
-  return new Response("Method not allowed", { status: 405, headers: corsHeaders });
+  return new Response('Method not allowed', { status: 405, headers: corsHeaders });
 });

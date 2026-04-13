@@ -4,6 +4,16 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { getAppEnvironment } from "@/lib/environment";
 
+export interface ActivityWeather {
+  temp: number | null;
+  apparent_temp: number | null;
+  humidity: number | null;
+  wind_speed: number | null;
+  wind_direction: string | null;
+  weather_type: string | null;
+  condition: string | null;
+}
+
 export interface StravaActivity {
   id: string;
   strava_id: number;
@@ -19,7 +29,9 @@ export interface StravaActivity {
   average_heartrate: number | null;
   max_heartrate: number | null;
   summary_polyline: string | null;
-  source?: string; // "strava" | "apple_health" source app name
+  source?: string;
+  calories?: number | null;
+  weather?: ActivityWeather | null;
 }
 
 export interface PlannedWorkout {
@@ -52,6 +64,7 @@ async function fetchAppleHealthActivities(userId: string): Promise<StravaActivit
     strava_id: 0,
     summary_polyline: null,
     source: a.source || "Apple Health",
+    calories: a.calories ?? null,
   }));
 }
 
@@ -64,12 +77,46 @@ async function fetchProfile(userId: string) {
   return data as any;
 }
 
+async function fetchGarminActivities(userId: string): Promise<StravaActivity[]> {
+  const { data } = await supabase
+    .from("garmin_activities")
+    .select("*")
+    .eq("user_id", userId)
+    .order("start_time", { ascending: false });
+  return ((data as any[]) || []).map((a) => ({
+    id: a.id,
+    strava_id: 0,
+    name: a.activity_name || "Garmin Activity",
+    sport_type: a.activity_type || "Run",
+    distance: a.distance_meters || 0,
+    moving_time: a.duration_seconds || 0,
+    elapsed_time: a.duration_seconds || 0,
+    total_elevation_gain: a.elevation_gain || 0,
+    start_date: a.start_time,
+    average_speed: (a.average_speed && a.average_speed > 0)
+      ? a.average_speed
+      : (a.distance_meters && a.duration_seconds && a.duration_seconds > 0)
+        ? a.distance_meters / a.duration_seconds
+        : 0,
+    average_pace: a.average_pace || null,
+    max_speed: 0,
+    average_heartrate: a.average_hr || null,
+    max_heartrate: a.max_hr || null,
+    summary_polyline: a.summary_polyline ?? null,
+    source: "Garmin",
+    calories: a.calories ?? null,
+    laps: a.laps || [],
+    weather: a.weather ?? null,
+  }));
+}
+
 async function fetchConnection(userId: string) {
-  const [stravaRes, ahRes] = await Promise.all([
+  const [stravaRes, ahRes, garminRes] = await Promise.all([
     supabase.from("strava_connections").select("id").eq("user_id", userId).maybeSingle(),
     supabase.from("apple_health_connections").select("id").eq("user_id", userId).maybeSingle(),
+    supabase.from("garmin_connections").select("id").eq("user_id", userId).maybeSingle(),
   ]);
-  return !!(stravaRes.data || ahRes.data);
+  return !!(stravaRes.data || ahRes.data || garminRes.data);
 }
 
 async function fetchPlannedWorkouts(userId: string): Promise<PlannedWorkout[]> {
@@ -113,6 +160,14 @@ export function useActivities() {
     gcTime: 10 * 60 * 1000,
   });
 
+  const garminQuery = useQuery({
+    queryKey: ["garmin-activities", user?.id],
+    queryFn: () => fetchGarminActivities(user!.id),
+    enabled: !!user,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+  });
+
   const profileQuery = useQuery({
     queryKey: ["user-profile", user?.id],
     queryFn: () => fetchProfile(user!.id),
@@ -135,19 +190,20 @@ export function useActivities() {
     staleTime: 5 * 60 * 1000,
   });
 
-  // Merge Strava + Apple Health activities, deduplicate by start_date proximity
+  // Merge Strava + Apple Health + Garmin activities
   const mergedActivities = useMemo(() => {
     const strava = activitiesQuery.data || [];
     const ah = appleHealthQuery.data || [];
-    const all = [...strava, ...ah];
-    // Sort by start_date descending
+    const gm = garminQuery.data || [];
+    const all = [...strava, ...ah, ...gm];
     all.sort((a, b) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime());
     return all;
-  }, [activitiesQuery.data, appleHealthQuery.data]);
+  }, [activitiesQuery.data, appleHealthQuery.data, garminQuery.data]);
 
   const invalidateAll = () => {
     queryClient.invalidateQueries({ queryKey: ["strava-activities", user?.id] });
     queryClient.invalidateQueries({ queryKey: ["apple-health-activities", user?.id] });
+    queryClient.invalidateQueries({ queryKey: ["garmin-activities", user?.id] });
     queryClient.invalidateQueries({ queryKey: ["user-profile", user?.id] });
     queryClient.invalidateQueries({ queryKey: ["planned-workouts", user?.id] });
     queryClient.invalidateQueries({ queryKey: ["fitness-connection", user?.id] });
@@ -158,7 +214,7 @@ export function useActivities() {
     profile: profileQuery.data,
     connected: connectionQuery.data ?? false,
     plannedWorkouts: workoutsQuery.data || [],
-    loading: activitiesQuery.isLoading || appleHealthQuery.isLoading || profileQuery.isLoading || connectionQuery.isLoading,
+    loading: activitiesQuery.isLoading || appleHealthQuery.isLoading || garminQuery.isLoading || profileQuery.isLoading || connectionQuery.isLoading,
     invalidateAll,
   };
 }

@@ -45,11 +45,11 @@ serve(async (req) => {
     // Use client-sent environment to pick correct Strava credentials
     const env = environment || Deno.env.get('APP_ENVIRONMENT') || 'dev';
     const STRAVA_CLIENT_ID = env === 'prod'
-      ? Deno.env.get('STRAVA_CLIENT_ID_PROD')
-      : Deno.env.get('STRAVA_CLIENT_ID');
+      ? Deno.env.get('STRAVA_CLIENT_ID_PROD')!
+      : Deno.env.get('STRAVA_CLIENT_ID')!;
     const STRAVA_CLIENT_SECRET = env === 'prod'
-      ? Deno.env.get('STRAVA_CLIENT_SECRET_PROD')
-      : Deno.env.get('STRAVA_CLIENT_SECRET');
+      ? Deno.env.get('STRAVA_CLIENT_SECRET_PROD')!
+      : Deno.env.get('STRAVA_CLIENT_SECRET')!;
 
     // Exchange code for tokens
     const tokenRes = await fetch('https://www.strava.com/oauth/token', {

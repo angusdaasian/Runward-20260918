@@ -1,4 +1,4 @@
-import { ArrowLeft, Check, RefreshCw, Info, Eye, EyeOff } from "lucide-react";
+import { ArrowLeft, Check, RefreshCw, Info, Eye, EyeOff, AlertTriangle } from "lucide-react";
 import { Lang, t } from "@/lib/i18n";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -28,7 +28,8 @@ const ConnectApps = ({ lang, onBack }: Props) => {
   const [garminPassword, setGarminPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
-  const hasConnection = stravaConnected || appleHealthConnected || garminConnected;
+  // A fitness app is Strava, Garmin, or Coros
+  const hasFitnessApp = stravaConnected || garminConnected;
 
   const checkConnections = useCallback(async () => {
     if (!user) { setLoading(false); return; }
@@ -51,13 +52,22 @@ const ConnectApps = ({ lang, onBack }: Props) => {
     }
   }, [appleHealthConnected]);
 
+  // Apple Health can always be connected (alone or alongside a fitness app)
   const handleConnectAppleHealth = async () => {
-    if (hasConnection) {
-      toast.error(lang === "zh" ? "請先中斷現有連結再連接新的應用" : "Please disconnect the current app before connecting a new one");
-      return;
-    }
     const success = await appleHealth.connect();
-    if (success) setAppleHealthConnected(true);
+    if (success) {
+      setAppleHealthConnected(true);
+      // If a fitness app is already connected, delete Apple Health activities
+      // since fitness app takes priority for activities
+      if (hasFitnessApp && user) {
+        await supabase.from("apple_health_activities").delete().eq("user_id", user.id);
+        toast.info(
+          lang === "zh"
+            ? "Apple Health 已連結（僅用於健康數據，活動由健身應用提供）"
+            : "Apple Health connected (health stats only, activities from fitness app)"
+        );
+      }
+    }
   };
 
   const handleDisconnectAppleHealth = async () => {
@@ -67,8 +77,9 @@ const ConnectApps = ({ lang, onBack }: Props) => {
 
   const handleConnectStrava = async () => {
     if (!user) return;
-    if (hasConnection) {
-      toast.error(lang === "zh" ? "請先中斷現有連結再連接新的應用" : "Please disconnect the current app before connecting a new one");
+    // Only 1 fitness app allowed
+    if (hasFitnessApp) {
+      toast.error(lang === "zh" ? "請先中斷現有健身應用再連接新的" : "Please disconnect the current fitness app before connecting a new one");
       return;
     }
     const { data, error } = await supabase.functions.invoke("strava-auth", {
@@ -78,6 +89,7 @@ const ConnectApps = ({ lang, onBack }: Props) => {
       toast.error(lang === "zh" ? "無法啟動 Strava 連結" : "Failed to start Strava connection");
       return;
     }
+    // If Apple Health activities exist, they'll be cleaned up after Strava sync
     window.location.href = data.url;
   };
 
@@ -92,8 +104,9 @@ const ConnectApps = ({ lang, onBack }: Props) => {
   };
 
   const handleConnectGarmin = async () => {
-    if (hasConnection) {
-      toast.error(lang === "zh" ? "請先中斷現有連結再連接新的應用" : "Please disconnect the current app before connecting a new one");
+    // Only 1 fitness app allowed
+    if (hasFitnessApp) {
+      toast.error(lang === "zh" ? "請先中斷現有健身應用再連接新的" : "Please disconnect the current fitness app before connecting a new one");
       return;
     }
     setShowGarminForm(true);
@@ -110,6 +123,15 @@ const ConnectApps = ({ lang, onBack }: Props) => {
       setShowGarminForm(false);
       setGarminEmail("");
       setGarminPassword("");
+      // Delete Apple Health activities if they exist (fitness app takes priority)
+      if (appleHealthConnected && user) {
+        await supabase.from("apple_health_activities").delete().eq("user_id", user.id);
+        toast.info(
+          lang === "zh"
+            ? "Apple Health 活動已清除，活動數據將由 Garmin 提供"
+            : "Apple Health activities cleared, activities will come from Garmin"
+        );
+      }
       // Auto-sync after connecting
       garmin.syncActivities();
     }
@@ -145,18 +167,28 @@ const ConnectApps = ({ lang, onBack }: Props) => {
           : "Connect your devices and services to automatically sync training data"}
       </p>
 
+      {/* Priority reminder */}
+      <div className="flex items-start gap-2 bg-muted border border-border rounded-lg p-3 mb-3">
+        <AlertTriangle size={16} className="text-muted-foreground mt-0.5 flex-shrink-0" />
+        <p className="text-xs text-muted-foreground">
+          {lang === "zh"
+            ? "你只能連接一個健身應用（Strava / Garmin / COROS 擇一）。如果同時連接 Apple Health 和健身應用，活動數據將以健身應用為主（數據更精確），Apple Health 則用於提供每日健康統計（步數、睡眠、卡路里等）。"
+            : "You can only connect one fitness app (Strava / Garmin / COROS). If you connect Apple Health alongside a fitness app, activities will come from the fitness app (more accurate data). Apple Health will be used for daily health stats (steps, sleep, calories, etc.) only."}
+        </p>
+      </div>
+
       <div className="flex items-start gap-2 bg-muted/50 border border-border rounded-lg p-3 mb-6">
         <Info size={16} className="text-muted-foreground mt-0.5 flex-shrink-0" />
         <p className="text-xs text-muted-foreground">
           {lang === "zh"
-            ? "你只能連接以下其中一個健身應用。如需更換，請先中斷現有連結。XP 和訓練分數只會從你連接的應用計算。"
-            : "You can only connect one fitness app at a time. To switch, disconnect the current one first. XP and training scores are calculated from your connected app only."}
+            ? "XP 和訓練分數只會從你連接的健身應用計算。如需更換健身應用，請先中斷現有連結。"
+            : "XP and training scores are calculated from your connected fitness app only. To switch fitness apps, disconnect the current one first."}
         </p>
       </div>
 
       <div className="space-y-3">
-        {/* Apple Health */}
-        <div className={`bg-card border border-border rounded-xl p-4 ${hasConnection && !appleHealthConnected ? "opacity-50" : ""}`}>
+        {/* Apple Health — can be connected alongside fitness apps */}
+        <div className="bg-card border border-border rounded-xl p-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-lg bg-red-500/10 flex items-center justify-center">
@@ -166,8 +198,12 @@ const ConnectApps = ({ lang, onBack }: Props) => {
                 <span className="font-medium text-foreground block">Apple Health</span>
                 <span className="text-xs text-muted-foreground">
                   {lang === "zh"
-                    ? "自動同步睡眠、卡路里、步數及距離"
-                    : "Sync sleep, calories, steps & distance automatically"}
+                    ? hasFitnessApp
+                      ? "提供每日健康統計（步數、睡眠、卡路里）"
+                      : "同步健康統計及活動數據"
+                    : hasFitnessApp
+                      ? "Daily health stats (steps, sleep, calories)"
+                      : "Sync health stats & activities"}
                 </span>
               </div>
             </div>
@@ -182,8 +218,7 @@ const ConnectApps = ({ lang, onBack }: Props) => {
             ) : (
               <button
                 onClick={handleConnectAppleHealth}
-                disabled={hasConnection}
-                className={`text-xs font-medium px-3 py-1 rounded-full ${hasConnection ? "bg-muted text-muted-foreground cursor-not-allowed" : "text-primary-foreground bg-primary"}`}
+                className="text-xs font-medium px-3 py-1 rounded-full text-primary-foreground bg-primary"
               >
                 {lang === "zh" ? "連結" : "Connect"}
               </button>
@@ -192,7 +227,7 @@ const ConnectApps = ({ lang, onBack }: Props) => {
         </div>
 
         {/* Garmin Connect */}
-        <div className={`bg-card border border-border rounded-xl p-4 ${hasConnection && !garminConnected ? "opacity-50" : ""}`}>
+        <div className={`bg-card border border-border rounded-xl p-4 ${hasFitnessApp && !garminConnected ? "opacity-50" : ""}`}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center text-lg">
@@ -221,8 +256,8 @@ const ConnectApps = ({ lang, onBack }: Props) => {
             ) : (
               <button
                 onClick={handleConnectGarmin}
-                disabled={hasConnection || garmin.connecting}
-                className={`text-xs font-medium px-3 py-1 rounded-full ${hasConnection ? "bg-muted text-muted-foreground cursor-not-allowed" : "text-primary-foreground bg-primary"}`}
+                disabled={hasFitnessApp || garmin.connecting}
+                className={`text-xs font-medium px-3 py-1 rounded-full ${hasFitnessApp ? "bg-muted text-muted-foreground cursor-not-allowed" : "text-primary-foreground bg-primary"}`}
               >
                 {garmin.connecting
                   ? (lang === "zh" ? "連結中..." : "Connecting...")

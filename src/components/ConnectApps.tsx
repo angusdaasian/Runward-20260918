@@ -168,9 +168,9 @@ const ConnectApps = ({ lang, onBack }: Props) => {
       </p>
 
       {/* Priority reminder */}
-      <div className="flex items-start gap-2 bg-amber-500/10 border border-amber-500/20 rounded-lg p-3 mb-3">
-        <AlertTriangle size={16} className="text-amber-500 mt-0.5 flex-shrink-0" />
-        <p className="text-xs text-amber-200">
+      <div className="flex items-start gap-2 bg-muted border border-border rounded-lg p-3 mb-3">
+        <AlertTriangle size={16} className="text-muted-foreground mt-0.5 flex-shrink-0" />
+        <p className="text-xs text-muted-foreground">
           {lang === "zh"
             ? "你只能連接一個健身應用（Strava / Garmin / COROS 擇一）。如果同時連接 Apple Health 和健身應用，活動數據將以健身應用為主（數據更精確），Apple Health 則用於提供每日健康統計（步數、睡眠、卡路里等）。"
             : "You can only connect one fitness app (Strava / Garmin / COROS). If you connect Apple Health alongside a fitness app, activities will come from the fitness app (more accurate data). Apple Health will be used for daily health stats (steps, sleep, calories, etc.) only."}

@@ -21,6 +21,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import ActivityMap from "@/components/activities/ActivityMap";
 import ActivityCalendar from "@/components/activities/ActivityCalendar";
+import MonthlyRoadQuest from "@/components/activities/MonthlyRoadQuest";
 import ActivityDetail from "@/components/activities/ActivityDetail";
 import { calculateRunningScore } from "@/lib/vdot";
 import { useActivities, type StravaActivity } from "@/hooks/use-activities";
@@ -68,7 +69,7 @@ function formatSleep(minutes: number): string {
   return `${m}m`;
 }
 
-const runningSportTypes = new Set(["Run", "TrailRun", "VirtualRun", "Treadmill"]);
+const runningSportTypes = new Set(["Run", "TrailRun", "VirtualRun", "Treadmill", "running", "trail_running", "treadmill_running"]);
 
 const sportTypeIcon: Record<string, string> = {
   Run: "🏃",
@@ -194,8 +195,8 @@ const ActivityCard = ({
       </div>
     </div>
 
-    {act.source && act.source !== "strava" ? (
-      /* Apple Health / non-Strava card layout */
+    {act.source === "Apple Health" ? (
+      /* Apple Health card layout — includes calories, no map */
       <>
         <div className="grid grid-cols-3 gap-3 mt-3">
           <div className="flex items-center gap-1.5">
@@ -230,6 +231,24 @@ const ActivityCard = ({
               </div>
             </div>
           )}
+          {act.average_heartrate && (
+            <div className="flex items-center gap-1.5">
+              <Heart size={12} className="text-destructive" />
+              <div>
+                <span className="text-xs text-muted-foreground block">HR</span>
+                <span className="text-sm font-semibold text-foreground">{Math.round(act.average_heartrate)}</span>
+              </div>
+            </div>
+          )}
+          {act.total_elevation_gain > 0 && (
+            <div className="flex items-center gap-1.5">
+              <TrendingUp size={12} className="text-primary" />
+              <div>
+                <span className="text-xs text-muted-foreground block">{lang === "zh" ? "爬升" : "Elev"}</span>
+                <span className="text-sm font-semibold text-foreground">{Math.round(act.total_elevation_gain)}m</span>
+              </div>
+            </div>
+          )}
           {act.calories && act.calories > 0 && (
             <div className="flex items-center gap-1.5">
               <Flame size={12} className="text-destructive" />
@@ -239,19 +258,10 @@ const ActivityCard = ({
               </div>
             </div>
           )}
-          {act.elapsed_time > 0 && act.elapsed_time !== act.moving_time && (
-            <div className="flex items-center gap-1.5">
-              <Timer size={12} className="text-primary" />
-              <div>
-                <span className="text-xs text-muted-foreground block">{lang === "zh" ? "總時間" : "Elapsed"}</span>
-                <span className="text-sm font-semibold text-foreground">{formatDuration(act.elapsed_time)}</span>
-              </div>
-            </div>
-          )}
         </div>
       </>
     ) : (
-      /* Strava card layout (unchanged) */
+      /* Strava / Garmin / Coros card layout — includes map, no calories */
       <>
         <div className="grid grid-cols-3 gap-3 mt-3">
           <div className="flex items-center gap-1.5">
@@ -524,6 +534,9 @@ const ActivitiesTab = ({ lang }: Props) => {
           </div>
         )}
       </div>
+
+      {/* Monthly Road Quest */}
+      <MonthlyRoadQuest lang={lang} activities={activities} plannedWorkouts={plannedWorkouts} />
 
       {/* Monthly Calendar */}
       <div className="pb-4">

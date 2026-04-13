@@ -37,7 +37,7 @@ Each day has: "day" (Mon/Tue/Wed/Thu/Fri/Sat/Sun), "date" (YYYY-MM-DD), "type" (
 WORKOUT TYPE DESCRIPTIONS (include a brief note of the type purpose in description):
 - Easy Run: Comfortable conversational pace to build aerobic base.
 - Tempo Run: Sustained comfortably hard effort at lactate threshold pace for 20-40 min.
-- Interval: High-intensity repeats to develop VO2max. DESCRIPTION FORMAT MUST be sets-based, e.g. "400m x 10 at 4:15/km, rest 1:30 between sets" or "800m x 6 at 4:00/km, rest 2:00 between sets". Always specify the rep distance, number of reps, target pace, and rest duration.
+- Interval: High-intensity repeats to develop VO2max. CRITICAL: The description field for ALL Interval workouts MUST follow EXACTLY this pattern: "{distance} x {reps} at {pace}/km, rest {duration} between sets". Examples: "800m x 6 at 4:00/km, rest 2:00 between sets", "400m x 10 at 4:15/km, rest 1:30 between sets", "1000m x 5 at 3:50/km, rest 2:30 between sets". Do NOT write paragraph-style or sentence-style descriptions for Interval workouts. ONLY the set notation format is acceptable.
 - Long Run: Extended distance at easy-to-moderate pace for endurance.
 - Recovery: Very easy short run for active recovery.
 - Cross Training: Non-running cardio (cycling, swimming, etc.) for active recovery.
@@ -120,6 +120,31 @@ Return ONLY valid JSON, no markdown, no explanation.`;
     } catch {
       console.error("Failed to parse AI response as JSON:", content.substring(0, 500));
       planData = [];
+    }
+
+    // Post-process: validate interval descriptions follow set format
+    const intervalPattern = /^\d+m?\s*x\s*\d+/i;
+    if (Array.isArray(planData)) {
+      for (const week of planData) {
+        if (week?.days && Array.isArray(week.days)) {
+          for (const day of week.days) {
+            if (day.type === "Interval" && day.description && !intervalPattern.test(day.description.trim())) {
+              // Try to extract numbers from the description and reformat
+              const distMatch = day.description.match(/(\d+)\s*m/i);
+              const repMatch = day.description.match(/x\s*(\d+)|(\d+)\s*(reps|repeats|sets)/i);
+              const paceMatch = day.description.match(/(\d+:\d+)\/km/);
+              const restMatch = day.description.match(/rest\s*(\d+:\d+|\d+\s*min)/i);
+              if (distMatch && repMatch) {
+                const dist = distMatch[1];
+                const reps = repMatch[1] || repMatch[2];
+                const pace = paceMatch ? ` at ${paceMatch[1]}/km` : (day.pace ? ` at ${day.pace}` : "");
+                const rest = restMatch ? `, rest ${restMatch[1]} between sets` : "";
+                day.description = `${dist}m x ${reps}${pace}${rest}`;
+              }
+            }
+          }
+        }
+      }
     }
 
     return new Response(JSON.stringify({ plan: planData, raw: content }), {

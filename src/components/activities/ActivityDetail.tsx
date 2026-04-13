@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { ArrowLeft, Clock, MapPin, Zap, Heart, TrendingUp, Mountain, Timer, Footprints, Trash2, Pencil, Sparkles, Lock } from "lucide-react";
+import { ArrowLeft, Clock, MapPin, Zap, Heart, TrendingUp, Mountain, Timer, Footprints, Trash2, Pencil, Sparkles, Lock, Gauge, AlertTriangle, Flame } from "lucide-react";
 import { Lang } from "@/lib/i18n";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
@@ -35,6 +35,7 @@ interface StravaActivity {
   max_heartrate: number | null;
   summary_polyline: string | null;
   source?: string;
+  calories?: number | null;
 }
 
 interface Split {
@@ -52,6 +53,7 @@ interface Props {
   lang: Lang;
   onBack: () => void;
   isPremium?: boolean;
+  trainingScore?: number;
 }
 
 function formatDuration(seconds: number): string {
@@ -93,7 +95,7 @@ const StatBox = ({ icon: Icon, label, value, unit, iconColor }: {
   </div>
 );
 
-const ActivityDetail = ({ activity, lang, onBack, isPremium }: Props) => {
+const ActivityDetail = ({ activity, lang, onBack, isPremium, trainingScore }: Props) => {
   const isAppleHealth = activity.source && activity.source !== "strava";
   const dbTable = isAppleHealth ? "apple_health_activities" : "strava_activities";
 
@@ -109,6 +111,8 @@ const ActivityDetail = ({ activity, lang, onBack, isPremium }: Props) => {
   const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiLang, setAiLang] = useState<string>(lang);
+  const [rpeInput, setRpeInput] = useState<string>("");
+  const [rpeSubmitted, setRpeSubmitted] = useState(false);
 
   const handleRename = async () => {
     if (!nameInput.trim() || nameInput === activityName) { setEditingName(false); return; }
@@ -136,7 +140,7 @@ const ActivityDetail = ({ activity, lang, onBack, isPremium }: Props) => {
     }
   };
 
-  const runAiAnalysis = async (currentSplits: Split[] | null) => {
+  const runAiAnalysis = async (currentSplits: Split[] | null, rpe?: number) => {
     if (!isPremium) return;
     setAiLoading(true);
     try {
@@ -158,12 +162,11 @@ const ActivityDetail = ({ activity, lang, onBack, isPremium }: Props) => {
           },
           splits: currentSplits || [],
           lang,
+          ...(rpe !== undefined ? { rpe } : {}),
         },
       });
       console.log("[AI Analysis] response:", { data, error });
       if (error) {
-        // supabase.functions.invoke returns error for non-2xx responses
-        // The error might contain the response body as a message
         const errMsg = typeof error === "object" && error?.message ? error.message : String(error);
         console.error("[AI Analysis] invoke error:", errMsg);
         toast.error(lang === "zh" ? `分析失敗: ${errMsg}` : `Analysis failed: ${errMsg}`);
@@ -184,6 +187,16 @@ const ActivityDetail = ({ activity, lang, onBack, isPremium }: Props) => {
       setAiAnalysis(null);
     }
     setAiLoading(false);
+  };
+
+  const handleRpeSubmit = () => {
+    const val = parseInt(rpeInput, 10);
+    if (isNaN(val) || val < 1 || val > 10) {
+      toast.error(lang === "zh" ? "請輸入 1-10 之間的數字" : "Please enter a number between 1 and 10");
+      return;
+    }
+    setRpeSubmitted(true);
+    runAiAnalysis(null, val);
   };
 
   useEffect(() => {
@@ -209,11 +222,22 @@ const ActivityDetail = ({ activity, lang, onBack, isPremium }: Props) => {
   useEffect(() => {
     const fetchStreams = async () => {
       setLoading(true);
-      // Apple Health activities: no Strava streams, go straight to AI analysis
-      if (!activity.strava_id || activity.strava_id <= 0) {
+      // Apple Health activities: no Strava streams, show RPE prompt instead of auto-analyzing
+      if (isAppleHealth || !activity.strava_id || activity.strava_id <= 0) {
         setStreams([]);
         setSplits(null);
-        if (isPremium) await runAiAnalysis(null);
+        // Check if analysis already exists (cached)
+        if (isPremium) {
+          try {
+            const { data } = await supabase.functions.invoke("analyze-activity", {
+              body: { activityDbId: activity.id, activity: { name: activityName, distance: activity.distance, moving_time: activity.moving_time, elapsed_time: activity.elapsed_time, total_elevation_gain: activity.total_elevation_gain, start_date: activity.start_date, average_speed: activity.average_speed, max_speed: activity.max_speed, source: activity.source || "Apple Health" }, splits: [], lang, checkCacheOnly: true },
+            });
+            if (data?.analysis) {
+              setAiAnalysis(data.analysis);
+              setRpeSubmitted(true);
+            }
+          } catch {}
+        }
         setLoading(false);
         return;
       }
@@ -236,7 +260,7 @@ const ActivityDetail = ({ activity, lang, onBack, isPremium }: Props) => {
       setLoading(false);
     };
     fetchStreams();
-  }, [activity.strava_id, isPremium]);
+  }, [activity.strava_id, isPremium, isAppleHealth]);
 
   const chartData = useMemo(() => {
     if (!streams || streams.length === 0) return [];
@@ -353,17 +377,46 @@ const ActivityDetail = ({ activity, lang, onBack, isPremium }: Props) => {
         </div>
       )}
 
+      {/* Apple Health accuracy reminder */}
+      {isAppleHealth && (
+        <div className="flex items-start gap-2 bg-amber-500/10 border border-amber-500/20 rounded-lg p-3 mb-4">
+          <AlertTriangle size={16} className="text-amber-500 mt-0.5 flex-shrink-0" />
+          <p className="text-xs text-amber-600 dark:text-amber-400">
+            {lang === "zh"
+              ? "Apple Health 的訓練分數可能不準確，因為第三方應用的心率和爬升數據不會被 Apple Health 政策允許捕獲。"
+              : "Training Score for Apple Health may not be accurate as HR and Elevation from third-party applications are not captured under Apple Health's policy."}
+          </p>
+        </div>
+      )}
+
       {/* Key Stats Grid */}
-      <div className="grid grid-cols-3 gap-2 mb-4">
-        <StatBox icon={MapPin} label={lang === "zh" ? "距離" : "Distance"} value={(activity.distance / 1000).toFixed(2)} unit="km" />
-        <StatBox icon={Clock} label={lang === "zh" ? "時間" : "Duration"} value={formatDuration(activity.moving_time)} />
-        <StatBox icon={Zap} label={lang === "zh" ? "配速" : "Avg Pace"} value={formatPace(activity.average_speed)} unit="/km" />
-      </div>
-      <div className="grid grid-cols-3 gap-2 mb-4">
-        <StatBox icon={Heart} label={lang === "zh" ? "平均心率" : "Avg HR"} value={activity.average_heartrate ? Math.round(activity.average_heartrate).toString() : "--"} unit="bpm" iconColor="text-destructive" />
-        <StatBox icon={Mountain} label={lang === "zh" ? "爬升" : "Elevation"} value={Math.round(activity.total_elevation_gain).toString()} unit="m" />
-        <StatBox icon={Heart} label={lang === "zh" ? "最高心率" : "Max HR"} value={activity.max_heartrate ? Math.round(activity.max_heartrate).toString() : "--"} unit="bpm" iconColor="text-destructive" />
-      </div>
+      {isAppleHealth ? (
+        <>
+          <div className="grid grid-cols-3 gap-2 mb-4">
+            <StatBox icon={MapPin} label={lang === "zh" ? "距離" : "Distance"} value={(activity.distance / 1000).toFixed(2)} unit="km" />
+            <StatBox icon={Clock} label={lang === "zh" ? "時間" : "Time"} value={formatDuration(activity.moving_time)} />
+            <StatBox icon={Zap} label={lang === "zh" ? "配速" : "Pace"} value={formatPace(activity.average_speed)} unit="/km" />
+          </div>
+          <div className="grid grid-cols-3 gap-2 mb-4">
+            <StatBox icon={TrendingUp} label={lang === "zh" ? "訓練分數" : "Training Score"} value={trainingScore != null ? trainingScore.toString() : "--"} />
+            <StatBox icon={Flame} label={lang === "zh" ? "卡路里" : "Calories"} value={activity.calories != null ? activity.calories.toString() : "--"} unit="kcal" />
+            <StatBox icon={Timer} label={lang === "zh" ? "總時間" : "Elapsed Time"} value={formatDuration(activity.elapsed_time)} />
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="grid grid-cols-3 gap-2 mb-4">
+            <StatBox icon={MapPin} label={lang === "zh" ? "距離" : "Distance"} value={(activity.distance / 1000).toFixed(2)} unit="km" />
+            <StatBox icon={Clock} label={lang === "zh" ? "時間" : "Duration"} value={formatDuration(activity.moving_time)} />
+            <StatBox icon={Zap} label={lang === "zh" ? "配速" : "Avg Pace"} value={formatPace(activity.average_speed)} unit="/km" />
+          </div>
+          <div className="grid grid-cols-3 gap-2 mb-4">
+            <StatBox icon={Heart} label={lang === "zh" ? "平均心率" : "Avg HR"} value={activity.average_heartrate ? Math.round(activity.average_heartrate).toString() : "--"} unit="bpm" iconColor="text-destructive" />
+            <StatBox icon={Mountain} label={lang === "zh" ? "爬升" : "Elevation"} value={Math.round(activity.total_elevation_gain).toString()} unit="m" />
+            <StatBox icon={Heart} label={lang === "zh" ? "最高心率" : "Max HR"} value={activity.max_heartrate ? Math.round(activity.max_heartrate).toString() : "--"} unit="bpm" iconColor="text-destructive" />
+          </div>
+        </>
+      )}
 
       {/* Charts */}
       {loading ? (
@@ -486,6 +539,45 @@ const ActivityDetail = ({ activity, lang, onBack, isPremium }: Props) => {
               {lang === "zh" ? "升級 Premium 以解鎖 AI 訓練分析" : "Upgrade to Premium to unlock AI Workout Analysis"}
             </p>
           </div>
+        ) : isAppleHealth && !rpeSubmitted && !aiAnalysis ? (
+          /* RPE Input for Apple Health activities */
+          <div className="py-2">
+            <div className="bg-muted/50 rounded-lg p-3 mb-3">
+              <div className="flex items-center gap-1.5 mb-1.5">
+                <Gauge size={14} className="text-primary" />
+                <span className="text-xs font-semibold text-foreground">
+                  {lang === "zh" ? "什麼是 RPE？" : "What is RPE?"}
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                {lang === "zh"
+                  ? "RPE（自覺運動強度）是一個 1-10 的量表，用來衡量你感覺這次運動有多辛苦。1 = 非常輕鬆（幾乎不費力），5 = 中等強度（有點吃力但還能對話），8 = 很辛苦（只能說幾個字），10 = 全力衝刺（完全無法說話）。"
+                  : "RPE (Rate of Perceived Exertion) is a 1-10 scale measuring how hard the workout felt. 1 = Very easy (barely any effort), 5 = Moderate (challenging but can hold a conversation), 8 = Very hard (can only say a few words), 10 = Maximum effort (cannot speak at all)."}
+              </p>
+            </div>
+            <label className="text-xs font-medium text-foreground mb-1.5 block">
+              {lang === "zh" ? "這次訓練的 RPE 是多少？(1-10)" : "How hard did this workout feel? (RPE 1-10)"}
+            </label>
+            <div className="flex items-center gap-2">
+              <Input
+                type="number"
+                min={1}
+                max={10}
+                value={rpeInput}
+                onChange={(e) => setRpeInput(e.target.value)}
+                placeholder={lang === "zh" ? "輸入 1-10" : "Enter 1-10"}
+                className="w-24 text-center"
+                onKeyDown={(e) => { if (e.key === "Enter") handleRpeSubmit(); }}
+              />
+              <button
+                onClick={handleRpeSubmit}
+                disabled={!rpeInput}
+                className="px-4 py-2 rounded-lg text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
+              >
+                {lang === "zh" ? "分析" : "Analyze"}
+              </button>
+            </div>
+          </div>
         ) : aiLoading ? (
           <div className="flex items-center justify-center py-8">
             <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
@@ -503,7 +595,7 @@ const ActivityDetail = ({ activity, lang, onBack, isPremium }: Props) => {
               {lang === "zh" ? "無法獲取分析結果" : "Could not retrieve analysis"}
             </p>
             <button
-              onClick={() => runAiAnalysis(splits)}
+              onClick={() => isAppleHealth ? setRpeSubmitted(false) : runAiAnalysis(splits)}
               className="px-4 py-1.5 rounded-lg text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
             >
               {lang === "zh" ? "重試" : "Retry"}

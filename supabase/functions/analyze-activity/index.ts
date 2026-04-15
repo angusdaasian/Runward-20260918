@@ -295,14 +295,45 @@ Please analyze whether the user executed the planned workout correctly and provi
     }
 
     if (splits && splits.length > 0) {
+      const splitPaces: number[] = [];
       statsText += "\n\nSplits (per km):";
       for (const s of splits) {
         const sp = s.average_speed > 0 ? 1000 / s.average_speed : 0;
+        splitPaces.push(sp);
         const sm = Math.floor(sp / 60);
         const ss = Math.floor(sp % 60);
         statsText += `\n  km ${s.split}: ${sm}:${String(ss).padStart(2, "0")} /km`;
         if (!isAppleHealth) {
           statsText += ` | Elev: ${s.elevation_difference > 0 ? "+" : ""}${Math.round(s.elevation_difference)}m`;
+        }
+      }
+
+      // Detect interval pattern: look for significant pace variation between splits
+      if (splitPaces.length >= 3) {
+        const validPaces = splitPaces.filter(p => p > 0);
+        if (validPaces.length >= 3) {
+          const fastestPace = Math.min(...validPaces);
+          const slowestPace = Math.max(...validPaces);
+          const paceRange = slowestPace - fastestPace;
+          const avgPaceSplits = validPaces.reduce((a, b) => a + b, 0) / validPaces.length;
+          const paceVariationPct = (paceRange / avgPaceSplits) * 100;
+
+          // Count pace alternations (fast→slow or slow→fast transitions)
+          let alternations = 0;
+          const medianPace = [...validPaces].sort((a, b) => a - b)[Math.floor(validPaces.length / 2)];
+          for (let i = 1; i < validPaces.length; i++) {
+            const prevFast = validPaces[i - 1] < medianPace;
+            const currFast = validPaces[i] < medianPace;
+            if (prevFast !== currFast) alternations++;
+          }
+
+          if (paceVariationPct > 15 && alternations >= 2) {
+            const fastPaceFmt = `${Math.floor(fastestPace / 60)}:${String(Math.floor(fastestPace % 60)).padStart(2, "0")}`;
+            const slowPaceFmt = `${Math.floor(slowestPace / 60)}:${String(Math.floor(slowestPace % 60)).padStart(2, "0")}`;
+            statsText += `\n\n⚡ INTERVAL PATTERN DETECTED: Splits show significant pace alternation (${alternations} transitions). Fastest split: ${fastPaceFmt}/km, Slowest split: ${slowPaceFmt}/km, Variation: ${Math.round(paceVariationPct)}%. This is likely an interval/fartlek workout — analyze accordingly (work vs recovery splits, target paces, rest adequacy).`;
+          } else if (paceVariationPct > 20) {
+            statsText += `\n\n📊 HIGH PACE VARIATION: ${Math.round(paceVariationPct)}% variation across splits. Could indicate tempo segments, progression run, or hilly terrain.`;
+          }
         }
       }
     }

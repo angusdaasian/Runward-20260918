@@ -204,7 +204,6 @@ const ActivityDetail = ({ activity, lang, onBack, isPremium, trainingScore }: Pr
   useEffect(() => {
     if (!isPremium || !aiAnalysis || lang === aiLang) return;
     setAiLoading(true);
-    setAiAnalysis(null);
     (async () => {
       try {
         const { data, error } = await supabase.functions.invoke("analyze-activity", {

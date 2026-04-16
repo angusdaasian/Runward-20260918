@@ -36,6 +36,7 @@ interface StravaActivity {
   summary_polyline: string | null;
   source?: string;
   calories?: number | null;
+  laps?: any[] | null;
 }
 
 interface Split {

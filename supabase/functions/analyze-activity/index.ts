@@ -47,7 +47,7 @@ serve(async (req) => {
     }
 
     const body = await req.json();
-    const { activity, splits, lang, translate, activityDbId, rpe, checkCacheOnly } = body;
+    const { activity, splits, lang, translate, activityDbId, rpe, checkCacheOnly, garminLaps } = body;
     const isZh = lang === "zh";
 
     // --- Translation mode ---
@@ -294,7 +294,76 @@ Please analyze whether the user executed the planned workout correctly and provi
       if (activity.max_heartrate) statsText += `\n- Max Heart Rate: ${Math.round(activity.max_heartrate)} bpm`;
     }
 
-    if (splits && splits.length > 0) {
+    // --- Garmin laps (interval-aware) ---
+    const garminLapsArr = asArray<any>(garminLaps);
+    if (garminLapsArr.length > 0) {
+      // Classify laps as work or rest based on distance and speed
+      const lapsWithType = garminLapsArr.map((lap: any) => {
+        const dist = lap.distance || 0;
+        const speed = lap.avg_speed || 0;
+        const isRest = dist < 200 && speed < 2; // short distance + slow speed = rest/recovery
+        return { ...lap, isRest };
+      });
+
+      const workLaps = lapsWithType.filter((l: any) => !l.isRest && l.distance > 0);
+      const restLaps = lapsWithType.filter((l: any) => l.isRest && l.distance >= 0);
+      const hasIntervalPattern = workLaps.length >= 2 && restLaps.length >= 1;
+
+      if (hasIntervalPattern) {
+        statsText += `\n\n⚡ INTERVAL WORKOUT DETECTED (from Garmin laps):`;
+        statsText += `\n  Work intervals: ${workLaps.length} | Rest/recovery intervals: ${restLaps.length}`;
+
+        statsText += `\n\n  Work intervals:`;
+        for (const lap of workLaps) {
+          const distM = Math.round(lap.distance || 0);
+          const elapsed = Math.round(lap.elapsed_time || 0);
+          const paceStr = lap.avg_speed > 0
+            ? `${Math.floor(1000 / lap.avg_speed / 60)}:${String(Math.floor((1000 / lap.avg_speed) % 60)).padStart(2, "0")} /km`
+            : "--";
+          statsText += `\n    Lap ${lap.split_number}: ${distM}m in ${elapsed}s (pace: ${paceStr})`;
+          if (lap.avg_hr) statsText += ` | HR: ${Math.round(lap.avg_hr)} bpm`;
+        }
+
+        if (restLaps.length > 0) {
+          statsText += `\n\n  Recovery intervals:`;
+          for (const lap of restLaps) {
+            const distM = Math.round(lap.distance || 0);
+            const elapsed = Math.round(lap.elapsed_time || 0);
+            statsText += `\n    Lap ${lap.split_number}: ${distM}m in ${elapsed}s (recovery)`;
+          }
+        }
+
+        // Summary stats
+        const workPaces = workLaps.map((l: any) => l.avg_speed > 0 ? 1000 / l.avg_speed : 0).filter((p: number) => p > 0);
+        if (workPaces.length > 0) {
+          const avgWorkPace = workPaces.reduce((a: number, b: number) => a + b, 0) / workPaces.length;
+          const fastestWork = Math.min(...workPaces);
+          const slowestWork = Math.max(...workPaces);
+          const fmtPace = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+          statsText += `\n\n  Work interval avg pace: ${fmtPace(avgWorkPace)} /km (range: ${fmtPace(fastestWork)} – ${fmtPace(slowestWork)})`;
+        }
+
+        const restTimes = restLaps.map((l: any) => Math.round(l.elapsed_time || 0));
+        if (restTimes.length > 0) {
+          const avgRest = Math.round(restTimes.reduce((a: number, b: number) => a + b, 0) / restTimes.length);
+          statsText += `\n  Avg recovery duration: ${avgRest}s`;
+        }
+
+        statsText += `\n\nThis is an INTERVAL session. Analyze work interval pace consistency, recovery adequacy, and overall interval quality. Do NOT treat this as a continuous run.`;
+      } else {
+        // Non-interval Garmin laps
+        statsText += "\n\nGarmin Laps:";
+        for (const lap of garminLapsArr) {
+          const distM = Math.round(lap.distance || 0);
+          const elapsed = Math.round(lap.elapsed_time || 0);
+          const paceStr = lap.avg_speed > 0
+            ? `${Math.floor(1000 / lap.avg_speed / 60)}:${String(Math.floor((1000 / lap.avg_speed) % 60)).padStart(2, "0")} /km`
+            : "--";
+          statsText += `\n  Lap ${lap.split_number}: ${distM}m in ${elapsed}s (pace: ${paceStr})`;
+          if (lap.avg_hr) statsText += ` | HR: ${Math.round(lap.avg_hr)} bpm`;
+        }
+      }
+    } else if (splits && splits.length > 0) {
       const splitPaces: number[] = [];
       statsText += "\n\nSplits (per km):";
       for (const s of splits) {
@@ -318,7 +387,6 @@ Please analyze whether the user executed the planned workout correctly and provi
           const avgPaceSplits = validPaces.reduce((a, b) => a + b, 0) / validPaces.length;
           const paceVariationPct = (paceRange / avgPaceSplits) * 100;
 
-          // Count pace alternations (fast→slow or slow→fast transitions)
           let alternations = 0;
           const medianPace = [...validPaces].sort((a, b) => a - b)[Math.floor(validPaces.length / 2)];
           for (let i = 1; i < validPaces.length; i++) {

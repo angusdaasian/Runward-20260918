@@ -1,28 +1,29 @@
 
 
-## Fix Build Errors + Enable Apple Health + Add name_zh Column
+## The Problem
 
-### Problem 1: RaceTab.tsx — `name_zh` missing from Supabase types
-The `races` table in the generated types file doesn't have `name_zh`. The migration to add `name_zh` to the `races` table needs to be created (it was done in the other Lovable project but not this one). After the migration runs, the types will regenerate. Meanwhile, fix the cast on line 235 to use `unknown` first.
+Your Garmin credentials are sent as **URL query parameters** (`?email=...&password=...`) to the Railway service. This means the plaintext password is logged in Railway's HTTP access logs, visible to anyone with Railway dashboard access, and potentially cached by any proxy or CDN in between.
 
-**Fix**: 
-- Create a database migration: `ALTER TABLE public.races ADD COLUMN IF NOT EXISTS name_zh text;`
-- Change line 235 from `(data as Race[])` to `(data as unknown as Race[])`
+Additionally, credentials are stored in the `garmin_connections` table using misleading column names (`access_token` for email, `refresh_token` for password) — but the real issue is the transport method.
 
-### Problem 2: use-apple-health.ts — `connected_at` not in types
-The `apple_health_connections` table Insert type only has `created_at`, `id`, `updated_at`, `user_id`. The code on line 119 passes `connected_at` which doesn't exist in the schema.
+## The Fix
 
-**Fix**: Remove `connected_at` from the upsert — use `updated_at` instead:
-```typescript
-.upsert({ user_id: user.id, updated_at: new Date().toISOString() }, { onConflict: "user_id" });
-```
+**Change all calls to the Railway Garmin service from GET with query params to POST with JSON body.** POST request bodies are not logged in standard HTTP access logs.
 
-### Problem 3: Enable Apple Health in ConnectApps
-The ConnectApps component currently shows Apple Health as "Coming Soon" with `opacity-50`. Re-enable it with the connect/disconnect buttons (the functional code is already there but the UI is hardcoded to "coming soon").
+### Changes needed in `supabase/functions/garmin-sync/index.ts`:
 
-### Changes Summary
-1. **Database migration** — Add `name_zh text` column to `races` table
-2. **`src/components/RaceTab.tsx`** line 235 — Cast through `unknown`
-3. **`src/hooks/use-apple-health.ts`** line 119 — Replace `connected_at` with `updated_at`
-4. **`src/components/ConnectApps.tsx`** — Re-enable Apple Health card with connect/disconnect functionality (remove opacity-50, remove "Coming Soon" badge, restore interactive buttons)
+1. **Login call** (~line 104): Change from `GET /garmin-activities?email=...&password=...` to `POST /garmin-activities` with `{ email, password, days }` in the JSON body.
+
+2. **Sync call** (~line 144-150): Same change — POST with JSON body instead of GET with query params.
+
+3. **Details call** (~line 195-200): Change from `GET /garmin-activity-details?email=...&password=...&activity_ids=...` to `POST /garmin-activity-details` with JSON body.
+
+### Important caveat
+
+This requires your **Railway Garmin service** to also accept POST requests with JSON bodies instead of (or in addition to) GET query parameters. If the Railway service is your own code, you'll need to update it too. If it only supports GET with query params, the edge function change alone won't work.
+
+### Summary of edge function changes
+
+- Replace all `new URLSearchParams(...)` + `fetch(URL?${params})` patterns with `fetch(URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({...}) })`
+- Three call sites total (login, sync, details)
 

@@ -95,8 +95,11 @@ serve(async (req) => {
         });
       }
 
-      const loginParams = new URLSearchParams({ email, password, days: "1" });
-      const loginRes = await fetch(`${GARMIN_RAILWAY_URL}/garmin-activities?${loginParams}`);
+      const loginRes = await fetch(`${GARMIN_RAILWAY_URL}/garmin-activities`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password, days: 1 }),
+      });
 
       if (!loginRes.ok) {
         const errData = await loginRes.json().catch(() => ({}));
@@ -141,13 +144,16 @@ serve(async (req) => {
       const garminPassword = conn.refresh_token;
 
       // ── Phase 1: Fetch basic activity list (no detail_limit) ──
-      const syncParams = new URLSearchParams({
-        email: garminEmail,
-        password: garminPassword || "",
-        days: String(body.days || 30),
-        detail_limit: "0",
+      const actRes = await fetch(`${GARMIN_RAILWAY_URL}/garmin-activities`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: garminEmail,
+          password: garminPassword || "",
+          days: body.days || 30,
+          detail_limit: 0,
+        }),
       });
-      const actRes = await fetch(`${GARMIN_RAILWAY_URL}/garmin-activities?${syncParams}`);
 
       if (!actRes.ok) {
         const errData = await actRes.json().catch(() => ({}));
@@ -224,12 +230,15 @@ serve(async (req) => {
 
         const activityIds = missingDetails.map((a) => a.garmin_activity_id).join(",");
         try {
-          const detailParams = new URLSearchParams({
-            email: garminEmail,
-            password: garminPassword || "",
-            activity_ids: activityIds,
+          const detailRes = await fetch(`${GARMIN_RAILWAY_URL}/garmin-activity-details`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              email: garminEmail,
+              password: garminPassword || "",
+              activity_ids: activityIds,
+            }),
           });
-          const detailRes = await fetch(`${GARMIN_RAILWAY_URL}/garmin-activity-details?${detailParams}`);
 
           if (detailRes.ok) {
             const detailsData = await detailRes.json();

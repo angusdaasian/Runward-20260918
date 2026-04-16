@@ -146,26 +146,31 @@ const ActivityDetail = ({ activity, lang, onBack, isPremium, trainingScore }: Pr
     if (!isPremium) return;
     setAiLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke("analyze-activity", {
-        body: {
-          activityDbId: activity.id,
-          activity: {
-            name: activityName,
-            distance: activity.distance,
-            moving_time: activity.moving_time,
-            elapsed_time: activity.elapsed_time,
-            total_elevation_gain: activity.total_elevation_gain,
-            start_date: activity.start_date,
-            average_speed: activity.average_speed,
-            max_speed: activity.max_speed,
-            average_heartrate: activity.average_heartrate,
-            max_heartrate: activity.max_heartrate,
-            source: activity.source || "strava",
-          },
-          splits: currentSplits || [],
-          lang,
-          ...(rpe !== undefined ? { rpe } : {}),
+      const bodyPayload: any = {
+        activityDbId: activity.id,
+        activity: {
+          name: activityName,
+          distance: activity.distance,
+          moving_time: activity.moving_time,
+          elapsed_time: activity.elapsed_time,
+          total_elevation_gain: activity.total_elevation_gain,
+          start_date: activity.start_date,
+          average_speed: activity.average_speed,
+          max_speed: activity.max_speed,
+          average_heartrate: activity.average_heartrate,
+          max_heartrate: activity.max_heartrate,
+          source: activity.source || "strava",
         },
+        splits: currentSplits || [],
+        lang,
+        ...(rpe !== undefined ? { rpe } : {}),
+      };
+      // Pass Garmin laps for interval detection
+      if (isGarmin && activity.laps && Array.isArray(activity.laps) && activity.laps.length > 0) {
+        bodyPayload.garminLaps = activity.laps;
+      }
+      const { data, error } = await supabase.functions.invoke("analyze-activity", {
+        body: bodyPayload,
       });
       console.log("[AI Analysis] response:", { data, error });
       if (error) {

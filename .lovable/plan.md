@@ -1,29 +1,46 @@
 
 
-## The Problem
+## Root Cause
 
-Your Garmin credentials are sent as **URL query parameters** (`?email=...&password=...`) to the Railway service. This means the plaintext password is logged in Railway's HTTP access logs, visible to anyone with Railway dashboard access, and potentially cached by any proxy or CDN in between.
+The `profiles` table has these SELECT RLS policies:
+1. `Users can view their own profile` — `auth.uid() = user_id`
+2. `Admins can read all profiles` — admins only
 
-Additionally, credentials are stored in the `garmin_connections` table using misleading column names (`access_token` for email, `refresh_token` for password) — but the real issue is the transport method.
+There is **NO policy** allowing authenticated users to read OTHER users' profiles. So when `LeaderboardTabs.tsx` runs:
+
+```ts
+supabase.from("profiles").select("user_id, display_name, ...").eq("is_premium", ...)
+```
+
+RLS filters the result down to **only the current user's own row** (or nothing if they're not premium and querying premium). That's why every user sees a different leaderboard — they only see themselves.
+
+The DB confirms 7 profiles have `monthly_xp > 0`, but each user only sees their own.
 
 ## The Fix
 
-**Change all calls to the Railway Garmin service from GET with query params to POST with JSON body.** POST request bodies are not logged in standard HTTP access logs.
+Expose only the public leaderboard fields (display_name, avatar_url, rank, xp, premium flag) to all authenticated users — without leaking private profile data (age, sex, last_login, training_score, streaks, trial_used, etc.).
 
-### Changes needed in `supabase/functions/garmin-sync/index.ts`:
+### Approach: Security-definer RPC function
 
-1. **Login call** (~line 104): Change from `GET /garmin-activities?email=...&password=...` to `POST /garmin-activities` with `{ email, password, days }` in the JSON body.
+Create a function `get_leaderboard(p_is_premium boolean, p_limit int)` that:
+- Runs as `SECURITY DEFINER` (bypasses RLS safely)
+- Returns ONLY: `user_id, display_name, avatar_url, monthly_xp, is_premium`
+- Computed `rank_tier` / `division` are already derived client-side from XP, so we don't even need to return them
+- Granted EXECUTE to `authenticated`
 
-2. **Sync call** (~line 144-150): Same change — POST with JSON body instead of GET with query params.
+Then update `LeaderboardTabs.tsx` to call `supabase.rpc('get_leaderboard', { p_is_premium: ..., p_limit: ... })` instead of querying `profiles` directly.
 
-3. **Details call** (~line 195-200): Change from `GET /garmin-activity-details?email=...&password=...&activity_ids=...` to `POST /garmin-activity-details` with JSON body.
+### Why this approach (vs adding a broad SELECT policy)
 
-### Important caveat
+A broad `SELECT TO authenticated USING (true)` policy on `profiles` would expose every column on every profile — including age, sex, trial_used, last_login, streaks, training_score. The RPC keeps the column allowlist narrow and explicit.
 
-This requires your **Railway Garmin service** to also accept POST requests with JSON bodies instead of (or in addition to) GET query parameters. If the Railway service is your own code, you'll need to update it too. If it only supports GET with query params, the edge function change alone won't work.
+## Changes
 
-### Summary of edge function changes
+1. **Migration**: Create `public.get_leaderboard(p_is_premium boolean, p_limit int)` SECURITY DEFINER function returning the 5 safe fields, ordered by `monthly_xp DESC`, filtered by `monthly_xp > 0`.
 
-- Replace all `new URLSearchParams(...)` + `fetch(URL?${params})` patterns with `fetch(URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({...}) })`
-- Three call sites total (login, sync, details)
+2. **`src/components/rewards/LeaderboardTabs.tsx`**: Replace the `.from("profiles").select(...)` query with `supabase.rpc("get_leaderboard", { p_is_premium: league === "premium", p_limit: limit })`. Drop `rank_tier` / `division` from the row type since they're already computed from XP via `getRankFromXP()`.
+
+3. **`supabase/functions/reset-season/index.ts`**: Already uses service-role key, so it bypasses RLS — no change needed.
+
+That's it. Single migration + one component edit fixes the issue without exposing any private profile data.
 

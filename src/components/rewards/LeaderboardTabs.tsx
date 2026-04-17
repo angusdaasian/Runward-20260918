@@ -16,8 +16,6 @@ interface LeaderboardEntry {
   user_id: string;
   display_name: string | null;
   avatar_url: string | null;
-  rank_tier: string;
-  division: string;
   monthly_xp: number;
   is_premium: boolean;
 }
@@ -31,13 +29,11 @@ const LeaderboardTabs = ({ lang, refreshKey = 0 }: Props) => {
     const fetch = async () => {
       setLoading(true);
       const limit = league === "premium" ? 10 : 3;
-      const { data } = await supabase
-        .from("profiles")
-        .select("user_id, display_name, avatar_url, rank_tier, division, monthly_xp, is_premium")
-        .eq("is_premium", league === "premium")
-        .gt("monthly_xp", 0)
-        .order("monthly_xp", { ascending: false })
-        .limit(limit);
+      const { data, error } = await supabase.rpc("get_leaderboard", {
+        p_is_premium: league === "premium",
+        p_limit: limit,
+      });
+      if (error) console.error("[Leaderboard] fetch error:", error);
       setEntries((data as LeaderboardEntry[]) || []);
       setLoading(false);
     };

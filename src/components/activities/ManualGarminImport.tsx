@@ -33,8 +33,21 @@ const ManualGarminImport = ({ lang, onImported }: Props) => {
       const { data, error } = await supabase.functions.invoke("garmin-manual-import", {
         body: { url: cleanUrl },
       });
-      if (error || !data?.success) {
-        const msg = data?.error || error?.message || "Import failed";
+      // supabase.functions.invoke surfaces non-2xx responses on `error`,
+      // but the JSON body (with our custom error/duplicate flag) is still in `data`.
+      const payload: any = data ?? (error as any)?.context?.body ?? {};
+      const isDuplicate = payload?.duplicate === true
+        || /already been imported/i.test(payload?.error || "");
+
+      if (isDuplicate) {
+        toast.error(
+          lang === "zh"
+            ? "此活動已被應用程式中的其他使用者匯入過。"
+            : "This activity has already been imported by someone in the app.",
+          { duration: 6000 },
+        );
+      } else if (error || !payload?.success) {
+        const msg = payload?.error || error?.message || "Import failed";
         toast.error(lang === "zh" ? `匯入失敗：${msg}` : msg);
       } else {
         const km = data.activity?.distance_km ?? 0;

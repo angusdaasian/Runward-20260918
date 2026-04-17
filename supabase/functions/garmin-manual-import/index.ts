@@ -257,6 +257,24 @@ serve(async (req) => {
 
     const garminActivityId = deriveActivityId(url);
 
+    // Duplicate check: has anyone (including this user) already imported this activity?
+    const { data: existing } = await supabase
+      .from("garmin_activities")
+      .select("user_id")
+      .eq("garmin_activity_id", garminActivityId)
+      .limit(1)
+      .maybeSingle();
+
+    if (existing && existing.user_id !== user.id) {
+      return new Response(JSON.stringify({
+        error: "This activity has already been imported by someone else in the app.",
+        duplicate: true,
+      }), {
+        status: 409,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     // Insert / update activity row
     const row = {
       user_id: user.id,

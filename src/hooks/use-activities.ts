@@ -32,6 +32,8 @@ export interface StravaActivity {
   source?: string;
   calories?: number | null;
   weather?: ActivityWeather | null;
+  laps?: any[] | null;
+  map_screenshot_url?: string | null;
 }
 
 export interface PlannedWorkout {
@@ -107,6 +109,7 @@ async function fetchGarminActivities(userId: string): Promise<StravaActivity[]> 
     calories: a.calories ?? null,
     laps: a.laps || [],
     weather: a.weather ?? null,
+    map_screenshot_url: a.raw_json?.map_screenshot_url ?? null,
   }));
 }
 

@@ -504,7 +504,7 @@ const ActivitiesTab = ({ lang }: Props) => {
           <h2 className="font-display text-lg font-bold text-foreground">
             {lang === "zh" ? "最近活動" : "Recent Activity"}
           </h2>
-          {connected && activities.length > 0 && (
+          {activities.length > 0 && (
             <button
               onClick={() => setShowAllActivities(true)}
               className="flex items-center gap-1 text-xs font-medium text-primary hover:text-primary/80 transition-colors"
@@ -515,7 +515,7 @@ const ActivitiesTab = ({ lang }: Props) => {
           )}
         </div>
 
-        {!connected ? (
+        {activities.length === 0 ? (
           <div className="bg-accent/50 border border-border rounded-xl p-5 text-center">
             <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mx-auto mb-3">
               <Activity size={24} className="text-muted-foreground" />

@@ -232,7 +232,26 @@ const ActivityDetail = ({ activity, lang, onBack, isPremium, trainingScore }: Pr
       // Apple Health activities: no Strava streams, show RPE prompt instead of auto-analyzing
       if (needsRpe || !activity.strava_id || activity.strava_id <= 0) {
         setStreams([]);
-        setSplits(null);
+        // Map Garmin laps → splits so the table renders
+        if (isGarmin && Array.isArray(activity.laps) && activity.laps.length > 0) {
+          const mapped: Split[] = activity.laps.map((lap: any, idx: number) => {
+            const distance = Number(lap.distance) || 0;
+            const elapsed = Number(lap.elapsed_time ?? lap.moving_time) || 0;
+            const avgSpeed = Number(lap.avg_speed) || (elapsed > 0 ? distance / elapsed : 0);
+            return {
+              distance,
+              elapsed_time: elapsed,
+              moving_time: Number(lap.moving_time) || elapsed,
+              average_speed: avgSpeed,
+              average_heartrate: lap.avg_hr ?? undefined,
+              elevation_difference: Number(lap.elevation_gain) || 0,
+              split: lap.split_number ?? idx + 1,
+            };
+          });
+          setSplits(mapped);
+        } else {
+          setSplits(null);
+        }
         // Check if analysis already exists (cached)
         if (isPremium) {
           try {
@@ -509,11 +528,12 @@ const ActivityDetail = ({ activity, lang, onBack, isPremium, trainingScore }: Pr
       {splits && splits.length > 0 && (
         <div className="bg-card border border-border rounded-xl p-4 mt-4">
           <h3 className="font-display font-bold text-foreground text-sm mb-3">
-            {lang === "zh" ? "每公里配速" : "Splits (per km)"}
+            {lang === "zh" ? "分段配速" : "Splits"}
           </h3>
           <div className="space-y-1">
-            <div className="grid grid-cols-4 text-[10px] text-muted-foreground font-medium pb-1 border-b border-border">
-              <span>km</span>
+            <div className="grid grid-cols-5 text-[10px] text-muted-foreground font-medium pb-1 border-b border-border">
+              <span>#</span>
+              <span className="text-center">{lang === "zh" ? "距離" : "Dist"}</span>
               <span className="text-center">{lang === "zh" ? "配速" : "Pace"}</span>
               <span className="text-center">{lang === "zh" ? "爬升" : "Elev"}</span>
               <span className="text-center">HR</span>
@@ -523,9 +543,12 @@ const ActivityDetail = ({ activity, lang, onBack, isPremium, trainingScore }: Pr
               const avgSplitPace = speedToPace(activity.average_speed);
               const splitPace = speedToPace(split.average_speed);
               const isFaster = splitPace < avgSplitPace;
+              const distKm = (split.distance || 0) / 1000;
+              const distLabel = distKm >= 1 ? `${distKm.toFixed(2)}km` : `${Math.round(split.distance || 0)}m`;
               return (
-                <div key={idx} className="grid grid-cols-4 text-xs py-1.5 border-b border-border/50 last:border-0">
+                <div key={idx} className="grid grid-cols-5 text-xs py-1.5 border-b border-border/50 last:border-0">
                   <span className="font-medium text-foreground">{split.split}</span>
+                  <span className="text-center text-muted-foreground">{distLabel}</span>
                   <span className={`text-center font-semibold ${isFaster ? "text-green-500" : "text-foreground"}`}>{pace}</span>
                   <span className="text-center text-muted-foreground">{split.elevation_difference > 0 ? "+" : ""}{Math.round(split.elevation_difference)}m</span>
                   <span className="text-center text-muted-foreground">{split.average_heartrate ? Math.round(split.average_heartrate) : "--"}</span>

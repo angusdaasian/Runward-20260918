@@ -30,7 +30,16 @@ function computeRankFromXP(monthlyXp: number) {
   return { tier: RANK_TIERS[tierIndex], division: DIVISIONS[divIndex] };
 }
 
-const runningSportTypes = new Set(["Run", "TrailRun", "VirtualRun", "Treadmill", "Workout", "running", "trail_running", "treadmill_running"]);
+const runningSportTypes = new Set([
+  "Run",
+  "TrailRun",
+  "VirtualRun",
+  "Treadmill",
+  "Workout",
+  "running",
+  "trail_running",
+  "treadmill_running",
+]);
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -57,7 +66,10 @@ serve(async (req) => {
     }
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-    const { data: { user }, error: userError } = await supabase.auth.getUser(accessToken);
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser(accessToken);
     if (userError || !user) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
@@ -110,7 +122,8 @@ serve(async (req) => {
 
       const loginData = await loginRes.json();
       const sessionToken: string = loginData.session_token;
-      const expiresAt: string = loginData.expires_at || new Date(Date.now() + 30 * 86400000).toISOString();
+      // Default to 365-day expiry if Railway doesn't return one
+      const expiresAt: string = loginData.expires_at || new Date(Date.now() + 365 * 86400000).toISOString();
       const displayName: string = loginData.display_name || email;
 
       if (!sessionToken) {
@@ -120,13 +133,16 @@ serve(async (req) => {
         });
       }
 
-      await supabase.from("garmin_connections").upsert({
-        user_id: user.id,
-        access_token: sessionToken,    // session token (NOT email)
-        refresh_token: null,            // password no longer stored
-        expires_at: expiresAt,
-        garmin_display_name: displayName,
-      }, { onConflict: "user_id" });
+      await supabase.from("garmin_connections").upsert(
+        {
+          user_id: user.id,
+          access_token: sessionToken, // session token (NOT email)
+          refresh_token: null, // password no longer stored
+          expires_at: expiresAt,
+          garmin_display_name: displayName,
+        },
+        { onConflict: "user_id" },
+      );
 
       return new Response(JSON.stringify({ success: true, display_name: displayName }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -139,7 +155,7 @@ serve(async (req) => {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${sessionToken}`,
+          Authorization: `Bearer ${sessionToken}`,
         },
         body: JSON.stringify(payload),
       });
@@ -208,7 +224,8 @@ serve(async (req) => {
         return d.toISOString();
       }
 
-      const rows = activities.map((a: any) => ({
+      // Build candidate rows from Garmin response
+      const candidateRows = activities.map((a: any) => ({
         user_id: user.id,
         garmin_activity_id: String(a.garmin_activity_id ?? a.activity_id ?? crypto.randomUUID()),
         activity_name: a.name ?? a.activity_name ?? "Garmin Activity",
@@ -231,39 +248,43 @@ serve(async (req) => {
         raw_json: a,
       }));
 
-      const { error: upsertError } = await supabase
+      // Find which activity IDs already exist for this user — only insert new ones
+      const candidateIds = candidateRows.map((r) => r.garmin_activity_id);
+      const { data: existing } = await supabase
         .from("garmin_activities")
-        .upsert(rows, { onConflict: "garmin_activity_id,user_id", ignoreDuplicates: false });
+        .select("garmin_activity_id")
+        .eq("user_id", user.id)
+        .in("garmin_activity_id", candidateIds);
 
-      if (upsertError) {
-        console.error("Garmin upsert error:", upsertError);
+      const existingIds = new Set((existing || []).map((e: any) => e.garmin_activity_id));
+      const newRows = candidateRows.filter((r) => !existingIds.has(r.garmin_activity_id));
+
+      if (newRows.length > 0) {
+        const { error: insertError } = await supabase.from("garmin_activities").insert(newRows);
+        if (insertError) {
+          console.error("Garmin insert error:", insertError);
+        }
       }
 
-      // ── Phase 2: Loop through missing details ──
+      // Helper: fetch details for a list of activity IDs in batches of 5
       let detailsFetched = 0;
-      const MAX_BATCHES = 3;
+      async function fetchDetailsForIds(ids: string[]): Promise<boolean> {
+        const BATCH_SIZE = 5;
+        for (let i = 0; i < ids.length; i += BATCH_SIZE) {
+          const batchIds = ids.slice(i, i + BATCH_SIZE);
+          try {
+            const detailRes = await callRailway("/garmin-activity-details", sessionToken, {
+              activity_ids: batchIds.join(","),
+            });
 
-      for (let batch = 0; batch < MAX_BATCHES; batch++) {
-        const { data: missingDetails } = await supabase
-          .from("garmin_activities")
-          .select("id, garmin_activity_id")
-          .eq("user_id", user.id)
-          .eq("has_details", false)
-          .order("start_time", { ascending: false })
-          .limit(5);
+            if (!detailRes.ok) {
+              console.error("Detail fetch failed batch", i, ":", await detailRes.text());
+              return false;
+            }
 
-        if (!missingDetails || missingDetails.length === 0) break;
-
-        const activityIds = missingDetails.map((a) => a.garmin_activity_id).join(",");
-        try {
-          const detailRes = await callRailway("/garmin-activity-details", sessionToken, {
-            activity_ids: activityIds,
-          });
-
-          if (detailRes.ok) {
             const detailsData = await detailRes.json();
-            for (const item of missingDetails) {
-              const detail = detailsData[item.garmin_activity_id];
+            for (const actId of batchIds) {
+              const detail = detailsData[actId];
               if (detail) {
                 await supabase
                   .from("garmin_activities")
@@ -273,23 +294,45 @@ serve(async (req) => {
                     summary_polyline: detail.map_polyline ?? null,
                     has_details: true,
                   })
-                  .eq("id", item.id);
+                  .eq("user_id", user.id)
+                  .eq("garmin_activity_id", actId);
                 detailsFetched++;
               } else {
                 await supabase
                   .from("garmin_activities")
                   .update({ has_details: true })
-                  .eq("id", item.id);
+                  .eq("user_id", user.id)
+                  .eq("garmin_activity_id", actId);
               }
             }
-          } else {
-            console.error("Detail fetch failed batch", batch, ":", await detailRes.text());
-            break;
+          } catch (detailErr) {
+            console.error("Detail fetch error batch", i, ":", detailErr);
+            return false;
           }
-        } catch (detailErr) {
-          console.error("Detail fetch error batch", batch, ":", detailErr);
-          break;
         }
+        return true;
+      }
+
+      // ── Phase 2a: Fetch details for newly inserted activities ──
+      const newActivityIds = newRows.map((r) => r.garmin_activity_id);
+      if (newActivityIds.length > 0) {
+        await fetchDetailsForIds(newActivityIds);
+      }
+
+      // ── Phase 2b: Backfill details for older activities still missing them ──
+      // Cap at 15 per sync so we don't hammer Garmin or time out
+      const BACKFILL_LIMIT = 15;
+      const { data: missingDetails } = await supabase
+        .from("garmin_activities")
+        .select("garmin_activity_id")
+        .eq("user_id", user.id)
+        .eq("has_details", false)
+        .order("start_time", { ascending: false })
+        .limit(BACKFILL_LIMIT);
+
+      if (missingDetails && missingDetails.length > 0) {
+        const backfillIds = missingDetails.map((m: any) => m.garmin_activity_id);
+        await fetchDetailsForIds(backfillIds);
       }
 
       // Compute training score
@@ -310,9 +353,8 @@ serve(async (req) => {
         if (vdotScores.length >= 20) break;
       }
 
-      const trainingScore = vdotScores.length > 0
-        ? Math.round(vdotScores.reduce((a, b) => a + b, 0) / vdotScores.length)
-        : 0;
+      const trainingScore =
+        vdotScores.length > 0 ? Math.round(vdotScores.reduce((a, b) => a + b, 0) / vdotScores.length) : 0;
 
       await supabase.from("profiles").update({ training_score: trainingScore }).eq("user_id", user.id);
 
@@ -348,24 +390,30 @@ serve(async (req) => {
         const newLifetimeXp = Math.max(0, (profile.lifetime_xp || 0) + xpDelta);
         const rank = computeRankFromXP(totalMonthlyXp);
 
-        await supabase.from("profiles").update({
-          monthly_xp: totalMonthlyXp,
-          lifetime_xp: newLifetimeXp,
-          rank_tier: rank.tier,
-          division: rank.division,
-        }).eq("user_id", user.id);
+        await supabase
+          .from("profiles")
+          .update({
+            monthly_xp: totalMonthlyXp,
+            lifetime_xp: newLifetimeXp,
+            rank_tier: rank.tier,
+            division: rank.division,
+          })
+          .eq("user_id", user.id);
       }
 
-      return new Response(JSON.stringify({
-        success: true,
-        synced: rows.length,
-        details_fetched: detailsFetched,
-        details_remaining: 0,
-        training_score: trainingScore,
-        total_xp: totalMonthlyXp,
-      }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return new Response(
+        JSON.stringify({
+          success: true,
+          synced: newRows.length,
+          details_fetched: detailsFetched,
+          details_remaining: 0,
+          training_score: trainingScore,
+          total_xp: totalMonthlyXp,
+        }),
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
     }
 
     // ── DISCONNECT ──
@@ -381,7 +429,7 @@ serve(async (req) => {
         try {
           await fetch(`${GARMIN_RAILWAY_URL}/garmin-logout`, {
             method: "POST",
-            headers: { "Authorization": `Bearer ${conn.access_token}` },
+            headers: { Authorization: `Bearer ${conn.access_token}` },
           });
         } catch (e) {
           console.error("Garmin logout error (non-fatal):", e);

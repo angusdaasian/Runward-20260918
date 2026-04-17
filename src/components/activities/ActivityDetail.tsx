@@ -37,6 +37,7 @@ interface StravaActivity {
   source?: string;
   calories?: number | null;
   laps?: any[] | null;
+  map_screenshot_url?: string | null;
 }
 
 interface Split {
@@ -232,20 +233,31 @@ const ActivityDetail = ({ activity, lang, onBack, isPremium, trainingScore }: Pr
       // Apple Health activities: no Strava streams, show RPE prompt instead of auto-analyzing
       if (needsRpe || !activity.strava_id || activity.strava_id <= 0) {
         setStreams([]);
-        // Map Garmin laps → splits so the table renders
+        // Map Garmin laps → splits so the table renders.
+        // Supports BOTH legacy field names (distance/elapsed_time/avg_speed/avg_hr)
+        // AND new manual-import field names (distance_meters/duration_seconds/
+        // average_pace_seconds_per_km/average_hr/max_hr/lap_index).
         if (isGarmin && Array.isArray(activity.laps) && activity.laps.length > 0) {
           const mapped: Split[] = activity.laps.map((lap: any, idx: number) => {
-            const distance = Number(lap.distance) || 0;
-            const elapsed = Number(lap.elapsed_time ?? lap.moving_time) || 0;
-            const avgSpeed = Number(lap.avg_speed) || (elapsed > 0 ? distance / elapsed : 0);
+            const distance = Number(lap.distance ?? lap.distance_meters) || 0;
+            const elapsed = Number(
+              lap.elapsed_time ?? lap.moving_time ?? lap.duration_seconds,
+            ) || 0;
+            // Prefer pace-derived speed when speed isn't supplied
+            let avgSpeed = Number(lap.avg_speed ?? lap.average_speed) || 0;
+            if (!avgSpeed && lap.average_pace_seconds_per_km) {
+              const pace = Number(lap.average_pace_seconds_per_km);
+              if (pace > 0) avgSpeed = 1000 / pace; // m/s
+            }
+            if (!avgSpeed && elapsed > 0) avgSpeed = distance / elapsed;
             return {
               distance,
               elapsed_time: elapsed,
-              moving_time: Number(lap.moving_time) || elapsed,
+              moving_time: Number(lap.moving_time ?? lap.duration_seconds) || elapsed,
               average_speed: avgSpeed,
-              average_heartrate: lap.avg_hr ?? undefined,
+              average_heartrate: lap.avg_hr ?? lap.average_hr ?? undefined,
               elevation_difference: Number(lap.elevation_gain) || 0,
-              split: lap.split_number ?? idx + 1,
+              split: lap.split_number ?? lap.lap_index ?? idx + 1,
             };
           });
           setSplits(mapped);
@@ -441,12 +453,21 @@ const ActivityDetail = ({ activity, lang, onBack, isPremium, trainingScore }: Pr
             <StatBox icon={Heart} label={lang === "zh" ? "平均心率" : "Avg HR"} value={activity.average_heartrate ? Math.round(activity.average_heartrate).toString() : "--"} unit="bpm" iconColor="text-destructive" />
             <StatBox icon={Mountain} label={lang === "zh" ? "爬升" : "Elevation"} value={Math.round(activity.total_elevation_gain).toString()} unit="m" />
           </div>
-          {/* Map below stats grid */}
-          {activity.summary_polyline && (
+          {/* Map below stats grid: prefer encoded polyline, fall back to Firecrawl screenshot for manual imports */}
+          {activity.summary_polyline ? (
             <div className="mb-4">
               <ActivityMap polyline={activity.summary_polyline} />
             </div>
-          )}
+          ) : activity.map_screenshot_url ? (
+            <div className="mb-4 rounded-lg overflow-hidden border border-border bg-muted">
+              <img
+                src={activity.map_screenshot_url}
+                alt={lang === "zh" ? "活動路線地圖" : "Activity route map"}
+                className="w-full h-auto block"
+                loading="lazy"
+              />
+            </div>
+          ) : null}
         </>
       )}
 

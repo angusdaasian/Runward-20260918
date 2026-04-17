@@ -23,6 +23,7 @@ import ActivityMap from "@/components/activities/ActivityMap";
 import ActivityCalendar from "@/components/activities/ActivityCalendar";
 import MonthlyRoadQuest from "@/components/activities/MonthlyRoadQuest";
 import ActivityDetail from "@/components/activities/ActivityDetail";
+import ManualGarminImport from "@/components/activities/ManualGarminImport";
 import { calculateRunningScore } from "@/lib/vdot";
 import { useActivities, type StravaActivity } from "@/hooks/use-activities";
 import FadeIn from "@/components/ui/FadeIn";
@@ -329,7 +330,7 @@ const SKELETON_MIN_MS = 400;
 const ActivitiesTab = ({ lang }: Props) => {
   const { user } = useAuth();
   const { isPremium } = usePremium();
-  const { activities, profile, connected, plannedWorkouts, loading, invalidateAll } = useActivities();
+  const { activities, profile, connected, fitnessAppConnected, plannedWorkouts, loading, invalidateAll } = useActivities();
   const [selectedActivity, setSelectedActivity] = useState<StravaActivity | null>(null);
   const [showAllActivities, setShowAllActivities] = useState(false);
 
@@ -374,6 +375,11 @@ const ActivitiesTab = ({ lang }: Props) => {
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "apple_health_activities", filter: `user_id=eq.${user.id}` },
+        () => invalidateAll(),
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "garmin_activities", filter: `user_id=eq.${user.id}` },
         () => invalidateAll(),
       )
       .subscribe();
@@ -486,6 +492,11 @@ const ActivitiesTab = ({ lang }: Props) => {
     <FadeIn className="px-5 pt-6 max-w-lg mx-auto">
       {/* Today Stats from Apple HealthKit */}
       <TodayStats lang={lang} healthStats={ahConnected ? appleHealth.healthStats : null} />
+
+      {/* Manual Garmin import — only when no fitness app (Strava/Garmin/Coros) is connected */}
+      {!fitnessAppConnected && (
+        <ManualGarminImport lang={lang} onImported={invalidateAll} />
+      )}
 
       {/* Recent Activity */}
       <div className="mb-4">

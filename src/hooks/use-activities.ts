@@ -116,7 +116,10 @@ async function fetchConnection(userId: string) {
     supabase.from("apple_health_connections").select("id").eq("user_id", userId).maybeSingle(),
     supabase.from("garmin_connections").select("id").eq("user_id", userId).maybeSingle(),
   ]);
-  return !!(stravaRes.data || ahRes.data || garminRes.data);
+  return {
+    any: !!(stravaRes.data || ahRes.data || garminRes.data),
+    fitnessApp: !!(stravaRes.data || garminRes.data),
+  };
 }
 
 async function fetchPlannedWorkouts(userId: string): Promise<PlannedWorkout[]> {
@@ -212,7 +215,8 @@ export function useActivities() {
   return {
     activities: mergedActivities,
     profile: profileQuery.data,
-    connected: connectionQuery.data ?? false,
+    connected: connectionQuery.data?.any ?? false,
+    fitnessAppConnected: connectionQuery.data?.fitnessApp ?? false,
     plannedWorkouts: workoutsQuery.data || [],
     loading: activitiesQuery.isLoading || appleHealthQuery.isLoading || garminQuery.isLoading || profileQuery.isLoading || connectionQuery.isLoading,
     invalidateAll,

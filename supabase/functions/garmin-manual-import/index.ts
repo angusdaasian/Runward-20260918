@@ -54,13 +54,17 @@ async function scrapeWithFirecrawl(url: string, apiKey: string): Promise<string>
 
 // ── AI extraction ──
 async function extractActivityData(markdown: string, aiKey: string): Promise<any> {
+  const todayIso = new Date().toISOString();
+  const todayDate = todayIso.slice(0, 10);
   const systemPrompt = `You extract running activity data from Garmin Connect public activity pages. Return ONLY a JSON object, no prose, no markdown fences.
+
+TODAY'S DATE IS ${todayDate} (UTC: ${todayIso}). Use this when the page shows relative dates like "Yesterday", "Today", "2 days ago", or a date with no year (e.g. "Apr 16"). NEVER guess a year — if no year is visible, assume the most recent past occurrence relative to today. The start_time MUST NOT be in the future and MUST NOT be more than 5 years in the past.
 
 Schema:
 {
   "activity_name": string,
   "activity_type": "Run" | "TrailRun" | "Treadmill" | "Workout" | "Other",
-  "start_time": ISO8601 string (use the activity start date/time, infer year if needed; use Z if no tz),
+  "start_time": ISO8601 string (activity start date/time; infer year from TODAY if missing; use Z if no tz),
   "distance_meters": number (convert km/mi to meters),
   "duration_seconds": number (convert hh:mm:ss to seconds),
   "average_pace_seconds_per_km": number | null,
@@ -215,9 +219,17 @@ serve(async (req) => {
       });
     }
 
-    const startTime = extracted?.start_time
-      ? new Date(extracted.start_time).toISOString()
-      : new Date().toISOString();
+    // Sanity-check the extracted start_time. If it's missing, in the future,
+    // or more than 5 years old, fall back to "now" (most likely the user
+    // imported a recent activity).
+    const nowMs = Date.now();
+    const fiveYearsMs = 5 * 365 * 24 * 60 * 60 * 1000;
+    let startMs = extracted?.start_time ? new Date(extracted.start_time).getTime() : NaN;
+    if (!isFinite(startMs) || startMs > nowMs + 24 * 60 * 60 * 1000 || startMs < nowMs - fiveYearsMs) {
+      console.warn(`[manual-import] invalid extracted start_time "${extracted?.start_time}" — falling back to now`);
+      startMs = nowMs;
+    }
+    const startTime = new Date(startMs).toISOString();
 
     const garminActivityId = deriveActivityId(url);
 

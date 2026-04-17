@@ -903,6 +903,16 @@ export type Database = {
       }
     }
     Functions: {
+      get_leaderboard: {
+        Args: { p_is_premium: boolean; p_limit: number }
+        Returns: {
+          avatar_url: string
+          display_name: string
+          is_premium: boolean
+          monthly_xp: number
+          user_id: string
+        }[]
+      }
       get_posture_averages: {
         Args: never
         Returns: {

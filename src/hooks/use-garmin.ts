@@ -1,9 +1,29 @@
 import { useState, useCallback } from "react";
+import { FunctionsHttpError } from "@supabase/supabase-js";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { Lang } from "@/lib/i18n";
+
+async function extractFunctionErrorMessage(error: unknown): Promise<string | null> {
+  if (error instanceof FunctionsHttpError) {
+    try {
+      const payload = await error.context.json();
+      if (typeof payload?.error === "string" && payload.error.trim()) {
+        return payload.error;
+      }
+    } catch {
+      return error.message;
+    }
+  }
+
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+
+  return null;
+}
 
 export function useGarmin(lang: Lang) {
   const { user } = useAuth();
@@ -29,8 +49,8 @@ export function useGarmin(lang: Lang) {
         body: { action: "login", email, password },
       });
       if (error || !data?.success) {
-        const msg = data?.error || "Garmin authentication failed";
-        toast.error(lang === "zh" ? "Garmin 連結失敗" : msg);
+        const msg = data?.error || await extractFunctionErrorMessage(error) || "Garmin authentication failed";
+        toast.error(lang === "zh" ? `Garmin 連結失敗：${msg}` : msg);
         return false;
       }
       toast.success(lang === "zh" ? "Garmin 已連結！" : "Garmin connected!");
@@ -38,12 +58,13 @@ export function useGarmin(lang: Lang) {
       return true;
     } catch (err) {
       console.error("Garmin connect error:", err);
-      toast.error(lang === "zh" ? "Garmin 連結失敗" : "Garmin connection failed");
+      const msg = await extractFunctionErrorMessage(err);
+      toast.error(lang === "zh" ? `Garmin 連結失敗${msg ? `：${msg}` : ""}` : msg || "Garmin connection failed");
       return false;
     } finally {
       setConnecting(false);
     }
-  }, [user, lang]);
+  }, [user, lang, invalidateActivities]);
 
   const syncActivities = useCallback(async (days = 30): Promise<boolean> => {
     if (!user) return false;
@@ -53,7 +74,8 @@ export function useGarmin(lang: Lang) {
         body: { action: "sync", days },
       });
       if (error || !data?.success) {
-        toast.error(lang === "zh" ? "同步失敗" : "Sync failed");
+        const msg = data?.error || await extractFunctionErrorMessage(error) || "Sync failed";
+        toast.error(lang === "zh" ? `同步失敗：${msg}` : msg);
         return false;
       }
 
@@ -68,12 +90,13 @@ export function useGarmin(lang: Lang) {
       return true;
     } catch (err) {
       console.error("Garmin sync error:", err);
-      toast.error(lang === "zh" ? "同步失敗" : "Sync failed");
+      const msg = await extractFunctionErrorMessage(err);
+      toast.error(lang === "zh" ? `同步失敗${msg ? `：${msg}` : ""}` : msg || "Sync failed");
       return false;
     } finally {
       setSyncing(false);
     }
-  }, [user, lang]);
+  }, [user, lang, invalidateActivities]);
 
   const disconnect = useCallback(async (): Promise<boolean> => {
     if (!user) return false;
@@ -82,7 +105,8 @@ export function useGarmin(lang: Lang) {
         body: { action: "disconnect" },
       });
       if (error || !data?.success) {
-        toast.error(lang === "zh" ? "中斷連結失敗" : "Failed to disconnect");
+        const msg = data?.error || await extractFunctionErrorMessage(error) || "Failed to disconnect";
+        toast.error(lang === "zh" ? `中斷連結失敗：${msg}` : msg);
         return false;
       }
       toast.success(lang === "zh" ? "已中斷 Garmin 連結" : "Garmin disconnected");
@@ -90,10 +114,11 @@ export function useGarmin(lang: Lang) {
       return true;
     } catch (err) {
       console.error("Garmin disconnect error:", err);
-      toast.error(lang === "zh" ? "中斷連結失敗" : "Failed to disconnect");
+      const msg = await extractFunctionErrorMessage(err);
+      toast.error(lang === "zh" ? `中斷連結失敗${msg ? `：${msg}` : ""}` : msg || "Failed to disconnect");
       return false;
     }
-  }, [user, lang]);
+  }, [user, lang, invalidateActivities]);
 
   return { connect, syncActivities, disconnect, connecting, syncing };
 }

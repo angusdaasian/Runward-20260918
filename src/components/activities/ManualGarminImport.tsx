@@ -44,6 +44,15 @@ const ManualGarminImport = ({ lang, onImported }: Props) => {
             ? `已匯入 ${km}km · 獲得 ${xp} XP`
             : `Imported ${km}km · +${xp} XP`,
         );
+        const ahRemoved = data.apple_health_removed ?? 0;
+        if (ahRemoved > 0) {
+          toast.info(
+            lang === "zh"
+              ? `已移除 ${ahRemoved} 筆 Apple Health 活動。請繼續匯入 Garmin 活動以獲得更準確的數據。`
+              : `Removed ${ahRemoved} Apple Health ${ahRemoved === 1 ? "activity" : "activities"}. Keep importing Garmin activities for better accuracy.`,
+            { duration: 7000 },
+          );
+        }
         setUrl("");
         setExpanded(false);
         onImported();

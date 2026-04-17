@@ -84,12 +84,14 @@ serve(async (req) => {
         });
       }
 
-      const [stravaConn, ahConn] = await Promise.all([
-        supabase.from("strava_connections").select("id").eq("user_id", user.id).maybeSingle(),
-        supabase.from("apple_health_connections").select("id").eq("user_id", user.id).maybeSingle(),
-      ]);
-      if (stravaConn.data || ahConn.data) {
-        return new Response(JSON.stringify({ error: "Please disconnect the current app before connecting a new one" }), {
+      const { data: stravaConn } = await supabase
+        .from("strava_connections")
+        .select("id")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (stravaConn) {
+        return new Response(JSON.stringify({ error: "Please disconnect Strava before connecting Garmin" }), {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });

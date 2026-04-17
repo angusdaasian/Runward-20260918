@@ -30,12 +30,6 @@ function computeRankFromXP(monthlyXp: number) {
   return { tier: RANK_TIERS[tierIndex], division: DIVISIONS[divIndex] };
 }
 
-function isCurrentMonth(dateStr: string): boolean {
-  const d = new Date(dateStr);
-  const now = new Date();
-  return d.getUTCFullYear() === now.getUTCFullYear() && d.getUTCMonth() === now.getUTCMonth();
-}
-
 const runningSportTypes = new Set(["Run", "TrailRun", "VirtualRun", "Treadmill", "Workout", "running", "trail_running", "treadmill_running"]);
 
 serve(async (req) => {
@@ -75,6 +69,8 @@ serve(async (req) => {
     const { action } = body;
 
     // ── LOGIN ──
+    // Calls Railway /garmin-login → receives session_token.
+    // We store ONLY the session_token (in access_token col) — never email/password.
     if (action === "login") {
       const { email, password } = body;
       if (!email || !password) {
@@ -97,10 +93,10 @@ serve(async (req) => {
         });
       }
 
-      const loginRes = await fetch(`${GARMIN_RAILWAY_URL}/garmin-activities`, {
+      const loginRes = await fetch(`${GARMIN_RAILWAY_URL}/garmin-login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password, days: 1 }),
+        body: JSON.stringify({ email, password }),
       });
 
       if (!loginRes.ok) {
@@ -112,18 +108,40 @@ serve(async (req) => {
         });
       }
 
-      await loginRes.json();
+      const loginData = await loginRes.json();
+      const sessionToken: string = loginData.session_token;
+      const expiresAt: string = loginData.expires_at || new Date(Date.now() + 30 * 86400000).toISOString();
+      const displayName: string = loginData.display_name || email;
+
+      if (!sessionToken) {
+        return new Response(JSON.stringify({ error: "No session token returned by Garmin service" }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
 
       await supabase.from("garmin_connections").upsert({
         user_id: user.id,
-        access_token: email,
-        refresh_token: password,
-        expires_at: new Date(Date.now() + 365 * 86400000).toISOString(),
-        garmin_display_name: null,
+        access_token: sessionToken,    // session token (NOT email)
+        refresh_token: null,            // password no longer stored
+        expires_at: expiresAt,
+        garmin_display_name: displayName,
       }, { onConflict: "user_id" });
 
-      return new Response(JSON.stringify({ success: true, display_name: email }), {
+      return new Response(JSON.stringify({ success: true, display_name: displayName }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Helper: call Railway with Bearer session token
+    async function callRailway(path: string, sessionToken: string, payload: any) {
+      return await fetch(`${GARMIN_RAILWAY_URL}${path}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${sessionToken}`,
+        },
+        body: JSON.stringify(payload),
       });
     }
 
@@ -131,35 +149,43 @@ serve(async (req) => {
     if (action === "sync") {
       const { data: conn } = await supabase
         .from("garmin_connections")
-        .select("access_token, refresh_token")
+        .select("access_token, expires_at")
         .eq("user_id", user.id)
         .maybeSingle();
 
-      if (!conn) {
-        return new Response(JSON.stringify({ error: "No Garmin connection found" }), {
+      if (!conn || !conn.access_token) {
+        return new Response(JSON.stringify({ error: "No Garmin connection found. Please reconnect." }), {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
-      const garminEmail = conn.access_token;
-      const garminPassword = conn.refresh_token;
+      // Check session expiry
+      if (conn.expires_at && new Date(conn.expires_at) < new Date()) {
+        return new Response(JSON.stringify({ error: "Garmin session expired. Please reconnect." }), {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
 
-      // ── Phase 1: Fetch basic activity list (no detail_limit) ──
-      const actRes = await fetch(`${GARMIN_RAILWAY_URL}/garmin-activities`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: garminEmail,
-          password: garminPassword || "",
-          days: body.days || 30,
-          detail_limit: 0,
-        }),
+      const sessionToken = conn.access_token;
+
+      // ── Phase 1: Fetch basic activity list ──
+      const actRes = await callRailway("/garmin-activities", sessionToken, {
+        days: body.days || 30,
+        detail_limit: 0,
       });
 
       if (!actRes.ok) {
         const errData = await actRes.json().catch(() => ({}));
         console.error("Garmin activity fetch failed:", errData);
+        // 401 from Railway = invalid/expired session
+        if (actRes.status === 401) {
+          return new Response(JSON.stringify({ error: "Garmin session expired. Please reconnect." }), {
+            status: 401,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
         return new Response(JSON.stringify({ error: errData.detail || "Failed to fetch Garmin activities" }), {
           status: 500,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -173,9 +199,7 @@ serve(async (req) => {
         });
       }
 
-      // Upsert basic activities (has_details stays false for new ones)
-      // Garmin API returns times in local time (HKT UTC+8) but labels them as UTC,
-      // so we subtract 8 hours to get the real UTC time.
+      // Garmin returns local time labelled as UTC; subtract 8h for HKT.
       function adjustGarminTime(dateStr: string | undefined | null): string | null {
         if (!dateStr) return null;
         const d = new Date(dateStr);
@@ -215,7 +239,7 @@ serve(async (req) => {
         console.error("Garmin upsert error:", upsertError);
       }
 
-      // ── Phase 2: Loop through all missing details (up to 3 batches of 5) ──
+      // ── Phase 2: Loop through missing details ──
       let detailsFetched = 0;
       const MAX_BATCHES = 3;
 
@@ -232,14 +256,8 @@ serve(async (req) => {
 
         const activityIds = missingDetails.map((a) => a.garmin_activity_id).join(",");
         try {
-          const detailRes = await fetch(`${GARMIN_RAILWAY_URL}/garmin-activity-details`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              email: garminEmail,
-              password: garminPassword || "",
-              activity_ids: activityIds,
-            }),
+          const detailRes = await callRailway("/garmin-activity-details", sessionToken, {
+            activity_ids: activityIds,
           });
 
           if (detailRes.ok) {
@@ -266,7 +284,7 @@ serve(async (req) => {
             }
           } else {
             console.error("Detail fetch failed batch", batch, ":", await detailRes.text());
-            break; // stop on error (likely rate limit)
+            break;
           }
         } catch (detailErr) {
           console.error("Detail fetch error batch", batch, ":", detailErr);
@@ -352,6 +370,24 @@ serve(async (req) => {
 
     // ── DISCONNECT ──
     if (action === "disconnect") {
+      // Tell Railway to revoke the session
+      const { data: conn } = await supabase
+        .from("garmin_connections")
+        .select("access_token")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (conn?.access_token) {
+        try {
+          await fetch(`${GARMIN_RAILWAY_URL}/garmin-logout`, {
+            method: "POST",
+            headers: { "Authorization": `Bearer ${conn.access_token}` },
+          });
+        } catch (e) {
+          console.error("Garmin logout error (non-fatal):", e);
+        }
+      }
+
       await Promise.all([
         supabase.from("garmin_connections").delete().eq("user_id", user.id),
         supabase.from("garmin_activities").delete().eq("user_id", user.id),

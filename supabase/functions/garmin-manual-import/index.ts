@@ -41,25 +41,15 @@ const runningSportTypes = new Set([
 ]);
 
 // ── Firecrawl ──
-async function scrapeWithFirecrawl(
-  url: string,
-  apiKey: string,
-): Promise<{ markdown: string; screenshotUrl: string | null }> {
+async function scrapeWithFirecrawl(url: string, apiKey: string): Promise<string> {
   const res = await fetch("https://api.firecrawl.dev/v1/scrape", {
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      url,
-      formats: ["markdown", "screenshot"],
-      waitFor: 8000,
-    }),
+    body: JSON.stringify({ url, formats: ["markdown"], waitFor: 8000 }),
   });
   const data = await res.json();
   if (!data.success) throw new Error(`Firecrawl failed: ${data.error || "Unknown error"}`);
-  return {
-    markdown: data.data?.markdown || "",
-    screenshotUrl: data.data?.screenshot || null,
-  };
+  return data.data?.markdown || "";
 }
 
 // ── AI extraction ──
@@ -200,7 +190,7 @@ serve(async (req) => {
 
     // Scrape + extract
     console.log(`[manual-import] scraping ${url} for user ${user.id}`);
-    const { markdown: md, screenshotUrl } = await scrapeWithFirecrawl(url, FIRECRAWL_API_KEY);
+    const md = await scrapeWithFirecrawl(url, FIRECRAWL_API_KEY);
     if (!md || md.length < 100) {
       return new Response(JSON.stringify({ error: "Could not read the activity page. Make sure the activity is set to Public." }), {
         status: 400,
@@ -260,8 +250,8 @@ serve(async (req) => {
       average_speed: duration > 0 ? distance / duration : null,
       laps: Array.isArray(extracted?.laps) ? extracted.laps : [],
       has_details: true,
-      has_gps: !!screenshotUrl,
-      raw_json: { source: "manual_import", url, extracted, map_screenshot_url: screenshotUrl },
+      has_gps: false,
+      raw_json: { source: "manual_import", url, extracted },
     };
 
     const { error: upsertError } = await supabase

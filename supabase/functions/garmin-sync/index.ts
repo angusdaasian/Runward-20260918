@@ -36,12 +36,22 @@ function isCurrentMonth(dateStr: string): boolean {
   return d.getUTCFullYear() === now.getUTCFullYear() && d.getUTCMonth() === now.getUTCMonth();
 }
 
-const runningSportTypes = new Set(["Run", "TrailRun", "VirtualRun", "Treadmill", "Workout", "running", "trail_running", "treadmill_running"]);
+const runningSportTypes = new Set([
+  "Run",
+  "TrailRun",
+  "VirtualRun",
+  "Treadmill",
+  "Workout",
+  "running",
+  "trail_running",
+  "treadmill_running",
+]);
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
+    console.log("[garmin-sync] request received", { method: req.method });
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
@@ -63,7 +73,10 @@ serve(async (req) => {
     }
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-    const { data: { user }, error: userError } = await supabase.auth.getUser(accessToken);
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser(accessToken);
     if (userError || !user) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
@@ -89,10 +102,13 @@ serve(async (req) => {
         supabase.from("apple_health_connections").select("id").eq("user_id", user.id).maybeSingle(),
       ]);
       if (stravaConn.data || ahConn.data) {
-        return new Response(JSON.stringify({ error: "Please disconnect the current app before connecting a new one" }), {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        return new Response(
+          JSON.stringify({ error: "Please disconnect the current app before connecting a new one" }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        );
       }
 
       const loginRes = await fetch(`${GARMIN_RAILWAY_URL}/garmin-activities`, {
@@ -112,13 +128,16 @@ serve(async (req) => {
 
       await loginRes.json();
 
-      await supabase.from("garmin_connections").upsert({
-        user_id: user.id,
-        access_token: email,
-        refresh_token: password,
-        expires_at: new Date(Date.now() + 365 * 86400000).toISOString(),
-        garmin_display_name: null,
-      }, { onConflict: "user_id" });
+      await supabase.from("garmin_connections").upsert(
+        {
+          user_id: user.id,
+          access_token: email,
+          refresh_token: password,
+          expires_at: new Date(Date.now() + 365 * 86400000).toISOString(),
+          garmin_display_name: null,
+        },
+        { onConflict: "user_id" },
+      );
 
       return new Response(JSON.stringify({ success: true, display_name: email }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -256,10 +275,7 @@ serve(async (req) => {
                   .eq("id", item.id);
                 detailsFetched++;
               } else {
-                await supabase
-                  .from("garmin_activities")
-                  .update({ has_details: true })
-                  .eq("id", item.id);
+                await supabase.from("garmin_activities").update({ has_details: true }).eq("id", item.id);
               }
             }
           } else {
@@ -290,9 +306,8 @@ serve(async (req) => {
         if (vdotScores.length >= 20) break;
       }
 
-      const trainingScore = vdotScores.length > 0
-        ? Math.round(vdotScores.reduce((a, b) => a + b, 0) / vdotScores.length)
-        : 0;
+      const trainingScore =
+        vdotScores.length > 0 ? Math.round(vdotScores.reduce((a, b) => a + b, 0) / vdotScores.length) : 0;
 
       await supabase.from("profiles").update({ training_score: trainingScore }).eq("user_id", user.id);
 
@@ -328,24 +343,30 @@ serve(async (req) => {
         const newLifetimeXp = Math.max(0, (profile.lifetime_xp || 0) + xpDelta);
         const rank = computeRankFromXP(totalMonthlyXp);
 
-        await supabase.from("profiles").update({
-          monthly_xp: totalMonthlyXp,
-          lifetime_xp: newLifetimeXp,
-          rank_tier: rank.tier,
-          division: rank.division,
-        }).eq("user_id", user.id);
+        await supabase
+          .from("profiles")
+          .update({
+            monthly_xp: totalMonthlyXp,
+            lifetime_xp: newLifetimeXp,
+            rank_tier: rank.tier,
+            division: rank.division,
+          })
+          .eq("user_id", user.id);
       }
 
-      return new Response(JSON.stringify({
-        success: true,
-        synced: rows.length,
-        details_fetched: detailsFetched,
-        details_remaining: 0,
-        training_score: trainingScore,
-        total_xp: totalMonthlyXp,
-      }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return new Response(
+        JSON.stringify({
+          success: true,
+          synced: rows.length,
+          details_fetched: detailsFetched,
+          details_remaining: 0,
+          training_score: trainingScore,
+          total_xp: totalMonthlyXp,
+        }),
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
     }
 
     // ── DISCONNECT ──

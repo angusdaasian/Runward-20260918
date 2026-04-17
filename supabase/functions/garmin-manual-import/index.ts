@@ -89,7 +89,8 @@ Schema:
       "duration_seconds": number | null,
       "average_pace_seconds_per_km": number | null,
       "average_hr": number | null,
-      "max_hr": number | null
+      "max_hr": number | null,
+      "total_ascent_meters": number | null
     }
   ]
 }
@@ -229,14 +230,27 @@ serve(async (req) => {
       });
     }
 
-    // Sanity-check the extracted start_time. If it's missing, in the future,
-    // or more than 5 years old, fall back to "now" (most likely the user
-    // imported a recent activity).
+    // Sanity-check the extracted start_time. The Garmin Connect public page
+    // renders timestamps in the viewer's local timezone (the user is in HKT,
+    // UTC+8). The AI returns a naive ISO string with "Z" appended, which the
+    // Date constructor then interprets as UTC — making the activity appear
+    // 8 hours ahead. Treat any "Z"-suffixed extraction as HKT wall-clock and
+    // subtract 8h to get the true UTC instant.
+    const HKT_OFFSET_MS = 8 * 60 * 60 * 1000;
     const nowMs = Date.now();
     const fiveYearsMs = 5 * 365 * 24 * 60 * 60 * 1000;
-    let startMs = extracted?.start_time ? new Date(extracted.start_time).getTime() : NaN;
+    const rawStart: string | undefined = extracted?.start_time;
+    let startMs = rawStart ? new Date(rawStart).getTime() : NaN;
+    // If the AI returned a naive timestamp (no explicit non-UTC offset), treat
+    // it as HKT wall-clock time and convert to true UTC.
+    if (isFinite(startMs) && rawStart) {
+      const hasExplicitOffset = /[+-]\d{2}:?\d{2}$/.test(rawStart);
+      if (!hasExplicitOffset) {
+        startMs = startMs - HKT_OFFSET_MS;
+      }
+    }
     if (!isFinite(startMs) || startMs > nowMs + 24 * 60 * 60 * 1000 || startMs < nowMs - fiveYearsMs) {
-      console.warn(`[manual-import] invalid extracted start_time "${extracted?.start_time}" — falling back to now`);
+      console.warn(`[manual-import] invalid extracted start_time "${rawStart}" — falling back to now`);
       startMs = nowMs;
     }
     const startTime = new Date(startMs).toISOString();
@@ -274,6 +288,28 @@ serve(async (req) => {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+
+    // Apple Health activities are less accurate than Garmin (no per-lap data,
+    // approximate HR, no GPS). Once the user starts manually importing Garmin
+    // activities we wipe their Apple Health data to avoid double-counting and
+    // mixed-accuracy stats.
+    let appleHealthRemoved = 0;
+    const { count: ahCount } = await supabase
+      .from("apple_health_activities")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", user.id);
+    if ((ahCount || 0) > 0) {
+      const { error: ahDelErr } = await supabase
+        .from("apple_health_activities")
+        .delete()
+        .eq("user_id", user.id);
+      if (ahDelErr) {
+        console.error("[manual-import] failed to clear Apple Health activities:", ahDelErr);
+      } else {
+        appleHealthRemoved = ahCount || 0;
+        console.log(`[manual-import] removed ${appleHealthRemoved} Apple Health activities for user ${user.id}`);
+      }
     }
 
     // ── Recompute training score (last 50 manual+garmin activities) ──
@@ -353,6 +389,7 @@ serve(async (req) => {
       training_score: trainingScore,
       monthly_xp: totalMonthlyXp,
       xp_gained: xpGained,
+      apple_health_removed: appleHealthRemoved,
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

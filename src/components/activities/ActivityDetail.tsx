@@ -256,7 +256,8 @@ const ActivityDetail = ({ activity, lang, onBack, isPremium, trainingScore }: Pr
               moving_time: Number(lap.moving_time ?? lap.duration_seconds) || elapsed,
               average_speed: avgSpeed,
               average_heartrate: lap.avg_hr ?? lap.average_hr ?? undefined,
-              elevation_difference: Number(lap.elevation_gain) || 0,
+              elevation_difference:
+                Number(lap.elevation_gain ?? lap.total_ascent_meters ?? lap.total_ascent) || 0,
               split: lap.split_number ?? lap.lap_index ?? idx + 1,
             };
           });

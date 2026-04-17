@@ -7,66 +7,6 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-// ─────────────────────────────────────────────────────────
-// AES-GCM encryption helpers (app-level encryption for Garmin creds)
-// Storage format: "v1:<base64(iv)>:<base64(ciphertext+tag)>"
-// Key: GARMIN_ENC_KEY env var, base64-encoded 32 bytes (256-bit)
-// ─────────────────────────────────────────────────────────
-let _cachedKey: CryptoKey | null = null;
-async function getEncKey(): Promise<CryptoKey> {
-  if (_cachedKey) return _cachedKey;
-  const raw = Deno.env.get("GARMIN_ENC_KEY");
-  if (!raw) throw new Error("GARMIN_ENC_KEY not configured");
-  const keyBytes = Uint8Array.from(atob(raw), (c) => c.charCodeAt(0));
-  if (keyBytes.length !== 32) {
-    throw new Error("GARMIN_ENC_KEY must be base64 of 32 bytes");
-  }
-  _cachedKey = await crypto.subtle.importKey(
-    "raw",
-    keyBytes,
-    { name: "AES-GCM" },
-    false,
-    ["encrypt", "decrypt"],
-  );
-  return _cachedKey;
-}
-
-function b64encode(bytes: Uint8Array): string {
-  let s = "";
-  for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
-  return btoa(s);
-}
-function b64decode(s: string): Uint8Array {
-  return Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
-}
-
-async function encryptString(plaintext: string): Promise<string> {
-  const key = await getEncKey();
-  const iv = crypto.getRandomValues(new Uint8Array(12));
-  const ct = new Uint8Array(
-    await crypto.subtle.encrypt(
-      { name: "AES-GCM", iv },
-      key,
-      new TextEncoder().encode(plaintext),
-    ),
-  );
-  return `v1:${b64encode(iv)}:${b64encode(ct)}`;
-}
-
-async function decryptString(stored: string): Promise<string> {
-  // Backwards compat: legacy plaintext rows have no "v1:" prefix
-  if (!stored.startsWith("v1:")) return stored;
-  const [, ivB64, ctB64] = stored.split(":");
-  if (!ivB64 || !ctB64) throw new Error("Malformed encrypted value");
-  const key = await getEncKey();
-  const pt = await crypto.subtle.decrypt(
-    { name: "AES-GCM", iv: b64decode(ivB64) },
-    key,
-    b64decode(ctB64),
-  );
-  return new TextDecoder().decode(pt);
-}
-
 function percentVO2(minutes: number): number {
   return 0.8 + 0.1894393 * Math.exp(-0.012778 * minutes) + 0.2989558 * Math.exp(-0.1932605 * minutes);
 }
@@ -96,12 +36,22 @@ function isCurrentMonth(dateStr: string): boolean {
   return d.getUTCFullYear() === now.getUTCFullYear() && d.getUTCMonth() === now.getUTCMonth();
 }
 
-const runningSportTypes = new Set(["Run", "TrailRun", "VirtualRun", "Treadmill", "Workout", "running", "trail_running", "treadmill_running"]);
+const runningSportTypes = new Set([
+  "Run",
+  "TrailRun",
+  "VirtualRun",
+  "Treadmill",
+  "Workout",
+  "running",
+  "trail_running",
+  "treadmill_running",
+]);
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
+    console.log("[garmin-sync] request received", { method: req.method });
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
@@ -123,7 +73,10 @@ serve(async (req) => {
     }
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-    const { data: { user }, error: userError } = await supabase.auth.getUser(accessToken);
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser(accessToken);
     if (userError || !user) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
@@ -149,10 +102,13 @@ serve(async (req) => {
         supabase.from("apple_health_connections").select("id").eq("user_id", user.id).maybeSingle(),
       ]);
       if (stravaConn.data || ahConn.data) {
-        return new Response(JSON.stringify({ error: "Please disconnect the current app before connecting a new one" }), {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        return new Response(
+          JSON.stringify({ error: "Please disconnect the current app before connecting a new one" }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        );
       }
 
       const loginRes = await fetch(`${GARMIN_RAILWAY_URL}/garmin-activities`, {
@@ -172,17 +128,16 @@ serve(async (req) => {
 
       await loginRes.json();
 
-      // Encrypt credentials before storing
-      const encEmail = await encryptString(email);
-      const encPassword = await encryptString(password);
-
-      await supabase.from("garmin_connections").upsert({
-        user_id: user.id,
-        access_token: encEmail,
-        refresh_token: encPassword,
-        expires_at: new Date(Date.now() + 365 * 86400000).toISOString(),
-        garmin_display_name: null,
-      }, { onConflict: "user_id" });
+      await supabase.from("garmin_connections").upsert(
+        {
+          user_id: user.id,
+          access_token: email,
+          refresh_token: password,
+          expires_at: new Date(Date.now() + 365 * 86400000).toISOString(),
+          garmin_display_name: null,
+        },
+        { onConflict: "user_id" },
+      );
 
       return new Response(JSON.stringify({ success: true, display_name: email }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -204,36 +159,8 @@ serve(async (req) => {
         });
       }
 
-      // Decrypt credentials (handles both v1 ciphertext and legacy plaintext)
-      let garminEmail: string;
-      let garminPassword: string;
-      try {
-        garminEmail = await decryptString(conn.access_token);
-        garminPassword = conn.refresh_token ? await decryptString(conn.refresh_token) : "";
-      } catch (decErr) {
-        console.error("Credential decryption failed:", decErr);
-        return new Response(JSON.stringify({ error: "Stored credentials are unreadable. Please reconnect Garmin." }), {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-
-      // Lazy migration: if either field was legacy plaintext, re-store encrypted
-      const wasPlaintext =
-        !conn.access_token.startsWith("v1:") ||
-        (conn.refresh_token && !conn.refresh_token.startsWith("v1:"));
-      if (wasPlaintext) {
-        try {
-          const encEmail = await encryptString(garminEmail);
-          const encPassword = await encryptString(garminPassword);
-          await supabase
-            .from("garmin_connections")
-            .update({ access_token: encEmail, refresh_token: encPassword })
-            .eq("user_id", user.id);
-        } catch (migErr) {
-          console.error("Lazy credential migration failed:", migErr);
-        }
-      }
+      const garminEmail = conn.access_token;
+      const garminPassword = conn.refresh_token;
 
       // ── Phase 1: Fetch basic activity list (no detail_limit) ──
       const actRes = await fetch(`${GARMIN_RAILWAY_URL}/garmin-activities`, {
@@ -348,10 +275,7 @@ serve(async (req) => {
                   .eq("id", item.id);
                 detailsFetched++;
               } else {
-                await supabase
-                  .from("garmin_activities")
-                  .update({ has_details: true })
-                  .eq("id", item.id);
+                await supabase.from("garmin_activities").update({ has_details: true }).eq("id", item.id);
               }
             }
           } else {
@@ -382,9 +306,8 @@ serve(async (req) => {
         if (vdotScores.length >= 20) break;
       }
 
-      const trainingScore = vdotScores.length > 0
-        ? Math.round(vdotScores.reduce((a, b) => a + b, 0) / vdotScores.length)
-        : 0;
+      const trainingScore =
+        vdotScores.length > 0 ? Math.round(vdotScores.reduce((a, b) => a + b, 0) / vdotScores.length) : 0;
 
       await supabase.from("profiles").update({ training_score: trainingScore }).eq("user_id", user.id);
 
@@ -420,24 +343,30 @@ serve(async (req) => {
         const newLifetimeXp = Math.max(0, (profile.lifetime_xp || 0) + xpDelta);
         const rank = computeRankFromXP(totalMonthlyXp);
 
-        await supabase.from("profiles").update({
-          monthly_xp: totalMonthlyXp,
-          lifetime_xp: newLifetimeXp,
-          rank_tier: rank.tier,
-          division: rank.division,
-        }).eq("user_id", user.id);
+        await supabase
+          .from("profiles")
+          .update({
+            monthly_xp: totalMonthlyXp,
+            lifetime_xp: newLifetimeXp,
+            rank_tier: rank.tier,
+            division: rank.division,
+          })
+          .eq("user_id", user.id);
       }
 
-      return new Response(JSON.stringify({
-        success: true,
-        synced: rows.length,
-        details_fetched: detailsFetched,
-        details_remaining: 0,
-        training_score: trainingScore,
-        total_xp: totalMonthlyXp,
-      }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return new Response(
+        JSON.stringify({
+          success: true,
+          synced: rows.length,
+          details_fetched: detailsFetched,
+          details_remaining: 0,
+          training_score: trainingScore,
+          total_xp: totalMonthlyXp,
+        }),
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
     }
 
     // ── DISCONNECT ──

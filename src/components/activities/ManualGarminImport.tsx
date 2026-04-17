@@ -15,17 +15,23 @@ const ManualGarminImport = ({ lang, onImported }: Props) => {
   const [loading, setLoading] = useState(false);
 
   const handleImport = async () => {
-    const trimmed = url.trim();
-    if (!trimmed) return;
-    if (!/garmin/i.test(trimmed)) {
-      toast.error(lang === "zh" ? "請貼上 Garmin Connect 的活動連結" : "Please paste a Garmin Connect activity link");
+    const raw = url.trim();
+    if (!raw) return;
+    // Accept share-style text like:
+    //   "Check out my track running activity on Garmin Connect. #beatyesterday https://connect.garmin.com/modern/activity/22465889243"
+    // Extract the first Garmin Connect URL we find.
+    const match = raw.match(/https?:\/\/[^\s]*garmin[^\s]*\/activity\/\d+[^\s]*/i)
+      || raw.match(/https?:\/\/[^\s]*garmin[^\s]*/i);
+    const cleanUrl = match ? match[0].replace(/[).,]+$/, "") : "";
+    if (!cleanUrl || !/\/activity\/\d+/i.test(cleanUrl)) {
+      toast.error(lang === "zh" ? "找不到有效的 Garmin 活動連結" : "Could not find a valid Garmin activity link");
       return;
     }
 
     setLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke("garmin-manual-import", {
-        body: { url: trimmed },
+        body: { url: cleanUrl },
       });
       if (error || !data?.success) {
         const msg = data?.error || error?.message || "Import failed";
@@ -76,11 +82,11 @@ const ManualGarminImport = ({ lang, onImported }: Props) => {
         <div className="px-4 pb-4 space-y-3 border-t border-border pt-3">
           <p className="text-xs text-muted-foreground">
             {lang === "zh"
-              ? "在 Garmin Connect 將活動的隱私設定為「公開」，然後將連結貼到這裡。我們會擷取距離、時間、配速、爬升及分段資料，並更新你的月度 XP 與排行榜。"
-              : "Set the activity to Public in Garmin Connect, then paste the link below. We'll extract distance, time, pace, ascent and lap data, then update your monthly XP and leaderboard."}
+              ? "在 Garmin Connect 將活動的隱私設定為「公開」，然後貼上連結（或整段「Check out my activity…」分享文字皆可）。我們會擷取距離、時間、配速、爬升、分段及路線地圖。"
+              : "Set the activity to Public in Garmin Connect, then paste the link (or the full \"Check out my activity…\" share text — we'll find the URL). We'll extract distance, time, pace, ascent, laps and the route map."}
           </p>
           <input
-            type="url"
+            type="text"
             value={url}
             onChange={(e) => setUrl(e.target.value)}
             placeholder="https://connect.garmin.com/modern/activity/..."

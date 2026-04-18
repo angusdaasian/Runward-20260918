@@ -269,6 +269,16 @@ const ConnectApps = ({ lang, onBack }: Props) => {
           {/* Garmin login form */}
           {showGarminForm && !garminConnected && (
             <div className="mt-3 pt-3 border-t border-border space-y-2">
+              <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-2.5">
+                <p className="text-[11px] font-semibold text-destructive leading-snug">
+                  {lang === "zh" ? "⚠️ 不支援雙重驗證 (MFA)" : "⚠️ Multi-Factor Authentication not supported"}
+                </p>
+                <p className="text-[10px] text-destructive/90 mt-1 leading-snug">
+                  {lang === "zh"
+                    ? "如果你的 Garmin 帳號啟用了 MFA / 兩步驟驗證，登入將會失敗。請先在 Garmin 帳號設定中停用 MFA 才能連接。"
+                    : "If your Garmin account has MFA / 2-step verification enabled, sign-in will fail. Please disable MFA in your Garmin account settings before connecting."}
+                </p>
+              </div>
               <input
                 type="email"
                 placeholder={lang === "zh" ? "Garmin 帳號 (Email)" : "Garmin Email"}

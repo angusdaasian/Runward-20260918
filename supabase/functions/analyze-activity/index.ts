@@ -361,6 +361,9 @@ ${plannedWorkout ? `- ${plannedWorkout}` : ""}`;
     if (typeof rpe === "number" && rpe >= 1 && rpe <= 10) {
       statsText += `\n- RPE: ${rpe}/10`;
     }
+    if (resolvedRaceName) {
+      statsText += `\n- Activity Type: 🏁 RACE — ${resolvedRaceName}`;
+    }
 
     if (!isAppleHealth) {
       if (activity.total_elevation_gain > 0) {
@@ -432,7 +435,14 @@ ${plannedWorkout ? `- ${plannedWorkout}` : ""}`;
     // --- Race + weather + comment context ---
     let raceContext = "";
     if (resolvedRaceName) {
-      raceContext += `\n\n🏁 RACE CONTEXT: This activity was a race — "${resolvedRaceName}"${raceCity ? ` in ${raceCity}${raceCountry ? ", " + raceCountry : ""}` : ""}. Treat this as a race-day effort, not a training run.`;
+      raceContext += `\n\n🏁🏁🏁 CRITICAL RACE CONTEXT 🏁🏁🏁
+THIS ACTIVITY IS A RACE — "${resolvedRaceName}"${raceCity ? ` held in ${raceCity}${raceCountry ? ", " + raceCountry : ""}` : ""}.
+This is NOT a training run. This is NOT a long run. This is a competitive race effort on race day.
+You MUST:
+- Open your "Overall Assessment" by explicitly naming the race ("${resolvedRaceName}") and treating the result as a race performance.
+- Evaluate pacing strategy (positive/negative/even split), race-day execution, and how the effort compares to a tempo or training run.
+- Use the race name when discussing the workout — never call it a "long run" or "easy run".
+- For the next-workout suggestion, assume the runner just RACED — recovery is the default unless the runner's comment says otherwise.`;
     }
     if (weatherSummary) {
       raceContext += `\n\n🌤 RACE-DAY WEATHER (${weatherLocationName || "race location"}, ${fallbackDateStr}): ${weatherSummary}. Factor weather conditions into your assessment of the effort and pace.`;

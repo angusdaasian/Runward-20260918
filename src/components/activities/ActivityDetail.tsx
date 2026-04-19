@@ -264,6 +264,7 @@ const ActivityDetail = ({ activity, lang, onBack, isPremium, trainingScore }: Pr
         });
         if (!error && data?.analysis) {
           setAiAnalysis(data.analysis);
+          if (data.nextWorkout !== undefined) setAiNextWorkout(data.nextWorkout);
           setAiLang(lang);
         }
       } catch (err) {
@@ -272,6 +273,21 @@ const ActivityDetail = ({ activity, lang, onBack, isPremium, trainingScore }: Pr
       setAiLoading(false);
     })();
   }, [lang]);
+
+  // Fetch races on the same calendar date as this activity
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase
+        .from("races")
+        .select("id, name, name_zh, city, country")
+        .eq("race_date", activityDateOnly);
+      if (!cancelled && !error && Array.isArray(data)) {
+        setSameDayRaces(data as any);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [activityDateOnly]);
 
   useEffect(() => {
     const fetchStreams = async () => {

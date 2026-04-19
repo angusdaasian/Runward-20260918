@@ -21,7 +21,13 @@ export type Database = {
           analysis_zh: string | null
           created_at: string
           id: string
+          next_workout_en: string | null
+          next_workout_zh: string | null
+          race_id: string | null
+          race_name: string | null
+          user_comment: string | null
           user_id: string
+          weather: Json | null
         }
         Insert: {
           activity_id: string
@@ -29,7 +35,13 @@ export type Database = {
           analysis_zh?: string | null
           created_at?: string
           id?: string
+          next_workout_en?: string | null
+          next_workout_zh?: string | null
+          race_id?: string | null
+          race_name?: string | null
+          user_comment?: string | null
           user_id: string
+          weather?: Json | null
         }
         Update: {
           activity_id?: string
@@ -37,7 +49,13 @@ export type Database = {
           analysis_zh?: string | null
           created_at?: string
           id?: string
+          next_workout_en?: string | null
+          next_workout_zh?: string | null
+          race_id?: string | null
+          race_name?: string | null
+          user_comment?: string | null
           user_id?: string
+          weather?: Json | null
         }
         Relationships: []
       }

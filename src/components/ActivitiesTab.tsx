@@ -24,6 +24,7 @@ import ActivityCalendar from "@/components/activities/ActivityCalendar";
 import MonthlyRoadQuest from "@/components/activities/MonthlyRoadQuest";
 import ActivityDetail from "@/components/activities/ActivityDetail";
 import ManualGarminImport from "@/components/activities/ManualGarminImport";
+import SuggestedNextWorkout from "@/components/activities/SuggestedNextWorkout";
 import { calculateRunningScore } from "@/lib/vdot";
 import { useActivities, type StravaActivity } from "@/hooks/use-activities";
 import FadeIn from "@/components/ui/FadeIn";
@@ -545,6 +546,9 @@ const ActivitiesTab = ({ lang }: Props) => {
           </div>
         )}
       </div>
+
+      {/* Suggested Next Workout (only if latest activity has been analyzed) */}
+      <SuggestedNextWorkout lang={lang} latestActivityId={latestActivity?.id ?? null} />
 
       {/* Monthly Road Quest */}
       <MonthlyRoadQuest lang={lang} activities={activities} plannedWorkouts={plannedWorkouts} />

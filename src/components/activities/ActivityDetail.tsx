@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo } from "react";
-import { ArrowLeft, Clock, MapPin, Zap, Heart, TrendingUp, Mountain, Timer, Footprints, Trash2, Pencil, Sparkles, Lock, Gauge, AlertTriangle, Flame } from "lucide-react";
+import { ArrowLeft, Clock, MapPin, Zap, Heart, TrendingUp, Mountain, Timer, Footprints, Trash2, Pencil, Sparkles, Lock, Gauge, AlertTriangle, Flame, Trophy, MessageSquare, RefreshCw } from "lucide-react";
 import { Lang } from "@/lib/i18n";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
@@ -113,10 +114,23 @@ const ActivityDetail = ({ activity, lang, onBack, isPremium, trainingScore }: Pr
   const [nameInput, setNameInput] = useState(activity.name);
   const [savingName, setSavingName] = useState(false);
   const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
+  const [aiNextWorkout, setAiNextWorkout] = useState<string | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiLang, setAiLang] = useState<string>(lang);
   const [rpeInput, setRpeInput] = useState<string>("");
   const [rpeSubmitted, setRpeSubmitted] = useState(false);
+  const [analysisAttempted, setAnalysisAttempted] = useState(false);
+
+  // Race tagging + comment state
+  const activityDateOnly = useMemo(() => activity.start_date.split("T")[0], [activity.start_date]);
+  const [sameDayRaces, setSameDayRaces] = useState<Array<{ id: string; name: string; name_zh: string | null; city: string; country: string }>>([]);
+  // raceSelection: "" = none, "manual" = user typing, or a race id
+  const [raceSelection, setRaceSelection] = useState<string>("");
+  const [manualRaceName, setManualRaceName] = useState<string>("");
+  const [userComment, setUserComment] = useState<string>("");
+  const [savedRaceId, setSavedRaceId] = useState<string | null>(null);
+  const [savedRaceName, setSavedRaceName] = useState<string | null>(null);
+  const [savedComment, setSavedComment] = useState<string | null>(null);
 
   const handleRename = async () => {
     if (!nameInput.trim() || nameInput === activityName) { setEditingName(false); return; }
@@ -144,10 +158,21 @@ const ActivityDetail = ({ activity, lang, onBack, isPremium, trainingScore }: Pr
     }
   };
 
-  const runAiAnalysis = async (currentSplits: Split[] | null, rpe?: number) => {
+  const runAiAnalysis = async (currentSplits: Split[] | null, rpe?: number, opts?: { forceRefresh?: boolean }) => {
     if (!isPremium) return;
     setAiLoading(true);
     try {
+      // Resolve current race selection into raceId / raceName
+      let raceId: string | null = null;
+      let raceName: string | null = null;
+      if (raceSelection && raceSelection !== "" && raceSelection !== "manual") {
+        raceId = raceSelection;
+        const match = sameDayRaces.find(r => r.id === raceSelection);
+        if (match) raceName = lang === "zh" && match.name_zh ? match.name_zh : match.name;
+      } else if (raceSelection === "manual" && manualRaceName.trim()) {
+        raceName = manualRaceName.trim();
+      }
+
       const bodyPayload: any = {
         activityDbId: activity.id,
         activity: {
@@ -166,35 +191,36 @@ const ActivityDetail = ({ activity, lang, onBack, isPremium, trainingScore }: Pr
         splits: currentSplits || [],
         lang,
         ...(rpe !== undefined ? { rpe } : {}),
+        ...(raceId ? { raceId } : {}),
+        ...(raceName ? { raceName } : {}),
+        ...(userComment.trim() ? { userComment: userComment.trim() } : {}),
+        ...(opts?.forceRefresh ? { forceRefresh: true } : {}),
       };
-      // Pass Garmin laps for interval detection
       if (isGarmin && activity.laps && Array.isArray(activity.laps) && activity.laps.length > 0) {
         bodyPayload.garminLaps = activity.laps;
       }
-      const { data, error } = await supabase.functions.invoke("analyze-activity", {
-        body: bodyPayload,
-      });
-      console.log("[AI Analysis] response:", { data, error });
+      const { data, error } = await supabase.functions.invoke("analyze-activity", { body: bodyPayload });
       if (error) {
         const errMsg = typeof error === "object" && error?.message ? error.message : String(error);
-        console.error("[AI Analysis] invoke error:", errMsg);
         toast.error(lang === "zh" ? `分析失敗: ${errMsg}` : `Analysis failed: ${errMsg}`);
         setAiAnalysis(null);
       } else if (data?.error) {
-        console.error("[AI Analysis] server error:", data.error);
         toast.error(lang === "zh" ? `分析失敗: ${data.error}` : `Analysis failed: ${data.error}`);
         setAiAnalysis(null);
       } else if (data?.analysis) {
         setAiAnalysis(data.analysis);
+        setAiNextWorkout(data.nextWorkout || null);
+        setSavedRaceId(data.raceId || null);
+        setSavedRaceName(data.raceName || null);
+        setSavedComment(data.userComment || null);
       } else {
-        console.error("[AI Analysis] empty response:", data);
         setAiAnalysis(null);
       }
     } catch (err: any) {
-      console.error("[AI Analysis] catch error:", err);
       toast.error(lang === "zh" ? "AI 分析失敗" : "AI analysis failed");
       setAiAnalysis(null);
     }
+    setAnalysisAttempted(true);
     setAiLoading(false);
   };
 
@@ -205,8 +231,35 @@ const ActivityDetail = ({ activity, lang, onBack, isPremium, trainingScore }: Pr
       return;
     }
     setRpeSubmitted(true);
-    runAiAnalysis(null, val);
+    runAiAnalysis(splits, val);
   };
+
+  const handleAnalyzeClick = () => {
+    // Strava-style flow: no RPE required, just trigger analysis with whatever race/comment is filled in.
+    runAiAnalysis(splits);
+  };
+
+  const handleRegenerateAnalysis = () => {
+    if (needsRpe) {
+      const val = parseInt(rpeInput, 10);
+      runAiAnalysis(splits, isNaN(val) ? undefined : val, { forceRefresh: true });
+    } else {
+      runAiAnalysis(splits, undefined, { forceRefresh: true });
+    }
+  };
+
+  // Detect if user has changed race/comment vs what was saved with the last analysis
+  const currentResolvedRaceId = raceSelection && raceSelection !== "manual" && raceSelection !== "" ? raceSelection : null;
+  const currentResolvedRaceName =
+    raceSelection === "manual" && manualRaceName.trim() ? manualRaceName.trim() :
+    (currentResolvedRaceId ? (sameDayRaces.find(r => r.id === currentResolvedRaceId) ? (lang === "zh" && sameDayRaces.find(r => r.id === currentResolvedRaceId)!.name_zh ? sameDayRaces.find(r => r.id === currentResolvedRaceId)!.name_zh : sameDayRaces.find(r => r.id === currentResolvedRaceId)!.name) : null) : null);
+  const inputsChanged =
+    aiAnalysis != null &&
+    (
+      (currentResolvedRaceId || null) !== (savedRaceId || null) ||
+      (currentResolvedRaceName || null) !== (savedRaceName || null) ||
+      (userComment.trim() || null) !== (savedComment || null)
+    );
 
   useEffect(() => {
     if (!isPremium || !aiAnalysis || lang === aiLang) return;
@@ -218,6 +271,7 @@ const ActivityDetail = ({ activity, lang, onBack, isPremium, trainingScore }: Pr
         });
         if (!error && data?.analysis) {
           setAiAnalysis(data.analysis);
+          if (data.nextWorkout !== undefined) setAiNextWorkout(data.nextWorkout);
           setAiLang(lang);
         }
       } catch (err) {
@@ -227,27 +281,37 @@ const ActivityDetail = ({ activity, lang, onBack, isPremium, trainingScore }: Pr
     })();
   }, [lang]);
 
+  // Fetch races on the same calendar date as this activity
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase
+        .from("races")
+        .select("id, name, name_zh, city, country")
+        .eq("race_date", activityDateOnly);
+      if (!cancelled && !error && Array.isArray(data)) {
+        setSameDayRaces(data as any);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [activityDateOnly]);
+
   useEffect(() => {
     const fetchStreams = async () => {
       setLoading(true);
-      // Apple Health activities: no Strava streams, show RPE prompt instead of auto-analyzing
+      // Apple Health / Garmin: no Strava streams. Map Garmin laps to splits.
       if (needsRpe || !activity.strava_id || activity.strava_id <= 0) {
         setStreams([]);
-        // Map Garmin laps → splits so the table renders.
-        // Supports BOTH legacy field names (distance/elapsed_time/avg_speed/avg_hr)
-        // AND new manual-import field names (distance_meters/duration_seconds/
-        // average_pace_seconds_per_km/average_hr/max_hr/lap_index).
         if (isGarmin && Array.isArray(activity.laps) && activity.laps.length > 0) {
           const mapped: Split[] = activity.laps.map((lap: any, idx: number) => {
             const distance = Number(lap.distance ?? lap.distance_meters) || 0;
             const elapsed = Number(
               lap.elapsed_time ?? lap.moving_time ?? lap.duration_seconds,
             ) || 0;
-            // Prefer pace-derived speed when speed isn't supplied
             let avgSpeed = Number(lap.avg_speed ?? lap.average_speed) || 0;
             if (!avgSpeed && lap.average_pace_seconds_per_km) {
               const pace = Number(lap.average_pace_seconds_per_km);
-              if (pace > 0) avgSpeed = 1000 / pace; // m/s
+              if (pace > 0) avgSpeed = 1000 / pace;
             }
             if (!avgSpeed && elapsed > 0) avgSpeed = distance / elapsed;
             return {
@@ -265,36 +329,63 @@ const ActivityDetail = ({ activity, lang, onBack, isPremium, trainingScore }: Pr
         } else {
           setSplits(null);
         }
-        // Check if analysis already exists (cached)
-        if (isPremium) {
-          try {
-            const { data } = await supabase.functions.invoke("analyze-activity", {
-              body: { activityDbId: activity.id, activity: { name: activityName, distance: activity.distance, moving_time: activity.moving_time, elapsed_time: activity.elapsed_time, total_elevation_gain: activity.total_elevation_gain, start_date: activity.start_date, average_speed: activity.average_speed, max_speed: activity.max_speed, average_heartrate: activity.average_heartrate, max_heartrate: activity.max_heartrate, source: activity.source || "Apple Health" }, splits: [], lang, checkCacheOnly: true },
-            });
-            if (data?.analysis) {
-              setAiAnalysis(data.analysis);
-              setRpeSubmitted(true);
-            }
-          } catch {}
+      } else {
+        try {
+          const { data, error } = await supabase.functions.invoke('strava-activity-streams', {
+            body: { strava_id: activity.strava_id },
+          });
+          if (!error && data) {
+            setStreams(data.streams || []);
+            setSplits(data.splits || null);
+          }
+        } catch (err) {
+          console.error('Error fetching streams:', err);
         }
-        setLoading(false);
-        return;
       }
 
-      try {
-        const { data, error } = await supabase.functions.invoke('strava-activity-streams', {
-          body: { strava_id: activity.strava_id },
-        });
-        if (!error && data) {
-          setStreams(data.streams || []);
-          setSplits(data.splits || null);
-          if (isPremium) await runAiAnalysis(data.splits || null);
-        } else if (isPremium) {
-          await runAiAnalysis(null);
-        }
-      } catch (err) {
-        console.error('Error fetching streams:', err);
-        if (isPremium) await runAiAnalysis(null);
+      // Check for cached analysis (all sources). Only auto-load — do NOT auto-run a new analysis.
+      // The user must click "Analyze" after optionally tagging a race / adding a comment / entering RPE.
+      if (isPremium) {
+        try {
+          const { data } = await supabase.functions.invoke("analyze-activity", {
+            body: {
+              activityDbId: activity.id,
+              activity: {
+                name: activityName,
+                distance: activity.distance,
+                moving_time: activity.moving_time,
+                elapsed_time: activity.elapsed_time,
+                total_elevation_gain: activity.total_elevation_gain,
+                start_date: activity.start_date,
+                average_speed: activity.average_speed,
+                max_speed: activity.max_speed,
+                average_heartrate: activity.average_heartrate,
+                max_heartrate: activity.max_heartrate,
+                source: activity.source || "strava",
+              },
+              splits: [],
+              lang,
+              checkCacheOnly: true,
+            },
+          });
+          if (data?.analysis) {
+            setAiAnalysis(data.analysis);
+            setAiNextWorkout(data.nextWorkout || null);
+            setRpeSubmitted(true);
+            if (data.raceId) {
+              setRaceSelection(data.raceId);
+              setSavedRaceId(data.raceId);
+            } else if (data.raceName) {
+              setRaceSelection("manual");
+              setManualRaceName(data.raceName);
+              setSavedRaceName(data.raceName);
+            }
+            if (data.userComment) {
+              setUserComment(data.userComment);
+              setSavedComment(data.userComment);
+            }
+          }
+        } catch {}
       }
       setLoading(false);
     };
@@ -581,6 +672,91 @@ const ActivityDetail = ({ activity, lang, onBack, isPremium, trainingScore }: Pr
         </div>
       )}
 
+      {/* Race tag + Runner comment (Premium only) */}
+      {isPremium && (
+        <div className="bg-card border border-border rounded-xl p-4 mt-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Trophy size={16} className="text-primary" />
+            <h3 className="font-display font-bold text-foreground text-sm">
+              {lang === "zh" ? "比賽標籤與感受" : "Race Tag & Your Comment"}
+            </h3>
+          </div>
+
+          <label className="text-xs font-medium text-foreground mb-1.5 block">
+            {lang === "zh" ? "這是比賽嗎？" : "Was this a race?"}
+          </label>
+          {sameDayRaces.length > 0 ? (
+            <select
+              value={raceSelection}
+              onChange={(e) => {
+                setRaceSelection(e.target.value);
+                if (e.target.value !== "manual") setManualRaceName("");
+              }}
+              className="w-full text-sm rounded-lg border border-input bg-background px-3 py-2 mb-2"
+            >
+              <option value="">{lang === "zh" ? "— 不是比賽 —" : "— Not a race —"}</option>
+              {sameDayRaces.map(r => (
+                <option key={r.id} value={r.id}>
+                  {(lang === "zh" && r.name_zh ? r.name_zh : r.name)} · {r.city}
+                </option>
+              ))}
+              <option value="manual">{lang === "zh" ? "找不到我的比賽，手動輸入…" : "I can't find my race — enter manually…"}</option>
+            </select>
+          ) : (
+            <div className="mb-2">
+              <p className="text-xs text-muted-foreground mb-2">
+                {lang === "zh"
+                  ? "今天沒有可選的比賽，請在下方輸入比賽名稱。"
+                  : "No race available today, please enter the race name below."}
+              </p>
+              <select
+                value={raceSelection}
+                onChange={(e) => setRaceSelection(e.target.value)}
+                className="w-full text-sm rounded-lg border border-input bg-background px-3 py-2 mb-2"
+              >
+                <option value="">{lang === "zh" ? "— 不是比賽 —" : "— Not a race —"}</option>
+                <option value="manual">{lang === "zh" ? "這是比賽 — 手動輸入" : "This was a race — enter manually"}</option>
+              </select>
+            </div>
+          )}
+
+          {raceSelection === "manual" && (
+            <Input
+              value={manualRaceName}
+              onChange={(e) => setManualRaceName(e.target.value)}
+              placeholder={lang === "zh" ? "輸入比賽名稱（例：渣打馬拉松）" : "Enter race name (e.g. Boston Marathon)"}
+              className="mb-2"
+              maxLength={120}
+            />
+          )}
+
+          <label className="text-xs font-medium text-foreground mb-1.5 block mt-3">
+            <MessageSquare size={12} className="inline mr-1" />
+            {lang === "zh" ? "你對這次活動有什麼感想？（選填）" : "How did this activity feel? (optional)"}
+          </label>
+          <Textarea
+            value={userComment}
+            onChange={(e) => setUserComment(e.target.value)}
+            placeholder={lang === "zh"
+              ? "例如：腿很沉、心率偏高、最後 5 公里很辛苦…"
+              : "e.g. Legs felt heavy, HR was higher than usual, struggled in the last 5 km…"}
+            className="text-sm min-h-[72px]"
+            maxLength={500}
+          />
+
+          {inputsChanged && (
+            <button
+              onClick={handleRegenerateAnalysis}
+              disabled={aiLoading}
+              className="mt-3 w-full flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
+            >
+              <RefreshCw size={12} />
+              {lang === "zh" ? "用新資訊重新分析" : "Re-analyze with new info"}
+            </button>
+          )}
+        </div>
+      )}
+
       {/* AI Workout Analysis Section */}
       <div className="bg-card border border-border rounded-xl p-4 mt-4">
         <div className="flex items-center gap-2 mb-3">
@@ -647,6 +823,22 @@ const ActivityDetail = ({ activity, lang, onBack, isPremium, trainingScore }: Pr
           <div className="prose prose-sm dark:prose-invert max-w-none text-foreground text-sm [&_h2]:text-base [&_h2]:font-bold [&_h2]:mt-3 [&_h2]:mb-1 [&_ul]:my-1 [&_li]:my-0.5">
             <ReactMarkdown>{aiAnalysis}</ReactMarkdown>
           </div>
+        ) : !analysisAttempted ? (
+          <div className="text-center py-4">
+            <p className="text-sm text-muted-foreground mb-3">
+              {lang === "zh"
+                ? "請先（可選）在上方標記比賽和填寫感受，然後點擊下方按鈕開始 AI 分析。"
+                : "Optionally tag a race and add a comment above first, then click below to run AI analysis."}
+            </p>
+            <button
+              onClick={handleAnalyzeClick}
+              disabled={aiLoading}
+              className="px-4 py-2 rounded-lg text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
+            >
+              <Sparkles size={12} className="inline mr-1" />
+              {lang === "zh" ? "開始 AI 分析" : "Run AI Analysis"}
+            </button>
+          </div>
         ) : (
           <div className="text-center py-4">
             <p className="text-sm text-muted-foreground mb-2">
@@ -661,6 +853,21 @@ const ActivityDetail = ({ activity, lang, onBack, isPremium, trainingScore }: Pr
           </div>
         )}
       </div>
+
+      {/* Suggested Next Workout */}
+      {isPremium && aiNextWorkout && !aiLoading && (
+        <div className="bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/30 rounded-xl p-4 mt-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Footprints size={16} className="text-primary" />
+            <h3 className="font-display font-bold text-foreground text-sm">
+              {lang === "zh" ? "建議的下一次訓練" : "Suggested Next Workout"}
+            </h3>
+          </div>
+          <div className="prose prose-sm dark:prose-invert max-w-none text-foreground text-sm [&_h2]:text-base [&_h2]:font-bold [&_h2]:mt-2 [&_h2]:mb-1 [&_ul]:my-1 [&_li]:my-0.5 [&_strong]:text-primary">
+            <ReactMarkdown>{aiNextWorkout}</ReactMarkdown>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

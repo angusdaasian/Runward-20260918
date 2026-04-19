@@ -9,10 +9,7 @@ const corsHeaders = {
 const jsonHeaders = { ...corsHeaders, "Content-Type": "application/json" };
 
 function jsonResponse(body: Record<string, unknown>, status = 200) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: jsonHeaders,
-  });
+  return new Response(JSON.stringify(body), { status, headers: jsonHeaders });
 }
 
 function asArray<T = any>(value: unknown): T[] {
@@ -23,14 +20,61 @@ function isValidDate(value: Date) {
   return !Number.isNaN(value.getTime());
 }
 
+// --- Open-Meteo helpers ---
+async function geocodeCity(query: string): Promise<{ lat: number; lon: number; name: string } | null> {
+  try {
+    const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=1&language=en&format=json`;
+    const resp = await fetch(url);
+    if (!resp.ok) return null;
+    const data = await resp.json();
+    const r = data?.results?.[0];
+    if (!r) return null;
+    return { lat: r.latitude, lon: r.longitude, name: `${r.name}${r.country ? ", " + r.country : ""}` };
+  } catch (e) {
+    console.error("geocodeCity error:", e);
+    return null;
+  }
+}
+
+async function fetchHistoricalWeather(lat: number, lon: number, dateStr: string): Promise<any | null> {
+  try {
+    // Open-Meteo archive API. dateStr should be YYYY-MM-DD.
+    const url = `https://archive-api.open-meteo.com/v1/archive?latitude=${lat}&longitude=${lon}&start_date=${dateStr}&end_date=${dateStr}&daily=temperature_2m_max,temperature_2m_min,temperature_2m_mean,precipitation_sum,wind_speed_10m_max,relative_humidity_2m_mean&timezone=auto`;
+    const resp = await fetch(url);
+    if (!resp.ok) {
+      // Fall back to forecast API for very recent dates not yet in archive
+      const fUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&start_date=${dateStr}&end_date=${dateStr}&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max&timezone=auto`;
+      const fResp = await fetch(fUrl);
+      if (!fResp.ok) return null;
+      return await fResp.json();
+    }
+    return await resp.json();
+  } catch (e) {
+    console.error("fetchHistoricalWeather error:", e);
+    return null;
+  }
+}
+
+function summarizeWeather(weather: any): string {
+  if (!weather?.daily) return "";
+  const d = weather.daily;
+  const parts: string[] = [];
+  if (d.temperature_2m_max?.[0] != null && d.temperature_2m_min?.[0] != null) {
+    parts.push(`Temp ${d.temperature_2m_min[0]}°C–${d.temperature_2m_max[0]}°C`);
+  }
+  if (d.temperature_2m_mean?.[0] != null) parts.push(`avg ${d.temperature_2m_mean[0]}°C`);
+  if (d.relative_humidity_2m_mean?.[0] != null) parts.push(`humidity ${d.relative_humidity_2m_mean[0]}%`);
+  if (d.precipitation_sum?.[0] != null) parts.push(`precip ${d.precipitation_sum[0]}mm`);
+  if (d.wind_speed_10m_max?.[0] != null) parts.push(`wind up to ${d.wind_speed_10m_max[0]} km/h`);
+  return parts.join(", ");
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return jsonResponse({ error: "Unauthorized" }, 401);
-    }
+    if (!authHeader) return jsonResponse({ error: "Unauthorized" }, 401);
 
     const accessToken = authHeader.replace(/^Bearer\s+/i, "").trim();
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
@@ -42,56 +86,49 @@ serve(async (req) => {
 
     const serviceClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
     const { data: { user }, error: userError } = await serviceClient.auth.getUser(accessToken);
-    if (userError || !user) {
-      return jsonResponse({ error: "Unauthorized" }, 401);
-    }
+    if (userError || !user) return jsonResponse({ error: "Unauthorized" }, 401);
 
     const body = await req.json();
-    const { activity, splits, lang, translate, activityDbId, rpe, checkCacheOnly, garminLaps } = body;
+    const {
+      activity, splits, lang, translate, activityDbId, rpe, checkCacheOnly, garminLaps,
+      raceId, raceName, userComment, forceRefresh,
+    } = body;
     const isZh = lang === "zh";
 
     // --- Translation mode ---
     if (translate && activityDbId) {
-      // Fetch existing analysis
-      const { data: existing, error: existingError } = await serviceClient
+      const { data: existing } = await serviceClient
         .from("activity_analyses")
         .select("*")
         .eq("activity_id", activityDbId)
         .eq("user_id", user.id)
         .maybeSingle();
 
-      if (existingError) {
-        console.error("activity_analyses translate fetch error:", existingError);
-      }
-
-      if (!existing) {
-        return jsonResponse({ error: "No analysis found to translate" }, 404);
-      }
+      if (!existing) return jsonResponse({ error: "No analysis found to translate" }, 404);
 
       const targetField = isZh ? "analysis_zh" : "analysis_en";
       const sourceField = isZh ? "analysis_en" : "analysis_zh";
+      const nextTargetField = isZh ? "next_workout_zh" : "next_workout_en";
+      const nextSourceField = isZh ? "next_workout_en" : "next_workout_zh";
 
-      // Already have this translation
-      if (existing[targetField]) {
-        return jsonResponse({ analysis: existing[targetField] });
+      // If we already have both translations, just return them
+      if (existing[targetField] && (existing[nextTargetField] || !existing[nextSourceField])) {
+        return jsonResponse({ analysis: existing[targetField], nextWorkout: existing[nextTargetField] || null });
       }
 
       const sourceText = existing[sourceField];
-      if (!sourceText) {
-        return jsonResponse({ error: "No source text to translate" }, 400);
-      }
+      if (!sourceText) return jsonResponse({ error: "No source text to translate" }, 400);
 
       const targetLang = isZh ? "Traditional Chinese (Hong Kong)" : "English";
+      const combinedSource = `===ANALYSIS===\n${sourceText}\n\n===NEXT_WORKOUT===\n${existing[nextSourceField] || ""}`;
+
       const tlResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
-          "Content-Type": "application/json",
-        },
+        headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
         body: JSON.stringify({
           model: "google/gemini-3-flash-preview",
           messages: [
-            { role: "user", content: `Translate the following running workout analysis into ${targetLang}. Keep the Markdown formatting intact. Only translate, do not change the content.\n\n${sourceText}` },
+            { role: "user", content: `Translate the following running coach output into ${targetLang}. Preserve the ===ANALYSIS=== and ===NEXT_WORKOUT=== separators exactly. Keep Markdown intact. Only translate, do not change content.\n\n${combinedSource}` },
           ],
         }),
       });
@@ -100,17 +137,17 @@ serve(async (req) => {
         console.error("Translation error:", tlResp.status, await tlResp.text());
         return jsonResponse({ error: "Translation failed" }, 500);
       }
-
       const tlData = await tlResp.json();
       const translated = tlData.choices?.[0]?.message?.content || "";
+      const [tAnalysisRaw, tNextRaw] = translated.split("===NEXT_WORKOUT===");
+      const tAnalysis = (tAnalysisRaw || "").replace(/^===ANALYSIS===\s*/i, "").trim();
+      const tNext = (tNextRaw || "").trim();
 
-      // Save translation
-      await serviceClient
-        .from("activity_analyses")
-        .update({ [targetField]: translated })
-        .eq("id", existing.id);
+      const updatePayload: any = { [targetField]: tAnalysis };
+      if (tNext) updatePayload[nextTargetField] = tNext;
+      await serviceClient.from("activity_analyses").update(updatePayload).eq("id", existing.id);
 
-      return jsonResponse({ analysis: translated });
+      return jsonResponse({ analysis: tAnalysis, nextWorkout: tNext || null });
     }
 
     // --- Analysis mode ---
@@ -118,7 +155,7 @@ serve(async (req) => {
       return jsonResponse({ error: "activity and activityDbId are required" }, 400);
     }
 
-    // --- Check cache only mode (for Apple Health on load) ---
+    // --- Check cache only mode ---
     if (checkCacheOnly) {
       const { data: cached } = await serviceClient
         .from("activity_analyses")
@@ -128,73 +165,127 @@ serve(async (req) => {
         .maybeSingle();
       if (cached) {
         const field = isZh ? "analysis_zh" : "analysis_en";
-        if (cached[field]) return jsonResponse({ analysis: cached[field] });
+        const nField = isZh ? "next_workout_zh" : "next_workout_en";
+        if (cached[field]) {
+          return jsonResponse({
+            analysis: cached[field],
+            nextWorkout: cached[nField] || null,
+            raceId: cached.race_id || null,
+            raceName: cached.race_name || null,
+            userComment: cached.user_comment || null,
+          });
+        }
       }
       return jsonResponse({ analysis: null });
     }
 
-    // Check if analysis already exists
-    const { data: existingAnalysis, error: existingAnalysisError } = await serviceClient
+    // Existing analysis check (skip if forceRefresh)
+    const { data: existingAnalysis } = await serviceClient
       .from("activity_analyses")
       .select("*")
       .eq("activity_id", activityDbId)
       .eq("user_id", user.id)
       .maybeSingle();
 
-    if (existingAnalysisError) {
-      console.error("activity_analyses fetch error:", existingAnalysisError);
-    }
-
-    if (existingAnalysis) {
+    if (existingAnalysis && !forceRefresh) {
       const field = isZh ? "analysis_zh" : "analysis_en";
+      const nField = isZh ? "next_workout_zh" : "next_workout_en";
       if (existingAnalysis[field]) {
-        return jsonResponse({ analysis: existingAnalysis[field] });
+        return jsonResponse({
+          analysis: existingAnalysis[field],
+          nextWorkout: existingAnalysis[nField] || null,
+          raceId: existingAnalysis.race_id || null,
+          raceName: existingAnalysis.race_name || null,
+          userComment: existingAnalysis.user_comment || null,
+        });
       }
-      // Has analysis in other language, trigger translation
+      // Translate from other language
       const otherField = isZh ? "analysis_en" : "analysis_zh";
+      const otherNextField = isZh ? "next_workout_en" : "next_workout_zh";
       if (existingAnalysis[otherField]) {
-        // Translate inline
         const targetLang = isZh ? "Traditional Chinese (Hong Kong)" : "English";
+        const combined = `===ANALYSIS===\n${existingAnalysis[otherField]}\n\n===NEXT_WORKOUT===\n${existingAnalysis[otherNextField] || ""}`;
         const tlResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
           method: "POST",
-          headers: {
-            Authorization: `Bearer ${LOVABLE_API_KEY}`,
-            "Content-Type": "application/json",
-          },
+          headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
           body: JSON.stringify({
             model: "google/gemini-3-flash-preview",
-            messages: [
-              { role: "user", content: `Translate the following running workout analysis into ${targetLang}. Keep the Markdown formatting intact.\n\n${existingAnalysis[otherField]}` },
-            ],
+            messages: [{ role: "user", content: `Translate the following into ${targetLang}. Preserve the ===ANALYSIS=== and ===NEXT_WORKOUT=== separators. Keep Markdown.\n\n${combined}` }],
           }),
         });
         if (tlResp.ok) {
           const tlData = await tlResp.json();
           const translated = tlData.choices?.[0]?.message?.content || "";
-          await serviceClient.from("activity_analyses").update({ [field]: translated }).eq("id", existingAnalysis.id);
-          return jsonResponse({ analysis: translated });
+          const [aRaw, nRaw] = translated.split("===NEXT_WORKOUT===");
+          const a = (aRaw || "").replace(/^===ANALYSIS===\s*/i, "").trim();
+          const n = (nRaw || "").trim();
+          const upd: any = { [field]: a };
+          if (n) upd[nField] = n;
+          await serviceClient.from("activity_analyses").update(upd).eq("id", existingAnalysis.id);
+          return jsonResponse({
+            analysis: a,
+            nextWorkout: n || null,
+            raceId: existingAnalysis.race_id || null,
+            raceName: existingAnalysis.race_name || null,
+            userComment: existingAnalysis.user_comment || null,
+          });
         }
       }
     }
 
-    // Fetch user's active training plan
-    const { data: plans, error: plansError } = await serviceClient
+    // --- Resolve race + weather ---
+    let resolvedRaceName: string | null = raceName?.trim() || null;
+    let raceCity: string | null = null;
+    let raceCountry: string | null = null;
+    if (raceId) {
+      const { data: raceRow } = await serviceClient
+        .from("races")
+        .select("name, name_zh, city, country")
+        .eq("id", raceId)
+        .maybeSingle();
+      if (raceRow) {
+        resolvedRaceName = isZh && raceRow.name_zh ? raceRow.name_zh : raceRow.name;
+        raceCity = raceRow.city;
+        raceCountry = raceRow.country;
+      }
+    }
+
+    let weatherJson: any = null;
+    let weatherSummary = "";
+    let weatherLocationName: string | null = null;
+    const activityDateStr = typeof activity.start_date === "string" && activity.start_date
+      ? activity.start_date.split("T")[0]
+      : null;
+
+    if (resolvedRaceName && activityDateStr) {
+      // Try geocoding by city,country first; fall back to race name
+      let geo: { lat: number; lon: number; name: string } | null = null;
+      if (raceCity) {
+        geo = await geocodeCity(`${raceCity}${raceCountry ? ", " + raceCountry : ""}`);
+      }
+      if (!geo) geo = await geocodeCity(resolvedRaceName);
+      if (geo) {
+        weatherLocationName = geo.name;
+        weatherJson = await fetchHistoricalWeather(geo.lat, geo.lon, activityDateStr);
+        if (weatherJson) {
+          weatherSummary = summarizeWeather(weatherJson);
+          weatherJson._location = geo.name;
+          weatherJson._summary = weatherSummary;
+        }
+      }
+    }
+
+    // --- Plan context (unchanged logic) ---
+    const { data: plans } = await serviceClient
       .from("training_plans")
       .select("*")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
       .limit(1);
 
-    if (plansError) {
-      console.error("training_plans fetch error:", plansError);
-    }
-
     const plan = plans && plans.length > 0 ? plans[0] : null;
-
     const activityDate = new Date(activity.start_date);
-    const activityDateStr = typeof activity.start_date === "string" && activity.start_date
-      ? activity.start_date.split("T")[0]
-      : "Unknown";
+    const fallbackDateStr = activityDateStr || "Unknown";
     let planContext = "";
 
     if (plan) {
@@ -207,15 +298,12 @@ serve(async (req) => {
         : null;
       const planStartDate = parsedPlanStartDate && isValidDate(parsedPlanStartDate)
         ? parsedPlanStartDate
-        : fallbackPlanStartDate && isValidDate(fallbackPlanStartDate)
-          ? fallbackPlanStartDate
-          : null;
+        : fallbackPlanStartDate && isValidDate(fallbackPlanStartDate) ? fallbackPlanStartDate : null;
 
       if (!planStartDate || !isValidDate(activityDate)) {
         planContext = `The user is on a ${plan.distance} training plan (${plan.goal === "custom" ? "Custom" : plan.goal}).
 - Target finishing time: ${plan.target_time}
-- Race date: ${plan.race_date}
-Please analyze how this activity fits the user's training plan, pacing, effort, and progression.`;
+- Race date: ${plan.race_date}`;
       } else if (activityDate < planStartDate) {
         planContext = `The user has an upcoming training plan:
 - Race type: ${plan.distance} (${plan.goal === "custom" ? "Custom plan" : plan.goal})
@@ -223,32 +311,37 @@ Please analyze how this activity fits the user's training plan, pacing, effort, 
 - Plan start date: ${planStartDate.toISOString().split("T")[0]}
 - Race date: ${plan.race_date}
 - Plan duration: ${plan.weeks} weeks
-- The plan has NOT started yet. This activity was done BEFORE the plan begins.
-Please analyze how this activity benefits the user's preparation for their upcoming plan.`;
+- The plan has NOT started yet.`;
       } else {
         const diffMs = activityDate.getTime() - planStartDate.getTime();
         const weekNumber = Math.max(1, Math.floor(diffMs / (7 * 24 * 60 * 60 * 1000)) + 1);
-
         let plannedWorkout = "";
         const weekData = planData.find((w: any) => Number(w?.week) === weekNumber) ?? planData[weekNumber - 1];
-        const dayMatch = asArray<any>(weekData?.days).find((d: any) => d?.date === activityDateStr);
+        const dayMatch = asArray<any>(weekData?.days).find((d: any) => d?.date === fallbackDateStr);
         if (dayMatch) {
           const plannedDistance = dayMatch.distance_km ?? dayMatch.distance;
           plannedWorkout = `Planned workout for this day: ${dayMatch.workout || dayMatch.description || dayMatch.type || "Rest"}` +
             (plannedDistance ? ` (${plannedDistance} km)` : "");
         }
-
         planContext = `The user is on a ${plan.distance} training plan (${plan.goal === "custom" ? "Custom" : plan.goal}).
-- This is Week ${weekNumber} of a ${plan.weeks}-week plan.
+- Week ${weekNumber} of ${plan.weeks}-week plan.
 - Target finishing time: ${plan.target_time}
 - Race date: ${plan.race_date}
-${plannedWorkout ? `- ${plannedWorkout}` : ""}
-Please analyze whether the user executed the planned workout correctly and provide feedback on pacing, effort, and adherence to the plan.`;
+${plannedWorkout ? `- ${plannedWorkout}` : ""}`;
       }
     } else {
-      planContext = "The user does not have an active training plan. Please analyze the workout quality based on the stats alone.";
+      planContext = "The user does not have an active training plan.";
     }
 
+    // --- Fetch user's training_score for next-workout pace targeting ---
+    const { data: profile } = await serviceClient
+      .from("profiles")
+      .select("training_score")
+      .eq("user_id", user.id)
+      .maybeSingle();
+    const trainingScore = profile?.training_score ?? null;
+
+    // --- Build stats text ---
     const distKm = (activity.distance / 1000).toFixed(2);
     const paceSeconds = activity.average_speed > 0 ? 1000 / activity.average_speed : 0;
     const paceMin = Math.floor(paceSeconds / 60);
@@ -257,62 +350,42 @@ Please analyze whether the user executed the planned workout correctly and provi
 
     const activitySource = activity.source || "unknown";
     const isAppleHealth = activitySource === "Apple Health";
-    const isGarmin = activitySource === "Garmin";
 
     let statsText = `Activity: "${activity.name}"
 - Source: ${activitySource}
-- Date: ${activityDateStr}
+- Date: ${fallbackDateStr}
 - Total Distance: ${distKm} km
 - Moving Time: ${Math.floor(activity.moving_time / 60)} min ${activity.moving_time % 60} sec
 - Average Pace: ${avgPace}`;
 
-    // RPE from user input (Apple Health activities)
     if (typeof rpe === "number" && rpe >= 1 && rpe <= 10) {
-      statsText += `\n- RPE (Rate of Perceived Exertion): ${rpe}/10`;
+      statsText += `\n- RPE: ${rpe}/10`;
     }
 
-    // Elevation — only include if meaningful
-    if (activity.total_elevation_gain > 0) {
-      statsText += `\n- Total Elevation Gain: ${Math.round(activity.total_elevation_gain)} m`;
-    }
-
-    // RPE from user input (Apple Health & Garmin activities)
-    if (typeof rpe === "number" && rpe >= 1 && rpe <= 10) {
-      statsText += `\n- RPE (Rate of Perceived Exertion): ${rpe}/10`;
-    }
-
-    // For Apple Health: only use pace, distance, RPE — skip HR and elevation
-    // For Garmin & Strava: include HR and elevation
     if (!isAppleHealth) {
-      // Elevation — only include if meaningful
       if (activity.total_elevation_gain > 0) {
         statsText += `\n- Total Elevation Gain: ${Math.round(activity.total_elevation_gain)} m`;
       }
-
-      // HR data
-      if (activity.average_heartrate) statsText += `\n- Average Heart Rate: ${Math.round(activity.average_heartrate)} bpm`;
-      if (activity.max_heartrate) statsText += `\n- Max Heart Rate: ${Math.round(activity.max_heartrate)} bpm`;
+      if (activity.average_heartrate) statsText += `\n- Average HR: ${Math.round(activity.average_heartrate)} bpm`;
+      if (activity.max_heartrate) statsText += `\n- Max HR: ${Math.round(activity.max_heartrate)} bpm`;
     }
 
     // --- Garmin laps (interval-aware) ---
     const garminLapsArr = asArray<any>(garminLaps);
     if (garminLapsArr.length > 0) {
-      // Classify laps as work or rest based on distance and speed
       const lapsWithType = garminLapsArr.map((lap: any) => {
         const dist = lap.distance || 0;
         const speed = lap.avg_speed || 0;
-        const isRest = dist < 200 && speed < 2; // short distance + slow speed = rest/recovery
+        const isRest = dist < 200 && speed < 2;
         return { ...lap, isRest };
       });
-
       const workLaps = lapsWithType.filter((l: any) => !l.isRest && l.distance > 0);
       const restLaps = lapsWithType.filter((l: any) => l.isRest && l.distance >= 0);
       const hasIntervalPattern = workLaps.length >= 2 && restLaps.length >= 1;
 
       if (hasIntervalPattern) {
-        statsText += `\n\n⚡ INTERVAL WORKOUT DETECTED (from Garmin laps):`;
-        statsText += `\n  Work intervals: ${workLaps.length} | Rest/recovery intervals: ${restLaps.length}`;
-
+        statsText += `\n\n⚡ INTERVAL WORKOUT DETECTED (Garmin laps):`;
+        statsText += `\n  Work: ${workLaps.length} | Rest: ${restLaps.length}`;
         statsText += `\n\n  Work intervals:`;
         for (const lap of workLaps) {
           const distM = Math.round(lap.distance || 0);
@@ -323,35 +396,15 @@ Please analyze whether the user executed the planned workout correctly and provi
           statsText += `\n    Lap ${lap.split_number}: ${distM}m in ${elapsed}s (pace: ${paceStr})`;
           if (lap.avg_hr) statsText += ` | HR: ${Math.round(lap.avg_hr)} bpm`;
         }
-
         if (restLaps.length > 0) {
           statsText += `\n\n  Recovery intervals:`;
           for (const lap of restLaps) {
             const distM = Math.round(lap.distance || 0);
             const elapsed = Math.round(lap.elapsed_time || 0);
-            statsText += `\n    Lap ${lap.split_number}: ${distM}m in ${elapsed}s (recovery)`;
+            statsText += `\n    Lap ${lap.split_number}: ${distM}m in ${elapsed}s`;
           }
         }
-
-        // Summary stats
-        const workPaces = workLaps.map((l: any) => l.avg_speed > 0 ? 1000 / l.avg_speed : 0).filter((p: number) => p > 0);
-        if (workPaces.length > 0) {
-          const avgWorkPace = workPaces.reduce((a: number, b: number) => a + b, 0) / workPaces.length;
-          const fastestWork = Math.min(...workPaces);
-          const slowestWork = Math.max(...workPaces);
-          const fmtPace = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
-          statsText += `\n\n  Work interval avg pace: ${fmtPace(avgWorkPace)} /km (range: ${fmtPace(fastestWork)} – ${fmtPace(slowestWork)})`;
-        }
-
-        const restTimes = restLaps.map((l: any) => Math.round(l.elapsed_time || 0));
-        if (restTimes.length > 0) {
-          const avgRest = Math.round(restTimes.reduce((a: number, b: number) => a + b, 0) / restTimes.length);
-          statsText += `\n  Avg recovery duration: ${avgRest}s`;
-        }
-
-        statsText += `\n\nThis is an INTERVAL session. Analyze work interval pace consistency, recovery adequacy, and overall interval quality. Do NOT treat this as a continuous run.`;
       } else {
-        // Non-interval Garmin laps
         statsText += "\n\nGarmin Laps:";
         for (const lap of garminLapsArr) {
           const distM = Math.round(lap.distance || 0);
@@ -364,11 +417,9 @@ Please analyze whether the user executed the planned workout correctly and provi
         }
       }
     } else if (splits && splits.length > 0) {
-      const splitPaces: number[] = [];
       statsText += "\n\nSplits (per km):";
       for (const s of splits) {
         const sp = s.average_speed > 0 ? 1000 / s.average_speed : 0;
-        splitPaces.push(sp);
         const sm = Math.floor(sp / 60);
         const ss = Math.floor(sp % 60);
         statsText += `\n  km ${s.split}: ${sm}:${String(ss).padStart(2, "0")} /km`;
@@ -376,108 +427,86 @@ Please analyze whether the user executed the planned workout correctly and provi
           statsText += ` | Elev: ${s.elevation_difference > 0 ? "+" : ""}${Math.round(s.elevation_difference)}m`;
         }
       }
+    }
 
-      // Detect interval pattern: look for significant pace variation between splits
-      if (splitPaces.length >= 3) {
-        const validPaces = splitPaces.filter(p => p > 0);
-        if (validPaces.length >= 3) {
-          const fastestPace = Math.min(...validPaces);
-          const slowestPace = Math.max(...validPaces);
-          const paceRange = slowestPace - fastestPace;
-          const avgPaceSplits = validPaces.reduce((a, b) => a + b, 0) / validPaces.length;
-          const paceVariationPct = (paceRange / avgPaceSplits) * 100;
-
-          let alternations = 0;
-          const medianPace = [...validPaces].sort((a, b) => a - b)[Math.floor(validPaces.length / 2)];
-          for (let i = 1; i < validPaces.length; i++) {
-            const prevFast = validPaces[i - 1] < medianPace;
-            const currFast = validPaces[i] < medianPace;
-            if (prevFast !== currFast) alternations++;
-          }
-
-          if (paceVariationPct > 15 && alternations >= 2) {
-            const fastPaceFmt = `${Math.floor(fastestPace / 60)}:${String(Math.floor(fastestPace % 60)).padStart(2, "0")}`;
-            const slowPaceFmt = `${Math.floor(slowestPace / 60)}:${String(Math.floor(slowestPace % 60)).padStart(2, "0")}`;
-            statsText += `\n\n⚡ INTERVAL PATTERN DETECTED: Splits show significant pace alternation (${alternations} transitions). Fastest split: ${fastPaceFmt}/km, Slowest split: ${slowPaceFmt}/km, Variation: ${Math.round(paceVariationPct)}%. This is likely an interval/fartlek workout — analyze accordingly (work vs recovery splits, target paces, rest adequacy).`;
-          } else if (paceVariationPct > 20) {
-            statsText += `\n\n📊 HIGH PACE VARIATION: ${Math.round(paceVariationPct)}% variation across splits. Could indicate tempo segments, progression run, or hilly terrain.`;
-          }
-        }
-      }
+    // --- Race + weather + comment context ---
+    let raceContext = "";
+    if (resolvedRaceName) {
+      raceContext += `\n\n🏁 RACE CONTEXT: This activity was a race — "${resolvedRaceName}"${raceCity ? ` in ${raceCity}${raceCountry ? ", " + raceCountry : ""}` : ""}. Treat this as a race-day effort, not a training run.`;
+    }
+    if (weatherSummary) {
+      raceContext += `\n\n🌤 RACE-DAY WEATHER (${weatherLocationName || "race location"}, ${fallbackDateStr}): ${weatherSummary}. Factor weather conditions into your assessment of the effort and pace.`;
+    }
+    if (userComment && typeof userComment === "string" && userComment.trim()) {
+      raceContext += `\n\n💬 RUNNER'S OWN COMMENT: "${userComment.trim()}". Use this to understand subjective effort, fatigue, mood — and weight your next-workout suggestion accordingly.`;
+    }
+    if (trainingScore != null) {
+      raceContext += `\n\n📊 RUNNER'S TRAINING SCORE: ${trainingScore} (rough fitness indicator — higher = fitter).`;
     }
 
     const hasRpe = typeof rpe === "number" && rpe >= 1 && rpe <= 10;
 
     const systemPrompt = isZh
-      ? `你是一位專業跑步教練 AI。根據提供的訓練計劃背景和活動數據，給出簡潔但深入的分析。回覆請用繁體中文。
+      ? `你是一位專業跑步教練 AI。根據訓練計劃、活動數據、天氣和跑者主觀感受，給出深入分析和明日訓練建議。回覆請用繁體中文。
 
-你的分析應主要基於以下核心指標：
-- 配速（平均配速、分段配速一致性）
-- 距離（是否完成計劃距離）
-- 時間（訓練時長是否合理）
-${hasRpe ? `- RPE（用戶的自覺運動強度），用來判斷訓練強度是否合適` : `- 爬升（地形對配速的影響）`}
+格式要求：嚴格使用以下兩個區塊，並用 ===NEXT_WORKOUT=== 分隔。
 
-${hasRpe ? `RPE 量表說明：1-3 = 輕鬆恢復跑，4-5 = 有氧輕鬆跑，6-7 = 節奏跑/乳酸閾值，8-9 = 間歇/高強度，10 = 全力衝刺。請根據 RPE 值判斷這次訓練的強度是否與配速和距離匹配，以及是否適合用戶的訓練計劃階段。` : `如果有心率數據，可以作為額外參考，但不要因為缺少心率數據而影響分析質量。`}
-
-如果用戶有訓練計劃，重點比較：
-- 實際距離 vs 計劃距離
-- 實際配速 vs 計劃目標配速
-- 訓練類型是否符合計劃安排
-${hasRpe ? `- RPE 是否與計劃中預期的訓練強度一致` : ``}
-
-格式要求：用 Markdown 格式回覆，包含以下部分：
+===ANALYSIS===
 ## 總評
-簡短評價這次訓練
+簡短評價（如果是比賽，要評估比賽表現；如果天氣特殊，要提到天氣的影響）
 
 ## 優點
-列出做得好的地方
+2-3 點做得好的地方
 
 ## 需改善
-列出需要改善的地方
+2-3 點需改善的地方
 
 ## 建議
-給出具體的訓練建議
+1-2 點針對這次訓練/比賽的具體建議
 
-保持簡潔實用，每個部分 2-3 點即可。`
-      : `You are a professional running coach AI. Based on the training plan context and activity data provided, give a concise but insightful analysis.
+===NEXT_WORKOUT===
+## 明日建議訓練
+根據今天的表現、跑者的主觀感受、訓練分數和（如有）比賽強度，給出非常具體的下一次訓練建議：
+- **類型**：（恢復跑 / 輕鬆有氧 / 節奏跑 / 間歇 / 休息）
+- **距離**：X 公里
+- **配速**：X:XX /km
+- **時長**：約 X 分鐘
+- **理由**：簡短說明為什麼這樣安排（1-2 句）
 
-Your analysis should focus on these core metrics:
-- Pace (average pace, split consistency, appropriate effort level)
-- Distance (did the runner complete the intended distance?)
-- Duration (was the workout duration reasonable?)
-${hasRpe ? `- RPE (Rate of Perceived Exertion) — use this to gauge whether the workout intensity was appropriate` : `- Elevation (how did terrain affect pace?)`}
+如果跑者今天比賽很辛苦或抱怨疲累，建議休息或非常輕鬆的恢復跑。如果是輕鬆訓練，可以建議稍強的訓練。`
+      : `You are a professional running coach AI. Based on the training plan, activity data, weather, and the runner's own comment, provide an in-depth analysis AND a concrete next-workout recommendation.
 
-${hasRpe ? `RPE Scale Reference: 1-3 = Easy recovery run, 4-5 = Aerobic easy run, 6-7 = Tempo/threshold effort, 8-9 = Intervals/high intensity, 10 = All-out sprint. Analyze whether the RPE matches the pace and distance, and whether the effort level is appropriate for the user's training plan stage.` : `If heart rate data is available, use it as supplementary context, but do NOT let missing HR data reduce your analysis quality. Many data sources (e.g. Apple Health) may not provide HR.`}
+FORMAT — strictly use two sections separated by ===NEXT_WORKOUT===:
 
-If the user has a training plan, focus on plan adherence:
-- Actual distance vs planned distance
-- Actual pace vs target pace implied by race goal
-- Whether the workout type matches the plan's intent (easy run, tempo, intervals, long run, etc.)
-${hasRpe ? `- Whether the RPE aligns with the expected intensity for this training session` : ``}
-
-Format your reply in Markdown with these sections:
+===ANALYSIS===
 ## Overall Assessment
-Brief evaluation of the workout
+Brief evaluation. If it was a race, assess race performance. If weather was notable, mention its impact.
 
 ## Strengths
-What went well
+2-3 things that went well
 
 ## Areas to Improve
-What could be better
+2-3 things to improve
 
 ## Recommendations
-Specific training advice
+1-2 specific recommendations for this workout/race
 
-Keep it concise and actionable, 2-3 points per section.`;
+===NEXT_WORKOUT===
+## Suggested Next Workout
+Based on today's performance, the runner's subjective feel, training score, and (if applicable) race intensity, give a very concrete next-workout recommendation:
+- **Type**: (Recovery run / Easy aerobic / Tempo / Intervals / Rest)
+- **Distance**: X km
+- **Pace**: X:XX /km
+- **Duration**: ~X minutes
+- **Why**: brief reasoning (1-2 sentences)
 
-    const userMessage = `${planContext}\n\n--- Activity Data ---\n${statsText}`;
+If the runner raced hard today or said they struggled, suggest rest or a very easy recovery run. If today was easy, you can suggest a harder session.${hasRpe ? " Use RPE to gauge today's intensity." : ""}`;
+
+    const userMessage = `${planContext}${raceContext}\n\n--- Activity Data ---\n${statsText}`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
+      headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         model: "google/gemini-3-flash-preview",
         messages: [
@@ -488,37 +517,49 @@ Keep it concise and actionable, 2-3 points per section.`;
     });
 
     if (!response.ok) {
-      if (response.status === 429) {
-        return jsonResponse({ error: "Rate limited, please try again later." }, 429);
-      }
-      if (response.status === 402) {
-        return jsonResponse({ error: "Payment required." }, 402);
-      }
+      if (response.status === 429) return jsonResponse({ error: "Rate limited, please try again later." }, 429);
+      if (response.status === 402) return jsonResponse({ error: "Payment required." }, 402);
       const t = await response.text();
       console.error("AI gateway error:", response.status, t);
       return jsonResponse({ error: "AI gateway error" }, 500);
     }
 
     const data = await response.json();
-    const analysisText = data.choices?.[0]?.message?.content || "";
+    const fullText = data.choices?.[0]?.message?.content || "";
+    const [analysisRaw, nextRaw] = fullText.split("===NEXT_WORKOUT===");
+    const analysisText = (analysisRaw || "").replace(/^===ANALYSIS===\s*/i, "").trim();
+    const nextWorkoutText = (nextRaw || "").trim();
 
-    // Save to DB in the appropriate language column
+    // Save to DB
     const upsertData: any = {
       user_id: user.id,
       activity_id: activityDbId,
+      race_id: raceId || null,
+      race_name: resolvedRaceName,
+      user_comment: userComment?.trim() || null,
+      weather: weatherJson,
     };
     if (isZh) {
       upsertData.analysis_zh = analysisText;
+      if (nextWorkoutText) upsertData.next_workout_zh = nextWorkoutText;
     } else {
       upsertData.analysis_en = analysisText;
+      if (nextWorkoutText) upsertData.next_workout_en = nextWorkoutText;
     }
 
-    const { error: upsertError } = await serviceClient.from("activity_analyses").upsert(upsertData, { onConflict: "activity_id" });
-    if (upsertError) {
-      console.error("activity_analyses upsert error:", upsertError);
-    }
+    const { error: upsertError } = await serviceClient
+      .from("activity_analyses")
+      .upsert(upsertData, { onConflict: "activity_id" });
+    if (upsertError) console.error("activity_analyses upsert error:", upsertError);
 
-    return jsonResponse({ analysis: analysisText });
+    return jsonResponse({
+      analysis: analysisText,
+      nextWorkout: nextWorkoutText || null,
+      raceName: resolvedRaceName,
+      raceId: raceId || null,
+      userComment: userComment?.trim() || null,
+      weatherSummary: weatherSummary || null,
+    });
   } catch (e) {
     console.error("analyze-activity error:", e);
     return jsonResponse({ error: e instanceof Error ? e.message : "Unknown error" }, 500);

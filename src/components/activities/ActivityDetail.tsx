@@ -157,10 +157,21 @@ const ActivityDetail = ({ activity, lang, onBack, isPremium, trainingScore }: Pr
     }
   };
 
-  const runAiAnalysis = async (currentSplits: Split[] | null, rpe?: number) => {
+  const runAiAnalysis = async (currentSplits: Split[] | null, rpe?: number, opts?: { forceRefresh?: boolean }) => {
     if (!isPremium) return;
     setAiLoading(true);
     try {
+      // Resolve current race selection into raceId / raceName
+      let raceId: string | null = null;
+      let raceName: string | null = null;
+      if (raceSelection && raceSelection !== "" && raceSelection !== "manual") {
+        raceId = raceSelection;
+        const match = sameDayRaces.find(r => r.id === raceSelection);
+        if (match) raceName = lang === "zh" && match.name_zh ? match.name_zh : match.name;
+      } else if (raceSelection === "manual" && manualRaceName.trim()) {
+        raceName = manualRaceName.trim();
+      }
+
       const bodyPayload: any = {
         activityDbId: activity.id,
         activity: {
@@ -179,32 +190,32 @@ const ActivityDetail = ({ activity, lang, onBack, isPremium, trainingScore }: Pr
         splits: currentSplits || [],
         lang,
         ...(rpe !== undefined ? { rpe } : {}),
+        ...(raceId ? { raceId } : {}),
+        ...(raceName ? { raceName } : {}),
+        ...(userComment.trim() ? { userComment: userComment.trim() } : {}),
+        ...(opts?.forceRefresh ? { forceRefresh: true } : {}),
       };
-      // Pass Garmin laps for interval detection
       if (isGarmin && activity.laps && Array.isArray(activity.laps) && activity.laps.length > 0) {
         bodyPayload.garminLaps = activity.laps;
       }
-      const { data, error } = await supabase.functions.invoke("analyze-activity", {
-        body: bodyPayload,
-      });
-      console.log("[AI Analysis] response:", { data, error });
+      const { data, error } = await supabase.functions.invoke("analyze-activity", { body: bodyPayload });
       if (error) {
         const errMsg = typeof error === "object" && error?.message ? error.message : String(error);
-        console.error("[AI Analysis] invoke error:", errMsg);
         toast.error(lang === "zh" ? `分析失敗: ${errMsg}` : `Analysis failed: ${errMsg}`);
         setAiAnalysis(null);
       } else if (data?.error) {
-        console.error("[AI Analysis] server error:", data.error);
         toast.error(lang === "zh" ? `分析失敗: ${data.error}` : `Analysis failed: ${data.error}`);
         setAiAnalysis(null);
       } else if (data?.analysis) {
         setAiAnalysis(data.analysis);
+        setAiNextWorkout(data.nextWorkout || null);
+        setSavedRaceId(data.raceId || null);
+        setSavedRaceName(data.raceName || null);
+        setSavedComment(data.userComment || null);
       } else {
-        console.error("[AI Analysis] empty response:", data);
         setAiAnalysis(null);
       }
     } catch (err: any) {
-      console.error("[AI Analysis] catch error:", err);
       toast.error(lang === "zh" ? "AI 分析失敗" : "AI analysis failed");
       setAiAnalysis(null);
     }
@@ -220,6 +231,28 @@ const ActivityDetail = ({ activity, lang, onBack, isPremium, trainingScore }: Pr
     setRpeSubmitted(true);
     runAiAnalysis(null, val);
   };
+
+  const handleRegenerateAnalysis = () => {
+    if (needsRpe) {
+      const val = parseInt(rpeInput, 10);
+      runAiAnalysis(splits, isNaN(val) ? undefined : val, { forceRefresh: true });
+    } else {
+      runAiAnalysis(splits, undefined, { forceRefresh: true });
+    }
+  };
+
+  // Detect if user has changed race/comment vs what was saved with the last analysis
+  const currentResolvedRaceId = raceSelection && raceSelection !== "manual" && raceSelection !== "" ? raceSelection : null;
+  const currentResolvedRaceName =
+    raceSelection === "manual" && manualRaceName.trim() ? manualRaceName.trim() :
+    (currentResolvedRaceId ? (sameDayRaces.find(r => r.id === currentResolvedRaceId) ? (lang === "zh" && sameDayRaces.find(r => r.id === currentResolvedRaceId)!.name_zh ? sameDayRaces.find(r => r.id === currentResolvedRaceId)!.name_zh : sameDayRaces.find(r => r.id === currentResolvedRaceId)!.name) : null) : null);
+  const inputsChanged =
+    aiAnalysis != null &&
+    (
+      (currentResolvedRaceId || null) !== (savedRaceId || null) ||
+      (currentResolvedRaceName || null) !== (savedRaceName || null) ||
+      (userComment.trim() || null) !== (savedComment || null)
+    );
 
   useEffect(() => {
     if (!isPremium || !aiAnalysis || lang === aiLang) return;

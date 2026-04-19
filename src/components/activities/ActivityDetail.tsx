@@ -656,6 +656,91 @@ const ActivityDetail = ({ activity, lang, onBack, isPremium, trainingScore }: Pr
         </div>
       )}
 
+      {/* Race tag + Runner comment (Premium only) */}
+      {isPremium && (
+        <div className="bg-card border border-border rounded-xl p-4 mt-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Trophy size={16} className="text-primary" />
+            <h3 className="font-display font-bold text-foreground text-sm">
+              {lang === "zh" ? "比賽標籤與感受" : "Race Tag & Your Comment"}
+            </h3>
+          </div>
+
+          <label className="text-xs font-medium text-foreground mb-1.5 block">
+            {lang === "zh" ? "這是比賽嗎？" : "Was this a race?"}
+          </label>
+          {sameDayRaces.length > 0 ? (
+            <select
+              value={raceSelection}
+              onChange={(e) => {
+                setRaceSelection(e.target.value);
+                if (e.target.value !== "manual") setManualRaceName("");
+              }}
+              className="w-full text-sm rounded-lg border border-input bg-background px-3 py-2 mb-2"
+            >
+              <option value="">{lang === "zh" ? "— 不是比賽 —" : "— Not a race —"}</option>
+              {sameDayRaces.map(r => (
+                <option key={r.id} value={r.id}>
+                  {(lang === "zh" && r.name_zh ? r.name_zh : r.name)} · {r.city}
+                </option>
+              ))}
+              <option value="manual">{lang === "zh" ? "找不到我的比賽，手動輸入…" : "I can't find my race — enter manually…"}</option>
+            </select>
+          ) : (
+            <div className="mb-2">
+              <p className="text-xs text-muted-foreground mb-2">
+                {lang === "zh"
+                  ? "今天沒有可選的比賽，請在下方輸入比賽名稱。"
+                  : "No race available today, please enter the race name below."}
+              </p>
+              <select
+                value={raceSelection}
+                onChange={(e) => setRaceSelection(e.target.value)}
+                className="w-full text-sm rounded-lg border border-input bg-background px-3 py-2 mb-2"
+              >
+                <option value="">{lang === "zh" ? "— 不是比賽 —" : "— Not a race —"}</option>
+                <option value="manual">{lang === "zh" ? "這是比賽 — 手動輸入" : "This was a race — enter manually"}</option>
+              </select>
+            </div>
+          )}
+
+          {raceSelection === "manual" && (
+            <Input
+              value={manualRaceName}
+              onChange={(e) => setManualRaceName(e.target.value)}
+              placeholder={lang === "zh" ? "輸入比賽名稱（例：渣打馬拉松）" : "Enter race name (e.g. Boston Marathon)"}
+              className="mb-2"
+              maxLength={120}
+            />
+          )}
+
+          <label className="text-xs font-medium text-foreground mb-1.5 block mt-3">
+            <MessageSquare size={12} className="inline mr-1" />
+            {lang === "zh" ? "你對這次活動有什麼感想？（選填）" : "How did this activity feel? (optional)"}
+          </label>
+          <Textarea
+            value={userComment}
+            onChange={(e) => setUserComment(e.target.value)}
+            placeholder={lang === "zh"
+              ? "例如：腿很沉、心率偏高、最後 5 公里很辛苦…"
+              : "e.g. Legs felt heavy, HR was higher than usual, struggled in the last 5 km…"}
+            className="text-sm min-h-[72px]"
+            maxLength={500}
+          />
+
+          {inputsChanged && (
+            <button
+              onClick={handleRegenerateAnalysis}
+              disabled={aiLoading}
+              className="mt-3 w-full flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
+            >
+              <RefreshCw size={12} />
+              {lang === "zh" ? "用新資訊重新分析" : "Re-analyze with new info"}
+            </button>
+          )}
+        </div>
+      )}
+
       {/* AI Workout Analysis Section */}
       <div className="bg-card border border-border rounded-xl p-4 mt-4">
         <div className="flex items-center gap-2 mb-3">
@@ -736,6 +821,21 @@ const ActivityDetail = ({ activity, lang, onBack, isPremium, trainingScore }: Pr
           </div>
         )}
       </div>
+
+      {/* Suggested Next Workout */}
+      {isPremium && aiNextWorkout && !aiLoading && (
+        <div className="bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/30 rounded-xl p-4 mt-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Footprints size={16} className="text-primary" />
+            <h3 className="font-display font-bold text-foreground text-sm">
+              {lang === "zh" ? "建議的下一次訓練" : "Suggested Next Workout"}
+            </h3>
+          </div>
+          <div className="prose prose-sm dark:prose-invert max-w-none text-foreground text-sm [&_h2]:text-base [&_h2]:font-bold [&_h2]:mt-2 [&_h2]:mb-1 [&_ul]:my-1 [&_li]:my-0.5 [&_strong]:text-primary">
+            <ReactMarkdown>{aiNextWorkout}</ReactMarkdown>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -335,7 +335,20 @@ const ActivityDetail = ({ activity, lang, onBack, isPremium, trainingScore }: Pr
             });
             if (data?.analysis) {
               setAiAnalysis(data.analysis);
+              setAiNextWorkout(data.nextWorkout || null);
               setRpeSubmitted(true);
+              if (data.raceId) {
+                setRaceSelection(data.raceId);
+                setSavedRaceId(data.raceId);
+              } else if (data.raceName) {
+                setRaceSelection("manual");
+                setManualRaceName(data.raceName);
+                setSavedRaceName(data.raceName);
+              }
+              if (data.userComment) {
+                setUserComment(data.userComment);
+                setSavedComment(data.userComment);
+              }
             }
           } catch {}
         }

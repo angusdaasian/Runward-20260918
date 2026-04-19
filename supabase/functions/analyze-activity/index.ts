@@ -55,6 +55,41 @@ async function fetchHistoricalWeather(lat: number, lon: number, dateStr: string)
   }
 }
 
+// Use Lovable AI to extract a likely city/country from a free-text race name.
+// Returns "City, Country" suitable for Open-Meteo geocoding, or null.
+async function extractCityFromRaceName(raceName: string, apiKey: string): Promise<string | null> {
+  try {
+    const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "google/gemini-3-flash-preview",
+        messages: [
+          {
+            role: "system",
+            content:
+              "You extract the host city of a running race from its name. Reply with ONLY the city and country in the format 'City, Country' (English). If you cannot determine the city with reasonable confidence, reply with exactly 'UNKNOWN'. No other text.",
+          },
+          { role: "user", content: `Race name: ${raceName}` },
+        ],
+      }),
+    });
+    if (!resp.ok) {
+      console.error("extractCityFromRaceName: AI error", resp.status, await resp.text());
+      return null;
+    }
+    const data = await resp.json();
+    const raw = (data.choices?.[0]?.message?.content || "").trim();
+    if (!raw || /^unknown$/i.test(raw)) return null;
+    // Strip surrounding quotes/markdown if any
+    const cleaned = raw.replace(/^["'`*]+|["'`*]+$/g, "").trim();
+    return cleaned || null;
+  } catch (e) {
+    console.error("extractCityFromRaceName error:", e);
+    return null;
+  }
+}
+
 function summarizeWeather(weather: any): string {
   if (!weather?.daily) return "";
   const d = weather.daily;
@@ -258,12 +293,21 @@ serve(async (req) => {
       : null;
 
     if (resolvedRaceName && activityDateStr) {
-      // Try geocoding by city,country first; fall back to race name
+      // 1) Try geocoding by structured city,country from the races table
       let geo: { lat: number; lon: number; name: string } | null = null;
       if (raceCity) {
         geo = await geocodeCity(`${raceCity}${raceCountry ? ", " + raceCountry : ""}`);
       }
+      // 2) Fall back: try geocoding the race name directly (works for races named after a city)
       if (!geo) geo = await geocodeCity(resolvedRaceName);
+      // 3) Last resort: ask the AI to extract the host city from the race name, then geocode that
+      if (!geo) {
+        const aiCity = await extractCityFromRaceName(resolvedRaceName, LOVABLE_API_KEY);
+        if (aiCity) {
+          console.log(`Race "${resolvedRaceName}" → AI-extracted city: "${aiCity}"`);
+          geo = await geocodeCity(aiCity);
+        }
+      }
       if (geo) {
         weatherLocationName = geo.name;
         weatherJson = await fetchHistoricalWeather(geo.lat, geo.lon, activityDateStr);
@@ -272,6 +316,8 @@ serve(async (req) => {
           weatherJson._location = geo.name;
           weatherJson._summary = weatherSummary;
         }
+      } else {
+        console.log(`Could not geocode race location for: "${resolvedRaceName}"`);
       }
     }
 

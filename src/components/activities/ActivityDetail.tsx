@@ -119,6 +119,7 @@ const ActivityDetail = ({ activity, lang, onBack, isPremium, trainingScore }: Pr
   const [aiLang, setAiLang] = useState<string>(lang);
   const [rpeInput, setRpeInput] = useState<string>("");
   const [rpeSubmitted, setRpeSubmitted] = useState(false);
+  const [analysisAttempted, setAnalysisAttempted] = useState(false);
 
   // Race tagging + comment state
   const activityDateOnly = useMemo(() => activity.start_date.split("T")[0], [activity.start_date]);
@@ -219,6 +220,7 @@ const ActivityDetail = ({ activity, lang, onBack, isPremium, trainingScore }: Pr
       toast.error(lang === "zh" ? "AI 分析失敗" : "AI analysis failed");
       setAiAnalysis(null);
     }
+    setAnalysisAttempted(true);
     setAiLoading(false);
   };
 
@@ -229,7 +231,12 @@ const ActivityDetail = ({ activity, lang, onBack, isPremium, trainingScore }: Pr
       return;
     }
     setRpeSubmitted(true);
-    runAiAnalysis(null, val);
+    runAiAnalysis(splits, val);
+  };
+
+  const handleAnalyzeClick = () => {
+    // Strava-style flow: no RPE required, just trigger analysis with whatever race/comment is filled in.
+    runAiAnalysis(splits);
   };
 
   const handleRegenerateAnalysis = () => {
@@ -292,24 +299,19 @@ const ActivityDetail = ({ activity, lang, onBack, isPremium, trainingScore }: Pr
   useEffect(() => {
     const fetchStreams = async () => {
       setLoading(true);
-      // Apple Health activities: no Strava streams, show RPE prompt instead of auto-analyzing
+      // Apple Health / Garmin: no Strava streams. Map Garmin laps to splits.
       if (needsRpe || !activity.strava_id || activity.strava_id <= 0) {
         setStreams([]);
-        // Map Garmin laps → splits so the table renders.
-        // Supports BOTH legacy field names (distance/elapsed_time/avg_speed/avg_hr)
-        // AND new manual-import field names (distance_meters/duration_seconds/
-        // average_pace_seconds_per_km/average_hr/max_hr/lap_index).
         if (isGarmin && Array.isArray(activity.laps) && activity.laps.length > 0) {
           const mapped: Split[] = activity.laps.map((lap: any, idx: number) => {
             const distance = Number(lap.distance ?? lap.distance_meters) || 0;
             const elapsed = Number(
               lap.elapsed_time ?? lap.moving_time ?? lap.duration_seconds,
             ) || 0;
-            // Prefer pace-derived speed when speed isn't supplied
             let avgSpeed = Number(lap.avg_speed ?? lap.average_speed) || 0;
             if (!avgSpeed && lap.average_pace_seconds_per_km) {
               const pace = Number(lap.average_pace_seconds_per_km);
-              if (pace > 0) avgSpeed = 1000 / pace; // m/s
+              if (pace > 0) avgSpeed = 1000 / pace;
             }
             if (!avgSpeed && elapsed > 0) avgSpeed = distance / elapsed;
             return {
@@ -327,49 +329,63 @@ const ActivityDetail = ({ activity, lang, onBack, isPremium, trainingScore }: Pr
         } else {
           setSplits(null);
         }
-        // Check if analysis already exists (cached)
-        if (isPremium) {
-          try {
-            const { data } = await supabase.functions.invoke("analyze-activity", {
-              body: { activityDbId: activity.id, activity: { name: activityName, distance: activity.distance, moving_time: activity.moving_time, elapsed_time: activity.elapsed_time, total_elevation_gain: activity.total_elevation_gain, start_date: activity.start_date, average_speed: activity.average_speed, max_speed: activity.max_speed, average_heartrate: activity.average_heartrate, max_heartrate: activity.max_heartrate, source: activity.source || "Apple Health" }, splits: [], lang, checkCacheOnly: true },
-            });
-            if (data?.analysis) {
-              setAiAnalysis(data.analysis);
-              setAiNextWorkout(data.nextWorkout || null);
-              setRpeSubmitted(true);
-              if (data.raceId) {
-                setRaceSelection(data.raceId);
-                setSavedRaceId(data.raceId);
-              } else if (data.raceName) {
-                setRaceSelection("manual");
-                setManualRaceName(data.raceName);
-                setSavedRaceName(data.raceName);
-              }
-              if (data.userComment) {
-                setUserComment(data.userComment);
-                setSavedComment(data.userComment);
-              }
-            }
-          } catch {}
+      } else {
+        try {
+          const { data, error } = await supabase.functions.invoke('strava-activity-streams', {
+            body: { strava_id: activity.strava_id },
+          });
+          if (!error && data) {
+            setStreams(data.streams || []);
+            setSplits(data.splits || null);
+          }
+        } catch (err) {
+          console.error('Error fetching streams:', err);
         }
-        setLoading(false);
-        return;
       }
 
-      try {
-        const { data, error } = await supabase.functions.invoke('strava-activity-streams', {
-          body: { strava_id: activity.strava_id },
-        });
-        if (!error && data) {
-          setStreams(data.streams || []);
-          setSplits(data.splits || null);
-          if (isPremium) await runAiAnalysis(data.splits || null);
-        } else if (isPremium) {
-          await runAiAnalysis(null);
-        }
-      } catch (err) {
-        console.error('Error fetching streams:', err);
-        if (isPremium) await runAiAnalysis(null);
+      // Check for cached analysis (all sources). Only auto-load — do NOT auto-run a new analysis.
+      // The user must click "Analyze" after optionally tagging a race / adding a comment / entering RPE.
+      if (isPremium) {
+        try {
+          const { data } = await supabase.functions.invoke("analyze-activity", {
+            body: {
+              activityDbId: activity.id,
+              activity: {
+                name: activityName,
+                distance: activity.distance,
+                moving_time: activity.moving_time,
+                elapsed_time: activity.elapsed_time,
+                total_elevation_gain: activity.total_elevation_gain,
+                start_date: activity.start_date,
+                average_speed: activity.average_speed,
+                max_speed: activity.max_speed,
+                average_heartrate: activity.average_heartrate,
+                max_heartrate: activity.max_heartrate,
+                source: activity.source || "strava",
+              },
+              splits: [],
+              lang,
+              checkCacheOnly: true,
+            },
+          });
+          if (data?.analysis) {
+            setAiAnalysis(data.analysis);
+            setAiNextWorkout(data.nextWorkout || null);
+            setRpeSubmitted(true);
+            if (data.raceId) {
+              setRaceSelection(data.raceId);
+              setSavedRaceId(data.raceId);
+            } else if (data.raceName) {
+              setRaceSelection("manual");
+              setManualRaceName(data.raceName);
+              setSavedRaceName(data.raceName);
+            }
+            if (data.userComment) {
+              setUserComment(data.userComment);
+              setSavedComment(data.userComment);
+            }
+          }
+        } catch {}
       }
       setLoading(false);
     };
@@ -806,6 +822,22 @@ const ActivityDetail = ({ activity, lang, onBack, isPremium, trainingScore }: Pr
         ) : aiAnalysis ? (
           <div className="prose prose-sm dark:prose-invert max-w-none text-foreground text-sm [&_h2]:text-base [&_h2]:font-bold [&_h2]:mt-3 [&_h2]:mb-1 [&_ul]:my-1 [&_li]:my-0.5">
             <ReactMarkdown>{aiAnalysis}</ReactMarkdown>
+          </div>
+        ) : !analysisAttempted ? (
+          <div className="text-center py-4">
+            <p className="text-sm text-muted-foreground mb-3">
+              {lang === "zh"
+                ? "請先（可選）在上方標記比賽和填寫感受，然後點擊下方按鈕開始 AI 分析。"
+                : "Optionally tag a race and add a comment above first, then click below to run AI analysis."}
+            </p>
+            <button
+              onClick={handleAnalyzeClick}
+              disabled={aiLoading}
+              className="px-4 py-2 rounded-lg text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
+            >
+              <Sparkles size={12} className="inline mr-1" />
+              {lang === "zh" ? "開始 AI 分析" : "Run AI Analysis"}
+            </button>
           </div>
         ) : (
           <div className="text-center py-4">

@@ -8,11 +8,11 @@ export type ChatMessage = {
 };
 
 const MODEL_MAP: Record<string, string> = {
+  "google/gemini-3.1-pro-preview": "gemini-3.1-pro-preview",
+  "google/gemini-3.1-flash-preview": "gemini-3.1-flash-preview",
   "google/gemini-3.1-flash-lite-preview": "gemini-3.1-flash-lite-preview",
-  "google/gemini-3.1-flash-lite-preview": "gemini-3.1-flash-lite-preview",
-  "google/gemini-3.1-flash-lite-preview": "gemini-3.1-flash-lite-preview",
-  "google/gemini-3-flash-preview": "gemini-3.1-flash-lite-preview",
-  "google/gemini-3-pro-image-preview": "gemini-3.1-flash-lite-preview",
+  "google/gemini-3-flash-preview": "gemini-3.1-flash-preview",
+  "google/gemini-3-pro-image-preview": "gemini-3.1-flash-preview",
 };
 
 export function mapModel(m?: string): string {

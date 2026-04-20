@@ -68,7 +68,7 @@ ${JSON.stringify(existingResult)}`;
 
       const tlResp = await callVertexAI({
         apiKey: VERTEX_API_KEY,
-        model: "google/gemini-3.1-flash-lite-preview",
+        model: "google/gemini-3.1-flash-preview",
         messages: [
           { role: "user", content: translatePrompt },
         ],
@@ -156,7 +156,7 @@ Scores should be objective based on actual posture observed. Be specific in feed
 
     const response = await callVertexAI({
       apiKey: VERTEX_API_KEY,
-      model: "google/gemini-3.1-flash-lite-preview",
+      model: "google/gemini-3.1-flash-preview",
       messages: [
         { role: "system", content: systemPrompt },
         {

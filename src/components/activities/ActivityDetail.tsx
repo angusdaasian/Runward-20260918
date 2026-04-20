@@ -132,6 +132,17 @@ const ActivityDetail = ({ activity, lang, onBack, isPremium, trainingScore }: Pr
   const [savedRaceName, setSavedRaceName] = useState<string | null>(null);
   const [savedComment, setSavedComment] = useState<string | null>(null);
 
+  // Race tagging + comment state
+  const activityDateOnly = useMemo(() => activity.start_date.split("T")[0], [activity.start_date]);
+  const [sameDayRaces, setSameDayRaces] = useState<Array<{ id: string; name: string; name_zh: string | null; city: string; country: string }>>([]);
+  // raceSelection: "" = none, "manual" = user typing, or a race id
+  const [raceSelection, setRaceSelection] = useState<string>("");
+  const [manualRaceName, setManualRaceName] = useState<string>("");
+  const [userComment, setUserComment] = useState<string>("");
+  const [savedRaceId, setSavedRaceId] = useState<string | null>(null);
+  const [savedRaceName, setSavedRaceName] = useState<string | null>(null);
+  const [savedComment, setSavedComment] = useState<string | null>(null);
+
   const handleRename = async () => {
     if (!nameInput.trim() || nameInput === activityName) { setEditingName(false); return; }
     setSavingName(true);
@@ -353,17 +364,30 @@ const ActivityDetail = ({ activity, lang, onBack, isPremium, trainingScore }: Pr
         } else {
           setSplits(null);
         }
-      } else {
-        try {
-          const { data, error } = await supabase.functions.invoke('strava-activity-streams', {
-            body: { strava_id: activity.strava_id },
-          });
-          if (!error && data) {
-            setStreams(data.streams || []);
-            setSplits(data.splits || null);
-          }
-        } catch (err) {
-          console.error('Error fetching streams:', err);
+        // Check if analysis already exists (cached)
+        if (isPremium) {
+          try {
+            const { data } = await supabase.functions.invoke("analyze-activity", {
+              body: { activityDbId: activity.id, activity: { name: activityName, distance: activity.distance, moving_time: activity.moving_time, elapsed_time: activity.elapsed_time, total_elevation_gain: activity.total_elevation_gain, start_date: activity.start_date, average_speed: activity.average_speed, max_speed: activity.max_speed, average_heartrate: activity.average_heartrate, max_heartrate: activity.max_heartrate, source: activity.source || "Apple Health" }, splits: [], lang, checkCacheOnly: true },
+            });
+            if (data?.analysis) {
+              setAiAnalysis(data.analysis);
+              setAiNextWorkout(data.nextWorkout || null);
+              setRpeSubmitted(true);
+              if (data.raceId) {
+                setRaceSelection(data.raceId);
+                setSavedRaceId(data.raceId);
+              } else if (data.raceName) {
+                setRaceSelection("manual");
+                setManualRaceName(data.raceName);
+                setSavedRaceName(data.raceName);
+              }
+              if (data.userComment) {
+                setUserComment(data.userComment);
+                setSavedComment(data.userComment);
+              }
+            }
+          } catch {}
         }
       }
 

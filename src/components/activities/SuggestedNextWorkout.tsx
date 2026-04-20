@@ -231,7 +231,7 @@ const SuggestedNextWorkout = ({ lang, latestActivityId, latestActivityDate }: Pr
 
       {(view.kind === "analysis" || view.kind === "generated") && (
         <div className="prose prose-sm dark:prose-invert max-w-none text-foreground text-sm [&_h2]:text-base [&_h2]:font-bold [&_h2]:mt-2 [&_h2]:mb-1 [&_ul]:my-1 [&_li]:my-0.5 [&_strong]:text-primary">
-          <ReactMarkdown>{view.text}</ReactMarkdown>
+          <ReactMarkdown>{stripLeadingHeading(view.text)}</ReactMarkdown>
         </div>
       )}
 

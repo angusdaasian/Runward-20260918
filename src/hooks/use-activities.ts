@@ -85,32 +85,35 @@ async function fetchGarminActivities(userId: string): Promise<StravaActivity[]> 
     .select("*")
     .eq("user_id", userId)
     .order("start_time", { ascending: false });
-  return ((data as any[]) || []).map((a) => ({
-    id: a.id,
-    strava_id: 0,
-    name: a.activity_name || "Garmin Activity",
-    sport_type: a.activity_type || "Run",
-    distance: a.distance_meters || 0,
-    moving_time: a.duration_seconds || 0,
-    elapsed_time: a.duration_seconds || 0,
-    total_elevation_gain: a.elevation_gain || 0,
-    start_date: a.start_time,
-    average_speed: (a.average_speed && a.average_speed > 0)
-      ? a.average_speed
-      : (a.distance_meters && a.duration_seconds && a.duration_seconds > 0)
-        ? a.distance_meters / a.duration_seconds
-        : 0,
-    average_pace: a.average_pace || null,
-    max_speed: 0,
-    average_heartrate: a.average_hr || null,
-    max_heartrate: a.max_hr || null,
-    summary_polyline: a.summary_polyline ?? null,
-    source: "Garmin",
-    calories: a.calories ?? null,
-    laps: a.laps || [],
-    weather: a.weather ?? null,
-    map_screenshot_url: a.raw_json?.map_screenshot_url ?? null,
-  }));
+  return ((data as any[]) || []).map((a) => {
+    const isCoros = typeof a.garmin_activity_id === "string" && a.garmin_activity_id.startsWith("coros-");
+    return {
+      id: a.id,
+      strava_id: 0,
+      name: a.activity_name || (isCoros ? "COROS Activity" : "Garmin Activity"),
+      sport_type: a.activity_type || "Run",
+      distance: a.distance_meters || 0,
+      moving_time: a.duration_seconds || 0,
+      elapsed_time: a.duration_seconds || 0,
+      total_elevation_gain: a.elevation_gain || 0,
+      start_date: a.start_time,
+      average_speed: (a.average_speed && a.average_speed > 0)
+        ? a.average_speed
+        : (a.distance_meters && a.duration_seconds && a.duration_seconds > 0)
+          ? a.distance_meters / a.duration_seconds
+          : 0,
+      average_pace: a.average_pace || null,
+      max_speed: 0,
+      average_heartrate: a.average_hr || null,
+      max_heartrate: a.max_hr || null,
+      summary_polyline: a.summary_polyline ?? null,
+      source: isCoros ? "COROS" : "Garmin",
+      calories: a.calories ?? null,
+      laps: a.laps || [],
+      weather: a.weather ?? null,
+      map_screenshot_url: a.raw_json?.map_screenshot_url ?? null,
+    };
+  });
 }
 
 async function fetchConnection(userId: string) {

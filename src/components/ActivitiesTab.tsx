@@ -496,8 +496,12 @@ const ActivitiesTab = ({ lang }: Props) => {
       <TodayStats lang={lang} healthStats={ahConnected ? appleHealth.healthStats : null} />
 
       {/* Manual Garmin import — only when no fitness app (Strava/Garmin/Coros) is connected */}
+      {/* Manual Garmin / COROS imports — only when no fitness app is connected */}
       {!fitnessAppConnected && (
-        <ManualGarminImport lang={lang} onImported={invalidateAll} />
+        <>
+          <ManualGarminImport lang={lang} onImported={invalidateAll} />
+          <CorosGpxImport lang={lang} onImported={invalidateAll} />
+        </>
       )}
 
       {/* Recent Activity */}

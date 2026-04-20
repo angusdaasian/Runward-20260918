@@ -526,6 +526,7 @@ export type Database = {
           last_check_in_date: string | null
           last_login: string | null
           lifetime_xp: number
+          monthly_goal_km: number
           monthly_xp: number
           onboarding_completed: boolean
           rank_tier: string
@@ -549,6 +550,7 @@ export type Database = {
           last_check_in_date?: string | null
           last_login?: string | null
           lifetime_xp?: number
+          monthly_goal_km?: number
           monthly_xp?: number
           onboarding_completed?: boolean
           rank_tier?: string
@@ -572,6 +574,7 @@ export type Database = {
           last_check_in_date?: string | null
           last_login?: string | null
           lifetime_xp?: number
+          monthly_goal_km?: number
           monthly_xp?: number
           onboarding_completed?: boolean
           rank_tier?: string

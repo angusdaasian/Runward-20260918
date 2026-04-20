@@ -138,9 +138,9 @@ const SuggestedNextWorkout = ({ lang, latestActivityId, latestActivityDate }: Pr
   }, [latestActivityId]);
 
   // Decide what to show:
-  //   1. If the latest activity is <=1 day old AND has an analysis suggestion → show it.
-  //   2. Else, if a cached generated suggestion exists for the same basis (or no basis) → show it.
-  //   3. Else, show the expired prompt.
+  //   The suggestion is valid only on the calendar day AFTER the latest activity
+  //   (in the user's local timezone). E.g. activity on 19/4 → show all of 20/4,
+  //   hidden on 21/4 and beyond.
   const view = useMemo<
     | { kind: "loading" }
     | { kind: "analysis"; text: string }
@@ -151,30 +151,36 @@ const SuggestedNextWorkout = ({ lang, latestActivityId, latestActivityDate }: Pr
     if (!user) return { kind: "hidden" };
     if (!analysisLoaded) return { kind: "loading" };
 
-    const now = Date.now();
-    const latestDateMs = latestActivityDate ? new Date(latestActivityDate).getTime() : null;
+    // Compute whether "today" (local) is the day immediately after the latest activity day.
+    const isDayAfterLatest = (() => {
+      if (!latestActivityDate) return false;
+      const act = new Date(latestActivityDate);
+      const actDay = new Date(act.getFullYear(), act.getMonth(), act.getDate());
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const diffDays = Math.round((today.getTime() - actDay.getTime()) / (24 * 60 * 60 * 1000));
+      return diffDays === 1;
+    })();
 
-    // If the most-recent activity already has an AI-generated next-workout suggestion,
-    // always show it — regardless of how long ago the activity was. (The suggestion
-    // is tied to the activity, not to the clock.)
+    // Outside the valid window → hide entirely (no expired prompt either).
+    if (!isDayAfterLatest) return { kind: "hidden" };
+
+    // Within the valid window: prefer the AI analysis-derived suggestion.
     if (analysisWorkout) {
       return { kind: "analysis", text: analysisWorkout };
     }
 
-    // Generated suggestion is valid only if there is no newer activity than the basis
+    // Otherwise, show a cached generated suggestion if it matches the latest activity.
     if (generated) {
       const basis = generated.basisActivityDate ? new Date(generated.basisActivityDate).getTime() : null;
-      const stillCurrent =
-        (latestDateMs == null && basis == null) ||
-        (latestDateMs != null && basis != null && Math.abs(latestDateMs - basis) < 1000) ||
-        (latestDateMs == null && basis != null);
-      // Generated suggestions themselves expire after 24h
-      const ageOk = now - new Date(generated.generatedAt).getTime() <= ONE_DAY_MS;
-      if (stillCurrent && ageOk) {
+      const latestDateMs = new Date(latestActivityDate!).getTime();
+      const stillCurrent = basis != null && Math.abs(latestDateMs - basis) < 1000;
+      if (stillCurrent) {
         return { kind: "generated", text: generated.suggestion };
       }
     }
 
+    // Within the window but nothing generated yet → offer to generate.
     return { kind: "expired" };
   }, [user, analysisLoaded, analysisWorkout, latestActivityDate, generated]);
 

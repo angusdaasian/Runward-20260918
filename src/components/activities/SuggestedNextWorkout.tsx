@@ -51,6 +51,13 @@ function readIdealTime(): { distance?: string; seconds?: number } | null {
   }
 }
 
+// Strip a leading H1/H2 heading (e.g. "## 明日建議訓練" / "## Suggested Next Workout")
+// from the AI markdown — the card already has its own header so showing the
+// heading again is redundant (and contradicts when the card title is "Today's").
+function stripLeadingHeading(md: string): string {
+  return md.replace(/^\s*#{1,3}\s+.*\n+/, "");
+}
+
 const SuggestedNextWorkout = ({ lang, latestActivityId, latestActivityDate }: Props) => {
   const { user } = useAuth();
   const isZh = lang === "zh";

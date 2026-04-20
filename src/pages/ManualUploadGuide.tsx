@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { Lang } from "@/lib/i18n";
@@ -75,6 +76,7 @@ const garminSteps: Step[] = [
 const ManualUploadGuide = () => {
   const navigate = useNavigate();
   const lang: Lang = (typeof window !== "undefined" && (localStorage.getItem("app_lang") as Lang)) || "en";
+  const [activeTab, setActiveTab] = useState<"garmin" | "coros">("garmin");
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -93,64 +95,85 @@ const ManualUploadGuide = () => {
         </div>
       </header>
 
-      <main className="max-w-2xl mx-auto px-4 py-6 space-y-8">
-        <section>
-          <div className="flex items-center gap-2 mb-2">
-            <span className="text-xs font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full bg-primary/10 text-primary">
-              Garmin
-            </span>
-            <h2 className="text-base font-semibold">
+      <main className="max-w-2xl mx-auto px-4 py-6">
+        {/* Tab switcher */}
+        <div className="flex gap-2 p-1 bg-muted rounded-xl mb-6">
+          <button
+            onClick={() => setActiveTab("garmin")}
+            className={`flex-1 py-2 px-3 text-sm font-medium rounded-lg transition-colors ${
+              activeTab === "garmin"
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Garmin
+          </button>
+          <button
+            onClick={() => setActiveTab("coros")}
+            className={`flex-1 py-2 px-3 text-sm font-medium rounded-lg transition-colors ${
+              activeTab === "coros"
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            COROS
+          </button>
+        </div>
+
+        {activeTab === "garmin" && (
+          <section>
+            <h2 className="text-base font-semibold mb-2">
               {lang === "zh" ? "從 Garmin Connect 匯入" : "Import from Garmin Connect"}
             </h2>
-          </div>
-          <p className="text-sm text-muted-foreground mb-6">
-            {lang === "zh"
-              ? "請先在 Garmin Connect 將活動隱私設定為「公開」，然後依下列步驟操作："
-              : "Set the activity to Public in Garmin Connect first, then follow the steps below:"}
-          </p>
+            <p className="text-sm text-muted-foreground mb-6">
+              {lang === "zh"
+                ? "請先在 Garmin Connect 將活動隱私設定為「公開」，然後依下列步驟操作："
+                : "Set the activity to Public in Garmin Connect first, then follow the steps below:"}
+            </p>
 
-          <ol className="space-y-8">
-            {garminSteps.map((step, idx) => (
-              <li key={idx} className="space-y-3">
-                <h3 className="text-sm font-semibold text-foreground">
-                  {step.title[lang]}
-                </h3>
-                {step.body && (
-                  <p className="text-sm text-muted-foreground whitespace-pre-line">
-                    {step.body[lang]}
-                  </p>
-                )}
-                <div className={`grid gap-3 ${step.images.length > 1 ? "grid-cols-2" : "grid-cols-1"}`}>
-                  {step.images.map((src, i) => (
-                    <img
-                      key={i}
-                      src={src}
-                      alt={`Step ${idx + 1}${step.images.length > 1 ? ` (${i + 1})` : ""}`}
-                      loading="lazy"
-                      className="w-full rounded-xl border border-border bg-muted"
-                    />
-                  ))}
-                </div>
-              </li>
-            ))}
-          </ol>
-        </section>
+            <ol className="space-y-8">
+              {garminSteps.map((step, idx) => (
+                <li key={idx} className="space-y-3">
+                  <h3 className="text-sm font-semibold text-foreground">
+                    {step.title[lang]}
+                  </h3>
+                  {step.body && (
+                    <p className="text-sm text-muted-foreground whitespace-pre-line">
+                      {step.body[lang]}
+                    </p>
+                  )}
+                  <div className={`grid gap-3 ${step.images.length > 1 ? "grid-cols-2" : "grid-cols-1"}`}>
+                    {step.images.map((src, i) => (
+                      <img
+                        key={i}
+                        src={src}
+                        alt={`Step ${idx + 1}${step.images.length > 1 ? ` (${i + 1})` : ""}`}
+                        loading="lazy"
+                        className="w-full rounded-xl border border-border bg-muted"
+                      />
+                    ))}
+                  </div>
+                </li>
+              ))}
+            </ol>
+          </section>
+        )}
 
-        <section className="border-t border-border pt-6">
-          <div className="flex items-center gap-2 mb-2">
-            <span className="text-xs font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full bg-primary/10 text-primary">
-              COROS
-            </span>
-            <h2 className="text-base font-semibold">
-              {lang === "zh" ? "從 COROS 匯入" : "Import from COROS"}
+        {activeTab === "coros" && (
+          <section className="text-center py-12">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-muted mb-4">
+              <span className="text-3xl">🚧</span>
+            </div>
+            <h2 className="text-base font-semibold mb-2">
+              {lang === "zh" ? "COROS 指南即將推出" : "COROS Guide Coming Soon"}
             </h2>
-          </div>
-          <p className="text-sm text-muted-foreground">
-            {lang === "zh"
-              ? "在 COROS App 將活動匯出為 .fit 檔案，然後在「手動匯入活動」分頁切換到 COROS，選擇檔案上傳即可。"
-              : "Export your activity as a .fit file from the COROS app, then open the Manually Import Activity card, switch to the COROS tab, and select the file."}
-          </p>
-        </section>
+            <p className="text-sm text-muted-foreground max-w-sm mx-auto">
+              {lang === "zh"
+                ? "我們正在準備 COROS 的逐步匯入教學，敬請期待。"
+                : "We're putting together a step-by-step COROS import guide. Stay tuned!"}
+            </p>
+          </section>
+        )}
       </main>
     </div>
   );

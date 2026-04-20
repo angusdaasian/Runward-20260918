@@ -51,6 +51,13 @@ function readIdealTime(): { distance?: string; seconds?: number } | null {
   }
 }
 
+// Strip a leading H1/H2 heading (e.g. "## 明日建議訓練" / "## Suggested Next Workout")
+// from the AI markdown — the card already has its own header so showing the
+// heading again is redundant (and contradicts when the card title is "Today's").
+function stripLeadingHeading(md: string): string {
+  return md.replace(/^\s*#{1,3}\s+.*\n+/, "");
+}
+
 const SuggestedNextWorkout = ({ lang, latestActivityId, latestActivityDate }: Props) => {
   const { user } = useAuth();
   const isZh = lang === "zh";
@@ -231,7 +238,7 @@ const SuggestedNextWorkout = ({ lang, latestActivityId, latestActivityDate }: Pr
 
       {(view.kind === "analysis" || view.kind === "generated") && (
         <div className="prose prose-sm dark:prose-invert max-w-none text-foreground text-sm [&_h2]:text-base [&_h2]:font-bold [&_h2]:mt-2 [&_h2]:mb-1 [&_ul]:my-1 [&_li]:my-0.5 [&_strong]:text-primary">
-          <ReactMarkdown>{view.text}</ReactMarkdown>
+          <ReactMarkdown>{stripLeadingHeading(view.text)}</ReactMarkdown>
         </div>
       )}
 

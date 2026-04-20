@@ -408,6 +408,12 @@ const ActivityDetail = ({ activity, lang, onBack, isPremium, trainingScore }: Pr
               setUserComment(data.userComment);
               setSavedComment(data.userComment);
             }
+            // Pre-warm the OTHER language's translation in the background so
+            // toggling language is instant and the DB stays bilingual.
+            const otherLang = lang === "zh" ? "en" : "zh";
+            supabase.functions.invoke("analyze-activity", {
+              body: { activityDbId: activity.id, translate: true, lang: otherLang },
+            }).catch(() => {});
           }
         } catch {}
       }

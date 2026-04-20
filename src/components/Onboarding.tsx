@@ -156,6 +156,24 @@ const Onboarding = ({
   const [resetNewPassword, setResetNewPassword] = useState("");
   const [resetConfirmPassword, setResetConfirmPassword] = useState("");
 
+  // Persist onboarding "ideal time" so the suggested-workout feature can fall back to it
+  useEffect(() => {
+    if (!estDistance) return;
+    const seconds =
+      (parseInt(estHours) || 0) * 3600 +
+      (parseInt(estMinutes) || 0) * 60 +
+      (parseInt(estSeconds) || 0);
+    if (seconds <= 0) return;
+    try {
+      localStorage.setItem(
+        "onboarding_ideal_time",
+        JSON.stringify({ distance: estDistance, seconds }),
+      );
+    } catch {
+      // ignore quota errors
+    }
+  }, [estDistance, estHours, estMinutes, estSeconds]);
+
   const setSignupInProgress = (active: boolean) => {
     if (active) {
       sessionStorage.setItem(ONBOARDING_SIGNUP_IN_PROGRESS_KEY, "true");

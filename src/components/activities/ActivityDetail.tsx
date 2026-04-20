@@ -132,17 +132,6 @@ const ActivityDetail = ({ activity, lang, onBack, isPremium, trainingScore }: Pr
   const [savedRaceName, setSavedRaceName] = useState<string | null>(null);
   const [savedComment, setSavedComment] = useState<string | null>(null);
 
-  // Race tagging + comment state
-  const activityDateOnly = useMemo(() => activity.start_date.split("T")[0], [activity.start_date]);
-  const [sameDayRaces, setSameDayRaces] = useState<Array<{ id: string; name: string; name_zh: string | null; city: string; country: string }>>([]);
-  // raceSelection: "" = none, "manual" = user typing, or a race id
-  const [raceSelection, setRaceSelection] = useState<string>("");
-  const [manualRaceName, setManualRaceName] = useState<string>("");
-  const [userComment, setUserComment] = useState<string>("");
-  const [savedRaceId, setSavedRaceId] = useState<string | null>(null);
-  const [savedRaceName, setSavedRaceName] = useState<string | null>(null);
-  const [savedComment, setSavedComment] = useState<string | null>(null);
-
   const handleRename = async () => {
     if (!nameInput.trim() || nameInput === activityName) { setEditingName(false); return; }
     setSavingName(true);

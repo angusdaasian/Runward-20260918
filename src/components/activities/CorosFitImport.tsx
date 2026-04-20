@@ -10,6 +10,7 @@ import { Lang } from "@/lib/i18n";
 interface Props {
   lang: Lang;
   onImported: () => void;
+  embedded?: boolean;
 }
 
 interface ParsedLap {
@@ -153,7 +154,7 @@ function parseFitBuffer(buffer: ArrayBuffer): Promise<ParsedFit> {
   });
 }
 
-const CorosFitImport = ({ lang, onImported }: Props) => {
+const CorosFitImport = ({ lang, onImported, embedded = false }: Props) => {
   const { user } = useAuth();
   const [expanded, setExpanded] = useState(false);
   const [loading, setLoading] = useState(false);

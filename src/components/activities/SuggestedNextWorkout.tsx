@@ -153,9 +153,11 @@ const SuggestedNextWorkout = ({ lang, latestActivityId, latestActivityDate }: Pr
 
     const now = Date.now();
     const latestDateMs = latestActivityDate ? new Date(latestActivityDate).getTime() : null;
-    const isFresh = latestDateMs != null && now - latestDateMs <= ONE_DAY_MS;
 
-    if (isFresh && analysisWorkout) {
+    // If the most-recent activity already has an AI-generated next-workout suggestion,
+    // always show it — regardless of how long ago the activity was. (The suggestion
+    // is tied to the activity, not to the clock.)
+    if (analysisWorkout) {
       return { kind: "analysis", text: analysisWorkout };
     }
 

@@ -158,19 +158,20 @@ const SuggestedNextWorkout = ({ lang, latestActivityId, latestActivityDate }: Pr
     if (!user) return { kind: "hidden" };
     if (!analysisLoaded) return { kind: "loading" };
 
-    // Compute whether "today" (local) is the day immediately after the latest activity day.
-    const isDayAfterLatest = (() => {
+    // Show today's suggestion when the latest activity is from today or yesterday
+    // (in the user's local timezone). Works for any source — Strava, Apple Health, Garmin.
+    const isWithinSuggestionWindow = (() => {
       if (!latestActivityDate) return false;
       const act = new Date(latestActivityDate);
       const actDay = new Date(act.getFullYear(), act.getMonth(), act.getDate());
       const now = new Date();
       const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
       const diffDays = Math.round((today.getTime() - actDay.getTime()) / (24 * 60 * 60 * 1000));
-      return diffDays === 1;
+      return diffDays >= 0 && diffDays <= 1;
     })();
 
     // Outside the valid window → hide entirely (no expired prompt either).
-    if (!isDayAfterLatest) return { kind: "hidden" };
+    if (!isWithinSuggestionWindow) return { kind: "hidden" };
 
     // Within the valid window: prefer the AI analysis-derived suggestion.
     if (analysisWorkout) {

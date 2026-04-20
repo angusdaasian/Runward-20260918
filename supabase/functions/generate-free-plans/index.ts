@@ -112,19 +112,13 @@ Return ONLY valid JSON, no markdown, no explanation.`;
 
       let response: Response | null = null;
       for (let attempt = 0; attempt < 3; attempt++) {
-        response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${LOVABLE_API_KEY}`,
-          },
-          body: JSON.stringify({
-            model: "google/gemini-3-flash-preview",
-            messages: [
-              { role: "system", content: "You are an expert running coach. Return ONLY valid JSON arrays. No markdown, no code fences, no explanation." },
-              { role: "user", content: prompt },
-            ],
-          }),
+        response = await callVertexAI({
+          apiKey: VERTEX_API_KEY,
+          model: "google/gemini-3-flash-preview",
+          messages: [
+            { role: "system", content: "You are an expert running coach. Return ONLY valid JSON arrays. No markdown, no code fences, no explanation." },
+            { role: "user", content: prompt },
+          ],
         });
         if (response.ok || (response.status !== 502 && response.status !== 503)) break;
         console.warn(`Retry ${attempt + 1} for ${planDef.distance} ${planDef.target_time}`);

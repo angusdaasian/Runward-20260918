@@ -280,7 +280,61 @@ serve(async (req) => {
       });
     }
 
-    // Insert / update activity row
+    // Cross-source duplicate check: similar activity within ±10 min and ±5% distance
+    // (or 100 m, whichever is larger) across strava / apple_health / garmin tables.
+    const TIME_WINDOW_MS = 10 * 60 * 1000;
+    const distTolerance = Math.max(distance * 0.05, 100);
+    const minDist = distance - distTolerance;
+    const maxDist = distance + distTolerance;
+    const startMsNum = new Date(startTime).getTime();
+    const fromIso = new Date(startMsNum - TIME_WINDOW_MS).toISOString();
+    const toIso = new Date(startMsNum + TIME_WINDOW_MS).toISOString();
+
+    const [stravaSimilar, ahSimilar, garminSimilar] = await Promise.all([
+      supabase
+        .from("strava_activities")
+        .select("id")
+        .eq("user_id", user.id)
+        .gte("start_date", fromIso).lte("start_date", toIso)
+        .gte("distance", minDist).lte("distance", maxDist)
+        .limit(1),
+      supabase
+        .from("apple_health_activities")
+        .select("id")
+        .eq("user_id", user.id)
+        .gte("start_date", fromIso).lte("start_date", toIso)
+        .gte("distance", minDist).lte("distance", maxDist)
+        .limit(1),
+      supabase
+        .from("garmin_activities")
+        .select("id, garmin_activity_id")
+        .eq("user_id", user.id)
+        .gte("start_time", fromIso).lte("start_time", toIso)
+        .gte("distance_meters", minDist).lte("distance_meters", maxDist)
+        .neq("garmin_activity_id", garminActivityId)
+        .limit(1),
+    ]);
+
+    let similarSource: string | null = null;
+    if (stravaSimilar.data && stravaSimilar.data.length > 0) similarSource = "Strava";
+    else if (ahSimilar.data && ahSimilar.data.length > 0) similarSource = "Apple Health";
+    else if (garminSimilar.data && garminSimilar.data.length > 0) {
+      const row: any = garminSimilar.data[0];
+      similarSource = (typeof row.garmin_activity_id === "string"
+        && row.garmin_activity_id.startsWith("coros-")) ? "COROS" : "Garmin";
+    }
+
+    if (similarSource) {
+      return new Response(JSON.stringify({
+        error: `A similar activity already exists from ${similarSource}. Skipping to prevent duplicates.`,
+        duplicate: true,
+        similar_source: similarSource,
+      }), {
+        status: 409,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const row = {
       user_id: user.id,
       garmin_activity_id: garminActivityId,

@@ -6,6 +6,7 @@ import FitParser from "fit-file-parser";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Lang } from "@/lib/i18n";
+import { findSimilarActivity } from "@/lib/duplicateActivityCheck";
 
 interface Props {
   lang: Lang;
@@ -171,15 +172,19 @@ const CorosFitImport = ({ lang, onImported, embedded = false }: Props) => {
 
       const externalId = `coros-${parsed.startDate}-${parsed.distanceMeters}`;
 
-      const { data: existing } = await supabase
-        .from("garmin_activities")
-        .select("id")
-        .eq("user_id", user.id)
-        .eq("garmin_activity_id", externalId)
-        .maybeSingle();
-
-      if (existing) {
-        toast.error(lang === "zh" ? "此活動已匯入過" : "This activity was already imported");
+      // Cross-source duplicate check (strava / apple health / garmin / coros)
+      const similar = await findSimilarActivity({
+        userId: user.id,
+        startDate: parsed.startDate,
+        distanceMeters: parsed.distanceMeters,
+      });
+      if (similar) {
+        toast.error(
+          lang === "zh"
+            ? `已存在相似活動（來自 ${similar.source}），無法重複匯入`
+            : `A similar activity already exists from ${similar.source}. Skipping to prevent duplicates.`,
+          { duration: 6000 },
+        );
         setLoading(false);
         if (fileRef.current) fileRef.current.value = "";
         return;

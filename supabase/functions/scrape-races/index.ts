@@ -278,24 +278,47 @@ async function scrapeWithFirecrawl(url: string, apiKey: string): Promise<string>
   return data.data?.markdown || "";
 }
 
+async function callVertexAIRaw(opts: { apiKey: string; model?: string; messages: Array<{ role: string; content: any }> }): Promise<{ ok: boolean; status: number; text: string; json?: any }> {
+  const VERTEX_MODEL_MAP: Record<string, string> = {
+    "google/gemini-2.5-flash": "gemini-2.5-flash",
+    "google/gemini-3-flash-preview": "gemini-2.5-flash",
+  };
+  const model = VERTEX_MODEL_MAP[opts.model || ""] || (opts.model || "gemini-2.5-flash").replace(/^google\//, "");
+  const url = `https://aiplatform.googleapis.com/v1/publishers/google/models/${model}:generateContent?key=${opts.apiKey}`;
+  const systemParts: any[] = [];
+  const contents: any[] = [];
+  for (const m of opts.messages) {
+    if (m.role === "system") { systemParts.push({ text: typeof m.content === "string" ? m.content : "" }); continue; }
+    const role = m.role === "assistant" ? "model" : "user";
+    contents.push({ role, parts: [{ text: typeof m.content === "string" ? m.content : String(m.content) }] });
+  }
+  const body: any = { contents };
+  if (systemParts.length) body.systemInstruction = { parts: systemParts };
+  const vRes = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const vText = await vRes.text();
+  if (!vRes.ok) return { ok: false, status: vRes.status, text: vText };
+  try {
+    const vData = JSON.parse(vText);
+    const text = vData?.candidates?.[0]?.content?.parts?.map((p: any) => p.text || "").join("") || "";
+    return { ok: true, status: 200, text, json: vData };
+  } catch {
+    return { ok: false, status: 500, text: vText };
+  }
+}
+
 async function callAI(apiKey: string, systemPrompt: string, userPrompt: string): Promise<string> {
-  const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: "google/gemini-2.5-flash",
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt },
-      ],
-    }),
+  const res = await callVertexAIRaw({
+    apiKey,
+    model: "google/gemini-2.5-flash",
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userPrompt },
+    ],
   });
   if (!res.ok) {
-    const t = await res.text();
-    throw new Error(`AI call failed: ${res.status} ${t}`);
+    throw new Error(`AI call failed: ${res.status} ${res.text}`);
   }
-  const data = await res.json();
-  let content = data.choices?.[0]?.message?.content || "";
+  let content = res.text || "";
   const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
   if (jsonMatch) content = jsonMatch[1].trim();
   return content;

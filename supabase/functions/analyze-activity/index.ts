@@ -222,15 +222,12 @@ serve(async (req) => {
       const targetLang = isZh ? "Traditional Chinese (Hong Kong)" : "English";
       const combinedSource = `===ANALYSIS===\n${sourceText}\n\n===NEXT_WORKOUT===\n${existing[nextSourceField] || ""}`;
 
-      const tlResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "google/gemini-2.5-flash",
-          messages: [
-            { role: "user", content: `Translate the following running coach output into ${targetLang}. Preserve the ===ANALYSIS=== and ===NEXT_WORKOUT=== separators exactly. Keep Markdown intact. Only translate, do not change content.\n\n${combinedSource}` },
-          ],
-        }),
+      const tlResp = await callVertexAI({
+        apiKey: VERTEX_API_KEY,
+        model: "google/gemini-2.5-flash",
+        messages: [
+          { role: "user", content: `Translate the following running coach output into ${targetLang}. Preserve the ===ANALYSIS=== and ===NEXT_WORKOUT=== separators exactly. Keep Markdown intact. Only translate, do not change content.\n\n${combinedSource}` },
+        ],
       });
 
       if (!tlResp.ok) {
@@ -283,13 +280,10 @@ serve(async (req) => {
         if (cached[otherField]) {
           const targetLang = isZh ? "Traditional Chinese (Hong Kong)" : "English";
           const combined = `===ANALYSIS===\n${cached[otherField]}\n\n===NEXT_WORKOUT===\n${cached[otherNField] || ""}`;
-          const tlResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-            method: "POST",
-            headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
-            body: JSON.stringify({
-              model: "google/gemini-2.5-flash",
-              messages: [{ role: "user", content: `Translate the following running coach output into ${targetLang}. Preserve the ===ANALYSIS=== and ===NEXT_WORKOUT=== separators exactly. Keep Markdown intact. Only translate, do not change content.\n\n${combined}` }],
-            }),
+          const tlResp = await callVertexAI({
+            apiKey: VERTEX_API_KEY,
+            model: "google/gemini-2.5-flash",
+            messages: [{ role: "user", content: `Translate the following running coach output into ${targetLang}. Preserve the ===ANALYSIS=== and ===NEXT_WORKOUT=== separators exactly. Keep Markdown intact. Only translate, do not change content.\n\n${combined}` }],
           });
           if (tlResp.ok) {
             const tlData = await tlResp.json();
@@ -339,13 +333,10 @@ serve(async (req) => {
       if (existingAnalysis[otherField]) {
         const targetLang = isZh ? "Traditional Chinese (Hong Kong)" : "English";
         const combined = `===ANALYSIS===\n${existingAnalysis[otherField]}\n\n===NEXT_WORKOUT===\n${existingAnalysis[otherNextField] || ""}`;
-        const tlResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-          method: "POST",
-          headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
-          body: JSON.stringify({
-            model: "google/gemini-2.5-flash",
-            messages: [{ role: "user", content: `Translate the following into ${targetLang}. Preserve the ===ANALYSIS=== and ===NEXT_WORKOUT=== separators. Keep Markdown.\n\n${combined}` }],
-          }),
+        const tlResp = await callVertexAI({
+          apiKey: VERTEX_API_KEY,
+          model: "google/gemini-2.5-flash",
+          messages: [{ role: "user", content: `Translate the following into ${targetLang}. Preserve the ===ANALYSIS=== and ===NEXT_WORKOUT=== separators. Keep Markdown.\n\n${combined}` }],
         });
         if (tlResp.ok) {
           const tlData = await tlResp.json();
@@ -401,7 +392,7 @@ serve(async (req) => {
       if (!geo) geo = await geocodeCity(resolvedRaceName);
       // 3) Last resort: ask the AI to extract the host city from the race name, then geocode that
       if (!geo) {
-        const aiCity = await extractCityFromRaceName(resolvedRaceName, LOVABLE_API_KEY);
+        const aiCity = await extractCityFromRaceName(resolvedRaceName, VERTEX_API_KEY);
         if (aiCity) {
           console.log(`Race "${resolvedRaceName}" → AI-extracted city: "${aiCity}"`);
           geo = await geocodeCity(aiCity);
@@ -659,16 +650,13 @@ If the runner raced hard today or said they struggled, suggest rest or a very ea
 
     const userMessage = `${planContext}${raceContext}\n\n--- Activity Data ---\n${statsText}`;
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userMessage },
-        ],
-      }),
+    const response = await callVertexAI({
+      apiKey: VERTEX_API_KEY,
+      model: "google/gemini-2.5-flash",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userMessage },
+      ],
     });
 
     if (!response.ok) {

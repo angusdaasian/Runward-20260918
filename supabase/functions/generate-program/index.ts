@@ -95,9 +95,9 @@ Return ONLY valid JSON, no markdown, no explanation.`;
     const maxRetries = 3;
 
     for (let attempt = 0; attempt < maxRetries; attempt++) {
-      response = await callVertexAI({
-        apiKey: VERTEX_API_KEY,
-        model: "google/gemini-3.1-pro-preview",
+        response = await callVertexAI({
+          apiKey: VERTEX_API_KEY,
+          model: "google/gemini-3.1-flash-preview",
         messages: [
           {
             role: "system",

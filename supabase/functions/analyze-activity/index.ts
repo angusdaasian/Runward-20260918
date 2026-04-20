@@ -127,20 +127,17 @@ async function fetchHistoricalWeather(lat: number, lon: number, dateStr: string)
 // Returns "City, Country" suitable for Open-Meteo geocoding, or null.
 async function extractCityFromRaceName(raceName: string, apiKey: string): Promise<string | null> {
   try {
-    const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          {
-            role: "system",
-            content:
-              "You extract the host city of a running race from its name. Reply with ONLY the city and country in the format 'City, Country' (English). If you cannot determine the city with reasonable confidence, reply with exactly 'UNKNOWN'. No other text.",
-          },
-          { role: "user", content: `Race name: ${raceName}` },
-        ],
-      }),
+    const resp = await callVertexAI({
+      apiKey,
+      model: "google/gemini-2.5-flash",
+      messages: [
+        {
+          role: "system",
+          content:
+            "You extract the host city of a running race from its name. Reply with ONLY the city and country in the format 'City, Country' (English). If you cannot determine the city with reasonable confidence, reply with exactly 'UNKNOWN'. No other text.",
+        },
+        { role: "user", content: `Race name: ${raceName}` },
+      ],
     });
     if (!resp.ok) {
       console.error("extractCityFromRaceName: AI error", resp.status, await resp.text());
@@ -182,10 +179,10 @@ serve(async (req) => {
     const accessToken = authHeader.replace(/^Bearer\s+/i, "").trim();
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    const VERTEX_API_KEY = Deno.env.get("GOOGLE_VERTEX_API_KEY");
     if (!SUPABASE_URL) throw new Error("SUPABASE_URL is not configured");
     if (!SUPABASE_SERVICE_ROLE_KEY) throw new Error("SUPABASE_SERVICE_ROLE_KEY is not configured");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+    if (!VERTEX_API_KEY) throw new Error("GOOGLE_VERTEX_API_KEY is not configured");
 
     const serviceClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
     const { data: { user }, error: userError } = await serviceClient.auth.getUser(accessToken);

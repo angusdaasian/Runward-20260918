@@ -547,8 +547,12 @@ const ActivitiesTab = ({ lang }: Props) => {
         )}
       </div>
 
-      {/* Suggested Next Workout (only if latest activity has been analyzed) */}
-      <SuggestedNextWorkout lang={lang} latestActivityId={latestActivity?.id ?? null} />
+      {/* Today's Suggestion (analysis-derived if fresh, else generated, else expired prompt) */}
+      <SuggestedNextWorkout
+        lang={lang}
+        latestActivityId={latestActivity?.id ?? null}
+        latestActivityDate={latestActivity?.start_date ?? null}
+      />
 
       {/* Monthly Road Quest */}
       <MonthlyRoadQuest lang={lang} activities={activities} plannedWorkouts={plannedWorkouts} />

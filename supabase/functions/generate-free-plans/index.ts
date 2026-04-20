@@ -27,10 +27,11 @@ const FREE_PLANS = [
 
 async function callVertexAI(opts: { apiKey: string; model?: string; messages: Array<{ role: string; content: any }> }): Promise<Response> {
   const VERTEX_MODEL_MAP: Record<string, string> = {
-    "google/gemini-3.1-flash-lite-preview": "gemini-3.1-flash-lite-preview",
+    "google/gemini-3.1-pro-preview": "gemini-3.1-pro-preview",
+    "google/gemini-3.1-flash-preview": "gemini-3.1-flash-preview",
     "google/gemini-3.1-flash-lite-preview": "gemini-3.1-flash-lite-preview",
   };
-  const model = VERTEX_MODEL_MAP[opts.model || ""] || (opts.model || "gemini-3.1-flash-lite-preview").replace(/^google\//, "");
+  const model = VERTEX_MODEL_MAP[opts.model || ""] || (opts.model || "gemini-3.1-pro-preview").replace(/^google\//, "");
   const url = `https://aiplatform.googleapis.com/v1/publishers/google/models/${model}:generateContent?key=${opts.apiKey}`;
   const systemParts: any[] = [];
   const contents: any[] = [];
@@ -114,7 +115,7 @@ Return ONLY valid JSON, no markdown, no explanation.`;
       for (let attempt = 0; attempt < 3; attempt++) {
         response = await callVertexAI({
           apiKey: VERTEX_API_KEY,
-          model: "google/gemini-3.1-flash-lite-preview",
+          model: "google/gemini-3.1-pro-preview",
           messages: [
             { role: "system", content: "You are an expert running coach. Return ONLY valid JSON arrays. No markdown, no code fences, no explanation." },
             { role: "user", content: prompt },

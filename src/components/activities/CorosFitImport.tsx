@@ -10,6 +10,7 @@ import { Lang } from "@/lib/i18n";
 interface Props {
   lang: Lang;
   onImported: () => void;
+  embedded?: boolean;
 }
 
 interface ParsedLap {
@@ -153,7 +154,7 @@ function parseFitBuffer(buffer: ArrayBuffer): Promise<ParsedFit> {
   });
 }
 
-const CorosFitImport = ({ lang, onImported }: Props) => {
+const CorosFitImport = ({ lang, onImported, embedded = false }: Props) => {
   const { user } = useAuth();
   const [expanded, setExpanded] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -227,6 +228,36 @@ const CorosFitImport = ({ lang, onImported }: Props) => {
     }
   };
 
+  const formBody = (
+    <div className="space-y-3">
+      <p className="text-xs text-muted-foreground">
+        {lang === "zh"
+          ? "在 COROS App 中分享活動 → 匯出為 FIT → 儲存到「檔案」。然後在這裡選擇該 FIT 檔案，我們會擷取距離、時間、配速、爬升、心率、步頻、卡路里、路線地圖以及每段分割。"
+          : "In the COROS app: share activity → export as FIT → save to Files. Then pick that FIT file here. We'll extract distance, time, pace, elevation, HR, cadence, calories, route map, and per-lap splits."}
+      </p>
+      <input
+        ref={fileRef}
+        type="file"
+        accept=".fit,application/octet-stream"
+        onChange={handleFileSelected}
+        disabled={loading}
+        className="hidden"
+      />
+      <button
+        onClick={() => fileRef.current?.click()}
+        disabled={loading}
+        className="w-full flex items-center justify-center gap-2 text-sm font-medium px-3 py-2 rounded-lg text-primary-foreground bg-primary disabled:opacity-50"
+      >
+        {loading && <Loader2 size={14} className="animate-spin" />}
+        {loading
+          ? (lang === "zh" ? "匯入中..." : "Importing...")
+          : (lang === "zh" ? "選擇 FIT 檔案" : "Choose FIT File")}
+      </button>
+    </div>
+  );
+
+  if (embedded) return formBody;
+
   return (
     <div className="bg-card border border-border rounded-xl mb-4 overflow-hidden">
       <button
@@ -250,30 +281,8 @@ const CorosFitImport = ({ lang, onImported }: Props) => {
       </button>
 
       {expanded && (
-        <div className="px-4 pb-4 space-y-3 border-t border-border pt-3">
-          <p className="text-xs text-muted-foreground">
-            {lang === "zh"
-              ? "在 COROS App 中分享活動 → 匯出為 FIT → 儲存到「檔案」。然後在這裡選擇該 FIT 檔案，我們會擷取距離、時間、配速、爬升、心率、步頻、卡路里、路線地圖以及每段分割。"
-              : "In the COROS app: share activity → export as FIT → save to Files. Then pick that FIT file here. We'll extract distance, time, pace, elevation, HR, cadence, calories, route map, and per-lap splits."}
-          </p>
-          <input
-            ref={fileRef}
-            type="file"
-            accept=".fit,application/octet-stream"
-            onChange={handleFileSelected}
-            disabled={loading}
-            className="hidden"
-          />
-          <button
-            onClick={() => fileRef.current?.click()}
-            disabled={loading}
-            className="w-full flex items-center justify-center gap-2 text-sm font-medium px-3 py-2 rounded-lg text-primary-foreground bg-primary disabled:opacity-50"
-          >
-            {loading && <Loader2 size={14} className="animate-spin" />}
-            {loading
-              ? (lang === "zh" ? "匯入中..." : "Importing...")
-              : (lang === "zh" ? "選擇 FIT 檔案" : "Choose FIT File")}
-          </button>
+        <div className="px-4 pb-4 border-t border-border pt-3">
+          {formBody}
         </div>
       )}
     </div>

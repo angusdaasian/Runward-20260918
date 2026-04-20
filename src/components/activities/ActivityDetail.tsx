@@ -101,8 +101,9 @@ const StatBox = ({ icon: Icon, label, value, unit, iconColor }: {
 const ActivityDetail = ({ activity, lang, onBack, isPremium, trainingScore }: Props) => {
   const isAppleHealth = activity.source === "Apple Health";
   const isGarmin = activity.source === "Garmin";
-  const needsRpe = isAppleHealth || isGarmin;
-  const dbTable = isAppleHealth ? "apple_health_activities" : isGarmin ? "garmin_activities" : "strava_activities";
+  const isCoros = activity.source === "COROS";
+  const needsRpe = isAppleHealth || isGarmin || isCoros;
+  const dbTable = isAppleHealth ? "apple_health_activities" : (isGarmin || isCoros) ? "garmin_activities" : "strava_activities";
 
   const [streams, setStreams] = useState<any[]>([]);
   const [splits, setSplits] = useState<Split[] | null>(null);

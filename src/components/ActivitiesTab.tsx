@@ -23,8 +23,7 @@ import ActivityMap from "@/components/activities/ActivityMap";
 import ActivityCalendar from "@/components/activities/ActivityCalendar";
 import MonthlyRoadQuest from "@/components/activities/MonthlyRoadQuest";
 import ActivityDetail from "@/components/activities/ActivityDetail";
-import ManualGarminImport from "@/components/activities/ManualGarminImport";
-import CorosFitImport from "@/components/activities/CorosFitImport";
+import ManualImportTabs from "@/components/activities/ManualImportTabs";
 import SuggestedNextWorkout from "@/components/activities/SuggestedNextWorkout";
 import { calculateRunningScore } from "@/lib/vdot";
 import { useActivities, type StravaActivity } from "@/hooks/use-activities";
@@ -495,13 +494,9 @@ const ActivitiesTab = ({ lang }: Props) => {
       {/* Today Stats from Apple HealthKit */}
       <TodayStats lang={lang} healthStats={ahConnected ? appleHealth.healthStats : null} />
 
-      {/* Manual Garmin import — only when no fitness app (Strava/Garmin/Coros) is connected */}
       {/* Manual Garmin / COROS imports — only when no fitness app is connected */}
       {!fitnessAppConnected && (
-        <>
-          <ManualGarminImport lang={lang} onImported={invalidateAll} />
-          <CorosFitImport lang={lang} onImported={invalidateAll} />
-        </>
+        <ManualImportTabs lang={lang} onImported={invalidateAll} />
       )}
 
       {/* Recent Activity */}

@@ -7,9 +7,10 @@ import { Lang } from "@/lib/i18n";
 interface Props {
   lang: Lang;
   onImported: () => void;
+  embedded?: boolean;
 }
 
-const ManualGarminImport = ({ lang, onImported }: Props) => {
+const ManualGarminImport = ({ lang, onImported, embedded = false }: Props) => {
   const [expanded, setExpanded] = useState(false);
   const [url, setUrl] = useState("");
   const [loading, setLoading] = useState(false);
@@ -78,6 +79,36 @@ const ManualGarminImport = ({ lang, onImported }: Props) => {
     }
   };
 
+  const formBody = (
+    <div className="space-y-3">
+      <p className="text-xs text-muted-foreground">
+        {lang === "zh"
+          ? "在 Garmin Connect 將活動的隱私設定為「公開」，然後貼上連結（或整段「Check out my activity…」分享文字皆可）。我們會擷取距離、時間、配速、爬升、分段及路線地圖。"
+          : "Set the activity to Public in Garmin Connect, then paste the link (or the full \"Check out my activity…\" share text — we'll find the URL). We'll extract distance, time, pace, ascent, laps and the route map."}
+      </p>
+      <input
+        type="text"
+        value={url}
+        onChange={(e) => setUrl(e.target.value)}
+        placeholder="https://connect.garmin.com/modern/activity/..."
+        disabled={loading}
+        className="w-full text-sm px-3 py-2 rounded-lg bg-background border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50"
+      />
+      <button
+        onClick={handleImport}
+        disabled={loading || !url.trim()}
+        className="w-full flex items-center justify-center gap-2 text-sm font-medium px-3 py-2 rounded-lg text-primary-foreground bg-primary disabled:opacity-50"
+      >
+        {loading && <Loader2 size={14} className="animate-spin" />}
+        {loading
+          ? (lang === "zh" ? "匯入中..." : "Importing...")
+          : (lang === "zh" ? "匯入活動" : "Import Activity")}
+      </button>
+    </div>
+  );
+
+  if (embedded) return formBody;
+
   return (
     <div className="bg-card border border-border rounded-xl mb-4 overflow-hidden">
       <button
@@ -101,30 +132,8 @@ const ManualGarminImport = ({ lang, onImported }: Props) => {
       </button>
 
       {expanded && (
-        <div className="px-4 pb-4 space-y-3 border-t border-border pt-3">
-          <p className="text-xs text-muted-foreground">
-            {lang === "zh"
-              ? "在 Garmin Connect 將活動的隱私設定為「公開」，然後貼上連結（或整段「Check out my activity…」分享文字皆可）。我們會擷取距離、時間、配速、爬升、分段及路線地圖。"
-              : "Set the activity to Public in Garmin Connect, then paste the link (or the full \"Check out my activity…\" share text — we'll find the URL). We'll extract distance, time, pace, ascent, laps and the route map."}
-          </p>
-          <input
-            type="text"
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            placeholder="https://connect.garmin.com/modern/activity/..."
-            disabled={loading}
-            className="w-full text-sm px-3 py-2 rounded-lg bg-background border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50"
-          />
-          <button
-            onClick={handleImport}
-            disabled={loading || !url.trim()}
-            className="w-full flex items-center justify-center gap-2 text-sm font-medium px-3 py-2 rounded-lg text-primary-foreground bg-primary disabled:opacity-50"
-          >
-            {loading && <Loader2 size={14} className="animate-spin" />}
-            {loading
-              ? (lang === "zh" ? "匯入中..." : "Importing...")
-              : (lang === "zh" ? "匯入活動" : "Import Activity")}
-          </button>
+        <div className="px-4 pb-4 border-t border-border pt-3">
+          {formBody}
         </div>
       )}
     </div>

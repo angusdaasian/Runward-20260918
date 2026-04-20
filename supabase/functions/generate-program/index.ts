@@ -21,7 +21,15 @@ async function callVertexAI(opts: { apiKey: string; model?: string; messages: Ar
     const role = m.role === "assistant" ? "model" : "user";
     contents.push({ role, parts: [{ text: typeof m.content === "string" ? m.content : String(m.content) }] });
   }
-  const body: any = { contents };
+  const body: any = {
+    contents,
+    generationConfig: {
+      // Medium thinking budget to keep latency under edge function CPU limit
+      thinkingConfig: { thinkingBudget: 4096 },
+      maxOutputTokens: 16384,
+      temperature: 0.7,
+    },
+  };
   if (systemParts.length) body.systemInstruction = { parts: systemParts };
   const vRes = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
   if (!vRes.ok) return new Response(await vRes.text(), { status: vRes.status });

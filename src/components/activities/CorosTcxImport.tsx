@@ -10,7 +10,17 @@ interface Props {
   onImported: () => void;
 }
 
-interface ParsedGpx {
+interface ParsedLap {
+  start_time: string;
+  total_time_seconds: number;
+  distance_meters: number;
+  average_hr: number | null;
+  max_hr: number | null;
+  average_speed: number; // m/s
+  average_pace: number; // s/km
+}
+
+interface ParsedTcx {
   name: string;
   startDate: string;
   distanceMeters: number;
@@ -19,7 +29,9 @@ interface ParsedGpx {
   avgSpeed: number;
   avgHr: number | null;
   maxHr: number | null;
+  avgCadence: number | null;
   polyline: string;
+  laps: ParsedLap[];
 }
 
 // Encode lat/lng pairs into Google encoded polyline format
@@ -57,81 +69,122 @@ function haversine(lat1: number, lng1: number, lat2: number, lng2: number): numb
   return 2 * R * Math.asin(Math.sqrt(a));
 }
 
-function parseGpx(xmlText: string): ParsedGpx {
+function textOf(parent: Element | null | undefined, tag: string): string | null {
+  if (!parent) return null;
+  const el = parent.getElementsByTagName(tag)[0];
+  return el?.textContent?.trim() || null;
+}
+
+function parseTcx(xmlText: string): ParsedTcx {
   const parser = new DOMParser();
   const doc = parser.parseFromString(xmlText, "application/xml");
   const parserErr = doc.querySelector("parsererror");
-  if (parserErr) throw new Error("Invalid GPX file");
+  if (parserErr) throw new Error("Invalid TCX file");
 
-  const trkpts = Array.from(doc.getElementsByTagName("trkpt"));
-  if (trkpts.length === 0) throw new Error("No track points found in GPX");
+  const activity = doc.getElementsByTagName("Activity")[0];
+  if (!activity) throw new Error("No Activity element found");
 
-  const points: Array<[number, number]> = [];
-  const times: Date[] = [];
-  const elevations: number[] = [];
-  const hrValues: number[] = [];
+  const startDate = textOf(activity, "Id") || new Date().toISOString();
+  const sportAttr = activity.getAttribute("Sport") || "Running";
 
-  for (const pt of trkpts) {
-    const lat = parseFloat(pt.getAttribute("lat") || "");
-    const lng = parseFloat(pt.getAttribute("lon") || "");
-    if (!isFinite(lat) || !isFinite(lng)) continue;
-    points.push([lat, lng]);
+  const lapEls = Array.from(activity.getElementsByTagName("Lap"));
+  const laps: ParsedLap[] = [];
 
-    const eleEl = pt.getElementsByTagName("ele")[0];
-    if (eleEl?.textContent) elevations.push(parseFloat(eleEl.textContent));
+  const allPoints: Array<[number, number]> = [];
+  const allElevations: number[] = [];
+  const allHrValues: number[] = [];
+  const allCadenceValues: number[] = [];
 
-    const timeEl = pt.getElementsByTagName("time")[0];
-    if (timeEl?.textContent) times.push(new Date(timeEl.textContent));
+  let totalTime = 0;
+  let totalDistance = 0;
 
-    const hrEl = pt.getElementsByTagName("gpxtpx:hr")[0] || pt.getElementsByTagName("hr")[0];
-    if (hrEl?.textContent) {
-      const hr = parseFloat(hrEl.textContent);
-      if (isFinite(hr) && hr > 0) hrValues.push(hr);
+  for (const lap of lapEls) {
+    const lapStart = lap.getAttribute("StartTime") || startDate;
+    const lapTime = parseFloat(textOf(lap, "TotalTimeSeconds") || "0");
+    const lapDist = parseFloat(textOf(lap, "DistanceMeters") || "0");
+    const lapAvgHr = parseFloat(
+      lap.getElementsByTagName("AverageHeartRateBpm")[0]?.getElementsByTagName("Value")[0]?.textContent || "",
+    );
+    const lapMaxHr = parseFloat(
+      lap.getElementsByTagName("MaximumHeartRateBpm")[0]?.getElementsByTagName("Value")[0]?.textContent || "",
+    );
+
+    totalTime += lapTime;
+    totalDistance += lapDist;
+
+    const lapSpeed = lapTime > 0 ? lapDist / lapTime : 0;
+    const lapPace = lapSpeed > 0 ? 1000 / lapSpeed : 0;
+
+    laps.push({
+      start_time: lapStart,
+      total_time_seconds: Math.round(lapTime),
+      distance_meters: Math.round(lapDist),
+      average_hr: isFinite(lapAvgHr) && lapAvgHr > 0 ? Math.round(lapAvgHr) : null,
+      max_hr: isFinite(lapMaxHr) && lapMaxHr > 0 ? Math.round(lapMaxHr) : null,
+      average_speed: lapSpeed,
+      average_pace: lapPace,
+    });
+
+    const tps = Array.from(lap.getElementsByTagName("Trackpoint"));
+    for (const tp of tps) {
+      const pos = tp.getElementsByTagName("Position")[0];
+      if (pos) {
+        const lat = parseFloat(textOf(pos, "LatitudeDegrees") || "");
+        const lng = parseFloat(textOf(pos, "LongitudeDegrees") || "");
+        if (isFinite(lat) && isFinite(lng)) {
+          allPoints.push([lat, lng]);
+        }
+      }
+      const ele = parseFloat(textOf(tp, "AltitudeMeters") || "");
+      if (isFinite(ele)) allElevations.push(ele);
+
+      const hrEl = tp.getElementsByTagName("HeartRateBpm")[0];
+      const hrVal = hrEl ? parseFloat(hrEl.getElementsByTagName("Value")[0]?.textContent || "") : NaN;
+      if (isFinite(hrVal) && hrVal > 0) allHrValues.push(hrVal);
+
+      const cad = parseFloat(textOf(tp, "Cadence") || "");
+      if (isFinite(cad) && cad > 0) allCadenceValues.push(cad);
     }
   }
 
-  if (points.length < 2) throw new Error("Not enough GPS points");
+  if (totalTime < 1) throw new Error("No duration found in TCX");
 
-  // Distance
-  let distanceMeters = 0;
-  for (let i = 1; i < points.length; i++) {
-    distanceMeters += haversine(points[i - 1][0], points[i - 1][1], points[i][0], points[i][1]);
-  }
-
-  // Time
-  const startDate = times[0] || new Date();
-  const endDate = times[times.length - 1] || startDate;
-  const movingTimeSec = Math.max(1, Math.round((endDate.getTime() - startDate.getTime()) / 1000));
-
-  // Elevation gain
   let elevationGain = 0;
-  for (let i = 1; i < elevations.length; i++) {
-    const diff = elevations[i] - elevations[i - 1];
+  for (let i = 1; i < allElevations.length; i++) {
+    const diff = allElevations[i] - allElevations[i - 1];
     if (diff > 0) elevationGain += diff;
   }
 
-  const avgSpeed = distanceMeters / movingTimeSec;
-  const avgHr = hrValues.length > 0 ? hrValues.reduce((a, b) => a + b, 0) / hrValues.length : null;
-  const maxHr = hrValues.length > 0 ? Math.max(...hrValues) : null;
+  if (totalDistance === 0 && allPoints.length >= 2) {
+    for (let i = 1; i < allPoints.length; i++) {
+      totalDistance += haversine(allPoints[i - 1][0], allPoints[i - 1][1], allPoints[i][0], allPoints[i][1]);
+    }
+  }
 
-  // Track name
-  const nameEl = doc.querySelector("trk > name") || doc.querySelector("metadata > name");
-  const name = nameEl?.textContent?.trim() || "COROS Activity";
+  const avgSpeed = totalDistance / totalTime;
+  const avgHr = allHrValues.length > 0 ? allHrValues.reduce((a, b) => a + b, 0) / allHrValues.length : null;
+  const maxHr = allHrValues.length > 0 ? Math.max(...allHrValues) : null;
+  const avgCadence = allCadenceValues.length > 0 ? allCadenceValues.reduce((a, b) => a + b, 0) / allCadenceValues.length : null;
+
+  const creatorName = textOf(activity.getElementsByTagName("Creator")[0], "Name");
+  const name = creatorName ? `${sportAttr} - ${creatorName}` : `COROS ${sportAttr}`;
 
   return {
     name,
-    startDate: startDate.toISOString(),
-    distanceMeters: Math.round(distanceMeters),
-    movingTimeSec,
+    startDate,
+    distanceMeters: Math.round(totalDistance),
+    movingTimeSec: Math.round(totalTime),
     elevationGain: Math.round(elevationGain),
     avgSpeed,
     avgHr: avgHr ? Math.round(avgHr) : null,
     maxHr: maxHr ? Math.round(maxHr) : null,
-    polyline: encodePolyline(points),
+    avgCadence: avgCadence ? Math.round(avgCadence) : null,
+    polyline: encodePolyline(allPoints),
+    laps,
   };
 }
 
-const CorosGpxImport = ({ lang, onImported }: Props) => {
+const CorosTcxImport = ({ lang, onImported }: Props) => {
   const { user } = useAuth();
   const [expanded, setExpanded] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -144,10 +197,8 @@ const CorosGpxImport = ({ lang, onImported }: Props) => {
     setLoading(true);
     try {
       const text = await file.text();
-      const parsed = parseGpx(text);
+      const parsed = parseTcx(text);
 
-      // Insert into garmin_activities (reusing the table since COROS exports same GPX format).
-      // Use a deterministic id based on filename + start to detect duplicates.
       const externalId = `coros-${parsed.startDate}-${parsed.distanceMeters}`;
 
       const { data: existing } = await supabase
@@ -177,22 +228,24 @@ const CorosGpxImport = ({ lang, onImported }: Props) => {
         average_pace: parsed.avgSpeed > 0 ? 1000 / parsed.avgSpeed : null,
         average_hr: parsed.avgHr,
         max_hr: parsed.maxHr,
-        has_gps: true,
+        avg_cadence: parsed.avgCadence,
+        has_gps: parsed.polyline.length > 0,
         has_details: true,
-        summary_polyline: parsed.polyline,
+        summary_polyline: parsed.polyline || null,
+        laps: parsed.laps,
       });
 
       if (insertErr) throw insertErr;
 
       toast.success(
         lang === "zh"
-          ? `已匯入 ${(parsed.distanceMeters / 1000).toFixed(2)} km`
-          : `Imported ${(parsed.distanceMeters / 1000).toFixed(2)} km`,
+          ? `已匯入 ${(parsed.distanceMeters / 1000).toFixed(2)} km · ${parsed.laps.length} 段`
+          : `Imported ${(parsed.distanceMeters / 1000).toFixed(2)} km · ${parsed.laps.length} splits`,
       );
       setExpanded(false);
       onImported();
     } catch (err: any) {
-      console.error("COROS GPX import error:", err);
+      console.error("COROS TCX import error:", err);
       toast.error(
         lang === "zh"
           ? `匯入失敗：${err?.message || "未知錯誤"}`
@@ -216,10 +269,10 @@ const CorosGpxImport = ({ lang, onImported }: Props) => {
           </div>
           <div>
             <div className="text-sm font-semibold text-foreground">
-              {lang === "zh" ? "匯入 COROS 活動 (GPX)" : "Import COROS Activity (GPX)"}
+              {lang === "zh" ? "匯入 COROS 活動 (TCX)" : "Import COROS Activity (TCX)"}
             </div>
             <div className="text-xs text-muted-foreground">
-              {lang === "zh" ? "從檔案選擇 GPX 檔案" : "Pick a GPX file from your device"}
+              {lang === "zh" ? "包含每公里分段、配速、心率、路線" : "Includes splits, pace, HR, and route"}
             </div>
           </div>
         </div>
@@ -230,13 +283,13 @@ const CorosGpxImport = ({ lang, onImported }: Props) => {
         <div className="px-4 pb-4 space-y-3 border-t border-border pt-3">
           <p className="text-xs text-muted-foreground">
             {lang === "zh"
-              ? "在 COROS App 中分享活動 → 匯出為 GPX → 儲存到「檔案」。然後在這裡選擇該 GPX 檔案，我們會擷取距離、時間、配速、爬升、心率與路線地圖。"
-              : "In the COROS app: share activity → export as GPX → save to Files. Then pick that GPX file here. We'll extract distance, time, pace, elevation, heart rate and the route map."}
+              ? "在 COROS App 中分享活動 → 匯出為 TCX → 儲存到「檔案」。然後在這裡選擇該 TCX 檔案，我們會擷取距離、時間、配速、爬升、心率、路線地圖以及每段分割。"
+              : "In the COROS app: share activity → export as TCX → save to Files. Then pick that TCX file here. We'll extract distance, time, pace, elevation, heart rate, route map, and per-lap splits."}
           </p>
           <input
             ref={fileRef}
             type="file"
-            accept=".gpx,application/gpx+xml,application/xml,text/xml"
+            accept=".tcx,application/vnd.garmin.tcx+xml,application/xml,text/xml"
             onChange={handleFileSelected}
             disabled={loading}
             className="hidden"
@@ -249,7 +302,7 @@ const CorosGpxImport = ({ lang, onImported }: Props) => {
             {loading && <Loader2 size={14} className="animate-spin" />}
             {loading
               ? (lang === "zh" ? "匯入中..." : "Importing...")
-              : (lang === "zh" ? "選擇 GPX 檔案" : "Choose GPX File")}
+              : (lang === "zh" ? "選擇 TCX 檔案" : "Choose TCX File")}
           </button>
         </div>
       )}
@@ -257,4 +310,4 @@ const CorosGpxImport = ({ lang, onImported }: Props) => {
   );
 };
 
-export default CorosGpxImport;
+export default CorosTcxImport;

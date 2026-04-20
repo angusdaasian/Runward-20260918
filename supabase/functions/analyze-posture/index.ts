@@ -65,18 +65,12 @@ serve(async (req) => {
 
 ${JSON.stringify(existingResult)}`;
 
-      const tlResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "google/gemini-3-flash-preview",
-          messages: [
-            { role: "user", content: translatePrompt },
-          ],
-        }),
+      const tlResp = await callVertexAI({
+        apiKey: VERTEX_API_KEY,
+        model: "google/gemini-3-flash-preview",
+        messages: [
+          { role: "user", content: translatePrompt },
+        ],
       });
 
       if (!tlResp.ok) {

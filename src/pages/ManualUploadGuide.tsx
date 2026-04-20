@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
-import { Lang, getLang } from "@/lib/i18n";
+import { Lang } from "@/lib/i18n";
 import step1 from "@/assets/garmin-step-1.png";
 import step2 from "@/assets/garmin-step-2.png";
 import step3 from "@/assets/garmin-step-3.png";
@@ -74,7 +74,7 @@ const garminSteps: Step[] = [
 
 const ManualUploadGuide = () => {
   const navigate = useNavigate();
-  const lang: Lang = getLang();
+  const lang: Lang = (typeof window !== "undefined" && (localStorage.getItem("app_lang") as Lang)) || "en";
 
   return (
     <div className="min-h-screen bg-background text-foreground">

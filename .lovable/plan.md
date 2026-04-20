@@ -1,4 +1,2 @@
 
-User picked: Activities tab only, single file, COROS takes priority over Apple Health.
-
-Let me verify a few things before finalizing — check ActivitiesTab to know where to mount the import button, and see how Garmin handles the Apple Health priority deletion.
+The user shared the Despia file-sharing docs. Let me fetch them to see if GPX file-sharing into the app is supported.

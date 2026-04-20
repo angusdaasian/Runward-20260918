@@ -153,25 +153,19 @@ Scores should be objective based on actual posture observed. Be specific in feed
       image_url: { url: frame },
     }));
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
-        messages: [
-          { role: "system", content: systemPrompt },
-          {
-            role: "user",
-            content: [
-              { type: "text", text: isZh ? "請分析這些跑步姿勢截圖並以 JSON 格式回覆：" : "Analyze these running form frames and respond in JSON format:" },
-              ...imageContent,
-            ],
-          },
-        ],
-      }),
+    const response = await callVertexAI({
+      apiKey: VERTEX_API_KEY,
+      model: "google/gemini-3-flash-preview",
+      messages: [
+        { role: "system", content: systemPrompt },
+        {
+          role: "user",
+          content: [
+            { type: "text", text: isZh ? "請分析這些跑步姿勢截圖並以 JSON 格式回覆：" : "Analyze these running form frames and respond in JSON format:" },
+            ...imageContent,
+          ],
+        },
+      ],
     });
 
     if (!response.ok) {

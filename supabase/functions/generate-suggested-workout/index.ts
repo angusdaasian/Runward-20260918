@@ -81,6 +81,8 @@ serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const lang: "en" | "zh" = body?.lang === "zh" ? "zh" : "en";
     const idealTime: { distance?: string; seconds?: number } | null = body?.idealTime ?? null;
+    const todayDate: string | null = typeof body?.todayDate === "string" ? body.todayDate : null;
+    const lastActivityDate: string | null = typeof body?.lastActivityDate === "string" ? body.lastActivityDate : null;
     const isZh = lang === "zh";
 
     // --- Pull last 7 days of runs from all 3 sources ---

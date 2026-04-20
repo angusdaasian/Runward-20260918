@@ -34,6 +34,30 @@ function paceFromSpeed(speedMps: number): string {
   return `${m}:${String(s).padStart(2, "0")} /km`;
 }
 
+// ── Vertex AI helper ──
+async function callVertexAI(opts: { apiKey: string; model?: string; messages: Array<{ role: string; content: any }> }): Promise<Response> {
+  const VERTEX_MODEL_MAP: Record<string, string> = {
+    "google/gemini-2.5-flash": "gemini-2.5-flash",
+    "google/gemini-3-flash-preview": "gemini-2.5-flash",
+  };
+  const model = VERTEX_MODEL_MAP[opts.model || ""] || (opts.model || "gemini-2.5-flash").replace(/^google\//, "");
+  const url = `https://aiplatform.googleapis.com/v1/publishers/google/models/${model}:generateContent?key=${opts.apiKey}`;
+  const systemParts: any[] = [];
+  const contents: any[] = [];
+  for (const m of opts.messages) {
+    if (m.role === "system") { systemParts.push({ text: typeof m.content === "string" ? m.content : "" }); continue; }
+    const role = m.role === "assistant" ? "model" : "user";
+    contents.push({ role, parts: [{ text: typeof m.content === "string" ? m.content : String(m.content) }] });
+  }
+  const body: any = { contents };
+  if (systemParts.length) body.systemInstruction = { parts: systemParts };
+  const vRes = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  if (!vRes.ok) return new Response(await vRes.text(), { status: vRes.status });
+  const vData = await vRes.json();
+  const text = vData?.candidates?.[0]?.content?.parts?.map((p: any) => p.text || "").join("") || "";
+  return new Response(JSON.stringify({ choices: [{ message: { content: text } }] }), { status: 200, headers: { "Content-Type": "application/json" } });
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -44,8 +68,8 @@ serve(async (req) => {
 
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
     const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY")!;
-    if (!SUPABASE_URL || !SERVICE_KEY || !LOVABLE_API_KEY) {
+    const VERTEX_API_KEY = Deno.env.get("GOOGLE_VERTEX_API_KEY")!;
+    if (!SUPABASE_URL || !SERVICE_KEY || !VERTEX_API_KEY) {
       return json({ error: "Server not configured" }, 500);
     }
 
@@ -168,16 +192,13 @@ Format:
 
 If recent volume was high or paces were taxing, suggest recovery/easy. If no runs at all, give a beginner-appropriate session matched to their goal pace.`;
 
-    const aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: context },
-        ],
-      }),
+    const aiResp = await callVertexAI({
+      apiKey: VERTEX_API_KEY,
+      model: "google/gemini-3-flash-preview",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: context },
+      ],
     });
     if (!aiResp.ok) {
       if (aiResp.status === 429) return json({ error: "Rate limited" }, 429);

@@ -122,7 +122,7 @@ Return ONLY valid JSON, no markdown, no explanation.`;
       for (let attempt = 0; attempt < 3; attempt++) {
         response = await callVertexAI({
           apiKey: VERTEX_API_KEY,
-          model: "google/gemini-3.1-pro-preview",
+          model: "google/gemini-3.1-flash-preview",
           messages: [
             { role: "system", content: "You are an expert running coach. Return ONLY valid JSON arrays. No markdown, no code fences, no explanation." },
             { role: "user", content: prompt },

@@ -12,6 +12,74 @@ function jsonResponse(body: Record<string, unknown>, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: jsonHeaders });
 }
 
+// ── Vertex AI helper (OpenAI-compatible response shape) ──
+const VERTEX_MODEL_MAP: Record<string, string> = {
+  "google/gemini-2.5-flash": "gemini-2.5-flash",
+  "google/gemini-2.5-flash-lite": "gemini-2.5-flash-lite",
+  "google/gemini-2.5-pro": "gemini-2.5-pro",
+  "google/gemini-3-flash-preview": "gemini-2.5-flash",
+};
+
+async function callVertexAI(opts: {
+  apiKey: string;
+  model?: string;
+  messages: Array<{ role: string; content: any }>;
+}): Promise<Response> {
+  const model = VERTEX_MODEL_MAP[opts.model || ""] || (opts.model || "gemini-2.5-flash").replace(/^google\//, "");
+  const url = `https://aiplatform.googleapis.com/v1/publishers/google/models/${model}:generateContent?key=${opts.apiKey}`;
+
+  const systemParts: any[] = [];
+  const contents: any[] = [];
+  for (const m of opts.messages) {
+    if (m.role === "system") {
+      const text = typeof m.content === "string" ? m.content : (m.content?.[0]?.text || "");
+      systemParts.push({ text });
+      continue;
+    }
+    const role = m.role === "assistant" ? "model" : "user";
+    let parts: any[];
+    if (typeof m.content === "string") {
+      parts = [{ text: m.content }];
+    } else if (Array.isArray(m.content)) {
+      parts = m.content.map((p: any) => {
+        if (p.type === "text") return { text: p.text };
+        if (p.type === "image_url") {
+          const url = p.image_url?.url || "";
+          // data URL: data:image/png;base64,xxxx
+          const match = url.match(/^data:([^;]+);base64,(.+)$/);
+          if (match) return { inlineData: { mimeType: match[1], data: match[2] } };
+          return { fileData: { fileUri: url, mimeType: "image/jpeg" } };
+        }
+        return { text: String(p) };
+      });
+    } else {
+      parts = [{ text: String(m.content) }];
+    }
+    contents.push({ role, parts });
+  }
+
+  const body: any = { contents };
+  if (systemParts.length) body.systemInstruction = { parts: systemParts };
+
+  const vRes = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+  if (!vRes.ok) {
+    const errText = await vRes.text();
+    return new Response(errText, { status: vRes.status });
+  }
+  const vData = await vRes.json();
+  const text = vData?.candidates?.[0]?.content?.parts?.map((p: any) => p.text || "").join("") || "";
+  // Return OpenAI-compatible shape
+  return new Response(JSON.stringify({ choices: [{ message: { content: text } }] }), {
+    status: 200,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
 function asArray<T = any>(value: unknown): T[] {
   return Array.isArray(value) ? value : [];
 }

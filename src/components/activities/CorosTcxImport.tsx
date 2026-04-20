@@ -215,7 +215,7 @@ const CorosTcxImport = ({ lang, onImported }: Props) => {
         return;
       }
 
-      const { error: insertErr } = await supabase.from("garmin_activities").insert({
+      const { error: insertErr } = await supabase.from("garmin_activities").insert([{
         user_id: user.id,
         garmin_activity_id: externalId,
         activity_name: parsed.name,
@@ -232,8 +232,8 @@ const CorosTcxImport = ({ lang, onImported }: Props) => {
         has_gps: parsed.polyline.length > 0,
         has_details: true,
         summary_polyline: parsed.polyline || null,
-        laps: parsed.laps,
-      });
+        laps: parsed.laps as any,
+      }]);
 
       if (insertErr) throw insertErr;
 

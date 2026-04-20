@@ -51,6 +51,13 @@ function readIdealTime(): { distance?: string; seconds?: number } | null {
   }
 }
 
+// Strip a leading H1/H2 heading (e.g. "## 明日建議訓練" / "## Suggested Next Workout")
+// from the AI markdown — the card already has its own header so showing the
+// heading again is redundant (and contradicts when the card title is "Today's").
+function stripLeadingHeading(md: string): string {
+  return md.replace(/^\s*#{1,3}\s+.*\n+/, "");
+}
+
 const SuggestedNextWorkout = ({ lang, latestActivityId, latestActivityDate }: Props) => {
   const { user } = useAuth();
   const isZh = lang === "zh";
@@ -138,9 +145,9 @@ const SuggestedNextWorkout = ({ lang, latestActivityId, latestActivityDate }: Pr
   }, [latestActivityId]);
 
   // Decide what to show:
-  //   1. If the latest activity is <=1 day old AND has an analysis suggestion → show it.
-  //   2. Else, if a cached generated suggestion exists for the same basis (or no basis) → show it.
-  //   3. Else, show the expired prompt.
+  //   The suggestion is valid only on the calendar day AFTER the latest activity
+  //   (in the user's local timezone). E.g. activity on 19/4 → show all of 20/4,
+  //   hidden on 21/4 and beyond.
   const view = useMemo<
     | { kind: "loading" }
     | { kind: "analysis"; text: string }
@@ -151,28 +158,36 @@ const SuggestedNextWorkout = ({ lang, latestActivityId, latestActivityDate }: Pr
     if (!user) return { kind: "hidden" };
     if (!analysisLoaded) return { kind: "loading" };
 
-    const now = Date.now();
-    const latestDateMs = latestActivityDate ? new Date(latestActivityDate).getTime() : null;
-    const isFresh = latestDateMs != null && now - latestDateMs <= ONE_DAY_MS;
+    // Compute whether "today" (local) is the day immediately after the latest activity day.
+    const isDayAfterLatest = (() => {
+      if (!latestActivityDate) return false;
+      const act = new Date(latestActivityDate);
+      const actDay = new Date(act.getFullYear(), act.getMonth(), act.getDate());
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const diffDays = Math.round((today.getTime() - actDay.getTime()) / (24 * 60 * 60 * 1000));
+      return diffDays === 1;
+    })();
 
-    if (isFresh && analysisWorkout) {
+    // Outside the valid window → hide entirely (no expired prompt either).
+    if (!isDayAfterLatest) return { kind: "hidden" };
+
+    // Within the valid window: prefer the AI analysis-derived suggestion.
+    if (analysisWorkout) {
       return { kind: "analysis", text: analysisWorkout };
     }
 
-    // Generated suggestion is valid only if there is no newer activity than the basis
+    // Otherwise, show a cached generated suggestion if it matches the latest activity.
     if (generated) {
       const basis = generated.basisActivityDate ? new Date(generated.basisActivityDate).getTime() : null;
-      const stillCurrent =
-        (latestDateMs == null && basis == null) ||
-        (latestDateMs != null && basis != null && Math.abs(latestDateMs - basis) < 1000) ||
-        (latestDateMs == null && basis != null);
-      // Generated suggestions themselves expire after 24h
-      const ageOk = now - new Date(generated.generatedAt).getTime() <= ONE_DAY_MS;
-      if (stillCurrent && ageOk) {
+      const latestDateMs = new Date(latestActivityDate!).getTime();
+      const stillCurrent = basis != null && Math.abs(latestDateMs - basis) < 1000;
+      if (stillCurrent) {
         return { kind: "generated", text: generated.suggestion };
       }
     }
 
+    // Within the window but nothing generated yet → offer to generate.
     return { kind: "expired" };
   }, [user, analysisLoaded, analysisWorkout, latestActivityDate, generated]);
 
@@ -223,7 +238,7 @@ const SuggestedNextWorkout = ({ lang, latestActivityId, latestActivityDate }: Pr
 
       {(view.kind === "analysis" || view.kind === "generated") && (
         <div className="prose prose-sm dark:prose-invert max-w-none text-foreground text-sm [&_h2]:text-base [&_h2]:font-bold [&_h2]:mt-2 [&_h2]:mb-1 [&_ul]:my-1 [&_li]:my-0.5 [&_strong]:text-primary">
-          <ReactMarkdown>{view.text}</ReactMarkdown>
+          <ReactMarkdown>{stripLeadingHeading(view.text)}</ReactMarkdown>
         </div>
       )}
 

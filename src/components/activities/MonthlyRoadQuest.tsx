@@ -1,7 +1,9 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Trophy, Droplets, MapPin, Flag, Medal } from "lucide-react";
 import { Lang } from "@/lib/i18n";
 import type { StravaActivity, PlannedWorkout } from "@/hooks/use-activities";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface Props {
   lang: Lang;
@@ -27,11 +29,36 @@ const MILESTONES = [
 ];
 
 const MonthlyRoadQuest = ({ lang, activities, plannedWorkouts }: Props) => {
+  const { user } = useAuth();
   const [goalKm, setGoalKm] = useState(getStoredGoal);
+
+  // Load goal from DB on mount (DB is the source of truth for the cron job)
+  useEffect(() => {
+    if (!user) return;
+    (async () => {
+      const { data } = await supabase
+        .from("profiles")
+        .select("monthly_goal_km")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      const dbGoal = (data as any)?.monthly_goal_km;
+      if (dbGoal && GOAL_OPTIONS.includes(Number(dbGoal))) {
+        setGoalKm(Number(dbGoal));
+        try { localStorage.setItem(STORAGE_KEY, String(dbGoal)); } catch {}
+      } else {
+        // Backfill DB with the local value so the cron job can use it
+        const local = getStoredGoal();
+        await supabase.from("profiles").update({ monthly_goal_km: local } as any).eq("user_id", user.id);
+      }
+    })();
+  }, [user]);
 
   const handleGoalChange = (g: number) => {
     setGoalKm(g);
     try { localStorage.setItem(STORAGE_KEY, String(g)); } catch {}
+    if (user) {
+      supabase.from("profiles").update({ monthly_goal_km: g } as any).eq("user_id", user.id).then();
+    }
   };
 
   // Current month total km

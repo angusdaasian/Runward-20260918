@@ -1,2 +1,2 @@
 
-The user shared the Despia file-sharing docs. Let me fetch them to see if GPX file-sharing into the app is supported.
+User wants the file picker for COROS GPX import. Let me check the existing ManualGarminImport component since it likely has a similar file-picker pattern I can follow.

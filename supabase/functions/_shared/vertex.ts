@@ -8,14 +8,14 @@ export type ChatMessage = {
 };
 
 const MODEL_MAP: Record<string, string> = {
-  "google/gemini-2.5-flash": "gemini-2.5-flash",
-  "google/gemini-2.5-flash-lite": "gemini-2.5-flash-lite",
-  "google/gemini-2.5-pro": "gemini-2.5-pro",
-  "google/gemini-3-flash-preview": "gemini-2.5-flash",
-  "google/gemini-3-pro-image-preview": "gemini-2.5-flash",
+  "google/gemini-3.1-flash-lite-preview": "gemini-3.1-flash-lite-preview",
+  "google/gemini-3.1-flash-lite-preview": "gemini-3.1-flash-lite-preview",
+  "google/gemini-3.1-flash-lite-preview": "gemini-3.1-flash-lite-preview",
+  "google/gemini-3-flash-preview": "gemini-3.1-flash-lite-preview",
+  "google/gemini-3-pro-image-preview": "gemini-3.1-flash-lite-preview",
 };
 
 export function mapModel(m?: string): string {
-  if (!m) return "gemini-2.5-flash";
+  if (!m) return "gemini-3.1-flash-lite-preview";
   return MODEL_MAP[m] || m.replace(/^google\//, "");
 }

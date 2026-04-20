@@ -98,10 +98,10 @@ Schema:
 If a field is not present, use null. If laps are not visible, return an empty array. Never invent values.`;
 
   const VERTEX_MODEL_MAP: Record<string, string> = {
-    "google/gemini-2.5-flash": "gemini-2.5-flash",
-    "google/gemini-3-flash-preview": "gemini-2.5-flash",
+    "google/gemini-3.1-flash-lite-preview": "gemini-3.1-flash-lite-preview",
+    "google/gemini-3-flash-preview": "gemini-3.1-flash-lite-preview",
   };
-  const model = VERTEX_MODEL_MAP["google/gemini-2.5-flash"];
+  const model = VERTEX_MODEL_MAP["google/gemini-3.1-flash-lite-preview"];
   const url = `https://aiplatform.googleapis.com/v1/publishers/google/models/${model}:generateContent?key=${aiKey}`;
   const res = await fetch(url, {
     method: "POST",

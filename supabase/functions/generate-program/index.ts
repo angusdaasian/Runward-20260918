@@ -8,10 +8,10 @@ const corsHeaders = {
 // ── Vertex AI helper ──
 async function callVertexAI(opts: { apiKey: string; model?: string; messages: Array<{ role: string; content: any }> }): Promise<Response> {
   const VERTEX_MODEL_MAP: Record<string, string> = {
-    "google/gemini-2.5-flash": "gemini-2.5-flash",
-    "google/gemini-3-flash-preview": "gemini-2.5-flash",
+    "google/gemini-3.1-flash-lite-preview": "gemini-3.1-flash-lite-preview",
+    "google/gemini-3.1-flash-lite-preview": "gemini-3.1-flash-lite-preview",
   };
-  const model = VERTEX_MODEL_MAP[opts.model || ""] || (opts.model || "gemini-2.5-flash").replace(/^google\//, "");
+  const model = VERTEX_MODEL_MAP[opts.model || ""] || (opts.model || "gemini-3.1-flash-lite-preview").replace(/^google\//, "");
   const url = `https://aiplatform.googleapis.com/v1/publishers/google/models/${model}:generateContent?key=${opts.apiKey}`;
   const systemParts: any[] = [];
   const contents: any[] = [];
@@ -88,7 +88,7 @@ Return ONLY valid JSON, no markdown, no explanation.`;
     for (let attempt = 0; attempt < maxRetries; attempt++) {
       response = await callVertexAI({
         apiKey: VERTEX_API_KEY,
-        model: "google/gemini-3-flash-preview",
+        model: "google/gemini-3.1-flash-lite-preview",
         messages: [
           {
             role: "system",

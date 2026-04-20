@@ -196,8 +196,12 @@ const SuggestedNextWorkout = ({ lang, latestActivityId, latestActivityDate }: Pr
     setGenerating(true);
     try {
       const idealTime = readIdealTime();
+      const fmtLocal = (d: Date) =>
+        `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      const todayDate = fmtLocal(new Date());
+      const lastActivityDateStr = latestActivityDate ? fmtLocal(new Date(latestActivityDate)) : null;
       const { data, error } = await supabase.functions.invoke("generate-suggested-workout", {
-        body: { lang, idealTime },
+        body: { lang, idealTime, todayDate, lastActivityDate: lastActivityDateStr },
       });
       if (error) throw error;
       const suggestion = (data as any)?.suggestion;

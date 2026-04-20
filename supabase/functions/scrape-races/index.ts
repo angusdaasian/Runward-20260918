@@ -278,24 +278,47 @@ async function scrapeWithFirecrawl(url: string, apiKey: string): Promise<string>
   return data.data?.markdown || "";
 }
 
+async function callVertexAIRaw(opts: { apiKey: string; model?: string; messages: Array<{ role: string; content: any }> }): Promise<{ ok: boolean; status: number; text: string; json?: any }> {
+  const VERTEX_MODEL_MAP: Record<string, string> = {
+    "google/gemini-2.5-flash": "gemini-2.5-flash",
+    "google/gemini-3-flash-preview": "gemini-2.5-flash",
+  };
+  const model = VERTEX_MODEL_MAP[opts.model || ""] || (opts.model || "gemini-2.5-flash").replace(/^google\//, "");
+  const url = `https://aiplatform.googleapis.com/v1/publishers/google/models/${model}:generateContent?key=${opts.apiKey}`;
+  const systemParts: any[] = [];
+  const contents: any[] = [];
+  for (const m of opts.messages) {
+    if (m.role === "system") { systemParts.push({ text: typeof m.content === "string" ? m.content : "" }); continue; }
+    const role = m.role === "assistant" ? "model" : "user";
+    contents.push({ role, parts: [{ text: typeof m.content === "string" ? m.content : String(m.content) }] });
+  }
+  const body: any = { contents };
+  if (systemParts.length) body.systemInstruction = { parts: systemParts };
+  const vRes = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const vText = await vRes.text();
+  if (!vRes.ok) return { ok: false, status: vRes.status, text: vText };
+  try {
+    const vData = JSON.parse(vText);
+    const text = vData?.candidates?.[0]?.content?.parts?.map((p: any) => p.text || "").join("") || "";
+    return { ok: true, status: 200, text, json: vData };
+  } catch {
+    return { ok: false, status: 500, text: vText };
+  }
+}
+
 async function callAI(apiKey: string, systemPrompt: string, userPrompt: string): Promise<string> {
-  const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: "google/gemini-2.5-flash",
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt },
-      ],
-    }),
+  const res = await callVertexAIRaw({
+    apiKey,
+    model: "google/gemini-2.5-flash",
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userPrompt },
+    ],
   });
   if (!res.ok) {
-    const t = await res.text();
-    throw new Error(`AI call failed: ${res.status} ${t}`);
+    throw new Error(`AI call failed: ${res.status} ${res.text}`);
   }
-  const data = await res.json();
-  let content = data.choices?.[0]?.message?.content || "";
+  let content = res.text || "";
   const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
   if (jsonMatch) content = jsonMatch[1].trim();
   return content;
@@ -745,8 +768,8 @@ Deno.serve(async (req) => {
 
     const FIRECRAWL_API_KEY = Deno.env.get("FIRECRAWL_API_KEY");
     if (!FIRECRAWL_API_KEY) throw new Error("FIRECRAWL_API_KEY not configured");
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
+    const VERTEX_API_KEY = Deno.env.get("GOOGLE_VERTEX_API_KEY");
+    if (!VERTEX_API_KEY) throw new Error("VERTEX_API_KEY not configured");
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) throw new Error("Supabase config missing");
@@ -756,51 +779,51 @@ Deno.serve(async (req) => {
 
     if (!sourceFilter || sourceFilter === "japan") {
       console.log("Scraping Japan races from flyareyou...");
-      const races = await scrapeFlyAreYou(SOURCES.japan, "flyareyou_japan", FIRECRAWL_API_KEY, LOVABLE_API_KEY);
+      const races = await scrapeFlyAreYou(SOURCES.japan, "flyareyou_japan", FIRECRAWL_API_KEY, VERTEX_API_KEY);
       console.log(`Japan: ${races.length} races`);
       allRawRaces.push(...races);
     }
 
     if (!sourceFilter || sourceFilter === "overseas") {
       console.log("Scraping Overseas races from flyareyou...");
-      const races = await scrapeFlyAreYou(SOURCES.overseas, "flyareyou_overseas", FIRECRAWL_API_KEY, LOVABLE_API_KEY);
+      const races = await scrapeFlyAreYou(SOURCES.overseas, "flyareyou_overseas", FIRECRAWL_API_KEY, VERTEX_API_KEY);
       console.log(`Overseas: ${races.length} races`);
       allRawRaces.push(...races);
     }
 
     if (!sourceFilter || sourceFilter === "hk") {
       console.log("Scraping HK races from fitz.hk...");
-      const races = await scrapeHKRaces(FIRECRAWL_API_KEY, LOVABLE_API_KEY);
+      const races = await scrapeHKRaces(FIRECRAWL_API_KEY, VERTEX_API_KEY);
       console.log(`HK: ${races.length} races`);
       allRawRaces.push(...races);
     }
 
     if (!sourceFilter || sourceFilter === "china") {
       console.log("Scraping China races from World Athletics...");
-      const races = await scrapeChinaRaces(FIRECRAWL_API_KEY, LOVABLE_API_KEY);
+      const races = await scrapeChinaRaces(FIRECRAWL_API_KEY, VERTEX_API_KEY);
       console.log(`China: ${races.length} races`);
       allRawRaces.push(...races);
     }
 
     if (!sourceFilter || sourceFilter === "taiwan") {
       console.log("Scraping Taiwan races from taipeimarathon.org.tw...");
-      const races = await scrapeTaiwanRaces(FIRECRAWL_API_KEY, LOVABLE_API_KEY);
+      const races = await scrapeTaiwanRaces(FIRECRAWL_API_KEY, VERTEX_API_KEY);
       console.log(`Taiwan: ${races.length} races`);
       allRawRaces.push(...races);
     }
 
     console.log(`Before dedup: ${allRawRaces.length} races`);
-    allRawRaces = await deduplicateRaces(allRawRaces, LOVABLE_API_KEY);
+    allRawRaces = await deduplicateRaces(allRawRaces, VERTEX_API_KEY);
     console.log(`After dedup: ${allRawRaces.length} races`);
 
     console.log("Verifying categories with AI...");
-    allRawRaces = await verifyCategoriesWithAI(allRawRaces, LOVABLE_API_KEY);
+    allRawRaces = await verifyCategoriesWithAI(allRawRaces, VERTEX_API_KEY);
     allRawRaces = compressRaces(allRawRaces);
     console.log("Category verification complete");
 
     // Translate names to Chinese for races that don't have name_zh yet
     console.log("Translating race names to Chinese...");
-    allRawRaces = await translateNamesToZh(allRawRaces, LOVABLE_API_KEY);
+    allRawRaces = await translateNamesToZh(allRawRaces, VERTEX_API_KEY);
     console.log("Translation complete");
 
     const allRows = expandRaces(allRawRaces);

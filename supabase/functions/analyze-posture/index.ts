@@ -5,13 +5,56 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+async function callVertexAI(opts: { apiKey: string; model?: string; messages: Array<{ role: string; content: any }> }): Promise<Response> {
+  const VERTEX_MODEL_MAP: Record<string, string> = {
+    "google/gemini-2.5-flash": "gemini-2.5-flash",
+    "google/gemini-3-flash-preview": "gemini-2.5-flash",
+  };
+  const model = VERTEX_MODEL_MAP[opts.model || ""] || (opts.model || "gemini-2.5-flash").replace(/^google\//, "");
+  const url = `https://aiplatform.googleapis.com/v1/publishers/google/models/${model}:generateContent?key=${opts.apiKey}`;
+  const systemParts: any[] = [];
+  const contents: any[] = [];
+  for (const m of opts.messages) {
+    if (m.role === "system") {
+      systemParts.push({ text: typeof m.content === "string" ? m.content : "" });
+      continue;
+    }
+    const role = m.role === "assistant" ? "model" : "user";
+    let parts: any[];
+    if (typeof m.content === "string") {
+      parts = [{ text: m.content }];
+    } else if (Array.isArray(m.content)) {
+      parts = m.content.map((p: any) => {
+        if (p.type === "text") return { text: p.text };
+        if (p.type === "image_url") {
+          const u = p.image_url?.url || "";
+          const match = u.match(/^data:([^;]+);base64,(.+)$/);
+          if (match) return { inlineData: { mimeType: match[1], data: match[2] } };
+          return { fileData: { fileUri: u, mimeType: "image/jpeg" } };
+        }
+        return { text: String(p) };
+      });
+    } else {
+      parts = [{ text: String(m.content) }];
+    }
+    contents.push({ role, parts });
+  }
+  const body: any = { contents };
+  if (systemParts.length) body.systemInstruction = { parts: systemParts };
+  const vRes = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  if (!vRes.ok) return new Response(await vRes.text(), { status: vRes.status });
+  const vData = await vRes.json();
+  const text = vData?.candidates?.[0]?.content?.parts?.map((p: any) => p.text || "").join("") || "";
+  return new Response(JSON.stringify({ choices: [{ message: { content: text } }] }), { status: 200, headers: { "Content-Type": "application/json" } });
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
     const { frames, lang, translate, existingResult } = await req.json();
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+    const VERTEX_API_KEY = Deno.env.get("GOOGLE_VERTEX_API_KEY");
+    if (!VERTEX_API_KEY) throw new Error("GOOGLE_VERTEX_API_KEY is not configured");
 
     const isZh = lang === "zh";
 
@@ -22,18 +65,12 @@ serve(async (req) => {
 
 ${JSON.stringify(existingResult)}`;
 
-      const tlResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "google/gemini-3-flash-preview",
-          messages: [
-            { role: "user", content: translatePrompt },
-          ],
-        }),
+      const tlResp = await callVertexAI({
+        apiKey: VERTEX_API_KEY,
+        model: "google/gemini-3-flash-preview",
+        messages: [
+          { role: "user", content: translatePrompt },
+        ],
       });
 
       if (!tlResp.ok) {
@@ -116,25 +153,19 @@ Scores should be objective based on actual posture observed. Be specific in feed
       image_url: { url: frame },
     }));
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
-        messages: [
-          { role: "system", content: systemPrompt },
-          {
-            role: "user",
-            content: [
-              { type: "text", text: isZh ? "請分析這些跑步姿勢截圖並以 JSON 格式回覆：" : "Analyze these running form frames and respond in JSON format:" },
-              ...imageContent,
-            ],
-          },
-        ],
-      }),
+    const response = await callVertexAI({
+      apiKey: VERTEX_API_KEY,
+      model: "google/gemini-3-flash-preview",
+      messages: [
+        { role: "system", content: systemPrompt },
+        {
+          role: "user",
+          content: [
+            { type: "text", text: isZh ? "請分析這些跑步姿勢截圖並以 JSON 格式回覆：" : "Analyze these running form frames and respond in JSON format:" },
+            ...imageContent,
+          ],
+        },
+      ],
     });
 
     if (!response.ok) {

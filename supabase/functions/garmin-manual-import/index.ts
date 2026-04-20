@@ -97,14 +97,19 @@ Schema:
 
 If a field is not present, use null. If laps are not visible, return an empty array. Never invent values.`;
 
-  const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+  const VERTEX_MODEL_MAP: Record<string, string> = {
+    "google/gemini-2.5-flash": "gemini-2.5-flash",
+    "google/gemini-3-flash-preview": "gemini-2.5-flash",
+  };
+  const model = VERTEX_MODEL_MAP["google/gemini-2.5-flash"];
+  const url = `https://aiplatform.googleapis.com/v1/publishers/google/models/${model}:generateContent?key=${aiKey}`;
+  const res = await fetch(url, {
     method: "POST",
-    headers: { Authorization: `Bearer ${aiKey}`, "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: "google/gemini-2.5-flash",
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: markdown.slice(0, 60000) },
+      systemInstruction: { parts: [{ text: systemPrompt }] },
+      contents: [
+        { role: "user", parts: [{ text: markdown.slice(0, 60000) }] },
       ],
     }),
   });
@@ -113,7 +118,7 @@ If a field is not present, use null. If laps are not visible, return an empty ar
     throw new Error(`AI extraction failed: ${res.status} ${t}`);
   }
   const data = await res.json();
-  let content = data.choices?.[0]?.message?.content || "";
+  let content = data?.candidates?.[0]?.content?.parts?.map((p: any) => p.text || "").join("") || "";
   const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
   if (jsonMatch) content = jsonMatch[1].trim();
   return JSON.parse(content);
@@ -144,7 +149,7 @@ serve(async (req) => {
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const FIRECRAWL_API_KEY = Deno.env.get("FIRECRAWL_API_KEY");
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    const VERTEX_API_KEY = Deno.env.get("GOOGLE_VERTEX_API_KEY");
 
     if (!FIRECRAWL_API_KEY) {
       return new Response(JSON.stringify({ error: "FIRECRAWL_API_KEY not configured" }), {
@@ -152,8 +157,8 @@ serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    if (!LOVABLE_API_KEY) {
-      return new Response(JSON.stringify({ error: "LOVABLE_API_KEY not configured" }), {
+    if (!VERTEX_API_KEY) {
+      return new Response(JSON.stringify({ error: "VERTEX_API_KEY not configured" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -211,7 +216,7 @@ serve(async (req) => {
 
     let extracted: any;
     try {
-      extracted = await extractActivityData(md, LOVABLE_API_KEY);
+      extracted = await extractActivityData(md, VERTEX_API_KEY);
     } catch (e) {
       console.error("AI extraction error:", e);
       return new Response(JSON.stringify({ error: "Failed to extract activity data from page" }), {

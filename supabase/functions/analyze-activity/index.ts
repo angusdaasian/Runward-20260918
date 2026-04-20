@@ -12,6 +12,74 @@ function jsonResponse(body: Record<string, unknown>, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: jsonHeaders });
 }
 
+// ── Vertex AI helper (OpenAI-compatible response shape) ──
+const VERTEX_MODEL_MAP: Record<string, string> = {
+  "google/gemini-2.5-flash": "gemini-2.5-flash",
+  "google/gemini-2.5-flash-lite": "gemini-2.5-flash-lite",
+  "google/gemini-2.5-pro": "gemini-2.5-pro",
+  "google/gemini-3-flash-preview": "gemini-2.5-flash",
+};
+
+async function callVertexAI(opts: {
+  apiKey: string;
+  model?: string;
+  messages: Array<{ role: string; content: any }>;
+}): Promise<Response> {
+  const model = VERTEX_MODEL_MAP[opts.model || ""] || (opts.model || "gemini-2.5-flash").replace(/^google\//, "");
+  const url = `https://aiplatform.googleapis.com/v1/publishers/google/models/${model}:generateContent?key=${opts.apiKey}`;
+
+  const systemParts: any[] = [];
+  const contents: any[] = [];
+  for (const m of opts.messages) {
+    if (m.role === "system") {
+      const text = typeof m.content === "string" ? m.content : (m.content?.[0]?.text || "");
+      systemParts.push({ text });
+      continue;
+    }
+    const role = m.role === "assistant" ? "model" : "user";
+    let parts: any[];
+    if (typeof m.content === "string") {
+      parts = [{ text: m.content }];
+    } else if (Array.isArray(m.content)) {
+      parts = m.content.map((p: any) => {
+        if (p.type === "text") return { text: p.text };
+        if (p.type === "image_url") {
+          const url = p.image_url?.url || "";
+          // data URL: data:image/png;base64,xxxx
+          const match = url.match(/^data:([^;]+);base64,(.+)$/);
+          if (match) return { inlineData: { mimeType: match[1], data: match[2] } };
+          return { fileData: { fileUri: url, mimeType: "image/jpeg" } };
+        }
+        return { text: String(p) };
+      });
+    } else {
+      parts = [{ text: String(m.content) }];
+    }
+    contents.push({ role, parts });
+  }
+
+  const body: any = { contents };
+  if (systemParts.length) body.systemInstruction = { parts: systemParts };
+
+  const vRes = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+  if (!vRes.ok) {
+    const errText = await vRes.text();
+    return new Response(errText, { status: vRes.status });
+  }
+  const vData = await vRes.json();
+  const text = vData?.candidates?.[0]?.content?.parts?.map((p: any) => p.text || "").join("") || "";
+  // Return OpenAI-compatible shape
+  return new Response(JSON.stringify({ choices: [{ message: { content: text } }] }), {
+    status: 200,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
 function asArray<T = any>(value: unknown): T[] {
   return Array.isArray(value) ? value : [];
 }
@@ -59,20 +127,17 @@ async function fetchHistoricalWeather(lat: number, lon: number, dateStr: string)
 // Returns "City, Country" suitable for Open-Meteo geocoding, or null.
 async function extractCityFromRaceName(raceName: string, apiKey: string): Promise<string | null> {
   try {
-    const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          {
-            role: "system",
-            content:
-              "You extract the host city of a running race from its name. Reply with ONLY the city and country in the format 'City, Country' (English). If you cannot determine the city with reasonable confidence, reply with exactly 'UNKNOWN'. No other text.",
-          },
-          { role: "user", content: `Race name: ${raceName}` },
-        ],
-      }),
+    const resp = await callVertexAI({
+      apiKey,
+      model: "google/gemini-2.5-flash",
+      messages: [
+        {
+          role: "system",
+          content:
+            "You extract the host city of a running race from its name. Reply with ONLY the city and country in the format 'City, Country' (English). If you cannot determine the city with reasonable confidence, reply with exactly 'UNKNOWN'. No other text.",
+        },
+        { role: "user", content: `Race name: ${raceName}` },
+      ],
     });
     if (!resp.ok) {
       console.error("extractCityFromRaceName: AI error", resp.status, await resp.text());
@@ -114,10 +179,10 @@ serve(async (req) => {
     const accessToken = authHeader.replace(/^Bearer\s+/i, "").trim();
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    const VERTEX_API_KEY = Deno.env.get("GOOGLE_VERTEX_API_KEY");
     if (!SUPABASE_URL) throw new Error("SUPABASE_URL is not configured");
     if (!SUPABASE_SERVICE_ROLE_KEY) throw new Error("SUPABASE_SERVICE_ROLE_KEY is not configured");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+    if (!VERTEX_API_KEY) throw new Error("GOOGLE_VERTEX_API_KEY is not configured");
 
     const serviceClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
     const { data: { user }, error: userError } = await serviceClient.auth.getUser(accessToken);
@@ -157,15 +222,12 @@ serve(async (req) => {
       const targetLang = isZh ? "Traditional Chinese (Hong Kong)" : "English";
       const combinedSource = `===ANALYSIS===\n${sourceText}\n\n===NEXT_WORKOUT===\n${existing[nextSourceField] || ""}`;
 
-      const tlResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "google/gemini-2.5-flash",
-          messages: [
-            { role: "user", content: `Translate the following running coach output into ${targetLang}. Preserve the ===ANALYSIS=== and ===NEXT_WORKOUT=== separators exactly. Keep Markdown intact. Only translate, do not change content.\n\n${combinedSource}` },
-          ],
-        }),
+      const tlResp = await callVertexAI({
+        apiKey: VERTEX_API_KEY,
+        model: "google/gemini-2.5-flash",
+        messages: [
+          { role: "user", content: `Translate the following running coach output into ${targetLang}. Preserve the ===ANALYSIS=== and ===NEXT_WORKOUT=== separators exactly. Keep Markdown intact. Only translate, do not change content.\n\n${combinedSource}` },
+        ],
       });
 
       if (!tlResp.ok) {
@@ -218,13 +280,10 @@ serve(async (req) => {
         if (cached[otherField]) {
           const targetLang = isZh ? "Traditional Chinese (Hong Kong)" : "English";
           const combined = `===ANALYSIS===\n${cached[otherField]}\n\n===NEXT_WORKOUT===\n${cached[otherNField] || ""}`;
-          const tlResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-            method: "POST",
-            headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
-            body: JSON.stringify({
-              model: "google/gemini-2.5-flash",
-              messages: [{ role: "user", content: `Translate the following running coach output into ${targetLang}. Preserve the ===ANALYSIS=== and ===NEXT_WORKOUT=== separators exactly. Keep Markdown intact. Only translate, do not change content.\n\n${combined}` }],
-            }),
+          const tlResp = await callVertexAI({
+            apiKey: VERTEX_API_KEY,
+            model: "google/gemini-2.5-flash",
+            messages: [{ role: "user", content: `Translate the following running coach output into ${targetLang}. Preserve the ===ANALYSIS=== and ===NEXT_WORKOUT=== separators exactly. Keep Markdown intact. Only translate, do not change content.\n\n${combined}` }],
           });
           if (tlResp.ok) {
             const tlData = await tlResp.json();
@@ -274,13 +333,10 @@ serve(async (req) => {
       if (existingAnalysis[otherField]) {
         const targetLang = isZh ? "Traditional Chinese (Hong Kong)" : "English";
         const combined = `===ANALYSIS===\n${existingAnalysis[otherField]}\n\n===NEXT_WORKOUT===\n${existingAnalysis[otherNextField] || ""}`;
-        const tlResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-          method: "POST",
-          headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
-          body: JSON.stringify({
-            model: "google/gemini-2.5-flash",
-            messages: [{ role: "user", content: `Translate the following into ${targetLang}. Preserve the ===ANALYSIS=== and ===NEXT_WORKOUT=== separators. Keep Markdown.\n\n${combined}` }],
-          }),
+        const tlResp = await callVertexAI({
+          apiKey: VERTEX_API_KEY,
+          model: "google/gemini-2.5-flash",
+          messages: [{ role: "user", content: `Translate the following into ${targetLang}. Preserve the ===ANALYSIS=== and ===NEXT_WORKOUT=== separators. Keep Markdown.\n\n${combined}` }],
         });
         if (tlResp.ok) {
           const tlData = await tlResp.json();
@@ -336,7 +392,7 @@ serve(async (req) => {
       if (!geo) geo = await geocodeCity(resolvedRaceName);
       // 3) Last resort: ask the AI to extract the host city from the race name, then geocode that
       if (!geo) {
-        const aiCity = await extractCityFromRaceName(resolvedRaceName, LOVABLE_API_KEY);
+        const aiCity = await extractCityFromRaceName(resolvedRaceName, VERTEX_API_KEY);
         if (aiCity) {
           console.log(`Race "${resolvedRaceName}" → AI-extracted city: "${aiCity}"`);
           geo = await geocodeCity(aiCity);
@@ -594,16 +650,13 @@ If the runner raced hard today or said they struggled, suggest rest or a very ea
 
     const userMessage = `${planContext}${raceContext}\n\n--- Activity Data ---\n${statsText}`;
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userMessage },
-        ],
-      }),
+    const response = await callVertexAI({
+      apiKey: VERTEX_API_KEY,
+      model: "google/gemini-2.5-flash",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userMessage },
+      ],
     });
 
     if (!response.ok) {

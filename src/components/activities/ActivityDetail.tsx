@@ -274,30 +274,6 @@ const ActivityDetail = ({ activity, lang, onBack, isPremium, trainingScore }: Pr
           if (data.nextWorkout !== undefined) setAiNextWorkout(data.nextWorkout);
           setAiLang(lang);
         }
-        // Re-hydrate race/comment state from the saved row so the user
-        // doesn't have to re-enter race info after a language switch.
-        const { data: row } = await supabase
-          .from("activity_analyses")
-          .select("race_id, race_name, user_comment")
-          .eq("activity_id", activity.id)
-          .maybeSingle();
-        if (row) {
-          if (row.race_id) {
-            setRaceSelection(row.race_id);
-            setSavedRaceId(row.race_id);
-            setManualRaceName("");
-          } else if (row.race_name) {
-            setRaceSelection("manual");
-            setManualRaceName(row.race_name);
-            setSavedRaceName(row.race_name);
-          }
-          if (row.user_comment) {
-            setUserComment(row.user_comment);
-            setSavedComment(row.user_comment);
-          }
-          // Activities that already have an analysis don't need RPE re-entry
-          setRpeSubmitted(true);
-        }
       } catch (err) {
         console.error("Translation error:", err);
       }
@@ -408,12 +384,6 @@ const ActivityDetail = ({ activity, lang, onBack, isPremium, trainingScore }: Pr
               setUserComment(data.userComment);
               setSavedComment(data.userComment);
             }
-            // Pre-warm the OTHER language's translation in the background so
-            // toggling language is instant and the DB stays bilingual.
-            const otherLang = lang === "zh" ? "en" : "zh";
-            supabase.functions.invoke("analyze-activity", {
-              body: { activityDbId: activity.id, translate: true, lang: otherLang },
-            }).catch(() => {});
           }
         } catch {}
       }

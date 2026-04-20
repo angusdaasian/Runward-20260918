@@ -63,7 +63,7 @@ async function extractCityFromRaceName(raceName: string, apiKey: string): Promis
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: "google/gemini-3-flash-preview",
         messages: [
           {
             role: "system",
@@ -161,7 +161,7 @@ serve(async (req) => {
         method: "POST",
         headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
         body: JSON.stringify({
-          model: "google/gemini-2.5-flash",
+          model: "google/gemini-3-flash-preview",
           messages: [
             { role: "user", content: `Translate the following running coach output into ${targetLang}. Preserve the ===ANALYSIS=== and ===NEXT_WORKOUT=== separators exactly. Keep Markdown intact. Only translate, do not change content.\n\n${combinedSource}` },
           ],
@@ -201,9 +201,6 @@ serve(async (req) => {
       if (cached) {
         const field = isZh ? "analysis_zh" : "analysis_en";
         const nField = isZh ? "next_workout_zh" : "next_workout_en";
-        const otherField = isZh ? "analysis_en" : "analysis_zh";
-        const otherNField = isZh ? "next_workout_en" : "next_workout_zh";
-
         if (cached[field]) {
           return jsonResponse({
             analysis: cached[field],
@@ -212,37 +209,6 @@ serve(async (req) => {
             raceName: cached.race_name || null,
             userComment: cached.user_comment || null,
           });
-        }
-
-        // Requested language missing but other-lang exists → translate on demand and cache.
-        if (cached[otherField]) {
-          const targetLang = isZh ? "Traditional Chinese (Hong Kong)" : "English";
-          const combined = `===ANALYSIS===\n${cached[otherField]}\n\n===NEXT_WORKOUT===\n${cached[otherNField] || ""}`;
-          const tlResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-            method: "POST",
-            headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
-            body: JSON.stringify({
-              model: "google/gemini-2.5-flash",
-              messages: [{ role: "user", content: `Translate the following running coach output into ${targetLang}. Preserve the ===ANALYSIS=== and ===NEXT_WORKOUT=== separators exactly. Keep Markdown intact. Only translate, do not change content.\n\n${combined}` }],
-            }),
-          });
-          if (tlResp.ok) {
-            const tlData = await tlResp.json();
-            const translated = tlData.choices?.[0]?.message?.content || "";
-            const [aRaw, nRaw] = translated.split("===NEXT_WORKOUT===");
-            const a = (aRaw || "").replace(/^===ANALYSIS===\s*/i, "").trim();
-            const n = (nRaw || "").trim();
-            const upd: any = { [field]: a };
-            if (n) upd[nField] = n;
-            await serviceClient.from("activity_analyses").update(upd).eq("id", cached.id);
-            return jsonResponse({
-              analysis: a,
-              nextWorkout: n || null,
-              raceId: cached.race_id || null,
-              raceName: cached.race_name || null,
-              userComment: cached.user_comment || null,
-            });
-          }
         }
       }
       return jsonResponse({ analysis: null });
@@ -278,7 +244,7 @@ serve(async (req) => {
           method: "POST",
           headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
           body: JSON.stringify({
-            model: "google/gemini-2.5-flash",
+            model: "google/gemini-3-flash-preview",
             messages: [{ role: "user", content: `Translate the following into ${targetLang}. Preserve the ===ANALYSIS=== and ===NEXT_WORKOUT=== separators. Keep Markdown.\n\n${combined}` }],
           }),
         });
@@ -598,7 +564,7 @@ If the runner raced hard today or said they struggled, suggest rest or a very ea
       method: "POST",
       headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: "google/gemini-3-flash-preview",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userMessage },

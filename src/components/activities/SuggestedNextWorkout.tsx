@@ -1,58 +1,266 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import ReactMarkdown from "react-markdown";
-import { Footprints } from "lucide-react";
+import { Footprints, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { usePremium } from "@/contexts/PremiumContext";
 import { Lang } from "@/lib/i18n";
+import { toast } from "sonner";
 
 interface Props {
   lang: Lang;
+  /** Most-recent activity id (any source) — used to look up its analysis. */
   latestActivityId: string | null;
+  /** Most-recent activity's start_date — used to compute expiry. */
+  latestActivityDate: string | null;
 }
 
-const SuggestedNextWorkout = ({ lang, latestActivityId }: Props) => {
-  const { user } = useAuth();
-  const { isPremium } = usePremium();
-  const [nextWorkout, setNextWorkout] = useState<string | null>(null);
+const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
+interface CachedGenerated {
+  suggestion: string;
+  generatedAt: string; // ISO
+  /** ISO date of the latest activity at the time of generation, or null if none. */
+  basisActivityDate: string | null;
+}
+
+function readCachedGenerated(userId: string): CachedGenerated | null {
+  try {
+    const raw = localStorage.getItem(`generated_suggestion_${userId}`);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+function writeCachedGenerated(userId: string, val: CachedGenerated) {
+  try {
+    localStorage.setItem(`generated_suggestion_${userId}`, JSON.stringify(val));
+  } catch {
+    // ignore
+  }
+}
+
+function readIdealTime(): { distance?: string; seconds?: number } | null {
+  try {
+    const raw = localStorage.getItem("onboarding_ideal_time");
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+const SuggestedNextWorkout = ({ lang, latestActivityId, latestActivityDate }: Props) => {
+  const { user } = useAuth();
+  const isZh = lang === "zh";
+
+  const [analysisWorkout, setAnalysisWorkout] = useState<string | null>(null);
+  const [analysisLoaded, setAnalysisLoaded] = useState(false);
+
+  const [generated, setGenerated] = useState<CachedGenerated | null>(null);
+  const [generating, setGenerating] = useState(false);
+  const [declined, setDeclined] = useState(false);
+
+  // Load cached generated suggestion
   useEffect(() => {
-    if (!user || !isPremium || !latestActivityId) {
-      setNextWorkout(null);
+    if (!user) return;
+    const cached = readCachedGenerated(user.id);
+    setGenerated(cached);
+  }, [user]);
+
+  // Fetch the analysis-derived next-workout for the latest activity
+  const fetchAnalysis = async () => {
+    if (!user || !latestActivityId) {
+      setAnalysisWorkout(null);
+      setAnalysisLoaded(true);
       return;
     }
+    const { data, error } = await supabase
+      .from("activity_analyses")
+      .select("next_workout_en, next_workout_zh")
+      .eq("user_id", user.id)
+      .eq("activity_id", latestActivityId)
+      .maybeSingle();
+    if (error) {
+      console.error("[SuggestedNextWorkout] fetch error:", error);
+      setAnalysisWorkout(null);
+      setAnalysisLoaded(true);
+      return;
+    }
+    const row = data as any;
+    const primary = isZh ? row?.next_workout_zh : row?.next_workout_en;
+    const fallback = isZh ? row?.next_workout_en : row?.next_workout_zh;
+    setAnalysisWorkout(primary || fallback || null);
+    setAnalysisLoaded(true);
+  };
+
+  useEffect(() => {
     let active = true;
+    setAnalysisLoaded(false);
     (async () => {
-      const field = lang === "zh" ? "next_workout_zh" : "next_workout_en";
-      const fallback = lang === "zh" ? "next_workout_en" : "next_workout_zh";
-      const { data } = await supabase
-        .from("activity_analyses")
-        .select(`${field}, ${fallback}`)
-        .eq("user_id", user.id)
-        .eq("activity_id", latestActivityId)
-        .maybeSingle();
+      await fetchAnalysis();
       if (!active) return;
-      const row = data as any;
-      setNextWorkout(row?.[field] || row?.[fallback] || null);
     })();
     return () => {
       active = false;
     };
-  }, [user, isPremium, latestActivityId, lang]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, latestActivityId, isZh]);
 
-  if (!isPremium || !nextWorkout) return null;
+  // Realtime: re-fetch when an analysis is inserted/updated for this activity
+  useEffect(() => {
+    if (!user || !latestActivityId) return;
+    const channel = supabase
+      .channel(`activity-analyses-${latestActivityId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "activity_analyses",
+          filter: `activity_id=eq.${latestActivityId}`,
+        },
+        () => {
+          void fetchAnalysis();
+        },
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, latestActivityId, isZh]);
+
+  // Reset the "no thanks" decline whenever the underlying activity changes
+  useEffect(() => {
+    setDeclined(false);
+  }, [latestActivityId]);
+
+  // Decide what to show:
+  //   1. If the latest activity is <=1 day old AND has an analysis suggestion → show it.
+  //   2. Else, if a cached generated suggestion exists for the same basis (or no basis) → show it.
+  //   3. Else, show the expired prompt.
+  const view = useMemo<
+    | { kind: "loading" }
+    | { kind: "analysis"; text: string }
+    | { kind: "generated"; text: string }
+    | { kind: "expired" }
+    | { kind: "hidden" }
+  >(() => {
+    if (!user) return { kind: "hidden" };
+    if (!analysisLoaded) return { kind: "loading" };
+
+    const now = Date.now();
+    const latestDateMs = latestActivityDate ? new Date(latestActivityDate).getTime() : null;
+    const isFresh = latestDateMs != null && now - latestDateMs <= ONE_DAY_MS;
+
+    if (isFresh && analysisWorkout) {
+      return { kind: "analysis", text: analysisWorkout };
+    }
+
+    // Generated suggestion is valid only if there is no newer activity than the basis
+    if (generated) {
+      const basis = generated.basisActivityDate ? new Date(generated.basisActivityDate).getTime() : null;
+      const stillCurrent =
+        (latestDateMs == null && basis == null) ||
+        (latestDateMs != null && basis != null && Math.abs(latestDateMs - basis) < 1000) ||
+        (latestDateMs == null && basis != null);
+      // Generated suggestions themselves expire after 24h
+      const ageOk = now - new Date(generated.generatedAt).getTime() <= ONE_DAY_MS;
+      if (stillCurrent && ageOk) {
+        return { kind: "generated", text: generated.suggestion };
+      }
+    }
+
+    return { kind: "expired" };
+  }, [user, analysisLoaded, analysisWorkout, latestActivityDate, generated]);
+
+  const handleGenerate = async () => {
+    if (!user || generating) return;
+    setGenerating(true);
+    try {
+      const idealTime = readIdealTime();
+      const { data, error } = await supabase.functions.invoke("generate-suggested-workout", {
+        body: { lang, idealTime },
+      });
+      if (error) throw error;
+      const suggestion = (data as any)?.suggestion;
+      if (!suggestion) throw new Error("Empty response");
+      const cached: CachedGenerated = {
+        suggestion,
+        generatedAt: new Date().toISOString(),
+        basisActivityDate: latestActivityDate,
+      };
+      writeCachedGenerated(user.id, cached);
+      setGenerated(cached);
+      toast.success(isZh ? "已產生建議訓練" : "Suggested workout ready");
+    } catch (e: any) {
+      console.error("[SuggestedNextWorkout] generate error:", e);
+      toast.error(isZh ? "產生失敗，請稍後再試" : "Could not generate. Try again later.");
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  if (view.kind === "hidden") return null;
 
   return (
     <div className="bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/30 rounded-xl p-4 mb-4">
       <div className="flex items-center gap-2 mb-3">
         <Footprints size={16} className="text-primary" />
         <h3 className="font-display font-bold text-foreground text-sm">
-          {lang === "zh" ? "建議的下一次訓練" : "Suggested Next Workout"}
+          {isZh ? "今日建議" : "Today's Suggestion"}
         </h3>
       </div>
-      <div className="prose prose-sm dark:prose-invert max-w-none text-foreground text-sm [&_h2]:text-base [&_h2]:font-bold [&_h2]:mt-2 [&_h2]:mb-1 [&_ul]:my-1 [&_li]:my-0.5 [&_strong]:text-primary">
-        <ReactMarkdown>{nextWorkout}</ReactMarkdown>
-      </div>
+
+      {view.kind === "loading" && (
+        <div className="flex items-center gap-2 text-muted-foreground text-sm py-2">
+          <Loader2 size={14} className="animate-spin" />
+          {isZh ? "載入中…" : "Loading…"}
+        </div>
+      )}
+
+      {(view.kind === "analysis" || view.kind === "generated") && (
+        <div className="prose prose-sm dark:prose-invert max-w-none text-foreground text-sm [&_h2]:text-base [&_h2]:font-bold [&_h2]:mt-2 [&_h2]:mb-1 [&_ul]:my-1 [&_li]:my-0.5 [&_strong]:text-primary">
+          <ReactMarkdown>{view.text}</ReactMarkdown>
+        </div>
+      )}
+
+      {view.kind === "expired" && !declined && (
+        <div className="space-y-3">
+          <p className="text-sm text-foreground/90 leading-relaxed">
+            {isZh
+              ? "請同步或上傳新的活動以取得下一次建議訓練。或者要我為你產生一個建議訓練嗎？"
+              : "Please sync or upload a new activity to get the next suggested workout. Or do you want me to generate you a suggested workout?"}
+          </p>
+          <div className="flex gap-2">
+            <button
+              onClick={handleGenerate}
+              disabled={generating}
+              className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium px-4 py-2 hover:bg-primary/90 transition-colors disabled:opacity-60"
+            >
+              {generating && <Loader2 size={14} className="animate-spin" />}
+              {isZh ? "好" : "Yes"}
+            </button>
+            <button
+              onClick={() => setDeclined(true)}
+              disabled={generating}
+              className="flex-1 inline-flex items-center justify-center rounded-lg border border-border bg-background text-foreground text-sm font-medium px-4 py-2 hover:bg-accent transition-colors"
+            >
+              {isZh ? "不要" : "No"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {view.kind === "expired" && declined && (
+        <p className="text-sm text-muted-foreground italic">
+          {isZh
+            ? "好的。同步新活動後再回來看看吧！"
+            : "Okay! Sync a new activity and check back."}
+        </p>
+      )}
     </div>
   );
 };

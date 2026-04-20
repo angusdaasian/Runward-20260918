@@ -149,7 +149,7 @@ serve(async (req) => {
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const FIRECRAWL_API_KEY = Deno.env.get("FIRECRAWL_API_KEY");
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    const VERTEX_API_KEY = Deno.env.get("GOOGLE_VERTEX_API_KEY");
 
     if (!FIRECRAWL_API_KEY) {
       return new Response(JSON.stringify({ error: "FIRECRAWL_API_KEY not configured" }), {
@@ -157,8 +157,8 @@ serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    if (!LOVABLE_API_KEY) {
-      return new Response(JSON.stringify({ error: "LOVABLE_API_KEY not configured" }), {
+    if (!VERTEX_API_KEY) {
+      return new Response(JSON.stringify({ error: "VERTEX_API_KEY not configured" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -216,7 +216,7 @@ serve(async (req) => {
 
     let extracted: any;
     try {
-      extracted = await extractActivityData(md, LOVABLE_API_KEY);
+      extracted = await extractActivityData(md, VERTEX_API_KEY);
     } catch (e) {
       console.error("AI extraction error:", e);
       return new Response(JSON.stringify({ error: "Failed to extract activity data from page" }), {

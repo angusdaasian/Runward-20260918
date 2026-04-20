@@ -81,6 +81,8 @@ serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const lang: "en" | "zh" = body?.lang === "zh" ? "zh" : "en";
     const idealTime: { distance?: string; seconds?: number } | null = body?.idealTime ?? null;
+    const todayDate: string | null = typeof body?.todayDate === "string" ? body.todayDate : null;
+    const lastActivityDate: string | null = typeof body?.lastActivityDate === "string" ? body.lastActivityDate : null;
     const isZh = lang === "zh";
 
     // --- Pull last 7 days of runs from all 3 sources ---
@@ -145,8 +147,10 @@ serve(async (req) => {
 
     // --- Build context for AI ---
     let context = "";
+    if (todayDate) context += `Today's date (user's local timezone): ${todayDate}.\n`;
+    if (lastActivityDate) context += `Last activity date: ${lastActivityDate}.\n`;
     if (recent.length > 0) {
-      context = `Runner's last 7 days of running (most recent first):\n`;
+      context += `Runner's last 7 days of running (most recent first):\n`;
       for (const r of recent.slice(0, 10)) {
         const dateStr = new Date(r.date).toISOString().split("T")[0];
         context += `- ${dateStr}: ${r.distance_km} km in ${r.duration_min} min, pace ${r.pace}` +
@@ -154,7 +158,7 @@ serve(async (req) => {
           ` (${r.source})\n`;
       }
     } else {
-      context = `Runner has NO logged runs in the last 7 days.\n`;
+      context += `Runner has NO logged runs in the last 7 days.\n`;
       if (idealTime?.distance && idealTime?.seconds && idealTime.seconds > 0) {
         const h = Math.floor(idealTime.seconds / 3600);
         const m = Math.floor((idealTime.seconds % 3600) / 60);
@@ -169,26 +173,26 @@ serve(async (req) => {
     if (runsPerWeek != null) context += `Typical runs/week: ${runsPerWeek}.\n`;
 
     const systemPrompt = isZh
-      ? `你是專業跑步教練 AI。根據跑者最近七天表現（或入門目標），給出明日具體訓練建議。回覆繁體中文 Markdown。
+      ? `你是專業跑步教練 AI。根據跑者最近七天表現（或入門目標），給出**今日**具體訓練建議（不是明日）。回覆繁體中文 Markdown。
 
 格式：
-## 明日建議訓練
+## 今日建議訓練
 - **類型**：（恢復跑 / 輕鬆有氧 / 節奏跑 / 間歇 / 休息）
 - **距離**：X 公里
 - **配速**：X:XX /km
 - **時長**：約 X 分鐘
-- **理由**：1-2 句說明
+- **理由**：1-2 句說明（請參考最後一次活動日期與今日日期之間的恢復狀況）
 
 如果跑者最近訓練量大或配速辛苦 → 建議恢復或輕鬆。如果完全沒有跑步紀錄 → 給一個適合其目標水平的入門訓練。`
-      : `You are a professional running coach AI. Given the runner's last 7 days (or onboarding goal if no runs), suggest tomorrow's concrete workout. Reply in Markdown.
+      : `You are a professional running coach AI. Given the runner's last 7 days (or onboarding goal if no runs), suggest **today's** concrete workout (NOT tomorrow's). Reply in Markdown.
 
 Format:
-## Suggested Workout
+## Today's Suggested Workout
 - **Type**: (Recovery / Easy aerobic / Tempo / Intervals / Rest)
 - **Distance**: X km
 - **Pace**: X:XX /km
 - **Duration**: ~X min
-- **Why**: 1-2 sentences
+- **Why**: 1-2 sentences (consider recovery time between the last activity date and today)
 
 If recent volume was high or paces were taxing, suggest recovery/easy. If no runs at all, give a beginner-appropriate session matched to their goal pace.`;
 

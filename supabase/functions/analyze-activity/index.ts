@@ -571,6 +571,7 @@ ${plannedWorkout ? `- ${plannedWorkout}` : ""}`;
     // --- Race + weather + comment context ---
     let raceContext = "";
     if (resolvedRaceName) {
+      const hasActivePlan = !!plan;
       raceContext += `\n\n🏁🏁🏁 CRITICAL RACE CONTEXT 🏁🏁🏁
 THIS ACTIVITY IS A RACE — "${resolvedRaceName}"${raceCity ? ` held in ${raceCity}${raceCountry ? ", " + raceCountry : ""}` : ""}.
 This is NOT a training run. This is NOT a long run. This is a competitive race effort on race day.
@@ -578,7 +579,12 @@ You MUST:
 - Open your "Overall Assessment" by explicitly naming the race ("${resolvedRaceName}") and treating the result as a race performance.
 - Evaluate pacing strategy (positive/negative/even split), race-day execution, and how the effort compares to a tempo or training run.
 - Use the race name when discussing the workout — never call it a "long run" or "easy run".
-- For the next-workout suggestion, assume the runner just RACED — recovery is the default unless the runner's comment says otherwise.`;
+- For the next-workout suggestion, assume the runner just RACED — recovery is the default unless the runner's comment says otherwise.${hasActivePlan ? `
+- 📋 PROGRAM ALIGNMENT — the runner is currently following an active training program (see plan context above). You MUST explicitly compare today's race performance against their program's target time / goal distance:
+  • State whether the result is on-track, ahead of, or behind the program's target pace.
+  • If the race distance matches the program's goal distance, treat this as a key benchmark for goal feasibility.
+  • If the race is shorter than the program's goal distance, extrapolate what today's effort implies about the goal time.
+  • Recommend specific adjustments to the remaining program (e.g., adjust target pace, add more threshold work, ease off long runs) based on the gap between actual and target.` : ""}`;
     }
     if (weatherSummary) {
       raceContext += `\n\n🌤 RACE-DAY WEATHER (${weatherLocationName || "race location"}, ${fallbackDateStr}): ${weatherSummary}. Factor weather conditions into your assessment of the effort and pace.`;

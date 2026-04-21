@@ -93,18 +93,48 @@ const ManualGarminImport = ({ lang, onImported, embedded = false }: Props) => {
         value={url}
         onChange={(e) => setUrl(e.target.value)}
         onPaste={(e) => {
-          // Some iOS WebKit hosts (incl. Despia) strip parts of long pasted
-          // strings via the default handler. Manually inject the clipboard
-          // text so the full share message (incl. the URL) lands intact.
-          const text = e.clipboardData?.getData("text");
-          if (text) {
-            e.preventDefault();
-            const target = e.currentTarget;
-            const start = target.selectionStart ?? url.length;
-            const end = target.selectionEnd ?? url.length;
-            const next = url.slice(0, start) + text + url.slice(end);
-            setUrl(next);
+          // iOS WebKit (incl. Despia) often truncates pasted share text via the
+          // default handler. Read the clipboard ourselves, preferring richer
+          // formats so the full URL survives. Fall back to the browser default
+          // if we can't read anything useful.
+          const cd = e.clipboardData;
+          if (!cd) return;
+
+          // Try every available format and pick whichever yields the longest
+          // string containing a Garmin activity link.
+          const candidates: string[] = [];
+          const types = Array.from(cd.types || []);
+          for (const t of types) {
+            try {
+              const v = cd.getData(t);
+              if (v) candidates.push(v);
+            } catch {
+              /* ignore */
+            }
           }
+
+          // Extract URL from any HTML payload as well (often contains the full
+          // link even when text/plain is truncated).
+          const htmlPayload = candidates.find((c) => /<a\s|href=/i.test(c));
+          if (htmlPayload) {
+            const hrefMatch = htmlPayload.match(/href=["']([^"']*garmin[^"']*\/activity\/\d+[^"']*)["']/i);
+            if (hrefMatch) candidates.push(hrefMatch[1]);
+          }
+
+          // Prefer the longest candidate that contains a Garmin activity URL,
+          // otherwise the longest non-empty candidate overall.
+          const withGarmin = candidates.filter((c) => /garmin[^\s]*\/activity\/\d+/i.test(c));
+          const best = (withGarmin.length ? withGarmin : candidates)
+            .sort((a, b) => b.length - a.length)[0];
+
+          if (!best) return; // let browser default paste run
+
+          e.preventDefault();
+          const target = e.currentTarget;
+          const start = target.selectionStart ?? url.length;
+          const end = target.selectionEnd ?? url.length;
+          const next = url.slice(0, start) + best + url.slice(end);
+          setUrl(next);
         }}
         placeholder={lang === "zh"
           ? "貼上 Garmin 連結,或整段「Check out my activity…」分享文字"

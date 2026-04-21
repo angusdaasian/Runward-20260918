@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link2, Loader2, ChevronDown, ChevronUp } from "lucide-react";
 import { toast } from "sonner";
 import despia from "despia-native";
@@ -9,6 +9,7 @@ interface Props {
   lang: Lang;
   onImported: () => void;
   embedded?: boolean;
+  initialUrl?: string;
 }
 
 const GARMIN_ACTIVITY_URL_RE = /https?:\/\/[^\s"'<>]*garmin[^\s"'<>]*\/activity\/\d+[^\s"'<>]*/i;
@@ -35,10 +36,18 @@ const readNativeClipboard = async () => {
   }
 };
 
-const ManualGarminImport = ({ lang, onImported, embedded = false }: Props) => {
+const ManualGarminImport = ({ lang, onImported, embedded = false, initialUrl }: Props) => {
   const [expanded, setExpanded] = useState(false);
   const [url, setUrl] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // When a URL is pushed in (e.g. via iOS share extension), prefill the field.
+  useEffect(() => {
+    if (initialUrl && initialUrl.trim()) {
+      setUrl(initialUrl);
+      setExpanded(true);
+    }
+  }, [initialUrl]);
 
   const handleImport = async () => {
     const raw = url.trim();

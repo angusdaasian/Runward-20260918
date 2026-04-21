@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { PremiumProvider } from "@/contexts/PremiumContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { isNativeApp } from "@/lib/nativeDetection";
+import { registerShareIntent } from "@/lib/shareIntent";
 import Index from "./pages/Index.tsx";
 import NotFound from "./pages/NotFound.tsx";
 import AdminPanel from "./pages/AdminPanel.tsx";
@@ -17,6 +18,7 @@ import ManualUploadGuide from "./pages/ManualUploadGuide.tsx";
 
 const queryClient = new QueryClient();
 const native = isNativeApp();
+registerShareIntent();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>

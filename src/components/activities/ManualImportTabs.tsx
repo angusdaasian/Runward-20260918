@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Upload, ChevronDown, ChevronUp, HelpCircle } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Lang } from "@/lib/i18n";
 import ManualGarminImport from "./ManualGarminImport";
 import CorosFitImport from "./CorosFitImport";
+import { SHARED_DATA_EVENT, consumePendingShared, type SharedPayload } from "@/lib/shareIntent";
 
 interface Props {
   lang: Lang;
@@ -12,9 +13,32 @@ interface Props {
 
 type TabKey = "garmin" | "coros";
 
+const GARMIN_RE = /garmin[^\s"'<>]*\/activity\/\d+/i;
+
 const ManualImportTabs = ({ lang, onImported }: Props) => {
   const [expanded, setExpanded] = useState(false);
   const [tab, setTab] = useState<TabKey>("garmin");
+  const [sharedUrl, setSharedUrl] = useState<string>("");
+
+  useEffect(() => {
+    const apply = (payload: SharedPayload | null) => {
+      if (!payload) return;
+      // Accept both `url` and `text` types — Garmin share is often text containing a URL.
+      const raw = payload.value || "";
+      if (!GARMIN_RE.test(raw)) return;
+      setTab("garmin");
+      setExpanded(true);
+      setSharedUrl(raw);
+    };
+
+    // 1. Pick up any payload buffered before we mounted.
+    apply(consumePendingShared());
+
+    // 2. Listen for live share events.
+    const handler = (e: Event) => apply((e as CustomEvent<SharedPayload>).detail);
+    window.addEventListener(SHARED_DATA_EVENT, handler);
+    return () => window.removeEventListener(SHARED_DATA_EVENT, handler);
+  }, []);
 
   return (
     <div className="bg-card border border-border rounded-xl mb-4 overflow-hidden">
@@ -77,7 +101,12 @@ const ManualImportTabs = ({ lang, onImported }: Props) => {
           </div>
 
           {tab === "garmin" ? (
-            <ManualGarminImport lang={lang} onImported={onImported} embedded />
+            <ManualGarminImport
+              lang={lang}
+              onImported={onImported}
+              embedded
+              initialUrl={sharedUrl}
+            />
           ) : (
             <CorosFitImport lang={lang} onImported={onImported} embedded />
           )}

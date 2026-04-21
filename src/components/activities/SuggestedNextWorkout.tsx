@@ -326,6 +326,12 @@ const SuggestedNextWorkout = ({ lang, latestActivityId, latestActivityDate }: Pr
 
       {view.kind === "generated" && (
         <div className="space-y-3">
+          {translating && (
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Loader2 size={12} className="animate-spin" />
+              {isZh ? "翻譯中…" : "Translating…"}
+            </div>
+          )}
           <div className="prose prose-sm dark:prose-invert max-w-none text-foreground text-sm [&_h2]:text-base [&_h2]:font-bold [&_h2]:mt-2 [&_h2]:mb-1 [&_ul]:my-1 [&_li]:my-0.5 [&_strong]:text-primary">
             <ReactMarkdown>{stripLeadingHeading(view.text)}</ReactMarkdown>
           </div>

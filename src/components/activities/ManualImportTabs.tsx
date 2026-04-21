@@ -27,21 +27,21 @@ const ManualImportTabs = ({ lang, onImported }: Props) => {
             <Upload size={18} className="text-primary" />
           </div>
           <div>
-            <div className="text-sm font-semibold text-foreground flex items-center gap-2">
+            <div className="text-sm font-semibold text-foreground">
               {lang === "zh" ? "手動匯入活動" : "Manually Import Activity"}
-              <Link
-                to="/manual-upload-guide"
-                onClick={(e) => e.stopPropagation()}
-                className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
-                aria-label={lang === "zh" ? "如何匯入？" : "How to upload?"}
-              >
-                <HelpCircle size={14} />
-                <span>{lang === "zh" ? "如何匯入？" : "How to upload?"}</span>
-              </Link>
             </div>
             <div className="text-xs text-muted-foreground">
               {lang === "zh" ? "從 Garmin 或 COROS 匯入" : "Import from Garmin or COROS"}
             </div>
+            <Link
+              to="/manual-upload-guide"
+              onClick={(e) => e.stopPropagation()}
+              className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+              aria-label={lang === "zh" ? "如何匯入？" : "How to upload?"}
+            >
+              <HelpCircle size={14} />
+              <span>{lang === "zh" ? "如何匯入？" : "How to upload?"}</span>
+            </Link>
           </div>
         </div>
         {expanded ? (

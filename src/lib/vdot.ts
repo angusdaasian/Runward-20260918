@@ -181,6 +181,29 @@ export const raceDistances = [
   { name: "1500m", nameZh: "1500米", meters: 1500 },
 ];
 
+export const roadRaceDistances = [
+  { name: "Marathon", nameZh: "馬拉松", meters: 42195 },
+  { name: "Half Marathon", nameZh: "半馬拉松", meters: 21097.5 },
+  { name: "10Mi", nameZh: "10英里", meters: 16093.4 },
+  { name: "15K", nameZh: "15公里", meters: 15000 },
+  { name: "10K", nameZh: "10公里", meters: 10000 },
+  { name: "8K", nameZh: "8公里", meters: 8000 },
+  { name: "6K", nameZh: "6公里", meters: 6000 },
+  { name: "5K", nameZh: "5公里", meters: 5000 },
+];
+
+export const trackRaceDistances = [
+  { name: "10000m", nameZh: "10000米", meters: 10000 },
+  { name: "5000m", nameZh: "5000米", meters: 5000 },
+  { name: "3200m", nameZh: "3200米", meters: 3200 },
+  { name: "3000m", nameZh: "3000米", meters: 3000 },
+  { name: "1Mi", nameZh: "1英里", meters: 1609.34 },
+  { name: "1600m", nameZh: "1600米", meters: 1600 },
+  { name: "1500m", nameZh: "1500米", meters: 1500 },
+  { name: "800m", nameZh: "800米", meters: 800 },
+  { name: "400m", nameZh: "400米", meters: 400 },
+];
+
 export const inputDistances = [
   { label: "Marathon", labelZh: "馬拉松", meters: 42195 },
   { label: "Half Marathon", labelZh: "半馬拉松", meters: 21097.5 },

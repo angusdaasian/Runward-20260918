@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Lang, t } from "@/lib/i18n";
-import { predictTime, formatTime, raceDistances } from "@/lib/vdot";
+import { predictTime, formatTime, roadRaceDistances, trackRaceDistances } from "@/lib/vdot";
 
 interface Props {
   score: number | null;
@@ -11,6 +11,7 @@ const EquivalentTab = ({ score, lang }: Props) => {
   
   const [inputScore, setInputScore] = useState(score?.toString() || "");
   const activeScore = score ?? (inputScore ? parseFloat(inputScore) : null);
+  const [category, setCategory] = useState<"road" | "track">("road");
 
   const getPace = (timeSeconds: number, meters: number): string => {
     const pacePerKm = timeSeconds / (meters / 1000);
@@ -18,6 +19,16 @@ const EquivalentTab = ({ score, lang }: Props) => {
     const s = Math.round(pacePerKm % 60);
     return `${m}:${s.toString().padStart(2, "0")} / km`;
   };
+
+  const getLap400 = (timeSeconds: number, meters: number): string => {
+    const lapSec = timeSeconds * (400 / meters);
+    const m = Math.floor(lapSec / 60);
+    const s = Math.round(lapSec % 60);
+    if (m === 0) return `${s}s`;
+    return `${m}:${s.toString().padStart(2, "0")}`;
+  };
+
+  const distances = category === "road" ? roadRaceDistances : trackRaceDistances;
 
   return (
     <div className="px-5 pt-6 max-w-lg mx-auto">
@@ -69,6 +80,25 @@ const EquivalentTab = ({ score, lang }: Props) => {
 
       {activeScore && (
         <div>
+          {/* Road / Track toggle */}
+          <div className="flex gap-1 bg-muted/50 p-1 rounded-lg mb-3">
+            {(["road", "track"] as const).map((cat) => (
+              <button
+                key={cat}
+                onClick={() => setCategory(cat)}
+                className={`flex-1 py-2 text-sm font-medium rounded-md transition-colors ${
+                  category === cat
+                    ? "bg-card text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {cat === "road"
+                  ? lang === "zh" ? "公路" : "Road"
+                  : lang === "zh" ? "田徑" : "Track"}
+              </button>
+            ))}
+          </div>
+
           {/* Table header */}
           <div className="grid grid-cols-3 gap-2 pb-2 border-b border-border mb-1">
             <span className="text-sm font-semibold text-foreground">
@@ -78,12 +108,16 @@ const EquivalentTab = ({ score, lang }: Props) => {
               {t("time", lang)}
             </span>
             <span className="text-sm font-semibold text-foreground text-right">
-              {lang === "zh" ? "配速" : "Pace"}
+              {category === "track"
+                ? (lang === "zh" ? "400米分段" : "400m Split")
+                : (lang === "zh" ? "配速" : "Pace")}
             </span>
           </div>
 
-          {raceDistances.map((race) => {
+          {distances.map((race) => {
             const time = predictTime(activeScore, race.meters);
+            const isTrack = category === "track";
+            const showLap = isTrack && race.meters !== 400;
             return (
               <div key={race.name} className="grid grid-cols-3 gap-2 py-3 border-b border-border/50">
                 <span className="text-sm text-foreground">
@@ -93,7 +127,9 @@ const EquivalentTab = ({ score, lang }: Props) => {
                   {formatTime(time)}
                 </span>
                 <span className="text-sm text-muted-foreground text-right">
-                  {getPace(time, race.meters)}
+                  {isTrack
+                    ? (showLap ? getLap400(time, race.meters) : "—")
+                    : getPace(time, race.meters)}
                 </span>
               </div>
             );

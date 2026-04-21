@@ -16,7 +16,9 @@ interface Props {
 }
 
 interface CachedGenerated {
-  suggestion: string;
+  suggestion: string;          // legacy fallback (single-language)
+  suggestion_en?: string;
+  suggestion_zh?: string;
   generatedAt: string; // ISO
   /** ISO date of the latest activity at the time of generation, or null if none. */
   basisActivityDate: string | null;

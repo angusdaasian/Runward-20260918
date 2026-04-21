@@ -406,9 +406,20 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
   };
 
   const handleNewPlan = async () => {
+    if (!isOnline()) {
+      toast({
+        title: lang === "zh" ? "離線中" : "You're offline",
+        description: lang === "zh" ? "需要連線才能修改計劃" : "Connect to the internet to edit your plan",
+        variant: "destructive",
+      });
+      return;
+    }
     // Delete from DB so it's removed from the activity calendar
     if (user && existingPlan) {
       await supabase.from("training_plans" as any).delete().eq("id", existingPlan.id);
+      // Clear cached copy so the calendar reflects the deletion next load.
+      const { clearCached } = await import("@/lib/offlineCache");
+      clearCached(CacheKeys.trainingPlan(user.id));
     }
     setProgramStep("details"); setDistance(null); setTargetTime(""); setTargetHours(""); setTargetMinutes(""); setTargetSeconds(""); setRaceDate(""); setStartDate(""); setPlan([]); setExistingPlan(null);
   };

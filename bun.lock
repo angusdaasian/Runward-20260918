@@ -719,7 +719,7 @@
 
     "dequal": ["dequal@2.0.3", "", {}, "sha512-0je+qPKHEMohvfRTCEo3CrPG6cAzAYgmzKyxRiYSSDkS6eGJdyVJm7WaYA5ECaAD9wLB2T4EEeymA5aFVcYXCA=="],
 
-    "despia-native": ["despia-native@1.0.21", "https://europe-west4-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/despia-native/-/despia-native-1.0.21.tgz", {}, "sha512-eq/Uxk4rfnuiJcKRwhIdqF9KHdR4wMShAssWDucjhQ23saf++UBE7DrKNvMVX3XzYAjVT4sR0e89uloiDY+XEg=="],
+    "despia-native": ["despia-native@1.0.24", "https://europe-west4-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/despia-native/-/despia-native-1.0.24.tgz", {}, "sha512-l+obHgABgigBCXakjmc33F+OptPboqe26a6EHvvWoHmE7NPBw83dZ/+IFvDRvCbmEl3LEUcdwyN6AJ1p/dCtqQ=="],
 
     "detect-node-es": ["detect-node-es@1.1.0", "", {}, "sha512-ypdmJU/TbBby2Dxibuv7ZLW3Bs1QEmM7nHjEANfohJLvE0XVujisn1qPJcZxg+qDucsr+bP6fLD1rPS3AhJ7EQ=="],
 

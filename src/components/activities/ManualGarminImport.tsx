@@ -89,13 +89,16 @@ const ManualGarminImport = ({ lang, onImported, embedded = false }: Props) => {
           ? "在 Garmin Connect 將活動的隱私設定為「公開」，然後貼上連結（或整段「Check out my activity…」分享文字皆可）。我們會擷取距離、時間、配速、爬升、分段及路線地圖。"
           : "Set the activity to Public in Garmin Connect, then paste the link (or the full \"Check out my activity…\" share text — we'll find the URL). We'll extract distance, time, pace, ascent, laps and the route map."}
       </p>
-      <input
-        type="text"
+      <textarea
         value={url}
         onChange={(e) => setUrl(e.target.value)}
-        placeholder="https://connect.garmin.com/modern/activity/..."
+        placeholder={lang === "zh"
+          ? "貼上 Garmin 連結，或整段「Check out my activity…」分享文字"
+          : "Paste Garmin link, or the full \"Check out my activity…\" share text"}
         disabled={loading}
-        className="w-full text-sm px-3 py-2 rounded-lg bg-background border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50"
+        rows={3}
+        maxLength={2000}
+        className="w-full text-sm px-3 py-2 rounded-lg bg-background border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50 resize-y min-h-[72px] break-all"
       />
       <button
         onClick={handleImport}

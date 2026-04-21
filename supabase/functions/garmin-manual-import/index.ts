@@ -321,6 +321,19 @@ serve(async (req) => {
       });
     }
 
+    // Coerce values to the column types. `calories`, `average_hr`,
+    // `max_hr`, and `duration_seconds` are integer columns in
+    // `garmin_activities` — rounding prevents 22P02 errors when the AI
+    // returns decimals like "520.7".
+    const toInt = (v: unknown): number | null => {
+      const n = Number(v);
+      return isFinite(n) ? Math.round(n) : null;
+    };
+    const toNum = (v: unknown): number | null => {
+      const n = Number(v);
+      return isFinite(n) ? n : null;
+    };
+
     const row = {
       user_id: user.id,
       garmin_activity_id: garminActivityId,
@@ -328,12 +341,12 @@ serve(async (req) => {
       activity_type: extracted?.activity_type || "Run",
       start_time: startTime,
       distance_meters: distance,
-      duration_seconds: duration,
-      elevation_gain: extracted?.elevation_gain_meters ?? null,
-      average_hr: extracted?.average_hr ?? null,
-      max_hr: extracted?.max_hr ?? null,
-      calories: extracted?.calories ?? null,
-      average_pace: extracted?.average_pace_seconds_per_km ?? null,
+      duration_seconds: Math.round(duration),
+      elevation_gain: toNum(extracted?.elevation_gain_meters),
+      average_hr: toInt(extracted?.average_hr),
+      max_hr: toInt(extracted?.max_hr),
+      calories: toInt(extracted?.calories),
+      average_pace: toNum(extracted?.average_pace_seconds_per_km),
       average_speed: duration > 0 ? distance / duration : null,
       laps: Array.isArray(extracted?.laps) ? extracted.laps : [],
       has_details: true,

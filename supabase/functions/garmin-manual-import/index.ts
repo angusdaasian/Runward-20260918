@@ -40,26 +40,24 @@ const runningSportTypes = new Set([
   "running", "trail_running", "treadmill_running",
 ]);
 
-// ── Firecrawl ──
-type ScrapeResult = { markdown: string; screenshotUrl: string | null };
-
+// ── Firecrawl (markdown only — we no longer scrape map screenshots) ──
 async function scrapeWithFirecrawl(
   url: string,
   apiKey: string,
-): Promise<ScrapeResult> {
+): Promise<string> {
+  let lastError = "Unknown error";
   const attempts = [
-    { formats: ["markdown", "screenshot"], waitFor: 3000, timeout: 60000 },
-    { formats: ["markdown"], waitFor: 1000, timeout: 60000 },
+    { waitFor: 3000, timeout: 60000 },
+    { waitFor: 1000, timeout: 60000 },
   ];
 
-  let lastError = "Unknown error";
   for (const attempt of attempts) {
     const res = await fetch("https://api.firecrawl.dev/v1/scrape", {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         url,
-        formats: attempt.formats,
+        formats: ["markdown"],
         waitFor: attempt.waitFor,
         timeout: attempt.timeout,
         blockAds: true,
@@ -68,17 +66,12 @@ async function scrapeWithFirecrawl(
     const data = await res.json().catch(() => ({}));
     if (!res.ok || !data.success) {
       lastError = data.error || `${res.status} ${res.statusText}`;
-      console.warn(`[manual-import] Firecrawl attempt failed (${attempt.formats.join(",")}): ${lastError}`);
+      console.warn(`[manual-import] Firecrawl attempt failed: ${lastError}`);
       continue;
     }
 
     const markdown = data.data?.markdown || "";
-    if (markdown.length >= 100) {
-      return {
-        markdown,
-        screenshotUrl: data.data?.screenshot || null,
-      };
-    }
+    if (markdown.length >= 100) return markdown;
     lastError = "Firecrawl returned too little page content";
   }
 
@@ -230,11 +223,8 @@ serve(async (req) => {
     // Scrape + extract
     console.log(`[manual-import] scraping ${url} for user ${user.id}`);
     let md = "";
-    let screenshotUrl: string | null = null;
     try {
-      const scraped = await scrapeWithFirecrawl(url, FIRECRAWL_API_KEY);
-      md = scraped.markdown;
-      screenshotUrl = scraped.screenshotUrl;
+      md = await scrapeWithFirecrawl(url, FIRECRAWL_API_KEY);
     } catch (e) {
       console.error("Firecrawl scrape error:", e);
       const message = e instanceof Error ? e.message : "Unknown scrape error";
@@ -244,12 +234,6 @@ serve(async (req) => {
           ? "Garmin took too long to load this public page. Please try again in a minute, or paste the full copied activity text instead of only the link."
           : "Could not read the Garmin activity page. Make sure the activity is set to Public.",
       }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-    if (!md || md.length < 100) {
-      return new Response(JSON.stringify({ error: "Could not read the activity page. Make sure the activity is set to Public." }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -391,8 +375,8 @@ serve(async (req) => {
       average_speed: duration > 0 ? distance / duration : null,
       laps: Array.isArray(extracted?.laps) ? extracted.laps : [],
       has_details: true,
-      has_gps: !!screenshotUrl,
-      raw_json: { source: "manual_import", url, extracted, map_screenshot_url: screenshotUrl },
+      has_gps: false,
+      raw_json: { source: "manual_import", url, extracted },
     };
 
     const { error: upsertError } = await supabase

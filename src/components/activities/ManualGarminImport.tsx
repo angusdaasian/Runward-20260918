@@ -151,7 +151,17 @@ const ManualGarminImport = ({ lang, onImported, embedded = false }: Props) => {
           const withGarmin = candidates.filter((c) => /garmin[^\s]*\/activity\/\d+/i.test(c));
           const best = withGarmin.sort((a, b) => b.length - a.length)[0];
 
-          if (!best) return; // let browser default paste run
+          if (!best) {
+            const target = e.currentTarget;
+            window.setTimeout(() => {
+              void (async () => {
+                const nativeText = await readNativeClipboard();
+                if (!extractGarminActivityUrl(nativeText) || extractGarminActivityUrl(target.value)) return;
+                setUrl(nativeText);
+              })();
+            }, 0);
+            return; // let browser default paste run, then repair via native clipboard if possible
+          }
 
           e.preventDefault();
           const target = e.currentTarget;

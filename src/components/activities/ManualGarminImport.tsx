@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link2, Loader2, ChevronDown, ChevronUp } from "lucide-react";
 import { toast } from "sonner";
+import despia from "despia-native";
 import { supabase } from "@/integrations/supabase/client";
 import { Lang } from "@/lib/i18n";
 
@@ -9,6 +10,30 @@ interface Props {
   onImported: () => void;
   embedded?: boolean;
 }
+
+const GARMIN_ACTIVITY_URL_RE = /https?:\/\/[^\s"'<>]*garmin[^\s"'<>]*\/activity\/\d+[^\s"'<>]*/i;
+
+const extractGarminActivityUrl = (value: string) => {
+  const match = value.match(GARMIN_ACTIVITY_URL_RE) || value.match(/https?:\/\/[^\s"'<>]*garmin[^\s"'<>]*/i);
+  const cleanUrl = match ? match[0].replace(/[).,]+$/, "") : "";
+  return cleanUrl && /\/activity\/\d+/i.test(cleanUrl) ? cleanUrl : "";
+};
+
+const canUseDespiaClipboard = () => {
+  if (typeof navigator === "undefined") return false;
+  const ua = navigator.userAgent.toLowerCase();
+  return ua.includes("despia") || typeof (window as any).despia !== "undefined";
+};
+
+const readNativeClipboard = async () => {
+  if (!canUseDespiaClipboard()) return "";
+  try {
+    const result = await despia("getclipboard://", ["clipboarddata"]);
+    return typeof result?.clipboarddata === "string" ? result.clipboarddata : "";
+  } catch {
+    return "";
+  }
+};
 
 const ManualGarminImport = ({ lang, onImported, embedded = false }: Props) => {
   const [expanded, setExpanded] = useState(false);
@@ -21,9 +46,7 @@ const ManualGarminImport = ({ lang, onImported, embedded = false }: Props) => {
     // Accept share-style text like:
     //   "Check out my track running activity on Garmin Connect. #beatyesterday https://connect.garmin.com/modern/activity/22465889243"
     // Extract the first Garmin Connect URL we find.
-    const match = raw.match(/https?:\/\/[^\s]*garmin[^\s]*\/activity\/\d+[^\s]*/i)
-      || raw.match(/https?:\/\/[^\s]*garmin[^\s]*/i);
-    const cleanUrl = match ? match[0].replace(/[).,]+$/, "") : "";
+    const cleanUrl = extractGarminActivityUrl(raw);
     if (!cleanUrl || !/\/activity\/\d+/i.test(cleanUrl)) {
       toast.error(lang === "zh" ? "找不到有效的 Garmin 活動連結" : "Could not find a valid Garmin activity link");
       return;

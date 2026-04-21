@@ -17,6 +17,19 @@ const RUNNING_SPORTS = new Set([
 
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 
+const WORKOUT_TYPE_DESCRIPTIONS: Record<string, string> = {
+  auto: "Coach picks the most appropriate session.",
+  recovery: "Very easy recovery jog; conversational pace, low HR, short.",
+  easy: "Easy aerobic run at conversational pace.",
+  long: "Long steady run to build aerobic endurance.",
+  tempo: "Comfortably hard tempo at lactate-threshold effort, ~20-40 min.",
+  intervals: "VO2max intervals (e.g. 400m–1km reps with recovery).",
+  progressive: "Progressive run that gradually increases pace each km.",
+  fartlek: "Fartlek with mixed surges and easy segments.",
+  hill: "Hill repeats — short hard uphill efforts with jog-down recovery.",
+  race_pace: "Race-pace specific workout aligned to the runner's goal pace.",
+};
+
 interface RecentRun {
   date: string;
   distance_km: number;
@@ -38,7 +51,6 @@ function paceFromSpeed(speedMps: number): string {
 async function callVertexAI(opts: { apiKey: string; model?: string; messages: Array<{ role: string; content: any }> }): Promise<Response> {
   const VERTEX_MODEL_MAP: Record<string, string> = {
     "google/gemini-3.1-flash-lite-preview": "gemini-3.1-flash-lite-preview",
-    "google/gemini-3.1-flash-lite-preview": "gemini-3.1-flash-lite-preview",
   };
   const model = VERTEX_MODEL_MAP[opts.model || ""] || (opts.model || "gemini-3.1-flash-lite-preview").replace(/^google\//, "");
   const url = `https://aiplatform.googleapis.com/v1/publishers/google/models/${model}:generateContent?key=${opts.apiKey}`;
@@ -56,6 +68,30 @@ async function callVertexAI(opts: { apiKey: string; model?: string; messages: Ar
   const vData = await vRes.json();
   const text = vData?.candidates?.[0]?.content?.parts?.map((p: any) => p.text || "").join("") || "";
   return new Response(JSON.stringify({ choices: [{ message: { content: text } }] }), { status: 200, headers: { "Content-Type": "application/json" } });
+}
+
+// Find a planned workout for "today" inside a saved training plan.
+function findTodayPlannedWorkout(planData: any, todayISO: string): any | null {
+  if (!Array.isArray(planData)) return null;
+  for (const week of planData) {
+    for (const day of week?.days || []) {
+      if (day?.date === todayISO) return day;
+    }
+  }
+  return null;
+}
+
+// Pull a few upcoming planned workouts to give the AI context about training direction.
+function nextPlannedWorkouts(planData: any, todayISO: string, limit = 5): any[] {
+  if (!Array.isArray(planData)) return [];
+  const all: any[] = [];
+  for (const week of planData) {
+    for (const day of week?.days || []) {
+      if (day?.date && day.date >= todayISO) all.push(day);
+    }
+  }
+  all.sort((a, b) => (a.date < b.date ? -1 : 1));
+  return all.slice(0, limit);
 }
 
 serve(async (req) => {
@@ -83,12 +119,14 @@ serve(async (req) => {
     const idealTime: { distance?: string; seconds?: number } | null = body?.idealTime ?? null;
     const todayDate: string | null = typeof body?.todayDate === "string" ? body.todayDate : null;
     const lastActivityDate: string | null = typeof body?.lastActivityDate === "string" ? body.lastActivityDate : null;
+    const workoutType: string = typeof body?.workoutType === "string" ? body.workoutType : "auto";
+    const workoutTypeLabel: string = typeof body?.workoutTypeLabel === "string" ? body.workoutTypeLabel : workoutType;
     const isZh = lang === "zh";
 
-    // --- Pull last 7 days of runs from all 3 sources ---
+    // --- Pull last 7 days of runs from all 3 sources + active training plan ---
     const since = new Date(Date.now() - SEVEN_DAYS_MS).toISOString();
 
-    const [stravaRes, ahRes, garminRes, profileRes] = await Promise.all([
+    const [stravaRes, ahRes, garminRes, profileRes, planRes] = await Promise.all([
       svc.from("strava_activities")
         .select("name, sport_type, distance, moving_time, average_speed, average_heartrate, start_date")
         .eq("user_id", user.id).gte("start_date", since).order("start_date", { ascending: false }),
@@ -101,6 +139,9 @@ serve(async (req) => {
       svc.from("profiles")
         .select("training_score, runs_per_week, age, sex")
         .eq("user_id", user.id).maybeSingle(),
+      svc.from("training_plans")
+        .select("distance, target_time, goal, race_date, weeks, plan_data")
+        .eq("user_id", user.id).order("created_at", { ascending: false }).limit(1).maybeSingle(),
     ]);
 
     const recent: RecentRun[] = [];
@@ -145,12 +186,46 @@ serve(async (req) => {
     const trainingScore = profile?.training_score ?? null;
     const runsPerWeek = profile?.runs_per_week ?? null;
 
+    const plan = planRes.data as any;
+    const planData = plan?.plan_data ?? null;
+    const todayPlanned = todayDate && planData ? findTodayPlannedWorkout(planData, todayDate) : null;
+    const upcomingPlanned = todayDate && planData ? nextPlannedWorkouts(planData, todayDate, 5) : [];
+
     // --- Build context for AI ---
     let context = "";
     if (todayDate) context += `Today's date (user's local timezone): ${todayDate}.\n`;
     if (lastActivityDate) context += `Last activity date: ${lastActivityDate}.\n`;
+    else context += `The runner has NO recorded activities yet.\n`;
+
+    // Workout type the user picked
+    const typeDesc = WORKOUT_TYPE_DESCRIPTIONS[workoutType] || WORKOUT_TYPE_DESCRIPTIONS.auto;
+    if (workoutType && workoutType !== "auto") {
+      context += `\nThe runner has REQUESTED a specific workout type: "${workoutTypeLabel}".\n`;
+      context += `Type guidance: ${typeDesc}\n`;
+      context += `You MUST design today's session as this type. Do NOT override their choice — only adjust distance/pace/intensity to suit their fitness and recovery.\n`;
+    } else {
+      context += `\nThe runner asked the coach to pick the best workout type for today (auto). Choose what fits their plan and recovery.\n`;
+    }
+
+    // Active plan context (highest priority anchor)
+    if (plan) {
+      context += `\nActive training plan: goal="${plan.goal ?? ""}", target distance=${plan.distance ?? "?"}, target time=${plan.target_time ?? "?"}, race date=${plan.race_date ?? "?"}, weeks=${plan.weeks ?? "?"}.\n`;
+      if (todayPlanned) {
+        context += `Today's planned workout from their plan: type=${todayPlanned.type ?? "?"}, distance_km=${todayPlanned.distance_km ?? "?"}.\n`;
+        context += `Use this planned workout as the primary anchor. Tailor pace/structure to their recent performance.\n`;
+      }
+      if (upcomingPlanned.length > 0) {
+        context += `Next ${upcomingPlanned.length} planned sessions:\n`;
+        for (const d of upcomingPlanned) {
+          context += `  - ${d.date}: ${d.type ?? "?"} ${d.distance_km ?? "?"} km\n`;
+        }
+      }
+    } else {
+      context += `\nNo training plan saved.\n`;
+    }
+
     if (recent.length > 0) {
-      context += `Runner's last 7 days of running (most recent first):\n`;
+      context += `\nRunner's last 7 days of running (most recent first):\n`;
       for (const r of recent.slice(0, 10)) {
         const dateStr = new Date(r.date).toISOString().split("T")[0];
         context += `- ${dateStr}: ${r.distance_km} km in ${r.duration_min} min, pace ${r.pace}` +
@@ -158,7 +233,7 @@ serve(async (req) => {
           ` (${r.source})\n`;
       }
     } else {
-      context += `Runner has NO logged runs in the last 7 days.\n`;
+      context += `\nRunner has NO logged runs in the last 7 days.\n`;
       if (idealTime?.distance && idealTime?.seconds && idealTime.seconds > 0) {
         const h = Math.floor(idealTime.seconds / 3600);
         const m = Math.floor((idealTime.seconds % 3600) / 60);
@@ -169,32 +244,42 @@ serve(async (req) => {
         context += `Use the runner's onboarding goal as the fitness anchor: target ${idealTime.distance} in ${tStr}.\n`;
       }
     }
-    if (trainingScore != null) context += `Training score: ${trainingScore} (higher = fitter).\n`;
+    if (trainingScore != null) context += `\nTraining score: ${trainingScore} (higher = fitter).\n`;
     if (runsPerWeek != null) context += `Typical runs/week: ${runsPerWeek}.\n`;
 
     const systemPrompt = isZh
-      ? `你是專業跑步教練 AI。根據跑者最近七天表現（或入門目標），給出**今日**具體訓練建議（不是明日）。回覆繁體中文 Markdown。
+      ? `你是專業跑步教練 AI。根據跑者的訓練計劃（最高優先級）、最近七天表現，以及他們今天指定的訓練類型，給出**今日**具體訓練建議（不是明日）。回覆繁體中文 Markdown。
+
+優先順序：
+1. 如果跑者有訓練計劃且今天有安排，以該安排為主軸。
+2. 如果跑者指定了訓練類型（不是 auto），必須遵守該類型。
+3. 用最近七天表現決定具體距離、配速、時長。
+4. 如果完全沒有跑步紀錄，使用入門目標作為基準，給適合的入門訓練。
 
 格式：
 ## 今日建議訓練
-- **類型**：（恢復跑 / 輕鬆有氧 / 節奏跑 / 間歇 / 休息）
+- **類型**：（跑者指定的類型）
 - **距離**：X 公里
-- **配速**：X:XX /km
+- **配速**：X:XX /km（如為間歇等多段配速，請列出每段）
 - **時長**：約 X 分鐘
-- **理由**：1-2 句說明（請參考最後一次活動日期與今日日期之間的恢復狀況）
+- **暖身/收操**：簡短建議
+- **理由**：1-2 句說明（連結到訓練計劃或最近恢復狀況）`
+      : `You are a professional running coach AI. Given the runner's training plan (highest priority), last 7 days of activity, and the workout type they picked for today, suggest **today's** concrete workout (NOT tomorrow's). Reply in Markdown.
 
-如果跑者最近訓練量大或配速辛苦 → 建議恢復或輕鬆。如果完全沒有跑步紀錄 → 給一個適合其目標水平的入門訓練。`
-      : `You are a professional running coach AI. Given the runner's last 7 days (or onboarding goal if no runs), suggest **today's** concrete workout (NOT tomorrow's). Reply in Markdown.
+Priority:
+1. If the runner has an active plan with a workout scheduled for today, anchor on that.
+2. If the runner specified a workout type (not "auto"), you MUST honor that type.
+3. Use the last 7 days of performance to set concrete distance, pace, and duration.
+4. If there are no logged runs at all, fall back to the onboarding goal pace and prescribe a beginner-appropriate session.
 
 Format:
 ## Today's Suggested Workout
-- **Type**: (Recovery / Easy aerobic / Tempo / Intervals / Rest)
+- **Type**: (the requested type)
 - **Distance**: X km
-- **Pace**: X:XX /km
+- **Pace**: X:XX /km (for intervals/progressive, list per segment)
 - **Duration**: ~X min
-- **Why**: 1-2 sentences (consider recovery time between the last activity date and today)
-
-If recent volume was high or paces were taxing, suggest recovery/easy. If no runs at all, give a beginner-appropriate session matched to their goal pace.`;
+- **Warm-up / Cool-down**: short note
+- **Why**: 1-2 sentences (tie back to plan or recent recovery)`;
 
     const aiResp = await callVertexAI({
       apiKey: VERTEX_API_KEY,
@@ -214,7 +299,13 @@ If recent volume was high or paces were taxing, suggest recovery/easy. If no run
     const aiData = await aiResp.json();
     const suggestion = aiData.choices?.[0]?.message?.content?.trim() || "";
 
-    return json({ suggestion, basedOnRuns: recent.length });
+    return json({
+      suggestion,
+      basedOnRuns: recent.length,
+      hasPlan: !!plan,
+      hasPlannedToday: !!todayPlanned,
+      workoutType,
+    });
   } catch (e) {
     console.error("generate-suggested-workout error:", e);
     return json({ error: e instanceof Error ? e.message : "Unknown error" }, 500);

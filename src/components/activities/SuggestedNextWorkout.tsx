@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Lang } from "@/lib/i18n";
 import { toast } from "sonner";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface Props {
   lang: Lang;
@@ -14,14 +15,38 @@ interface Props {
   latestActivityDate: string | null;
 }
 
-const ONE_DAY_MS = 24 * 60 * 60 * 1000;
-
 interface CachedGenerated {
   suggestion: string;
   generatedAt: string; // ISO
   /** ISO date of the latest activity at the time of generation, or null if none. */
   basisActivityDate: string | null;
+  workoutType?: string;
 }
+
+type WorkoutType =
+  | "auto"
+  | "recovery"
+  | "easy"
+  | "long"
+  | "tempo"
+  | "intervals"
+  | "progressive"
+  | "fartlek"
+  | "hill"
+  | "race_pace";
+
+const WORKOUT_TYPE_LABELS: Record<WorkoutType, { en: string; zh: string }> = {
+  auto: { en: "Coach's pick (recommended)", zh: "教練建議（推薦）" },
+  recovery: { en: "Recovery run", zh: "恢復跑" },
+  easy: { en: "Easy aerobic", zh: "輕鬆有氧" },
+  long: { en: "Long run", zh: "長距離跑" },
+  tempo: { en: "Tempo run", zh: "節奏跑" },
+  intervals: { en: "Intervals", zh: "間歇" },
+  progressive: { en: "Progressive run", zh: "漸進跑" },
+  fartlek: { en: "Fartlek", zh: "法特萊克" },
+  hill: { en: "Hill repeats", zh: "上坡重複" },
+  race_pace: { en: "Race-pace workout", zh: "比賽配速訓練" },
+};
 
 function readCachedGenerated(userId: string): CachedGenerated | null {
   try {
@@ -68,6 +93,7 @@ const SuggestedNextWorkout = ({ lang, latestActivityId, latestActivityDate }: Pr
   const [generated, setGenerated] = useState<CachedGenerated | null>(null);
   const [generating, setGenerating] = useState(false);
   const [declined, setDeclined] = useState(false);
+  const [workoutType, setWorkoutType] = useState<WorkoutType>("auto");
 
   // Load cached generated suggestion
   useEffect(() => {
@@ -144,15 +170,15 @@ const SuggestedNextWorkout = ({ lang, latestActivityId, latestActivityDate }: Pr
     setDeclined(false);
   }, [latestActivityId]);
 
-  // Decide what to show:
-  //   The suggestion is valid only on the calendar day AFTER the latest activity
-  //   (in the user's local timezone). E.g. activity on 19/4 → show all of 20/4,
-  //   hidden on 21/4 and beyond.
+  // Decide what to show.
+  //   - If there's a fresh AI analysis for "the day after the latest activity" → show it.
+  //   - Otherwise → always show the "pick a workout" prompt so the user can ask
+  //     the coach for a custom run today (works even with no activities at all).
   const view = useMemo<
     | { kind: "loading" }
     | { kind: "analysis"; text: string }
     | { kind: "generated"; text: string }
-    | { kind: "expired" }
+    | { kind: "prompt" }
     | { kind: "hidden" }
   >(() => {
     if (!user) return { kind: "hidden" };
@@ -169,26 +195,26 @@ const SuggestedNextWorkout = ({ lang, latestActivityId, latestActivityDate }: Pr
       return diffDays === 1;
     })();
 
-    // Outside the valid window → hide entirely (no expired prompt either).
-    if (!isDayAfterLatest) return { kind: "hidden" };
-
-    // Within the valid window: prefer the AI analysis-derived suggestion.
-    if (analysisWorkout) {
+    // Prefer the AI analysis-derived suggestion when it's still fresh.
+    if (isDayAfterLatest && analysisWorkout) {
       return { kind: "analysis", text: analysisWorkout };
     }
 
-    // Otherwise, show a cached generated suggestion if it matches the latest activity.
+    // Show a cached generated suggestion if it matches the current "basis"
+    // (latest activity date, including null=no activities).
     if (generated) {
-      const basis = generated.basisActivityDate ? new Date(generated.basisActivityDate).getTime() : null;
-      const latestDateMs = new Date(latestActivityDate!).getTime();
-      const stillCurrent = basis != null && Math.abs(latestDateMs - basis) < 1000;
-      if (stillCurrent) {
+      const sameBasis =
+        (generated.basisActivityDate ?? null) === (latestActivityDate ?? null) ||
+        (latestActivityDate &&
+          generated.basisActivityDate &&
+          Math.abs(new Date(latestActivityDate).getTime() - new Date(generated.basisActivityDate).getTime()) < 1000);
+      if (sameBasis) {
         return { kind: "generated", text: generated.suggestion };
       }
     }
 
-    // Within the window but nothing generated yet → offer to generate.
-    return { kind: "expired" };
+    // Otherwise, always offer to generate a custom workout (even if no activities at all).
+    return { kind: "prompt" };
   }, [user, analysisLoaded, analysisWorkout, latestActivityDate, generated]);
 
   const handleGenerate = async () => {
@@ -201,7 +227,14 @@ const SuggestedNextWorkout = ({ lang, latestActivityId, latestActivityDate }: Pr
       const todayDate = fmtLocal(new Date());
       const lastActivityDateStr = latestActivityDate ? fmtLocal(new Date(latestActivityDate)) : null;
       const { data, error } = await supabase.functions.invoke("generate-suggested-workout", {
-        body: { lang, idealTime, todayDate, lastActivityDate: lastActivityDateStr },
+        body: {
+          lang,
+          idealTime,
+          todayDate,
+          lastActivityDate: lastActivityDateStr,
+          workoutType,
+          workoutTypeLabel: WORKOUT_TYPE_LABELS[workoutType].en,
+        },
       });
       if (error) throw error;
       const suggestion = (data as any)?.suggestion;
@@ -210,6 +243,7 @@ const SuggestedNextWorkout = ({ lang, latestActivityId, latestActivityDate }: Pr
         suggestion,
         generatedAt: new Date().toISOString(),
         basisActivityDate: latestActivityDate,
+        workoutType,
       };
       writeCachedGenerated(user.id, cached);
       setGenerated(cached);
@@ -220,6 +254,11 @@ const SuggestedNextWorkout = ({ lang, latestActivityId, latestActivityDate }: Pr
     } finally {
       setGenerating(false);
     }
+  };
+
+  const handleRegenerate = () => {
+    setGenerated(null);
+    setDeclined(false);
   };
 
   if (view.kind === "hidden") return null;
@@ -240,19 +279,45 @@ const SuggestedNextWorkout = ({ lang, latestActivityId, latestActivityDate }: Pr
         </div>
       )}
 
-      {(view.kind === "analysis" || view.kind === "generated") && (
+      {view.kind === "analysis" && (
         <div className="prose prose-sm dark:prose-invert max-w-none text-foreground text-sm [&_h2]:text-base [&_h2]:font-bold [&_h2]:mt-2 [&_h2]:mb-1 [&_ul]:my-1 [&_li]:my-0.5 [&_strong]:text-primary">
           <ReactMarkdown>{stripLeadingHeading(view.text)}</ReactMarkdown>
         </div>
       )}
 
-      {view.kind === "expired" && !declined && (
+      {view.kind === "generated" && (
+        <div className="space-y-3">
+          <div className="prose prose-sm dark:prose-invert max-w-none text-foreground text-sm [&_h2]:text-base [&_h2]:font-bold [&_h2]:mt-2 [&_h2]:mb-1 [&_ul]:my-1 [&_li]:my-0.5 [&_strong]:text-primary">
+            <ReactMarkdown>{stripLeadingHeading(view.text)}</ReactMarkdown>
+          </div>
+          <button
+            onClick={handleRegenerate}
+            className="text-xs font-medium text-primary hover:text-primary/80 underline-offset-2 hover:underline"
+          >
+            {isZh ? "選擇其他訓練類型" : "Pick a different workout"}
+          </button>
+        </div>
+      )}
+
+      {view.kind === "prompt" && !declined && (
         <div className="space-y-3">
           <p className="text-sm text-foreground/90 leading-relaxed">
             {isZh
-              ? "請同步或上傳新的活動以取得下一次建議訓練。或者要我為你產生一個建議訓練嗎？"
-              : "Please sync or upload a new activity to get the next suggested workout. Or do you want me to generate you a suggested workout?"}
+              ? "想要今天跑步嗎？選擇一種訓練類型，AI 教練會根據你的訓練計劃（或最近 7 天的表現）給你最適合的距離與配速。"
+              : "Want to run today? Pick a workout type and the AI coach will suggest the best distance and pace based on your plan (or your last 7 days)."}
           </p>
+          <Select value={workoutType} onValueChange={(v) => setWorkoutType(v as WorkoutType)} disabled={generating}>
+            <SelectTrigger className="w-full bg-background border-border text-sm">
+              <SelectValue placeholder={isZh ? "選擇訓練類型" : "Select workout type"} />
+            </SelectTrigger>
+            <SelectContent>
+              {(Object.keys(WORKOUT_TYPE_LABELS) as WorkoutType[]).map((key) => (
+                <SelectItem key={key} value={key}>
+                  {isZh ? WORKOUT_TYPE_LABELS[key].zh : WORKOUT_TYPE_LABELS[key].en}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <div className="flex gap-2">
             <button
               onClick={handleGenerate}
@@ -260,25 +325,33 @@ const SuggestedNextWorkout = ({ lang, latestActivityId, latestActivityDate }: Pr
               className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium px-4 py-2 hover:bg-primary/90 transition-colors disabled:opacity-60"
             >
               {generating && <Loader2 size={14} className="animate-spin" />}
-              {isZh ? "好" : "Yes"}
+              {generating
+                ? isZh ? "產生中…" : "Generating…"
+                : isZh ? "產生建議訓練" : "Generate workout"}
             </button>
             <button
               onClick={() => setDeclined(true)}
               disabled={generating}
-              className="flex-1 inline-flex items-center justify-center rounded-lg border border-border bg-background text-foreground text-sm font-medium px-4 py-2 hover:bg-accent transition-colors"
+              className="inline-flex items-center justify-center rounded-lg border border-border bg-background text-foreground text-sm font-medium px-4 py-2 hover:bg-accent transition-colors"
             >
-              {isZh ? "不要" : "No"}
+              {isZh ? "不要" : "No thanks"}
             </button>
           </div>
         </div>
       )}
 
-      {view.kind === "expired" && declined && (
-        <p className="text-sm text-muted-foreground italic">
-          {isZh
-            ? "好的。同步新活動後再回來看看吧！"
-            : "Okay! Sync a new activity and check back."}
-        </p>
+      {view.kind === "prompt" && declined && (
+        <div className="space-y-2">
+          <p className="text-sm text-muted-foreground italic">
+            {isZh ? "好的，今天好好休息！" : "Got it — enjoy your rest day!"}
+          </p>
+          <button
+            onClick={() => setDeclined(false)}
+            className="text-xs font-medium text-primary hover:text-primary/80 underline-offset-2 hover:underline"
+          >
+            {isZh ? "改變主意？" : "Changed your mind?"}
+          </button>
+        </div>
       )}
     </div>
   );

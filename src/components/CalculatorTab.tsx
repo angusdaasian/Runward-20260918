@@ -227,7 +227,13 @@ const CalculatorTab = ({ score, setScore, lang, onCalculated }: Props) => {
         <p className="text-lg font-semibold text-primary">
           {paceDisplay} /{paceUnit}
         </p>
-        <p className="text-sm text-muted-foreground">{distanceDisplay}</p>
+        {category === "track" && lap400Display ? (
+          <p className="text-sm text-muted-foreground">
+            {lang === "zh" ? `400米分段 ${lap400Display}` : `400m split ${lap400Display}`}
+          </p>
+        ) : (
+          <p className="text-sm text-muted-foreground">{distanceDisplay}</p>
+        )}
       </div>
 
       {/* Distance Section */}

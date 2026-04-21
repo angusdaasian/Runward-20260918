@@ -40,26 +40,24 @@ const runningSportTypes = new Set([
   "running", "trail_running", "treadmill_running",
 ]);
 
-// ── Firecrawl ──
-type ScrapeResult = { markdown: string; screenshotUrl: string | null };
-
+// ── Firecrawl (markdown only — we no longer scrape map screenshots) ──
 async function scrapeWithFirecrawl(
   url: string,
   apiKey: string,
-): Promise<ScrapeResult> {
+): Promise<string> {
+  let lastError = "Unknown error";
   const attempts = [
-    { formats: ["markdown", "screenshot"], waitFor: 3000, timeout: 60000 },
-    { formats: ["markdown"], waitFor: 1000, timeout: 60000 },
+    { waitFor: 3000, timeout: 60000 },
+    { waitFor: 1000, timeout: 60000 },
   ];
 
-  let lastError = "Unknown error";
   for (const attempt of attempts) {
     const res = await fetch("https://api.firecrawl.dev/v1/scrape", {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         url,
-        formats: attempt.formats,
+        formats: ["markdown"],
         waitFor: attempt.waitFor,
         timeout: attempt.timeout,
         blockAds: true,
@@ -68,17 +66,12 @@ async function scrapeWithFirecrawl(
     const data = await res.json().catch(() => ({}));
     if (!res.ok || !data.success) {
       lastError = data.error || `${res.status} ${res.statusText}`;
-      console.warn(`[manual-import] Firecrawl attempt failed (${attempt.formats.join(",")}): ${lastError}`);
+      console.warn(`[manual-import] Firecrawl attempt failed: ${lastError}`);
       continue;
     }
 
     const markdown = data.data?.markdown || "";
-    if (markdown.length >= 100) {
-      return {
-        markdown,
-        screenshotUrl: data.data?.screenshot || null,
-      };
-    }
+    if (markdown.length >= 100) return markdown;
     lastError = "Firecrawl returned too little page content";
   }
 

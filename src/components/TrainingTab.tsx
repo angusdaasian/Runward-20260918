@@ -8,9 +8,11 @@ import { useToast } from "@/hooks/use-toast";
 import { usePremium } from "@/contexts/PremiumContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { useOnlineStatus, isOnline } from "@/hooks/use-online-status";
+import { getCached, setCached, CacheKeys } from "@/lib/offlineCache";
 import {
   Loader2, Lock, ChevronLeft, ChevronRight, Plus, Calendar, Target, Trophy,
-  Repeat, Route, Check, HelpCircle, X
+  Repeat, Route, Check, HelpCircle, X, WifiOff
 } from "lucide-react";
 const CalculatorTab = lazy(() => import("@/components/CalculatorTab"));
 import freePlan5k from "@/assets/free-plan-5k.jpg";
@@ -196,6 +198,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
   const { isPremium } = usePremium();
   const { user } = useAuth();
   const { toast } = useToast();
+  const { online } = useOnlineStatus();
 
   // Paces view
   const [view, setView] = useState<"paces" | "equivalent">("paces");

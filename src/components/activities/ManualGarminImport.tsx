@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link2, Loader2, ChevronDown, ChevronUp } from "lucide-react";
 import { toast } from "sonner";
 import despia from "despia-native";
@@ -9,6 +9,7 @@ interface Props {
   lang: Lang;
   onImported: () => void;
   embedded?: boolean;
+  initialUrl?: string;
 }
 
 const GARMIN_ACTIVITY_URL_RE = /https?:\/\/[^\s"'<>]*garmin[^\s"'<>]*\/activity\/\d+[^\s"'<>]*/i;

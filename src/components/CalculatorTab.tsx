@@ -147,6 +147,16 @@ const CalculatorTab = ({ score, setScore, lang, onCalculated }: Props) => {
     return `${(dist / 1000).toFixed(1)} km`;
   }, [getDistanceMeters, paceUnit]);
 
+  const lap400Display = useMemo(() => {
+    const dist = getDistanceMeters();
+    if (dist <= 0 || totalSeconds <= 0 || dist === 400) return null;
+    const lapSec = totalSeconds * (400 / dist);
+    const m = Math.floor(lapSec / 60);
+    const s = Math.round(lapSec % 60);
+    const formatted = m === 0 ? `${s}s` : `${m}:${s.toString().padStart(2, "0")}`;
+    return formatted;
+  }, [getDistanceMeters, totalSeconds]);
+
   const toggleUnit = () => {
     const newUnit = paceUnit === "km" ? "mi" : "km";
     if (category === "custom") {
@@ -217,7 +227,13 @@ const CalculatorTab = ({ score, setScore, lang, onCalculated }: Props) => {
         <p className="text-lg font-semibold text-primary">
           {paceDisplay} /{paceUnit}
         </p>
-        <p className="text-sm text-muted-foreground">{distanceDisplay}</p>
+        {category === "track" && lap400Display ? (
+          <p className="text-sm text-muted-foreground">
+            {lang === "zh" ? `400米分段 ${lap400Display}` : `400m split ${lap400Display}`}
+          </p>
+        ) : (
+          <p className="text-sm text-muted-foreground">{distanceDisplay}</p>
+        )}
       </div>
 
       {/* Distance Section */}
@@ -312,84 +328,80 @@ const CalculatorTab = ({ score, setScore, lang, onCalculated }: Props) => {
           </Select>
         </div>
 
-        {inputMode === "time" ? (
-          <div className="flex items-center justify-center gap-2">
-            <div className="flex flex-col items-center">
-              <input
-                type="number"
-                value={hours}
-                onChange={(e) => { setHours(e.target.value); setWorldRecordError(null); }}
-                min="0"
-                max="99"
-                className="w-16 h-14 text-center text-2xl font-display font-bold bg-card border border-border rounded-xl text-foreground focus:outline-none focus:border-primary transition-colors"
-              />
-              <span className="text-[11px] text-muted-foreground mt-1">
-                {lang === "zh" ? "時" : "hr"}
+        {(() => {
+          const range = (n: number) => Array.from({ length: n }, (_, i) => i.toString());
+          const NumberSelect = ({
+            value,
+            onChange,
+            options,
+            width = "w-20",
+          }: {
+            value: string;
+            onChange: (v: string) => void;
+            options: string[];
+            width?: string;
+          }) => (
+            <Select value={value} onValueChange={(v) => { onChange(v); setWorldRecordError(null); }}>
+              <SelectTrigger className={`${width} h-14 text-2xl font-display font-bold bg-card border-border justify-center [&>svg]:hidden px-2`}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="max-h-60">
+                {options.map((o) => (
+                  <SelectItem key={o} value={o} className="justify-center text-base">
+                    {o.padStart(2, "0")}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          );
+
+          if (inputMode === "time") {
+            return (
+              <div className="flex items-center justify-center gap-2">
+                <div className="flex flex-col items-center">
+                  <NumberSelect value={hours} onChange={setHours} options={range(24)} width="w-20" />
+                  <span className="text-[11px] text-muted-foreground mt-1">
+                    {lang === "zh" ? "時" : "hr"}
+                  </span>
+                </div>
+                <span className="text-2xl font-bold text-muted-foreground pb-5">:</span>
+                <div className="flex flex-col items-center">
+                  <NumberSelect value={minutes} onChange={setMinutes} options={range(60)} width="w-20" />
+                  <span className="text-[11px] text-muted-foreground mt-1">
+                    {lang === "zh" ? "分" : "min"}
+                  </span>
+                </div>
+                <span className="text-2xl font-bold text-muted-foreground pb-5">:</span>
+                <div className="flex flex-col items-center">
+                  <NumberSelect value={seconds} onChange={setSeconds} options={range(60)} width="w-20" />
+                  <span className="text-[11px] text-muted-foreground mt-1">
+                    {lang === "zh" ? "秒" : "sec"}
+                  </span>
+                </div>
+              </div>
+            );
+          }
+          return (
+            <div className="flex items-center justify-center gap-2">
+              <div className="flex flex-col items-center">
+                <NumberSelect value={paceMin} onChange={setPaceMin} options={range(31)} width="w-20" />
+                <span className="text-[11px] text-muted-foreground mt-1">
+                  {lang === "zh" ? "分" : "min"}
+                </span>
+              </div>
+              <span className="text-2xl font-bold text-muted-foreground pb-5">:</span>
+              <div className="flex flex-col items-center">
+                <NumberSelect value={paceSec} onChange={setPaceSec} options={range(60)} width="w-20" />
+                <span className="text-[11px] text-muted-foreground mt-1">
+                  {lang === "zh" ? "秒" : "sec"}
+                </span>
+              </div>
+              <span className="text-lg text-muted-foreground font-medium pb-5">
+                /{paceUnit}
               </span>
             </div>
-            <span className="text-2xl font-bold text-muted-foreground pb-5">:</span>
-            <div className="flex flex-col items-center">
-              <input
-                type="number"
-                value={minutes}
-                onChange={(e) => { setMinutes(e.target.value); setWorldRecordError(null); }}
-                min="0"
-                max="59"
-                className="w-16 h-14 text-center text-2xl font-display font-bold bg-card border border-border rounded-xl text-foreground focus:outline-none focus:border-primary transition-colors"
-              />
-              <span className="text-[11px] text-muted-foreground mt-1">
-                {lang === "zh" ? "分" : "min"}
-              </span>
-            </div>
-            <span className="text-2xl font-bold text-muted-foreground pb-5">:</span>
-            <div className="flex flex-col items-center">
-              <input
-                type="number"
-                value={seconds}
-                onChange={(e) => { setSeconds(e.target.value); setWorldRecordError(null); }}
-                min="0"
-                max="59"
-                className="w-16 h-14 text-center text-2xl font-display font-bold bg-card border border-border rounded-xl text-foreground focus:outline-none focus:border-primary transition-colors"
-              />
-              <span className="text-[11px] text-muted-foreground mt-1">
-                {lang === "zh" ? "秒" : "sec"}
-              </span>
-            </div>
-          </div>
-        ) : (
-          <div className="flex items-center justify-center gap-2">
-            <div className="flex flex-col items-center">
-              <input
-                type="number"
-                value={paceMin}
-                onChange={(e) => { setPaceMin(e.target.value); setWorldRecordError(null); }}
-                min="0"
-                max="30"
-                className="w-20 h-14 text-center text-2xl font-display font-bold bg-card border border-border rounded-xl text-foreground focus:outline-none focus:border-primary transition-colors"
-              />
-              <span className="text-[11px] text-muted-foreground mt-1">
-                {lang === "zh" ? "分" : "min"}
-              </span>
-            </div>
-            <span className="text-2xl font-bold text-muted-foreground pb-5">:</span>
-            <div className="flex flex-col items-center">
-              <input
-                type="number"
-                value={paceSec}
-                onChange={(e) => { setPaceSec(e.target.value); setWorldRecordError(null); }}
-                min="0"
-                max="59"
-                className="w-20 h-14 text-center text-2xl font-display font-bold bg-card border border-border rounded-xl text-foreground focus:outline-none focus:border-primary transition-colors"
-              />
-              <span className="text-[11px] text-muted-foreground mt-1">
-                {lang === "zh" ? "秒" : "sec"}
-              </span>
-            </div>
-            <span className="text-lg text-muted-foreground font-medium pb-5">
-              /{paceUnit}
-            </span>
-          </div>
-        )}
+          );
+        })()}
       </div>
 
       {/* World Record Warning */}

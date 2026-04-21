@@ -360,6 +360,12 @@ const RaceTab = ({ lang }: Props) => {
       <p className="text-sm text-muted-foreground mb-1">
         {lang === "zh" ? "探索即將舉行的跑步賽事" : "Discover upcoming running events"}
       </p>
+      {(!online || servedFromCache) && (
+        <div className="flex items-center gap-1.5 mb-2 text-[11px] text-muted-foreground bg-muted/50 px-2 py-1 rounded-md w-fit">
+          <WifiOff size={11} />
+          {lang === "zh" ? "離線中 — 顯示已儲存的賽事" : "Offline — showing saved races"}
+        </div>
+      )}
       {lastUpdated && (
         <p className="text-[11px] text-muted-foreground/60 mb-4">
           {lang === "zh" ? "最後更新：" : "Last updated: "}

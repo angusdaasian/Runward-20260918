@@ -2,6 +2,7 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
+// @ts-expect-error - @despia/local ships JS only, no type declarations
 import { despiaLocalPlugin } from "@despia/local/vite";
 
 // https://vitejs.dev/config/

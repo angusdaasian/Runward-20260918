@@ -260,25 +260,9 @@ serve(async (req) => {
     }
     const startTime = new Date(startMs).toISOString();
 
-    const garminActivityId = deriveActivityId(url);
-
-    // Duplicate check: has anyone (including this user) already imported this activity?
-    const { data: existing } = await supabase
-      .from("garmin_activities")
-      .select("user_id")
-      .eq("garmin_activity_id", garminActivityId)
-      .limit(1)
-      .maybeSingle();
-
-    if (existing && existing.user_id !== user.id) {
-      return new Response(JSON.stringify({
-        error: "This activity has already been imported by someone else in the app.",
-        duplicate: true,
-      }), {
-        status: 409,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    // Make the derived id unique per user so two users can import the same
+    // public Garmin activity without conflicting on the unique constraint.
+    const garminActivityId = `${deriveActivityId(url)}_${user.id.slice(0, 8)}`;
 
     // Cross-source duplicate check: similar activity within ±10 min and ±5% distance
     // (or 100 m, whichever is larger) across strava / apple_health / garmin tables.

@@ -41,25 +41,48 @@ const runningSportTypes = new Set([
 ]);
 
 // ── Firecrawl ──
+type ScrapeResult = { markdown: string; screenshotUrl: string | null };
+
 async function scrapeWithFirecrawl(
   url: string,
   apiKey: string,
-): Promise<{ markdown: string; screenshotUrl: string | null }> {
-  const res = await fetch("https://api.firecrawl.dev/v1/scrape", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      url,
-      formats: ["markdown", "screenshot"],
-      waitFor: 8000,
-    }),
-  });
-  const data = await res.json();
-  if (!data.success) throw new Error(`Firecrawl failed: ${data.error || "Unknown error"}`);
-  return {
-    markdown: data.data?.markdown || "",
-    screenshotUrl: data.data?.screenshot || null,
-  };
+): Promise<ScrapeResult> {
+  const attempts = [
+    { formats: ["markdown", "screenshot"], waitFor: 3000, timeout: 60000 },
+    { formats: ["markdown"], waitFor: 1000, timeout: 60000 },
+  ];
+
+  let lastError = "Unknown error";
+  for (const attempt of attempts) {
+    const res = await fetch("https://api.firecrawl.dev/v1/scrape", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        url,
+        formats: attempt.formats,
+        waitFor: attempt.waitFor,
+        timeout: attempt.timeout,
+        blockAds: true,
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.success) {
+      lastError = data.error || `${res.status} ${res.statusText}`;
+      console.warn(`[manual-import] Firecrawl attempt failed (${attempt.formats.join(",")}): ${lastError}`);
+      continue;
+    }
+
+    const markdown = data.data?.markdown || "";
+    if (markdown.length >= 100) {
+      return {
+        markdown,
+        screenshotUrl: data.data?.screenshot || null,
+      };
+    }
+    lastError = "Firecrawl returned too little page content";
+  }
+
+  throw new Error(`Firecrawl failed: ${lastError}`);
 }
 
 // ── AI extraction ──

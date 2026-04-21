@@ -103,7 +103,7 @@ const ManualGarminImport = ({ lang, onImported, embedded = false }: Props) => {
             const start = target.selectionStart ?? url.length;
             const end = target.selectionEnd ?? url.length;
             const next = url.slice(0, start) + text + url.slice(end);
-            setUrl(next.slice(0, 2000));
+            setUrl(next);
           }
         }}
         placeholder={lang === "zh"
@@ -111,7 +111,6 @@ const ManualGarminImport = ({ lang, onImported, embedded = false }: Props) => {
           : "Paste Garmin link, or the full \"Check out my activity…\" share text"}
         disabled={loading}
         rows={3}
-        maxLength={2000}
         autoCapitalize="off"
         autoCorrect="off"
         spellCheck={false}

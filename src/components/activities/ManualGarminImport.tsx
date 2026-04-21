@@ -92,13 +92,30 @@ const ManualGarminImport = ({ lang, onImported, embedded = false }: Props) => {
       <textarea
         value={url}
         onChange={(e) => setUrl(e.target.value)}
+        onPaste={(e) => {
+          // Some iOS WebKit hosts (incl. Despia) strip parts of long pasted
+          // strings via the default handler. Manually inject the clipboard
+          // text so the full share message (incl. the URL) lands intact.
+          const text = e.clipboardData?.getData("text");
+          if (text) {
+            e.preventDefault();
+            const target = e.currentTarget;
+            const start = target.selectionStart ?? url.length;
+            const end = target.selectionEnd ?? url.length;
+            const next = url.slice(0, start) + text + url.slice(end);
+            setUrl(next.slice(0, 2000));
+          }
+        }}
         placeholder={lang === "zh"
-          ? "貼上 Garmin 連結，或整段「Check out my activity…」分享文字"
+          ? "貼上 Garmin 連結,或整段「Check out my activity…」分享文字"
           : "Paste Garmin link, or the full \"Check out my activity…\" share text"}
         disabled={loading}
         rows={3}
         maxLength={2000}
-        className="w-full text-sm px-3 py-2 rounded-lg bg-background border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50 resize-y min-h-[72px] break-all"
+        autoCapitalize="off"
+        autoCorrect="off"
+        spellCheck={false}
+        className="w-full text-sm px-3 py-2 rounded-lg bg-background border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50 resize-y min-h-[72px] whitespace-pre-wrap break-words"
       />
       <button
         onClick={handleImport}

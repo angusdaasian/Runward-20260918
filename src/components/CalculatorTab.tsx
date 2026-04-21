@@ -147,6 +147,16 @@ const CalculatorTab = ({ score, setScore, lang, onCalculated }: Props) => {
     return `${(dist / 1000).toFixed(1)} km`;
   }, [getDistanceMeters, paceUnit]);
 
+  const lap400Display = useMemo(() => {
+    const dist = getDistanceMeters();
+    if (dist <= 0 || totalSeconds <= 0 || dist === 400) return null;
+    const lapSec = totalSeconds * (400 / dist);
+    const m = Math.floor(lapSec / 60);
+    const s = Math.round(lapSec % 60);
+    const formatted = m === 0 ? `${s}s` : `${m}:${s.toString().padStart(2, "0")}`;
+    return formatted;
+  }, [getDistanceMeters, totalSeconds]);
+
   const toggleUnit = () => {
     const newUnit = paceUnit === "km" ? "mi" : "km";
     if (category === "custom") {

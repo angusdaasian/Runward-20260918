@@ -392,10 +392,12 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
       setProgramStep("calendar");
       if (user) {
         await supabase.from("training_plans" as any).delete().eq("user_id", user.id);
-        await (supabase.from("training_plans" as any) as any).insert({
+        const inserted: any = {
           user_id: user.id, goal: goal || "race", distance, target_time: targetTime,
           race_date: raceDate, weeks: weeksUntilRace, plan_data: planData, raw_output: result.raw || "",
-        });
+        };
+        await (supabase.from("training_plans" as any) as any).insert(inserted);
+        setCached(CacheKeys.trainingPlan(user.id), inserted);
       }
     } catch (err: any) {
       console.error("Error generating program:", err);
@@ -493,6 +495,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
       setCustomStep("calendar");
       setExistingPlan(null);
       setPlan([]);
+      setCached(CacheKeys.trainingPlan(user.id), data);
       toast({ title: lang === "zh" ? "計劃已建立" : "Program Created" });
     }
   };

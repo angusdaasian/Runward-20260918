@@ -94,6 +94,7 @@ const SuggestedNextWorkout = ({ lang, latestActivityId, latestActivityDate }: Pr
 
   const [generated, setGenerated] = useState<CachedGenerated | null>(null);
   const [generating, setGenerating] = useState(false);
+  const [translating, setTranslating] = useState(false);
   const [declined, setDeclined] = useState(false);
   const [workoutType, setWorkoutType] = useState<WorkoutType>("auto");
 

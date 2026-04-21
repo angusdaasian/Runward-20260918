@@ -267,53 +267,82 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
   const [editPace, setEditPace] = useState("");
   const [editDescription, setEditDescription] = useState("");
 
-  // Load existing plan
+  // Load existing plan (cache-then-network so it works offline)
   useEffect(() => {
     if (!user) return;
+
+    const applyPlan = (p: any) => {
+      if (!p) return;
+      if (p.goal === "custom") {
+        setCustomExistingPlan(p);
+        setCustomPlan(p.plan_data || []);
+        setCustomStep("calendar");
+        const today = new Date().toISOString().split("T")[0];
+        const idx = (p.plan_data || []).findIndex((w: WeekPlan) => w.days.some((d: DayPlan) => d.date >= today));
+        setCustomWeekIdx(Math.max(0, idx));
+      } else {
+        setExistingPlan(p);
+        setPlan(p.plan_data || []);
+        setProgramStep("calendar");
+        const today = new Date().toISOString().split("T")[0];
+        const idx = (p.plan_data || []).findIndex((w: WeekPlan) => w.days.some((d: DayPlan) => d.date >= today));
+        setCurrentWeekIdx(Math.max(0, idx));
+      }
+    };
+
+    // 1) Hydrate from cache so the calendar is visible offline.
+    const cached = getCached<any>(CacheKeys.trainingPlan(user.id));
+    if (cached) applyPlan(cached.value);
+
+    // 2) Refresh from network when online.
+    if (!online) return;
     const load = async () => {
-      const { data } = await supabase.from("training_plans" as any).select("*").eq("user_id", user.id).order("created_at", { ascending: false }).limit(1);
-      if (data && (data as any[]).length > 0) {
-        const p = (data as any[])[0];
-        if (p.goal === "custom") {
-          setCustomExistingPlan(p);
-          setCustomPlan(p.plan_data || []);
-          setCustomStep("calendar");
-          const today = new Date().toISOString().split("T")[0];
-          const idx = (p.plan_data || []).findIndex((w: WeekPlan) => w.days.some((d: DayPlan) => d.date >= today));
-          setCustomWeekIdx(Math.max(0, idx));
-        } else if (p.goal === "free") {
-          // Free plan: load into existingPlan state but show in free section
-          setExistingPlan(p);
-          setPlan(p.plan_data || []);
-          setProgramStep("calendar");
-          const today = new Date().toISOString().split("T")[0];
-          const idx = (p.plan_data || []).findIndex((w: WeekPlan) => w.days.some((d: DayPlan) => d.date >= today));
-          setCurrentWeekIdx(Math.max(0, idx));
-        } else {
-          setExistingPlan(p);
-          setPlan(p.plan_data || []);
-          setProgramStep("calendar");
-          const today = new Date().toISOString().split("T")[0];
-          const idx = (p.plan_data || []).findIndex((w: WeekPlan) => w.days.some((d: DayPlan) => d.date >= today));
-          setCurrentWeekIdx(Math.max(0, idx));
+      try {
+        const { data } = await supabase.from("training_plans" as any).select("*").eq("user_id", user.id).order("created_at", { ascending: false }).limit(1);
+        if (data && (data as any[]).length > 0) {
+          const p = (data as any[])[0];
+          applyPlan(p);
+          setCached(CacheKeys.trainingPlan(user.id), p);
         }
+      } catch {
+        // Network failed — keep cached plan on screen.
       }
     };
     load();
-  }, [user]);
+  }, [user, online]);
 
-  // Load free plans for selected distance
+  // Load free plans for selected distance (cache-then-network)
   useEffect(() => {
-    const loadFree = async () => {
-      setLoadingFree(true);
-      const { data } = await supabase.from("free_training_plans" as any).select("*").eq("distance", freeDistance).order("target_time");
-      setFreePlans((data as any[]) || []);
+    const cacheKey = CacheKeys.freePlans(freeDistance);
+    const cached = getCached<any[]>(cacheKey);
+    if (cached) {
+      setFreePlans(cached.value || []);
       setSelectedFreePlan(null);
       setFreeWeekIdx(0);
       setLoadingFree(false);
+    } else {
+      setLoadingFree(true);
+    }
+    if (!online) {
+      setLoadingFree(false);
+      return;
+    }
+    const loadFree = async () => {
+      try {
+        const { data } = await supabase.from("free_training_plans" as any).select("*").eq("distance", freeDistance).order("target_time");
+        const list = (data as any[]) || [];
+        setFreePlans(list);
+        setSelectedFreePlan(null);
+        setFreeWeekIdx(0);
+        setCached(cacheKey, list);
+      } catch {
+        // Keep cached value
+      } finally {
+        setLoadingFree(false);
+      }
     };
     loadFree();
-  }, [freeDistance]);
+  }, [freeDistance, online]);
 
   const weeksUntilRace = useMemo(() => {
     if (!raceDate || !startDate) return 0;

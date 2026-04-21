@@ -123,6 +123,30 @@ serve(async (req) => {
     const workoutTypeLabel: string = typeof body?.workoutTypeLabel === "string" ? body.workoutTypeLabel : workoutType;
     const isZh = lang === "zh";
 
+    // ── Translate-only mode: take an existing suggestion and translate it ──
+    if (body?.translate === true && typeof body?.existingSuggestion === "string") {
+      const targetLang: "en" | "zh" = body?.targetLang === "zh" ? "zh" : "en";
+      const sysT = targetLang === "zh"
+        ? `你是專業翻譯。把以下跑步訓練建議的 Markdown 翻譯成繁體中文（香港用語）。保留所有 Markdown 結構、標題層級、列表、粗體、配速數字（例如 5:30 /km 保持原樣）。只輸出翻譯結果，不要加任何前言。`
+        : `You are a professional translator. Translate the following running workout suggestion Markdown into natural English. Preserve all Markdown structure, headings, lists, bold, and pace numbers (e.g. keep "5:30 /km" verbatim). Output only the translation, no preamble.`;
+      const tResp = await callVertexAI({
+        apiKey: VERTEX_API_KEY,
+        model: "google/gemini-3.1-flash-lite-preview",
+        messages: [
+          { role: "system", content: sysT },
+          { role: "user", content: body.existingSuggestion },
+        ],
+      });
+      if (!tResp.ok) {
+        if (tResp.status === 429) return json({ error: "Rate limited" }, 429);
+        if (tResp.status === 402) return json({ error: "Payment required" }, 402);
+        return json({ error: "AI gateway error" }, 500);
+      }
+      const tData = await tResp.json();
+      const translated = tData.choices?.[0]?.message?.content?.trim() || "";
+      return json({ suggestion: translated, targetLang });
+    }
+
     // --- Pull last 7 days of runs from all 3 sources + active training plan ---
     const since = new Date(Date.now() - SEVEN_DAYS_MS).toISOString();
 

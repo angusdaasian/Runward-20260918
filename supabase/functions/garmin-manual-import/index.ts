@@ -264,10 +264,12 @@ serve(async (req) => {
     // public Garmin activity without conflicting on the unique constraint.
     const garminActivityId = `${deriveActivityId(url)}_${user.id.slice(0, 8)}`;
 
-    // Cross-source duplicate check: similar activity within ±10 min and ±5% distance
-    // (or 100 m, whichever is larger) across strava / apple_health / garmin tables.
+    // Per-user cross-source duplicate check: similar activity within ±10 min
+    // and ±2.5% distance (or 50 m, whichever is larger) across the same
+    // user's strava / apple_health / garmin tables. Same garmin_activity_id
+    // across different users is intentionally allowed.
     const TIME_WINDOW_MS = 10 * 60 * 1000;
-    const distTolerance = Math.max(distance * 0.05, 100);
+    const distTolerance = Math.max(distance * 0.025, 50);
     const minDist = distance - distTolerance;
     const maxDist = distance + distTolerance;
     const startMsNum = new Date(startTime).getTime();

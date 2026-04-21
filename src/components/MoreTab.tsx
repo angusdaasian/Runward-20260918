@@ -117,6 +117,14 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps }: Props
 
   const toggleActivityNotifications = async () => {
     if (!user || notifLoading) return;
+    if (!navigator.onLine) {
+      toast({
+        title: lang === "zh" ? "離線中" : "You're offline",
+        description: lang === "zh" ? "需要連線才能更改通知設定" : "Connect to the internet to change notification settings",
+        variant: "destructive",
+      });
+      return;
+    }
     setNotifLoading(true);
     const newVal = !activityNotifications;
     setActivityNotifications(newVal);

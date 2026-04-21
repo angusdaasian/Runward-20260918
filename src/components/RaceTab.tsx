@@ -6,6 +6,9 @@ import FadeIn from "@/components/ui/FadeIn";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/contexts/AuthContext";
+import { useOnlineStatus } from "@/hooks/use-online-status";
+import { getCached, setCached, CacheKeys } from "@/lib/offlineCache";
+import { WifiOff } from "lucide-react";
 
 interface Race {
   id: string;
@@ -225,22 +228,55 @@ const RaceTab = ({ lang }: Props) => {
     return () => clearTimeout(timer);
   }, []);
 
+  const { online } = useOnlineStatus();
+  const [servedFromCache, setServedFromCache] = useState(false);
+
   useEffect(() => {
-    const fetchRaces = async () => {
-      const { data } = await supabase
-        .from("races")
-        .select("*")
-        .gte("race_date", new Date().toISOString().split("T")[0])
-        .order("race_date", { ascending: true });
-      setRaces((data as unknown as Race[]) || []);
-      if (data && data.length > 0) {
-        const latest = data.reduce((a: any, b: any) => (a.updated_at > b.updated_at ? a : b));
-        setLastUpdated(latest.updated_at);
-      }
+    // 1) Hydrate immediately from cache so the page is usable offline.
+    const cached = getCached<{ races: Race[]; lastUpdated: string | null }>(
+      CacheKeys.races(),
+    );
+    if (cached) {
+      // Filter out past races client-side so cached data stays useful for days.
+      const today = new Date().toISOString().split("T")[0];
+      const upcoming = cached.value.races.filter((r) => r.race_date >= today);
+      setRaces(upcoming);
+      setLastUpdated(cached.value.lastUpdated);
+      setServedFromCache(true);
       setLoading(false);
+    }
+
+    // 2) If online, refresh in the background.
+    if (!online) {
+      if (!cached) setLoading(false);
+      return;
+    }
+
+    const fetchRaces = async () => {
+      try {
+        const { data } = await supabase
+          .from("races")
+          .select("*")
+          .gte("race_date", new Date().toISOString().split("T")[0])
+          .order("race_date", { ascending: true });
+        const list = (data as unknown as Race[]) || [];
+        setRaces(list);
+        let latestUpdated: string | null = null;
+        if (data && data.length > 0) {
+          const latest = data.reduce((a: any, b: any) => (a.updated_at > b.updated_at ? a : b));
+          latestUpdated = latest.updated_at;
+          setLastUpdated(latestUpdated);
+        }
+        setServedFromCache(false);
+        setCached(CacheKeys.races(), { races: list, lastUpdated: latestUpdated });
+      } catch {
+        // Network failed — keep cached data on screen.
+      } finally {
+        setLoading(false);
+      }
     };
     fetchRaces();
-  }, []);
+  }, [online]);
 
   const grouped = useMemo(() => {
     const map = new Map<string, GroupedRace>();
@@ -324,6 +360,12 @@ const RaceTab = ({ lang }: Props) => {
       <p className="text-sm text-muted-foreground mb-1">
         {lang === "zh" ? "探索即將舉行的跑步賽事" : "Discover upcoming running events"}
       </p>
+      {(!online || servedFromCache) && (
+        <div className="flex items-center gap-1.5 mb-2 text-[11px] text-muted-foreground bg-muted/50 px-2 py-1 rounded-md w-fit">
+          <WifiOff size={11} />
+          {lang === "zh" ? "離線中 — 顯示已儲存的賽事" : "Offline — showing saved races"}
+        </div>
+      )}
       {lastUpdated && (
         <p className="text-[11px] text-muted-foreground/60 mb-4">
           {lang === "zh" ? "最後更新：" : "Last updated: "}

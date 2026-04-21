@@ -1,8 +1,9 @@
 import { useState, useEffect, lazy, Suspense } from "react";
-import { Activity, Dumbbell, Loader2, ScanEye, Shield, Award, Trophy } from "lucide-react";
+import { Activity, Dumbbell, Loader2, ScanEye, Shield, Award, Trophy, WifiOff } from "lucide-react";
 import { Lang, t } from "@/lib/i18n";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAdmin } from "@/hooks/use-admin";
+import { useOnlineStatus } from "@/hooks/use-online-status";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { TabPageSkeleton, SettingsSkeleton, CommunitySkeleton, PostureSkeleton, TrainingSkeleton } from "@/components/ui/PageSkeleton";
 
@@ -27,6 +28,7 @@ const ONBOARDING_SIGNUP_IN_PROGRESS_KEY = "onboarding_signup_in_progress";
 const Index = () => {
   const { user, loading, isWarmResume } = useAuth();
   const { isAdmin } = useAdmin();
+  const { online } = useOnlineStatus();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState<Tab>(() => {
@@ -180,6 +182,12 @@ const Index = () => {
       {activeTab !== "more" || !showConnectApps ? (
         <AppHeader lang={lang} onNavigateSettings={handleNavigateSettings} isGuest={isGuest} />
       ) : null}
+      {!online && (
+        <div className="flex items-center justify-center gap-1.5 text-[11px] text-muted-foreground bg-muted/60 border-y border-border py-1.5 px-3">
+          <WifiOff size={12} />
+          <span>{lang === "zh" ? "離線中 — 顯示已儲存的資料" : "You're offline — showing saved data"}</span>
+        </div>
+      )}
       <div className="flex-1 overflow-y-auto relative" style={{ paddingBottom: 'calc(5rem + var(--safe-area-bottom, 0px))' }}>
         {langSwitching && (
           <div className="absolute inset-0 bg-background/80 z-50 flex items-center justify-center">

@@ -219,7 +219,38 @@ const SuggestedNextWorkout = ({ lang, latestActivityId, latestActivityDate }: Pr
 
     // Otherwise, always offer to generate a custom workout (even if no activities at all).
     return { kind: "prompt" };
-  }, [user, analysisLoaded, analysisWorkout, latestActivityDate, generated]);
+  }, [user, analysisLoaded, analysisWorkout, latestActivityDate, generated, isZh]);
+
+  // Auto-translate cached suggestion when language changes if target lang is missing.
+  useEffect(() => {
+    if (!user || !generated || translating) return;
+    const haveTarget = isZh ? !!generated.suggestion_zh : !!generated.suggestion_en;
+    if (haveTarget) return;
+    const source = (isZh ? generated.suggestion_en : generated.suggestion_zh) || generated.suggestion;
+    if (!source) return;
+    setTranslating(true);
+    (async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke("generate-suggested-workout", {
+          body: { translate: true, existingSuggestion: source, targetLang: isZh ? "zh" : "en" },
+        });
+        if (error) throw error;
+        const translated = (data as any)?.suggestion;
+        if (!translated) return;
+        const next: CachedGenerated = {
+          ...generated,
+          suggestion_en: isZh ? generated.suggestion_en : translated,
+          suggestion_zh: isZh ? translated : generated.suggestion_zh,
+        };
+        writeCachedGenerated(user.id, next);
+        setGenerated(next);
+      } catch (e) {
+        console.error("[SuggestedNextWorkout] translate error:", e);
+      } finally {
+        setTranslating(false);
+      }
+    })();
+  }, [user, isZh, generated, translating]);
 
   const handleGenerate = async () => {
     if (!user || generating) return;
@@ -242,9 +273,13 @@ const SuggestedNextWorkout = ({ lang, latestActivityId, latestActivityDate }: Pr
       });
       if (error) throw error;
       const suggestion = (data as any)?.suggestion;
+      const suggestion_en = (data as any)?.suggestion_en;
+      const suggestion_zh = (data as any)?.suggestion_zh;
       if (!suggestion) throw new Error("Empty response");
       const cached: CachedGenerated = {
         suggestion,
+        suggestion_en: suggestion_en || (isZh ? undefined : suggestion),
+        suggestion_zh: suggestion_zh || (isZh ? suggestion : undefined),
         generatedAt: new Date().toISOString(),
         basisActivityDate: latestActivityDate,
         workoutType,

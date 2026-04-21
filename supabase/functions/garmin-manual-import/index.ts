@@ -375,8 +375,8 @@ serve(async (req) => {
       average_speed: duration > 0 ? distance / duration : null,
       laps: Array.isArray(extracted?.laps) ? extracted.laps : [],
       has_details: true,
-      has_gps: !!screenshotUrl,
-      raw_json: { source: "manual_import", url, extracted, map_screenshot_url: screenshotUrl },
+      has_gps: false,
+      raw_json: { source: "manual_import", url, extracted },
     };
 
     const { error: upsertError } = await supabase

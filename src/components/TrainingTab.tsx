@@ -364,6 +364,14 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
 
   const handleGenerate = async () => {
     if (!distance || !targetTime || !raceDate || !startDate || !dateValid) return;
+    if (!isOnline()) {
+      toast({
+        title: lang === "zh" ? "離線中" : "You're offline",
+        description: lang === "zh" ? "需要連線才能生成訓練計劃" : "Connect to the internet to generate a training plan",
+        variant: "destructive",
+      });
+      return;
+    }
     setLoading(true);
     try {
       const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-program`;

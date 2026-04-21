@@ -223,11 +223,8 @@ serve(async (req) => {
     // Scrape + extract
     console.log(`[manual-import] scraping ${url} for user ${user.id}`);
     let md = "";
-    let screenshotUrl: string | null = null;
     try {
-      const scraped = await scrapeWithFirecrawl(url, FIRECRAWL_API_KEY);
-      md = scraped.markdown;
-      screenshotUrl = scraped.screenshotUrl;
+      md = await scrapeWithFirecrawl(url, FIRECRAWL_API_KEY);
     } catch (e) {
       console.error("Firecrawl scrape error:", e);
       const message = e instanceof Error ? e.message : "Unknown scrape error";
@@ -237,12 +234,6 @@ serve(async (req) => {
           ? "Garmin took too long to load this public page. Please try again in a minute, or paste the full copied activity text instead of only the link."
           : "Could not read the Garmin activity page. Make sure the activity is set to Public.",
       }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-    if (!md || md.length < 100) {
-      return new Response(JSON.stringify({ error: "Could not read the activity page. Make sure the activity is set to Public." }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });

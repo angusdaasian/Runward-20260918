@@ -121,11 +121,12 @@ const ManualGarminImport = ({ lang, onImported, embedded = false }: Props) => {
             if (hrefMatch) candidates.push(hrefMatch[1]);
           }
 
-          // Prefer the longest candidate that contains a Garmin activity URL,
-          // otherwise the longest non-empty candidate overall.
+          // Prefer the longest candidate that contains a Garmin activity URL.
+          // If the WebView only exposes truncated text without the URL, do not
+          // prevent the browser's native paste — native paste can still include
+          // the full share text on iOS/Despia.
           const withGarmin = candidates.filter((c) => /garmin[^\s]*\/activity\/\d+/i.test(c));
-          const best = (withGarmin.length ? withGarmin : candidates)
-            .sort((a, b) => b.length - a.length)[0];
+          const best = withGarmin.sort((a, b) => b.length - a.length)[0];
 
           if (!best) return; // let browser default paste run
 

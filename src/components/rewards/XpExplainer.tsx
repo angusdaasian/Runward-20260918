@@ -53,8 +53,8 @@ const XpExplainer = ({ lang }: Props) => {
       </div>
       <p className="text-[10px] text-muted-foreground mt-3 leading-relaxed">
         {isZh
-          ? "每月排名重置。高級用戶前 10 名和免費用戶前 3 名可獲得 App Store 兌換碼獎勵！"
-          : "Rankings reset monthly. Top 10 Premium and Top 3 Free users win App Store redeem codes!"}
+          ? "每月排名重置。高級用戶前 10 名和免費用戶前 3 名可獲得 7 天 App Store 兌換碼獎勵！"
+          : "Rankings reset monthly. Top 10 Premium and Top 3 Free users win a 7-day App Store redeem code!"}
       </p>
     </div>
   );

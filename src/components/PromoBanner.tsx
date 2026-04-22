@@ -14,9 +14,22 @@ interface Banner {
 interface Props {
   lang: Lang;
   userId?: string | null;
+  /** When true, bypass the once-per-day check (admin preview). */
+  forceShow?: boolean;
+  /** Called when the banner closes (used for preview mode). */
+  onClose?: () => void;
 }
 
 const STORAGE_PREFIX = "promo_banner_seen_";
+
+// Expose a helper so admins can re-trigger from the manager.
+export const clearPromoBannerSeen = (userId?: string | null) => {
+  try {
+    localStorage.removeItem(`${STORAGE_PREFIX}${userId ?? "guest"}`);
+  } catch {
+    /* ignore */
+  }
+};
 
 const todayKey = () => {
   const d = new Date();

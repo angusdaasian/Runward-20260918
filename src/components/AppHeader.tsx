@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Settings, Bell } from "lucide-react";
+import { Settings, Bell, Megaphone } from "lucide-react";
 import { Lang } from "@/lib/i18n";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -105,10 +105,11 @@ const AnnouncementBell = ({ lang }: { lang: Lang }) => {
 interface AppHeaderProps {
   lang: Lang;
   onNavigateSettings: () => void;
+  onOpenPromoBanner?: () => void;
   isGuest?: boolean;
 }
 
-const AppHeader = ({ lang, onNavigateSettings, isGuest }: AppHeaderProps) => {
+const AppHeader = ({ lang, onNavigateSettings, onOpenPromoBanner, isGuest }: AppHeaderProps) => {
   const { user } = useAuth();
   const [profile, setProfile] = useState(() =>
     _headerUserId === user?.id ? _headerProfile : null
@@ -202,6 +203,15 @@ const AppHeader = ({ lang, onNavigateSettings, isGuest }: AppHeaderProps) => {
       </div>
       <div className="flex items-center gap-2">
         <WeatherWidget lang={lang} />
+        {onOpenPromoBanner && (
+          <button
+            onClick={onOpenPromoBanner}
+            aria-label={lang === "zh" ? "賽事消息" : "Race news"}
+            className="w-10 h-10 rounded-full bg-muted flex items-center justify-center hover:bg-muted/80 active:scale-90 active:bg-muted/60 transition-all duration-150"
+          >
+            <Megaphone size={18} className="text-foreground" />
+          </button>
+        )}
         <button
           onClick={onNavigateSettings}
           className="w-10 h-10 rounded-full bg-muted flex items-center justify-center hover:bg-muted/80 active:scale-90 active:bg-muted/60 transition-all duration-150"

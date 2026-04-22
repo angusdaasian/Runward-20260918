@@ -37,6 +37,7 @@ const Index = () => {
     return (tabParam === "training" || tabParam === "posture" || tabParam === "activities" || tabParam === "more" || tabParam === "community" || tabParam === "races") ? tabParam : "activities";
   });
   const [showConnectApps, setShowConnectApps] = useState(() => searchParams.get("page") === "connect-apps");
+  const [promoTrigger, setPromoTrigger] = useState(0);
   const [runningScore, setRunningScore] = useState<number | null>(null);
   const [lang, setLangState] = useState<Lang>(() => (localStorage.getItem("app_lang") as Lang) || "en");
   const [langSwitching, setLangSwitching] = useState(false);
@@ -181,7 +182,12 @@ const Index = () => {
       )}
       {/* Shared header across all tabs */}
       {activeTab !== "more" || !showConnectApps ? (
-        <AppHeader lang={lang} onNavigateSettings={handleNavigateSettings} isGuest={isGuest} />
+        <AppHeader
+          lang={lang}
+          onNavigateSettings={handleNavigateSettings}
+          onOpenPromoBanner={() => setPromoTrigger((n) => n + 1)}
+          isGuest={isGuest}
+        />
       ) : null}
       {!online && (
         <div className="flex items-center justify-center gap-1.5 text-[11px] text-muted-foreground bg-muted/60 border-y border-border py-1.5 px-3">
@@ -272,7 +278,7 @@ const Index = () => {
         </div>
       </div>
 
-      <PromoBanner lang={lang} userId={user?.id ?? null} />
+      <PromoBanner lang={lang} userId={user?.id ?? null} triggerKey={promoTrigger} />
     </div>
   );
 };

@@ -28,6 +28,7 @@ const PromoBannerManager = () => {
   const [banners, setBanners] = useState<PromoBanner[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [previewing, setPreviewing] = useState(false);
 
   const fileRef = useRef<HTMLInputElement>(null);
   const [caption, setCaption] = useState("");

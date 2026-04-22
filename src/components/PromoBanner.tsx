@@ -39,10 +39,11 @@ const todayKey = () => {
   return `${yyyy}-${mm}-${dd}`;
 };
 
-const PromoBanner = ({ lang, userId }: Props) => {
+const PromoBanner = ({ lang, userId, forceShow = false, onClose }: Props) => {
   const [banners, setBanners] = useState<Banner[]>([]);
   const [open, setOpen] = useState(false);
   const [current, setCurrent] = useState(0);
+  const [imgError, setImgError] = useState<Record<string, boolean>>({});
 
   // swipe state
   const touchStartX = useRef<number | null>(null);
@@ -50,13 +51,15 @@ const PromoBanner = ({ lang, userId }: Props) => {
   const [dragOffset, setDragOffset] = useState(0);
 
   useEffect(() => {
-    const seenKey = `${STORAGE_PREFIX}${userId ?? "guest"}`;
-    const lastSeen = localStorage.getItem(seenKey);
-    if (lastSeen === todayKey()) return;
+    if (!forceShow) {
+      const seenKey = `${STORAGE_PREFIX}${userId ?? "guest"}`;
+      const lastSeen = localStorage.getItem(seenKey);
+      if (lastSeen === todayKey()) return;
+    }
 
     let cancelled = false;
     const fetchBanners = async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("promo_banners")
         .select("id, image_url, link_url, caption, caption_zh")
         .eq("is_active", true)
@@ -64,9 +67,14 @@ const PromoBanner = ({ lang, userId }: Props) => {
         .order("display_order", { ascending: true })
         .order("created_at", { ascending: false });
       if (cancelled) return;
+      if (error) {
+        console.error("[PromoBanner] fetch error", error);
+        return;
+      }
       const list = (data as Banner[]) || [];
       if (list.length > 0) {
         setBanners(list);
+        setCurrent(0);
         setOpen(true);
       }
     };
@@ -74,13 +82,16 @@ const PromoBanner = ({ lang, userId }: Props) => {
     return () => {
       cancelled = true;
     };
-  }, [userId]);
+  }, [userId, forceShow]);
 
   const handleClose = useCallback(() => {
-    const seenKey = `${STORAGE_PREFIX}${userId ?? "guest"}`;
-    localStorage.setItem(seenKey, todayKey());
+    if (!forceShow) {
+      const seenKey = `${STORAGE_PREFIX}${userId ?? "guest"}`;
+      localStorage.setItem(seenKey, todayKey());
+    }
     setOpen(false);
-  }, [userId]);
+    onClose?.();
+  }, [userId, forceShow, onClose]);
 
   // Esc to close
   useEffect(() => {

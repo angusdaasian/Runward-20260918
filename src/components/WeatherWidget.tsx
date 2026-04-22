@@ -49,12 +49,6 @@ const codeMeta = (code: number, isDay: boolean, fallbackText: string, lang: Lang
 };
 
 async function fetchWeather(city: string): Promise<WeatherData | null> {
-  const { data, error } = await supabase.functions.invoke("get-weather", {
-    method: "GET",
-    headers: { "x-city": city },
-    // supabase-js doesn't pass query string via invoke; use fetch directly instead
-  } as never);
-  // The above invoke path has limitations with query strings; use a direct fetch:
   const projectRef = import.meta.env.VITE_SUPABASE_PROJECT_ID;
   const url = `https://${projectRef}.supabase.co/functions/v1/get-weather?city=${encodeURIComponent(city)}`;
   const res = await fetch(url, {

@@ -105,10 +105,11 @@ const AnnouncementBell = ({ lang }: { lang: Lang }) => {
 interface AppHeaderProps {
   lang: Lang;
   onNavigateSettings: () => void;
+  onOpenPromoBanner?: () => void;
   isGuest?: boolean;
 }
 
-const AppHeader = ({ lang, onNavigateSettings, isGuest }: AppHeaderProps) => {
+const AppHeader = ({ lang, onNavigateSettings, onOpenPromoBanner, isGuest }: AppHeaderProps) => {
   const { user } = useAuth();
   const [profile, setProfile] = useState(() =>
     _headerUserId === user?.id ? _headerProfile : null

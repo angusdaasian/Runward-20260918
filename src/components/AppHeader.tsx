@@ -102,7 +102,7 @@ const AnnouncementRow = ({ lang }: { lang: Lang }) => {
           </div>
         </button>
       </PopoverTrigger>
-      <PopoverContent align="end" side="left" className="w-72 p-4">
+      <PopoverContent align="center" side="bottom" className="w-72 p-4">
         {announcement ? (
           <>
             <h3 className="font-semibold text-foreground text-sm">{displayTitle}</h3>
@@ -247,7 +247,7 @@ const AppHeader = ({ lang, onNavigateSettings, onOpenPromoBanner, isGuest }: App
                     </div>
                   </button>
                 </PopoverTrigger>
-                <PopoverContent align="end" side="left" className="w-64 p-0">
+                <PopoverContent align="center" side="bottom" className="w-64 p-0">
                   <WeatherInline lang={lang} />
                 </PopoverContent>
               </Popover>

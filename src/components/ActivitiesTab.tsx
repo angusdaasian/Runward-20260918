@@ -338,7 +338,14 @@ const ActivitiesTab = ({ lang }: Props) => {
   const [dateSheet, setDateSheet] = useState<{
     dateLabel: string;
     activities: StravaActivity[];
-    planned: { type: string; distance_km: number | null; color: string } | null;
+    planned: {
+      type: string;
+      distance_km: number | null;
+      color: string;
+      title?: string | null;
+      description?: string | null;
+      pace?: string | null;
+    } | null;
   } | null>(null);
 
   // Mandatory skeleton on every mount

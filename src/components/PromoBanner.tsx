@@ -14,9 +14,11 @@ interface Banner {
 interface Props {
   lang: Lang;
   userId?: string | null;
-  /** When true, bypass the once-per-day check (admin preview). */
+  /** When true, bypass the once-per-day check (admin preview / manual trigger). */
   forceShow?: boolean;
-  /** Called when the banner closes (used for preview mode). */
+  /** Bumping this number re-runs the open logic even if already seen today. */
+  triggerKey?: number;
+  /** Called when the banner closes (used for preview / manual trigger mode). */
   onClose?: () => void;
 }
 

@@ -1,61 +1,76 @@
 import { useEffect, useState } from "react";
-import { Cloud, CloudDrizzle, CloudFog, CloudLightning, CloudRain, CloudSnow, Loader2, MapPin, Pencil, Sun, CloudSun } from "lucide-react";
+import { Cloud, CloudDrizzle, CloudFog, CloudLightning, CloudRain, CloudSnow, Loader2, MapPin, Moon, Pencil, Sun, CloudSun } from "lucide-react";
 import { Lang } from "@/lib/i18n";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { supabase } from "@/integrations/supabase/client";
 
 const CITY_KEY = "weather_city";
-const CACHE_KEY = "weather_cache_v1";
+const CACHE_KEY = "weather_cache_v2";
 const CACHE_TTL_MS = 30 * 60 * 1000; // 30 min
 
 interface WeatherData {
   city: string;
   temperature: number;
   code: number;
+  conditionText: string;
+  isDay: boolean;
   high: number;
   low: number;
+  humidity: number | null;
+  wind_kph: number | null;
   fetchedAt: number;
 }
 
-// WMO weather interpretation codes → icon + label
-const codeMeta = (code: number, lang: Lang): { Icon: typeof Sun; label: string } => {
+// WeatherAPI.com condition codes → icon
+// Reference: https://www.weatherapi.com/docs/weather_conditions.json
+const codeMeta = (code: number, isDay: boolean, fallbackText: string, lang: Lang): { Icon: typeof Sun; label: string } => {
   const isZh = lang === "zh";
-  if (code === 0) return { Icon: Sun, label: isZh ? "晴朗" : "Clear" };
-  if (code <= 2) return { Icon: CloudSun, label: isZh ? "局部多雲" : "Partly cloudy" };
-  if (code === 3) return { Icon: Cloud, label: isZh ? "多雲" : "Cloudy" };
-  if (code <= 48) return { Icon: CloudFog, label: isZh ? "霧" : "Fog" };
-  if (code <= 57) return { Icon: CloudDrizzle, label: isZh ? "毛毛雨" : "Drizzle" };
-  if (code <= 67) return { Icon: CloudRain, label: isZh ? "雨" : "Rain" };
-  if (code <= 77) return { Icon: CloudSnow, label: isZh ? "雪" : "Snow" };
-  if (code <= 82) return { Icon: CloudRain, label: isZh ? "陣雨" : "Showers" };
-  if (code <= 86) return { Icon: CloudSnow, label: isZh ? "雪陣" : "Snow showers" };
-  if (code <= 99) return { Icon: CloudLightning, label: isZh ? "雷暴" : "Thunderstorm" };
-  return { Icon: Cloud, label: isZh ? "—" : "—" };
+  // Sunny / Clear
+  if (code === 1000) return { Icon: isDay ? Sun : Moon, label: isDay ? (isZh ? "晴朗" : "Sunny") : (isZh ? "晴夜" : "Clear") };
+  // Partly cloudy
+  if (code === 1003) return { Icon: CloudSun, label: isZh ? "局部多雲" : "Partly cloudy" };
+  // Cloudy / Overcast
+  if (code === 1006 || code === 1009) return { Icon: Cloud, label: isZh ? "多雲" : "Cloudy" };
+  // Mist / Fog / Freezing fog
+  if (code === 1030 || code === 1135 || code === 1147) return { Icon: CloudFog, label: isZh ? "霧" : "Fog" };
+  // Drizzle codes
+  if ([1150, 1153, 1168, 1171, 1180, 1183].includes(code)) return { Icon: CloudDrizzle, label: isZh ? "毛毛雨" : "Drizzle" };
+  // Rain
+  if ([1186, 1189, 1192, 1195, 1198, 1201, 1240, 1243, 1246].includes(code)) return { Icon: CloudRain, label: isZh ? "雨" : "Rain" };
+  // Snow / Sleet / Ice pellets
+  if ([1066, 1069, 1072, 1114, 1117, 1204, 1207, 1210, 1213, 1216, 1219, 1222, 1225, 1237, 1249, 1252, 1255, 1258, 1261, 1264].includes(code)) {
+    return { Icon: CloudSnow, label: isZh ? "雪" : "Snow" };
+  }
+  // Thunder
+  if ([1087, 1273, 1276, 1279, 1282].includes(code)) return { Icon: CloudLightning, label: isZh ? "雷暴" : "Thunderstorm" };
+  return { Icon: Cloud, label: fallbackText || "—" };
 };
 
 async function fetchWeather(city: string): Promise<WeatherData | null> {
-  // 1. Geocode
-  const geoRes = await fetch(
-    `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1&language=en&format=json`
-  );
-  const geo = await geoRes.json();
-  const place = geo?.results?.[0];
-  if (!place) return null;
-
-  // 2. Weather
-  const wRes = await fetch(
-    `https://api.open-meteo.com/v1/forecast?latitude=${place.latitude}&longitude=${place.longitude}&current=temperature_2m,weather_code&daily=temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=1`
-  );
-  const w = await wRes.json();
-  if (!w?.current) return null;
+  const projectRef = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+  const url = `https://${projectRef}.supabase.co/functions/v1/get-weather?city=${encodeURIComponent(city)}`;
+  const res = await fetch(url, {
+    headers: {
+      apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string,
+      Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+    },
+  });
+  if (!res.ok) return null;
+  const w = await res.json();
+  if (!w || w.error) return null;
 
   return {
-    city: place.name,
-    temperature: Math.round(w.current.temperature_2m),
-    code: w.current.weather_code,
-    high: Math.round(w.daily?.temperature_2m_max?.[0] ?? w.current.temperature_2m),
-    low: Math.round(w.daily?.temperature_2m_min?.[0] ?? w.current.temperature_2m),
+    city: w.city,
+    temperature: w.temperature,
+    code: w.conditionCode,
+    conditionText: w.conditionText,
+    isDay: !!w.isDay,
+    high: w.high,
+    low: w.low,
+    humidity: w.humidity ?? null,
+    wind_kph: w.wind_kph ?? null,
     fetchedAt: Date.now(),
   };
 }
@@ -117,7 +132,9 @@ const WeatherWidget = ({ lang }: WeatherWidgetProps) => {
     void load(trimmed);
   };
 
-  const { Icon, label } = weather ? codeMeta(weather.code, lang) : { Icon: Cloud, label: "" };
+  const { Icon, label } = weather
+    ? codeMeta(weather.code, weather.isDay, weather.conditionText, lang)
+    : { Icon: Cloud, label: "" };
 
   return (
     <Popover onOpenChange={(open) => { if (!open) setEditing(false); }}>

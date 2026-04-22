@@ -247,10 +247,8 @@ const AppHeader = ({ lang, onNavigateSettings, onOpenPromoBanner, isGuest }: App
                     </div>
                   </button>
                 </PopoverTrigger>
-                <PopoverContent align="end" side="left" className="w-64 p-0 border-0 bg-transparent shadow-none">
-                  <div className="bg-popover border rounded-md shadow-md">
-                    <WeatherInline lang={lang} />
-                  </div>
+                <PopoverContent align="end" side="left" className="w-64 p-0">
+                  <WeatherInline lang={lang} />
                 </PopoverContent>
               </Popover>
 

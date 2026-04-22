@@ -182,7 +182,12 @@ const Index = () => {
       )}
       {/* Shared header across all tabs */}
       {activeTab !== "more" || !showConnectApps ? (
-        <AppHeader lang={lang} onNavigateSettings={handleNavigateSettings} isGuest={isGuest} />
+        <AppHeader
+          lang={lang}
+          onNavigateSettings={handleNavigateSettings}
+          onOpenPromoBanner={() => setPromoTrigger((n) => n + 1)}
+          isGuest={isGuest}
+        />
       ) : null}
       {!online && (
         <div className="flex items-center justify-center gap-1.5 text-[11px] text-muted-foreground bg-muted/60 border-y border-border py-1.5 px-3">

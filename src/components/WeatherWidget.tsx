@@ -140,7 +140,7 @@ const WeatherWidget = ({ lang }: WeatherWidgetProps) => {
     <Popover onOpenChange={(open) => { if (!open) setEditing(false); }}>
       <PopoverTrigger asChild>
         <button
-          className="relative w-10 h-10 rounded-full bg-muted flex items-center justify-center hover:bg-muted/80 transition-colors"
+          className="relative w-10 h-10 rounded-full bg-muted flex items-center justify-center hover:bg-muted/80 active:scale-90 active:bg-muted/60 transition-all duration-150"
           aria-label={lang === "zh" ? "天氣" : "Weather"}
         >
           {loading && !weather ? (

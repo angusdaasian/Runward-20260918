@@ -213,18 +213,29 @@ const AppHeader = ({ lang, onNavigateSettings, onOpenPromoBanner, isGuest }: App
           </PopoverTrigger>
           <PopoverContent align="end" className="w-64 p-2">
             <div className="flex flex-col">
-              {/* Weather */}
-              <div className="flex items-center gap-3 px-2 py-1.5 rounded-md hover:bg-muted/60 transition-colors">
-                <WeatherWidget lang={lang} />
-                <div className="flex flex-col text-left">
-                  <span className="text-sm font-medium text-foreground leading-tight">
-                    {lang === "zh" ? "天氣" : "Weather"}
-                  </span>
-                  <span className="text-[11px] text-muted-foreground leading-tight">
-                    {lang === "zh" ? "查看本地天氣" : "Check local weather"}
-                  </span>
-                </div>
-              </div>
+              {/* Weather — entire row triggers nested popover */}
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button className="flex items-center gap-3 px-2 py-1.5 rounded-md hover:bg-muted/60 transition-colors text-left active:scale-[0.98] w-full">
+                    <span className="w-10 h-10 rounded-full bg-muted flex items-center justify-center shrink-0">
+                      <Cloud size={18} className="text-foreground" />
+                    </span>
+                    <div className="flex flex-col">
+                      <span className="text-sm font-medium text-foreground leading-tight">
+                        {lang === "zh" ? "天氣" : "Weather"}
+                      </span>
+                      <span className="text-[11px] text-muted-foreground leading-tight">
+                        {lang === "zh" ? "查看本地天氣" : "Check local weather"}
+                      </span>
+                    </div>
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent align="end" side="left" className="w-64 p-0 border-0 bg-transparent shadow-none">
+                  <div className="bg-popover border rounded-md shadow-md">
+                    <WeatherInline lang={lang} />
+                  </div>
+                </PopoverContent>
+              </Popover>
 
               {/* Race news / Promo banner */}
               {onOpenPromoBanner && (
@@ -264,18 +275,8 @@ const AppHeader = ({ lang, onNavigateSettings, onOpenPromoBanner, isGuest }: App
                 </div>
               </button>
 
-              {/* Announcements */}
-              <div className="flex items-center gap-3 px-2 py-1.5 rounded-md hover:bg-muted/60 transition-colors">
-                <AnnouncementBell lang={lang} />
-                <div className="flex flex-col text-left">
-                  <span className="text-sm font-medium text-foreground leading-tight">
-                    {lang === "zh" ? "公告" : "Announcements"}
-                  </span>
-                  <span className="text-[11px] text-muted-foreground leading-tight">
-                    {lang === "zh" ? "管理員的最新通知" : "Latest news from admin"}
-                  </span>
-                </div>
-              </div>
+              {/* Announcements — entire row triggers */}
+              <AnnouncementRow lang={lang} />
             </div>
           </PopoverContent>
         </Popover>

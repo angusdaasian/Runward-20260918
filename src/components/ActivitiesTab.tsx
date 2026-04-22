@@ -581,7 +581,7 @@ const ActivitiesTab = ({ lang }: Props) => {
             });
             setDateSheet({
               dateLabel,
-              activity,
+              activity: activity as StravaActivity | null,
               extraCount: extraActivities.length,
               planned: planned
                 ? { type: planned.type, distance_km: planned.distance_km, color: planned.color }

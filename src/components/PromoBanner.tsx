@@ -86,16 +86,18 @@ const PromoBanner = ({ lang, userId, forceShow = false, triggerKey = 0, onClose 
     return () => {
       cancelled = true;
     };
-  }, [userId, forceShow]);
+  }, [userId, forceShow, triggerKey]);
 
   const handleClose = useCallback(() => {
-    if (!forceShow) {
+    // Only persist "seen today" on the natural auto-open. Manual trigger and
+    // admin preview should not affect the daily flag.
+    if (!forceShow && triggerKey === 0) {
       const seenKey = `${STORAGE_PREFIX}${userId ?? "guest"}`;
       localStorage.setItem(seenKey, todayKey());
     }
     setOpen(false);
     onClose?.();
-  }, [userId, forceShow, onClose]);
+  }, [userId, forceShow, triggerKey, onClose]);
 
   // Esc to close
   useEffect(() => {

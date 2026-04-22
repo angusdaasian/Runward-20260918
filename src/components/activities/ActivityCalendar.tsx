@@ -7,6 +7,7 @@ interface StravaActivity {
   distance: number;
   start_date: string;
   sport_type: string;
+  [key: string]: any;
 }
 
 interface PlannedWorkout {

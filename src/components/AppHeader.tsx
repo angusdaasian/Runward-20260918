@@ -203,6 +203,15 @@ const AppHeader = ({ lang, onNavigateSettings, onOpenPromoBanner, isGuest }: App
       </div>
       <div className="flex items-center gap-2">
         <WeatherWidget lang={lang} />
+        {onOpenPromoBanner && (
+          <button
+            onClick={onOpenPromoBanner}
+            aria-label={lang === "zh" ? "賽事消息" : "Race news"}
+            className="w-10 h-10 rounded-full bg-muted flex items-center justify-center hover:bg-muted/80 active:scale-90 active:bg-muted/60 transition-all duration-150"
+          >
+            <Megaphone size={18} className="text-foreground" />
+          </button>
+        )}
         <button
           onClick={onNavigateSettings}
           className="w-10 h-10 rounded-full bg-muted flex items-center justify-center hover:bg-muted/80 active:scale-90 active:bg-muted/60 transition-all duration-150"

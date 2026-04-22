@@ -121,6 +121,7 @@ serve(async (req) => {
     const lastActivityDate: string | null = typeof body?.lastActivityDate === "string" ? body.lastActivityDate : null;
     const workoutType: string = typeof body?.workoutType === "string" ? body.workoutType : "auto";
     const workoutTypeLabel: string = typeof body?.workoutTypeLabel === "string" ? body.workoutTypeLabel : workoutType;
+    const weather: any = body?.weather ?? null;
     const isZh = lang === "zh";
 
     // ── Translate-only mode: take an existing suggestion and translate it ──

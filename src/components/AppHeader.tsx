@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Settings, Bell, Megaphone } from "lucide-react";
+import { Settings, Bell, Megaphone, Menu } from "lucide-react";
 import { Lang } from "@/lib/i18n";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";

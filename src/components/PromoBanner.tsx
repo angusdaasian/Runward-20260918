@@ -41,7 +41,7 @@ const todayKey = () => {
   return `${yyyy}-${mm}-${dd}`;
 };
 
-const PromoBanner = ({ lang, userId, forceShow = false, onClose }: Props) => {
+const PromoBanner = ({ lang, userId, forceShow = false, triggerKey = 0, onClose }: Props) => {
   const [banners, setBanners] = useState<Banner[]>([]);
   const [open, setOpen] = useState(false);
   const [current, setCurrent] = useState(0);

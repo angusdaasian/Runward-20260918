@@ -272,6 +272,33 @@ serve(async (req) => {
     if (trainingScore != null) context += `\nTraining score: ${trainingScore} (higher = fitter).\n`;
     if (runsPerWeek != null) context += `Typical runs/week: ${runsPerWeek}.\n`;
 
+    // ── Weather context (used to recommend the best time to run today) ──
+    if (weather && typeof weather === "object") {
+      context += `\nToday's weather for ${weather.city ?? "the runner's city"}${weather.country ? ", " + weather.country : ""}:\n`;
+      context += `- Current: ${weather.temperature}°C (feels like ${weather.feelslike ?? weather.temperature}°C), ${weather.conditionText ?? ""}\n`;
+      context += `- High/Low: ${weather.high}°C / ${weather.low}°C\n`;
+      if (weather.humidity != null) context += `- Humidity: ${weather.humidity}%\n`;
+      if (weather.wind_kph != null) context += `- Wind: ${weather.wind_kph} km/h\n`;
+      if (weather.uv != null) context += `- UV index (current): ${weather.uv}\n`;
+      if (weather.sunrise) context += `- Sunrise: ${weather.sunrise}\n`;
+      if (weather.sunset) context += `- Sunset: ${weather.sunset}\n`;
+      if (weather.chance_of_rain != null) context += `- Daily chance of rain: ${weather.chance_of_rain}%\n`;
+      if (weather.localtime) context += `- Local time now: ${weather.localtime}\n`;
+      if (Array.isArray(weather.hourly) && weather.hourly.length > 0) {
+        // Only include upcoming hours from "now" to keep the context short.
+        const nowStr: string = weather.localtime || "";
+        const upcoming = weather.hourly.filter((h: any) => !nowStr || h.time >= nowStr).slice(0, 18);
+        if (upcoming.length > 0) {
+          context += `\nHourly forecast (upcoming, local time):\n`;
+          for (const h of upcoming) {
+            const hh = (h.time || "").split(" ")[1] || h.time;
+            context += `  - ${hh}: ${h.temp_c}°C (feels ${h.feelslike_c}°C), ${h.condition}, rain ${h.chance_of_rain}%, humidity ${h.humidity}%, wind ${h.wind_kph} km/h, UV ${h.uv}${h.is_day ? "" : " [night]"}\n`;
+          }
+        }
+      }
+      context += `\nUse this weather to recommend the BEST TIME OF DAY to run today (a specific hour or short window), considering temperature, humidity, rain chance, UV, wind, and daylight. If conditions are dangerous (heavy rain/thunderstorm/extreme heat), advise indoor/treadmill or postponing.\n`;
+    }
+
     const systemPrompt = isZh
       ? `你是專業跑步教練 AI。根據跑者的訓練計劃（最高優先級）、最近七天表現，以及他們今天指定的訓練類型，給出**今日**具體訓練建議（不是明日）。回覆繁體中文 Markdown。
 

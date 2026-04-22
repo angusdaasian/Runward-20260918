@@ -1,5 +1,5 @@
-// One-shot seeding function for the initial promo banner.
-// Anyone can call it, but it only inserts when the bucket has zero TCS banners.
+// One-shot seeding function for promo banners.
+// Accepts either { image_url } (fetched server-side) or { image_base64 } (raw bytes).
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 const corsHeaders = {
@@ -12,17 +12,19 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json().catch(() => ({}));
-    const imageUrl: string = body.image_url;
+    const imageUrl: string | undefined = body.image_url;
+    const imageBase64: string | undefined = body.image_base64;
     const endsAt: string = body.ends_at;
     const caption: string = body.caption ?? "";
     const captionZh: string = body.caption_zh ?? "";
     const createdBy: string = body.created_by;
+    const replaceId: string | undefined = body.replace_id;
 
-    if (!imageUrl || !endsAt || !createdBy) {
-      return new Response(JSON.stringify({ error: "image_url, ends_at, created_by required" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    if ((!imageUrl && !imageBase64) || !endsAt || !createdBy) {
+      return new Response(
+        JSON.stringify({ error: "image_url or image_base64, plus ends_at and created_by required" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
     }
 
     const supabase = createClient(
@@ -30,20 +32,48 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
 
-    // Fetch the source image
-    const imgResp = await fetch(imageUrl);
-    if (!imgResp.ok) {
-      return new Response(JSON.stringify({ error: `failed fetching image: ${imgResp.status}` }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    // Resolve image bytes
+    let bytes: Uint8Array;
+    if (imageBase64) {
+      const clean = imageBase64.replace(/^data:image\/\w+;base64,/, "");
+      const bin = atob(clean);
+      bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    } else {
+      const imgResp = await fetch(imageUrl!);
+      if (!imgResp.ok) {
+        return new Response(JSON.stringify({ error: `failed fetching image: ${imgResp.status}` }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const ct = imgResp.headers.get("content-type") || "";
+      if (!ct.startsWith("image/")) {
+        return new Response(
+          JSON.stringify({ error: `URL did not return an image (got ${ct || "unknown"})` }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+      bytes = new Uint8Array(await imgResp.arrayBuffer());
     }
-    const bytes = new Uint8Array(await imgResp.arrayBuffer());
-    const filename = `tcs-london-marathon-2027-${Date.now()}.png`;
+
+    // Validate PNG/JPEG magic bytes
+    const isPng = bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47;
+    const isJpg = bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
+    if (!isPng && !isJpg) {
+      return new Response(
+        JSON.stringify({ error: "Decoded data is not a valid PNG or JPEG image" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    const ext = isPng ? "png" : "jpg";
+    const contentType = isPng ? "image/png" : "image/jpeg";
+    const filename = `tcs-london-marathon-${Date.now()}.${ext}`;
 
     const { error: upErr } = await supabase.storage
       .from("promo-banners")
-      .upload(filename, bytes, { contentType: "image/png", upsert: false });
+      .upload(filename, bytes, { contentType, upsert: false });
 
     if (upErr) {
       return new Response(JSON.stringify({ error: `upload: ${upErr.message}` }), {
@@ -53,6 +83,26 @@ Deno.serve(async (req) => {
     }
 
     const { data: pub } = supabase.storage.from("promo-banners").getPublicUrl(filename);
+
+    // If replacing an existing record, delete it (and its file) first
+    if (replaceId) {
+      const { data: oldRow } = await supabase
+        .from("promo_banners")
+        .select("image_url")
+        .eq("id", replaceId)
+        .maybeSingle();
+      if (oldRow?.image_url) {
+        try {
+          const u = new URL(oldRow.image_url);
+          const idx = u.pathname.indexOf("/promo-banners/");
+          if (idx >= 0) {
+            const path = u.pathname.slice(idx + "/promo-banners/".length);
+            await supabase.storage.from("promo-banners").remove([path]);
+          }
+        } catch { /* ignore */ }
+      }
+      await supabase.from("promo_banners").delete().eq("id", replaceId);
+    }
 
     const { data: row, error: insErr } = await supabase
       .from("promo_banners")
@@ -75,9 +125,10 @@ Deno.serve(async (req) => {
       });
     }
 
-    return new Response(JSON.stringify({ ok: true, id: row.id, image_url: pub.publicUrl }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return new Response(
+      JSON.stringify({ ok: true, id: row.id, image_url: pub.publicUrl, bytes: bytes.length }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
   } catch (e) {
     return new Response(JSON.stringify({ error: String(e) }), {
       status: 500,

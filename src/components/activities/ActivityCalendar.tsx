@@ -15,6 +15,9 @@ interface PlannedWorkout {
   type: string;
   distance_km: number | null;
   color: string;
+  title?: string | null;
+  description?: string | null;
+  pace?: string | null;
 }
 
 interface Props {

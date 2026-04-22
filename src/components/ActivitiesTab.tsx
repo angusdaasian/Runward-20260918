@@ -338,7 +338,14 @@ const ActivitiesTab = ({ lang }: Props) => {
   const [dateSheet, setDateSheet] = useState<{
     dateLabel: string;
     activities: StravaActivity[];
-    planned: { type: string; distance_km: number | null; color: string } | null;
+    planned: {
+      type: string;
+      distance_km: number | null;
+      color: string;
+      title?: string | null;
+      description?: string | null;
+      pace?: string | null;
+    } | null;
   } | null>(null);
 
   // Mandatory skeleton on every mount
@@ -585,7 +592,14 @@ const ActivitiesTab = ({ lang }: Props) => {
                 ...(extraActivities as StravaActivity[]),
               ],
               planned: planned
-                ? { type: planned.type, distance_km: planned.distance_km, color: planned.color }
+                ? {
+                    type: planned.type,
+                    distance_km: planned.distance_km,
+                    color: planned.color,
+                    title: (planned as any).title ?? null,
+                    description: (planned as any).description ?? null,
+                    pace: (planned as any).pace ?? null,
+                  }
                 : null,
             });
           }}
@@ -748,14 +762,26 @@ const ActivitiesTab = ({ lang }: Props) => {
                       {lang === "zh" ? "計劃" : "Planned"}
                     </span>
                   </div>
-                  <div className="mt-2 flex items-baseline gap-2">
-                    <span className="text-base font-semibold text-foreground">{dateSheet.planned.type}</span>
+                  <div className="mt-2 flex items-baseline gap-2 flex-wrap">
+                    <span className="text-base font-semibold text-foreground">
+                      {dateSheet.planned.title || dateSheet.planned.type}
+                    </span>
                     {dateSheet.planned.distance_km && (
                       <span className="text-sm text-muted-foreground">
                         {dateSheet.planned.distance_km} km
                       </span>
                     )}
+                    {dateSheet.planned.pace && (
+                      <span className="text-sm text-muted-foreground">
+                        @ {dateSheet.planned.pace}
+                      </span>
+                    )}
                   </div>
+                  {dateSheet.planned.description && (
+                    <p className="mt-2 text-sm text-muted-foreground leading-relaxed whitespace-pre-line">
+                      {dateSheet.planned.description}
+                    </p>
+                  )}
                 </div>
               )}
             </>

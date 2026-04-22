@@ -7,6 +7,7 @@ interface StravaActivity {
   distance: number;
   start_date: string;
   sport_type: string;
+  [key: string]: any;
 }
 
 interface PlannedWorkout {
@@ -20,6 +21,12 @@ interface Props {
   lang: Lang;
   activities: StravaActivity[];
   plannedWorkouts: PlannedWorkout[];
+  onSelectDate?: (info: {
+    date: string;
+    activity: StravaActivity | null;
+    extraActivities: StravaActivity[];
+    planned: PlannedWorkout | null;
+  }) => void;
 }
 
 const WEEKDAY_LABELS_EN = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -67,7 +74,7 @@ function formatDateKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-const ActivityCalendar = ({ lang, activities, plannedWorkouts }: Props) => {
+const ActivityCalendar = ({ lang, activities, plannedWorkouts, onSelectDate }: Props) => {
   const today = new Date();
   const [viewYear, setViewYear] = useState(today.getFullYear());
   const [viewMonth, setViewMonth] = useState(today.getMonth());
@@ -81,6 +88,21 @@ const ActivityCalendar = ({ lang, activities, plannedWorkouts }: Props) => {
       const d = new Date(act.start_date);
       const key = formatDateKey(d);
       map[key] = (map[key] || 0) + act.distance / 1000;
+    }
+    return map;
+  }, [activities]);
+
+  // Build lookup: date string -> all activities on that date (sorted by distance desc)
+  const actsByDate = useMemo(() => {
+    const map: Record<string, StravaActivity[]> = {};
+    for (const act of activities) {
+      const d = new Date(act.start_date);
+      const key = formatDateKey(d);
+      if (!map[key]) map[key] = [];
+      map[key].push(act);
+    }
+    for (const key in map) {
+      map[key].sort((a, b) => b.distance - a.distance);
     }
     return map;
   }, [activities]);
@@ -163,15 +185,16 @@ const ActivityCalendar = ({ lang, activities, plannedWorkouts }: Props) => {
           const isToday = key === todayKey;
           const stravaKm = kmByDate[key];
           const planned = planByDate[key];
+          const dayActs = actsByDate[key] || [];
           const hasStrava = stravaKm !== undefined && stravaKm > 0;
+          const isTappable = hasStrava || !!planned;
 
-          return (
-            <div
-              key={key}
-              className={`aspect-square rounded-lg flex flex-col items-center justify-center relative overflow-hidden text-[10px] ${
-                isToday ? "ring-1 ring-primary" : ""
-              } ${hasStrava ? "bg-primary/10" : planned ? "bg-accent/50" : ""}`}
-            >
+          const cellClass = `aspect-square rounded-lg flex flex-col items-center justify-center relative overflow-hidden text-[10px] ${
+            isToday ? "ring-1 ring-primary" : ""
+          } ${hasStrava ? "bg-primary/10" : planned ? "bg-accent/50" : ""}`;
+
+          const inner = (
+            <>
               <span className={`font-medium leading-none ${isToday ? "text-primary font-bold" : "text-foreground"}`}>
                 {day.getDate()}
               </span>
@@ -195,6 +218,34 @@ const ActivityCalendar = ({ lang, activities, plannedWorkouts }: Props) => {
                   style={{ backgroundColor: planned.color || "hsl(var(--muted-foreground))" }}
                 />
               )}
+            </>
+          );
+
+          if (isTappable && onSelectDate) {
+            const primary = dayActs[0] || null;
+            const extras = dayActs.slice(1);
+            return (
+              <button
+                key={key}
+                type="button"
+                onClick={() =>
+                  onSelectDate({
+                    date: key,
+                    activity: primary,
+                    extraActivities: extras,
+                    planned: planned || null,
+                  })
+                }
+                className={`${cellClass} cursor-pointer transition-transform active:scale-95 hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-primary/40`}
+              >
+                {inner}
+              </button>
+            );
+          }
+
+          return (
+            <div key={key} className={cellClass}>
+              {inner}
             </div>
           );
         })}

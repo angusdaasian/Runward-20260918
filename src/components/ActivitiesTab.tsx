@@ -15,6 +15,7 @@ import {
   Timer,
 } from "lucide-react";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Lang, t } from "@/lib/i18n";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -334,6 +335,12 @@ const ActivitiesTab = ({ lang }: Props) => {
   const { activities, profile, connected, fitnessAppConnected, plannedWorkouts, loading, invalidateAll } = useActivities();
   const [selectedActivity, setSelectedActivity] = useState<StravaActivity | null>(null);
   const [showAllActivities, setShowAllActivities] = useState(false);
+  const [dateSheet, setDateSheet] = useState<{
+    dateLabel: string;
+    activity: StravaActivity | null;
+    extraCount: number;
+    planned: { type: string; distance_km: number | null; color: string } | null;
+  } | null>(null);
 
   // Mandatory skeleton on every mount
   const [skeletonDone, setSkeletonDone] = useState(false);
@@ -560,8 +567,194 @@ const ActivitiesTab = ({ lang }: Props) => {
       {/* Monthly Calendar */}
       <div className="pb-4">
         <h2 className="text-sm font-semibold text-foreground mb-2">{lang === "zh" ? "月曆" : "Monthly Overview"}</h2>
-        <ActivityCalendar lang={lang} activities={activities} plannedWorkouts={plannedWorkouts} />
+        <ActivityCalendar
+          lang={lang}
+          activities={activities}
+          plannedWorkouts={plannedWorkouts}
+          onSelectDate={({ date, activity, extraActivities, planned }) => {
+            const d = new Date(date + "T00:00:00");
+            const dateLabel = d.toLocaleDateString(lang === "zh" ? "zh-TW" : "en-US", {
+              weekday: "short",
+              month: "short",
+              day: "numeric",
+              year: "numeric",
+            });
+            setDateSheet({
+              dateLabel,
+              activity: activity as StravaActivity | null,
+              extraCount: extraActivities.length,
+              planned: planned
+                ? { type: planned.type, distance_km: planned.distance_km, color: planned.color }
+                : null,
+            });
+          }}
+        />
       </div>
+
+      {/* Date detail bottom sheet */}
+      <Sheet open={!!dateSheet} onOpenChange={(open) => !open && setDateSheet(null)}>
+        <SheetContent side="bottom" className="rounded-t-2xl max-h-[85vh] overflow-y-auto">
+          {dateSheet && (
+            <>
+              <SheetHeader>
+                <SheetTitle className="text-left">{dateSheet.dateLabel}</SheetTitle>
+              </SheetHeader>
+
+              {dateSheet.activity && (
+                <div className="mt-4 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">{sportTypeIcon[dateSheet.activity.sport_type] || "🏃"}</span>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-medium text-foreground text-sm truncate">{dateSheet.activity.name}</h3>
+                      <span className="text-[11px] text-muted-foreground">
+                        {new Date(dateSheet.activity.start_date).toLocaleTimeString(lang === "zh" ? "zh-TW" : "en-US", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                        {" · "}
+                        {dateSheet.activity.source && dateSheet.activity.source !== "strava"
+                          ? dateSheet.activity.source
+                          : "Strava"}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-3">
+                    <div>
+                      <span className="text-[11px] font-medium text-primary block mb-0.5">
+                        {lang === "zh" ? "距離" : "Distance"}
+                      </span>
+                      <div className="flex items-center gap-1">
+                        <MapPin size={12} className="text-primary" />
+                        <span className="text-sm font-semibold text-foreground">
+                          {formatDistance(dateSheet.activity.distance)} km
+                        </span>
+                      </div>
+                    </div>
+                    <div>
+                      <span className="text-[11px] font-medium text-primary block mb-0.5">
+                        {lang === "zh" ? "時間" : "Time"}
+                      </span>
+                      <div className="flex items-center gap-1">
+                        <Clock size={12} className="text-primary" />
+                        <span className="text-sm font-semibold text-foreground">
+                          {formatDuration(dateSheet.activity.moving_time)}
+                        </span>
+                      </div>
+                    </div>
+                    <div>
+                      <span className="text-[11px] font-medium text-primary block mb-0.5">
+                        {lang === "zh" ? "配速" : "Pace"}
+                      </span>
+                      <div className="flex items-center gap-1">
+                        <Zap size={12} className="text-primary" />
+                        <span className="text-sm font-semibold text-foreground">
+                          {formatPace(dateSheet.activity.average_speed)} /km
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-3">
+                    {(() => {
+                      const s = activityScores[dateSheet.activity.id];
+                      return s !== null && s !== undefined ? (
+                        <div>
+                          <span className="text-[11px] font-medium text-primary block mb-0.5">
+                            {lang === "zh" ? "訓練分數" : "Score"}
+                          </span>
+                          <div className="flex items-center gap-1">
+                            <TrendingUp size={12} className="text-primary" />
+                            <span className="text-sm font-semibold text-foreground">{s}</span>
+                          </div>
+                        </div>
+                      ) : null;
+                    })()}
+                    {dateSheet.activity.average_heartrate && (
+                      <div>
+                        <span className="text-[11px] font-medium text-destructive block mb-0.5">HR</span>
+                        <div className="flex items-center gap-1">
+                          <Heart size={12} className="text-destructive" />
+                          <span className="text-sm font-semibold text-foreground">
+                            {Math.round(dateSheet.activity.average_heartrate)}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                    {dateSheet.activity.total_elevation_gain > 0 && (
+                      <div>
+                        <span className="text-[11px] font-medium text-primary block mb-0.5">
+                          {lang === "zh" ? "爬升" : "Elev"}
+                        </span>
+                        <div className="flex items-center gap-1">
+                          <TrendingUp size={12} className="text-primary" />
+                          <span className="text-sm font-semibold text-foreground">
+                            {Math.round(dateSheet.activity.total_elevation_gain)}m
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                    {dateSheet.activity.calories && dateSheet.activity.calories > 0 && (
+                      <div>
+                        <span className="text-[11px] font-medium text-destructive block mb-0.5">
+                          {lang === "zh" ? "卡路里" : "Calories"}
+                        </span>
+                        <div className="flex items-center gap-1">
+                          <Flame size={12} className="text-destructive" />
+                          <span className="text-sm font-semibold text-foreground">
+                            {dateSheet.activity.calories} kcal
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {dateSheet.extraCount > 0 && (
+                    <p className="text-[11px] text-muted-foreground">
+                      {lang === "zh"
+                        ? `+${dateSheet.extraCount} 個其他活動`
+                        : `+${dateSheet.extraCount} more ${dateSheet.extraCount === 1 ? "activity" : "activities"} on this day`}
+                    </p>
+                  )}
+
+                  <button
+                    onClick={() => {
+                      const act = dateSheet.activity;
+                      setDateSheet(null);
+                      if (act) setSelectedActivity(act);
+                    }}
+                    className="w-full mt-1 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors"
+                  >
+                    {lang === "zh" ? "查看詳情" : "View details"}
+                  </button>
+                </div>
+              )}
+
+              {dateSheet.planned && (
+                <div className={`${dateSheet.activity ? "mt-4 pt-4 border-t border-border" : "mt-4"}`}>
+                  <div className="flex items-center gap-2">
+                    <div
+                      className="w-2.5 h-2.5 rounded-full"
+                      style={{ backgroundColor: dateSheet.planned.color || "hsl(var(--muted-foreground))" }}
+                    />
+                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                      {lang === "zh" ? "計劃" : "Planned"}
+                    </span>
+                  </div>
+                  <div className="mt-2 flex items-baseline gap-2">
+                    <span className="text-base font-semibold text-foreground">{dateSheet.planned.type}</span>
+                    {dateSheet.planned.distance_km && (
+                      <span className="text-sm text-muted-foreground">
+                        {dateSheet.planned.distance_km} km
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </SheetContent>
+      </Sheet>
     </FadeIn>
   );
 };

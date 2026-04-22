@@ -145,7 +145,15 @@ async function fetchPlannedWorkouts(userId: string): Promise<PlannedWorkout[]> {
   for (const week of planData) {
     for (const day of week.days || []) {
       if (day.date && day.type !== "Rest") {
-        workouts.push({ date: day.date, type: day.type, distance_km: day.distance_km, color: day.color || "#94a3b8" });
+        workouts.push({
+          date: day.date,
+          type: day.type,
+          distance_km: day.distance_km,
+          color: day.color || "#94a3b8",
+          title: day.title || null,
+          description: day.description || null,
+          pace: day.pace || null,
+        });
       }
     }
   }

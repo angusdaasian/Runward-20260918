@@ -88,7 +88,7 @@ const AnnouncementBell = ({ lang }: { lang: Lang }) => {
   return (
     <Popover onOpenChange={(open) => { if (open && !read) setRead(true); }}>
       <PopoverTrigger asChild>
-        <button className="relative w-10 h-10 rounded-full bg-muted flex items-center justify-center hover:bg-muted/80 transition-colors">
+        <button className="relative w-10 h-10 rounded-full bg-muted flex items-center justify-center hover:bg-muted/80 active:scale-90 active:bg-muted/60 transition-all duration-150">
           <Bell size={18} className="text-foreground" />
           {!read && <span className="absolute top-1 right-1 w-2.5 h-2.5 rounded-full bg-destructive animate-pulse" />}
         </button>
@@ -204,7 +204,7 @@ const AppHeader = ({ lang, onNavigateSettings, isGuest }: AppHeaderProps) => {
         <WeatherWidget lang={lang} />
         <button
           onClick={onNavigateSettings}
-          className="w-10 h-10 rounded-full bg-muted flex items-center justify-center hover:bg-muted/80 transition-colors"
+          className="w-10 h-10 rounded-full bg-muted flex items-center justify-center hover:bg-muted/80 active:scale-90 active:bg-muted/60 transition-all duration-150"
         >
           <Settings size={18} className="text-foreground" />
         </button>

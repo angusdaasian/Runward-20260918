@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Crown, Users } from "lucide-react";
 import AnnouncementManager from "@/components/admin/AnnouncementManager";
+import PromoBannerManager from "@/components/admin/PromoBannerManager";
 import FeedbackManager from "@/components/admin/FeedbackManager";
 import RaceManager from "@/components/admin/RaceManager";
 import PendingRaceManager from "@/components/admin/PendingRaceManager";
@@ -218,6 +219,7 @@ const AdminPanel = () => {
 
         <NotificationManager />
         <AnnouncementManager />
+        <PromoBannerManager />
         <RewardCodeManager />
         <RaceManager />
         <PendingRaceManager />

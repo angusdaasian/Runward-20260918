@@ -587,6 +587,48 @@ export type Database = {
         }
         Relationships: []
       }
+      promo_banners: {
+        Row: {
+          caption: string | null
+          caption_zh: string | null
+          created_at: string
+          created_by: string
+          display_order: number
+          ends_at: string
+          id: string
+          image_url: string
+          is_active: boolean
+          link_url: string | null
+          updated_at: string
+        }
+        Insert: {
+          caption?: string | null
+          caption_zh?: string | null
+          created_at?: string
+          created_by: string
+          display_order?: number
+          ends_at: string
+          id?: string
+          image_url: string
+          is_active?: boolean
+          link_url?: string | null
+          updated_at?: string
+        }
+        Update: {
+          caption?: string | null
+          caption_zh?: string | null
+          created_at?: string
+          created_by?: string
+          display_order?: number
+          ends_at?: string
+          id?: string
+          image_url?: string
+          is_active?: boolean
+          link_url?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       races: {
         Row: {
           category: string

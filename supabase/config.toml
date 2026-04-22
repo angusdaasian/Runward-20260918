@@ -2,3 +2,6 @@ project_id = "kbghvclwhxnjeskdodeh"
 
 [functions.get-weather]
 verify_jwt = false
+
+[functions.seed-promo-banner]
+verify_jwt = false

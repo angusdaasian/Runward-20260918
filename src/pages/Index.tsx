@@ -11,6 +11,7 @@ import { TabPageSkeleton, SettingsSkeleton, CommunitySkeleton, PostureSkeleton, 
 import ActivitiesTab from "@/components/ActivitiesTab";
 import Onboarding from "@/components/Onboarding";
 import AppHeader, { preloadHeaderProfile } from "@/components/AppHeader";
+import PromoBanner from "@/components/PromoBanner";
 
 // Lazy load less-visited tabs
 
@@ -270,6 +271,8 @@ const Index = () => {
           ))}
         </div>
       </div>
+
+      <PromoBanner lang={lang} userId={user?.id ?? null} />
     </div>
   );
 };

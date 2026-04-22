@@ -130,10 +130,20 @@ const PromoBannerManager = () => {
 
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="flex-row items-center justify-between space-y-0">
         <CardTitle className="flex items-center gap-2">
           <ImageIcon className="h-5 w-5" /> Promo Banners
         </CardTitle>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            clearPromoBannerSeen(user?.id);
+            setPreviewing(true);
+          }}
+        >
+          <Eye className="h-4 w-4 mr-1" /> Preview
+        </Button>
       </CardHeader>
       <CardContent className="space-y-6">
         <div className="space-y-3 p-4 bg-muted/50 rounded-lg border border-border">

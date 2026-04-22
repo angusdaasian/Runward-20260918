@@ -132,7 +132,9 @@ const WeatherWidget = ({ lang }: WeatherWidgetProps) => {
     void load(trimmed);
   };
 
-  const { Icon, label } = weather ? codeMeta(weather.code, lang) : { Icon: Cloud, label: "" };
+  const { Icon, label } = weather
+    ? codeMeta(weather.code, weather.isDay, weather.conditionText, lang)
+    : { Icon: Cloud, label: "" };
 
   return (
     <Popover onOpenChange={(open) => { if (!open) setEditing(false); }}>

@@ -6,10 +6,40 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
+const ALLOWED_ORIGINS = new Set([
+  "https://pacecalculator.fun",
+  "https://www.pacecalculator.fun",
+  "https://angustest.site",
+  "https://www.angustest.site",
+]);
+const DEFAULT_ORIGIN = "https://pacecalculator.fun";
+
+/**
+ * Resolve a safe base origin from the redirect_uri provided in state.
+ * - Full URL with allowlisted origin → use that origin
+ * - Relative path or anything else → fall back to DEFAULT_ORIGIN
+ */
+function resolveBaseOrigin(redirectUri: string): string {
+  if (!redirectUri) return DEFAULT_ORIGIN;
+  if (redirectUri.startsWith("http://") || redirectUri.startsWith("https://")) {
+    try {
+      const u = new URL(redirectUri);
+      if (ALLOWED_ORIGINS.has(u.origin)) return u.origin;
+    } catch {
+      // fall through
+    }
+    return DEFAULT_ORIGIN;
+  }
+  // Relative path — preserve previous behavior
+  return DEFAULT_ORIGIN;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
+
+  let baseOrigin = DEFAULT_ORIGIN;
 
   try {
     let code: string | null = null;
@@ -28,7 +58,6 @@ Deno.serve(async (req) => {
         stateRaw = formData.get("state") as string | null;
         userInfo = formData.get("user") as string | null;
       } else if (contentType.includes("application/json")) {
-        // Fallback: also handle JSON requests (e.g. from frontend)
         const body = await req.json();
         code = body.code || null;
         id_token = body.id_token || null;
@@ -46,26 +75,24 @@ Deno.serve(async (req) => {
 
     // Parse state to get nonce and redirect_uri
     let nonce: string | undefined;
-    let redirectUri = "/";
+    let redirectUri = "";
     if (stateRaw) {
       try {
         const stateObj = JSON.parse(stateRaw);
         nonce = stateObj.nonce;
-        redirectUri = stateObj.redirect_uri || "/";
+        redirectUri = stateObj.redirect_uri || "";
       } catch {
-        // If state isn't JSON, treat it as nonce directly
         nonce = stateRaw;
       }
     }
 
+    baseOrigin = resolveBaseOrigin(redirectUri);
+
     if (!id_token) {
       console.error("[apple-auth-callback] Missing id_token");
-      const errorRedirect = new URL(redirectUri.startsWith("http") ? redirectUri : `https://pacecalculator.fun${redirectUri}`);
-      errorRedirect.pathname = "/callback/apple";
-      errorRedirect.searchParams.set("error", "missing_id_token");
       return new Response(null, {
         status: 302,
-        headers: { Location: errorRedirect.toString() },
+        headers: { Location: `${baseOrigin}/callback/apple?error=missing_id_token` },
       });
     }
 
@@ -85,12 +112,11 @@ Deno.serve(async (req) => {
 
     if (error) {
       console.error("[apple-auth-callback] signInWithIdToken error:", error);
-      const errorRedirect = new URL(redirectUri.startsWith("http") ? redirectUri : `https://pacecalculator.fun${redirectUri}`);
-      errorRedirect.pathname = "/callback/apple";
-      errorRedirect.searchParams.set("error", error.message);
       return new Response(null, {
         status: 302,
-        headers: { Location: errorRedirect.toString() },
+        headers: {
+          Location: `${baseOrigin}/callback/apple?error=${encodeURIComponent(error.message)}`,
+        },
       });
     }
 
@@ -114,8 +140,6 @@ Deno.serve(async (req) => {
     }
 
     // Redirect back to the frontend with tokens in the hash
-    const baseUrl = redirectUri.startsWith("http") ? redirectUri : `https://pacecalculator.fun`;
-    const successRedirect = new URL("/callback/apple", baseUrl);
     const hashParams = new URLSearchParams({
       access_token: data.session?.access_token || "",
       refresh_token: data.session?.refresh_token || "",
@@ -123,11 +147,11 @@ Deno.serve(async (req) => {
       token_type: "bearer",
       type: "apple",
     });
-    
+
     return new Response(null, {
       status: 302,
       headers: {
-        Location: `${successRedirect.toString()}#${hashParams.toString()}`,
+        Location: `${baseOrigin}/callback/apple#${hashParams.toString()}`,
       },
     });
   } catch (err) {
@@ -135,7 +159,7 @@ Deno.serve(async (req) => {
     return new Response(null, {
       status: 302,
       headers: {
-        Location: `https://pacecalculator.fun/callback/apple?error=internal_error`,
+        Location: `${baseOrigin}/callback/apple?error=internal_error`,
       },
     });
   }

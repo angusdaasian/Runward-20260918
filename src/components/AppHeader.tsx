@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Settings, Bell, Megaphone } from "lucide-react";
+import { Settings, Bell, Megaphone, Menu } from "lucide-react";
 import { Lang } from "@/lib/i18n";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -202,23 +202,83 @@ const AppHeader = ({ lang, onNavigateSettings, onOpenPromoBanner, isGuest }: App
         )}
       </div>
       <div className="flex items-center gap-2">
-        <WeatherWidget lang={lang} />
-        {onOpenPromoBanner && (
-          <button
-            onClick={onOpenPromoBanner}
-            aria-label={lang === "zh" ? "賽事消息" : "Race news"}
-            className="w-10 h-10 rounded-full bg-muted flex items-center justify-center hover:bg-muted/80 active:scale-90 active:bg-muted/60 transition-all duration-150"
-          >
-            <Megaphone size={18} className="text-foreground" />
-          </button>
-        )}
-        <button
-          onClick={onNavigateSettings}
-          className="w-10 h-10 rounded-full bg-muted flex items-center justify-center hover:bg-muted/80 active:scale-90 active:bg-muted/60 transition-all duration-150"
-        >
-          <Settings size={18} className="text-foreground" />
-        </button>
-        <AnnouncementBell lang={lang} />
+        <Popover>
+          <PopoverTrigger asChild>
+            <button
+              aria-label={lang === "zh" ? "選單" : "Menu"}
+              className="w-10 h-10 rounded-full bg-muted flex items-center justify-center hover:bg-muted/80 active:scale-90 active:bg-muted/60 transition-all duration-150"
+            >
+              <Menu size={18} className="text-foreground" />
+            </button>
+          </PopoverTrigger>
+          <PopoverContent align="end" className="w-64 p-2">
+            <div className="flex flex-col">
+              {/* Weather */}
+              <div className="flex items-center gap-3 px-2 py-1.5 rounded-md hover:bg-muted/60 transition-colors">
+                <WeatherWidget lang={lang} />
+                <div className="flex flex-col text-left">
+                  <span className="text-sm font-medium text-foreground leading-tight">
+                    {lang === "zh" ? "天氣" : "Weather"}
+                  </span>
+                  <span className="text-[11px] text-muted-foreground leading-tight">
+                    {lang === "zh" ? "查看本地天氣" : "Check local weather"}
+                  </span>
+                </div>
+              </div>
+
+              {/* Race news / Promo banner */}
+              {onOpenPromoBanner && (
+                <button
+                  onClick={onOpenPromoBanner}
+                  className="flex items-center gap-3 px-2 py-1.5 rounded-md hover:bg-muted/60 transition-colors text-left active:scale-[0.98]"
+                >
+                  <span className="w-10 h-10 rounded-full bg-muted flex items-center justify-center shrink-0">
+                    <Megaphone size={18} className="text-foreground" />
+                  </span>
+                  <div className="flex flex-col">
+                    <span className="text-sm font-medium text-foreground leading-tight">
+                      {lang === "zh" ? "賽事消息" : "Race News"}
+                    </span>
+                    <span className="text-[11px] text-muted-foreground leading-tight">
+                      {lang === "zh" ? "查看最新賽事推廣" : "Latest race promotions"}
+                    </span>
+                  </div>
+                </button>
+              )}
+
+              {/* Settings */}
+              <button
+                onClick={onNavigateSettings}
+                className="flex items-center gap-3 px-2 py-1.5 rounded-md hover:bg-muted/60 transition-colors text-left active:scale-[0.98]"
+              >
+                <span className="w-10 h-10 rounded-full bg-muted flex items-center justify-center shrink-0">
+                  <Settings size={18} className="text-foreground" />
+                </span>
+                <div className="flex flex-col">
+                  <span className="text-sm font-medium text-foreground leading-tight">
+                    {lang === "zh" ? "設定" : "Settings"}
+                  </span>
+                  <span className="text-[11px] text-muted-foreground leading-tight">
+                    {lang === "zh" ? "個人資料與偏好" : "Profile & preferences"}
+                  </span>
+                </div>
+              </button>
+
+              {/* Announcements */}
+              <div className="flex items-center gap-3 px-2 py-1.5 rounded-md hover:bg-muted/60 transition-colors">
+                <AnnouncementBell lang={lang} />
+                <div className="flex flex-col text-left">
+                  <span className="text-sm font-medium text-foreground leading-tight">
+                    {lang === "zh" ? "公告" : "Announcements"}
+                  </span>
+                  <span className="text-[11px] text-muted-foreground leading-tight">
+                    {lang === "zh" ? "管理員的最新通知" : "Latest news from admin"}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </PopoverContent>
+        </Popover>
       </div>
     </div>
   );

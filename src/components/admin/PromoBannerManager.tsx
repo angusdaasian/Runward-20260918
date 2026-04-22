@@ -286,6 +286,9 @@ const PromoBannerManager = () => {
           </div>
         )}
       </CardContent>
+      {previewing && (
+        <PromoBanner lang="en" userId={user?.id} forceShow onClose={() => setPreviewing(false)} />
+      )}
     </Card>
   );
 };

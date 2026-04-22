@@ -7,8 +7,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { ImageIcon, Plus, Trash2, Upload } from "lucide-react";
+import { Eye, ImageIcon, Plus, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
+import PromoBanner, { clearPromoBannerSeen } from "@/components/PromoBanner";
 
 interface PromoBanner {
   id: string;
@@ -27,6 +28,7 @@ const PromoBannerManager = () => {
   const [banners, setBanners] = useState<PromoBanner[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [previewing, setPreviewing] = useState(false);
 
   const fileRef = useRef<HTMLInputElement>(null);
   const [caption, setCaption] = useState("");
@@ -128,10 +130,20 @@ const PromoBannerManager = () => {
 
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="flex-row items-center justify-between space-y-0">
         <CardTitle className="flex items-center gap-2">
           <ImageIcon className="h-5 w-5" /> Promo Banners
         </CardTitle>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            clearPromoBannerSeen(user?.id);
+            setPreviewing(true);
+          }}
+        >
+          <Eye className="h-4 w-4 mr-1" /> Preview
+        </Button>
       </CardHeader>
       <CardContent className="space-y-6">
         <div className="space-y-3 p-4 bg-muted/50 rounded-lg border border-border">
@@ -274,6 +286,9 @@ const PromoBannerManager = () => {
           </div>
         )}
       </CardContent>
+      {previewing && (
+        <PromoBanner lang="en" userId={user?.id} forceShow onClose={() => setPreviewing(false)} />
+      )}
     </Card>
   );
 };

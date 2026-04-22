@@ -14,9 +14,22 @@ interface Banner {
 interface Props {
   lang: Lang;
   userId?: string | null;
+  /** When true, bypass the once-per-day check (admin preview). */
+  forceShow?: boolean;
+  /** Called when the banner closes (used for preview mode). */
+  onClose?: () => void;
 }
 
 const STORAGE_PREFIX = "promo_banner_seen_";
+
+// Expose a helper so admins can re-trigger from the manager.
+export const clearPromoBannerSeen = (userId?: string | null) => {
+  try {
+    localStorage.removeItem(`${STORAGE_PREFIX}${userId ?? "guest"}`);
+  } catch {
+    /* ignore */
+  }
+};
 
 const todayKey = () => {
   const d = new Date();
@@ -26,10 +39,11 @@ const todayKey = () => {
   return `${yyyy}-${mm}-${dd}`;
 };
 
-const PromoBanner = ({ lang, userId }: Props) => {
+const PromoBanner = ({ lang, userId, forceShow = false, onClose }: Props) => {
   const [banners, setBanners] = useState<Banner[]>([]);
   const [open, setOpen] = useState(false);
   const [current, setCurrent] = useState(0);
+  const [imgError, setImgError] = useState<Record<string, boolean>>({});
 
   // swipe state
   const touchStartX = useRef<number | null>(null);
@@ -37,13 +51,15 @@ const PromoBanner = ({ lang, userId }: Props) => {
   const [dragOffset, setDragOffset] = useState(0);
 
   useEffect(() => {
-    const seenKey = `${STORAGE_PREFIX}${userId ?? "guest"}`;
-    const lastSeen = localStorage.getItem(seenKey);
-    if (lastSeen === todayKey()) return;
+    if (!forceShow) {
+      const seenKey = `${STORAGE_PREFIX}${userId ?? "guest"}`;
+      const lastSeen = localStorage.getItem(seenKey);
+      if (lastSeen === todayKey()) return;
+    }
 
     let cancelled = false;
     const fetchBanners = async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("promo_banners")
         .select("id, image_url, link_url, caption, caption_zh")
         .eq("is_active", true)
@@ -51,9 +67,14 @@ const PromoBanner = ({ lang, userId }: Props) => {
         .order("display_order", { ascending: true })
         .order("created_at", { ascending: false });
       if (cancelled) return;
+      if (error) {
+        console.error("[PromoBanner] fetch error", error);
+        return;
+      }
       const list = (data as Banner[]) || [];
       if (list.length > 0) {
         setBanners(list);
+        setCurrent(0);
         setOpen(true);
       }
     };
@@ -61,13 +82,16 @@ const PromoBanner = ({ lang, userId }: Props) => {
     return () => {
       cancelled = true;
     };
-  }, [userId]);
+  }, [userId, forceShow]);
 
   const handleClose = useCallback(() => {
-    const seenKey = `${STORAGE_PREFIX}${userId ?? "guest"}`;
-    localStorage.setItem(seenKey, todayKey());
+    if (!forceShow) {
+      const seenKey = `${STORAGE_PREFIX}${userId ?? "guest"}`;
+      localStorage.setItem(seenKey, todayKey());
+    }
     setOpen(false);
-  }, [userId]);
+    onClose?.();
+  }, [userId, forceShow, onClose]);
 
   // Esc to close
   useEffect(() => {
@@ -144,14 +168,26 @@ const PromoBanner = ({ lang, userId }: Props) => {
           >
             {banners.map((b) => {
               const cap = lang === "zh" && b.caption_zh ? b.caption_zh : b.caption;
+              const failed = imgError[b.id];
               const inner = (
-                <div className="w-full shrink-0">
-                  <img
-                    src={b.image_url}
-                    alt={cap || "Promotion"}
-                    className="w-full h-auto block select-none"
-                    draggable={false}
-                  />
+                <div className="w-full shrink-0 bg-muted">
+                  {failed ? (
+                    <div className="w-full aspect-[4/5] flex flex-col items-center justify-center text-muted-foreground p-6 text-center">
+                      <span className="text-sm">Image failed to load</span>
+                      <span className="text-[10px] mt-1 break-all opacity-60">{b.image_url}</span>
+                    </div>
+                  ) : (
+                    <img
+                      src={b.image_url}
+                      alt={cap || "Promotion"}
+                      className="w-full h-auto block select-none"
+                      draggable={false}
+                      onError={() => {
+                        console.error("[PromoBanner] image failed", b.image_url);
+                        setImgError((s) => ({ ...s, [b.id]: true }));
+                      }}
+                    />
+                  )}
                 </div>
               );
               return b.link_url ? (

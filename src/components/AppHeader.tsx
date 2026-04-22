@@ -6,7 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Skeleton } from "@/components/ui/skeleton";
-import WeatherWidget from "@/components/WeatherWidget";
+import { WeatherInline } from "@/components/WeatherWidget";
 
 import { getRankFromXP, formatRank, getTierColor, type RankTier } from "@/lib/ranks";
 import { RANK_EMBLEMS } from "@/lib/rankEmblems";

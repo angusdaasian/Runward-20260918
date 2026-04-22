@@ -762,14 +762,26 @@ const ActivitiesTab = ({ lang }: Props) => {
                       {lang === "zh" ? "計劃" : "Planned"}
                     </span>
                   </div>
-                  <div className="mt-2 flex items-baseline gap-2">
-                    <span className="text-base font-semibold text-foreground">{dateSheet.planned.type}</span>
+                  <div className="mt-2 flex items-baseline gap-2 flex-wrap">
+                    <span className="text-base font-semibold text-foreground">
+                      {dateSheet.planned.title || dateSheet.planned.type}
+                    </span>
                     {dateSheet.planned.distance_km && (
                       <span className="text-sm text-muted-foreground">
                         {dateSheet.planned.distance_km} km
                       </span>
                     )}
+                    {dateSheet.planned.pace && (
+                      <span className="text-sm text-muted-foreground">
+                        @ {dateSheet.planned.pace}
+                      </span>
+                    )}
                   </div>
+                  {dateSheet.planned.description && (
+                    <p className="mt-2 text-sm text-muted-foreground leading-relaxed whitespace-pre-line">
+                      {dateSheet.planned.description}
+                    </p>
+                  )}
                 </div>
               )}
             </>

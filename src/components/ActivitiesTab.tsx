@@ -337,8 +337,7 @@ const ActivitiesTab = ({ lang }: Props) => {
   const [showAllActivities, setShowAllActivities] = useState(false);
   const [dateSheet, setDateSheet] = useState<{
     dateLabel: string;
-    activity: StravaActivity | null;
-    extraCount: number;
+    activities: StravaActivity[];
     planned: { type: string; distance_km: number | null; color: string } | null;
   } | null>(null);
 

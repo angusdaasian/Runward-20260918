@@ -335,6 +335,12 @@ const ActivitiesTab = ({ lang }: Props) => {
   const { activities, profile, connected, fitnessAppConnected, plannedWorkouts, loading, invalidateAll } = useActivities();
   const [selectedActivity, setSelectedActivity] = useState<StravaActivity | null>(null);
   const [showAllActivities, setShowAllActivities] = useState(false);
+  const [dateSheet, setDateSheet] = useState<{
+    dateLabel: string;
+    activity: StravaActivity | null;
+    extraCount: number;
+    planned: { type: string; distance_km: number | null; color: string } | null;
+  } | null>(null);
 
   // Mandatory skeleton on every mount
   const [skeletonDone, setSkeletonDone] = useState(false);

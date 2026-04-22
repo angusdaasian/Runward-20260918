@@ -121,6 +121,7 @@ serve(async (req) => {
     const lastActivityDate: string | null = typeof body?.lastActivityDate === "string" ? body.lastActivityDate : null;
     const workoutType: string = typeof body?.workoutType === "string" ? body.workoutType : "auto";
     const workoutTypeLabel: string = typeof body?.workoutTypeLabel === "string" ? body.workoutTypeLabel : workoutType;
+    const weather: any = body?.weather ?? null;
     const isZh = lang === "zh";
 
     // ── Translate-only mode: take an existing suggestion and translate it ──
@@ -271,14 +272,43 @@ serve(async (req) => {
     if (trainingScore != null) context += `\nTraining score: ${trainingScore} (higher = fitter).\n`;
     if (runsPerWeek != null) context += `Typical runs/week: ${runsPerWeek}.\n`;
 
+    // ── Weather context (used to recommend the best time to run today) ──
+    if (weather && typeof weather === "object") {
+      context += `\nToday's weather for ${weather.city ?? "the runner's city"}${weather.country ? ", " + weather.country : ""}:\n`;
+      context += `- Current: ${weather.temperature}°C (feels like ${weather.feelslike ?? weather.temperature}°C), ${weather.conditionText ?? ""}\n`;
+      context += `- High/Low: ${weather.high}°C / ${weather.low}°C\n`;
+      if (weather.humidity != null) context += `- Humidity: ${weather.humidity}%\n`;
+      if (weather.wind_kph != null) context += `- Wind: ${weather.wind_kph} km/h\n`;
+      if (weather.uv != null) context += `- UV index (current): ${weather.uv}\n`;
+      if (weather.sunrise) context += `- Sunrise: ${weather.sunrise}\n`;
+      if (weather.sunset) context += `- Sunset: ${weather.sunset}\n`;
+      if (weather.chance_of_rain != null) context += `- Daily chance of rain: ${weather.chance_of_rain}%\n`;
+      if (weather.localtime) context += `- Local time now: ${weather.localtime}\n`;
+      if (Array.isArray(weather.hourly) && weather.hourly.length > 0) {
+        // Only include upcoming hours from "now" to keep the context short.
+        const nowStr: string = weather.localtime || "";
+        const upcoming = weather.hourly.filter((h: any) => !nowStr || h.time >= nowStr).slice(0, 18);
+        if (upcoming.length > 0) {
+          context += `\nHourly forecast (upcoming, local time):\n`;
+          for (const h of upcoming) {
+            const hh = (h.time || "").split(" ")[1] || h.time;
+            context += `  - ${hh}: ${h.temp_c}°C (feels ${h.feelslike_c}°C), ${h.condition}, rain ${h.chance_of_rain}%, humidity ${h.humidity}%, wind ${h.wind_kph} km/h, UV ${h.uv}${h.is_day ? "" : " [night]"}\n`;
+          }
+        }
+      }
+      context += `\nUse this weather to recommend the BEST TIME OF DAY to run today (a specific hour or short window), considering temperature, humidity, rain chance, UV, wind, and daylight. If conditions are dangerous (heavy rain/thunderstorm/extreme heat), advise indoor/treadmill or postponing.\n`;
+    }
+
     const systemPrompt = isZh
-      ? `你是專業跑步教練 AI。根據跑者的訓練計劃（最高優先級）、最近七天表現，以及他們今天指定的訓練類型，給出**今日**具體訓練建議（不是明日）。回覆繁體中文 Markdown。
+      ? `你是專業跑步教練 AI。根據跑者的訓練計劃（最高優先級）、最近七天表現、他們今天指定的訓練類型，以及今日天氣，給出**今日**具體訓練建議（不是明日）。回覆繁體中文 Markdown。
 
 優先順序：
 1. 如果跑者有訓練計劃且今天有安排，以該安排為主軸。
 2. 如果跑者指定了訓練類型（不是 auto），必須遵守該類型。
 3. 用最近七天表現決定具體距離、配速、時長。
 4. 如果完全沒有跑步紀錄，使用入門目標作為基準，給適合的入門訓練。
+5. 根據今日天氣（溫度、濕度、降雨機率、UV、風、日出日落）建議**今天最佳跑步時段**（具體時間或短時段）。
+6. 如果遇到雷暴、極端高溫或大雨，建議改室內/跑步機或延後。
 
 格式：
 ## 今日建議訓練
@@ -287,14 +317,17 @@ serve(async (req) => {
 - **配速**：X:XX /km（如為間歇等多段配速，請列出每段）
 - **時長**：約 X 分鐘
 - **暖身/收操**：簡短建議
+- **最佳時段**：今日 HH:MM 左右（簡述天氣理由，例如「氣溫較涼、濕度較低」；若天氣惡劣，建議室內或延後）
 - **理由**：1-2 句說明（連結到訓練計劃或最近恢復狀況）`
-      : `You are a professional running coach AI. Given the runner's training plan (highest priority), last 7 days of activity, and the workout type they picked for today, suggest **today's** concrete workout (NOT tomorrow's). Reply in Markdown.
+      : `You are a professional running coach AI. Given the runner's training plan (highest priority), last 7 days of activity, the workout type they picked for today, and today's weather, suggest **today's** concrete workout (NOT tomorrow's). Reply in Markdown.
 
 Priority:
 1. If the runner has an active plan with a workout scheduled for today, anchor on that.
 2. If the runner specified a workout type (not "auto"), you MUST honor that type.
 3. Use the last 7 days of performance to set concrete distance, pace, and duration.
 4. If there are no logged runs at all, fall back to the onboarding goal pace and prescribe a beginner-appropriate session.
+5. Use today's weather (temperature, humidity, rain chance, UV, wind, sunrise/sunset) to recommend the **best time of day** to run today (a specific hour or short window).
+6. If conditions are dangerous (thunderstorm, extreme heat, heavy rain), advise indoor/treadmill or postponing.
 
 Format:
 ## Today's Suggested Workout
@@ -303,6 +336,7 @@ Format:
 - **Pace**: X:XX /km (for intervals/progressive, list per segment)
 - **Duration**: ~X min
 - **Warm-up / Cool-down**: short note
+- **Best time to run**: around HH:MM today (1 short reason citing weather, e.g. "cooler temps, lower humidity"; if weather is hazardous, recommend indoor/treadmill or postponing)
 - **Why**: 1-2 sentences (tie back to plan or recent recovery)`;
 
     const aiResp = await callVertexAI({

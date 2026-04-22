@@ -738,7 +738,7 @@ const ActivitiesTab = ({ lang }: Props) => {
 
 
               {dateSheet.planned && (
-                <div className={`${dateSheet.activity ? "mt-4 pt-4 border-t border-border" : "mt-4"}`}>
+                <div className={`${dateSheet.activities.length > 0 ? "mt-4 pt-4 border-t border-border" : "mt-4"}`}>
                   <div className="flex items-center gap-2">
                     <div
                       className="w-2.5 h-2.5 rounded-full"

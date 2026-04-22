@@ -168,14 +168,26 @@ const PromoBanner = ({ lang, userId, forceShow = false, onClose }: Props) => {
           >
             {banners.map((b) => {
               const cap = lang === "zh" && b.caption_zh ? b.caption_zh : b.caption;
+              const failed = imgError[b.id];
               const inner = (
-                <div className="w-full shrink-0">
-                  <img
-                    src={b.image_url}
-                    alt={cap || "Promotion"}
-                    className="w-full h-auto block select-none"
-                    draggable={false}
-                  />
+                <div className="w-full shrink-0 bg-muted">
+                  {failed ? (
+                    <div className="w-full aspect-[4/5] flex flex-col items-center justify-center text-muted-foreground p-6 text-center">
+                      <span className="text-sm">Image failed to load</span>
+                      <span className="text-[10px] mt-1 break-all opacity-60">{b.image_url}</span>
+                    </div>
+                  ) : (
+                    <img
+                      src={b.image_url}
+                      alt={cap || "Promotion"}
+                      className="w-full h-auto block select-none"
+                      draggable={false}
+                      onError={() => {
+                        console.error("[PromoBanner] image failed", b.image_url);
+                        setImgError((s) => ({ ...s, [b.id]: true }));
+                      }}
+                    />
+                  )}
                 </div>
               );
               return b.link_url ? (

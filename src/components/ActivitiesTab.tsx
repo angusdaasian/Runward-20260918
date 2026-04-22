@@ -592,7 +592,14 @@ const ActivitiesTab = ({ lang }: Props) => {
                 ...(extraActivities as StravaActivity[]),
               ],
               planned: planned
-                ? { type: planned.type, distance_km: planned.distance_km, color: planned.color }
+                ? {
+                    type: planned.type,
+                    distance_km: planned.distance_km,
+                    color: planned.color,
+                    title: (planned as any).title ?? null,
+                    description: (planned as any).description ?? null,
+                    pace: (planned as any).pace ?? null,
+                  }
                 : null,
             });
           }}

@@ -278,7 +278,7 @@ const Index = () => {
         </div>
       </div>
 
-      <PromoBanner lang={lang} userId={user?.id ?? null} />
+      <PromoBanner lang={lang} userId={user?.id ?? null} triggerKey={promoTrigger} />
     </div>
   );
 };

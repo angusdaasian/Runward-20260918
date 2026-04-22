@@ -58,7 +58,7 @@ interface Announcement {
   message_zh: string | null;
 }
 
-const AnnouncementBell = ({ lang }: { lang: Lang }) => {
+const AnnouncementRow = ({ lang }: { lang: Lang }) => {
   const [announcement, setAnnouncement] = useState<Announcement | null>(null);
   const [read, setRead] = useState(false);
 
@@ -75,27 +75,44 @@ const AnnouncementBell = ({ lang }: { lang: Lang }) => {
       });
   }, []);
 
-  if (!announcement)
-    return (
-      <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
-        <Bell size={18} className="text-muted-foreground" />
-      </div>
-    );
-
-  const displayTitle = lang === "zh" && announcement.title_zh ? announcement.title_zh : announcement.title;
-  const displayMessage = lang === "zh" && announcement.message_zh ? announcement.message_zh : announcement.message;
+  const displayTitle = announcement
+    ? (lang === "zh" && announcement.title_zh ? announcement.title_zh : announcement.title)
+    : null;
+  const displayMessage = announcement
+    ? (lang === "zh" && announcement.message_zh ? announcement.message_zh : announcement.message)
+    : null;
 
   return (
     <Popover onOpenChange={(open) => { if (open && !read) setRead(true); }}>
       <PopoverTrigger asChild>
-        <button className="relative w-10 h-10 rounded-full bg-muted flex items-center justify-center hover:bg-muted/80 active:scale-90 active:bg-muted/60 transition-all duration-150">
-          <Bell size={18} className="text-foreground" />
-          {!read && <span className="absolute top-1 right-1 w-2.5 h-2.5 rounded-full bg-destructive animate-pulse" />}
+        <button className="flex items-center gap-3 px-2 py-1.5 rounded-md hover:bg-muted/60 transition-colors text-left active:scale-[0.98] w-full">
+          <span className="relative w-10 h-10 rounded-full bg-muted flex items-center justify-center shrink-0">
+            <Bell size={18} className="text-foreground" />
+            {announcement && !read && (
+              <span className="absolute top-1 right-1 w-2.5 h-2.5 rounded-full bg-destructive animate-pulse" />
+            )}
+          </span>
+          <div className="flex flex-col">
+            <span className="text-sm font-medium text-foreground leading-tight">
+              {lang === "zh" ? "公告" : "Announcements"}
+            </span>
+            <span className="text-[11px] text-muted-foreground leading-tight">
+              {lang === "zh" ? "管理員的最新通知" : "Latest news from admin"}
+            </span>
+          </div>
         </button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-72 p-4">
-        <h3 className="font-semibold text-foreground text-sm">{displayTitle}</h3>
-        <p className="text-xs text-muted-foreground mt-1 whitespace-pre-wrap">{displayMessage}</p>
+      <PopoverContent align="end" side="left" className="w-72 p-4">
+        {announcement ? (
+          <>
+            <h3 className="font-semibold text-foreground text-sm">{displayTitle}</h3>
+            <p className="text-xs text-muted-foreground mt-1 whitespace-pre-wrap">{displayMessage}</p>
+          </>
+        ) : (
+          <p className="text-xs text-muted-foreground">
+            {lang === "zh" ? "目前沒有公告" : "No announcements right now"}
+          </p>
+        )}
       </PopoverContent>
     </Popover>
   );

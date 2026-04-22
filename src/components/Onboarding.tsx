@@ -314,7 +314,7 @@ const Onboarding = ({
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "apple",
       options: {
-        redirectTo: "https://pacecalculator.fun",
+        redirectTo: window.location.origin,
       },
     });
     if (error) {

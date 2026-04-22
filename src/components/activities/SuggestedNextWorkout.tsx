@@ -261,6 +261,26 @@ const SuggestedNextWorkout = ({ lang, latestActivityId, latestActivityDate }: Pr
         `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
       const todayDate = fmtLocal(new Date());
       const lastActivityDateStr = latestActivityDate ? fmtLocal(new Date(latestActivityDate)) : null;
+
+      // Fetch today's weather (with hourly forecast) so the AI can advise the
+      // best time to run. Uses the same city the WeatherWidget uses.
+      let weather: any = null;
+      try {
+        const city = (localStorage.getItem("weather_city") || "Hong Kong").trim();
+        const projectRef = (import.meta as any).env.VITE_SUPABASE_PROJECT_ID;
+        const pubKey = (import.meta as any).env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
+        const wRes = await fetch(
+          `https://${projectRef}.supabase.co/functions/v1/get-weather?city=${encodeURIComponent(city)}`,
+          { headers: { apikey: pubKey, Authorization: `Bearer ${pubKey}` } },
+        );
+        if (wRes.ok) {
+          const w = await wRes.json();
+          if (w && !w.error) weather = w;
+        }
+      } catch (e) {
+        console.warn("[SuggestedNextWorkout] weather fetch failed:", e);
+      }
+
       const { data, error } = await supabase.functions.invoke("generate-suggested-workout", {
         body: {
           lang,
@@ -269,6 +289,7 @@ const SuggestedNextWorkout = ({ lang, latestActivityId, latestActivityDate }: Pr
           lastActivityDate: lastActivityDateStr,
           workoutType,
           workoutTypeLabel: WORKOUT_TYPE_LABELS[workoutType].en,
+          weather,
         },
       });
       if (error) throw error;

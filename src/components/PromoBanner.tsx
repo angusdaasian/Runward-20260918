@@ -53,7 +53,9 @@ const PromoBanner = ({ lang, userId, forceShow = false, triggerKey = 0, onClose 
   const [dragOffset, setDragOffset] = useState(0);
 
   useEffect(() => {
-    if (!forceShow) {
+    // Manual trigger: any non-zero key bypasses the daily seen flag
+    const manualTrigger = triggerKey > 0;
+    if (!forceShow && !manualTrigger) {
       const seenKey = `${STORAGE_PREFIX}${userId ?? "guest"}`;
       const lastSeen = localStorage.getItem(seenKey);
       if (lastSeen === todayKey()) return;

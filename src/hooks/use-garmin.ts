@@ -7,6 +7,13 @@ import { toast } from "sonner";
 import { Lang } from "@/lib/i18n";
 import { clearGarminSsoTransientState, GARMIN_SSO_KEYS, getGarminSsoValue, setGarminSsoValue } from "@/lib/garminSso";
 import { isNativeApp } from "@/lib/nativeDetection";
+import despia from "despia-native";
+
+const NATIVE_GARMIN_CALLBACK_PATH = "/garmin-native-callback.html";
+
+function getDespiaOauthScheme() {
+  return "runward";
+}
 
 async function extractFunctionErrorMessage(error: unknown): Promise<string | null> {
   if (error instanceof FunctionsHttpError) {
@@ -82,7 +89,10 @@ export function useGarmin(lang: Lang) {
         setGarminSsoValue(GARMIN_SSO_KEYS.mobileServiceUrl, mobileServiceUrl);
 
         if (isNative) {
-          window.location.href = `/garmin-mobile-auth?embedUrl=${encodeURIComponent(mobileEmbedUrl)}&serviceUrl=${encodeURIComponent(mobileServiceUrl)}`;
+          if (popup && !popup.closed) popup.close();
+          const nativeCallbackUrl = `${window.location.origin}${NATIVE_GARMIN_CALLBACK_PATH}`;
+          const nativeAuthUrl = `${startData.url}&service=${encodeURIComponent(nativeCallbackUrl)}&source=${encodeURIComponent(nativeCallbackUrl)}&redirectAfterAccountLoginUrl=${encodeURIComponent(nativeCallbackUrl)}&redirectAfterAccountCreationUrl=${encodeURIComponent(nativeCallbackUrl)}`;
+          await despia(`oauth://?url=${encodeURIComponent(nativeAuthUrl)}`);
           return { ok: false };
         }
 

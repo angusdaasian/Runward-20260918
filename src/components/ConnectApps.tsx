@@ -73,6 +73,10 @@ const ConnectApps = ({ lang, onBack }: Props) => {
     if (!raw) return;
     sessionStorage.removeItem(GARMIN_SSO_KEYS.result);
     localStorage.removeItem(GARMIN_SSO_KEYS.result);
+    sessionStorage.removeItem(GARMIN_SSO_KEYS.pending);
+    localStorage.removeItem(GARMIN_SSO_KEYS.pending);
+    sessionStorage.removeItem(GARMIN_SSO_KEYS.callback);
+    localStorage.removeItem(GARMIN_SSO_KEYS.callback);
     try {
       const result = JSON.parse(raw) as { ok: boolean; displayName?: string; error?: string };
       if (result.ok) {

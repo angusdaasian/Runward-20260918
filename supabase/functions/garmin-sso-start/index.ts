@@ -151,7 +151,7 @@ serve(async (req) => {
 
     const nativeUrl = `https://sso.garmin.com/sso/signin?${nativeParams.toString()}`;
 
-    return new Response(JSON.stringify({ url, callback, mobile_embed_url: mobileEmbedUrl, service_url: serviceUrl, native_url: nativeUrl }), {
+    return new Response(JSON.stringify({ url, callback, mobile_embed_url: mobileEmbedUrl, service_url: serviceUrl, native_url: nativeUrl, native_service_url: nativeCallback }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {

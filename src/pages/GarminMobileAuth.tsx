@@ -7,6 +7,7 @@ import {
   GARMIN_SSO_RETURN_URL,
   getGarminSsoValue,
   setGarminSsoResult,
+  setGarminSsoValue,
 } from "@/lib/garminSso";
 
 const GarminMobileAuth = () => {
@@ -14,6 +15,8 @@ const GarminMobileAuth = () => {
   const lang = useMemo(() => (localStorage.getItem("app_lang") as "en" | "zh") || "en", []);
   const query = useMemo(() => new URLSearchParams(window.location.search), []);
   const isPopupMode = query.get("popup") === "1";
+  const ticketFromQuery = query.get("ticket");
+  const errorParam = query.get("error");
   const embedUrl = query.get("embedUrl") || getGarminSsoValue(GARMIN_SSO_KEYS.mobileEmbedUrl) || "";
   const serviceUrl = query.get("serviceUrl") || getGarminSsoValue(GARMIN_SSO_KEYS.mobileServiceUrl) || GARMIN_SSO_EMBED_SERVICE_URL;
 
@@ -22,6 +25,7 @@ const GarminMobileAuth = () => {
     let timeoutId: number | undefined;
 
     const finishAndReturn = (result: { ok: boolean; displayName?: string; error?: string }) => {
+      console.log("[GarminMobileAuth] finishing", { result, isPopupMode, serviceUrl });
       setGarminSsoResult(result);
       clearGarminSsoTransientState();
       if (isPopupMode && window.opener) {
@@ -40,6 +44,7 @@ const GarminMobileAuth = () => {
       if (settled) return;
       settled = true;
       setMessage(lang === "zh" ? "正在完成 Garmin 登入…" : "Finishing Garmin sign-in…");
+      console.log("[GarminMobileAuth] exchanging ticket", { ticket, serviceUrl });
 
       try {
         const { data, error } = await supabase.functions.invoke("garmin-sso-exchange", {
@@ -59,6 +64,17 @@ const GarminMobileAuth = () => {
         });
       }
     };
+
+    if (errorParam) {
+      finishAndReturn({ ok: false, error: errorParam });
+      return;
+    }
+
+    if (ticketFromQuery) {
+      setGarminSsoValue(GARMIN_SSO_KEYS.pending, "1");
+      void finish(ticketFromQuery);
+      return;
+    }
 
     if (!embedUrl) {
       finishAndReturn({
@@ -84,6 +100,7 @@ const GarminMobileAuth = () => {
 
       const ticket = "serviceTicket" in payload ? payload.serviceTicket : ("ticket" in payload ? payload.ticket : null);
       if (typeof ticket === "string" && ticket.startsWith("ST-")) {
+        console.log("[GarminMobileAuth] received Garmin postMessage ticket", { ticket, serviceUrl });
         void finish(ticket);
       }
     };
@@ -101,7 +118,7 @@ const GarminMobileAuth = () => {
       window.removeEventListener("message", onMessage);
       if (timeoutId) window.clearTimeout(timeoutId);
     };
-  }, [embedUrl, isPopupMode, lang, serviceUrl]);
+  }, [embedUrl, errorParam, isPopupMode, lang, serviceUrl, ticketFromQuery]);
 
   return (
     <div className="flex min-h-screen flex-col bg-background text-foreground">
@@ -109,12 +126,14 @@ const GarminMobileAuth = () => {
         {message}
       </div>
       <div className="flex-1 bg-background">
-        <iframe
-          title="Garmin sign-in"
-          src={embedUrl}
-          className="h-full w-full border-0 bg-background"
-          referrerPolicy="strict-origin-when-cross-origin"
-        />
+        {ticketFromQuery || errorParam ? null : (
+          <iframe
+            title="Garmin sign-in"
+            src={embedUrl}
+            className="h-full w-full border-0 bg-background"
+            referrerPolicy="strict-origin-when-cross-origin"
+          />
+        )}
       </div>
     </div>
   );

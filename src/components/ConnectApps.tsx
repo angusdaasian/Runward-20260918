@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { useAppleHealth } from "@/hooks/use-apple-health";
 import { useGarmin } from "@/hooks/use-garmin";
 import { getAppEnvironment } from "@/lib/environment";
+import { GARMIN_SSO_KEYS, getGarminSsoValue } from "@/lib/garminSso";
 
 interface Props {
   lang: Lang;
@@ -51,14 +52,16 @@ const ConnectApps = ({ lang, onBack }: Props) => {
   // Pick up the result of a Garmin redirect-flow sign-in (mobile).
   useEffect(() => {
     if (!user) return;
-    const raw = sessionStorage.getItem("garmin-sso-result");
-    const pending = sessionStorage.getItem("garmin-sso-pending");
+    const raw = getGarminSsoValue(GARMIN_SSO_KEYS.result);
+    const pending = getGarminSsoValue(GARMIN_SSO_KEYS.pending);
 
     // If we returned without ever hitting /garmin-callback (Garmin redirected
     // us elsewhere, e.g. to Connect's own landing page), surface that.
     if (!raw && pending) {
-      sessionStorage.removeItem("garmin-sso-pending");
-      sessionStorage.removeItem("garmin-sso-callback");
+      sessionStorage.removeItem(GARMIN_SSO_KEYS.pending);
+      localStorage.removeItem(GARMIN_SSO_KEYS.pending);
+      sessionStorage.removeItem(GARMIN_SSO_KEYS.callback);
+      localStorage.removeItem(GARMIN_SSO_KEYS.callback);
       toast.error(
         lang === "zh"
           ? "Garmin 登入後沒有返回 — 請再試一次,或在桌面瀏覽器使用。"
@@ -68,7 +71,8 @@ const ConnectApps = ({ lang, onBack }: Props) => {
     }
 
     if (!raw) return;
-    sessionStorage.removeItem("garmin-sso-result");
+    sessionStorage.removeItem(GARMIN_SSO_KEYS.result);
+    localStorage.removeItem(GARMIN_SSO_KEYS.result);
     try {
       const result = JSON.parse(raw) as { ok: boolean; displayName?: string; error?: string };
       if (result.ok) {

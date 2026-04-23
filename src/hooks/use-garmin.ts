@@ -6,6 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { Lang } from "@/lib/i18n";
 import { clearGarminSsoTransientState, GARMIN_SSO_KEYS, getGarminSsoValue, setGarminSsoValue } from "@/lib/garminSso";
+import { isNativeApp } from "@/lib/nativeDetection";
 
 async function extractFunctionErrorMessage(error: unknown): Promise<string | null> {
   if (error instanceof FunctionsHttpError) {
@@ -54,6 +55,7 @@ export function useGarmin(lang: Lang) {
     // top-level browsing context instead of inside our iframe bridge page.
     // If popups are unavailable, fall back to the full-page bridge route.
     const isMobile = /iphone|ipad|ipod|android/i.test(navigator.userAgent);
+    const isNative = isNativeApp() || /despia/i.test(navigator.userAgent) || typeof (window as Window & { despia?: unknown }).despia !== "undefined";
 
     if (isMobile) {
       const popup = window.open("about:blank", "garmin-sso-mobile", "width=520,height=720");
@@ -78,6 +80,11 @@ export function useGarmin(lang: Lang) {
         setGarminSsoValue(GARMIN_SSO_KEYS.pending, "1");
         setGarminSsoValue(GARMIN_SSO_KEYS.mobileEmbedUrl, mobileEmbedUrl);
         setGarminSsoValue(GARMIN_SSO_KEYS.mobileServiceUrl, mobileServiceUrl);
+
+        if (isNative) {
+          window.location.href = `/garmin-mobile-auth?embedUrl=${encodeURIComponent(mobileEmbedUrl)}&serviceUrl=${encodeURIComponent(mobileServiceUrl)}`;
+          return { ok: false };
+        }
 
         if (!popup) {
           window.location.href = "/garmin-mobile-auth";

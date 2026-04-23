@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { GARMIN_SSO_KEYS, getGarminSsoValue, setGarminSsoValue } from "@/lib/garminSso";
 
 const GarminCallback = () => {
   const [message, setMessage] = useState<string>("Signing you in…");
@@ -12,22 +13,21 @@ const GarminCallback = () => {
     // Mobile/redirect flow: no opener — we landed here as a full-page navigation.
     // Exchange the ticket on this page, then redirect back to the connect-apps view.
     if (!window.opener) {
-      const callback = sessionStorage.getItem("garmin-sso-callback") || "";
+      const callback = getGarminSsoValue(GARMIN_SSO_KEYS.callback) || "";
       const returnUrl = "/?tab=more&page=connect-apps";
 
       if (errorParam) {
-        sessionStorage.setItem("garmin-sso-result", JSON.stringify({ ok: false, error: errorParam }));
-        sessionStorage.removeItem("garmin-sso-pending");
+        setGarminSsoValue(GARMIN_SSO_KEYS.result, JSON.stringify({ ok: false, error: errorParam }));
+        sessionStorage.removeItem(GARMIN_SSO_KEYS.pending);
+        localStorage.removeItem(GARMIN_SSO_KEYS.pending);
         window.location.replace(returnUrl);
         return;
       }
 
       if (!ticket) {
-        sessionStorage.setItem(
-          "garmin-sso-result",
-          JSON.stringify({ ok: false, error: "No sign-in ticket received" })
-        );
-        sessionStorage.removeItem("garmin-sso-pending");
+        setGarminSsoValue(GARMIN_SSO_KEYS.result, JSON.stringify({ ok: false, error: "No sign-in ticket received" }));
+        sessionStorage.removeItem(GARMIN_SSO_KEYS.pending);
+        localStorage.removeItem(GARMIN_SSO_KEYS.pending);
         setTimeout(() => window.location.replace(returnUrl), 1500);
         return;
       }
@@ -40,22 +40,18 @@ const GarminCallback = () => {
           });
           if (error || !data?.success) {
             const msg = data?.error || (error instanceof Error ? error.message : "Garmin connection failed");
-            sessionStorage.setItem("garmin-sso-result", JSON.stringify({ ok: false, error: msg }));
+            setGarminSsoValue(GARMIN_SSO_KEYS.result, JSON.stringify({ ok: false, error: msg }));
           } else {
-            sessionStorage.setItem(
-              "garmin-sso-result",
-              JSON.stringify({ ok: true, displayName: data.display_name })
-            );
+            setGarminSsoValue(GARMIN_SSO_KEYS.result, JSON.stringify({ ok: true, displayName: data.display_name }));
           }
         } catch (e) {
           console.error("[GarminCallback] exchange failed:", e);
-          sessionStorage.setItem(
-            "garmin-sso-result",
-            JSON.stringify({ ok: false, error: e instanceof Error ? e.message : "Unknown error" })
-          );
+          setGarminSsoValue(GARMIN_SSO_KEYS.result, JSON.stringify({ ok: false, error: e instanceof Error ? e.message : "Unknown error" }));
         } finally {
-          sessionStorage.removeItem("garmin-sso-pending");
-          sessionStorage.removeItem("garmin-sso-callback");
+          sessionStorage.removeItem(GARMIN_SSO_KEYS.pending);
+          localStorage.removeItem(GARMIN_SSO_KEYS.pending);
+          sessionStorage.removeItem(GARMIN_SSO_KEYS.callback);
+          localStorage.removeItem(GARMIN_SSO_KEYS.callback);
           window.location.replace(returnUrl);
         }
       })();

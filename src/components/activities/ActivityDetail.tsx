@@ -534,6 +534,7 @@ const ActivityDetail = ({ activity, lang, onBack, isPremium, trainingScore }: Pr
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+        </div>
       </div>
 
       <div className="mb-4">

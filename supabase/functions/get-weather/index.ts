@@ -5,7 +5,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
 };
 
@@ -41,21 +41,19 @@ Deno.serve(async (req) => {
       });
     }
 
+    const token = authHeader.replace('Bearer ', '');
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_ANON_KEY')!,
-      { global: { headers: { Authorization: authHeader } } },
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
     );
-
-    const token = authHeader.replace('Bearer ', '');
-    const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
-    if (claimsError || !claimsData?.claims?.sub) {
+    const { data: userData, error: userError } = await supabase.auth.getUser(token);
+    if (userError || !userData?.user?.id) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
-    const userId = claimsData.claims.sub as string;
+    const userId = userData.user.id;
 
     // --- RATE LIMIT ---
     if (!checkRate(userId)) {
@@ -95,12 +93,34 @@ Deno.serve(async (req) => {
     }
 
     const apiUrl = `https://api.weatherapi.com/v1/forecast.json?key=${apiKey}&q=${encodeURIComponent(city)}&days=1&aqi=no&alerts=no`;
-    const res = await fetch(apiUrl);
-    const data = await res.json();
+    const res = await fetch(apiUrl, {
+      headers: { Accept: 'application/json' },
+    });
+    const raw = await res.text();
+    let data: any = null;
+
+    try {
+      data = raw ? JSON.parse(raw) : null;
+    } catch {
+      console.error('[get-weather] Non-JSON upstream response', { status: res.status, body: raw.slice(0, 400) });
+      return new Response(JSON.stringify({ error: 'Weather provider error' }), {
+        status: 502,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     if (!res.ok) {
+      console.error('[get-weather] Upstream request failed', { status: res.status, data });
       return new Response(JSON.stringify({ error: data?.error?.message || 'Weather lookup failed' }), {
-        status: res.status,
+        status: res.status >= 400 && res.status < 500 ? res.status : 502,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (!data?.location || !data?.current) {
+      console.error('[get-weather] Upstream payload missing required fields', data);
+      return new Response(JSON.stringify({ error: 'Weather provider error' }), {
+        status: 502,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
@@ -150,6 +170,7 @@ Deno.serve(async (req) => {
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
     );
   } catch (e) {
+    console.error('[get-weather] Unhandled error', e);
     return new Response(JSON.stringify({ error: (e as Error).message }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

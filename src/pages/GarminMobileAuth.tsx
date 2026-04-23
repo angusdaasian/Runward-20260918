@@ -11,12 +11,25 @@ import {
 const GarminMobileAuth = () => {
   const [message, setMessage] = useState("Continue in Garmin to finish sign-in…");
   const lang = useMemo(() => (localStorage.getItem("app_lang") as "en" | "zh") || "en", []);
-  const embedUrl = sessionStorage.getItem(GARMIN_SSO_KEYS.mobileEmbedUrl) || "";
-  const serviceUrl = sessionStorage.getItem(GARMIN_SSO_KEYS.mobileServiceUrl) || GARMIN_SSO_EMBED_SERVICE_URL;
+  const query = useMemo(() => new URLSearchParams(window.location.search), []);
+  const isPopupMode = query.get("popup") === "1";
+  const embedUrl = query.get("embedUrl") || sessionStorage.getItem(GARMIN_SSO_KEYS.mobileEmbedUrl) || "";
+  const serviceUrl = query.get("serviceUrl") || sessionStorage.getItem(GARMIN_SSO_KEYS.mobileServiceUrl) || GARMIN_SSO_EMBED_SERVICE_URL;
 
   useEffect(() => {
     let settled = false;
     let timeoutId: number | undefined;
+
+    const finishAndReturn = (result: { ok: boolean; displayName?: string; error?: string }) => {
+      setGarminSsoResult(result);
+      if (isPopupMode && window.opener) {
+        window.opener.postMessage({ type: "garmin-mobile-result", result }, window.location.origin);
+        window.close();
+        return;
+      }
+      clearGarminSsoTransientState();
+      window.location.replace(GARMIN_SSO_RETURN_URL);
+    };
 
     const finish = async (ticket: string) => {
       if (settled) return;
@@ -30,28 +43,23 @@ const GarminMobileAuth = () => {
 
         if (error || !data?.success) {
           const msg = data?.error || (error instanceof Error ? error.message : "Garmin connection failed");
-          setGarminSsoResult({ ok: false, error: msg });
+          finishAndReturn({ ok: false, error: msg });
         } else {
-          setGarminSsoResult({ ok: true, displayName: data.display_name });
+          finishAndReturn({ ok: true, displayName: data.display_name });
         }
       } catch (error) {
-        setGarminSsoResult({
+        finishAndReturn({
           ok: false,
           error: error instanceof Error ? error.message : "Unknown error",
         });
-      } finally {
-        clearGarminSsoTransientState();
-        window.location.replace(GARMIN_SSO_RETURN_URL);
       }
     };
 
     if (!embedUrl) {
-      setGarminSsoResult({
+      finishAndReturn({
         ok: false,
         error: lang === "zh" ? "Garmin 登入工作階段已失效，請再試一次" : "Garmin sign-in session expired. Please try again.",
       });
-      clearGarminSsoTransientState();
-      window.location.replace(GARMIN_SSO_RETURN_URL);
       return;
     }
 
@@ -77,12 +85,10 @@ const GarminMobileAuth = () => {
 
     timeoutId = window.setTimeout(() => {
       if (settled) return;
-      setGarminSsoResult({
+      finishAndReturn({
         ok: false,
         error: lang === "zh" ? "Garmin 登入逾時，請再試一次" : "Garmin sign-in timed out. Please try again.",
       });
-      clearGarminSsoTransientState();
-      window.location.replace(GARMIN_SSO_RETURN_URL);
     }, 5 * 60 * 1000);
 
     window.addEventListener("message", onMessage);
@@ -90,7 +96,7 @@ const GarminMobileAuth = () => {
       window.removeEventListener("message", onMessage);
       if (timeoutId) window.clearTimeout(timeoutId);
     };
-  }, [embedUrl, lang, serviceUrl]);
+  }, [embedUrl, isPopupMode, lang, serviceUrl]);
 
   return (
     <div className="flex min-h-screen flex-col bg-background text-foreground">

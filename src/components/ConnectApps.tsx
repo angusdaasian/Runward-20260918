@@ -48,6 +48,37 @@ const ConnectApps = ({ lang, onBack }: Props) => {
     }
   }, [appleHealthConnected]);
 
+  // Pick up the result of a Garmin redirect-flow sign-in (mobile).
+  useEffect(() => {
+    if (!user) return;
+    const raw = sessionStorage.getItem("garmin-sso-result");
+    if (!raw) return;
+    sessionStorage.removeItem("garmin-sso-result");
+    try {
+      const result = JSON.parse(raw) as { ok: boolean; displayName?: string; error?: string };
+      if (result.ok) {
+        toast.success(lang === "zh" ? "Garmin 已連結!" : "Garmin connected!");
+        setGarminConnected(true);
+        (async () => {
+          if (appleHealthConnected) {
+            await supabase.from("apple_health_activities").delete().eq("user_id", user.id);
+            toast.info(
+              lang === "zh"
+                ? "Apple Health 活動已清除,活動數據將由 Garmin 提供"
+                : "Apple Health activities cleared, activities will come from Garmin"
+            );
+          }
+          garmin.syncActivities();
+        })();
+      } else if (result.error) {
+        toast.error(lang === "zh" ? `Garmin 連結失敗:${result.error}` : `Garmin sign-in failed: ${result.error}`);
+      }
+    } catch (e) {
+      console.error("Failed to parse garmin-sso-result:", e);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
+
   // Apple Health can always be connected (alone or alongside a fitness app)
   const handleConnectAppleHealth = async () => {
     const success = await appleHealth.connect();

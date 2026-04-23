@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 const GarminCallback = () => {
   const [message, setMessage] = useState<string>("Signing you in…");
@@ -8,11 +9,60 @@ const GarminCallback = () => {
     const ticket = params.get("ticket");
     const errorParam = params.get("error");
 
+    // Mobile/redirect flow: no opener — we landed here as a full-page navigation.
+    // Exchange the ticket on this page, then redirect back to `/`.
     if (!window.opener) {
-      setMessage("This page must be opened from the app. You can close this tab.");
+      const callback = sessionStorage.getItem("garmin-sso-callback") || "";
+
+      if (errorParam) {
+        sessionStorage.setItem("garmin-sso-result", JSON.stringify({ ok: false, error: errorParam }));
+        sessionStorage.removeItem("garmin-sso-pending");
+        window.location.replace("/");
+        return;
+      }
+
+      if (!ticket) {
+        sessionStorage.setItem(
+          "garmin-sso-result",
+          JSON.stringify({ ok: false, error: "No sign-in ticket received" })
+        );
+        sessionStorage.removeItem("garmin-sso-pending");
+        // Wait briefly in case Garmin double-redirects without params.
+        setTimeout(() => window.location.replace("/"), 1500);
+        return;
+      }
+
+      (async () => {
+        setMessage("Finishing sign-in…");
+        try {
+          const { data, error } = await supabase.functions.invoke("garmin-sso-exchange", {
+            body: { ticket, callback },
+          });
+          if (error || !data?.success) {
+            const msg = data?.error || (error instanceof Error ? error.message : "Garmin connection failed");
+            sessionStorage.setItem("garmin-sso-result", JSON.stringify({ ok: false, error: msg }));
+          } else {
+            sessionStorage.setItem(
+              "garmin-sso-result",
+              JSON.stringify({ ok: true, displayName: data.display_name })
+            );
+          }
+        } catch (e) {
+          console.error("[GarminCallback] exchange failed:", e);
+          sessionStorage.setItem(
+            "garmin-sso-result",
+            JSON.stringify({ ok: false, error: e instanceof Error ? e.message : "Unknown error" })
+          );
+        } finally {
+          sessionStorage.removeItem("garmin-sso-pending");
+          sessionStorage.removeItem("garmin-sso-callback");
+          window.location.replace("/");
+        }
+      })();
       return;
     }
 
+    // Desktop/popup flow: postMessage back to the opener and close.
     try {
       if (errorParam) {
         window.opener.postMessage(
@@ -28,8 +78,6 @@ const GarminCallback = () => {
         setMessage("Signed in! Closing…");
         setTimeout(() => window.close(), 300);
       } else {
-        // No ticket and no error — Garmin sometimes redirects without params on the first hop.
-        // Wait briefly to see if the page navigates again before reporting failure.
         setMessage("Waiting for Garmin…");
         setTimeout(() => {
           window.opener?.postMessage(

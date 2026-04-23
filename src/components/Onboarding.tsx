@@ -801,7 +801,8 @@ const Onboarding = ({
         <TopBar onBack={() => setIsSignInMode(false)} title={t("signIn", lang)} showProgress={false} />
 
         <div className="flex-1 flex flex-col px-6 pt-8 pb-8 max-w-md mx-auto w-full">
-          <LangSwitcher />
+          <div className="flex justify-end mb-6"><LangToggleButton /></div>
+
 
           {switchingLang && (
             <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-background/90">
@@ -909,54 +910,88 @@ const Onboarding = ({
   if (step === 0) {
     return (
       <OnboardingShell>
-        <div className="flex-1 flex flex-col px-6 pt-12 pb-10 max-w-md mx-auto w-full">
-          <LangSwitcher />
+        <div className="relative flex-1 flex flex-col min-h-screen overflow-hidden">
+          {/* Hero photo */}
+          <img
+            src={onboardingHero}
+            alt=""
+            aria-hidden="true"
+            className="absolute inset-0 w-full h-full object-cover"
+          />
+          {/* Darkening + bottom gradient for legibility */}
+          <div className="absolute inset-0 bg-black/35" />
+          <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/85 via-black/55 to-transparent" />
+
+          {/* Top bar — language toggle only, top right */}
+          <div className="relative z-10 flex justify-end px-5 pt-5">
+            <LangToggleButton variant="dark" />
+          </div>
 
           {switchingLang && (
-            <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-background/90">
-              <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mb-4" />
-              <p className="text-sm text-foreground/60">{lang === "zh" ? "切換語言中..." : "Switching language..."}</p>
+            <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/80">
+              <div className="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin mb-4" />
+              <p className="text-sm text-white/80">{lang === "zh" ? "切換語言中..." : "Switching language..."}</p>
             </div>
           )}
 
-          <div className="flex-1 flex flex-col items-center justify-center text-center">
-            <img src={gingrunLogo} alt="RunWard" width={88} height={88} className="mb-8" />
-            <h1 className="font-display text-[40px] leading-[1.05] font-bold tracking-tight text-foreground mb-4">
-              {lang === "zh" ? "用心而跑。" : "Run with intention."}
+          {/* Big editorial headline — bottom-left aligned over photo */}
+          <div className="relative z-10 flex-1 flex flex-col justify-end px-6 pb-8 max-w-md mx-auto w-full">
+            <h1 className="font-display text-white font-extrabold tracking-[-0.02em] leading-[0.95] text-[64px] sm:text-[72px] mb-8">
+              {lang === "zh" ? (
+                <>
+                  每一步<br />都是<br />勝利
+                </>
+              ) : (
+                <>
+                  Every<br />Step Is<br />Victory
+                </>
+              )}
             </h1>
-            <p className="text-foreground/60 text-base max-w-sm">
-              {lang === "zh"
-                ? "由 AI 教練、跑姿分析與真實訓練數據驅動。"
-                : "AI coaching, posture analysis and real training data."}
-            </p>
-          </div>
 
-          <div className="space-y-3">
-            <PrimaryPill onClick={() => setStep(1)}>
-              {lang === "zh" ? "開始" : "Get started"}
-            </PrimaryPill>
+            <div className="text-center mb-5">
+              <p className="text-white text-base font-semibold mb-1">
+                {lang === "zh" ? "歡迎使用 RunWard" : "Welcome to RunWard"}
+              </p>
+              <p className="text-white/70 text-sm">
+                {lang === "zh"
+                  ? "追蹤配速、距離與訓練進度，輕鬆掌握。"
+                  : "Monitor your pace, distance, and progress with ease."}
+              </p>
+            </div>
+
+            <button
+              onClick={() => setStep(1)}
+              className="w-full h-14 rounded-full bg-primary text-primary-foreground text-base font-semibold transition-transform active:scale-[0.98] shadow-lg shadow-black/30"
+            >
+              {lang === "zh" ? "開始你的旅程" : "Start Your Journey"}
+            </button>
+
             <button
               onClick={() => setIsSignInMode(true)}
-              className="w-full h-14 rounded-full border border-border/40 bg-card/60 text-foreground text-base font-semibold transition-colors hover:bg-card"
+              className="w-full text-center text-sm text-white/80 hover:text-white transition-colors py-3 mt-1"
             >
-              {lang === "zh" ? "我已有帳號" : "I have an account"}
+              {lang === "zh" ? "已有帳號？" : "Already have an account? "}
+              <span className="font-semibold text-white underline-offset-4 underline decoration-white/50">
+                {lang === "zh" ? "登入" : "Login"}
+              </span>
             </button>
+
             <button
               onClick={onGuest}
-              className="w-full text-center text-sm text-foreground/50 hover:text-foreground transition-colors py-2"
+              className="w-full text-center text-xs text-white/55 hover:text-white/80 transition-colors py-1"
             >
               {t("continueAsGuest", lang)}
             </button>
-          </div>
 
-          <p className="text-center text-xs text-foreground/50 mt-6">
-            {lang === "zh" ? "繼續即表示您同意我們的" : "By continuing, you agree to our "}
-            <a href="/privacy" className="text-foreground/70 underline">{lang === "zh" ? "隱私權政策" : "Privacy Policy"}</a>
-            {lang === "zh" ? "及" : " and "}
-            <a href="https://www.apple.com/legal/internet-services/itunes/dev/stdeula/" target="_blank" rel="noopener noreferrer" className="text-foreground/70 underline">
-              {lang === "zh" ? "使用條款" : "Terms of Use"}
-            </a>
-          </p>
+            <p className="text-center text-[11px] text-white/45 mt-4 leading-relaxed">
+              {lang === "zh" ? "繼續即表示您同意我們的" : "By continuing, you agree to our "}
+              <a href="/privacy" className="text-white/70 underline">{lang === "zh" ? "隱私權政策" : "Privacy Policy"}</a>
+              {lang === "zh" ? "及" : " and "}
+              <a href="https://www.apple.com/legal/internet-services/itunes/dev/stdeula/" target="_blank" rel="noopener noreferrer" className="text-white/70 underline">
+                {lang === "zh" ? "使用條款" : "Terms of Use"}
+              </a>
+            </p>
+          </div>
         </div>
       </OnboardingShell>
     );

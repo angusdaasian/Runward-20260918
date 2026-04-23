@@ -934,9 +934,15 @@ const Onboarding = ({
             </div>
           )}
 
-          {/* Big editorial headline — bottom-left aligned over photo */}
+          {/* Big editorial headline — fills container width */}
           <div className="relative z-10 flex-1 flex flex-col justify-end px-6 pb-8 max-w-md mx-auto w-full">
-            <h1 className="font-display text-white font-extrabold tracking-[-0.02em] leading-[0.95] text-[64px] sm:text-[72px] mb-8">
+            <h1
+              className="font-display font-extrabold tracking-[-0.03em] leading-[0.92] mb-8 text-center"
+              style={{
+                color: "hsl(75 90% 65%)",
+                fontSize: "clamp(56px, 22vw, 104px)",
+              }}
+            >
               {lang === "zh" ? (
                 <>
                   每一步<br />都是<br />勝利

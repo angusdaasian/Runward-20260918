@@ -41,7 +41,6 @@ export function clearGarminSsoTransientState() {
   for (const storage of GARMIN_SSO_STORAGE_SCOPES) {
     storage.removeItem(GARMIN_SSO_KEYS.callback);
     storage.removeItem(GARMIN_SSO_KEYS.pending);
-    storage.removeItem(GARMIN_SSO_KEYS.result);
     storage.removeItem(GARMIN_SSO_KEYS.mobileEmbedUrl);
     storage.removeItem(GARMIN_SSO_KEYS.mobileServiceUrl);
   }

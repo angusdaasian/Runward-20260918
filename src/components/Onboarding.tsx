@@ -23,6 +23,7 @@ import {
   Timer,
   Lock,
   ArrowRight,
+  type LucideIcon,
 } from "lucide-react";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { Lang, t } from "@/lib/i18n";

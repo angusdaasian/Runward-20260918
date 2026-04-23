@@ -1,4 +1,4 @@
-import { ArrowLeft, Check, RefreshCw, Info, Eye, EyeOff, AlertTriangle } from "lucide-react";
+import { ArrowLeft, Check, RefreshCw, Info, AlertTriangle } from "lucide-react";
 import { Lang, t } from "@/lib/i18n";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -22,13 +22,7 @@ const ConnectApps = ({ lang, onBack }: Props) => {
   const appleHealth = useAppleHealth(lang);
   const garmin = useGarmin(lang);
 
-  // Garmin login form state
-  const [showGarminForm, setShowGarminForm] = useState(false);
-  const [garminEmail, setGarminEmail] = useState("");
-  const [garminPassword, setGarminPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [mfaSessionId, setMfaSessionId] = useState<string | null>(null);
-  const [mfaCode, setMfaCode] = useState("");
+  // Garmin uses a popup to Garmin's real SSO page — no local form state needed.
 
   // A fitness app is Strava, Garmin, or Coros
   const hasFitnessApp = stravaConnected || garminConnected;

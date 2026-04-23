@@ -821,15 +821,6 @@ const Onboarding = ({
             />
           </div>
 
-          {/* Migration notice */}
-          <div className="mb-6 p-4 rounded-2xl border border-warning/30 bg-warning/10">
-            <p className="text-warning text-xs leading-relaxed">
-              {lang === "zh"
-                ? "我們已遷移至新伺服器。如果你是現有用戶，請使用「忘記密碼」重設密碼，或重新註冊帳號。"
-                : "We've migrated to a new server. If you're a returning user, please use \"Forgot Password\" to reset your password, or re-register your account."}
-            </p>
-          </div>
-
           <div className="space-y-3">
             <button
               onClick={handleAppleSignIn}

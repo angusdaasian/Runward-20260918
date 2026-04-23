@@ -27,6 +27,8 @@ const ConnectApps = ({ lang, onBack }: Props) => {
   const [garminEmail, setGarminEmail] = useState("");
   const [garminPassword, setGarminPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [mfaSessionId, setMfaSessionId] = useState<string | null>(null);
+  const [mfaCode, setMfaCode] = useState("");
 
   // A fitness app is Strava, Garmin, or Coros
   const hasFitnessApp = stravaConnected || garminConnected;

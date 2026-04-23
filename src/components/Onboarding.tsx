@@ -30,6 +30,7 @@ import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp
 import { Lang, t } from "@/lib/i18n";
 import { calculateRunningScore, predictTime, formatTime } from "@/lib/vdot";
 import gingrunLogo from "@/assets/gingrun-logo.png";
+import onboardingHero from "@/assets/onboarding-hero.jpg";
 import badge5k from "@/assets/badge-5k.png";
 import badge10k from "@/assets/badge-10k.png";
 import badge21k from "@/assets/badge-21k.png";
@@ -672,17 +673,26 @@ const Onboarding = ({
     return Math.min(3, score);
   })();
 
-  const LangSwitcher = () => (
-    <div className="flex gap-1.5 mb-8">
-      <button
-        onClick={() => { if (lang !== "en") { setSwitchingLang(true); setLang("en"); setTimeout(() => setSwitchingLang(false), 4000); } }}
-        className={`flex-1 py-2.5 rounded-full text-xs font-semibold tracking-wide transition-colors ${lang === "en" ? "bg-primary text-primary-foreground" : "bg-card/60 text-foreground/60 border border-border/30 hover:text-foreground"}`}
-      >English</button>
-      <button
-        onClick={() => { if (lang !== "zh") { setSwitchingLang(true); setLang("zh"); setTimeout(() => setSwitchingLang(false), 4000); } }}
-        className={`flex-1 py-2.5 rounded-full text-xs font-semibold tracking-wide transition-colors ${lang === "zh" ? "bg-primary text-primary-foreground" : "bg-card/60 text-foreground/60 border border-border/30 hover:text-foreground"}`}
-      >中文 (HK)</button>
-    </div>
+  const toggleLang = () => {
+    const next: Lang = lang === "en" ? "zh" : "en";
+    setSwitchingLang(true);
+    setLang(next);
+    setTimeout(() => setSwitchingLang(false), 4000);
+  };
+
+  /** Small circular language toggle — shows the OPPOSITE language as its label. */
+  const LangToggleButton = ({ variant = "light" }: { variant?: "light" | "dark" }) => (
+    <button
+      onClick={toggleLang}
+      aria-label="Switch language"
+      className={`h-9 w-9 rounded-full flex items-center justify-center text-sm font-semibold transition-colors backdrop-blur-md ${
+        variant === "dark"
+          ? "bg-white/15 text-white border border-white/25 hover:bg-white/25"
+          : "bg-card/70 text-foreground border border-border/40 hover:bg-card"
+      }`}
+    >
+      {lang === "en" ? "中" : "EN"}
+    </button>
   );
 
   // ---- SIGN IN MODE ----

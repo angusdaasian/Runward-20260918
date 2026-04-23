@@ -42,17 +42,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isWarmResume] = useState(() => detectWarmResume());
 
   useEffect(() => {
-    // Mark active on visibility changes
+    // Mark active on visibility changes.
+    // IMPORTANT: do NOT setSession / setLoading on resume — onAuthStateChange
+    // already fires when the token changes. Re-setting state here causes the
+    // entire app to re-render and feel like a "refresh" every time the user
+    // returns from the home screen.
     const onVisChange = () => {
       if (document.visibilityState === "hidden") {
         markActive();
-      } else if (document.visibilityState === "visible") {
-        // Re-check session on resume
-        supabase.auth.getSession().then(({ data: { session } }) => {
-          setSession(session);
-          setLoading(false);
-        });
       }
+      // On "visible" we intentionally do nothing. Supabase's auth listener
+      // will emit TOKEN_REFRESHED if needed, which updates session naturally.
     };
     document.addEventListener("visibilitychange", onVisChange);
 

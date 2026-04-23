@@ -41,8 +41,8 @@ export function useGarmin(lang: Lang) {
     queryClient.invalidateQueries({ queryKey: ["planned-workouts", user.id] });
   }, [user, queryClient]);
 
-  const connect = useCallback(async (email: string, password: string): Promise<boolean> => {
-    if (!user) return false;
+  const connect = useCallback(async (email: string, password: string): Promise<{ ok: boolean; needsMfa?: boolean; sessionId?: string }> => {
+    if (!user) return { ok: false };
     setConnecting(true);
     try {
       const { data, error } = await supabase.functions.invoke("garmin-sync", {
@@ -51,15 +51,44 @@ export function useGarmin(lang: Lang) {
       if (error || !data?.success) {
         const msg = data?.error || await extractFunctionErrorMessage(error) || "Garmin authentication failed";
         toast.error(lang === "zh" ? `Garmin 連結失敗：${msg}` : msg);
+        return { ok: false };
+      }
+      if (data.needs_mfa) {
+        // Don't toast — UI will prompt for code
+        return { ok: true, needsMfa: true, sessionId: data.session_id };
+      }
+      toast.success(lang === "zh" ? "Garmin 已連結！" : "Garmin connected!");
+      invalidateActivities();
+      return { ok: true, needsMfa: false };
+    } catch (err) {
+      console.error("Garmin connect error:", err);
+      const msg = await extractFunctionErrorMessage(err);
+      toast.error(lang === "zh" ? `Garmin 連結失敗${msg ? `：${msg}` : ""}` : msg || "Garmin connection failed");
+      return { ok: false };
+    } finally {
+      setConnecting(false);
+    }
+  }, [user, lang, invalidateActivities]);
+
+  const submitMfa = useCallback(async (email: string, password: string, sessionId: string, code: string): Promise<boolean> => {
+    if (!user) return false;
+    setConnecting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("garmin-sync", {
+        body: { action: "login_mfa", email, password, session_id: sessionId, mfa_code: code },
+      });
+      if (error || !data?.success) {
+        const msg = data?.error || await extractFunctionErrorMessage(error) || "Invalid MFA code";
+        toast.error(lang === "zh" ? `驗證失敗：${msg}` : msg);
         return false;
       }
       toast.success(lang === "zh" ? "Garmin 已連結！" : "Garmin connected!");
       invalidateActivities();
       return true;
     } catch (err) {
-      console.error("Garmin connect error:", err);
+      console.error("Garmin MFA error:", err);
       const msg = await extractFunctionErrorMessage(err);
-      toast.error(lang === "zh" ? `Garmin 連結失敗${msg ? `：${msg}` : ""}` : msg || "Garmin connection failed");
+      toast.error(lang === "zh" ? `驗證失敗${msg ? `：${msg}` : ""}` : msg || "MFA verification failed");
       return false;
     } finally {
       setConnecting(false);
@@ -120,5 +149,5 @@ export function useGarmin(lang: Lang) {
     }
   }, [user, lang, invalidateActivities]);
 
-  return { connect, syncActivities, disconnect, connecting, syncing };
+  return { connect, submitMfa, syncActivities, disconnect, connecting, syncing };
 }

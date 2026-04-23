@@ -41,57 +41,112 @@ export function useGarmin(lang: Lang) {
     queryClient.invalidateQueries({ queryKey: ["planned-workouts", user.id] });
   }, [user, queryClient]);
 
-  const connect = useCallback(async (email: string, password: string): Promise<{ ok: boolean; needsMfa?: boolean; sessionId?: string }> => {
+  /**
+   * Opens a popup to Garmin's real SSO sign-in page. Resolves with the connection result
+   * after the popup posts back a ticket and we exchange it on the backend.
+   */
+  const connectViaPopup = useCallback(async (): Promise<{ ok: boolean; displayName?: string }> => {
     if (!user) return { ok: false };
+
+    // Open a placeholder popup *synchronously* from the click handler so popup blockers don't trip.
+    const popup = window.open("about:blank", "garmin-sso", "width=520,height=720");
+    if (!popup) {
+      toast.error(
+        lang === "zh"
+          ? "請允許彈出視窗以登入 Garmin"
+          : "Please allow popups to sign in to Garmin"
+      );
+      return { ok: false };
+    }
+
     setConnecting(true);
     try {
-      const { data, error } = await supabase.functions.invoke("garmin-sync", {
-        body: { action: "login", email, password },
+      // 1) Get the SSO URL (and the callback we registered) from the edge function.
+      const { data: startData, error: startErr } = await supabase.functions.invoke("garmin-sso-start", {
+        body: { origin: window.location.origin },
       });
-      if (error || !data?.success) {
-        const msg = data?.error || await extractFunctionErrorMessage(error) || "Garmin authentication failed";
+      if (startErr || !startData?.url) {
+        const msg = await extractFunctionErrorMessage(startErr) || "Failed to start Garmin sign-in";
+        toast.error(lang === "zh" ? `Garmin 連結失敗：${msg}` : msg);
+        popup.close();
+        return { ok: false };
+      }
+
+      popup.location.href = startData.url;
+
+      // 2) Wait for postMessage from /garmin-callback (or popup-closed timeout).
+      const ticket = await new Promise<string | null>((resolve) => {
+        const TIMEOUT_MS = 5 * 60 * 1000;
+        let pollTimer: number | undefined;
+        let timeoutTimer: number | undefined;
+
+        const cleanup = () => {
+          window.removeEventListener("message", onMessage);
+          if (pollTimer) window.clearInterval(pollTimer);
+          if (timeoutTimer) window.clearTimeout(timeoutTimer);
+        };
+
+        const onMessage = (ev: MessageEvent) => {
+          if (ev.origin !== window.location.origin) return;
+          const data = ev.data;
+          if (!data || typeof data !== "object") return;
+          if (data.type === "garmin-ticket" && typeof data.ticket === "string") {
+            cleanup();
+            resolve(data.ticket);
+          } else if (data.type === "garmin-ticket-error") {
+            cleanup();
+            toast.error(
+              lang === "zh"
+                ? `Garmin 登入失敗：${data.error || "未知錯誤"}`
+                : `Garmin sign-in failed: ${data.error || "unknown error"}`
+            );
+            resolve(null);
+          }
+        };
+
+        window.addEventListener("message", onMessage);
+
+        // Detect manual close.
+        pollTimer = window.setInterval(() => {
+          if (popup.closed) {
+            cleanup();
+            resolve(null);
+          }
+        }, 500);
+
+        timeoutTimer = window.setTimeout(() => {
+          cleanup();
+          if (!popup.closed) popup.close();
+          resolve(null);
+        }, TIMEOUT_MS);
+      });
+
+      if (!ticket) {
+        return { ok: false };
+      }
+
+      // 3) Exchange the ticket on the backend.
+      const { data: exData, error: exErr } = await supabase.functions.invoke("garmin-sso-exchange", {
+        body: { ticket, callback: startData.callback },
+      });
+
+      if (exErr || !exData?.success) {
+        const msg = exData?.error || await extractFunctionErrorMessage(exErr) || "Garmin connection failed";
         toast.error(lang === "zh" ? `Garmin 連結失敗：${msg}` : msg);
         return { ok: false };
       }
-      if (data.needs_mfa) {
-        // Don't toast — UI will prompt for code
-        return { ok: true, needsMfa: true, sessionId: data.session_id };
-      }
+
       toast.success(lang === "zh" ? "Garmin 已連結！" : "Garmin connected!");
       invalidateActivities();
-      return { ok: true, needsMfa: false };
+      return { ok: true, displayName: exData.display_name };
     } catch (err) {
-      console.error("Garmin connect error:", err);
+      console.error("Garmin connectViaPopup error:", err);
       const msg = await extractFunctionErrorMessage(err);
       toast.error(lang === "zh" ? `Garmin 連結失敗${msg ? `：${msg}` : ""}` : msg || "Garmin connection failed");
       return { ok: false };
     } finally {
       setConnecting(false);
-    }
-  }, [user, lang, invalidateActivities]);
-
-  const submitMfa = useCallback(async (email: string, password: string, sessionId: string, code: string): Promise<boolean> => {
-    if (!user) return false;
-    setConnecting(true);
-    try {
-      const { data, error } = await supabase.functions.invoke("garmin-sync", {
-        body: { action: "login_mfa", email, password, session_id: sessionId, mfa_code: code },
-      });
-      if (error || !data?.success) {
-        const msg = data?.error || await extractFunctionErrorMessage(error) || "Invalid MFA code";
-        toast.error(lang === "zh" ? `驗證失敗：${msg}` : msg);
-        return false;
-      }
-      toast.success(lang === "zh" ? "Garmin 已連結！" : "Garmin connected!");
-      invalidateActivities();
-      return true;
-    } catch (err) {
-      console.error("Garmin MFA error:", err);
-      const msg = await extractFunctionErrorMessage(err);
-      toast.error(lang === "zh" ? `驗證失敗${msg ? `：${msg}` : ""}` : msg || "MFA verification failed");
-      return false;
-    } finally {
-      setConnecting(false);
+      if (!popup.closed) popup.close();
     }
   }, [user, lang, invalidateActivities]);
 
@@ -104,14 +159,22 @@ export function useGarmin(lang: Lang) {
       });
       if (error || !data?.success) {
         const msg = data?.error || await extractFunctionErrorMessage(error) || "Sync failed";
-        toast.error(lang === "zh" ? `同步失敗：${msg}` : msg);
+        if (data?.reauth_required) {
+          toast.error(
+            lang === "zh"
+              ? "Garmin 連結已過期，請重新登入"
+              : "Garmin sign-in expired — please reconnect"
+          );
+        } else {
+          toast.error(lang === "zh" ? `同步失敗：${msg}` : msg);
+        }
         return false;
       }
 
       const detailsFetched = data.details_fetched ?? 0;
       toast.success(
         lang === "zh"
-          ? `已同步 ${data.synced} 筆活動${detailsFetched > 0 ? `，已取得 ${detailsFetched} 筆詳細資料` : ""}`
+          ? `已同步 ${data.synced} 筆活動${detailsFetched > 0 ? `,已取得 ${detailsFetched} 筆詳細資料` : ""}`
           : `Synced ${data.synced} activities${detailsFetched > 0 ? `, ${detailsFetched} details fetched` : ""}`
       );
 
@@ -120,7 +183,7 @@ export function useGarmin(lang: Lang) {
     } catch (err) {
       console.error("Garmin sync error:", err);
       const msg = await extractFunctionErrorMessage(err);
-      toast.error(lang === "zh" ? `同步失敗${msg ? `：${msg}` : ""}` : msg || "Sync failed");
+      toast.error(lang === "zh" ? `同步失敗${msg ? `:${msg}` : ""}` : msg || "Sync failed");
       return false;
     } finally {
       setSyncing(false);
@@ -135,7 +198,7 @@ export function useGarmin(lang: Lang) {
       });
       if (error || !data?.success) {
         const msg = data?.error || await extractFunctionErrorMessage(error) || "Failed to disconnect";
-        toast.error(lang === "zh" ? `中斷連結失敗：${msg}` : msg);
+        toast.error(lang === "zh" ? `中斷連結失敗:${msg}` : msg);
         return false;
       }
       toast.success(lang === "zh" ? "已中斷 Garmin 連結" : "Garmin disconnected");
@@ -144,10 +207,10 @@ export function useGarmin(lang: Lang) {
     } catch (err) {
       console.error("Garmin disconnect error:", err);
       const msg = await extractFunctionErrorMessage(err);
-      toast.error(lang === "zh" ? `中斷連結失敗${msg ? `：${msg}` : ""}` : msg || "Failed to disconnect");
+      toast.error(lang === "zh" ? `中斷連結失敗${msg ? `:${msg}` : ""}` : msg || "Failed to disconnect");
       return false;
     }
   }, [user, lang, invalidateActivities]);
 
-  return { connect, submitMfa, syncActivities, disconnect, connecting, syncing };
+  return { connectViaPopup, syncActivities, disconnect, connecting, syncing };
 }

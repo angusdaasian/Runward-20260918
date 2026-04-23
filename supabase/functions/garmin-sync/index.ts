@@ -74,112 +74,8 @@ serve(async (req) => {
     const body = await req.json();
     const { action } = body;
 
-    // ── LOGIN ──
-    if (action === "login") {
-      const { email, password } = body;
-      if (!email || !password) {
-        return new Response(JSON.stringify({ error: "Email and password required" }), {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-
-      const { data: stravaConn } = await supabase
-        .from("strava_connections")
-        .select("id")
-        .eq("user_id", user.id)
-        .maybeSingle();
-
-      if (stravaConn) {
-        return new Response(JSON.stringify({ error: "Please disconnect Strava before connecting Garmin" }), {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-
-      const loginRes = await fetch(`${GARMIN_RAILWAY_URL}/garmin-login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
-
-      if (!loginRes.ok) {
-        const errData = await loginRes.json().catch(() => ({}));
-        console.error("Garmin login failed:", errData);
-        return new Response(JSON.stringify({ error: errData.detail || "Garmin authentication failed" }), {
-          status: loginRes.status === 429 ? 429 : 401,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-
-      const loginData = await loginRes.json();
-      console.log("Garmin /garmin-login response:", JSON.stringify(loginData));
-
-      // MFA required — don't save credentials yet, return session_id to client
-      if (loginData.needs_mfa) {
-        console.log("MFA required, returning session_id:", loginData.session_id);
-        return new Response(JSON.stringify({
-          success: true,
-          needs_mfa: true,
-          session_id: loginData.session_id,
-        }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-
-      // No MFA — save credentials
-      await supabase.from("garmin_connections").upsert({
-        user_id: user.id,
-        access_token: email,
-        refresh_token: password,
-        expires_at: new Date(Date.now() + 365 * 86400000).toISOString(),
-        garmin_display_name: null,
-      }, { onConflict: "user_id" });
-
-      return new Response(JSON.stringify({ success: true, needs_mfa: false, display_name: email }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // ── LOGIN MFA ──
-    if (action === "login_mfa") {
-      const { email, password, session_id, mfa_code } = body;
-      if (!email || !password || !session_id || !mfa_code) {
-        return new Response(JSON.stringify({ error: "email, password, session_id, mfa_code required" }), {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-
-      const mfaRes = await fetch(`${GARMIN_RAILWAY_URL}/garmin-login-mfa`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, session_id, mfa_code }),
-      });
-
-      if (!mfaRes.ok) {
-        const errData = await mfaRes.json().catch(() => ({}));
-        console.error("Garmin MFA failed:", errData);
-        return new Response(JSON.stringify({ error: errData.detail || "Invalid MFA code" }), {
-          status: mfaRes.status === 429 ? 429 : 401,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-
-      await mfaRes.json();
-
-      await supabase.from("garmin_connections").upsert({
-        user_id: user.id,
-        access_token: email,
-        refresh_token: password,
-        expires_at: new Date(Date.now() + 365 * 86400000).toISOString(),
-        garmin_display_name: null,
-      }, { onConflict: "user_id" });
-
-      return new Response(JSON.stringify({ success: true, display_name: email }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    // Note: login is now handled by garmin-sso-start + garmin-sso-exchange (popup flow).
+    // The legacy "login" and "login_mfa" actions have been removed.
 
     // ── SYNC ──
     if (action === "sync") {
@@ -197,15 +93,13 @@ serve(async (req) => {
       }
 
       const garminEmail = conn.access_token;
-      const garminPassword = conn.refresh_token;
 
-      // ── Phase 1: Fetch basic activity list (no detail_limit) ──
+      // ── Phase 1: Fetch basic activity list (token-based, no password) ──
       const actRes = await fetch(`${GARMIN_RAILWAY_URL}/garmin-activities`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           email: garminEmail,
-          password: garminPassword || "",
           days: body.days || 30,
           detail_limit: 0,
         }),
@@ -214,6 +108,12 @@ serve(async (req) => {
       if (!actRes.ok) {
         const errData = await actRes.json().catch(() => ({}));
         console.error("Garmin activity fetch failed:", errData);
+        if (actRes.status === 401) {
+          return new Response(JSON.stringify({ error: "Garmin sign-in expired", reauth_required: true }), {
+            status: 401,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
         return new Response(JSON.stringify({ error: errData.detail || "Failed to fetch Garmin activities" }), {
           status: 500,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -291,7 +191,6 @@ serve(async (req) => {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               email: garminEmail,
-              password: garminPassword || "",
               activity_ids: activityIds,
             }),
           });

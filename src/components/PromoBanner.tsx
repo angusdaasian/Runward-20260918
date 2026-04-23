@@ -52,6 +52,22 @@ const PromoBanner = ({ lang, userId, forceShow = false, triggerKey = 0, onClose 
   const touchDeltaX = useRef(0);
   const [dragOffset, setDragOffset] = useState(0);
 
+  // Per-image natural aspect ratios (width / height)
+  const [ratios, setRatios] = useState<Record<string, number>>({});
+  const trackRef = useRef<HTMLDivElement>(null);
+  const [trackWidth, setTrackWidth] = useState(0);
+
+  useEffect(() => {
+    if (!open) return;
+    const el = trackRef.current;
+    if (!el) return;
+    const update = () => setTrackWidth(el.clientWidth);
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [open]);
+
   useEffect(() => {
     // Manual trigger: any non-zero key bypasses the daily seen flag
     const manualTrigger = triggerKey > 0;
@@ -158,15 +174,22 @@ const PromoBanner = ({ lang, userId, forceShow = false, triggerKey = 0, onClose 
           <X size={18} />
         </button>
 
-        {/* Image carousel */}
+        {/* Image carousel — height follows current slide's natural aspect ratio */}
         <div
-          className="relative overflow-hidden rounded-2xl shadow-2xl bg-card touch-pan-y"
+          ref={trackRef}
+          className="relative overflow-hidden rounded-2xl shadow-2xl bg-card touch-pan-y transition-[height] duration-300 ease-out"
+          style={{
+            height:
+              trackWidth && ratios[banners[current].id]
+                ? `${trackWidth / ratios[banners[current].id]}px`
+                : undefined,
+          }}
           onTouchStart={onTouchStart}
           onTouchMove={onTouchMove}
           onTouchEnd={onTouchEnd}
         >
           <div
-            className="flex transition-transform duration-300 ease-out"
+            className="flex h-full transition-transform duration-300 ease-out"
             style={{
               transform: `translateX(calc(${-current * 100}% + ${dragOffset}px))`,
               transitionDuration: dragOffset === 0 ? "300ms" : "0ms",
@@ -176,7 +199,7 @@ const PromoBanner = ({ lang, userId, forceShow = false, triggerKey = 0, onClose 
               const cap = lang === "zh" && b.caption_zh ? b.caption_zh : b.caption;
               const failed = imgError[b.id];
               const inner = (
-                <div className="w-full shrink-0 bg-muted">
+                <div className="w-full h-full shrink-0 bg-card flex items-center justify-center">
                   {failed ? (
                     <div className="w-full aspect-[4/5] flex flex-col items-center justify-center text-muted-foreground p-6 text-center">
                       <span className="text-sm">Image failed to load</span>
@@ -186,8 +209,17 @@ const PromoBanner = ({ lang, userId, forceShow = false, triggerKey = 0, onClose 
                     <img
                       src={b.image_url}
                       alt={cap || "Promotion"}
-                      className="w-full h-auto block select-none"
+                      className="w-full h-full object-contain block select-none"
                       draggable={false}
+                      onLoad={(e) => {
+                        const img = e.currentTarget;
+                        if (img.naturalWidth && img.naturalHeight) {
+                          setRatios((r) => ({
+                            ...r,
+                            [b.id]: img.naturalWidth / img.naturalHeight,
+                          }));
+                        }
+                      }}
                       onError={() => {
                         console.error("[PromoBanner] image failed", b.image_url);
                         setImgError((s) => ({ ...s, [b.id]: true }));
@@ -203,12 +235,12 @@ const PromoBanner = ({ lang, userId, forceShow = false, triggerKey = 0, onClose 
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={handleClose}
-                  className="w-full shrink-0"
+                  className="w-full h-full shrink-0"
                 >
                   {inner}
                 </a>
               ) : (
-                <div key={b.id} className="w-full shrink-0">
+                <div key={b.id} className="w-full h-full shrink-0">
                   {inner}
                 </div>
               );

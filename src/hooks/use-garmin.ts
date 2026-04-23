@@ -43,26 +43,18 @@ export function useGarmin(lang: Lang) {
 
   /**
    * Connects Garmin. On desktop, opens a popup to Garmin's real SSO page.
-   * On mobile (where popup windows are unreliable), opens Garmin in a new tab and
-   * waits for the callback tab to broadcast the result via localStorage.
+   * On mobile (where popups are unreliable / often blocked), does a full-page redirect
+   * and resumes the exchange when the user lands back on the app.
    */
   const connectViaPopup = useCallback(async (): Promise<{ ok: boolean; displayName?: string }> => {
     if (!user) return { ok: false };
 
+    // Mobile: popups are unreliable on iOS Safari and many Android browsers.
+    // Use a full-page redirect instead. The callback page will exchange the ticket
+    // itself and then redirect back here.
     const isMobile = /iphone|ipad|ipod|android/i.test(navigator.userAgent);
 
     if (isMobile) {
-      // Open the new tab synchronously from the click so the browser allows it.
-      const newTab = window.open("about:blank", "_blank");
-      if (!newTab) {
-        toast.error(
-          lang === "zh"
-            ? "請允許開啟新分頁以登入 Garmin"
-            : "Please allow new tabs to sign in to Garmin"
-        );
-        return { ok: false };
-      }
-
       setConnecting(true);
       try {
         const { data: startData, error: startErr } = await supabase.functions.invoke("garmin-sso-start", {
@@ -71,60 +63,21 @@ export function useGarmin(lang: Lang) {
         if (startErr || !startData?.url) {
           const msg = await extractFunctionErrorMessage(startErr) || "Failed to start Garmin sign-in";
           toast.error(lang === "zh" ? `Garmin 連結失敗:${msg}` : msg);
-          newTab.close();
           setConnecting(false);
           return { ok: false };
         }
-        // The callback tab needs to know which `service` URL we registered.
-        localStorage.setItem("garmin-sso-callback", startData.callback ?? "");
-        newTab.location.href = startData.url;
-
-        // Wait for the callback tab to write the result to localStorage.
-        const result = await new Promise<{ ok: boolean; displayName?: string; error?: string } | null>((resolve) => {
-          const TIMEOUT_MS = 10 * 60 * 1000;
-          const KEY = "garmin-sso-result";
-          let timeoutTimer: number | undefined;
-
-          const finish = (value: { ok: boolean; displayName?: string; error?: string } | null) => {
-            window.removeEventListener("storage", onStorage);
-            if (timeoutTimer) window.clearTimeout(timeoutTimer);
-            resolve(value);
-          };
-
-          const onStorage = (ev: StorageEvent) => {
-            if (ev.key !== KEY || !ev.newValue) return;
-            try {
-              finish(JSON.parse(ev.newValue));
-            } catch {
-              finish(null);
-            }
-            localStorage.removeItem(KEY);
-          };
-
-          window.addEventListener("storage", onStorage);
-          timeoutTimer = window.setTimeout(() => finish(null), TIMEOUT_MS);
-        });
-
-        if (!result) return { ok: false };
-        if (!result.ok) {
-          toast.error(
-            lang === "zh"
-              ? `Garmin 連結失敗:${result.error || "未知錯誤"}`
-              : `Garmin sign-in failed: ${result.error || "unknown error"}`
-          );
-          return { ok: false };
-        }
-
-        toast.success(lang === "zh" ? "Garmin 已連結!" : "Garmin connected!");
-        invalidateActivities();
-        return { ok: true, displayName: result.displayName };
+        // Remember the callback for the exchange step + flag so we know we're returning from Garmin.
+        sessionStorage.setItem("garmin-sso-callback", startData.callback ?? "");
+        sessionStorage.setItem("garmin-sso-pending", "1");
+        window.location.href = startData.url;
+        // The page is being unloaded; nothing to return.
+        return { ok: false };
       } catch (err) {
-        console.error("Garmin mobile connect error:", err);
+        console.error("Garmin redirect start error:", err);
         const msg = await extractFunctionErrorMessage(err);
         toast.error(lang === "zh" ? `Garmin 連結失敗${msg ? `:${msg}` : ""}` : msg || "Garmin connection failed");
-        return { ok: false };
-      } finally {
         setConnecting(false);
+        return { ok: false };
       }
     }
 

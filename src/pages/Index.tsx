@@ -58,8 +58,14 @@ const Index = () => {
   // Preload header profile as soon as user is known
   useEffect(() => {
     if (user) preloadHeaderProfile(user.id);
-  }, [user]);
+  }, [user?.id]);
 
+  // Key the entry-resolution effect off user.id (stable string) — NOT the
+  // user object reference. Supabase emits new session objects on token refresh
+  // and on app resume; if we depend on `user` directly the effect re-runs
+  // every time, flipping checkingProfile=true and showing the skeleton
+  // (which the user perceives as a "refresh" when returning from home screen).
+  const userId = user?.id ?? null;
   useEffect(() => {
     if (loading) return;
 
@@ -74,7 +80,7 @@ const Index = () => {
     let onboardingTimeout: number | null = null;
 
     const resolveEntryState = async () => {
-      if (!user && !isGuest) {
+      if (!userId && !isGuest) {
         setCheckingProfile(true);
         setShowOnboarding(false);
         onboardingTimeout = window.setTimeout(() => {
@@ -85,7 +91,7 @@ const Index = () => {
         return;
       }
 
-      if (user) {
+      if (userId) {
         setShowOnboarding(false);
         setCheckingProfile(true);
 
@@ -94,7 +100,7 @@ const Index = () => {
           const { data } = await supabase
             .from("profiles")
             .select("onboarding_completed")
-            .eq("user_id", user.id)
+            .eq("user_id", userId)
             .single();
 
           if (!isActive) return;
@@ -121,7 +127,7 @@ const Index = () => {
         window.clearTimeout(onboardingTimeout);
       }
     };
-  }, [user, loading, isGuest]);
+  }, [userId, loading, isGuest]);
 
   // During loading: warm resume shows skeleton of last page, cold start shows splash
   const suppressAppLoading = sessionStorage.getItem(ONBOARDING_SIGNUP_IN_PROGRESS_KEY) === "true";

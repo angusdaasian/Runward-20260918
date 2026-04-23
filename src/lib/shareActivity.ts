@@ -1,19 +1,28 @@
 /**
  * Share an activity as a generated image card.
  *
- * Renders a polished summary card on a <canvas>, then:
- *  1. On native (Despia) → saves to camera roll via `savethisimage://`
- *  2. On Web Share API capable browsers → shares the PNG as a File
- *  3. Otherwise → triggers a download of the PNG
+ * Renders a Strava-style summary on a <canvas>:
+ *  - Top half: hero photo with activity title + stat row (Distance / Pace / Time)
+ *  - Bottom: notepad-styled card containing the AI analysis
+ *  - Footer: Runward branding (logo + url)
  *
- * Always includes Runward branding for marketing purposes.
+ * Distribution:
+ *  1. Native (Despia) → save to camera roll via `savethisimage://`
+ *  2. Web Share API → share PNG as a File
+ *  3. Otherwise → download the PNG
  */
 import despia from "despia-native";
 import { Lang } from "@/lib/i18n";
 import { toast } from "sonner";
 
+import appIcon from "@/assets/app-icon.png";
+import bg1 from "@/assets/share-bg-1.jpg";
+import bg2 from "@/assets/share-bg-2.jpg";
+import bg3 from "@/assets/share-bg-3.jpg";
+
 const APP_NAME = "Runward";
 const APP_URL = "https://runward.app";
+const HEROES = [bg1, bg2, bg3];
 
 export interface ShareActivityInput {
   name: string;
@@ -28,12 +37,18 @@ export interface ShareActivityInput {
 
 // ---------------- formatting helpers ----------------
 
-function fmtDuration(seconds: number): string {
+function fmtDistance(meters: number): string {
+  return (meters / 1000).toFixed(2);
+}
+
+function fmtTimeShort(seconds: number, isZh: boolean): string {
   const h = Math.floor(seconds / 3600);
   const m = Math.floor((seconds % 3600) / 60);
   const s = Math.floor(seconds % 60);
-  if (h > 0) return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
-  return `${m}:${String(s).padStart(2, "0")}`;
+  if (h > 0) {
+    return isZh ? `${h}時 ${m}分` : `${h}h ${m}m`;
+  }
+  return isZh ? `${m}分 ${s}秒` : `${m}m ${s}s`;
 }
 
 function fmtPace(avgSpeed: number, isZh: boolean): string {
@@ -41,7 +56,7 @@ function fmtPace(avgSpeed: number, isZh: boolean): string {
   const paceSec = 1000 / avgSpeed;
   const min = Math.floor(paceSec / 60);
   const sec = Math.floor(paceSec % 60);
-  return `${min}:${String(sec).padStart(2, "0")}${isZh ? "/公里" : "/km"}`;
+  return `${min}:${String(sec).padStart(2, "0")} ${isZh ? "/公里" : "/km"}`;
 }
 
 function fmtDate(iso: string, lang: Lang): string {
@@ -73,52 +88,22 @@ function stripMarkdown(md: string): string {
     .trim();
 }
 
-// ---------------- canvas rendering ----------------
+// ---------------- canvas helpers ----------------
 
-/** Word-wrap text within maxWidth. Returns the y position after the block. */
-function wrapText(
-  ctx: CanvasRenderingContext2D,
-  text: string,
-  x: number,
-  y: number,
-  maxWidth: number,
-  lineHeight: number,
-  maxLines: number,
-): number {
-  const paragraphs = text.split("\n");
-  let lines: string[] = [];
-  for (const para of paragraphs) {
-    if (!para.trim()) {
-      lines.push("");
-      continue;
-    }
-    // Char-by-char wrap so it works for both CJK and Latin text.
-    let current = "";
-    for (const ch of para) {
-      const test = current + ch;
-      if (ctx.measureText(test).width > maxWidth && current.length > 0) {
-        lines.push(current);
-        current = ch;
-      } else {
-        current = test;
-      }
-    }
-    if (current) lines.push(current);
-  }
-  if (lines.length > maxLines) {
-    lines = lines.slice(0, maxLines);
-    const last = lines[maxLines - 1];
-    // Trim last line to fit ellipsis
-    let trimmed = last;
-    while (ctx.measureText(trimmed + "…").width > maxWidth && trimmed.length > 0) {
-      trimmed = trimmed.slice(0, -1);
-    }
-    lines[maxLines - 1] = trimmed + "…";
-  }
-  for (let i = 0; i < lines.length; i++) {
-    ctx.fillText(lines[i], x, y + i * lineHeight);
-  }
-  return y + lines.length * lineHeight;
+function loadImage(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = src;
+  });
+}
+
+function pickHero(seed: string): string {
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
+  return HEROES[h % HEROES.length];
 }
 
 function roundedRect(
@@ -142,6 +127,84 @@ function roundedRect(
   ctx.closePath();
 }
 
+/** Draw image cropped to fill the target rect (object-cover). */
+function drawCover(
+  ctx: CanvasRenderingContext2D,
+  img: HTMLImageElement,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+) {
+  const ir = img.width / img.height;
+  const tr = w / h;
+  let sx = 0,
+    sy = 0,
+    sw = img.width,
+    sh = img.height;
+  if (ir > tr) {
+    // Image wider → crop sides
+    sw = img.height * tr;
+    sx = (img.width - sw) / 2;
+  } else {
+    sh = img.width / tr;
+    sy = (img.height - sh) / 2;
+  }
+  ctx.drawImage(img, sx, sy, sw, sh, x, y, w, h);
+}
+
+/** Word-wrap text within maxWidth. Returns the y position after the block. */
+function wrapText(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  x: number,
+  y: number,
+  maxWidth: number,
+  lineHeight: number,
+  maxLines: number,
+): number {
+  const paragraphs = text.split("\n");
+  let lines: string[] = [];
+  for (const para of paragraphs) {
+    if (!para.trim()) {
+      lines.push("");
+      continue;
+    }
+    let current = "";
+    for (const ch of para) {
+      const test = current + ch;
+      if (ctx.measureText(test).width > maxWidth && current.length > 0) {
+        lines.push(current);
+        current = ch;
+      } else {
+        current = test;
+      }
+    }
+    if (current) lines.push(current);
+  }
+  if (lines.length > maxLines) {
+    lines = lines.slice(0, maxLines);
+    let trimmed = lines[maxLines - 1];
+    while (ctx.measureText(trimmed + "…").width > maxWidth && trimmed.length > 0) {
+      trimmed = trimmed.slice(0, -1);
+    }
+    lines[maxLines - 1] = trimmed + "…";
+  }
+  for (let i = 0; i < lines.length; i++) {
+    ctx.fillText(lines[i], x, y + i * lineHeight);
+  }
+  return y + lines.length * lineHeight;
+}
+
+// ---------------- card renderer ----------------
+
+const FONT_DISPLAY =
+  "-apple-system, 'SF Pro Display', 'PingFang TC', 'Helvetica Neue', system-ui, sans-serif";
+const FONT_TEXT =
+  "-apple-system, 'SF Pro Text', 'PingFang TC', 'Helvetica Neue', system-ui, sans-serif";
+const FONT_HAND =
+  "'Bradley Hand', 'Noteworthy', 'Marker Felt', 'Comic Sans MS', 'PingFang TC', cursive";
+
 async function renderShareCard(input: ShareActivityInput): Promise<Blob> {
   const W = 1080;
   const H = 1920;
@@ -152,127 +215,226 @@ async function renderShareCard(input: ShareActivityInput): Promise<Blob> {
   canvas.height = H;
   const ctx = canvas.getContext("2d")!;
 
-  // Background gradient (Runward orange → deep navy)
-  const bg = ctx.createLinearGradient(0, 0, W, H);
-  bg.addColorStop(0, "#FC4C02");
-  bg.addColorStop(0.55, "#7A1F00");
-  bg.addColorStop(1, "#0B0F1A");
-  ctx.fillStyle = bg;
+  // Base background
+  ctx.fillStyle = "#0B0F1A";
   ctx.fillRect(0, 0, W, H);
 
-  // Soft radial highlight
-  const glow = ctx.createRadialGradient(W * 0.2, H * 0.15, 50, W * 0.2, H * 0.15, 900);
-  glow.addColorStop(0, "rgba(255,255,255,0.25)");
-  glow.addColorStop(1, "rgba(255,255,255,0)");
-  ctx.fillStyle = glow;
-  ctx.fillRect(0, 0, W, H);
-
-  // ---------- Header ----------
-  ctx.fillStyle = "rgba(255,255,255,0.95)";
-  ctx.font = "700 56px -apple-system, 'SF Pro Display', 'PingFang TC', 'Segoe UI', system-ui, sans-serif";
-  ctx.textBaseline = "top";
-  ctx.fillText(APP_NAME, 80, 90);
-
-  ctx.fillStyle = "rgba(255,255,255,0.65)";
-  ctx.font = "400 32px -apple-system, 'SF Pro Text', 'PingFang TC', 'Segoe UI', sans-serif";
-  ctx.fillText(fmtDate(input.startDate, input.lang), 80, 165);
-
-  // ---------- Activity name ----------
-  ctx.fillStyle = "#FFFFFF";
-  ctx.font = "800 76px -apple-system, 'SF Pro Display', 'PingFang TC', 'Segoe UI', sans-serif";
-  let y = wrapText(ctx, input.name, 80, 280, W - 160, 86, 2);
-
-  // ---------- Stats card ----------
-  const cardX = 60;
-  const cardY = y + 60;
-  const cardW = W - 120;
-  const cardH = 360;
-  ctx.fillStyle = "rgba(255,255,255,0.10)";
-  roundedRect(ctx, cardX, cardY, cardW, cardH, 32);
-  ctx.fill();
-  ctx.strokeStyle = "rgba(255,255,255,0.18)";
-  ctx.lineWidth = 2;
-  ctx.stroke();
-
-  const km = (input.distanceMeters / 1000).toFixed(2);
-  const stats: Array<{ label: string; value: string }> = [
-    { label: isZh ? "距離" : "DISTANCE", value: `${km} ${isZh ? "公里" : "km"}` },
-    { label: isZh ? "時間" : "TIME", value: fmtDuration(input.movingTimeSeconds) },
-    { label: isZh ? "配速" : "PACE", value: fmtPace(input.averageSpeed, isZh) },
-  ];
-
-  const colW = cardW / stats.length;
-  stats.forEach((s, i) => {
-    const cx = cardX + colW * i + colW / 2;
-    ctx.textAlign = "center";
-
-    ctx.fillStyle = "rgba(255,255,255,0.55)";
-    ctx.font = "600 26px -apple-system, 'SF Pro Text', 'PingFang TC', sans-serif";
-    ctx.fillText(s.label, cx, cardY + 70);
-
-    ctx.fillStyle = "#FFFFFF";
-    ctx.font = "800 78px -apple-system, 'SF Pro Display', 'PingFang TC', sans-serif";
-    ctx.fillText(s.value, cx, cardY + 130);
-
-    // divider
-    if (i < stats.length - 1) {
-      ctx.fillStyle = "rgba(255,255,255,0.15)";
-      ctx.fillRect(cardX + colW * (i + 1) - 1, cardY + 60, 2, cardH - 120);
-    }
-  });
-  ctx.textAlign = "left";
-
-  // ---------- AI analysis section ----------
-  let bodyY = cardY + cardH + 70;
-  const bodyMaxY = H - 220;
-
-  if (input.analysis) {
-    ctx.fillStyle = "rgba(255,255,255,0.85)";
-    ctx.font = "700 36px -apple-system, 'SF Pro Display', 'PingFang TC', sans-serif";
-    ctx.fillText(isZh ? "🤖 AI 分析" : "🤖 AI Analysis", 80, bodyY);
-    bodyY += 60;
-
-    ctx.fillStyle = "rgba(255,255,255,0.92)";
-    ctx.font = "400 32px -apple-system, 'SF Pro Text', 'PingFang TC', sans-serif";
-    const cleaned = stripMarkdown(input.analysis);
-    const remaining = bodyMaxY - bodyY;
-    const maxLines = Math.max(0, Math.floor(remaining / 44) - (input.nextWorkout ? 4 : 0));
-    bodyY = wrapText(ctx, cleaned, 80, bodyY, W - 160, 44, maxLines);
-    bodyY += 40;
+  // ---------- Hero photo (top ~58%) ----------
+  const heroH = 1120;
+  const heroSrc = pickHero(input.startDate + input.name);
+  let hero: HTMLImageElement | null = null;
+  try {
+    hero = await loadImage(heroSrc);
+    drawCover(ctx, hero, 0, 0, W, heroH);
+  } catch {
+    // Fallback gradient
+    const g = ctx.createLinearGradient(0, 0, W, heroH);
+    g.addColorStop(0, "#FC4C02");
+    g.addColorStop(1, "#0B0F1A");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, heroH);
   }
 
-  if (input.nextWorkout && bodyY < bodyMaxY - 100) {
-    ctx.fillStyle = "rgba(255,255,255,0.85)";
-    ctx.font = "700 36px -apple-system, 'SF Pro Display', 'PingFang TC', sans-serif";
-    ctx.fillText(isZh ? "🎯 下一步" : "🎯 Next Up", 80, bodyY);
-    bodyY += 60;
+  // Dark vignette over photo for legibility
+  const vignette = ctx.createLinearGradient(0, 0, 0, heroH);
+  vignette.addColorStop(0, "rgba(0,0,0,0.55)");
+  vignette.addColorStop(0.45, "rgba(0,0,0,0.15)");
+  vignette.addColorStop(1, "rgba(0,0,0,0.85)");
+  ctx.fillStyle = vignette;
+  ctx.fillRect(0, 0, W, heroH);
 
-    ctx.fillStyle = "rgba(255,255,255,0.92)";
-    ctx.font = "400 32px -apple-system, 'SF Pro Text', 'PingFang TC', sans-serif";
-    const cleaned = stripMarkdown(input.nextWorkout);
+  // ---------- Header (logo + brand) ----------
+  try {
+    const icon = await loadImage(appIcon);
+    // Rounded mask for icon
+    ctx.save();
+    roundedRect(ctx, 70, 70, 80, 80, 18);
+    ctx.clip();
+    ctx.drawImage(icon, 70, 70, 80, 80);
+    ctx.restore();
+  } catch {
+    // ignore
+  }
+  ctx.fillStyle = "#FFFFFF";
+  ctx.textBaseline = "top";
+  ctx.font = `700 42px ${FONT_DISPLAY}`;
+  ctx.fillText(APP_NAME, 170, 80);
+  ctx.fillStyle = "rgba(255,255,255,0.7)";
+  ctx.font = `500 24px ${FONT_TEXT}`;
+  ctx.fillText(isZh ? "AI 跑步教練" : "AI Running Coach", 170, 130);
+
+  // Date pill (top-right)
+  const dateText = fmtDate(input.startDate, input.lang);
+  ctx.font = `600 24px ${FONT_TEXT}`;
+  const dateW = ctx.measureText(dateText).width;
+  const pillW = dateW + 48;
+  const pillX = W - 70 - pillW;
+  ctx.fillStyle = "rgba(255,255,255,0.18)";
+  roundedRect(ctx, pillX, 80, pillW, 56, 28);
+  ctx.fill();
+  ctx.fillStyle = "#FFFFFF";
+  ctx.fillText(dateText, pillX + 24, 96);
+
+  // ---------- Activity title (over photo, lower-left) ----------
+  ctx.fillStyle = "#FFFFFF";
+  ctx.font = `800 72px ${FONT_DISPLAY}`;
+  ctx.textBaseline = "alphabetic";
+  // Add subtle shadow for legibility
+  ctx.shadowColor = "rgba(0,0,0,0.5)";
+  ctx.shadowBlur = 24;
+  ctx.shadowOffsetY = 4;
+  // Manual wrap, max 2 lines
+  const titleY = heroH - 280;
+  ctx.textBaseline = "top";
+  wrapText(ctx, input.name, 70, titleY, W - 140, 80, 2);
+  ctx.shadowColor = "transparent";
+  ctx.shadowBlur = 0;
+  ctx.shadowOffsetY = 0;
+
+  // ---------- Stat row (Distance / Pace / Time) over photo ----------
+  const stats = [
+    {
+      label: isZh ? "距離" : "Distance",
+      value: `${fmtDistance(input.distanceMeters)} ${isZh ? "公里" : "km"}`,
+    },
+    { label: isZh ? "配速" : "Pace", value: fmtPace(input.averageSpeed, isZh) },
+    { label: isZh ? "時間" : "Time", value: fmtTimeShort(input.movingTimeSeconds, isZh) },
+  ];
+
+  const statsY = heroH - 140;
+  const colW = (W - 140) / stats.length;
+
+  ctx.shadowColor = "rgba(0,0,0,0.5)";
+  ctx.shadowBlur = 18;
+  stats.forEach((s, i) => {
+    const cx = 70 + colW * i;
+    ctx.textBaseline = "top";
+    ctx.fillStyle = "rgba(255,255,255,0.85)";
+    ctx.font = `600 28px ${FONT_TEXT}`;
+    ctx.fillText(s.label, cx, statsY);
+
+    ctx.fillStyle = "#FFFFFF";
+    ctx.font = `800 56px ${FONT_DISPLAY}`;
+    ctx.fillText(s.value, cx, statsY + 44);
+  });
+  ctx.shadowColor = "transparent";
+  ctx.shadowBlur = 0;
+
+  // ---------- Notepad card (AI analysis) ----------
+  const padX = 60;
+  const padY = heroH + 40;
+  const padW = W - 120;
+  const padH = H - padY - 200;
+  const padR = 28;
+
+  // Paper shadow
+  ctx.save();
+  ctx.shadowColor = "rgba(0,0,0,0.45)";
+  ctx.shadowBlur = 30;
+  ctx.shadowOffsetY = 10;
+  ctx.fillStyle = "#FAF7EE";
+  roundedRect(ctx, padX, padY, padW, padH, padR);
+  ctx.fill();
+  ctx.restore();
+
+  // Tape strip (top-left)
+  ctx.save();
+  ctx.translate(padX + 80, padY - 18);
+  ctx.rotate(-0.08);
+  ctx.fillStyle = "rgba(252, 76, 2, 0.55)";
+  ctx.fillRect(-60, -16, 200, 36);
+  ctx.restore();
+
+  // Red margin line + ruled lines (notepad feel)
+  ctx.strokeStyle = "rgba(220, 38, 38, 0.45)";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(padX + 90, padY + 30);
+  ctx.lineTo(padX + 90, padY + padH - 30);
+  ctx.stroke();
+
+  ctx.strokeStyle = "rgba(30, 41, 59, 0.10)";
+  ctx.lineWidth = 1.5;
+  const lineGap = 50;
+  const linesStart = padY + 150;
+  for (let ly = linesStart; ly < padY + padH - 40; ly += lineGap) {
+    ctx.beginPath();
+    ctx.moveTo(padX + 110, ly);
+    ctx.lineTo(padX + padW - 50, ly);
+    ctx.stroke();
+  }
+
+  // Notepad header
+  ctx.fillStyle = "#0F172A";
+  ctx.textBaseline = "top";
+  ctx.font = `700 40px ${FONT_DISPLAY}`;
+  ctx.fillText(isZh ? "教練筆記" : "Coach's Notes", padX + 110, padY + 50);
+
+  // Underline accent
+  ctx.fillStyle = "#FC4C02";
+  ctx.fillRect(padX + 110, padY + 100, 80, 5);
+
+  // Body content
+  const bodyX = padX + 110;
+  let bodyY = linesStart - 38; // sit text on the ruled lines
+  const bodyMaxY = padY + padH - 60;
+  const bodyMaxW = padW - 160;
+  const bodyLineH = lineGap;
+
+  ctx.fillStyle = "#1E293B";
+  ctx.font = `400 30px ${FONT_HAND}`;
+
+  const sections: string[] = [];
+  if (input.analysis) {
+    sections.push(stripMarkdown(input.analysis));
+  }
+  if (input.nextWorkout) {
+    sections.push(
+      (isZh ? "下一步: " : "Next up: ") + stripMarkdown(input.nextWorkout),
+    );
+  }
+  if (sections.length === 0) {
+    sections.push(
+      isZh ? "繼續加油！每一步都算數。" : "Keep it up! Every step counts.",
+    );
+  }
+
+  for (const section of sections) {
     const remaining = bodyMaxY - bodyY;
-    const maxLines = Math.max(0, Math.floor(remaining / 44));
-    bodyY = wrapText(ctx, cleaned, 80, bodyY, W - 160, 44, maxLines);
+    if (remaining < bodyLineH) break;
+    const maxLines = Math.floor(remaining / bodyLineH);
+    bodyY = wrapText(ctx, section, bodyX, bodyY, bodyMaxW, bodyLineH, maxLines);
+    bodyY += bodyLineH * 0.4; // small gap between sections
   }
 
   // ---------- Footer ----------
-  // Footer divider
-  ctx.fillStyle = "rgba(255,255,255,0.15)";
-  ctx.fillRect(80, H - 170, W - 160, 2);
+  const footerY = H - 130;
 
-  // Footer brand row
+  // Brand row
+  try {
+    const icon = await loadImage(appIcon);
+    ctx.save();
+    roundedRect(ctx, 70, footerY, 64, 64, 14);
+    ctx.clip();
+    ctx.drawImage(icon, 70, footerY, 64, 64);
+    ctx.restore();
+  } catch {
+    // ignore
+  }
+
   ctx.fillStyle = "#FFFFFF";
-  ctx.font = "800 44px -apple-system, 'SF Pro Display', 'PingFang TC', sans-serif";
-  ctx.fillText(APP_NAME, 80, H - 130);
+  ctx.textBaseline = "top";
+  ctx.font = `800 36px ${FONT_DISPLAY}`;
+  ctx.fillText(APP_NAME, 150, footerY + 4);
+  ctx.fillStyle = "rgba(255,255,255,0.65)";
+  ctx.font = `500 22px ${FONT_TEXT}`;
+  ctx.fillText(isZh ? "用 AI 訓練得更聰明" : "Train smarter with AI", 150, footerY + 44);
 
-  ctx.fillStyle = "rgba(255,255,255,0.6)";
-  ctx.font = "500 30px -apple-system, 'SF Pro Text', 'PingFang TC', sans-serif";
-  ctx.fillText(isZh ? "AI 跑步教練" : "AI Running Coach", 80, H - 75);
-
+  // URL right-aligned
   ctx.textAlign = "right";
   ctx.fillStyle = "rgba(255,255,255,0.85)";
-  ctx.font = "600 32px -apple-system, 'SF Pro Text', 'PingFang TC', sans-serif";
-  ctx.fillText(APP_URL.replace("https://", ""), W - 80, H - 95);
+  ctx.font = `600 26px ${FONT_TEXT}`;
+  ctx.fillText(APP_URL.replace("https://", ""), W - 70, footerY + 18);
   ctx.textAlign = "left";
 
   return await new Promise<Blob>((resolve, reject) => {
@@ -284,6 +446,8 @@ async function renderShareCard(input: ShareActivityInput): Promise<Blob> {
   });
 }
 
+// ---------------- distribution ----------------
+
 function blobToDataUrl(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -293,7 +457,6 @@ function blobToDataUrl(blob: Blob): Promise<string> {
   });
 }
 
-/** Detect whether the Despia native bridge is available. */
 function hasNativeBridge(): boolean {
   if (typeof window === "undefined") return false;
   return (

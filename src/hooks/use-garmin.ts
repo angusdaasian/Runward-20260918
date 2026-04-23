@@ -9,12 +9,6 @@ import { clearGarminSsoTransientState, GARMIN_SSO_KEYS, getGarminSsoValue, setGa
 import { isNativeApp } from "@/lib/nativeDetection";
 import despia from "despia-native";
 
-const NATIVE_GARMIN_CALLBACK_PATH = "/garmin-native-callback.html";
-
-function getDespiaOauthScheme() {
-  return "runward";
-}
-
 async function extractFunctionErrorMessage(error: unknown): Promise<string | null> {
   if (error instanceof FunctionsHttpError) {
     try {
@@ -65,7 +59,7 @@ export function useGarmin(lang: Lang) {
     const isNative = isNativeApp() || /despia/i.test(navigator.userAgent) || typeof (window as Window & { despia?: unknown }).despia !== "undefined";
 
     if (isMobile) {
-      const popup = window.open("about:blank", "garmin-sso-mobile", "width=520,height=720");
+      const popup = isNative ? null : window.open("about:blank", "garmin-sso-mobile", "width=520,height=720");
       setConnecting(true);
       try {
         const { data: startData, error: startErr } = await supabase.functions.invoke("garmin-sso-start", {
@@ -89,9 +83,7 @@ export function useGarmin(lang: Lang) {
         setGarminSsoValue(GARMIN_SSO_KEYS.mobileServiceUrl, mobileServiceUrl);
 
         if (isNative) {
-          if (popup && !popup.closed) popup.close();
-          const nativeCallbackUrl = `${window.location.origin}${NATIVE_GARMIN_CALLBACK_PATH}`;
-          const nativeAuthUrl = `${startData.url}&service=${encodeURIComponent(nativeCallbackUrl)}&source=${encodeURIComponent(nativeCallbackUrl)}&redirectAfterAccountLoginUrl=${encodeURIComponent(nativeCallbackUrl)}&redirectAfterAccountCreationUrl=${encodeURIComponent(nativeCallbackUrl)}`;
+          const nativeAuthUrl = startData.native_url ?? startData.url;
           await despia(`oauth://?url=${encodeURIComponent(nativeAuthUrl)}`);
           return { ok: false };
         }

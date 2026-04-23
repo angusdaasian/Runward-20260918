@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Garmin sign-in</title>
+  </head>
+  <body>
+    <script>
+      (function () {
+        var params = new URLSearchParams(window.location.search);
+        var ticket = params.get("ticket") || params.get("serviceTicket");
+        var error = params.get("error") || params.get("errorMessage") || "";
+        var target = new URL("runward://oauth/garmin-mobile-auth");
+
+        if (ticket) {
+          target.searchParams.set("ticket", ticket);
+        } else if (error) {
+          target.searchParams.set("error", error);
+        } else {
+          target.searchParams.set("error", "No sign-in ticket received");
+        }
+
+        window.location.replace(target.toString());
+      })();
+    </script>
+  </body>
+</html>

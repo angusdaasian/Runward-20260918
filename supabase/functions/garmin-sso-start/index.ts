@@ -33,6 +33,7 @@ serve(async (req) => {
 
     const callback = `${origin}/garmin-callback`;
     const mobileBridge = `${origin}/garmin-mobile-auth`;
+    const nativeCallback = `${origin}/garmin-native-callback.html`;
     const serviceUrl = "https://sso.garmin.com/sso/embed";
     // Use the embed-widget SSO flow. Unlike the bare `clientId=GarminConnect`
     // sign-in (which redirects to Connect's own post-auth landing page after
@@ -109,7 +110,48 @@ serve(async (req) => {
 
     const mobileEmbedUrl = `https://sso.garmin.com/sso/embed?${mobileParams.toString()}`;
 
-    return new Response(JSON.stringify({ url, callback, mobile_embed_url: mobileEmbedUrl, service_url: serviceUrl }), {
+    const nativeParams = new URLSearchParams({
+      service: nativeCallback,
+      webhost: "https://sso.garmin.com",
+      source: nativeCallback,
+      redirectAfterAccountLoginUrl: nativeCallback,
+      redirectAfterAccountCreationUrl: nativeCallback,
+      gauthHost: "https://sso.garmin.com/sso",
+      locale: "en_US",
+      id: "gauth-widget",
+      cssUrl: "https://static.garmincdn.com/com.garmin.connect/ui/css/gauth-custom-v1.2-min.css",
+      privacyStatementUrl: "https://www.garmin.com/en-US/privacy/connect/",
+      clientId: "GarminConnect",
+      rememberMeShown: "true",
+      rememberMeChecked: "false",
+      createAccountShown: "true",
+      openCreateAccount: "false",
+      displayNameShown: "false",
+      consumeServiceTicket: "false",
+      initialFocus: "true",
+      embedWidget: "true",
+      generateExtraServiceTicket: "true",
+      generateTwoExtraServiceTickets: "false",
+      generateNoServiceTicket: "false",
+      globalOptInShown: "true",
+      globalOptInChecked: "false",
+      mobile: "false",
+      connectLegalTerms: "true",
+      showTermsOfUse: "false",
+      showPrivacyPolicy: "false",
+      showConnectLegalAge: "false",
+      locationPromptShown: "true",
+      showPassword: "true",
+      useCustomHeader: "false",
+      mfaRequired: "false",
+      performMFACheck: "false",
+      rememberMyBrowserShown: "false",
+      rememberMyBrowserChecked: "false",
+    });
+
+    const nativeUrl = `https://sso.garmin.com/sso/signin?${nativeParams.toString()}`;
+
+    return new Response(JSON.stringify({ url, callback, mobile_embed_url: mobileEmbedUrl, service_url: serviceUrl, native_url: nativeUrl }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {

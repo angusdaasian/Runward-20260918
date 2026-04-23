@@ -1,65 +1,39 @@
 
 
-## How MFA works in the new `cyberjunky/python-garminconnect` + what you need to do
+## Wire up Garmin MFA — minimal changes
 
-### How MFA is handled (upstream library)
+**Goal:** Get the new Railway endpoints (`/garmin-login`, `/garmin-login-mfa`) working end-to-end. No DB schema changes, no UI redesign. Reuse existing `garmin_connections` row to store email+password as today (so token store on Railway disk does the heavy lifting).
 
-The new library uses Garmin's **mobile SSO flow** (same as the Android app). MFA is not a separate endpoint — it's a **callback** you pass into the `Garmin()` constructor:
+### Changes
 
-```python
-client = Garmin(
-    email,
-    password,
-    prompt_mfa=lambda: input("MFA code: "),   # called only when Garmin demands MFA
-)
-client.login("~/.garminconnect")  # writes garmin_tokens.json (mode 0600)
-```
+**1. `supabase/functions/garmin-sync/index.ts`**
+- Replace the single `login` action with two actions:
+  - `action: "login"` → POSTs to Railway `/garmin-login`. If response is `{needs_mfa: false}`, upsert `garmin_connections` and return `{success: true, needs_mfa: false}`. If `{needs_mfa: true, session_id}`, return `{success: true, needs_mfa: true, session_id}` **without** writing to DB yet (credentials held in memory by the client).
+  - `action: "login_mfa"` (new) → body `{email, password, session_id, mfa_code}`. POSTs to Railway `/garmin-login-mfa`. On success, upsert `garmin_connections` with email+password and return `{success: true}`.
+- `sync` action: unchanged endpoint URL (`/garmin-activities`), unchanged payload shape — Railway now uses stored tokens automatically, password is just a fallback.
+- `disconnect`: unchanged.
 
-Key behaviour:
-- `prompt_mfa` is called **only if** Garmin's SSO challenges with MFA. Accounts without MFA never trigger it.
-- On success, the library exchanges the SSO ticket for **DI OAuth Bearer tokens** (`access_token` + `refresh_token`) and saves them to disk.
-- Subsequent runs call `client.login("~/.garminconnect")` — it loads tokens and **auto-refreshes** them before each API call. No password, no MFA needed again until the refresh token itself expires/is revoked.
+**2. `src/hooks/use-garmin.ts`**
+- Change `connect(email, password)` return type from `boolean` to `{ ok: boolean; needsMfa?: boolean; sessionId?: string }`.
+- Add `submitMfa(email, password, sessionId, code)` returning `boolean`.
+- On `needs_mfa: true`, do NOT toast success — let the UI prompt for code.
 
-So MFA support in your Railway service = exposing `prompt_mfa` as a two-step HTTP flow:
-1. `POST /garmin-login` with `{email, password}` → if MFA required, return `{needs_mfa: true, session_id}`.
-2. `POST /garmin-login-mfa` with `{session_id, mfa_code}` → returns the serialised tokens.
+**3. `src/components/ConnectApps.tsx`**
+- Remove the red "MFA not supported" warning box.
+- Add MFA state: `mfaSessionId`, `mfaCode`.
+- After `handleGarminLogin`:
+  - If `result.needsMfa` → show a 6-digit code input below the password field (replace the email/password inputs with a "Enter code from Garmin email/app" input + Submit button).
+  - Otherwise, behave as today.
+- Add `handleSubmitMfa` that calls `garmin.submitMfa(...)` then runs the same post-connect logic (clear Apple Health activities if present, auto-sync, close form).
+- Update copy: "Used to sign in to Garmin. Supports 2-step verification."
 
-For non-MFA accounts step 1 returns the tokens directly. The two-step shape is the only way to bridge Python's blocking `prompt_mfa` callback to a stateless HTTP API — typically done by running the login in a background thread and passing the code in via a queue, or by using `garth` directly (which exposes the same flow without a callback).
+### Files touched
+- `supabase/functions/garmin-sync/index.ts`
+- `src/hooks/use-garmin.ts`
+- `src/components/ConnectApps.tsx`
 
-### Do you need to fork it into `angusdaasian/python-garminconnect`?
-
-**No — you should stop forking and just install it as a dependency.**
-
-Your fork made sense when you were patching the library. But:
-- The upstream library is now actively maintained (release 0.3.3 yesterday, 70 releases, 2.2k stars).
-- Forking means you have to manually sync forever and you lose auto-updates.
-- Your Railway service doesn't need to *modify* the library — it just needs to *call* it.
-
-**Recommended setup:**
-
-| Repo | Role |
-|---|---|
-| `cyberjunky/python-garminconnect` | Pinned dependency: `pip install garminconnect>=0.3.3` |
-| Your Railway service repo (whatever hosts `/garmin-activities`) | Imports `from garminconnect import Garmin`, exposes the HTTP endpoints, persists tokens to a writable path (e.g. `/tmp/tokens/{user_id}.json` or back to Supabase as JSON) |
-| `angusdaasian/python-garminconnect` | **Archive or delete** — no longer needed |
-
-If you previously had custom patches in your fork, port those into your Railway service code (wrap or subclass `Garmin`) instead of carrying a fork.
-
-### What you actually need to do (in order)
-
-1. **In your Railway service repo** (the Python service `GARMIN_RAILWAY_URL` points to):
-   - Update `requirements.txt` / `pyproject.toml`:
-     - Remove: `git+https://github.com/angusdaasian/python-garminconnect`
-     - Add: `garminconnect>=0.3.3` and `curl_cffi`
-   - Rewrite endpoints to use the new `Garmin(..., prompt_mfa=...).login(tokenstore)` pattern.
-   - Add the two-step MFA flow (`/garmin-login` + `/garmin-login-mfa`) and a token-based `/garmin-activities`.
-   - Persist `garmin_tokens.json` somewhere durable per user (or return tokens to Supabase and pass them back on each call).
-
-2. **Archive `angusdaasian/python-garminconnect`** on GitHub (Settings → Archive). No more sync needed.
-
-3. **Tell me the new endpoint shapes are live**, then I'll do the Lovable side (Part 2 from the previous plan): add `garmin_tokens jsonb` to `garmin_connections`, update `garmin-sync` edge function for the two-step MFA flow, and add the MFA code input to the connect UI.
-
-### Optional: I can write the new Railway service code for you
-
-If you want, I can produce a complete `main.py` (FastAPI) — all endpoints, MFA threading, token persistence — as a markdown file you paste into your Railway repo. Say the word and that becomes the next step.
+### Not touched
+- DB schema (no `garmin_tokens` column — Railway's per-user token files handle persistence)
+- Existing `sync` / `disconnect` flows
+- UI styling beyond the new MFA code input
 

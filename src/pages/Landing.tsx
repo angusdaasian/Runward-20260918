@@ -93,82 +93,75 @@ const Landing = () => {
 
   return (
     <div className="min-h-screen bg-background text-foreground font-body overflow-x-hidden">
-      {/* ─── Nav ─── */}
-      <nav className="sticky top-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border/50">
-        <div className="max-w-6xl mx-auto flex items-center justify-between px-6 py-3">
-          <div className="flex items-center gap-2.5">
-            <img src={appIcon} alt="Runward" className="h-8 w-8 rounded-lg" />
-            <span className="font-display font-bold text-lg">{zh ? "向前跑" : "Runward"}</span>
-          </div>
-          <div className="flex items-center gap-3">
+      {/* ─── Hero (full-screen photo) ─── */}
+      <section className="relative h-screen min-h-[680px] w-full overflow-hidden">
+        {/* Background photo */}
+        <img
+          src={heroRunners}
+          alt={zh ? "跑者在橋上奔跑" : "Runners on a city bridge at dusk"}
+          className="absolute inset-0 w-full h-full object-cover"
+          fetchPriority="high"
+        />
+        {/* Gradient overlay for legibility */}
+        <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-black/20 to-black/80 pointer-events-none" />
+
+        {/* Top bar — language toggle only */}
+        <div className="absolute top-0 inset-x-0 z-20">
+          <div className="max-w-6xl mx-auto flex items-center justify-end px-6 py-5">
             <button
               onClick={toggleLang}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-card border border-border text-sm text-muted-foreground hover:text-foreground transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-sm text-white hover:bg-white/20 transition-colors"
             >
               <Globe size={14} />
               {lang === "en" ? "中文" : "EN"}
             </button>
+          </div>
+        </div>
+
+        {/* Headline — large lime display type */}
+        <div className={`absolute inset-x-0 top-[16%] md:top-[20%] z-10 px-6 transition-all duration-700 ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}>
+          <h1 className="font-display text-primary font-bold tracking-tight leading-[0.95] text-center mx-auto max-w-5xl text-[clamp(3.5rem,11vw,9rem)] drop-shadow-[0_4px_20px_rgba(0,0,0,0.4)]">
+            {zh ? (
+              <>
+                <span className="block">每一步</span>
+                <span className="block">都是勝利</span>
+              </>
+            ) : (
+              <>
+                <span className="block">Every Step</span>
+                <span className="block">Is Victory</span>
+              </>
+            )}
+          </h1>
+        </div>
+
+        {/* Bottom CTA stack */}
+        <div className={`absolute inset-x-0 bottom-0 z-10 pb-10 md:pb-14 px-6 transition-all duration-700 delay-200 ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"}`}>
+          <div className="max-w-md mx-auto text-center space-y-4">
+            <div className="space-y-1.5">
+              <p className="text-white font-display font-semibold text-lg md:text-xl">
+                {zh ? "歡迎使用 Runward" : "Welcome to Runward"}
+              </p>
+              <p className="text-white/80 text-sm md:text-base">
+                {zh
+                  ? "輕鬆追蹤配速、距離與進度。"
+                  : "Monitor your pace, distance, and progress with ease."}
+              </p>
+            </div>
             <a
               href={APP_STORE_URL}
               target="_blank"
               rel="noopener noreferrer"
-              className="hidden sm:inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors"
+              className="flex items-center justify-center w-full h-14 rounded-full bg-primary text-primary-foreground font-display font-semibold text-lg shadow-2xl shadow-primary/30 hover:bg-primary/90 transition-colors"
             >
-              <Smartphone size={14} />
-              {zh ? "下載" : "Download"}
+              {zh ? "開始旅程" : "Start Your Journey"}
             </a>
-          </div>
-        </div>
-      </nav>
-
-      {/* ─── Hero ─── */}
-      <section className="relative px-6 pt-20 pb-28 md:pt-28 md:pb-36 overflow-hidden">
-        {/* BG blurs */}
-        <div className="absolute top-[-200px] left-1/2 -translate-x-1/2 w-[900px] h-[900px] rounded-full bg-primary/6 blur-3xl pointer-events-none" />
-        <div className="absolute top-20 -right-32 w-80 h-80 rounded-full bg-primary/8 blur-3xl pointer-events-none" />
-
-        <div className="relative z-10 max-w-6xl mx-auto grid md:grid-cols-2 gap-12 items-center">
-          {/* Left — copy */}
-          <div className={`transition-all duration-700 ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"}`}>
-            <div className="flex items-center gap-3 mb-6">
-              <img src={appIcon} alt="" className="h-14 w-14 rounded-2xl shadow-lg ring-1 ring-border" />
-              <div>
-                <h1 className="font-display text-4xl sm:text-5xl md:text-[3.25rem] font-bold tracking-tight leading-[1.1]">
-                  {zh ? "你的 AI 跑步教練" : "Run Smarter."}
-                </h1>
-              </div>
-            </div>
-            {!zh && (
-              <h1 className="font-display text-4xl sm:text-5xl md:text-[3.25rem] font-bold tracking-tight leading-[1.1] -mt-2 mb-6">
-                <span className="text-primary">Train Better.</span>
-              </h1>
-            )}
-            <p className="text-lg md:text-xl text-muted-foreground leading-relaxed max-w-lg mb-8">
-              {zh
-                ? "AI 訓練計劃、跑姿分析、排名賽季獎勵 — 跑得更聰明，盡在一個應用。"
-                : "AI training plans, posture analysis, ranked seasons & rewards — everything a runner needs in one beautifully crafted app."}
-            </p>
-            <div className="flex flex-col sm:flex-row items-start gap-4">
-              <a href={APP_STORE_URL} target="_blank" rel="noopener noreferrer">
-                <img src={appStoreBadge} alt="Download on the App Store" className="h-14" />
+            <p className="text-white/70 text-sm">
+              {zh ? "已經有帳戶？" : "Already have an account? "}
+              <a href={APP_STORE_URL} target="_blank" rel="noopener noreferrer" className="text-white font-semibold hover:underline">
+                {zh ? "登入" : "Login"}
               </a>
-              <span className="text-sm text-muted-foreground mt-2 sm:mt-4">
-                {zh ? "免費下載 · 支援 iPhone" : "Free · iPhone"}
-              </span>
-            </div>
-          </div>
-
-          {/* Right — hero phones */}
-          <div className={`relative flex justify-center items-end gap-4 transition-all duration-700 delay-200 ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}>
-            <div className="relative -rotate-6 translate-y-4">
-              <IPhoneFrame src={zh ? trainingScreenshotZh : trainingScreenshot} alt="Training" className="w-[180px] md:w-[210px]" />
-            </div>
-            <div className="relative z-10">
-              <IPhoneFrame src={zh ? rewardsScreenshotZh : rewardsScreenshot} alt="Rewards" className="w-[200px] md:w-[240px]" />
-            </div>
-            <div className="relative rotate-6 translate-y-4">
-              <IPhoneFrame src={zh ? racesScreenshotZh : racesScreenshot} alt="Races" className="w-[180px] md:w-[210px]" />
-            </div>
+            </p>
           </div>
         </div>
       </section>

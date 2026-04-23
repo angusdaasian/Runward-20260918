@@ -798,10 +798,12 @@ const Onboarding = ({
 
     return (
       <OnboardingShell>
-        <TopBar onBack={() => setIsSignInMode(false)} title={t("signIn", lang)} showProgress={false} />
+        <div className="relative">
+          <TopBar onBack={() => setIsSignInMode(false)} title={t("signIn", lang)} showProgress={false} />
+          <div className="absolute top-6 right-5"><LangToggleButton /></div>
+        </div>
 
         <div className="flex-1 flex flex-col px-6 pt-8 pb-8 max-w-md mx-auto w-full">
-          <div className="flex justify-end mb-6"><LangToggleButton /></div>
 
 
           {switchingLang && (

@@ -1,47 +1,42 @@
 
 
-# Tap Calendar Date to View Activity or Planned Workout
+## Onboarding redesign — "Quiet Sport" direction
 
-Add tap interaction to the monthly calendar so users can see what they did or what's planned for any given date.
+Restyling `src/components/Onboarding.tsx` only. No logic, validation, auth, i18n, or asset changes.
 
-## Behavior
+### Design language
 
-- **Tap a day with a Strava/Garmin/Coros/Apple Health activity** → opens a bottom sheet showing the activity summary (distance, time, pace, HR, elevation, calories where applicable). Includes a "View details" button that opens the existing full `ActivityDetail` view.
-- **Tap a day with only a planned workout** → opens a smaller popover/sheet showing the plan: type (Easy, Tempo, Interval, etc.), planned distance, and the plan color dot.
-- **Tap a day with both** → shows the activity summary (what actually happened) plus a small line "Planned: Tempo 10 km" underneath.
-- **Tap an empty day** → nothing happens, no visual change. Day cell is not even given a hover/active style.
+- **Surface**: solid `--background` dark on all data steps. Photo only on the welcome screen (darkened to 80% with bottom gradient).
+- **Type**: `font-display` (Space Grotesk) for question headers at ~28px / semibold / tight tracking. Inter for body and helpers.
+- **Icons**: replace every emoji header with a 24px monochrome `lucide-react` icon in `text-muted-foreground`. Emojis removed from buttons and microcopy.
+- **Inputs**: borderless underline style — `border-0 border-b border-border/50 rounded-none bg-transparent focus:border-primary` — replacing the glass pill inputs.
+- **Buttons**: standardized `h-12 rounded-lg`. Primary = `bg-primary text-primary-foreground`. Secondary = `border border-border/50 bg-transparent`. Tertiary = ghost link.
+- **Progress**: single 2px line at the top, fills left-to-right with `--primary`. Replaces the segmented pill bar.
+- **Accent**: only `--primary` (existing green). White is text only.
+- **Theme lock**: wrap the onboarding root in a `dark` class so the redesign renders consistently regardless of system preference.
 
-## Files changed
+### Screen-by-screen
 
-**1. `src/components/activities/ActivityCalendar.tsx`** — main change
-- Accept two new optional props:
-  - `onSelectActivity?: (activity: StravaActivity) => void`
-  - `onSelectDate?: (info: { date: string; activity: StravaActivity | null; planned: PlannedWorkout | null }) => void`
-- Build a `actByDate` lookup (date string → `StravaActivity`) alongside the existing `kmByDate`.
-- Compute per-day `hasActivity` / `planned`. Wrap each day cell in a `<button>` only when one of them exists; otherwise render the existing inert `<div>`.
-- On click, call `onSelectDate` with the resolved data.
-- Add subtle visual affordance (cursor-pointer, slight scale on active) only on tappable cells.
+| Step | Change |
+|---|---|
+| 0 Welcome | Keep hero photo, darken to 80%, add bottom gradient. 64px logo. Display headline "Run with intention." Filled primary CTA + ghost "I have an account" + small "Continue as guest" link. |
+| 1 Name / 3 Gender / 4 Age | Solid dark surface. Lucide icon (User / UserCircle / Cake) at 24px. Display question header. Underline input, 56px height. Helper line below in muted-foreground. |
+| 5 Runs/week | Horizontal segmented selector 0–7 in one row. Selected = primary fill, others = subtle border. |
+| 6 Race time | 2×2 distance cards keeping the medal images, distance label in display type. Time inputs as one inline group (HH : MM : SS) with monospace digits. Inline validation. |
+| 7 Before/After | Replace teal gradient with dark card + thin primary left-edge bar. Replace dotted runner row with a horizontal line + small primary arrow icon. Time deltas use success token. Add caption: "Projected after a 12-week training block." |
+| 8 Email + social | Apple (black), Google (outlined white), divider, underline email input. |
+| 9 Password | Two underline inputs + 3-bar live strength meter beneath the first. |
+| 10 Plan prompt | Remove 🎉. Headline "Your plan is ready." Primary card "Start 7-day free trial — Generate my plan", ghost card "Skip for now". Redemption code as collapsed link. |
+| 11 Loading | 3-dot phased loader with rotating microcopy ("Calibrating pace zones…", "Reading your VDOT…"). |
+| 12 OTP | Restyle slots to match underline input language. |
+| Sign-in | Same dark surface as data steps (no photo bg). |
 
-**2. `src/components/ActivitiesTab.tsx`**
-- Add `dateSheet` state: `{ activity, planned, dateLabel } | null`.
-- Pass `onSelectDate` handler to `<ActivityCalendar>`. Handler sets the sheet state.
-- Render a `<Sheet>` (from existing `@/components/ui/sheet`) anchored to the bottom containing:
-  - Header: localized formatted date (e.g. "Mon, Apr 22").
-  - If activity present: compact stats grid reusing the same fields as `ActivityCard` (distance, time, pace, HR, elevation, calories, score) + a "View details" button → calls existing `setSelectedActivity(activity)` and closes the sheet.
-  - If planned present (with or without activity): "Planned" row with type label + distance + colored dot.
-  - i18n via `lang === "zh"` ternaries, matching existing patterns.
-- No changes to data fetching — `activities` and `plannedWorkouts` are already available.
+### Preserved
 
-## What this does NOT change
+- All step state machine, validation, Supabase auth, OTP/reset, VDOT/distance math, i18n keys, existing assets (`gingrun-logo.png`, badge PNGs, `onboarding-bg.jpg`).
+- No new dependencies, no migrations, no new files.
 
-- No new DB tables, RLS, or edge functions.
-- No changes to `ActivityDetail.tsx` — reused as-is for full view.
-- Empty days remain visually identical to today (no extra borders/cursors).
-- Calendar grid layout, legend, and month navigation unchanged.
+### Files
 
-## Edge cases handled
-
-- Multiple activities on one day: pick the one with the largest distance (most representative). The sheet shows a subtle "+N more" hint and "View details" jumps to that primary activity. (Other activities remain accessible via the "See all" list.)
-- Apple Health activities (no map, no polyline): stat grid omits map but shows calories, mirroring existing `ActivityCard` behavior.
-- Future-dated planned workouts: still tappable, shows planned info.
+- `src/components/Onboarding.tsx` — visual restructure only.
 

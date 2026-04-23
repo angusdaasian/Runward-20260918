@@ -133,7 +133,7 @@ const StepHeader = ({
   title,
   helper,
 }: {
-  icon: React.ComponentType<{ size?: number; className?: string }>;
+  icon: LucideIcon;
   title: string;
   helper?: string;
 }) => (

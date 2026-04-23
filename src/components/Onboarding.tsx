@@ -945,16 +945,16 @@ const Onboarding = ({
               }}
             >
               {lang === "zh" ? (
-                <>
-                  {/* Mobile: 2 lines, larger characters */}
-                  <span className="block sm:hidden" style={{ fontSize: "clamp(80px, 32vw, 160px)", letterSpacing: "0.02em" }}>
-                    每一步<br />都是勝利
-                  </span>
-                  {/* Desktop: 3 lines */}
-                  <span className="hidden sm:block">
-                    每一步<br />都是<br />勝利
-                  </span>
-                </>
+                <span
+                  className="block"
+                  style={{
+                    fontSize: "clamp(56px, 19vw, 96px)",
+                    letterSpacing: "0.04em",
+                    lineHeight: 0.95,
+                  }}
+                >
+                  每一步<br />都是勝利
+                </span>
               ) : (
                 <>
                   Every<br />Step Is<br />Victory

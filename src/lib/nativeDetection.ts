@@ -20,7 +20,7 @@ export function isNativeApp(): boolean {
 
   // 0. OAuth / callback routes — always show full app
   const path = window.location.pathname;
-  if (/\/(callback|auth|strava)/i.test(path)) {
+  if (/\/(callback|auth|strava|garmin)/i.test(path)) {
     localStorage.setItem(STORAGE_KEY, "true");
     return true;
   }

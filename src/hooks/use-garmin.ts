@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { Lang } from "@/lib/i18n";
+import { GARMIN_SSO_KEYS } from "@/lib/garminSso";
 
 async function extractFunctionErrorMessage(error: unknown): Promise<string | null> {
   if (error instanceof FunctionsHttpError) {
@@ -66,10 +67,11 @@ export function useGarmin(lang: Lang) {
           setConnecting(false);
           return { ok: false };
         }
-        // Remember the callback for the exchange step + flag so we know we're returning from Garmin.
-        sessionStorage.setItem("garmin-sso-callback", startData.callback ?? "");
-        sessionStorage.setItem("garmin-sso-pending", "1");
-        window.location.href = startData.url;
+        sessionStorage.setItem(GARMIN_SSO_KEYS.callback, startData.callback ?? "");
+        sessionStorage.setItem(GARMIN_SSO_KEYS.pending, "1");
+        sessionStorage.setItem(GARMIN_SSO_KEYS.mobileEmbedUrl, startData.mobile_embed_url ?? startData.url ?? "");
+        sessionStorage.setItem(GARMIN_SSO_KEYS.mobileServiceUrl, startData.service_url ?? "https://sso.garmin.com/sso/embed");
+        window.location.href = "/garmin-mobile-auth";
         // The page is being unloaded; nothing to return.
         return { ok: false };
       } catch (err) {

@@ -60,16 +60,30 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     markActive();
     const interval = setInterval(markActive, 30_000);
 
-    // Set up listener BEFORE getSession to avoid missing events
+    // Set up listener BEFORE getSession to avoid missing events.
+    // CRITICAL: Only update session state when the user/token actually changes.
+    // Supabase emits TOKEN_REFRESHED / SIGNED_IN on resume with a new session
+    // object that has the same user. If we naively call setSession every time,
+    // the new object reference cascades through every consumer (Index.tsx's
+    // user-dependent effects re-run, profile re-check fires, skeleton shows)
+    // — which the user perceives as a "refresh / flicker" on app resume.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        setSession(session);
+      (_event, newSession) => {
+        setSession((prev) => {
+          const sameUser = prev?.user?.id === newSession?.user?.id;
+          const sameToken = prev?.access_token === newSession?.access_token;
+          if (sameUser && sameToken) {
+            // No meaningful change — keep prev reference to avoid re-renders
+            return prev;
+          }
+          return newSession;
+        });
         setLoading(false);
-        if (session?.user) {
-          preloadHeaderProfile(session.user.id);
+        if (newSession?.user) {
+          preloadHeaderProfile(newSession.user.id);
           // Register OneSignal player ID with the user's Supabase UID
           try {
-            despia(`setonesignalplayerid://?user_id=${session.user.id}`);
+            despia(`setonesignalplayerid://?user_id=${newSession.user.id}`);
           } catch (e) {
             console.warn("[Push] Failed to set OneSignal player ID:", e);
           }
@@ -77,12 +91,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     );
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      if (session?.user) {
-        preloadHeaderProfile(session.user.id);
+    supabase.auth.getSession().then(({ data: { session: initialSession } }) => {
+      setSession((prev) => {
+        const sameUser = prev?.user?.id === initialSession?.user?.id;
+        const sameToken = prev?.access_token === initialSession?.access_token;
+        if (sameUser && sameToken) return prev;
+        return initialSession;
+      });
+      if (initialSession?.user) {
+        preloadHeaderProfile(initialSession.user.id);
         try {
-          despia(`setonesignalplayerid://?user_id=${session.user.id}`);
+          despia(`setonesignalplayerid://?user_id=${initialSession.user.id}`);
         } catch (e) {
           console.warn("[Push] Failed to set OneSignal player ID:", e);
         }

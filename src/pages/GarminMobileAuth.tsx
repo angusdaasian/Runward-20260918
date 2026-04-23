@@ -22,12 +22,12 @@ const GarminMobileAuth = () => {
 
     const finishAndReturn = (result: { ok: boolean; displayName?: string; error?: string }) => {
       setGarminSsoResult(result);
+      clearGarminSsoTransientState();
       if (isPopupMode && window.opener) {
         window.opener.postMessage({ type: "garmin-mobile-result", result }, window.location.origin);
         window.close();
         return;
       }
-      clearGarminSsoTransientState();
       window.location.replace(GARMIN_SSO_RETURN_URL);
     };
 

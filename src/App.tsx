@@ -11,6 +11,7 @@ import Index from "./pages/Index.tsx";
 import NotFound from "./pages/NotFound.tsx";
 import AdminPanel from "./pages/AdminPanel.tsx";
 import AppleCallback from "./pages/AppleCallback.tsx";
+import GarminCallback from "./pages/GarminCallback.tsx";
 import Support from "./pages/Support.tsx";
 import Privacy from "./pages/Privacy.tsx";
 import Landing from "./pages/Landing.tsx";
@@ -31,6 +32,7 @@ const App = () => (
             <Routes>
               <Route path="/" element={native ? <Index /> : <Landing />} />
               <Route path="/callback/apple" element={<AppleCallback />} />
+              <Route path="/garmin-callback" element={<GarminCallback />} />
               <Route path="/admin" element={<AdminPanel />} />
               <Route path="/support" element={<Support />} />
               <Route path="/privacy" element={<Privacy />} />

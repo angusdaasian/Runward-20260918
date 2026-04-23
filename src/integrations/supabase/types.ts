@@ -325,9 +325,9 @@ export type Database = {
       }
       garmin_connections: {
         Row: {
-          access_token: string
+          access_token: string | null
           created_at: string | null
-          expires_at: string
+          expires_at: string | null
           garmin_display_name: string | null
           id: string
           refresh_token: string | null
@@ -337,9 +337,9 @@ export type Database = {
           user_id: string
         }
         Insert: {
-          access_token: string
+          access_token?: string | null
           created_at?: string | null
-          expires_at: string
+          expires_at?: string | null
           garmin_display_name?: string | null
           id?: string
           refresh_token?: string | null
@@ -349,9 +349,9 @@ export type Database = {
           user_id: string
         }
         Update: {
-          access_token?: string
+          access_token?: string | null
           created_at?: string | null
-          expires_at?: string
+          expires_at?: string | null
           garmin_display_name?: string | null
           id?: string
           refresh_token?: string | null

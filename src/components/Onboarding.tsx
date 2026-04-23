@@ -935,17 +935,25 @@ const Onboarding = ({
           )}
 
           {/* Big editorial headline — fills container width */}
-          <div className="relative z-10 flex-1 flex flex-col justify-end px-6 pb-8 max-w-md mx-auto w-full">
+          <div className="relative z-10 flex-1 flex flex-col justify-end px-5 pb-8 max-w-md mx-auto w-full">
             <h1
-              className="font-display font-extrabold tracking-[-0.03em] leading-[0.92] mb-8 text-center"
+              className="font-display font-black tracking-[-0.04em] leading-[0.88] mb-6 text-center"
               style={{
-                color: "hsl(75 90% 65%)",
-                fontSize: "clamp(56px, 22vw, 104px)",
+                color: "hsl(75 95% 62%)",
+                fontSize: "clamp(64px, 26vw, 132px)",
+                textShadow: "0 2px 24px rgba(0,0,0,0.25)",
               }}
             >
               {lang === "zh" ? (
                 <>
-                  每一步<br />都是<br />勝利
+                  {/* Mobile: 2 lines, larger characters */}
+                  <span className="block sm:hidden" style={{ fontSize: "clamp(80px, 32vw, 160px)", letterSpacing: "0.02em" }}>
+                    每一步<br />都是勝利
+                  </span>
+                  {/* Desktop: 3 lines */}
+                  <span className="hidden sm:block">
+                    每一步<br />都是<br />勝利
+                  </span>
                 </>
               ) : (
                 <>

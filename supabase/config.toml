@@ -1,7 +1,7 @@
 project_id = "kbghvclwhxnjeskdodeh"
 
 [functions.get-weather]
-verify_jwt = false
+verify_jwt = true
 
 [functions.seed-promo-banner]
-verify_jwt = false
+verify_jwt = true

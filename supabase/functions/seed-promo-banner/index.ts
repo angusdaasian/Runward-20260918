@@ -1,5 +1,5 @@
-// One-shot seeding function for promo banners.
-// Accepts either { image_url } (fetched server-side) or { image_base64 } (raw bytes).
+// Admin-only edge function for seeding promo banners.
+// Requires authenticated admin JWT. Ignores any client-supplied created_by.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 const corsHeaders = {
@@ -7,32 +7,89 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024; // 5 MB
+const MAX_CAPTION_LEN = 500;
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const body = await req.json().catch(() => ({}));
-    const imageUrl: string | undefined = body.image_url;
-    const imageBase64: string | undefined = body.image_base64;
-    const endsAt: string = body.ends_at;
-    const caption: string = body.caption ?? "";
-    const captionZh: string = body.caption_zh ?? "";
-    const createdBy: string = body.created_by;
-    const replaceId: string | undefined = body.replace_id;
-
-    if ((!imageUrl && !imageBase64) || !endsAt || !createdBy) {
-      return new Response(
-        JSON.stringify({ error: "image_url or image_base64, plus ends_at and created_by required" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
+    // --- AUTH: require valid JWT ---
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
-    const supabase = createClient(
+    const userClient = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_ANON_KEY")!,
+      { global: { headers: { Authorization: authHeader } } },
+    );
+
+    const token = authHeader.replace("Bearer ", "");
+    const { data: claimsData, error: claimsError } = await userClient.auth.getClaims(token);
+    if (claimsError || !claimsData?.claims?.sub) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const callerId = claimsData.claims.sub as string;
+
+    // --- AUTHORIZATION: must be admin ---
+    const admin = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
 
-    // Resolve image bytes
+    const { data: roleRow, error: roleErr } = await admin
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", callerId)
+      .eq("role", "admin")
+      .maybeSingle();
+
+    if (roleErr || !roleRow) {
+      return new Response(JSON.stringify({ error: "Forbidden" }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // --- INPUT VALIDATION ---
+    const body = await req.json().catch(() => ({}));
+    const imageUrl: string | undefined = body.image_url;
+    const imageBase64: string | undefined = body.image_base64;
+    const endsAt: string | undefined = body.ends_at;
+    const caption: string = (body.caption ?? "").toString().slice(0, MAX_CAPTION_LEN);
+    const captionZh: string = (body.caption_zh ?? "").toString().slice(0, MAX_CAPTION_LEN);
+    const replaceId: string | undefined = body.replace_id;
+
+    if (!imageUrl && !imageBase64) {
+      return new Response(
+        JSON.stringify({ error: "image_url or image_base64 required" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    if (!endsAt) {
+      return new Response(JSON.stringify({ error: "ends_at required" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const endsAtDate = new Date(endsAt);
+    if (isNaN(endsAtDate.getTime()) || endsAtDate.getTime() <= Date.now()) {
+      return new Response(JSON.stringify({ error: "ends_at must be a valid future ISO date" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // --- RESOLVE IMAGE BYTES ---
     let bytes: Uint8Array;
     if (imageBase64) {
       const clean = imageBase64.replace(/^data:image\/\w+;base64,/, "");
@@ -57,7 +114,13 @@ Deno.serve(async (req) => {
       bytes = new Uint8Array(await imgResp.arrayBuffer());
     }
 
-    // Validate PNG/JPEG magic bytes
+    if (bytes.byteLength > MAX_IMAGE_BYTES) {
+      return new Response(
+        JSON.stringify({ error: `Image too large (max ${MAX_IMAGE_BYTES} bytes)` }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
     const isPng = bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47;
     const isJpg = bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
     if (!isPng && !isJpg) {
@@ -69,9 +132,9 @@ Deno.serve(async (req) => {
 
     const ext = isPng ? "png" : "jpg";
     const contentType = isPng ? "image/png" : "image/jpeg";
-    const filename = `tcs-london-marathon-${Date.now()}.${ext}`;
+    const filename = `promo-${Date.now()}.${ext}`;
 
-    const { error: upErr } = await supabase.storage
+    const { error: upErr } = await admin.storage
       .from("promo-banners")
       .upload(filename, bytes, { contentType, upsert: false });
 
@@ -82,11 +145,10 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { data: pub } = supabase.storage.from("promo-banners").getPublicUrl(filename);
+    const { data: pub } = admin.storage.from("promo-banners").getPublicUrl(filename);
 
-    // If replacing an existing record, delete it (and its file) first
     if (replaceId) {
-      const { data: oldRow } = await supabase
+      const { data: oldRow } = await admin
         .from("promo_banners")
         .select("image_url")
         .eq("id", replaceId)
@@ -97,23 +159,23 @@ Deno.serve(async (req) => {
           const idx = u.pathname.indexOf("/promo-banners/");
           if (idx >= 0) {
             const path = u.pathname.slice(idx + "/promo-banners/".length);
-            await supabase.storage.from("promo-banners").remove([path]);
+            await admin.storage.from("promo-banners").remove([path]);
           }
         } catch { /* ignore */ }
       }
-      await supabase.from("promo_banners").delete().eq("id", replaceId);
+      await admin.from("promo_banners").delete().eq("id", replaceId);
     }
 
-    const { data: row, error: insErr } = await supabase
+    const { data: row, error: insErr } = await admin
       .from("promo_banners")
       .insert({
         image_url: pub.publicUrl,
         caption,
         caption_zh: captionZh,
         display_order: 0,
-        ends_at: endsAt,
+        ends_at: endsAtDate.toISOString(),
         is_active: true,
-        created_by: createdBy,
+        created_by: callerId, // always the verified caller, never client-supplied
       })
       .select()
       .single();

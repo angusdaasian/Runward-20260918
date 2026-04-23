@@ -1,8 +1,28 @@
-// Public edge function that proxies WeatherAPI.com calls so the API key stays secret.
+// Authenticated edge function that proxies WeatherAPI.com calls so the API key stays secret.
+// Requires a valid Supabase JWT and applies a per-user in-memory rate limit (30 req / 5 min).
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+// Per-user rate limit (in-memory; resets on cold start, fine for abuse throttling)
+const RATE_LIMIT_MAX = 30;
+const RATE_LIMIT_WINDOW_MS = 5 * 60 * 1000;
+const rateBuckets = new Map<string, { count: number; resetAt: number }>();
+
+function checkRate(userId: string): boolean {
+  const now = Date.now();
+  const bucket = rateBuckets.get(userId);
+  if (!bucket || bucket.resetAt < now) {
+    rateBuckets.set(userId, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+    return true;
+  }
+  if (bucket.count >= RATE_LIMIT_MAX) return false;
+  bucket.count += 1;
+  return true;
+}
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -10,6 +30,40 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // --- AUTH ---
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_ANON_KEY')!,
+      { global: { headers: { Authorization: authHeader } } },
+    );
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
+    if (claimsError || !claimsData?.claims?.sub) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    const userId = claimsData.claims.sub as string;
+
+    // --- RATE LIMIT ---
+    if (!checkRate(userId)) {
+      return new Response(JSON.stringify({ error: 'Rate limit exceeded' }), {
+        status: 429,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // --- INPUT ---
     const url = new URL(req.url);
     const city = (url.searchParams.get('city') || '').trim();
     if (!city || city.length > 100) {
@@ -44,9 +98,8 @@ Deno.serve(async (req) => {
     const hourArr: any[] = data.forecast?.forecastday?.[0]?.hour || [];
     const location = data.location;
 
-    // Compact hourly forecast (24 entries) — only fields useful for "best time to run".
     const hourly = hourArr.map((h: any) => ({
-      time: h.time, // "YYYY-MM-DD HH:mm" in local time
+      time: h.time,
       temp_c: Math.round(h.temp_c ?? 0),
       feelslike_c: Math.round(h.feelslike_c ?? h.temp_c ?? 0),
       condition: h.condition?.text ?? '',

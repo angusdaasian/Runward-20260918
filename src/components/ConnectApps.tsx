@@ -114,29 +114,49 @@ const ConnectApps = ({ lang, onBack }: Props) => {
     setShowGarminForm(true);
   };
 
+  const finalizeGarminConnect = async () => {
+    setGarminConnected(true);
+    setShowGarminForm(false);
+    setGarminEmail("");
+    setGarminPassword("");
+    setMfaSessionId(null);
+    setMfaCode("");
+    // Delete Apple Health activities if they exist (fitness app takes priority)
+    if (appleHealthConnected && user) {
+      await supabase.from("apple_health_activities").delete().eq("user_id", user.id);
+      toast.info(
+        lang === "zh"
+          ? "Apple Health 活動已清除，活動數據將由 Garmin 提供"
+          : "Apple Health activities cleared, activities will come from Garmin"
+      );
+    }
+    // Auto-sync after connecting
+    garmin.syncActivities();
+  };
+
   const handleGarminLogin = async () => {
     if (!garminEmail || !garminPassword) {
       toast.error(lang === "zh" ? "請輸入帳號和密碼" : "Please enter email and password");
       return;
     }
-    const success = await garmin.connect(garminEmail, garminPassword);
-    if (success) {
-      setGarminConnected(true);
-      setShowGarminForm(false);
-      setGarminEmail("");
-      setGarminPassword("");
-      // Delete Apple Health activities if they exist (fitness app takes priority)
-      if (appleHealthConnected && user) {
-        await supabase.from("apple_health_activities").delete().eq("user_id", user.id);
-        toast.info(
-          lang === "zh"
-            ? "Apple Health 活動已清除，活動數據將由 Garmin 提供"
-            : "Apple Health activities cleared, activities will come from Garmin"
-        );
-      }
-      // Auto-sync after connecting
-      garmin.syncActivities();
+    const result = await garmin.connect(garminEmail, garminPassword);
+    if (!result.ok) return;
+    if (result.needsMfa && result.sessionId) {
+      setMfaSessionId(result.sessionId);
+      setMfaCode("");
+      return;
     }
+    await finalizeGarminConnect();
+  };
+
+  const handleSubmitMfa = async () => {
+    if (!mfaSessionId) return;
+    if (!mfaCode || mfaCode.length < 4) {
+      toast.error(lang === "zh" ? "請輸入驗證碼" : "Please enter the verification code");
+      return;
+    }
+    const ok = await garmin.submitMfa(garminEmail, garminPassword, mfaSessionId, mfaCode);
+    if (ok) await finalizeGarminConnect();
   };
 
   const handleDisconnectGarmin = async () => {

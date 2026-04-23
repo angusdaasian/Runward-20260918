@@ -6,7 +6,25 @@ import { useDespiaPurchases } from "@/hooks/use-despia-purchases";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Mail, Eye, EyeOff, Ticket, ShieldCheck } from "lucide-react";
+import {
+  ChevronRight,
+  ChevronLeft,
+  ChevronDown,
+  ChevronUp,
+  Mail,
+  Eye,
+  EyeOff,
+  Ticket,
+  ShieldCheck,
+  User,
+  UserCircle2,
+  Cake,
+  CalendarDays,
+  Timer,
+  Lock,
+  ArrowRight,
+  type LucideIcon,
+} from "lucide-react";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { Lang, t } from "@/lib/i18n";
 import { calculateRunningScore, predictTime, formatTime } from "@/lib/vdot";
@@ -64,8 +82,12 @@ function getImprovementPct(score: number): number {
 //        6=estimated-time, 7=before-after, 8=email, 9=password, 10=want-plan
 type OnboardingStep = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12;
 
-const OnboardingBgWrapper = ({ children, showOverlay = true }: { children: ReactNode; showOverlay?: boolean }) => (
-  <div className="relative min-h-screen flex flex-col">
+/**
+ * Welcome-only background: hero photo, darkened to 80%, with bottom gradient.
+ * Used exclusively on Step 0.
+ */
+const WelcomeBgWrapper = ({ children }: { children: ReactNode }) => (
+  <div className="dark relative min-h-screen flex flex-col bg-background">
     <img
       src={onboardingBg}
       alt=""
@@ -73,25 +95,62 @@ const OnboardingBgWrapper = ({ children, showOverlay = true }: { children: React
       width={896}
       height={1920}
     />
-    {showOverlay && <div className="absolute inset-0 bg-black/60" />}
-    <div className="relative z-10 flex flex-col min-h-screen">
-      {children}
-    </div>
+    <div className="absolute inset-0 bg-background/80" />
+    <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-background via-background/60 to-transparent" />
+    <div className="relative z-10 flex flex-col min-h-screen">{children}</div>
   </div>
 );
 
-const OnboardingProgressBar = ({ current, total }: { current: number; total: number }) => (
-  <div className="flex justify-center gap-1.5 mb-6 px-6 pt-6">
-    {Array.from({ length: total }).map((_, i) => (
-      <div
-        key={i}
-        className={`h-1.5 rounded-full transition-all duration-300 ${
-          i < current ? "flex-1 bg-white" : i === current ? "flex-[2] bg-white" : "flex-1 bg-white/30"
-        }`}
-      />
-    ))}
+/**
+ * Solid dark surface for all data-entry steps.
+ */
+const SolidBgWrapper = ({ children }: { children: ReactNode }) => (
+  <div className="dark min-h-screen flex flex-col bg-background text-foreground">
+    {children}
   </div>
 );
+
+/**
+ * Single thin (2px) progress line at the top, fills left-to-right with --primary.
+ */
+const ProgressLine = ({ current, total }: { current: number; total: number }) => {
+  const pct = Math.max(0, Math.min(100, ((current + 1) / total) * 100));
+  return (
+    <div className="h-[2px] w-full bg-border/40">
+      <div
+        className="h-full bg-primary transition-all duration-500 ease-out"
+        style={{ width: `${pct}%` }}
+      />
+    </div>
+  );
+};
+
+/**
+ * Reusable header for data steps: small monochrome icon + display headline + optional helper.
+ */
+const StepHeader = ({
+  icon: Icon,
+  title,
+  helper,
+}: {
+  icon: LucideIcon;
+  title: string;
+  helper?: string;
+}) => (
+  <div className="space-y-3">
+    <Icon size={24} className="text-muted-foreground" />
+    <h2 className="font-display text-[28px] leading-tight font-semibold tracking-tight text-foreground">
+      {title}
+    </h2>
+    {helper && <p className="text-sm text-muted-foreground">{helper}</p>}
+  </div>
+);
+
+/**
+ * Underline-style input class: borderless, single bottom border, primary on focus.
+ */
+const underlineInput =
+  "h-14 rounded-none border-0 border-b border-border/50 bg-transparent px-0 text-lg font-medium placeholder:text-muted-foreground/60 focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:border-primary transition-colors";
 
 const Onboarding = ({
   onComplete,
@@ -155,6 +214,19 @@ const Onboarding = ({
   const [resetOtp, setResetOtp] = useState("");
   const [resetNewPassword, setResetNewPassword] = useState("");
   const [resetConfirmPassword, setResetConfirmPassword] = useState("");
+
+  // Loading microcopy rotation (Step 11)
+  const loadingPhrases = lang === "zh"
+    ? ["校準配速區間…", "讀取你的 VDOT…", "整理訓練計劃…", "差不多好了…"]
+    : ["Calibrating pace zones…", "Reading your VDOT…", "Shaping your plan…", "Almost there…"];
+  const [loadingPhraseIdx, setLoadingPhraseIdx] = useState(0);
+  useEffect(() => {
+    if (step !== 11) return;
+    const id = setInterval(() => {
+      setLoadingPhraseIdx((i) => (i + 1) % loadingPhrases.length);
+    }, 1800);
+    return () => clearInterval(id);
+  }, [step, loadingPhrases.length]);
 
   // Persist onboarding "ideal time" so the suggested-workout feature can fall back to it
   useEffect(() => {
@@ -425,9 +497,6 @@ const Onboarding = ({
 
     const improvePct = getImprovementPct(score);
 
-    // Find the user's chosen distance for headline
-    const chosenRace = ALL_RACE_DISTS.find((r) => r.meters === dist.meters);
-
     return ALL_RACE_DISTS.map((race) => {
       const currentTime = predictTime(score, race.meters);
       const improvedScore = score * (1 + improvePct);
@@ -467,7 +536,6 @@ const Onboarding = ({
       return;
     }
     setSaving(true);
-    // Verify OTP to get a session
     const { error: otpError } = await supabase.auth.verifyOtp({
       email: resetEmail,
       token: resetOtp,
@@ -478,7 +546,6 @@ const Onboarding = ({
       setSaving(false);
       return;
     }
-    // Now update the password
     const { error: updateError } = await supabase.auth.updateUser({ password: resetNewPassword });
     setSaving(false);
     if (updateError) {
@@ -486,7 +553,6 @@ const Onboarding = ({
       return;
     }
     toast({ title: "✅", description: t("resetPasswordSuccess", lang) });
-    // Sign out so user can sign in fresh
     await supabase.auth.signOut();
     setForgotPasswordMode("idle");
     setResetEmail("");
@@ -497,24 +563,50 @@ const Onboarding = ({
 
   const labels = sexLabels(lang);
 
+  // Password strength: 0-3 (length + character variety)
+  const passwordStrength = (() => {
+    if (!password) return 0;
+    let score = 0;
+    if (password.length >= 6) score++;
+    if (password.length >= 10) score++;
+    if (/[A-Z]/.test(password) && /[0-9]/.test(password)) score++;
+    return Math.min(3, score);
+  })();
+
+  // ---- LANGUAGE SWITCHER (shared) ----
+  const LangSwitcher = () => (
+    <div className="flex gap-1.5 mb-10">
+      <button
+        onClick={() => { if (lang !== "en") { setSwitchingLang(true); setLang("en"); setTimeout(() => setSwitchingLang(false), 4000); } }}
+        className={`flex-1 py-2 rounded-md text-xs font-medium tracking-wide uppercase transition-colors ${lang === "en" ? "bg-foreground text-background" : "bg-transparent text-muted-foreground border border-border/50 hover:text-foreground"}`}
+      >English</button>
+      <button
+        onClick={() => { if (lang !== "zh") { setSwitchingLang(true); setLang("zh"); setTimeout(() => setSwitchingLang(false), 4000); } }}
+        className={`flex-1 py-2 rounded-md text-xs font-medium tracking-wide uppercase transition-colors ${lang === "zh" ? "bg-foreground text-background" : "bg-transparent text-muted-foreground border border-border/50 hover:text-foreground"}`}
+      >中文 (HK)</button>
+    </div>
+  );
+
   // ---- SIGN IN MODE ----
   if (isSignInMode) {
     // Forgot password sub-flow
     if (forgotPasswordMode !== "idle") {
       return (
-        <OnboardingBgWrapper>
-          <div className="flex-1 flex flex-col px-6 pt-16 pb-8">
-            <div className="text-center mb-8">
-              <img src={gingrunLogo} alt="RunWard" width={80} height={80} className="mx-auto mb-3" />
-              <h1 className="text-2xl font-bold text-white">{t("resetPassword", lang)}</h1>
-              <p className="text-white/70 text-sm mt-1">
+        <SolidBgWrapper>
+          <div className="flex-1 flex flex-col px-6 pt-16 pb-8 max-w-md mx-auto w-full">
+            <div className="mb-10">
+              <img src={gingrunLogo} alt="RunWard" width={56} height={56} className="mb-6" />
+              <h1 className="font-display text-[28px] leading-tight font-semibold tracking-tight text-foreground">
+                {t("resetPassword", lang)}
+              </h1>
+              <p className="text-sm text-muted-foreground mt-2">
                 {forgotPasswordMode === "email" && t("resetPasswordDesc", lang)}
                 {forgotPasswordMode === "code" && t("resetCodeSent", lang)}
                 {forgotPasswordMode === "newpass" && t("enterResetCode", lang)}
               </p>
             </div>
 
-            <div className="space-y-3 max-w-sm mx-auto w-full">
+            <div className="space-y-5">
               {forgotPasswordMode === "email" && (
                 <>
                   <Input
@@ -522,12 +614,12 @@ const Onboarding = ({
                     placeholder={t("email", lang)}
                     value={resetEmail}
                     onChange={(e) => setResetEmail(e.target.value)}
-                    className="bg-white/10 border-white/20 text-white placeholder:text-white/50"
+                    className={underlineInput}
                   />
                   <Button
                     onClick={handleForgotPasswordSendCode}
                     disabled={saving || !resetEmail}
-                    className="w-full h-12 rounded-xl bg-white text-black hover:bg-white/90"
+                    className="w-full h-12 rounded-lg"
                   >
                     {saving ? t("onboardingSaving", lang) : t("sendResetCode", lang)}
                   </Button>
@@ -536,11 +628,15 @@ const Onboarding = ({
 
               {forgotPasswordMode === "code" && (
                 <>
-                  <div className="flex justify-center">
+                  <div className="flex justify-center py-2">
                     <InputOTP maxLength={6} value={resetOtp} onChange={setResetOtp}>
-                      <InputOTPGroup>
+                      <InputOTPGroup className="gap-2">
                         {[0, 1, 2, 3, 4, 5].map((i) => (
-                          <InputOTPSlot key={i} index={i} className="bg-white/10 border-white/20 text-white" />
+                          <InputOTPSlot
+                            key={i}
+                            index={i}
+                            className="h-12 w-10 rounded-md border border-border/50 bg-transparent text-foreground text-lg first:rounded-l-md last:rounded-r-md"
+                          />
                         ))}
                       </InputOTPGroup>
                     </InputOTP>
@@ -548,13 +644,13 @@ const Onboarding = ({
                   <Button
                     onClick={() => setForgotPasswordMode("newpass")}
                     disabled={resetOtp.length !== 6}
-                    className="w-full h-12 rounded-xl bg-white text-black hover:bg-white/90"
+                    className="w-full h-12 rounded-lg"
                   >
                     {t("onboardingNext", lang)}
                   </Button>
                   <button
                     onClick={handleForgotPasswordSendCode}
-                    className="text-white/70 text-sm hover:text-white transition-colors w-full text-center"
+                    className="text-muted-foreground text-sm hover:text-foreground transition-colors w-full text-center"
                   >
                     {lang === "zh" ? "重新發送驗證碼" : "Resend code"}
                   </button>
@@ -568,19 +664,19 @@ const Onboarding = ({
                     placeholder={t("newPassword", lang)}
                     value={resetNewPassword}
                     onChange={(e) => setResetNewPassword(e.target.value)}
-                    className="bg-white/10 border-white/20 text-white placeholder:text-white/50"
+                    className={underlineInput}
                   />
                   <Input
                     type="password"
                     placeholder={t("confirmNewPassword", lang)}
                     value={resetConfirmPassword}
                     onChange={(e) => setResetConfirmPassword(e.target.value)}
-                    className="bg-white/10 border-white/20 text-white placeholder:text-white/50"
+                    className={underlineInput}
                   />
                   <Button
                     onClick={handleResetPasswordVerify}
                     disabled={saving || resetNewPassword.length < 6}
-                    className="w-full h-12 rounded-xl bg-white text-black hover:bg-white/90"
+                    className="w-full h-12 rounded-lg"
                   >
                     {saving ? t("onboardingSaving", lang) : t("resetPassword", lang)}
                   </Button>
@@ -588,7 +684,7 @@ const Onboarding = ({
               )}
             </div>
 
-            <div className="mt-6 text-center">
+            <div className="mt-8">
               <button
                 onClick={() => {
                   setForgotPasswordMode("idle");
@@ -596,57 +692,50 @@ const Onboarding = ({
                   setResetNewPassword("");
                   setResetConfirmPassword("");
                 }}
-                className="text-white/70 text-sm hover:text-white transition-colors"
+                className="text-muted-foreground text-sm hover:text-foreground transition-colors inline-flex items-center"
               >
-                <ChevronLeft size={14} className="inline mr-1" />
+                <ChevronLeft size={14} className="mr-1" />
                 {t("onboardingBack", lang)}
               </button>
             </div>
           </div>
-        </OnboardingBgWrapper>
+        </SolidBgWrapper>
       );
     }
 
     return (
-      <OnboardingBgWrapper>
-        <div className="flex-1 flex flex-col px-6 pt-16 pb-8">
-          <div className="flex gap-2 mb-8">
-            <button
-              onClick={() => { if (lang !== "en") { setSwitchingLang(true); setLang("en"); setTimeout(() => setSwitchingLang(false), 4000); } }}
-              className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${lang === "en" ? "bg-white text-black" : "bg-white/20 text-white"}`}
-            >English</button>
-            <button
-              onClick={() => { if (lang !== "zh") { setSwitchingLang(true); setLang("zh"); setTimeout(() => setSwitchingLang(false), 4000); } }}
-              className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${lang === "zh" ? "bg-white text-black" : "bg-white/20 text-white"}`}
-            >中文 (HK)</button>
-          </div>
+      <SolidBgWrapper>
+        <div className="flex-1 flex flex-col px-6 pt-16 pb-8 max-w-md mx-auto w-full">
+          <LangSwitcher />
 
           {switchingLang && (
-            <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/80">
-              <div className="w-8 h-8 border-3 border-white border-t-transparent rounded-full animate-spin mb-4" />
-              <p className="text-sm text-white/70">{lang === "zh" ? "切換語言中..." : "Switching language..."}</p>
+            <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-background/90">
+              <div className="w-8 h-8 border-2 border-foreground border-t-transparent rounded-full animate-spin mb-4" />
+              <p className="text-sm text-muted-foreground">{lang === "zh" ? "切換語言中..." : "Switching language..."}</p>
             </div>
           )}
 
-          <div className="text-center mb-8">
-            <img src={gingrunLogo} alt="RunWard" width={80} height={80} className="mx-auto mb-3" />
-            <h1 className="text-2xl font-bold text-white">{t("onboardingWelcomeBack", lang)}</h1>
-            <p className="text-white/70 text-sm mt-1">{t("onboardingSignInDesc", lang)}</p>
+          <div className="mb-8">
+            <img src={gingrunLogo} alt="RunWard" width={56} height={56} className="mb-6" />
+            <h1 className="font-display text-[28px] leading-tight font-semibold tracking-tight text-foreground">
+              {t("onboardingWelcomeBack", lang)}
+            </h1>
+            <p className="text-muted-foreground text-sm mt-2">{t("onboardingSignInDesc", lang)}</p>
           </div>
 
           {/* Migration notice */}
-          <div className="max-w-sm mx-auto w-full mb-4 p-3 rounded-xl bg-amber-500/15 border border-amber-500/30 text-center">
-            <p className="text-amber-200 text-xs leading-relaxed">
+          <div className="mb-6 p-3 rounded-md border border-warning/30 bg-warning/5">
+            <p className="text-warning text-xs leading-relaxed">
               {lang === "zh"
-                ? "⚠️ 我們已遷移至新伺服器。如果你是現有用戶，請使用「忘記密碼」重設密碼，或重新註冊帳號。"
-                : "⚠️ We've migrated to a new server. If you're a returning user, please use \"Forgot Password\" to reset your password, or re-register your account."}
+                ? "我們已遷移至新伺服器。如果你是現有用戶，請使用「忘記密碼」重設密碼，或重新註冊帳號。"
+                : "We've migrated to a new server. If you're a returning user, please use \"Forgot Password\" to reset your password, or re-register your account."}
             </p>
           </div>
 
-          <div className="space-y-3 max-w-sm mx-auto w-full">
+          <div className="space-y-3">
             <button
               onClick={handleAppleSignIn}
-              className="w-full flex items-center justify-center gap-2 bg-white text-black py-3 rounded-xl font-medium text-sm transition-all hover:opacity-90"
+              className="w-full flex items-center justify-center gap-2 bg-foreground text-background h-12 rounded-lg font-medium text-sm transition-opacity hover:opacity-90"
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z" />
@@ -656,7 +745,7 @@ const Onboarding = ({
 
             <button
               onClick={handleGoogleSignIn}
-              className="w-full flex items-center justify-center gap-2 bg-white text-black py-3 rounded-xl font-medium text-sm transition-all hover:opacity-90"
+              className="w-full flex items-center justify-center gap-2 bg-transparent text-foreground border border-border/50 h-12 rounded-lg font-medium text-sm transition-colors hover:bg-accent"
             >
               <svg width="18" height="18" viewBox="0 0 24 24">
                 <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4" />
@@ -667,10 +756,10 @@ const Onboarding = ({
               {lang === "zh" ? "使用 Google 登入" : "Sign in with Google"}
             </button>
 
-            <div className="flex items-center gap-3 my-2">
-              <div className="flex-1 h-px bg-white/30" />
-              <span className="text-xs text-white/60">{t("orContinueWith", lang)}</span>
-              <div className="flex-1 h-px bg-white/30" />
+            <div className="flex items-center gap-3 my-4">
+              <div className="flex-1 h-px bg-border/50" />
+              <span className="text-xs text-muted-foreground uppercase tracking-wider">{t("orContinueWith", lang)}</span>
+              <div className="flex-1 h-px bg-border/50" />
             </div>
 
             <Input
@@ -678,23 +767,23 @@ const Onboarding = ({
               placeholder={t("email", lang)}
               value={signInEmail}
               onChange={(e) => setSignInEmail(e.target.value)}
-              className="bg-white/10 border-white/20 text-white placeholder:text-white/50"
+              className={underlineInput}
             />
             <Input
               type="password"
               placeholder={t("password", lang)}
               value={signInPassword}
               onChange={(e) => setSignInPassword(e.target.value)}
-              className="bg-white/10 border-white/20 text-white placeholder:text-white/50"
+              className={underlineInput}
             />
 
-            <div className="text-right">
+            <div className="text-right pt-1">
               <button
                 onClick={() => {
                   setForgotPasswordMode("email");
                   setResetEmail(signInEmail);
                 }}
-                className="text-white/70 text-xs hover:text-white transition-colors"
+                className="text-muted-foreground text-xs hover:text-foreground transition-colors"
               >
                 {t("forgotPassword", lang)}
               </button>
@@ -703,111 +792,101 @@ const Onboarding = ({
             <Button
               onClick={handleSignIn}
               disabled={saving || !signInEmail || !signInPassword}
-              className="w-full h-12 rounded-xl bg-white text-black hover:bg-white/90"
+              className="w-full h-12 rounded-lg mt-2"
             >
               <Mail size={16} />
               {saving ? t("onboardingSaving", lang) : t("signIn", lang)}
             </Button>
           </div>
 
-          <div className="mt-6 text-center">
+          <div className="mt-8">
             <button
               onClick={() => setIsSignInMode(false)}
-              className="text-white/70 text-sm hover:text-white transition-colors"
+              className="text-muted-foreground text-sm hover:text-foreground transition-colors inline-flex items-center"
             >
-              <ChevronLeft size={14} className="inline mr-1" />
+              <ChevronLeft size={14} className="mr-1" />
               {t("onboardingBack", lang)}
             </button>
           </div>
 
-          <div className="mt-auto pt-6">
-            <p className="text-center text-xs text-white/50">
+          <div className="mt-auto pt-8">
+            <p className="text-center text-xs text-muted-foreground/80">
               {lang === "zh" ? "登入即表示您同意我們的" : "By signing in, you agree to our "}
-              <a href="/privacy" className="text-white/70 underline">{lang === "zh" ? "隱私權政策" : "Privacy Policy"}</a>
+              <a href="/privacy" className="text-foreground/80 underline">{lang === "zh" ? "隱私權政策" : "Privacy Policy"}</a>
               {lang === "zh" ? "及" : " and "}
-              <a href="https://www.apple.com/legal/internet-services/itunes/dev/stdeula/" target="_blank" rel="noopener noreferrer" className="text-white/70 underline">
+              <a href="https://www.apple.com/legal/internet-services/itunes/dev/stdeula/" target="_blank" rel="noopener noreferrer" className="text-foreground/80 underline">
                 {lang === "zh" ? "使用條款" : "Terms of Use"}
               </a>
             </p>
           </div>
         </div>
-      </OnboardingBgWrapper>
+      </SolidBgWrapper>
     );
   }
 
-  // ---- STEP 0: First time? ----
+  // ---- STEP 0: Welcome (hero photo) ----
   if (step === 0) {
     return (
-      <OnboardingBgWrapper>
-        <div className="flex-1 flex flex-col px-6 pt-16 pb-8">
-          <div className="flex gap-2 mb-8">
-            <button
-              onClick={() => { if (lang !== "en") { setSwitchingLang(true); setLang("en"); setTimeout(() => setSwitchingLang(false), 4000); } }}
-              className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${lang === "en" ? "bg-white text-black" : "bg-white/20 text-white"}`}
-            >English</button>
-            <button
-              onClick={() => { if (lang !== "zh") { setSwitchingLang(true); setLang("zh"); setTimeout(() => setSwitchingLang(false), 4000); } }}
-              className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${lang === "zh" ? "bg-white text-black" : "bg-white/20 text-white"}`}
-            >中文 (HK)</button>
-          </div>
+      <WelcomeBgWrapper>
+        <div className="flex-1 flex flex-col px-6 pt-16 pb-10 max-w-md mx-auto w-full">
+          <LangSwitcher />
 
           {switchingLang && (
-            <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/80">
-              <div className="w-8 h-8 border-3 border-white border-t-transparent rounded-full animate-spin mb-4" />
-              <p className="text-sm text-white/70">{lang === "zh" ? "切換語言中..." : "Switching language..."}</p>
+            <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-background/90">
+              <div className="w-8 h-8 border-2 border-foreground border-t-transparent rounded-full animate-spin mb-4" />
+              <p className="text-sm text-muted-foreground">{lang === "zh" ? "切換語言中..." : "Switching language..."}</p>
             </div>
           )}
 
-          <div className="flex-1 flex flex-col items-center justify-center">
-            <img src={gingrunLogo} alt="RunWard" width={100} height={100} className="mx-auto mb-4" />
-            <h1 className="text-3xl font-bold text-white mb-2">
-              {lang === "zh" ? "向前跑" : "RunWard"}
+          <div className="flex-1 flex flex-col justify-end">
+            <img src={gingrunLogo} alt="RunWard" width={64} height={64} className="mb-8" />
+            <h1 className="font-display text-[44px] leading-[1.05] font-semibold tracking-tight text-foreground mb-4">
+              {lang === "zh" ? "用心而跑。" : "Run with intention."}
             </h1>
-            <p className="text-white/70 text-sm mb-10">
-              {lang === "zh" ? "你的跑步訓練夥伴" : "Your running training companion"}
+            <p className="text-muted-foreground text-base mb-10 max-w-sm">
+              {lang === "zh"
+                ? "由 AI 教練、跑姿分析與真實訓練數據驅動。"
+                : "AI coaching, posture analysis and real training data."}
             </p>
 
-            <h2 className="text-xl font-semibold text-white mb-6 text-center">
-              {t("onboardingFirstTime", lang)}
-            </h2>
-
-            <div className="space-y-3 w-full max-w-xs">
+            <div className="space-y-3">
               <Button
                 onClick={() => setStep(1)}
-                className="w-full h-14 rounded-xl bg-white text-black hover:bg-white/90 text-base font-semibold"
+                className="w-full h-12 rounded-lg text-base font-medium"
               >
-                {t("onboardingYes", lang)}
+                {lang === "zh" ? "開始" : "Get started"}
+                <ArrowRight size={16} />
               </Button>
               <Button
                 onClick={() => setIsSignInMode(true)}
                 variant="outline"
-                className="w-full h-14 rounded-xl border-white/30 text-white bg-white/10 hover:bg-white/20 text-base font-semibold"
+                className="w-full h-12 rounded-lg border-border/50 bg-transparent text-foreground text-base font-medium hover:bg-accent"
               >
-                {t("onboardingNo", lang)}
+                {lang === "zh" ? "我已有帳號" : "I have an account"}
               </Button>
               <button
                 onClick={onGuest}
-                className="w-full text-center text-sm text-white/60 hover:text-white transition-colors py-2"
+                className="w-full text-center text-sm text-muted-foreground hover:text-foreground transition-colors py-2"
               >
                 {t("continueAsGuest", lang)}
               </button>
             </div>
           </div>
 
-          <p className="text-center text-xs text-white/50 mt-4">
-            {lang === "zh" ? "登入即表示您同意我們的" : "By signing in, you agree to our "}
-            <a href="/privacy" className="text-white/70 underline">{lang === "zh" ? "隱私權政策" : "Privacy Policy"}</a>
+          <p className="text-center text-xs text-muted-foreground/80 mt-8">
+            {lang === "zh" ? "繼續即表示您同意我們的" : "By continuing, you agree to our "}
+            <a href="/privacy" className="text-foreground/80 underline">{lang === "zh" ? "隱私權政策" : "Privacy Policy"}</a>
             {lang === "zh" ? "及" : " and "}
-            <a href="https://www.apple.com/legal/internet-services/itunes/dev/stdeula/" target="_blank" rel="noopener noreferrer" className="text-white/70 underline">
+            <a href="https://www.apple.com/legal/internet-services/itunes/dev/stdeula/" target="_blank" rel="noopener noreferrer" className="text-foreground/80 underline">
               {lang === "zh" ? "使用條款" : "Terms of Use"}
             </a>
           </p>
         </div>
-      </OnboardingBgWrapper>
+      </WelcomeBgWrapper>
     );
   }
 
-  // ---- STEPS 1-10: Signup flow ----
+  // ---- STEPS 1-12: Signup flow ----
   const goBack = () => {
     if (step === 1) setStep(0);
     else if (step === 3) setStep(1); // skip welcome anim going back
@@ -843,7 +922,7 @@ const Onboarding = ({
       case 4: return !!age && parseInt(age) >= 10 && parseInt(age) <= 100;
       case 5: return runsPerWeek !== null;
       case 6: return !!estDistance && getEnteredSeconds() > 0 && !isFasterThanWorldRecord();
-      case 7: return true; // before/after is just display
+      case 7: return true;
       case 8: return !!email && email.includes("@");
       case 9: return password.length >= 6 && password === confirmPassword;
       default: return true;
@@ -857,48 +936,49 @@ const Onboarding = ({
   const signupPanels = (
     <>
       {/* Step 1: Name */}
-      <div hidden={step !== 1} className="space-y-6">
-        <div className="text-center">
-          <span className="text-5xl mb-3 block">👋</span>
-          <h2 className="text-2xl font-bold text-white">{lang === "zh" ? "你叫什麼名字？" : "What's your name?"}</h2>
-        </div>
+      <div hidden={step !== 1} className="space-y-8">
+        <StepHeader
+          icon={User}
+          title={lang === "zh" ? "你叫什麼名字？" : "What's your name?"}
+          helper={lang === "zh" ? "我們會用它來個人化你的計劃。" : "We'll use this to personalize your plan."}
+        />
         <Input
           type="text"
-          placeholder={lang === "zh" ? "輸入你的名字" : "Enter your name"}
+          placeholder={lang === "zh" ? "輸入你的名字" : "Your name"}
           value={displayName}
           onChange={(e) => setDisplayName(e.target.value)}
           autoFocus={step === 1}
-          className="text-center text-lg h-14 bg-white/10 border-white/20 text-white placeholder:text-white/50"
+          className={underlineInput}
         />
       </div>
 
       {/* Step 2: Welcome Animation */}
       <div hidden={step !== 2} className="space-y-6">
-        <div className="flex flex-col items-center justify-center min-h-[300px]">
+        <div className="flex flex-col items-center justify-center min-h-[320px]">
           <div
             className={`transition-all duration-1000 ease-out ${
-              welcomeVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
+              welcomeVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
             }`}
           >
-            <p className="text-lg text-white/70 text-center mb-2">
-              {lang === "zh" ? "歡迎來到我們的應用程式" : "Welcome to our App"}
+            <p className="text-sm uppercase tracking-[0.2em] text-muted-foreground text-center mb-6">
+              {lang === "zh" ? "歡迎" : "Welcome"}
             </p>
           </div>
           <div
             className={`transition-all duration-1000 ease-out delay-500 ${
-              welcomeVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
+              welcomeVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
             }`}
           >
-            <h1 className="text-4xl font-bold text-white text-center">
-              {displayName} 🎉
+            <h1 className="font-display text-5xl font-semibold tracking-tight text-foreground text-center">
+              {displayName}
             </h1>
           </div>
           <div
             className={`transition-all duration-1000 ease-out delay-1000 ${
-              welcomeVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
+              welcomeVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
             }`}
           >
-            <p className="text-sm text-white/50 text-center mt-4">
+            <p className="text-sm text-muted-foreground text-center mt-6">
               {lang === "zh" ? "讓我們開始設定你的個人檔案" : "Let's set up your profile"}
             </p>
           </div>
@@ -906,35 +986,32 @@ const Onboarding = ({
       </div>
 
       {/* Step 3: Gender */}
-      <div hidden={step !== 3} className="space-y-6">
-        <div className="text-center">
-          <span className="text-5xl mb-3 block">🏃</span>
-          <h2 className="text-2xl font-bold text-white">{t("onboardingGender", lang)}</h2>
-        </div>
-        <div className="flex gap-2">
+      <div hidden={step !== 3} className="space-y-8">
+        <StepHeader icon={UserCircle2} title={t("onboardingGender", lang)} />
+        <div className="space-y-2">
           {(["male", "female", "other"] as const).map((s) => (
             <button
               key={s}
               onClick={() => setSex(s)}
-              className={`flex-1 py-4 rounded-xl text-sm font-semibold transition-all border-2 ${
+              className={`w-full text-left px-5 h-14 rounded-lg border transition-colors ${
                 sex === s
-                  ? "bg-white text-black border-white shadow-md"
-                  : "bg-white/10 text-white border-white/20 hover:border-white/40"
+                  ? "border-primary bg-primary/10 text-foreground"
+                  : "border-border/50 bg-transparent text-foreground hover:border-border"
               }`}
             >
-              {s === "male" ? "🙋‍♂️ " : s === "female" ? "🙋‍♀️ " : "🧑 "}
-              {labels[s]}
+              <span className="text-base font-medium">{labels[s]}</span>
             </button>
           ))}
         </div>
       </div>
 
       {/* Step 4: Age */}
-      <div hidden={step !== 4} className="space-y-6">
-        <div className="text-center">
-          <span className="text-5xl mb-3 block">🎂</span>
-          <h2 className="text-2xl font-bold text-white">{t("onboardingAgeQuestion", lang)}</h2>
-        </div>
+      <div hidden={step !== 4} className="space-y-8">
+        <StepHeader
+          icon={Cake}
+          title={t("onboardingAgeQuestion", lang)}
+          helper={lang === "zh" ? "用於校準訓練強度。" : "Used to calibrate training intensity."}
+        />
         <Input
           type="number"
           placeholder={t("onboardingAge", lang)}
@@ -943,79 +1020,79 @@ const Onboarding = ({
           min={10}
           max={100}
           autoFocus={step === 4}
-          className="text-center text-lg h-14 bg-white/10 border-white/20 text-white placeholder:text-white/50"
+          className={underlineInput}
         />
       </div>
 
       {/* Step 5: Run frequency */}
-      <div hidden={step !== 5} className="space-y-6">
-        <div className="text-center">
-          <span className="text-5xl mb-3 block">📅</span>
-          <h2 className="text-2xl font-bold text-white">{t("onboardingRunFreqQuestion", lang)}</h2>
-        </div>
-        <div className="grid grid-cols-4 gap-3">
+      <div hidden={step !== 5} className="space-y-8">
+        <StepHeader
+          icon={CalendarDays}
+          title={t("onboardingRunFreqQuestion", lang)}
+          helper={t("onboardingDaysPerWeek", lang)}
+        />
+        <div className="grid grid-cols-8 gap-1.5">
           {[0, 1, 2, 3, 4, 5, 6, 7].map((n) => (
             <button
               key={n}
               onClick={() => setRunsPerWeek(n)}
-              className={`py-4 rounded-xl text-lg font-bold transition-all border-2 ${
+              className={`h-12 rounded-md text-base font-semibold transition-colors border ${
                 runsPerWeek === n
-                  ? "bg-white text-black border-white shadow-md scale-105"
-                  : "bg-white/10 text-white border-white/20 hover:border-white/40"
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "bg-transparent text-foreground border-border/50 hover:border-border"
               }`}
             >
               {n}
             </button>
           ))}
         </div>
-        <p className="text-xs text-center text-white/60">{t("onboardingDaysPerWeek", lang)}</p>
       </div>
 
       {/* Step 6: Estimated Race Time */}
-      <div hidden={step !== 6} className="space-y-6">
-        <div className="text-center">
-          <span className="text-5xl mb-3 block">⏱️</span>
-          <h2 className="text-xl font-bold text-white">
-            {lang === "zh" ? "輸入你的預估比賽時間" : "Enter your estimated race time"}
-          </h2>
-          <p className="text-sm text-white/60 mt-2">
-            {lang === "zh"
-              ? "這是你認為如果現在比賽可以跑出的時間！"
-              : "This is the time you think you can run if you race now!"}
-          </p>
-        </div>
+      <div hidden={step !== 6} className="space-y-8">
+        <StepHeader
+          icon={Timer}
+          title={lang === "zh" ? "輸入你的預估比賽時間" : "Your estimated race time"}
+          helper={
+            lang === "zh"
+              ? "這是你認為如果現在比賽可以跑出的時間。"
+              : "What you think you could run if you raced today."
+          }
+        />
         <div>
-          <label className="text-sm font-medium text-white/80 mb-2 block">{t("distance", lang)}</label>
-          <div className="grid grid-cols-4 gap-3">
+          <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3 block">{t("distance", lang)}</label>
+          <div className="grid grid-cols-2 gap-2">
             {EST_DISTANCES.map((d) => (
               <button
                 key={d.label}
                 onClick={() => setEstDistance(d.label)}
-                className={`flex flex-col items-center gap-1.5 p-2 rounded-xl transition-all border-2 ${
+                className={`flex items-center gap-3 p-3 rounded-lg transition-colors border ${
                   estDistance === d.label
-                    ? "border-white shadow-lg bg-white/15 scale-105"
-                    : "border-white/20 bg-white/5 hover:border-white/40"
+                    ? "border-primary bg-primary/10"
+                    : "border-border/50 bg-transparent hover:border-border"
                 }`}
               >
-                <img src={DISTANCE_BADGES[d.label]} alt={d.label} className="w-14 h-14 object-contain" />
-                <span className="text-xs font-semibold text-white">{lang === "zh" ? d.labelZh : d.label}</span>
+                <img src={DISTANCE_BADGES[d.label]} alt={d.label} className="w-10 h-10 object-contain" />
+                <span className="font-display text-base font-semibold text-foreground">{lang === "zh" ? d.labelZh : d.label}</span>
               </button>
             ))}
           </div>
         </div>
         {estDistance && (
           <div>
-            <label className="text-sm font-medium text-white/80 mb-2 block">{t("time", lang)}</label>
-            <div className="flex gap-2">
-              <Input placeholder="H" type="number" min={0} value={estHours} onChange={(e) => setEstHours(e.target.value)} className="text-center h-12 text-lg bg-white/10 border-white/20 text-white placeholder:text-white/50" />
-              <Input placeholder="M" type="number" min={0} max={59} value={estMinutes} onChange={(e) => setEstMinutes(e.target.value)} className="text-center h-12 text-lg bg-white/10 border-white/20 text-white placeholder:text-white/50" />
-              <Input placeholder="S" type="number" min={0} max={59} value={estSeconds} onChange={(e) => setEstSeconds(e.target.value)} className="text-center h-12 text-lg bg-white/10 border-white/20 text-white placeholder:text-white/50" />
+            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3 block">{t("time", lang)}</label>
+            <div className="flex items-center gap-2">
+              <Input placeholder="HH" type="number" min={0} value={estHours} onChange={(e) => setEstHours(e.target.value)} className={`${underlineInput} text-center font-mono tabular-nums`} />
+              <span className="text-2xl font-mono text-muted-foreground">:</span>
+              <Input placeholder="MM" type="number" min={0} max={59} value={estMinutes} onChange={(e) => setEstMinutes(e.target.value)} className={`${underlineInput} text-center font-mono tabular-nums`} />
+              <span className="text-2xl font-mono text-muted-foreground">:</span>
+              <Input placeholder="SS" type="number" min={0} max={59} value={estSeconds} onChange={(e) => setEstSeconds(e.target.value)} className={`${underlineInput} text-center font-mono tabular-nums`} />
             </div>
             {isFasterThanWorldRecord() && (
-              <p className="text-amber-400 text-sm text-center mt-3">
+              <p className="text-warning text-sm mt-3">
                 {lang === "zh"
-                  ? "你比目前的世界紀錄還快！😅"
-                  : "You are faster than the current world record! 😅"}
+                  ? "這個時間比目前世界紀錄還快。"
+                  : "That's faster than the current world record."}
               </p>
             )}
           </div>
@@ -1023,73 +1100,75 @@ const Onboarding = ({
       </div>
 
       {/* Step 7: Before/After Comparison */}
-      <div hidden={step !== 7} className="space-y-4">
+      <div hidden={step !== 7} className="space-y-5">
         {estimatedTimes && chosenRaceForHeader ? (
           <>
-            {/* Header banner */}
-            <div className="rounded-xl bg-gradient-to-r from-teal-600 to-teal-400 p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="text-white/80">⏱</span>
-                <span className="text-sm font-medium text-white">
+            {/* Header card with primary left bar */}
+            <div className="relative rounded-lg border border-border/50 bg-card overflow-hidden">
+              <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary" />
+              <div className="p-5 pl-6">
+                <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2">
                   {lang === "zh"
-                    ? `預估${lang === "zh" ? (chosenDist?.labelZh || "") : (chosenDist?.label || "")}時間`
-                    : `Estimated ${chosenDist?.label || ""} Time`}
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <img src={chosenRaceForHeader.badge} alt={chosenRaceForHeader.label} className="w-9 h-9 object-contain" />
-                <span className="text-2xl font-bold text-white">
-                  {formatTime(chosenRaceForHeader.improvedTime)} - {formatTime(chosenRaceForHeader.currentTime)}
-                </span>
+                    ? `預估 ${chosenDist?.labelZh || ""} 時間`
+                    : `Projected ${chosenDist?.label || ""} time`}
+                </p>
+                <div className="flex items-center gap-3">
+                  <img src={chosenRaceForHeader.badge} alt={chosenRaceForHeader.label} className="w-10 h-10 object-contain" />
+                  <span className="font-display text-2xl font-semibold tracking-tight text-foreground tabular-nums">
+                    {formatTime(chosenRaceForHeader.improvedTime)} – {formatTime(chosenRaceForHeader.currentTime)}
+                  </span>
+                </div>
               </div>
             </div>
 
             {/* Column headers */}
-            <div className="flex justify-between px-2 text-xs text-white/50 uppercase tracking-wider">
-              <span>{lang === "zh" ? "目前" : "Current"}</span>
-              <span>{lang === "zh" ? "12週後" : "In 12 Weeks"}</span>
+            <div className="flex justify-between px-1 text-xs text-muted-foreground uppercase tracking-wider">
+              <span>{lang === "zh" ? "目前" : "Today"}</span>
+              <span>{lang === "zh" ? "12 週後" : "In 12 weeks"}</span>
             </div>
 
             {/* Race rows */}
-            {(showAllRaces ? estimatedTimes : estimatedTimes.filter((r) => r.isChosen)).map((race) => (
-              <div key={race.label} className="flex items-center justify-between bg-white/5 rounded-xl px-4 py-3">
-                <div className="flex items-center gap-3">
-                  <img src={race.badge} alt={race.label} className="w-9 h-9 object-contain" />
-                  <span className="text-white font-medium">{formatTime(race.currentTime)}</span>
+            <div className="space-y-2">
+              {(showAllRaces ? estimatedTimes : estimatedTimes.filter((r) => r.isChosen)).map((race) => (
+                <div key={race.label} className="flex items-center justify-between border border-border/50 rounded-lg px-4 py-3">
+                  <div className="flex items-center gap-3 w-[40%]">
+                    <img src={race.badge} alt={race.label} className="w-8 h-8 object-contain" />
+                    <span className="text-foreground font-medium tabular-nums">{formatTime(race.currentTime)}</span>
+                  </div>
+                  <div className="flex-1 flex items-center justify-center gap-2">
+                    <div className="h-px flex-1 bg-border/50" />
+                    <ArrowRight size={14} className="text-primary" />
+                    <div className="h-px flex-1 bg-border/50" />
+                  </div>
+                  <div className="text-right w-[40%]">
+                    <span className="text-foreground font-semibold tabular-nums">{formatTime(race.improvedTime)}</span>
+                    <p className="text-xs text-success mt-0.5">
+                      −{Math.floor(race.diff / 60)}m {Math.round(race.diff % 60)}s
+                    </p>
+                  </div>
                 </div>
-                <div className="flex items-center gap-1 text-white/40">
-                  <span>•</span><span>•</span>
-                  <span className="text-white/60">🏃</span>
-                  <span>•</span><span>•</span>
-                </div>
-                <div className="text-right">
-                  <span className="text-white font-bold">{formatTime(race.improvedTime)}</span>
-                  <p className="text-xs text-green-400">
-                    -{Math.floor(race.diff / 60)}m {Math.round(race.diff % 60)}s
-                  </p>
-                </div>
-              </div>
-            ))}
+              ))}
+            </div>
 
             {/* Toggle */}
             <button
               onClick={() => setShowAllRaces(!showAllRaces)}
-              className="w-full flex items-center justify-center gap-1 py-2 text-sm text-white/60 hover:text-white transition-colors"
+              className="w-full flex items-center justify-center gap-1 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
             >
               {showAllRaces
-                ? (lang === "zh" ? "收起" : "See Less")
-                : (lang === "zh" ? "查看所有距離" : "See All Distances")}
+                ? (lang === "zh" ? "收起" : "Show less")
+                : (lang === "zh" ? "查看所有距離" : "Show all distances")}
               {showAllRaces ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
             </button>
 
-            <p className="text-center text-xs text-white/40">
+            <p className="text-xs text-muted-foreground/80">
               {lang === "zh"
-                ? "* 基於12週 AI 訓練計劃的預估改善幅度"
-                : "* Estimated improvement based on 12 weeks of AI training plan"}
+                ? "預估值基於 12 週 AI 訓練計劃。"
+                : "Projected after a 12-week training block."}
             </p>
           </>
         ) : (
-          <div className="text-center text-white/60 text-sm py-12">
+          <div className="text-muted-foreground text-sm py-12">
             {lang === "zh" ? "請先輸入你的預估比賽時間" : "Please enter your estimated race time first"}
           </div>
         )}
@@ -1097,39 +1176,41 @@ const Onboarding = ({
 
       {/* Step 8: Email / Account creation */}
       <div hidden={step !== 8} className="space-y-6">
-        <div className="text-center">
-          <span className="text-5xl mb-3 block">📧</span>
-          <h2 className="text-2xl font-bold text-white">{t("createAccount", lang)}</h2>
-          <p className="text-sm text-white/60 mt-1">{t("createAccountDesc", lang)}</p>
+        <StepHeader
+          icon={Mail}
+          title={t("createAccount", lang)}
+          helper={t("createAccountDesc", lang)}
+        />
+
+        <div className="space-y-3">
+          <button
+            onClick={handleAppleSignUp}
+            className="w-full flex items-center justify-center gap-2 bg-foreground text-background h-12 rounded-lg font-medium text-sm transition-opacity hover:opacity-90"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z" />
+            </svg>
+            {t("signInWithApple", lang)}
+          </button>
+
+          <button
+            onClick={handleGoogleSignUp}
+            className="w-full flex items-center justify-center gap-2 bg-transparent text-foreground border border-border/50 h-12 rounded-lg font-medium text-sm transition-colors hover:bg-accent"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24">
+              <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4" />
+              <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
+              <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
+              <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
+            </svg>
+            {lang === "zh" ? "使用 Google 註冊" : "Sign up with Google"}
+          </button>
         </div>
 
-        <button
-          onClick={handleAppleSignUp}
-          className="w-full flex items-center justify-center gap-2 bg-white text-black py-3.5 rounded-xl font-medium text-sm transition-all hover:opacity-90"
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z" />
-          </svg>
-          {t("signInWithApple", lang)}
-        </button>
-
-        <button
-          onClick={handleGoogleSignUp}
-          className="w-full flex items-center justify-center gap-2 bg-white text-black py-3.5 rounded-xl font-medium text-sm transition-all hover:opacity-90"
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24">
-            <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4" />
-            <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
-            <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
-            <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
-          </svg>
-          {lang === "zh" ? "使用 Google 註冊" : "Sign up with Google"}
-        </button>
-
         <div className="flex items-center gap-3">
-          <div className="flex-1 h-px bg-white/30" />
-          <span className="text-xs text-white/60">{t("orContinueWith", lang)}</span>
-          <div className="flex-1 h-px bg-white/30" />
+          <div className="flex-1 h-px bg-border/50" />
+          <span className="text-xs text-muted-foreground uppercase tracking-wider">{t("orContinueWith", lang)}</span>
+          <div className="flex-1 h-px bg-border/50" />
         </div>
 
         <Input
@@ -1138,76 +1219,110 @@ const Onboarding = ({
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           autoFocus={step === 8}
-          className="text-center text-lg h-14 bg-white/10 border-white/20 text-white placeholder:text-white/50"
+          className={underlineInput}
         />
       </div>
 
       {/* Step 9: Password */}
-      <div hidden={step !== 9} className="space-y-6">
-        <div className="text-center">
-          <span className="text-5xl mb-3 block">🔐</span>
-          <h2 className="text-2xl font-bold text-white">{t("onboardingSetPassword", lang)}</h2>
+      <div hidden={step !== 9} className="space-y-8">
+        <StepHeader icon={Lock} title={t("onboardingSetPassword", lang)} />
+        <div className="space-y-6">
+          <div>
+            <div className="relative">
+              <Input
+                type={showPassword ? "text" : "password"}
+                placeholder={t("password", lang)}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                minLength={6}
+                autoFocus={step === 9}
+                className={`${underlineInput} pr-10`}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-0 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
+            {/* Strength meter */}
+            <div className="flex gap-1.5 mt-3">
+              {[0, 1, 2].map((i) => (
+                <div
+                  key={i}
+                  className={`h-1 flex-1 rounded-full transition-colors ${
+                    i < passwordStrength
+                      ? passwordStrength === 1
+                        ? "bg-destructive"
+                        : passwordStrength === 2
+                        ? "bg-warning"
+                        : "bg-success"
+                      : "bg-border/50"
+                  }`}
+                />
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">
+              {password.length === 0
+                ? (lang === "zh" ? "至少 6 個字元" : "At least 6 characters")
+                : password.length < 6
+                ? t("passwordMinLength", lang)
+                : passwordStrength === 1
+                ? (lang === "zh" ? "弱" : "Weak")
+                : passwordStrength === 2
+                ? (lang === "zh" ? "中等" : "Okay")
+                : (lang === "zh" ? "強" : "Strong")}
+            </p>
+          </div>
+
+          <div>
+            <div className="relative">
+              <Input
+                type={showConfirmPassword ? "text" : "password"}
+                placeholder={t("confirmPassword", lang)}
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                minLength={6}
+                className={`${underlineInput} pr-10`}
+              />
+              <button
+                type="button"
+                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                className="absolute right-0 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
+            {password && confirmPassword && password !== confirmPassword && (
+              <p className="text-destructive text-xs mt-2">{t("passwordsDoNotMatch", lang)}</p>
+            )}
+          </div>
         </div>
-        <div className="relative">
-          <Input
-            type={showPassword ? "text" : "password"}
-            placeholder={t("password", lang)}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            minLength={6}
-            autoFocus={step === 9}
-            className="text-center text-lg h-14 bg-white/10 border-white/20 text-white placeholder:text-white/50 pr-12"
-          />
-          <button
-            type="button"
-            onClick={() => setShowPassword(!showPassword)}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-white/50 hover:text-white"
-          >
-            {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-          </button>
-        </div>
-        <div className="relative">
-          <Input
-            type={showConfirmPassword ? "text" : "password"}
-            placeholder={t("confirmPassword", lang)}
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            minLength={6}
-            className="text-center text-lg h-14 bg-white/10 border-white/20 text-white placeholder:text-white/50 pr-12"
-          />
-          <button
-            type="button"
-            onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-white/50 hover:text-white"
-          >
-            {showConfirmPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-          </button>
-        </div>
-        <p className={`text-red-400 text-sm text-center ${password && confirmPassword && password !== confirmPassword ? "visible" : "invisible"}`}>{t("passwordsDoNotMatch", lang)}</p>
-        <p className={`text-red-400 text-sm text-center ${password && password.length > 0 && password.length < 6 ? "visible" : "invisible"}`}>{t("passwordMinLength", lang)}</p>
       </div>
 
       {/* Step 12: Email OTP verification */}
       <div hidden={step !== 12} className="space-y-6">
-        <div className="flex flex-col items-center justify-center min-h-[300px]">
-          <ShieldCheck size={48} className="text-white mb-6" />
-          <h2 className="text-2xl font-bold text-white text-center">
+        <div className="flex flex-col items-start min-h-[300px]">
+          <ShieldCheck size={24} className="text-muted-foreground mb-3" />
+          <h2 className="font-display text-[28px] leading-tight font-semibold tracking-tight text-foreground">
             {lang === "zh" ? "輸入驗證碼" : "Enter verification code"}
           </h2>
-          <p className="text-sm text-white/60 text-center mt-3 max-w-xs">
+          <p className="text-sm text-muted-foreground mt-2">
             {lang === "zh"
               ? `我們已發送 6 位數驗證碼到 ${email}`
               : `We've sent a 6-digit code to ${email}`}
           </p>
-          <div className="mt-6">
+          <div className="mt-8 w-full flex justify-center">
             <InputOTP maxLength={6} value={otpCode} onChange={setOtpCode}>
-              <InputOTPGroup>
-                <InputOTPSlot index={0} className="bg-white/10 border-white/30 text-white text-lg" />
-                <InputOTPSlot index={1} className="bg-white/10 border-white/30 text-white text-lg" />
-                <InputOTPSlot index={2} className="bg-white/10 border-white/30 text-white text-lg" />
-                <InputOTPSlot index={3} className="bg-white/10 border-white/30 text-white text-lg" />
-                <InputOTPSlot index={4} className="bg-white/10 border-white/30 text-white text-lg" />
-                <InputOTPSlot index={5} className="bg-white/10 border-white/30 text-white text-lg" />
+              <InputOTPGroup className="gap-2">
+                {[0, 1, 2, 3, 4, 5].map((i) => (
+                  <InputOTPSlot
+                    key={i}
+                    index={i}
+                    className="h-14 w-12 rounded-md border border-border/50 bg-transparent text-foreground text-lg font-mono first:rounded-l-md last:rounded-r-md"
+                  />
+                ))}
               </InputOTPGroup>
             </InputOTP>
           </div>
@@ -1234,7 +1349,7 @@ const Onboarding = ({
               }
             }}
             disabled={otpCode.length !== 6 || verifyingOtp}
-            className="mt-4 w-full max-w-[250px] h-12 rounded-xl bg-white text-black hover:bg-white/90 font-semibold"
+            className="mt-6 w-full h-12 rounded-lg"
           >
             {verifyingOtp
               ? (lang === "zh" ? "驗證中..." : "Verifying...")
@@ -1245,7 +1360,7 @@ const Onboarding = ({
               supabase.auth.resend({ type: "signup", email });
               toast({ title: lang === "zh" ? "已重新發送" : "Resent", description: lang === "zh" ? "驗證碼已重新寄出" : "Verification code resent" });
             }}
-            className="mt-3 text-sm text-white/50 hover:text-white transition-colors"
+            className="mt-4 text-sm text-muted-foreground hover:text-foreground transition-colors w-full text-center"
           >
             {lang === "zh" ? "重新發送驗證碼" : "Resend code"}
           </button>
@@ -1254,46 +1369,66 @@ const Onboarding = ({
 
       {/* Step 11: Creating account loading */}
       <div hidden={step !== 11} className="space-y-6">
-        <div className="flex flex-col items-center justify-center min-h-[300px]">
-          <div className="w-10 h-10 border-3 border-white border-t-transparent rounded-full animate-spin mb-6" />
-          <h2 className="text-2xl font-bold text-white text-center">
-            {lang === "zh" ? "正在建立你的帳號..." : "Creating your account..."}
+        <div className="flex flex-col items-center justify-center min-h-[320px]">
+          <div className="flex gap-1.5 mb-8">
+            {[0, 1, 2].map((i) => (
+              <div
+                key={i}
+                className="w-2 h-2 rounded-full bg-primary animate-pulse"
+                style={{ animationDelay: `${i * 200}ms`, animationDuration: "1.2s" }}
+              />
+            ))}
+          </div>
+          <h2 className="font-display text-[24px] leading-tight font-semibold tracking-tight text-foreground text-center">
+            {lang === "zh" ? "正在建立你的帳號" : "Creating your account"}
           </h2>
-          <p className="text-sm text-white/60 text-center mt-3">
-            {lang === "zh" ? "請稍候，我們正在為你準備一切" : "Please wait while we set everything up for you"}
+          <p className="text-sm text-muted-foreground text-center mt-3 transition-opacity duration-300 min-h-[1.5rem]">
+            {loadingPhrases[loadingPhraseIdx]}
           </p>
         </div>
       </div>
 
       {/* Step 10: Plan prompt */}
       <div hidden={step !== 10} className="space-y-8">
-        <div className="text-center">
-          <span className="text-5xl mb-3 block">🎉</span>
-          <h2 className="text-2xl font-bold text-white">{t("onboardingWantPlan", lang)}</h2>
+        <div>
+          <h2 className="font-display text-[28px] leading-tight font-semibold tracking-tight text-foreground">
+            {lang === "zh" ? "你的計劃已準備好。" : "Your plan is ready."}
+          </h2>
+          <p className="text-sm text-muted-foreground mt-2">
+            {lang === "zh" ? "由 AI 教練根據你的資料生成。" : "Built by your AI coach from your data."}
+          </p>
         </div>
-        <div className="space-y-3 max-w-xs mx-auto">
-          <Button
+        <div className="space-y-3">
+          <button
             onClick={() => void finalizeOnboarding(true)}
-            className="w-full h-auto py-3 rounded-xl bg-white text-black hover:bg-white/90 font-semibold whitespace-normal leading-tight flex flex-col items-center gap-0.5"
+            className="w-full text-left p-5 rounded-lg bg-primary text-primary-foreground transition-opacity hover:opacity-90"
           >
-            <span className="text-base">{lang === "zh" ? "是，請給我我的 AI 訓練計劃！" : "Yes, please give me my Generated plan!"}</span>
-            <span className="text-xs font-medium text-black/60">{lang === "zh" ? "領取 7 天免費體驗" : "Claim Your 7‑Day Free Access"}</span>
-          </Button>
-          <Button
+            <p className="font-display text-base font-semibold leading-tight">
+              {lang === "zh" ? "開始 7 天免費體驗" : "Start 7-day free trial"}
+            </p>
+            <p className="text-sm text-primary-foreground/80 mt-1">
+              {lang === "zh" ? "立即生成我的 AI 訓練計劃" : "Generate my AI training plan"}
+            </p>
+          </button>
+          <button
             onClick={() => void finalizeOnboarding(false)}
-            variant="outline"
-            className="w-full h-14 rounded-xl border-white/30 text-white bg-white/10 hover:bg-white/20 text-base font-semibold whitespace-normal leading-tight"
+            className="w-full text-left p-5 rounded-lg border border-border/50 bg-transparent text-foreground transition-colors hover:bg-accent"
           >
-            {lang === "zh" ? "不，帶我去主頁。" : "No, take me to the home page."}
-          </Button>
+            <p className="font-medium text-base">
+              {lang === "zh" ? "暫時略過" : "Skip for now"}
+            </p>
+            <p className="text-sm text-muted-foreground mt-1">
+              {lang === "zh" ? "之後可隨時在設定中啟用。" : "You can enable it later from settings."}
+            </p>
+          </button>
 
           {/* Redemption code option */}
           {!showRedeemInput ? (
             <button
               onClick={() => setShowRedeemInput(true)}
-              className="w-full flex items-center justify-center gap-2 py-3 text-sm text-white/60 hover:text-white transition-colors"
+              className="w-full flex items-center justify-center gap-2 py-3 text-sm text-muted-foreground hover:text-foreground transition-colors"
             >
-              <Ticket size={16} />
+              <Ticket size={14} />
               {lang === "zh" ? "我有兌換代碼" : "I have a redemption code"}
             </button>
           ) : (
@@ -1302,7 +1437,7 @@ const Onboarding = ({
                 value={redeemCode}
                 onChange={(e) => setRedeemCode(e.target.value.toUpperCase())}
                 placeholder={lang === "zh" ? "輸入代碼" : "Enter code"}
-                className="text-center text-lg tracking-widest font-mono bg-white/10 border-white/20 text-white placeholder:text-white/50"
+                className={`${underlineInput} text-center tracking-widest font-mono`}
                 autoFocus
               />
               <Button
@@ -1313,7 +1448,7 @@ const Onboarding = ({
                   }
                 }}
                 disabled={!redeemCode.trim()}
-                className="w-full h-12 rounded-xl bg-white text-black hover:bg-white/90"
+                className="w-full h-12 rounded-lg"
               >
                 <Ticket size={16} />
                 {lang === "zh" ? "兌換" : "Redeem"}
@@ -1325,28 +1460,27 @@ const Onboarding = ({
     </>
   );
 
-  // Progress bar: steps 1-10, but skip step 2 (welcome anim) from count
-  // Show progress for steps 1, 3-10 = 9 visible steps
-  const progressStep = step <= 1 ? 0 : step === 2 ? 0 : step - 2; // map step to progress index
+  // Progress: steps 1, 3-9 visible (step 2 = welcome anim, 10-12 = post-flow)
+  const progressStep = step <= 1 ? 0 : step === 2 ? 0 : step - 2;
   const TOTAL_PROGRESS_STEPS = 9;
 
   return (
-    <OnboardingBgWrapper>
+    <SolidBgWrapper>
       {step >= 1 && step <= 10 && step !== 2 && (
-        <OnboardingProgressBar current={progressStep} total={TOTAL_PROGRESS_STEPS} />
+        <ProgressLine current={progressStep} total={TOTAL_PROGRESS_STEPS} />
       )}
 
-      <div className="flex-1 flex items-center justify-center px-6">
-        <div className="w-full max-w-sm">{signupPanels}</div>
+      <div className="flex-1 flex items-start justify-center px-6 pt-12 pb-6">
+        <div className="w-full max-w-md">{signupPanels}</div>
       </div>
 
-      {/* Bottom nav for steps 1, 3-9 (not 2=welcome anim, not 10=plan prompt) */}
+      {/* Bottom nav for steps 1, 3-9 */}
       {step >= 1 && step <= 9 && step !== 2 && (
-        <div className="flex items-center gap-3 px-6 pb-8 pt-4">
+        <div className="flex items-center gap-3 px-6 pb-8 pt-4 max-w-md mx-auto w-full">
           <Button
             variant="outline"
             onClick={goBack}
-            className="h-12 px-5 rounded-xl border-white/30 text-white bg-white/10 hover:bg-white/20"
+            className="h-12 px-5 rounded-lg border-border/50 bg-transparent text-foreground hover:bg-accent"
           >
             <ChevronLeft size={16} /> {t("onboardingBack", lang)}
           </Button>
@@ -1354,7 +1488,7 @@ const Onboarding = ({
           <Button
             onClick={goNext}
             disabled={!canProceed() || saving}
-            className="h-12 px-6 rounded-xl bg-white text-black hover:bg-white/90"
+            className="h-12 px-6 rounded-lg"
           >
             {step === 9
               ? (saving ? t("onboardingCreatingAccount", lang) : t("onboardingStart", lang))
@@ -1363,7 +1497,7 @@ const Onboarding = ({
           </Button>
         </div>
       )}
-    </OnboardingBgWrapper>
+    </SolidBgWrapper>
   );
 };
 

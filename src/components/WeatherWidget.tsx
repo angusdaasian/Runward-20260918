@@ -38,34 +38,43 @@ const codeMeta = (code: number, isDay: boolean, fallbackText: string, lang: Lang
   return { Icon: Cloud, label: fallbackText || "—" };
 };
 
-async function fetchWeather(city: string): Promise<WeatherData | null> {
+type FetchResult =
+  | { kind: "ok"; data: WeatherData }
+  | { kind: "no_auth" }
+  | { kind: "not_found" }
+  | { kind: "fetch_fail" };
+
+async function fetchWeather(city: string): Promise<FetchResult> {
   // get-weather now requires a valid Supabase JWT.
   const { data: { session } } = await supabase.auth.getSession();
-  if (!session?.access_token) return null;
+  if (!session?.access_token) return { kind: "no_auth" };
 
-  const projectRef = import.meta.env.VITE_SUPABASE_PROJECT_ID;
-  const url = `https://${projectRef}.supabase.co/functions/v1/get-weather?city=${encodeURIComponent(city)}`;
-  const res = await fetch(url, {
-    headers: {
-      apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string,
-      Authorization: `Bearer ${session.access_token}`,
-    },
+  const { data: w, error } = await supabase.functions.invoke("get-weather", {
+    body: { city },
   });
-  if (!res.ok) return null;
-  const w = await res.json();
-  if (!w || w.error) return null;
+
+  if (error) {
+    // Supabase wraps non-2xx into FunctionsHttpError. Treat 400 (invalid city) as not_found.
+    const msg = (error as { message?: string })?.message ?? "";
+    if (/400|invalid city|not found/i.test(msg)) return { kind: "not_found" };
+    return { kind: "fetch_fail" };
+  }
+  if (!w || (w as { error?: string }).error) return { kind: "not_found" };
 
   return {
-    city: w.city,
-    temperature: w.temperature,
-    code: w.conditionCode,
-    conditionText: w.conditionText,
-    isDay: !!w.isDay,
-    high: w.high,
-    low: w.low,
-    humidity: w.humidity ?? null,
-    wind_kph: w.wind_kph ?? null,
-    fetchedAt: Date.now(),
+    kind: "ok",
+    data: {
+      city: w.city,
+      temperature: w.temperature,
+      code: w.conditionCode,
+      conditionText: w.conditionText,
+      isDay: !!w.isDay,
+      high: w.high,
+      low: w.low,
+      humidity: w.humidity ?? null,
+      wind_kph: w.wind_kph ?? null,
+      fetchedAt: Date.now(),
+    },
   };
 }
 
@@ -93,13 +102,21 @@ function useWeather(lang: Lang) {
     setLoading(true);
     setError(null);
     try {
-      const data = await fetchWeather(targetCity);
-      if (!data) {
+      const result = await fetchWeather(targetCity);
+      if (result.kind === "ok") {
+        setWeather(result.data);
+        localStorage.setItem(CACHE_KEY, JSON.stringify(result.data));
+        return;
+      }
+      if (result.kind === "no_auth") {
+        setError(lang === "zh" ? "請登入以查看天氣" : "Sign in to see weather");
+        return;
+      }
+      if (result.kind === "not_found") {
         setError(lang === "zh" ? "找不到城市" : "City not found");
         return;
       }
-      setWeather(data);
-      localStorage.setItem(CACHE_KEY, JSON.stringify(data));
+      setError(lang === "zh" ? "載入失敗" : "Failed to load");
     } catch {
       setError(lang === "zh" ? "載入失敗" : "Failed to load");
     } finally {

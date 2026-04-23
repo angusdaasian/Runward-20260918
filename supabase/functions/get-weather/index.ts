@@ -1,10 +1,12 @@
 // Authenticated edge function that proxies WeatherAPI.com calls so the API key stays secret.
 // Requires a valid Supabase JWT and applies a per-user in-memory rate limit (30 req / 5 min).
+// Accepts both POST (JSON body { city }) and GET (?city=) for backwards compatibility.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
 };
 
 // Per-user rate limit (in-memory; resets on cold start, fine for abuse throttling)
@@ -63,9 +65,20 @@ Deno.serve(async (req) => {
       });
     }
 
-    // --- INPUT ---
-    const url = new URL(req.url);
-    const city = (url.searchParams.get('city') || '').trim();
+    // --- INPUT (POST body or GET query) ---
+    let city = '';
+    if (req.method === 'POST') {
+      try {
+        const body = await req.json();
+        city = (body?.city || '').toString().trim();
+      } catch {
+        // fall through to validation error below
+      }
+    } else {
+      const url = new URL(req.url);
+      city = (url.searchParams.get('city') || '').trim();
+    }
+
     if (!city || city.length > 100) {
       return new Response(JSON.stringify({ error: 'Invalid city' }), {
         status: 400,

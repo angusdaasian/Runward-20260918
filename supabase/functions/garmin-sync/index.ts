@@ -113,9 +113,11 @@ serve(async (req) => {
       }
 
       const loginData = await loginRes.json();
+      console.log("Garmin /garmin-login response:", JSON.stringify(loginData));
 
       // MFA required — don't save credentials yet, return session_id to client
       if (loginData.needs_mfa) {
+        console.log("MFA required, returning session_id:", loginData.session_id);
         return new Response(JSON.stringify({
           success: true,
           needs_mfa: true,

@@ -93,15 +93,13 @@ serve(async (req) => {
       }
 
       const garminEmail = conn.access_token;
-      const garminPassword = conn.refresh_token;
 
-      // ── Phase 1: Fetch basic activity list (no detail_limit) ──
+      // ── Phase 1: Fetch basic activity list (token-based, no password) ──
       const actRes = await fetch(`${GARMIN_RAILWAY_URL}/garmin-activities`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           email: garminEmail,
-          password: garminPassword || "",
           days: body.days || 30,
           detail_limit: 0,
         }),
@@ -110,6 +108,12 @@ serve(async (req) => {
       if (!actRes.ok) {
         const errData = await actRes.json().catch(() => ({}));
         console.error("Garmin activity fetch failed:", errData);
+        if (actRes.status === 401) {
+          return new Response(JSON.stringify({ error: "Garmin sign-in expired", reauth_required: true }), {
+            status: 401,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
         return new Response(JSON.stringify({ error: errData.detail || "Failed to fetch Garmin activities" }), {
           status: 500,
           headers: { ...corsHeaders, "Content-Type": "application/json" },

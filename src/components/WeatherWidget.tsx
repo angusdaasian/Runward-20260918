@@ -39,13 +39,21 @@ const codeMeta = (code: number, isDay: boolean, fallbackText: string, lang: Lang
 };
 
 async function fetchWeather(city: string): Promise<WeatherData | null> {
-  // Use functions.invoke so the user's JWT is auto-attached (function now requires auth).
-  const { data: w, error } = await supabase.functions.invoke("get-weather", {
-    method: "GET",
-    // @ts-expect-error supabase-js supports query for GET invokes at runtime
-    query: { city },
+  // get-weather now requires a valid Supabase JWT.
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.access_token) return null;
+
+  const projectRef = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+  const url = `https://${projectRef}.supabase.co/functions/v1/get-weather?city=${encodeURIComponent(city)}`;
+  const res = await fetch(url, {
+    headers: {
+      apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string,
+      Authorization: `Bearer ${session.access_token}`,
+    },
   });
-  if (error || !w || (w as any).error) return null;
+  if (!res.ok) return null;
+  const w = await res.json();
+  if (!w || w.error) return null;
 
   return {
     city: w.city,

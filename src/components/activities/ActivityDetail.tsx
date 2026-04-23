@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
-import { ArrowLeft, Clock, MapPin, Zap, Heart, TrendingUp, Mountain, Timer, Footprints, Trash2, Pencil, Sparkles, Lock, Gauge, AlertTriangle, Flame, Trophy, MessageSquare, RefreshCw } from "lucide-react";
+import { ArrowLeft, Clock, MapPin, Zap, Heart, TrendingUp, Mountain, Timer, Footprints, Trash2, Pencil, Sparkles, Lock, Gauge, AlertTriangle, Flame, Trophy, MessageSquare, RefreshCw, Share2 } from "lucide-react";
+import { shareActivity } from "@/lib/shareActivity";
 import { Lang } from "@/lib/i18n";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -492,6 +493,25 @@ const ActivityDetail = ({ activity, lang, onBack, isPremium, trainingScore }: Pr
           <ArrowLeft size={16} />
           {lang === "zh" ? "返回" : "Back"}
         </button>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() =>
+              shareActivity({
+                name: activityName,
+                distanceMeters: activity.distance,
+                movingTimeSeconds: activity.moving_time,
+                averageSpeed: activity.average_speed,
+                startDate: activity.start_date,
+                analysis: aiAnalysis,
+                nextWorkout: aiNextWorkout,
+                lang,
+              })
+            }
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-primary hover:bg-primary/10 transition-colors"
+          >
+            <Share2 size={14} />
+            {lang === "zh" ? "分享" : "Share"}
+          </button>
         <AlertDialog>
           <AlertDialogTrigger asChild>
             <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-destructive hover:bg-destructive/10 transition-colors">

@@ -42,12 +42,46 @@ export function useGarmin(lang: Lang) {
   }, [user, queryClient]);
 
   /**
-   * Opens a popup to Garmin's real SSO sign-in page. Resolves with the connection result
-   * after the popup posts back a ticket and we exchange it on the backend.
+   * Connects Garmin. On desktop, opens a popup to Garmin's real SSO page.
+   * On mobile (where popups are unreliable / often blocked), does a full-page redirect
+   * and resumes the exchange when the user lands back on the app.
    */
   const connectViaPopup = useCallback(async (): Promise<{ ok: boolean; displayName?: string }> => {
     if (!user) return { ok: false };
 
+    // Mobile: popups are unreliable on iOS Safari and many Android browsers.
+    // Use a full-page redirect instead. The callback page will exchange the ticket
+    // itself and then redirect back here.
+    const isMobile = /iphone|ipad|ipod|android/i.test(navigator.userAgent);
+
+    if (isMobile) {
+      setConnecting(true);
+      try {
+        const { data: startData, error: startErr } = await supabase.functions.invoke("garmin-sso-start", {
+          body: { origin: window.location.origin },
+        });
+        if (startErr || !startData?.url) {
+          const msg = await extractFunctionErrorMessage(startErr) || "Failed to start Garmin sign-in";
+          toast.error(lang === "zh" ? `Garmin 連結失敗:${msg}` : msg);
+          setConnecting(false);
+          return { ok: false };
+        }
+        // Remember the callback for the exchange step + flag so we know we're returning from Garmin.
+        sessionStorage.setItem("garmin-sso-callback", startData.callback ?? "");
+        sessionStorage.setItem("garmin-sso-pending", "1");
+        window.location.href = startData.url;
+        // The page is being unloaded; nothing to return.
+        return { ok: false };
+      } catch (err) {
+        console.error("Garmin redirect start error:", err);
+        const msg = await extractFunctionErrorMessage(err);
+        toast.error(lang === "zh" ? `Garmin 連結失敗${msg ? `:${msg}` : ""}` : msg || "Garmin connection failed");
+        setConnecting(false);
+        return { ok: false };
+      }
+    }
+
+    // Desktop: popup flow.
     // Open a placeholder popup *synchronously* from the click handler so popup blockers don't trip.
     const popup = window.open("about:blank", "garmin-sso", "width=520,height=720");
     if (!popup) {

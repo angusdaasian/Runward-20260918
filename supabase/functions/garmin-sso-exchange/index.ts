@@ -41,7 +41,10 @@ serve(async (req) => {
     }
 
     const body = await req.json().catch(() => ({}));
-    const { ticket, callback } = body;
+    const { ticket, callback, serviceUrl } = body;
+    const exchangeServiceUrl = typeof serviceUrl === "string" && serviceUrl.trim()
+      ? serviceUrl.trim()
+      : (typeof callback === "string" && callback.trim() ? callback.trim() : null);
 
     if (!ticket || typeof ticket !== "string") {
       return new Response(JSON.stringify({ error: "ticket required" }), {
@@ -67,7 +70,7 @@ serve(async (req) => {
     const exchangeRes = await fetch(`${GARMIN_RAILWAY_URL}/garmin-exchange-ticket`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ticket, callback: callback ?? null }),
+      body: JSON.stringify({ ticket, callback: exchangeServiceUrl, serviceUrl: exchangeServiceUrl }),
     });
 
     if (!exchangeRes.ok) {

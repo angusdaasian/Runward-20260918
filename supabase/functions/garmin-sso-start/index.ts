@@ -32,6 +32,8 @@ serve(async (req) => {
     }
 
     const callback = `${origin}/garmin-callback`;
+    const mobileBridge = `${origin}/garmin-mobile-auth`;
+    const serviceUrl = "https://sso.garmin.com/sso/embed";
     // Use the embed-widget SSO flow. Unlike the bare `clientId=GarminConnect`
     // sign-in (which redirects to Connect's own post-auth landing page after
     // MFA — bypassing our `service` callback), the embed widget flow always
@@ -77,7 +79,37 @@ serve(async (req) => {
     });
 
     const url = `https://sso.garmin.com/sso/signin?${params.toString()}`;
-    return new Response(JSON.stringify({ url, callback }), {
+
+    const mobileParams = new URLSearchParams({
+      id: "gauth-widget",
+      embedWidget: "true",
+      gauthHost: "https://sso.garmin.com/sso",
+      locale: "en_US",
+      clientId: "GarminConnect",
+      service: serviceUrl,
+      source: mobileBridge,
+      redirectAfterAccountLoginUrl: serviceUrl,
+      redirectAfterAccountCreationUrl: serviceUrl,
+      rememberMeShown: "true",
+      rememberMeChecked: "false",
+      createAccountShown: "true",
+      openCreateAccount: "false",
+      displayNameShown: "false",
+      consumeServiceTicket: "false",
+      generateExtraServiceTicket: "true",
+      generateTwoExtraServiceTickets: "false",
+      generateNoServiceTicket: "false",
+      showTermsOfUse: "false",
+      showPrivacyPolicy: "false",
+      connectLegalTerms: "true",
+      showConnectLegalAge: "false",
+      locationPromptShown: "true",
+      useCustomHeader: "false",
+    });
+
+    const mobileEmbedUrl = `https://sso.garmin.com/sso/embed?${mobileParams.toString()}`;
+
+    return new Response(JSON.stringify({ url, callback, mobile_embed_url: mobileEmbedUrl, service_url: serviceUrl }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {

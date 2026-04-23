@@ -191,7 +191,6 @@ serve(async (req) => {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               email: garminEmail,
-              password: garminPassword || "",
               activity_ids: activityIds,
             }),
           });

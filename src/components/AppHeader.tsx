@@ -230,27 +230,29 @@ const AppHeader = ({ lang, onNavigateSettings, onOpenPromoBanner, isGuest }: App
           </PopoverTrigger>
           <PopoverContent align="end" className="w-64 p-2">
             <div className="flex flex-col">
-              {/* Weather — entire row triggers nested popover */}
-              <Popover>
-                <PopoverTrigger asChild>
-                  <button className="flex items-center gap-3 px-2 py-1.5 rounded-md hover:bg-muted/60 transition-colors text-left active:scale-[0.98] w-full">
-                    <span className="w-10 h-10 rounded-full bg-muted flex items-center justify-center shrink-0">
-                      <Cloud size={18} className="text-foreground" />
-                    </span>
-                    <div className="flex flex-col">
-                      <span className="text-sm font-medium text-foreground leading-tight">
-                        {lang === "zh" ? "天氣" : "Weather"}
+              {/* Weather — authenticated users only */}
+              {!isGuest && user && (
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button className="flex items-center gap-3 px-2 py-1.5 rounded-md hover:bg-muted/60 transition-colors text-left active:scale-[0.98] w-full">
+                      <span className="w-10 h-10 rounded-full bg-muted flex items-center justify-center shrink-0">
+                        <Cloud size={18} className="text-foreground" />
                       </span>
-                      <span className="text-[11px] text-muted-foreground leading-tight">
-                        {lang === "zh" ? "查看本地天氣" : "Check local weather"}
-                      </span>
-                    </div>
-                  </button>
-                </PopoverTrigger>
-                <PopoverContent align="center" side="bottom" className="w-64 p-0">
-                  <WeatherInline lang={lang} />
-                </PopoverContent>
-              </Popover>
+                      <div className="flex flex-col">
+                        <span className="text-sm font-medium text-foreground leading-tight">
+                          {lang === "zh" ? "天氣" : "Weather"}
+                        </span>
+                        <span className="text-[11px] text-muted-foreground leading-tight">
+                          {lang === "zh" ? "查看本地天氣" : "Check local weather"}
+                        </span>
+                      </div>
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent align="center" side="bottom" className="w-64 p-0">
+                    <WeatherInline lang={lang} />
+                  </PopoverContent>
+                </Popover>
+              )}
 
               {/* Race news / Promo banner */}
               {onOpenPromoBanner && (

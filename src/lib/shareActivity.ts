@@ -21,7 +21,7 @@ import bg2 from "@/assets/share-bg-2.jpg";
 import bg3 from "@/assets/share-bg-3.jpg";
 
 const APP_NAME = "Runward";
-const APP_URL = "https://runward.app";
+const APP_URL = "https://pacecalculator.fun";
 const HEROES = [bg1, bg2, bg3];
 
 export interface ShareActivityInput {

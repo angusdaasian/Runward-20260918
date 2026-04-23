@@ -10,14 +10,15 @@ const GarminCallback = () => {
     const errorParam = params.get("error");
 
     // Mobile/redirect flow: no opener — we landed here as a full-page navigation.
-    // Exchange the ticket on this page, then redirect back to `/`.
+    // Exchange the ticket on this page, then redirect back to the connect-apps view.
     if (!window.opener) {
       const callback = sessionStorage.getItem("garmin-sso-callback") || "";
+      const returnUrl = "/?tab=more&page=connect-apps";
 
       if (errorParam) {
         sessionStorage.setItem("garmin-sso-result", JSON.stringify({ ok: false, error: errorParam }));
         sessionStorage.removeItem("garmin-sso-pending");
-        window.location.replace("/");
+        window.location.replace(returnUrl);
         return;
       }
 
@@ -27,8 +28,7 @@ const GarminCallback = () => {
           JSON.stringify({ ok: false, error: "No sign-in ticket received" })
         );
         sessionStorage.removeItem("garmin-sso-pending");
-        // Wait briefly in case Garmin double-redirects without params.
-        setTimeout(() => window.location.replace("/"), 1500);
+        setTimeout(() => window.location.replace(returnUrl), 1500);
         return;
       }
 
@@ -56,7 +56,7 @@ const GarminCallback = () => {
         } finally {
           sessionStorage.removeItem("garmin-sso-pending");
           sessionStorage.removeItem("garmin-sso-callback");
-          window.location.replace("/");
+          window.location.replace(returnUrl);
         }
       })();
       return;

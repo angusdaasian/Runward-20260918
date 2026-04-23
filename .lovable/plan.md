@@ -1,42 +1,55 @@
 
 
-## Onboarding redesign — "Quiet Sport" direction
+## Security Fixes — Plan
 
-Restyling `src/components/Onboarding.tsx` only. No logic, validation, auth, i18n, or asset changes.
+Apply four contained fixes from the audit: lock down the seed function, secure the weather proxy, restrict storage listing, and add Realtime RLS for Strava (in preparation for future athlete-limit approval).
 
-### Design language
+### 1. Harden `seed-promo-banner` (Critical)
+Currently `verify_jwt = false` + service role = anyone can create banners as any user.
 
-- **Surface**: solid `--background` dark on all data steps. Photo only on the welcome screen (darkened to 80% with bottom gradient).
-- **Type**: `font-display` (Space Grotesk) for question headers at ~28px / semibold / tight tracking. Inter for body and helpers.
-- **Icons**: replace every emoji header with a 24px monochrome `lucide-react` icon in `text-muted-foreground`. Emojis removed from buttons and microcopy.
-- **Inputs**: borderless underline style — `border-0 border-b border-border/50 rounded-none bg-transparent focus:border-primary` — replacing the glass pill inputs.
-- **Buttons**: standardized `h-12 rounded-lg`. Primary = `bg-primary text-primary-foreground`. Secondary = `border border-border/50 bg-transparent`. Tertiary = ghost link.
-- **Progress**: single 2px line at the top, fills left-to-right with `--primary`. Replaces the segmented pill bar.
-- **Accent**: only `--primary` (existing green). White is text only.
-- **Theme lock**: wrap the onboarding root in a `dark` class so the redesign renders consistently regardless of system preference.
+- **`supabase/config.toml`**: change `[functions.seed-promo-banner] verify_jwt` → `true`.
+- **`supabase/functions/seed-promo-banner/index.ts`**:
+  - Validate JWT via `getClaims()` against the bearer token.
+  - Look up caller's role via `user_roles` table; reject non-admins with 403.
+  - **Ignore** the `created_by` field from the request body — always set `created_by = claims.sub`.
+  - Add basic input validation: `ends_at` must be valid ISO and in the future; `caption`/`captionZh` capped at 500 chars; reject images >5 MB.
 
-### Screen-by-screen
+### 2. Secure `get-weather` proxy (High)
+Unauthenticated → quota abuse risk on WeatherAPI.
 
-| Step | Change |
-|---|---|
-| 0 Welcome | Keep hero photo, darken to 80%, add bottom gradient. 64px logo. Display headline "Run with intention." Filled primary CTA + ghost "I have an account" + small "Continue as guest" link. |
-| 1 Name / 3 Gender / 4 Age | Solid dark surface. Lucide icon (User / UserCircle / Cake) at 24px. Display question header. Underline input, 56px height. Helper line below in muted-foreground. |
-| 5 Runs/week | Horizontal segmented selector 0–7 in one row. Selected = primary fill, others = subtle border. |
-| 6 Race time | 2×2 distance cards keeping the medal images, distance label in display type. Time inputs as one inline group (HH : MM : SS) with monospace digits. Inline validation. |
-| 7 Before/After | Replace teal gradient with dark card + thin primary left-edge bar. Replace dotted runner row with a horizontal line + small primary arrow icon. Time deltas use success token. Add caption: "Projected after a 12-week training block." |
-| 8 Email + social | Apple (black), Google (outlined white), divider, underline email input. |
-| 9 Password | Two underline inputs + 3-bar live strength meter beneath the first. |
-| 10 Plan prompt | Remove 🎉. Headline "Your plan is ready." Primary card "Start 7-day free trial — Generate my plan", ghost card "Skip for now". Redemption code as collapsed link. |
-| 11 Loading | 3-dot phased loader with rotating microcopy ("Calibrating pace zones…", "Reading your VDOT…"). |
-| 12 OTP | Restyle slots to match underline input language. |
-| Sign-in | Same dark surface as data steps (no photo bg). |
+- **`supabase/config.toml`**: change `[functions.get-weather] verify_jwt` → `true`.
+- **`supabase/functions/get-weather/index.ts`**:
+  - Require `Authorization: Bearer <jwt>`; validate via `getClaims()`.
+  - Return 401 on missing/invalid token.
+  - Add a lightweight per-user in-memory rate limit (e.g. 30 requests / 5 min) keyed on `claims.sub` to throttle abuse from a single account.
+- **Client (`src/components/WeatherWidget.tsx`)**: confirm it already calls via `supabase.functions.invoke` (which auto-attaches the JWT). If it uses raw `fetch`, switch to `supabase.functions.invoke('get-weather', { ... })`.
 
-### Preserved
+### 3. Lock down storage bucket listing (Medium)
+Public buckets `avatars` and `promo-banners` currently allow anyone to LIST every object path.
 
-- All step state machine, validation, Supabase auth, OTP/reset, VDOT/distance math, i18n keys, existing assets (`gingrun-logo.png`, badge PNGs, `onboarding-bg.jpg`).
-- No new dependencies, no migrations, no new files.
+New migration on `storage.objects`:
+- **Drop** any broad `SELECT … USING (true)` policies on these two buckets.
+- **Add** narrow policies:
+  - `avatars`: owners can manage their own folder (`auth.uid()::text = (storage.foldername(name))[1]`); public `SELECT` only on individual objects (no listing). Since `getPublicUrl` works without listing, this is safe.
+  - `promo-banners`: only admins (`has_role(auth.uid(), 'admin')`) can `INSERT`/`UPDATE`/`DELETE`. Public can read individual files via `getPublicUrl` but cannot enumerate.
 
-### Files
+### 4. Realtime RLS for Strava tables (preparation)
+Even though Strava sync is currently unused, prepare for athlete-limit approval.
 
-- `src/components/Onboarding.tsx` — visual restructure only.
+New migration:
+- Ensure `strava_activities` and `strava_connections` are **removed** from the `supabase_realtime` publication if currently included (prevents broadcast leaks while RLS-on-realtime is unconfigured).
+- If realtime is desired later, the proper pattern is to add table-level RLS (already in place) plus filter subscriptions by `user_id` on the client. Document this in a code comment near the Strava client hooks.
+
+### Technical Notes
+- All edge function changes preserve existing CORS headers and response shapes.
+- Migration includes `DROP POLICY IF EXISTS` guards so it's idempotent.
+- After deploy, mark security findings #1, #3, #4 (and the Strava realtime item) as `mark_as_fixed` via `security--manage_security_finding`.
+- No client UI changes required other than the optional `WeatherWidget` invoke check.
+
+### Files Changed
+- `supabase/config.toml`
+- `supabase/functions/seed-promo-banner/index.ts`
+- `supabase/functions/get-weather/index.ts`
+- `src/components/WeatherWidget.tsx` (only if it uses raw fetch)
+- New migration: storage policy tightening + realtime publication cleanup
 

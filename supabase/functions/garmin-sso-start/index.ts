@@ -39,15 +39,23 @@ serve(async (req) => {
       redirectAfterAccountLoginUrl: callback,
       redirectAfterAccountCreationUrl: callback,
       gauthHost: "https://sso.garmin.com/sso",
-      clientId: "GarminConnect",
       locale: "en_US",
       id: "gauth-widget",
       cssUrl: "https://connect.garmin.com/gauth-custom-v1.2-min.css",
       privacyStatementUrl: "https://www.garmin.com/en-US/privacy/connect/",
+      clientId: "GarminConnect",
+      rememberMeShown: "true",
+      rememberMeChecked: "false",
+      createAccountShown: "true",
+      openCreateAccount: "false",
+      usernameShown: "true",
+      displayNameShown: "false",
+      initialFocus: "true",
+      embedWidget: "false",
       consumeServiceTicket: "false",
     });
 
-    const url = `https://sso.garmin.com/sso/signin?${params.toString()}`;
+    const url = `https://sso.garmin.com/sso/login?${params.toString()}`;
     return new Response(JSON.stringify({ url, callback }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

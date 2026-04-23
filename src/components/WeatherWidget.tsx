@@ -4,6 +4,7 @@ import { Lang } from "@/lib/i18n";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { supabase } from "@/integrations/supabase/client";
 
 const CITY_KEY = "weather_city";
 const CACHE_KEY = "weather_cache_v2";
@@ -38,17 +39,13 @@ const codeMeta = (code: number, isDay: boolean, fallbackText: string, lang: Lang
 };
 
 async function fetchWeather(city: string): Promise<WeatherData | null> {
-  const projectRef = import.meta.env.VITE_SUPABASE_PROJECT_ID;
-  const url = `https://${projectRef}.supabase.co/functions/v1/get-weather?city=${encodeURIComponent(city)}`;
-  const res = await fetch(url, {
-    headers: {
-      apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string,
-      Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-    },
+  // Use functions.invoke so the user's JWT is auto-attached (function now requires auth).
+  const { data: w, error } = await supabase.functions.invoke("get-weather", {
+    method: "GET",
+    // @ts-expect-error supabase-js supports query for GET invokes at runtime
+    query: { city },
   });
-  if (!res.ok) return null;
-  const w = await res.json();
-  if (!w || w.error) return null;
+  if (error || !w || (w as any).error) return null;
 
   return {
     city: w.city,

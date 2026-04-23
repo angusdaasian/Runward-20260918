@@ -1,4 +1,4 @@
-import { useState, useEffect, type ReactNode } from "react";
+import { useState, useEffect, type ReactNode, type CSSProperties } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDespiaPurchases } from "@/hooks/use-despia-purchases";
@@ -23,13 +23,13 @@ import {
   Timer,
   Lock,
   ArrowRight,
+  Sparkles,
   type LucideIcon,
 } from "lucide-react";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { Lang, t } from "@/lib/i18n";
 import { calculateRunningScore, predictTime, formatTime } from "@/lib/vdot";
 import gingrunLogo from "@/assets/gingrun-logo.png";
-import onboardingBg from "@/assets/onboarding-bg.jpg";
 import badge5k from "@/assets/badge-5k.png";
 import badge10k from "@/assets/badge-10k.png";
 import badge21k from "@/assets/badge-21k.png";
@@ -73,84 +73,191 @@ const sexLabels = (lang: Lang) => ({
 });
 
 function getImprovementPct(score: number): number {
-  if (score >= 60) return 0.04;   // Advanced: 3-5%
-  if (score >= 45) return 0.065;  // Intermediate: 5-8%
-  return 0.10;                    // Beginner: 8-12%
+  if (score >= 60) return 0.04;
+  if (score >= 45) return 0.065;
+  return 0.10;
 }
 
-// Steps: 0=first-time?, 1=name, 2=welcome-anim, 3=gender, 4=age, 5=run-freq,
-//        6=estimated-time, 7=before-after, 8=email, 9=password, 10=want-plan
 type OnboardingStep = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12;
 
 /**
- * Welcome-only background: hero photo, darkened to 80%, with bottom gradient.
- * Used exclusively on Step 0.
+ * Scoped "Quiet Mint" palette — overrides design tokens for the onboarding flow only,
+ * leaving the rest of the app untouched. Soft mint surface, deep teal ink, primary green accent.
  */
-const WelcomeBgWrapper = ({ children }: { children: ReactNode }) => (
-  <div className="dark relative min-h-screen flex flex-col bg-background">
-    <img
-      src={onboardingBg}
-      alt=""
-      className="absolute inset-0 w-full h-full object-cover"
-      width={896}
-      height={1920}
-    />
-    <div className="absolute inset-0 bg-background/80" />
-    <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-background via-background/60 to-transparent" />
-    <div className="relative z-10 flex flex-col min-h-screen">{children}</div>
-  </div>
-);
+const ONBOARDING_THEME: CSSProperties = {
+  // Page surface – soft mint cream
+  ["--background" as string]: "150 30% 94%",
+  ["--foreground" as string]: "175 35% 15%",
+
+  // Cards – slightly lighter mint
+  ["--card" as string]: "150 35% 90%",
+  ["--card-foreground" as string]: "175 35% 15%",
+
+  ["--popover" as string]: "0 0% 100%",
+  ["--popover-foreground" as string]: "175 35% 15%",
+
+  // Primary – deep teal-green
+  ["--primary" as string]: "175 40% 22%",
+  ["--primary-foreground" as string]: "150 30% 96%",
+
+  ["--secondary" as string]: "150 30% 88%",
+  ["--secondary-foreground" as string]: "175 35% 20%",
+
+  ["--muted" as string]: "150 25% 88%",
+  ["--muted-foreground" as string]: "175 12% 45%",
+
+  ["--accent" as string]: "150 35% 88%",
+  ["--accent-foreground" as string]: "175 35% 20%",
+
+  ["--border" as string]: "150 20% 80%",
+  ["--input" as string]: "150 20% 80%",
+  ["--ring" as string]: "175 40% 22%",
+
+  ["--success" as string]: "142 64% 32%",
+  ["--warning" as string]: "28 80% 45%",
+
+  ["--radius" as string]: "1.25rem",
+
+  backgroundColor: "hsl(150 30% 94%)",
+  color: "hsl(175 35% 15%)",
+};
 
 /**
- * Solid dark surface for all data-entry steps.
+ * The shared themed wrapper — all onboarding steps render inside this.
  */
-const SolidBgWrapper = ({ children }: { children: ReactNode }) => (
-  <div className="dark min-h-screen flex flex-col bg-background text-foreground">
+const OnboardingShell = ({ children }: { children: ReactNode }) => (
+  <div
+    className="min-h-screen flex flex-col font-body"
+    style={ONBOARDING_THEME}
+  >
     {children}
   </div>
 );
 
 /**
- * Single thin (2px) progress line at the top, fills left-to-right with --primary.
+ * Top bar: round back button (optional) + centered title + small step counter.
+ * Renders the thin progress line beneath itself.
  */
-const ProgressLine = ({ current, total }: { current: number; total: number }) => {
-  const pct = Math.max(0, Math.min(100, ((current + 1) / total) * 100));
+const TopBar = ({
+  onBack,
+  title,
+  current,
+  total,
+  showProgress = true,
+}: {
+  onBack?: () => void;
+  title?: string;
+  current?: number;
+  total?: number;
+  showProgress?: boolean;
+}) => {
+  const pct =
+    typeof current === "number" && typeof total === "number"
+      ? Math.max(0, Math.min(100, ((current + 1) / total) * 100))
+      : 0;
   return (
-    <div className="h-[2px] w-full bg-border/40">
-      <div
-        className="h-full bg-primary transition-all duration-500 ease-out"
-        style={{ width: `${pct}%` }}
-      />
+    <div className="px-5 pt-6">
+      <div className="relative flex items-center justify-center h-10">
+        {onBack && (
+          <button
+            onClick={onBack}
+            aria-label="Back"
+            className="absolute left-0 w-10 h-10 rounded-full bg-card/70 border border-border/40 flex items-center justify-center text-foreground/70 hover:text-foreground hover:bg-card transition-colors"
+          >
+            <ChevronLeft size={18} />
+          </button>
+        )}
+        {title && (
+          <h3 className="font-display text-base font-medium text-foreground/80">
+            {title}
+          </h3>
+        )}
+        {typeof current === "number" && typeof total === "number" && (
+          <span className="absolute right-0 text-xs font-medium text-foreground/60 tabular-nums">
+            {current + 1}/{total}
+          </span>
+        )}
+      </div>
+      {showProgress && typeof current === "number" && typeof total === "number" && (
+        <div className="mt-4 h-[3px] w-full bg-foreground/10 rounded-full overflow-hidden">
+          <div
+            className="h-full bg-primary rounded-full transition-all duration-500 ease-out"
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+      )}
     </div>
   );
 };
 
 /**
- * Reusable header for data steps: small monochrome icon + display headline + optional helper.
+ * Page title block: bold display headline + helper line. Centered.
  */
-const StepHeader = ({
-  icon: Icon,
+const QuestionHeader = ({
   title,
   helper,
 }: {
-  icon: LucideIcon;
   title: string;
   helper?: string;
 }) => (
-  <div className="space-y-3">
-    <Icon size={24} className="text-muted-foreground" />
-    <h2 className="font-display text-[28px] leading-tight font-semibold tracking-tight text-foreground">
+  <div className="space-y-2 text-center px-2">
+    <h2 className="font-display text-[26px] leading-[1.2] font-bold tracking-tight text-foreground">
       {title}
     </h2>
-    {helper && <p className="text-sm text-muted-foreground">{helper}</p>}
+    {helper && (
+      <p className="text-sm text-foreground/60 leading-relaxed max-w-[320px] mx-auto">
+        {helper}
+      </p>
+    )}
   </div>
 );
 
 /**
- * Underline-style input class: borderless, single bottom border, primary on focus.
+ * Large rounded card container used for option groups / inputs.
+ */
+const SoftCard = ({
+  children,
+  className = "",
+}: {
+  children: ReactNode;
+  className?: string;
+}) => (
+  <div
+    className={`rounded-3xl bg-card/80 border border-border/30 p-4 ${className}`}
+  >
+    {children}
+  </div>
+);
+
+/**
+ * Pill-shaped primary CTA used at the bottom of every step.
+ */
+const PrimaryPill = ({
+  children,
+  onClick,
+  disabled,
+  type = "button",
+}: {
+  children: ReactNode;
+  onClick?: () => void;
+  disabled?: boolean;
+  type?: "button" | "submit";
+}) => (
+  <button
+    type={type}
+    onClick={onClick}
+    disabled={disabled}
+    className="w-full h-14 rounded-full bg-primary text-primary-foreground text-base font-semibold tracking-wide transition-all hover:opacity-95 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed shadow-[0_4px_14px_-4px_hsl(175_40%_22%/0.4)]"
+  >
+    {children}
+  </button>
+);
+
+/**
+ * Underline-style input — borderless, single bottom border.
  */
 const underlineInput =
-  "h-14 rounded-none border-0 border-b border-border/50 bg-transparent px-0 text-lg font-medium placeholder:text-muted-foreground/60 focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:border-primary transition-colors";
+  "h-14 rounded-none border-0 border-b-2 border-foreground/15 bg-transparent px-1 text-lg font-medium text-foreground placeholder:text-foreground/35 focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:border-primary transition-colors";
 
 const Onboarding = ({
   onComplete,
@@ -228,7 +335,7 @@ const Onboarding = ({
     return () => clearInterval(id);
   }, [step, loadingPhrases.length]);
 
-  // Persist onboarding "ideal time" so the suggested-workout feature can fall back to it
+  // Persist onboarding "ideal time"
   useEffect(() => {
     if (!estDistance) return;
     const seconds =
@@ -263,7 +370,7 @@ const Onboarding = ({
     }
   }, [step]);
 
-  // Auto-advance welcome step after animation
+  // Auto-advance welcome step
   useEffect(() => {
     if (step === 2 && welcomeVisible) {
       const timer = setTimeout(() => setStep(3), 2500);
@@ -323,7 +430,6 @@ const Onboarding = ({
   useEffect(() => {
     if (user && !isSignInMode) {
       const signupInProgress = sessionStorage.getItem(ONBOARDING_SIGNUP_IN_PROGRESS_KEY) === "true";
-      // If on step 12 (email verification) and user just confirmed, advance to profile save flow
       if (step === 12) {
         setOnboardingUserId(user.id);
         setSignupInProgress(true);
@@ -385,9 +491,7 @@ const Onboarding = ({
   const handleAppleSignIn = async () => {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "apple",
-      options: {
-        redirectTo: window.location.origin,
-      },
+      options: { redirectTo: window.location.origin },
     });
     if (error) {
       console.error("[AppleSignIn] Error:", error);
@@ -403,9 +507,7 @@ const Onboarding = ({
   const handleGoogleSignIn = async () => {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
-      options: {
-        redirectTo: window.location.origin,
-      },
+      options: { redirectTo: window.location.origin },
     });
     if (error) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -430,7 +532,7 @@ const Onboarding = ({
     setSaving(true);
     setSignupInProgress(true);
     setIsAccountCreationInFlight(true);
-    setStep(11); // Show "creating account" loading screen immediately
+    setStep(11);
 
     const { data: authData, error } = await supabase.auth.signUp({
       email,
@@ -446,7 +548,6 @@ const Onboarding = ({
       return;
     }
 
-    // If email confirmation is required, session will be null
     if (authData.user && !authData.session) {
       setSignupInProgress(false);
       setSaving(false);
@@ -454,14 +555,13 @@ const Onboarding = ({
       setOnboardingUserId(authData.user.id);
       localStorage.setItem("onboarding_show_plan_prompt", "true");
       saveOnboardingDataToStorage();
-      setStep(12); // Show "check your email" screen
+      setStep(12);
       return;
     }
 
     if (authData.user) {
       setOnboardingUserId(authData.user.id);
       localStorage.setItem("onboarding_show_plan_prompt", "true");
-      // The useEffect watching user+step===11 will handle profile save and advance to step 10
     }
   };
 
@@ -485,7 +585,6 @@ const Onboarding = ({
     onComplete();
   };
 
-  // Compute estimated race times for Before/After
   const getEstimatedTimes = () => {
     const dist = EST_DISTANCES.find((d) => d.label === estDistance);
     if (!dist) return null;
@@ -563,7 +662,7 @@ const Onboarding = ({
 
   const labels = sexLabels(lang);
 
-  // Password strength: 0-3 (length + character variety)
+  // Password strength: 0-3
   const passwordStrength = (() => {
     if (!password) return 0;
     let score = 0;
@@ -573,42 +672,44 @@ const Onboarding = ({
     return Math.min(3, score);
   })();
 
-  // ---- LANGUAGE SWITCHER (shared) ----
   const LangSwitcher = () => (
-    <div className="flex gap-1.5 mb-10">
+    <div className="flex gap-1.5 mb-8">
       <button
         onClick={() => { if (lang !== "en") { setSwitchingLang(true); setLang("en"); setTimeout(() => setSwitchingLang(false), 4000); } }}
-        className={`flex-1 py-2 rounded-md text-xs font-medium tracking-wide uppercase transition-colors ${lang === "en" ? "bg-foreground text-background" : "bg-transparent text-muted-foreground border border-border/50 hover:text-foreground"}`}
+        className={`flex-1 py-2.5 rounded-full text-xs font-semibold tracking-wide transition-colors ${lang === "en" ? "bg-primary text-primary-foreground" : "bg-card/60 text-foreground/60 border border-border/30 hover:text-foreground"}`}
       >English</button>
       <button
         onClick={() => { if (lang !== "zh") { setSwitchingLang(true); setLang("zh"); setTimeout(() => setSwitchingLang(false), 4000); } }}
-        className={`flex-1 py-2 rounded-md text-xs font-medium tracking-wide uppercase transition-colors ${lang === "zh" ? "bg-foreground text-background" : "bg-transparent text-muted-foreground border border-border/50 hover:text-foreground"}`}
+        className={`flex-1 py-2.5 rounded-full text-xs font-semibold tracking-wide transition-colors ${lang === "zh" ? "bg-primary text-primary-foreground" : "bg-card/60 text-foreground/60 border border-border/30 hover:text-foreground"}`}
       >中文 (HK)</button>
     </div>
   );
 
   // ---- SIGN IN MODE ----
   if (isSignInMode) {
-    // Forgot password sub-flow
     if (forgotPasswordMode !== "idle") {
       return (
-        <SolidBgWrapper>
-          <div className="flex-1 flex flex-col px-6 pt-16 pb-8 max-w-md mx-auto w-full">
-            <div className="mb-10">
-              <img src={gingrunLogo} alt="RunWard" width={56} height={56} className="mb-6" />
-              <h1 className="font-display text-[28px] leading-tight font-semibold tracking-tight text-foreground">
-                {t("resetPassword", lang)}
-              </h1>
-              <p className="text-sm text-muted-foreground mt-2">
-                {forgotPasswordMode === "email" && t("resetPasswordDesc", lang)}
-                {forgotPasswordMode === "code" && t("resetCodeSent", lang)}
-                {forgotPasswordMode === "newpass" && t("enterResetCode", lang)}
-              </p>
-            </div>
+        <OnboardingShell>
+          <TopBar onBack={() => {
+            setForgotPasswordMode("idle");
+            setResetOtp("");
+            setResetNewPassword("");
+            setResetConfirmPassword("");
+          }} title={t("resetPassword", lang)} showProgress={false} />
 
-            <div className="space-y-5">
+          <div className="flex-1 flex flex-col px-6 pt-10 pb-8 max-w-md mx-auto w-full">
+            <QuestionHeader
+              title={t("resetPassword", lang)}
+              helper={
+                forgotPasswordMode === "email" ? t("resetPasswordDesc", lang) :
+                forgotPasswordMode === "code" ? t("resetCodeSent", lang) :
+                t("enterResetCode", lang)
+              }
+            />
+
+            <div className="mt-10 space-y-5">
               {forgotPasswordMode === "email" && (
-                <>
+                <SoftCard>
                   <Input
                     type="email"
                     placeholder={t("email", lang)}
@@ -616,49 +717,27 @@ const Onboarding = ({
                     onChange={(e) => setResetEmail(e.target.value)}
                     className={underlineInput}
                   />
-                  <Button
-                    onClick={handleForgotPasswordSendCode}
-                    disabled={saving || !resetEmail}
-                    className="w-full h-12 rounded-lg"
-                  >
-                    {saving ? t("onboardingSaving", lang) : t("sendResetCode", lang)}
-                  </Button>
-                </>
+                </SoftCard>
               )}
 
               {forgotPasswordMode === "code" && (
-                <>
-                  <div className="flex justify-center py-2">
-                    <InputOTP maxLength={6} value={resetOtp} onChange={setResetOtp}>
-                      <InputOTPGroup className="gap-2">
-                        {[0, 1, 2, 3, 4, 5].map((i) => (
-                          <InputOTPSlot
-                            key={i}
-                            index={i}
-                            className="h-12 w-10 rounded-md border border-border/50 bg-transparent text-foreground text-lg first:rounded-l-md last:rounded-r-md"
-                          />
-                        ))}
-                      </InputOTPGroup>
-                    </InputOTP>
-                  </div>
-                  <Button
-                    onClick={() => setForgotPasswordMode("newpass")}
-                    disabled={resetOtp.length !== 6}
-                    className="w-full h-12 rounded-lg"
-                  >
-                    {t("onboardingNext", lang)}
-                  </Button>
-                  <button
-                    onClick={handleForgotPasswordSendCode}
-                    className="text-muted-foreground text-sm hover:text-foreground transition-colors w-full text-center"
-                  >
-                    {lang === "zh" ? "重新發送驗證碼" : "Resend code"}
-                  </button>
-                </>
+                <SoftCard className="flex justify-center py-6">
+                  <InputOTP maxLength={6} value={resetOtp} onChange={setResetOtp}>
+                    <InputOTPGroup className="gap-2">
+                      {[0, 1, 2, 3, 4, 5].map((i) => (
+                        <InputOTPSlot
+                          key={i}
+                          index={i}
+                          className="h-12 w-10 rounded-xl border border-border/40 bg-background/60 text-foreground text-lg first:rounded-l-xl last:rounded-r-xl"
+                        />
+                      ))}
+                    </InputOTPGroup>
+                  </InputOTP>
+                </SoftCard>
               )}
 
               {forgotPasswordMode === "newpass" && (
-                <>
+                <SoftCard className="space-y-4">
                   <Input
                     type="password"
                     placeholder={t("newPassword", lang)}
@@ -673,58 +752,64 @@ const Onboarding = ({
                     onChange={(e) => setResetConfirmPassword(e.target.value)}
                     className={underlineInput}
                   />
-                  <Button
-                    onClick={handleResetPasswordVerify}
-                    disabled={saving || resetNewPassword.length < 6}
-                    className="w-full h-12 rounded-lg"
-                  >
-                    {saving ? t("onboardingSaving", lang) : t("resetPassword", lang)}
-                  </Button>
-                </>
+                </SoftCard>
               )}
             </div>
 
-            <div className="mt-8">
-              <button
-                onClick={() => {
-                  setForgotPasswordMode("idle");
-                  setResetOtp("");
-                  setResetNewPassword("");
-                  setResetConfirmPassword("");
-                }}
-                className="text-muted-foreground text-sm hover:text-foreground transition-colors inline-flex items-center"
-              >
-                <ChevronLeft size={14} className="mr-1" />
-                {t("onboardingBack", lang)}
-              </button>
+            <div className="mt-auto pt-8 space-y-3">
+              {forgotPasswordMode === "email" && (
+                <PrimaryPill onClick={handleForgotPasswordSendCode} disabled={saving || !resetEmail}>
+                  {saving ? t("onboardingSaving", lang) : t("sendResetCode", lang)}
+                </PrimaryPill>
+              )}
+              {forgotPasswordMode === "code" && (
+                <>
+                  <PrimaryPill onClick={() => setForgotPasswordMode("newpass")} disabled={resetOtp.length !== 6}>
+                    {t("onboardingNext", lang)}
+                  </PrimaryPill>
+                  <button
+                    onClick={handleForgotPasswordSendCode}
+                    className="text-foreground/60 text-sm hover:text-foreground transition-colors w-full text-center py-2"
+                  >
+                    {lang === "zh" ? "重新發送驗證碼" : "Resend code"}
+                  </button>
+                </>
+              )}
+              {forgotPasswordMode === "newpass" && (
+                <PrimaryPill onClick={handleResetPasswordVerify} disabled={saving || resetNewPassword.length < 6}>
+                  {saving ? t("onboardingSaving", lang) : t("resetPassword", lang)}
+                </PrimaryPill>
+              )}
             </div>
           </div>
-        </SolidBgWrapper>
+        </OnboardingShell>
       );
     }
 
     return (
-      <SolidBgWrapper>
-        <div className="flex-1 flex flex-col px-6 pt-16 pb-8 max-w-md mx-auto w-full">
+      <OnboardingShell>
+        <TopBar onBack={() => setIsSignInMode(false)} title={t("signIn", lang)} showProgress={false} />
+
+        <div className="flex-1 flex flex-col px-6 pt-8 pb-8 max-w-md mx-auto w-full">
           <LangSwitcher />
 
           {switchingLang && (
             <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-background/90">
-              <div className="w-8 h-8 border-2 border-foreground border-t-transparent rounded-full animate-spin mb-4" />
-              <p className="text-sm text-muted-foreground">{lang === "zh" ? "切換語言中..." : "Switching language..."}</p>
+              <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mb-4" />
+              <p className="text-sm text-foreground/60">{lang === "zh" ? "切換語言中..." : "Switching language..."}</p>
             </div>
           )}
 
-          <div className="mb-8">
-            <img src={gingrunLogo} alt="RunWard" width={56} height={56} className="mb-6" />
-            <h1 className="font-display text-[28px] leading-tight font-semibold tracking-tight text-foreground">
-              {t("onboardingWelcomeBack", lang)}
-            </h1>
-            <p className="text-muted-foreground text-sm mt-2">{t("onboardingSignInDesc", lang)}</p>
+          <div className="flex flex-col items-center mb-8">
+            <img src={gingrunLogo} alt="RunWard" width={56} height={56} className="mb-5" />
+            <QuestionHeader
+              title={t("onboardingWelcomeBack", lang)}
+              helper={t("onboardingSignInDesc", lang)}
+            />
           </div>
 
           {/* Migration notice */}
-          <div className="mb-6 p-3 rounded-md border border-warning/30 bg-warning/5">
+          <div className="mb-6 p-4 rounded-2xl border border-warning/30 bg-warning/10">
             <p className="text-warning text-xs leading-relaxed">
               {lang === "zh"
                 ? "我們已遷移至新伺服器。如果你是現有用戶，請使用「忘記密碼」重設密碼，或重新註冊帳號。"
@@ -735,7 +820,7 @@ const Onboarding = ({
           <div className="space-y-3">
             <button
               onClick={handleAppleSignIn}
-              className="w-full flex items-center justify-center gap-2 bg-foreground text-background h-12 rounded-lg font-medium text-sm transition-opacity hover:opacity-90"
+              className="w-full flex items-center justify-center gap-2 bg-foreground text-background h-13 py-3.5 rounded-full font-semibold text-sm transition-opacity hover:opacity-90"
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z" />
@@ -745,7 +830,7 @@ const Onboarding = ({
 
             <button
               onClick={handleGoogleSignIn}
-              className="w-full flex items-center justify-center gap-2 bg-transparent text-foreground border border-border/50 h-12 rounded-lg font-medium text-sm transition-colors hover:bg-accent"
+              className="w-full flex items-center justify-center gap-2 bg-card/60 text-foreground border border-border/40 py-3.5 rounded-full font-semibold text-sm transition-colors hover:bg-card"
             >
               <svg width="18" height="18" viewBox="0 0 24 24">
                 <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4" />
@@ -757,25 +842,27 @@ const Onboarding = ({
             </button>
 
             <div className="flex items-center gap-3 my-4">
-              <div className="flex-1 h-px bg-border/50" />
-              <span className="text-xs text-muted-foreground uppercase tracking-wider">{t("orContinueWith", lang)}</span>
-              <div className="flex-1 h-px bg-border/50" />
+              <div className="flex-1 h-px bg-foreground/10" />
+              <span className="text-xs text-foreground/50 uppercase tracking-wider">{t("orContinueWith", lang)}</span>
+              <div className="flex-1 h-px bg-foreground/10" />
             </div>
 
-            <Input
-              type="email"
-              placeholder={t("email", lang)}
-              value={signInEmail}
-              onChange={(e) => setSignInEmail(e.target.value)}
-              className={underlineInput}
-            />
-            <Input
-              type="password"
-              placeholder={t("password", lang)}
-              value={signInPassword}
-              onChange={(e) => setSignInPassword(e.target.value)}
-              className={underlineInput}
-            />
+            <SoftCard className="space-y-2">
+              <Input
+                type="email"
+                placeholder={t("email", lang)}
+                value={signInEmail}
+                onChange={(e) => setSignInEmail(e.target.value)}
+                className={underlineInput}
+              />
+              <Input
+                type="password"
+                placeholder={t("password", lang)}
+                value={signInPassword}
+                onChange={(e) => setSignInPassword(e.target.value)}
+                className={underlineInput}
+              />
+            </SoftCard>
 
             <div className="text-right pt-1">
               <button
@@ -783,119 +870,98 @@ const Onboarding = ({
                   setForgotPasswordMode("email");
                   setResetEmail(signInEmail);
                 }}
-                className="text-muted-foreground text-xs hover:text-foreground transition-colors"
+                className="text-foreground/60 text-xs hover:text-foreground transition-colors"
               >
                 {t("forgotPassword", lang)}
               </button>
             </div>
-
-            <Button
-              onClick={handleSignIn}
-              disabled={saving || !signInEmail || !signInPassword}
-              className="w-full h-12 rounded-lg mt-2"
-            >
-              <Mail size={16} />
-              {saving ? t("onboardingSaving", lang) : t("signIn", lang)}
-            </Button>
-          </div>
-
-          <div className="mt-8">
-            <button
-              onClick={() => setIsSignInMode(false)}
-              className="text-muted-foreground text-sm hover:text-foreground transition-colors inline-flex items-center"
-            >
-              <ChevronLeft size={14} className="mr-1" />
-              {t("onboardingBack", lang)}
-            </button>
           </div>
 
           <div className="mt-auto pt-8">
-            <p className="text-center text-xs text-muted-foreground/80">
+            <PrimaryPill onClick={handleSignIn} disabled={saving || !signInEmail || !signInPassword}>
+              {saving ? t("onboardingSaving", lang) : t("signIn", lang)}
+            </PrimaryPill>
+            <p className="text-center text-xs text-foreground/50 mt-5">
               {lang === "zh" ? "登入即表示您同意我們的" : "By signing in, you agree to our "}
-              <a href="/privacy" className="text-foreground/80 underline">{lang === "zh" ? "隱私權政策" : "Privacy Policy"}</a>
+              <a href="/privacy" className="text-foreground/70 underline">{lang === "zh" ? "隱私權政策" : "Privacy Policy"}</a>
               {lang === "zh" ? "及" : " and "}
-              <a href="https://www.apple.com/legal/internet-services/itunes/dev/stdeula/" target="_blank" rel="noopener noreferrer" className="text-foreground/80 underline">
+              <a href="https://www.apple.com/legal/internet-services/itunes/dev/stdeula/" target="_blank" rel="noopener noreferrer" className="text-foreground/70 underline">
                 {lang === "zh" ? "使用條款" : "Terms of Use"}
               </a>
             </p>
           </div>
         </div>
-      </SolidBgWrapper>
+      </OnboardingShell>
     );
   }
 
-  // ---- STEP 0: Welcome (hero photo) ----
+  // ---- STEP 0: Welcome ----
   if (step === 0) {
     return (
-      <WelcomeBgWrapper>
-        <div className="flex-1 flex flex-col px-6 pt-16 pb-10 max-w-md mx-auto w-full">
+      <OnboardingShell>
+        <div className="flex-1 flex flex-col px-6 pt-12 pb-10 max-w-md mx-auto w-full">
           <LangSwitcher />
 
           {switchingLang && (
             <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-background/90">
-              <div className="w-8 h-8 border-2 border-foreground border-t-transparent rounded-full animate-spin mb-4" />
-              <p className="text-sm text-muted-foreground">{lang === "zh" ? "切換語言中..." : "Switching language..."}</p>
+              <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mb-4" />
+              <p className="text-sm text-foreground/60">{lang === "zh" ? "切換語言中..." : "Switching language..."}</p>
             </div>
           )}
 
-          <div className="flex-1 flex flex-col justify-end">
-            <img src={gingrunLogo} alt="RunWard" width={64} height={64} className="mb-8" />
-            <h1 className="font-display text-[44px] leading-[1.05] font-semibold tracking-tight text-foreground mb-4">
+          <div className="flex-1 flex flex-col items-center justify-center text-center">
+            <img src={gingrunLogo} alt="RunWard" width={88} height={88} className="mb-8" />
+            <h1 className="font-display text-[40px] leading-[1.05] font-bold tracking-tight text-foreground mb-4">
               {lang === "zh" ? "用心而跑。" : "Run with intention."}
             </h1>
-            <p className="text-muted-foreground text-base mb-10 max-w-sm">
+            <p className="text-foreground/60 text-base max-w-sm">
               {lang === "zh"
                 ? "由 AI 教練、跑姿分析與真實訓練數據驅動。"
                 : "AI coaching, posture analysis and real training data."}
             </p>
-
-            <div className="space-y-3">
-              <Button
-                onClick={() => setStep(1)}
-                className="w-full h-12 rounded-lg text-base font-medium"
-              >
-                {lang === "zh" ? "開始" : "Get started"}
-                <ArrowRight size={16} />
-              </Button>
-              <Button
-                onClick={() => setIsSignInMode(true)}
-                variant="outline"
-                className="w-full h-12 rounded-lg border-border/50 bg-transparent text-foreground text-base font-medium hover:bg-accent"
-              >
-                {lang === "zh" ? "我已有帳號" : "I have an account"}
-              </Button>
-              <button
-                onClick={onGuest}
-                className="w-full text-center text-sm text-muted-foreground hover:text-foreground transition-colors py-2"
-              >
-                {t("continueAsGuest", lang)}
-              </button>
-            </div>
           </div>
 
-          <p className="text-center text-xs text-muted-foreground/80 mt-8">
+          <div className="space-y-3">
+            <PrimaryPill onClick={() => setStep(1)}>
+              {lang === "zh" ? "開始" : "Get started"}
+            </PrimaryPill>
+            <button
+              onClick={() => setIsSignInMode(true)}
+              className="w-full h-14 rounded-full border border-border/40 bg-card/60 text-foreground text-base font-semibold transition-colors hover:bg-card"
+            >
+              {lang === "zh" ? "我已有帳號" : "I have an account"}
+            </button>
+            <button
+              onClick={onGuest}
+              className="w-full text-center text-sm text-foreground/50 hover:text-foreground transition-colors py-2"
+            >
+              {t("continueAsGuest", lang)}
+            </button>
+          </div>
+
+          <p className="text-center text-xs text-foreground/50 mt-6">
             {lang === "zh" ? "繼續即表示您同意我們的" : "By continuing, you agree to our "}
-            <a href="/privacy" className="text-foreground/80 underline">{lang === "zh" ? "隱私權政策" : "Privacy Policy"}</a>
+            <a href="/privacy" className="text-foreground/70 underline">{lang === "zh" ? "隱私權政策" : "Privacy Policy"}</a>
             {lang === "zh" ? "及" : " and "}
-            <a href="https://www.apple.com/legal/internet-services/itunes/dev/stdeula/" target="_blank" rel="noopener noreferrer" className="text-foreground/80 underline">
+            <a href="https://www.apple.com/legal/internet-services/itunes/dev/stdeula/" target="_blank" rel="noopener noreferrer" className="text-foreground/70 underline">
               {lang === "zh" ? "使用條款" : "Terms of Use"}
             </a>
           </p>
         </div>
-      </WelcomeBgWrapper>
+      </OnboardingShell>
     );
   }
 
   // ---- STEPS 1-12: Signup flow ----
   const goBack = () => {
     if (step === 1) setStep(0);
-    else if (step === 3) setStep(1); // skip welcome anim going back
+    else if (step === 3) setStep(1);
     else setStep((step - 1) as OnboardingStep);
   };
 
   const goNext = () => {
     if (step === 1) {
-      setStep(2); // go to welcome animation
+      setStep(2);
     } else if (step === 9) {
       handleCreateAccount();
     } else if (step < 10) {
@@ -933,52 +999,64 @@ const Onboarding = ({
   const chosenDist = EST_DISTANCES.find((d) => d.label === estDistance);
   const chosenRaceForHeader = estimatedTimes?.find((r) => r.isChosen);
 
+  // Map step → top-bar title + step number for the user
+  const STEP_META: Record<number, { title: string; titleZh: string }> = {
+    1: { title: "Name", titleZh: "稱呼" },
+    3: { title: "Gender", titleZh: "性別" },
+    4: { title: "Age", titleZh: "年齡" },
+    5: { title: "Frequency", titleZh: "頻率" },
+    6: { title: "Race time", titleZh: "比賽時間" },
+    7: { title: "Projection", titleZh: "預估" },
+    8: { title: "Account", titleZh: "帳號" },
+    9: { title: "Password", titleZh: "密碼" },
+  };
+
+  // Visible step counter: name=1, gender=2, age=3, freq=4, race=5, proj=6, account=7, password=8
+  const stepCounterMap: Record<number, number> = { 1: 0, 3: 1, 4: 2, 5: 3, 6: 4, 7: 5, 8: 6, 9: 7 };
+  const TOTAL_VISIBLE_STEPS = 8;
+
+  const currentMeta = STEP_META[step];
+  const currentCounter = stepCounterMap[step];
+  const showTopBar = currentMeta !== undefined;
+
   const signupPanels = (
     <>
       {/* Step 1: Name */}
-      <div hidden={step !== 1} className="space-y-8">
-        <StepHeader
-          icon={User}
+      <div hidden={step !== 1} className="space-y-10">
+        <QuestionHeader
           title={lang === "zh" ? "你叫什麼名字？" : "What's your name?"}
           helper={lang === "zh" ? "我們會用它來個人化你的計劃。" : "We'll use this to personalize your plan."}
         />
-        <Input
-          type="text"
-          placeholder={lang === "zh" ? "輸入你的名字" : "Your name"}
-          value={displayName}
-          onChange={(e) => setDisplayName(e.target.value)}
-          autoFocus={step === 1}
-          className={underlineInput}
-        />
+        <SoftCard className="px-5 py-3">
+          <div className="flex items-center gap-3">
+            <User size={20} className="text-foreground/40" />
+            <Input
+              type="text"
+              placeholder={lang === "zh" ? "輸入你的名字" : "Your name"}
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+              autoFocus={step === 1}
+              className={underlineInput}
+            />
+          </div>
+        </SoftCard>
       </div>
 
       {/* Step 2: Welcome Animation */}
       <div hidden={step !== 2} className="space-y-6">
-        <div className="flex flex-col items-center justify-center min-h-[320px]">
-          <div
-            className={`transition-all duration-1000 ease-out ${
-              welcomeVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
-            }`}
-          >
-            <p className="text-sm uppercase tracking-[0.2em] text-muted-foreground text-center mb-6">
+        <div className="flex flex-col items-center justify-center min-h-[360px]">
+          <div className={`transition-all duration-1000 ease-out ${welcomeVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}>
+            <p className="text-sm uppercase tracking-[0.3em] text-foreground/50 text-center mb-6">
               {lang === "zh" ? "歡迎" : "Welcome"}
             </p>
           </div>
-          <div
-            className={`transition-all duration-1000 ease-out delay-500 ${
-              welcomeVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
-            }`}
-          >
-            <h1 className="font-display text-5xl font-semibold tracking-tight text-foreground text-center">
+          <div className={`transition-all duration-1000 ease-out delay-500 ${welcomeVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}>
+            <h1 className="font-display text-5xl font-bold tracking-tight text-foreground text-center">
               {displayName}
             </h1>
           </div>
-          <div
-            className={`transition-all duration-1000 ease-out delay-1000 ${
-              welcomeVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
-            }`}
-          >
-            <p className="text-sm text-muted-foreground text-center mt-6">
+          <div className={`transition-all duration-1000 ease-out delay-1000 ${welcomeVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}>
+            <p className="text-sm text-foreground/60 text-center mt-6">
               {lang === "zh" ? "讓我們開始設定你的個人檔案" : "Let's set up your profile"}
             </p>
           </div>
@@ -986,189 +1064,207 @@ const Onboarding = ({
       </div>
 
       {/* Step 3: Gender */}
-      <div hidden={step !== 3} className="space-y-8">
-        <StepHeader icon={UserCircle2} title={t("onboardingGender", lang)} />
-        <div className="space-y-2">
-          {(["male", "female", "other"] as const).map((s) => (
-            <button
-              key={s}
-              onClick={() => setSex(s)}
-              className={`w-full text-left px-5 h-14 rounded-lg border transition-colors ${
-                sex === s
-                  ? "border-primary bg-primary/10 text-foreground"
-                  : "border-border/50 bg-transparent text-foreground hover:border-border"
-              }`}
-            >
-              <span className="text-base font-medium">{labels[s]}</span>
-            </button>
-          ))}
-        </div>
+      <div hidden={step !== 3} className="space-y-10">
+        <QuestionHeader
+          title={lang === "zh" ? "介紹一下你自己" : "Introduce yourself"}
+          helper={lang === "zh" ? "為了給你更好的體驗與結果，我們需要知道你的性別。" : "To give you a better experience and results, we need to know your gender."}
+        />
+        <SoftCard className="p-3">
+          <div className="grid grid-cols-3 gap-2">
+            {(["male", "female", "other"] as const).map((s) => {
+              const isActive = sex === s;
+              return (
+                <button
+                  key={s}
+                  onClick={() => setSex(s)}
+                  className={`relative flex flex-col items-center justify-center gap-3 p-4 h-32 rounded-2xl transition-all ${
+                    isActive
+                      ? "bg-primary/10 ring-2 ring-primary"
+                      : "bg-background/50 ring-1 ring-border/30 hover:ring-border/60"
+                  }`}
+                >
+                  <div className={`w-12 h-12 rounded-full flex items-center justify-center ${isActive ? "bg-primary/20" : "bg-foreground/5"}`}>
+                    <UserCircle2 size={28} className={isActive ? "text-primary" : "text-foreground/50"} />
+                  </div>
+                  <span className="text-sm font-semibold text-foreground">{labels[s]}</span>
+                  {isActive && (
+                    <div className="absolute top-2 right-2 w-4 h-4 rounded-full bg-primary flex items-center justify-center">
+                      <div className="w-1.5 h-1.5 rounded-full bg-primary-foreground" />
+                    </div>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </SoftCard>
       </div>
 
       {/* Step 4: Age */}
-      <div hidden={step !== 4} className="space-y-8">
-        <StepHeader
-          icon={Cake}
-          title={t("onboardingAgeQuestion", lang)}
+      <div hidden={step !== 4} className="space-y-10">
+        <QuestionHeader
+          title={lang === "zh" ? "你的年齡是？" : "What's your age?"}
           helper={lang === "zh" ? "用於校準訓練強度。" : "Used to calibrate training intensity."}
         />
-        <Input
-          type="number"
-          placeholder={t("onboardingAge", lang)}
-          value={age}
-          onChange={(e) => setAge(e.target.value)}
-          min={10}
-          max={100}
-          autoFocus={step === 4}
-          className={underlineInput}
-        />
+        <SoftCard className="px-5 py-3">
+          <div className="flex items-center gap-3">
+            <Cake size={20} className="text-foreground/40" />
+            <Input
+              type="number"
+              placeholder={t("onboardingAge", lang)}
+              value={age}
+              onChange={(e) => setAge(e.target.value)}
+              min={10}
+              max={100}
+              autoFocus={step === 4}
+              className={underlineInput}
+            />
+          </div>
+        </SoftCard>
       </div>
 
       {/* Step 5: Run frequency */}
-      <div hidden={step !== 5} className="space-y-8">
-        <StepHeader
-          icon={CalendarDays}
-          title={t("onboardingRunFreqQuestion", lang)}
+      <div hidden={step !== 5} className="space-y-10">
+        <QuestionHeader
+          title={lang === "zh" ? "每週跑幾次？" : "How often do you run?"}
           helper={t("onboardingDaysPerWeek", lang)}
         />
-        <div className="grid grid-cols-8 gap-1.5">
-          {[0, 1, 2, 3, 4, 5, 6, 7].map((n) => (
-            <button
-              key={n}
-              onClick={() => setRunsPerWeek(n)}
-              className={`h-12 rounded-md text-base font-semibold transition-colors border ${
-                runsPerWeek === n
-                  ? "bg-primary text-primary-foreground border-primary"
-                  : "bg-transparent text-foreground border-border/50 hover:border-border"
-              }`}
-            >
-              {n}
-            </button>
-          ))}
-        </div>
+        <SoftCard className="p-4">
+          <div className="grid grid-cols-4 gap-2">
+            {[0, 1, 2, 3, 4, 5, 6, 7].map((n) => {
+              const isActive = runsPerWeek === n;
+              return (
+                <button
+                  key={n}
+                  onClick={() => setRunsPerWeek(n)}
+                  className={`h-16 rounded-2xl text-xl font-display font-bold transition-all ${
+                    isActive
+                      ? "bg-primary text-primary-foreground shadow-[0_4px_14px_-4px_hsl(175_40%_22%/0.4)]"
+                      : "bg-background/50 text-foreground ring-1 ring-border/30 hover:ring-border/60"
+                  }`}
+                >
+                  {n}
+                </button>
+              );
+            })}
+          </div>
+          <p className="text-xs text-foreground/50 text-center mt-4">
+            {lang === "zh" ? "選擇你目前的訓練頻率" : "Pick your current training frequency"}
+          </p>
+        </SoftCard>
       </div>
 
       {/* Step 6: Estimated Race Time */}
       <div hidden={step !== 6} className="space-y-8">
-        <StepHeader
-          icon={Timer}
-          title={lang === "zh" ? "輸入你的預估比賽時間" : "Your estimated race time"}
-          helper={
-            lang === "zh"
-              ? "這是你認為如果現在比賽可以跑出的時間。"
-              : "What you think you could run if you raced today."
-          }
+        <QuestionHeader
+          title={lang === "zh" ? "你的預估比賽時間" : "Your estimated race time"}
+          helper={lang === "zh" ? "這是你認為如果現在比賽可以跑出的時間。" : "What you think you could run if you raced today."}
         />
-        <div>
-          <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3 block">{t("distance", lang)}</label>
-          <div className="grid grid-cols-2 gap-2">
-            {EST_DISTANCES.map((d) => (
-              <button
-                key={d.label}
-                onClick={() => setEstDistance(d.label)}
-                className={`flex items-center gap-3 p-3 rounded-lg transition-colors border ${
-                  estDistance === d.label
-                    ? "border-primary bg-primary/10"
-                    : "border-border/50 bg-transparent hover:border-border"
-                }`}
-              >
-                <img src={DISTANCE_BADGES[d.label]} alt={d.label} className="w-10 h-10 object-contain" />
-                <span className="font-display text-base font-semibold text-foreground">{lang === "zh" ? d.labelZh : d.label}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-        {estDistance && (
+        <SoftCard className="space-y-5">
           <div>
-            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3 block">{t("time", lang)}</label>
-            <div className="flex items-center gap-2">
-              <Input placeholder="HH" type="number" min={0} value={estHours} onChange={(e) => setEstHours(e.target.value)} className={`${underlineInput} text-center font-mono tabular-nums`} />
-              <span className="text-2xl font-mono text-muted-foreground">:</span>
-              <Input placeholder="MM" type="number" min={0} max={59} value={estMinutes} onChange={(e) => setEstMinutes(e.target.value)} className={`${underlineInput} text-center font-mono tabular-nums`} />
-              <span className="text-2xl font-mono text-muted-foreground">:</span>
-              <Input placeholder="SS" type="number" min={0} max={59} value={estSeconds} onChange={(e) => setEstSeconds(e.target.value)} className={`${underlineInput} text-center font-mono tabular-nums`} />
+            <label className="text-[11px] font-semibold text-foreground/50 uppercase tracking-wider mb-3 block px-1">{t("distance", lang)}</label>
+            <div className="grid grid-cols-2 gap-2">
+              {EST_DISTANCES.map((d) => {
+                const isActive = estDistance === d.label;
+                return (
+                  <button
+                    key={d.label}
+                    onClick={() => setEstDistance(d.label)}
+                    className={`flex items-center gap-3 p-3 rounded-2xl transition-all ${
+                      isActive
+                        ? "bg-primary/10 ring-2 ring-primary"
+                        : "bg-background/50 ring-1 ring-border/30 hover:ring-border/60"
+                    }`}
+                  >
+                    <img src={DISTANCE_BADGES[d.label]} alt={d.label} className="w-9 h-9 object-contain" />
+                    <span className="font-display text-sm font-bold text-foreground">{lang === "zh" ? d.labelZh : d.label}</span>
+                  </button>
+                );
+              })}
             </div>
-            {isFasterThanWorldRecord() && (
-              <p className="text-warning text-sm mt-3">
-                {lang === "zh"
-                  ? "這個時間比目前世界紀錄還快。"
-                  : "That's faster than the current world record."}
-              </p>
-            )}
           </div>
-        )}
+
+          {estDistance && (
+            <div>
+              <label className="text-[11px] font-semibold text-foreground/50 uppercase tracking-wider mb-3 block px-1">{t("time", lang)}</label>
+              <div className="flex items-center gap-2 bg-background/50 rounded-2xl px-4 py-2">
+                <Input placeholder="HH" type="number" min={0} value={estHours} onChange={(e) => setEstHours(e.target.value)} className={`${underlineInput} text-center font-mono tabular-nums text-2xl border-b-0`} />
+                <span className="text-2xl font-mono text-foreground/40">:</span>
+                <Input placeholder="MM" type="number" min={0} max={59} value={estMinutes} onChange={(e) => setEstMinutes(e.target.value)} className={`${underlineInput} text-center font-mono tabular-nums text-2xl border-b-0`} />
+                <span className="text-2xl font-mono text-foreground/40">:</span>
+                <Input placeholder="SS" type="number" min={0} max={59} value={estSeconds} onChange={(e) => setEstSeconds(e.target.value)} className={`${underlineInput} text-center font-mono tabular-nums text-2xl border-b-0`} />
+              </div>
+              {isFasterThanWorldRecord() && (
+                <p className="text-warning text-sm mt-3">
+                  {lang === "zh" ? "這個時間比目前世界紀錄還快。" : "That's faster than the current world record."}
+                </p>
+              )}
+            </div>
+          )}
+        </SoftCard>
       </div>
 
       {/* Step 7: Before/After Comparison */}
       <div hidden={step !== 7} className="space-y-5">
+        <QuestionHeader
+          title={lang === "zh" ? "你的潛力預估" : "Your potential"}
+          helper={lang === "zh" ? "12 週訓練計劃後的預估時間。" : "Projected after a 12-week training block."}
+        />
+
         {estimatedTimes && chosenRaceForHeader ? (
           <>
-            {/* Header card with primary left bar */}
-            <div className="relative rounded-lg border border-border/50 bg-card overflow-hidden">
-              <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary" />
-              <div className="p-5 pl-6">
-                <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2">
-                  {lang === "zh"
-                    ? `預估 ${chosenDist?.labelZh || ""} 時間`
-                    : `Projected ${chosenDist?.label || ""} time`}
-                </p>
-                <div className="flex items-center gap-3">
-                  <img src={chosenRaceForHeader.badge} alt={chosenRaceForHeader.label} className="w-10 h-10 object-contain" />
-                  <span className="font-display text-2xl font-semibold tracking-tight text-foreground tabular-nums">
-                    {formatTime(chosenRaceForHeader.improvedTime)} – {formatTime(chosenRaceForHeader.currentTime)}
-                  </span>
-                </div>
+            <SoftCard className="px-5 py-5">
+              <p className="text-[11px] uppercase tracking-wider text-foreground/50 mb-2 font-semibold">
+                {lang === "zh"
+                  ? `預估 ${chosenDist?.labelZh || ""} 時間`
+                  : `Projected ${chosenDist?.label || ""} time`}
+              </p>
+              <div className="flex items-center gap-3">
+                <img src={chosenRaceForHeader.badge} alt={chosenRaceForHeader.label} className="w-12 h-12 object-contain" />
+                <span className="font-display text-2xl font-bold tracking-tight text-foreground tabular-nums">
+                  {formatTime(chosenRaceForHeader.improvedTime)} – {formatTime(chosenRaceForHeader.currentTime)}
+                </span>
               </div>
-            </div>
+            </SoftCard>
 
-            {/* Column headers */}
-            <div className="flex justify-between px-1 text-xs text-muted-foreground uppercase tracking-wider">
+            <div className="flex justify-between px-2 text-[11px] text-foreground/50 uppercase tracking-wider font-semibold">
               <span>{lang === "zh" ? "目前" : "Today"}</span>
               <span>{lang === "zh" ? "12 週後" : "In 12 weeks"}</span>
             </div>
 
-            {/* Race rows */}
             <div className="space-y-2">
               {(showAllRaces ? estimatedTimes : estimatedTimes.filter((r) => r.isChosen)).map((race) => (
-                <div key={race.label} className="flex items-center justify-between border border-border/50 rounded-lg px-4 py-3">
+                <SoftCard key={race.label} className="flex items-center justify-between px-4 py-3">
                   <div className="flex items-center gap-3 w-[40%]">
                     <img src={race.badge} alt={race.label} className="w-8 h-8 object-contain" />
                     <span className="text-foreground font-medium tabular-nums">{formatTime(race.currentTime)}</span>
                   </div>
                   <div className="flex-1 flex items-center justify-center gap-2">
-                    <div className="h-px flex-1 bg-border/50" />
+                    <div className="h-px flex-1 bg-foreground/15" />
                     <ArrowRight size={14} className="text-primary" />
-                    <div className="h-px flex-1 bg-border/50" />
+                    <div className="h-px flex-1 bg-foreground/15" />
                   </div>
                   <div className="text-right w-[40%]">
-                    <span className="text-foreground font-semibold tabular-nums">{formatTime(race.improvedTime)}</span>
-                    <p className="text-xs text-success mt-0.5">
+                    <span className="text-foreground font-bold tabular-nums">{formatTime(race.improvedTime)}</span>
+                    <p className="text-xs text-success mt-0.5 font-semibold">
                       −{Math.floor(race.diff / 60)}m {Math.round(race.diff % 60)}s
                     </p>
                   </div>
-                </div>
+                </SoftCard>
               ))}
             </div>
 
-            {/* Toggle */}
             <button
               onClick={() => setShowAllRaces(!showAllRaces)}
-              className="w-full flex items-center justify-center gap-1 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+              className="w-full flex items-center justify-center gap-1 py-2 text-sm text-foreground/60 hover:text-foreground transition-colors"
             >
               {showAllRaces
                 ? (lang === "zh" ? "收起" : "Show less")
                 : (lang === "zh" ? "查看所有距離" : "Show all distances")}
               {showAllRaces ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
             </button>
-
-            <p className="text-xs text-muted-foreground/80">
-              {lang === "zh"
-                ? "預估值基於 12 週 AI 訓練計劃。"
-                : "Projected after a 12-week training block."}
-            </p>
           </>
         ) : (
-          <div className="text-muted-foreground text-sm py-12">
+          <div className="text-foreground/60 text-sm text-center py-12">
             {lang === "zh" ? "請先輸入你的預估比賽時間" : "Please enter your estimated race time first"}
           </div>
         )}
@@ -1176,8 +1272,7 @@ const Onboarding = ({
 
       {/* Step 8: Email / Account creation */}
       <div hidden={step !== 8} className="space-y-6">
-        <StepHeader
-          icon={Mail}
+        <QuestionHeader
           title={t("createAccount", lang)}
           helper={t("createAccountDesc", lang)}
         />
@@ -1185,7 +1280,7 @@ const Onboarding = ({
         <div className="space-y-3">
           <button
             onClick={handleAppleSignUp}
-            className="w-full flex items-center justify-center gap-2 bg-foreground text-background h-12 rounded-lg font-medium text-sm transition-opacity hover:opacity-90"
+            className="w-full flex items-center justify-center gap-2 bg-foreground text-background h-13 py-3.5 rounded-full font-semibold text-sm transition-opacity hover:opacity-90"
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
               <path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z" />
@@ -1195,7 +1290,7 @@ const Onboarding = ({
 
           <button
             onClick={handleGoogleSignUp}
-            className="w-full flex items-center justify-center gap-2 bg-transparent text-foreground border border-border/50 h-12 rounded-lg font-medium text-sm transition-colors hover:bg-accent"
+            className="w-full flex items-center justify-center gap-2 bg-card/60 text-foreground border border-border/40 py-3.5 rounded-full font-semibold text-sm transition-colors hover:bg-card"
           >
             <svg width="18" height="18" viewBox="0 0 24 24">
               <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4" />
@@ -1208,27 +1303,33 @@ const Onboarding = ({
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="flex-1 h-px bg-border/50" />
-          <span className="text-xs text-muted-foreground uppercase tracking-wider">{t("orContinueWith", lang)}</span>
-          <div className="flex-1 h-px bg-border/50" />
+          <div className="flex-1 h-px bg-foreground/10" />
+          <span className="text-xs text-foreground/50 uppercase tracking-wider">{t("orContinueWith", lang)}</span>
+          <div className="flex-1 h-px bg-foreground/10" />
         </div>
 
-        <Input
-          type="email"
-          placeholder={t("email", lang)}
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          autoFocus={step === 8}
-          className={underlineInput}
-        />
+        <SoftCard className="px-5 py-3">
+          <div className="flex items-center gap-3">
+            <Mail size={20} className="text-foreground/40" />
+            <Input
+              type="email"
+              placeholder={t("email", lang)}
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              autoFocus={step === 8}
+              className={underlineInput}
+            />
+          </div>
+        </SoftCard>
       </div>
 
       {/* Step 9: Password */}
       <div hidden={step !== 9} className="space-y-8">
-        <StepHeader icon={Lock} title={t("onboardingSetPassword", lang)} />
-        <div className="space-y-6">
+        <QuestionHeader title={t("onboardingSetPassword", lang)} />
+        <SoftCard className="space-y-5 px-5 py-4">
           <div>
-            <div className="relative">
+            <div className="relative flex items-center gap-3">
+              <Lock size={20} className="text-foreground/40" />
               <Input
                 type={showPassword ? "text" : "password"}
                 placeholder={t("password", lang)}
@@ -1241,12 +1342,11 @@ const Onboarding = ({
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-0 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                className="absolute right-0 top-1/2 -translate-y-1/2 text-foreground/40 hover:text-foreground"
               >
                 {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
             </div>
-            {/* Strength meter */}
             <div className="flex gap-1.5 mt-3">
               {[0, 1, 2].map((i) => (
                 <div
@@ -1258,12 +1358,12 @@ const Onboarding = ({
                         : passwordStrength === 2
                         ? "bg-warning"
                         : "bg-success"
-                      : "bg-border/50"
+                      : "bg-foreground/10"
                   }`}
                 />
               ))}
             </div>
-            <p className="text-xs text-muted-foreground mt-2">
+            <p className="text-xs text-foreground/50 mt-2">
               {password.length === 0
                 ? (lang === "zh" ? "至少 6 個字元" : "At least 6 characters")
                 : password.length < 6
@@ -1277,7 +1377,8 @@ const Onboarding = ({
           </div>
 
           <div>
-            <div className="relative">
+            <div className="relative flex items-center gap-3">
+              <Lock size={20} className="text-foreground/40" />
               <Input
                 type={showConfirmPassword ? "text" : "password"}
                 placeholder={t("confirmPassword", lang)}
@@ -1289,7 +1390,7 @@ const Onboarding = ({
               <button
                 type="button"
                 onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                className="absolute right-0 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                className="absolute right-0 top-1/2 -translate-y-1/2 text-foreground/40 hover:text-foreground"
               >
                 {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
@@ -1298,35 +1399,33 @@ const Onboarding = ({
               <p className="text-destructive text-xs mt-2">{t("passwordsDoNotMatch", lang)}</p>
             )}
           </div>
-        </div>
+        </SoftCard>
       </div>
 
       {/* Step 12: Email OTP verification */}
       <div hidden={step !== 12} className="space-y-6">
-        <div className="flex flex-col items-start min-h-[300px]">
-          <ShieldCheck size={24} className="text-muted-foreground mb-3" />
-          <h2 className="font-display text-[28px] leading-tight font-semibold tracking-tight text-foreground">
-            {lang === "zh" ? "輸入驗證碼" : "Enter verification code"}
-          </h2>
-          <p className="text-sm text-muted-foreground mt-2">
-            {lang === "zh"
-              ? `我們已發送 6 位數驗證碼到 ${email}`
-              : `We've sent a 6-digit code to ${email}`}
-          </p>
-          <div className="mt-8 w-full flex justify-center">
+        <div className="flex flex-col items-center min-h-[300px] text-center">
+          <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-4">
+            <ShieldCheck size={28} className="text-primary" />
+          </div>
+          <QuestionHeader
+            title={lang === "zh" ? "輸入驗證碼" : "Enter verification code"}
+            helper={lang === "zh" ? `我們已發送 6 位數驗證碼到 ${email}` : `We've sent a 6-digit code to ${email}`}
+          />
+          <SoftCard className="mt-8 w-full flex justify-center py-6">
             <InputOTP maxLength={6} value={otpCode} onChange={setOtpCode}>
               <InputOTPGroup className="gap-2">
                 {[0, 1, 2, 3, 4, 5].map((i) => (
                   <InputOTPSlot
                     key={i}
                     index={i}
-                    className="h-14 w-12 rounded-md border border-border/50 bg-transparent text-foreground text-lg font-mono first:rounded-l-md last:rounded-r-md"
+                    className="h-14 w-12 rounded-xl border border-border/40 bg-background/60 text-foreground text-lg font-mono first:rounded-l-xl last:rounded-r-xl"
                   />
                 ))}
               </InputOTPGroup>
             </InputOTP>
-          </div>
-          <Button
+          </SoftCard>
+          <PrimaryPill
             onClick={async () => {
               if (otpCode.length !== 6) return;
               setVerifyingOtp(true);
@@ -1349,18 +1448,17 @@ const Onboarding = ({
               }
             }}
             disabled={otpCode.length !== 6 || verifyingOtp}
-            className="mt-6 w-full h-12 rounded-lg"
           >
             {verifyingOtp
               ? (lang === "zh" ? "驗證中..." : "Verifying...")
               : (lang === "zh" ? "驗證" : "Verify")}
-          </Button>
+          </PrimaryPill>
           <button
             onClick={() => {
               supabase.auth.resend({ type: "signup", email });
               toast({ title: lang === "zh" ? "已重新發送" : "Resent", description: lang === "zh" ? "驗證碼已重新寄出" : "Verification code resent" });
             }}
-            className="mt-4 text-sm text-muted-foreground hover:text-foreground transition-colors w-full text-center"
+            className="mt-4 text-sm text-foreground/60 hover:text-foreground transition-colors w-full text-center"
           >
             {lang === "zh" ? "重新發送驗證碼" : "Resend code"}
           </button>
@@ -1369,41 +1467,42 @@ const Onboarding = ({
 
       {/* Step 11: Creating account loading */}
       <div hidden={step !== 11} className="space-y-6">
-        <div className="flex flex-col items-center justify-center min-h-[320px]">
-          <div className="flex gap-1.5 mb-8">
+        <div className="flex flex-col items-center justify-center min-h-[360px]">
+          <div className="flex gap-2 mb-8">
             {[0, 1, 2].map((i) => (
               <div
                 key={i}
-                className="w-2 h-2 rounded-full bg-primary animate-pulse"
+                className="w-2.5 h-2.5 rounded-full bg-primary animate-pulse"
                 style={{ animationDelay: `${i * 200}ms`, animationDuration: "1.2s" }}
               />
             ))}
           </div>
-          <h2 className="font-display text-[24px] leading-tight font-semibold tracking-tight text-foreground text-center">
+          <h2 className="font-display text-[24px] leading-tight font-bold tracking-tight text-foreground text-center">
             {lang === "zh" ? "正在建立你的帳號" : "Creating your account"}
           </h2>
-          <p className="text-sm text-muted-foreground text-center mt-3 transition-opacity duration-300 min-h-[1.5rem]">
+          <p className="text-sm text-foreground/60 text-center mt-3 transition-opacity duration-300 min-h-[1.5rem]">
             {loadingPhrases[loadingPhraseIdx]}
           </p>
         </div>
       </div>
 
       {/* Step 10: Plan prompt */}
-      <div hidden={step !== 10} className="space-y-8">
-        <div>
-          <h2 className="font-display text-[28px] leading-tight font-semibold tracking-tight text-foreground">
-            {lang === "zh" ? "你的計劃已準備好。" : "Your plan is ready."}
-          </h2>
-          <p className="text-sm text-muted-foreground mt-2">
-            {lang === "zh" ? "由 AI 教練根據你的資料生成。" : "Built by your AI coach from your data."}
-          </p>
+      <div hidden={step !== 10} className="space-y-6">
+        <div className="text-center pt-4">
+          <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
+            <Sparkles size={28} className="text-primary" />
+          </div>
+          <QuestionHeader
+            title={lang === "zh" ? "你的計劃已準備好" : "Your plan is ready"}
+            helper={lang === "zh" ? "由 AI 教練根據你的資料生成。" : "Built by your AI coach from your data."}
+          />
         </div>
-        <div className="space-y-3">
+        <div className="space-y-3 pt-2">
           <button
             onClick={() => void finalizeOnboarding(true)}
-            className="w-full text-left p-5 rounded-lg bg-primary text-primary-foreground transition-opacity hover:opacity-90"
+            className="w-full text-left p-5 rounded-3xl bg-primary text-primary-foreground transition-all hover:opacity-95 active:scale-[0.99] shadow-[0_4px_14px_-4px_hsl(175_40%_22%/0.4)]"
           >
-            <p className="font-display text-base font-semibold leading-tight">
+            <p className="font-display text-base font-bold leading-tight">
               {lang === "zh" ? "開始 7 天免費體驗" : "Start 7-day free trial"}
             </p>
             <p className="text-sm text-primary-foreground/80 mt-1">
@@ -1412,27 +1511,26 @@ const Onboarding = ({
           </button>
           <button
             onClick={() => void finalizeOnboarding(false)}
-            className="w-full text-left p-5 rounded-lg border border-border/50 bg-transparent text-foreground transition-colors hover:bg-accent"
+            className="w-full text-left p-5 rounded-3xl border border-border/40 bg-card/60 text-foreground transition-colors hover:bg-card"
           >
-            <p className="font-medium text-base">
+            <p className="font-semibold text-base">
               {lang === "zh" ? "暫時略過" : "Skip for now"}
             </p>
-            <p className="text-sm text-muted-foreground mt-1">
+            <p className="text-sm text-foreground/60 mt-1">
               {lang === "zh" ? "之後可隨時在設定中啟用。" : "You can enable it later from settings."}
             </p>
           </button>
 
-          {/* Redemption code option */}
           {!showRedeemInput ? (
             <button
               onClick={() => setShowRedeemInput(true)}
-              className="w-full flex items-center justify-center gap-2 py-3 text-sm text-muted-foreground hover:text-foreground transition-colors"
+              className="w-full flex items-center justify-center gap-2 py-3 text-sm text-foreground/60 hover:text-foreground transition-colors"
             >
               <Ticket size={14} />
               {lang === "zh" ? "我有兌換代碼" : "I have a redemption code"}
             </button>
           ) : (
-            <div className="space-y-3 pt-2">
+            <SoftCard className="space-y-3 px-5 py-4">
               <Input
                 value={redeemCode}
                 onChange={(e) => setRedeemCode(e.target.value.toUpperCase())}
@@ -1440,7 +1538,7 @@ const Onboarding = ({
                 className={`${underlineInput} text-center tracking-widest font-mono`}
                 autoFocus
               />
-              <Button
+              <PrimaryPill
                 onClick={() => {
                   if (redeemCode.trim()) {
                     redeemOfferCode(redeemCode.trim(), lang);
@@ -1448,56 +1546,43 @@ const Onboarding = ({
                   }
                 }}
                 disabled={!redeemCode.trim()}
-                className="w-full h-12 rounded-lg"
               >
-                <Ticket size={16} />
                 {lang === "zh" ? "兌換" : "Redeem"}
-              </Button>
-            </div>
+              </PrimaryPill>
+            </SoftCard>
           )}
         </div>
       </div>
     </>
   );
 
-  // Progress: steps 1, 3-9 visible (step 2 = welcome anim, 10-12 = post-flow)
-  const progressStep = step <= 1 ? 0 : step === 2 ? 0 : step - 2;
-  const TOTAL_PROGRESS_STEPS = 9;
-
   return (
-    <SolidBgWrapper>
-      {step >= 1 && step <= 10 && step !== 2 && (
-        <ProgressLine current={progressStep} total={TOTAL_PROGRESS_STEPS} />
+    <OnboardingShell>
+      {showTopBar && (
+        <TopBar
+          onBack={goBack}
+          title={lang === "zh" ? currentMeta.titleZh : currentMeta.title}
+          current={currentCounter}
+          total={TOTAL_VISIBLE_STEPS}
+        />
       )}
 
-      <div className="flex-1 flex items-start justify-center px-6 pt-12 pb-6">
+      <div className="flex-1 flex items-start justify-center px-6 pt-10 pb-6">
         <div className="w-full max-w-md">{signupPanels}</div>
       </div>
 
-      {/* Bottom nav for steps 1, 3-9 */}
+      {/* Bottom CTA for steps 1, 3-9 */}
       {step >= 1 && step <= 9 && step !== 2 && (
-        <div className="flex items-center gap-3 px-6 pb-8 pt-4 max-w-md mx-auto w-full">
-          <Button
-            variant="outline"
-            onClick={goBack}
-            className="h-12 px-5 rounded-lg border-border/50 bg-transparent text-foreground hover:bg-accent"
-          >
-            <ChevronLeft size={16} /> {t("onboardingBack", lang)}
-          </Button>
-          <div className="flex-1" />
-          <Button
-            onClick={goNext}
-            disabled={!canProceed() || saving}
-            className="h-12 px-6 rounded-lg"
-          >
+        <div className="px-6 pb-8 pt-4 max-w-md mx-auto w-full">
+          <PrimaryPill onClick={goNext} disabled={!canProceed() || saving}>
             {step === 9
               ? (saving ? t("onboardingCreatingAccount", lang) : t("onboardingStart", lang))
-              : (<>{t("onboardingNext", lang)} <ChevronRight size={16} /></>)
+              : (lang === "zh" ? "下一步" : "Next")
             }
-          </Button>
+          </PrimaryPill>
         </div>
       )}
-    </SolidBgWrapper>
+    </OnboardingShell>
   );
 };
 

@@ -5,6 +5,7 @@ import {
   GARMIN_SSO_EMBED_SERVICE_URL,
   GARMIN_SSO_KEYS,
   GARMIN_SSO_RETURN_URL,
+  getGarminSsoValue,
   setGarminSsoResult,
 } from "@/lib/garminSso";
 
@@ -13,8 +14,8 @@ const GarminMobileAuth = () => {
   const lang = useMemo(() => (localStorage.getItem("app_lang") as "en" | "zh") || "en", []);
   const query = useMemo(() => new URLSearchParams(window.location.search), []);
   const isPopupMode = query.get("popup") === "1";
-  const embedUrl = query.get("embedUrl") || sessionStorage.getItem(GARMIN_SSO_KEYS.mobileEmbedUrl) || "";
-  const serviceUrl = query.get("serviceUrl") || sessionStorage.getItem(GARMIN_SSO_KEYS.mobileServiceUrl) || GARMIN_SSO_EMBED_SERVICE_URL;
+  const embedUrl = query.get("embedUrl") || getGarminSsoValue(GARMIN_SSO_KEYS.mobileEmbedUrl) || "";
+  const serviceUrl = query.get("serviceUrl") || getGarminSsoValue(GARMIN_SSO_KEYS.mobileServiceUrl) || GARMIN_SSO_EMBED_SERVICE_URL;
 
   useEffect(() => {
     let settled = false;
@@ -25,6 +26,10 @@ const GarminMobileAuth = () => {
       clearGarminSsoTransientState();
       if (isPopupMode && window.opener) {
         window.opener.postMessage({ type: "garmin-mobile-result", result }, window.location.origin);
+        window.close();
+        return;
+      }
+      if (isPopupMode) {
         window.close();
         return;
       }

@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { Lang } from "@/lib/i18n";
-import { clearGarminSsoTransientState, GARMIN_SSO_KEYS } from "@/lib/garminSso";
+import { clearGarminSsoTransientState, GARMIN_SSO_KEYS, getGarminSsoValue, setGarminSsoValue } from "@/lib/garminSso";
 
 async function extractFunctionErrorMessage(error: unknown): Promise<string | null> {
   if (error instanceof FunctionsHttpError) {
@@ -73,10 +73,11 @@ export function useGarmin(lang: Lang) {
         const mobileEmbedUrl = startData.mobile_embed_url ?? startData.url ?? "";
         const mobileServiceUrl = startData.service_url ?? "https://sso.garmin.com/sso/embed";
 
-        sessionStorage.setItem(GARMIN_SSO_KEYS.callback, startData.callback ?? "");
-        sessionStorage.setItem(GARMIN_SSO_KEYS.pending, "1");
-        sessionStorage.setItem(GARMIN_SSO_KEYS.mobileEmbedUrl, mobileEmbedUrl);
-        sessionStorage.setItem(GARMIN_SSO_KEYS.mobileServiceUrl, mobileServiceUrl);
+        clearGarminSsoTransientState();
+        setGarminSsoValue(GARMIN_SSO_KEYS.callback, startData.callback ?? "");
+        setGarminSsoValue(GARMIN_SSO_KEYS.pending, "1");
+        setGarminSsoValue(GARMIN_SSO_KEYS.mobileEmbedUrl, mobileEmbedUrl);
+        setGarminSsoValue(GARMIN_SSO_KEYS.mobileServiceUrl, mobileServiceUrl);
 
         if (!popup) {
           window.location.href = "/garmin-mobile-auth";
@@ -93,8 +94,22 @@ export function useGarmin(lang: Lang) {
 
           const cleanup = () => {
             window.removeEventListener("message", onMessage);
+            window.removeEventListener("storage", onStorage);
             if (pollTimer) window.clearInterval(pollTimer);
             if (timeoutTimer) window.clearTimeout(timeoutTimer);
+          };
+
+          const resolveFromStoredResult = () => {
+            const raw = getGarminSsoValue(GARMIN_SSO_KEYS.result);
+            if (!raw) return false;
+            try {
+              const parsed = JSON.parse(raw) as { ok: boolean; displayName?: string; error?: string };
+              cleanup();
+              resolve(parsed);
+              return true;
+            } catch {
+              return false;
+            }
           };
 
           const onMessage = (ev: MessageEvent) => {
@@ -108,9 +123,19 @@ export function useGarmin(lang: Lang) {
             }
           };
 
+          const onStorage = (ev: StorageEvent) => {
+            if (ev.key === GARMIN_SSO_KEYS.result && ev.newValue) {
+              resolveFromStoredResult();
+            }
+          };
+
           window.addEventListener("message", onMessage);
+          window.addEventListener("storage", onStorage);
+
+          if (resolveFromStoredResult()) return;
 
           pollTimer = window.setInterval(() => {
+            if (resolveFromStoredResult()) return;
             if (popup.closed) {
               cleanup();
               resolve({ ok: false, error: lang === "zh" ? "Garmin 登入視窗已關閉" : "Garmin sign-in window was closed" });

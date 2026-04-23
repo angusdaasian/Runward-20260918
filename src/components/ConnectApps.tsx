@@ -282,102 +282,13 @@ const ConnectApps = ({ lang, onBack }: Props) => {
             )}
           </div>
 
-          {/* Garmin login form */}
-          {showGarminForm && !garminConnected && (
-            <div className="mt-3 pt-3 border-t border-border space-y-2">
-              {mfaSessionId ? (
-                <>
-                  <p className="text-xs text-foreground font-medium">
-                    {lang === "zh"
-                      ? "請輸入 Garmin 寄送至你信箱（或驗證 App）的驗證碼"
-                      : "Enter the verification code sent to your email or authenticator app"}
-                  </p>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    autoComplete="one-time-code"
-                    placeholder={lang === "zh" ? "6 位數驗證碼" : "6-digit code"}
-                    value={mfaCode}
-                    onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, "").slice(0, 8))}
-                    onKeyDown={(e) => e.key === "Enter" && handleSubmitMfa()}
-                    className="w-full text-sm px-3 py-2 rounded-lg bg-background border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary tracking-widest"
-                    autoFocus
-                  />
-                  <div className="flex gap-2">
-                    <button
-                      onClick={handleSubmitMfa}
-                      disabled={garmin.connecting}
-                      className="flex-1 text-xs font-medium px-3 py-2 rounded-lg text-primary-foreground bg-primary disabled:opacity-50"
-                    >
-                      {garmin.connecting
-                        ? (lang === "zh" ? "驗證中..." : "Verifying...")
-                        : (lang === "zh" ? "提交" : "Submit")}
-                    </button>
-                    <button
-                      onClick={() => {
-                        setShowGarminForm(false);
-                        setGarminEmail("");
-                        setGarminPassword("");
-                        setMfaSessionId(null);
-                        setMfaCode("");
-                      }}
-                      className="text-xs px-3 py-2 rounded-lg text-muted-foreground hover:text-foreground"
-                    >
-                      {lang === "zh" ? "取消" : "Cancel"}
-                    </button>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <input
-                    type="email"
-                    placeholder={lang === "zh" ? "Garmin 帳號 (Email)" : "Garmin Email"}
-                    value={garminEmail}
-                    onChange={(e) => setGarminEmail(e.target.value)}
-                    className="w-full text-sm px-3 py-2 rounded-lg bg-background border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
-                  />
-                  <div className="relative">
-                    <input
-                      type={showPassword ? "text" : "password"}
-                      placeholder={lang === "zh" ? "密碼" : "Password"}
-                      value={garminPassword}
-                      onChange={(e) => setGarminPassword(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && handleGarminLogin()}
-                      className="w-full text-sm px-3 py-2 rounded-lg bg-background border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary pr-10"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground"
-                    >
-                      {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                    </button>
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={handleGarminLogin}
-                      disabled={garmin.connecting}
-                      className="flex-1 text-xs font-medium px-3 py-2 rounded-lg text-primary-foreground bg-primary disabled:opacity-50"
-                    >
-                      {garmin.connecting
-                        ? (lang === "zh" ? "登入中..." : "Signing in...")
-                        : (lang === "zh" ? "登入" : "Sign In")}
-                    </button>
-                    <button
-                      onClick={() => { setShowGarminForm(false); setGarminEmail(""); setGarminPassword(""); }}
-                      className="text-xs px-3 py-2 rounded-lg text-muted-foreground hover:text-foreground"
-                    >
-                      {lang === "zh" ? "取消" : "Cancel"}
-                    </button>
-                  </div>
-                  <p className="text-[10px] text-muted-foreground">
-                    {lang === "zh"
-                      ? "用於登入 Garmin，支援雙重驗證 (2FA)。憑證僅用於驗證。"
-                      : "Used to sign in to Garmin. Supports 2-step verification. Credentials used for auth only."}
-                  </p>
-                </>
-              )}
-            </div>
+          {/* Garmin sign-in is handled in a popup to Garmin's secure SSO page */}
+          {!garminConnected && (
+            <p className="mt-3 pt-3 border-t border-border text-[11px] text-muted-foreground">
+              {lang === "zh"
+                ? "點擊「連結」會在彈出視窗中開啟 Garmin 的官方登入頁面，由 Garmin 處理你的密碼及兩步驟驗證 — 我們不會看到。"
+                : "Click Connect to open Garmin's secure sign-in page in a popup. Garmin handles your password and 2-step verification — we never see them."}
+            </p>
           )}
         </div>
 

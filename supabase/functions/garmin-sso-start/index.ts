@@ -32,30 +32,51 @@ serve(async (req) => {
     }
 
     const callback = `${origin}/garmin-callback`;
+    // Use the embed-widget SSO flow. Unlike the bare `clientId=GarminConnect`
+    // sign-in (which redirects to Connect's own post-auth landing page after
+    // MFA — bypassing our `service` callback), the embed widget flow always
+    // redirects back to the `service` URL with `?ticket=ST-...` appended on
+    // success, which is exactly what we need to exchange.
     const params = new URLSearchParams({
       service: callback,
       webhost: "https://sso.garmin.com",
-      source: "https://connect.garmin.com/signin",
+      source: callback,
       redirectAfterAccountLoginUrl: callback,
       redirectAfterAccountCreationUrl: callback,
       gauthHost: "https://sso.garmin.com/sso",
       locale: "en_US",
       id: "gauth-widget",
-      cssUrl: "https://connect.garmin.com/gauth-custom-v1.2-min.css",
+      cssUrl: "https://static.garmincdn.com/com.garmin.connect/ui/css/gauth-custom-v1.2-min.css",
       privacyStatementUrl: "https://www.garmin.com/en-US/privacy/connect/",
       clientId: "GarminConnect",
       rememberMeShown: "true",
       rememberMeChecked: "false",
       createAccountShown: "true",
       openCreateAccount: "false",
-      usernameShown: "true",
       displayNameShown: "false",
-      initialFocus: "true",
-      embedWidget: "false",
       consumeServiceTicket: "false",
+      initialFocus: "true",
+      embedWidget: "true",
+      generateExtraServiceTicket: "true",
+      generateTwoExtraServiceTickets: "false",
+      generateNoServiceTicket: "false",
+      globalOptInShown: "true",
+      globalOptInChecked: "false",
+      mobile: "false",
+      connectLegalTerms: "true",
+      showTermsOfUse: "false",
+      showPrivacyPolicy: "false",
+      showConnectLegalAge: "false",
+      locationPromptShown: "true",
+      showPassword: "true",
+      useCustomHeader: "false",
+      mfaRequired: "false",
+      performMFACheck: "false",
+      rememberMyBrowserShown: "false",
+      rememberMyBrowserChecked: "false",
     });
 
-    const url = `https://sso.garmin.com/sso/login?${params.toString()}`;
+    const url = `https://sso.garmin.com/sso/signin?${params.toString()}`;
     return new Response(JSON.stringify({ url, callback }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

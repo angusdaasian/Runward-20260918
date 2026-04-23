@@ -7,7 +7,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { Eye, ImageIcon, Plus, Trash2, Upload } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Eye, ImageIcon, Pencil, Plus, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
 import PromoBanner, { clearPromoBannerSeen } from "@/components/PromoBanner";
 
@@ -23,6 +30,13 @@ interface PromoBanner {
   created_at: string;
 }
 
+// datetime-local needs "YYYY-MM-DDTHH:mm" in *local* time.
+const toDatetimeLocal = (iso: string) => {
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
+
 const PromoBannerManager = () => {
   const { user } = useAuth();
   const [banners, setBanners] = useState<PromoBanner[]>([]);
@@ -36,6 +50,15 @@ const PromoBannerManager = () => {
   const [linkUrl, setLinkUrl] = useState("");
   const [endsAt, setEndsAt] = useState(""); // datetime-local
   const [displayOrder, setDisplayOrder] = useState("0");
+
+  // Edit dialog state
+  const [editing, setEditing] = useState<PromoBanner | null>(null);
+  const [editCaption, setEditCaption] = useState("");
+  const [editCaptionZh, setEditCaptionZh] = useState("");
+  const [editLinkUrl, setEditLinkUrl] = useState("");
+  const [editEndsAt, setEditEndsAt] = useState("");
+  const [editDisplayOrder, setEditDisplayOrder] = useState("0");
+  const [savingEdit, setSavingEdit] = useState(false);
 
   const fetchBanners = async () => {
     const { data } = await supabase
@@ -105,6 +128,50 @@ const PromoBannerManager = () => {
     else fetchBanners();
   };
 
+  const openEdit = (b: PromoBanner) => {
+    setEditing(b);
+    setEditCaption(b.caption || "");
+    setEditCaptionZh(b.caption_zh || "");
+    setEditLinkUrl(b.link_url || "");
+    setEditEndsAt(toDatetimeLocal(b.ends_at));
+    setEditDisplayOrder(String(b.display_order));
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editing) return;
+    setSavingEdit(true);
+    try {
+      const { error } = await supabase
+        .from("promo_banners")
+        .update({
+          caption: editCaption.trim() || null,
+          caption_zh: editCaptionZh.trim() || null,
+          link_url: editLinkUrl.trim() || null,
+          display_order: parseInt(editDisplayOrder, 10) || 0,
+          ends_at: new Date(editEndsAt).toISOString(),
+        })
+        .eq("id", editing.id);
+      if (error) throw error;
+      toast.success("Banner updated");
+      setEditing(null);
+      fetchBanners();
+    } catch (e: any) {
+      toast.error(e.message || "Failed to update");
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  const handleQuickOrder = async (b: PromoBanner, delta: number) => {
+    const newOrder = (b.display_order || 0) + delta;
+    const { error } = await supabase
+      .from("promo_banners")
+      .update({ display_order: newOrder })
+      .eq("id", b.id);
+    if (error) toast.error("Failed to reorder");
+    else fetchBanners();
+  };
+
   const handleDelete = async (b: PromoBanner) => {
     if (!confirm("Delete this banner?")) return;
     // Try removing the image file (best-effort)
@@ -148,6 +215,9 @@ const PromoBannerManager = () => {
       <CardContent className="space-y-6">
         <div className="space-y-3 p-4 bg-muted/50 rounded-lg border border-border">
           <h3 className="text-sm font-semibold text-foreground">Upload New Banner</h3>
+          <p className="text-[11px] text-muted-foreground -mt-1">
+            Banner image is shown at its natural aspect ratio — any size works.
+          </p>
 
           <div className="space-y-1">
             <Label className="text-xs text-muted-foreground">Image</Label>
@@ -233,7 +303,7 @@ const PromoBannerManager = () => {
                   <img
                     src={b.image_url}
                     alt={b.caption || "Banner"}
-                    className="w-20 h-20 rounded-md object-cover shrink-0 bg-muted"
+                    className="w-20 h-20 rounded-md object-contain shrink-0 bg-muted"
                   />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1 flex-wrap">
@@ -251,8 +321,31 @@ const PromoBannerManager = () => {
                         </Badge>
                       )}
                     </div>
+                    <div className="flex items-center gap-1 mb-1">
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-5 w-5 text-[10px]"
+                        onClick={() => handleQuickOrder(b, -1)}
+                        title="Move up (lower order)"
+                      >
+                        −
+                      </Button>
+                      <span className="text-[11px] text-muted-foreground px-1">
+                        Order: {b.display_order}
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-5 w-5 text-[10px]"
+                        onClick={() => handleQuickOrder(b, 1)}
+                        title="Move down (higher order)"
+                      >
+                        +
+                      </Button>
+                    </div>
                     <p className="text-[11px] text-muted-foreground">
-                      Order: {b.display_order} · Ends: {new Date(b.ends_at).toLocaleString()}
+                      Ends: {new Date(b.ends_at).toLocaleString()}
                     </p>
                     {b.link_url && (
                       <p className="text-[11px] text-muted-foreground truncate">
@@ -275,7 +368,17 @@ const PromoBannerManager = () => {
                       variant="ghost"
                       size="icon"
                       className="h-7 w-7"
+                      onClick={() => openEdit(b)}
+                      title="Edit"
+                    >
+                      <Pencil className="h-3.5 w-3.5 text-foreground" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7"
                       onClick={() => handleDelete(b)}
+                      title="Delete"
                     >
                       <Trash2 className="h-3.5 w-3.5 text-destructive" />
                     </Button>
@@ -286,6 +389,75 @@ const PromoBannerManager = () => {
           </div>
         )}
       </CardContent>
+
+      {/* Edit dialog */}
+      <Dialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Promo Banner</DialogTitle>
+          </DialogHeader>
+          {editing && (
+            <div className="space-y-3">
+              <img
+                src={editing.image_url}
+                alt={editing.caption || "Banner"}
+                className="w-full max-h-48 object-contain rounded-md bg-muted"
+              />
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Display order</Label>
+                  <Input
+                    type="number"
+                    value={editDisplayOrder}
+                    onChange={(e) => setEditDisplayOrder(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Ends at</Label>
+                  <Input
+                    type="datetime-local"
+                    value={editEndsAt}
+                    onChange={(e) => setEditEndsAt(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Link URL</Label>
+                <Input
+                  placeholder="https://..."
+                  value={editLinkUrl}
+                  onChange={(e) => setEditLinkUrl(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Caption (English)</Label>
+                <Input
+                  value={editCaption}
+                  onChange={(e) => setEditCaption(e.target.value)}
+                  maxLength={200}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">說明文字 (中文)</Label>
+                <Input
+                  value={editCaptionZh}
+                  onChange={(e) => setEditCaptionZh(e.target.value)}
+                  maxLength={200}
+                />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setEditing(null)} disabled={savingEdit}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveEdit} disabled={savingEdit}>
+              {savingEdit ? "Saving..." : "Save"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {previewing && (
         <PromoBanner lang="en" userId={user?.id} forceShow onClose={() => setPreviewing(false)} />
       )}

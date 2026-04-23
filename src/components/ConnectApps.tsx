@@ -52,6 +52,21 @@ const ConnectApps = ({ lang, onBack }: Props) => {
   useEffect(() => {
     if (!user) return;
     const raw = sessionStorage.getItem("garmin-sso-result");
+    const pending = sessionStorage.getItem("garmin-sso-pending");
+
+    // If we returned without ever hitting /garmin-callback (Garmin redirected
+    // us elsewhere, e.g. to Connect's own landing page), surface that.
+    if (!raw && pending) {
+      sessionStorage.removeItem("garmin-sso-pending");
+      sessionStorage.removeItem("garmin-sso-callback");
+      toast.error(
+        lang === "zh"
+          ? "Garmin 登入後沒有返回 — 請再試一次,或在桌面瀏覽器使用。"
+          : "Garmin didn't redirect back after sign-in — please try again, or use a desktop browser."
+      );
+      return;
+    }
+
     if (!raw) return;
     sessionStorage.removeItem("garmin-sso-result");
     try {

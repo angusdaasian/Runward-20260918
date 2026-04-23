@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
-import { Globe, Smartphone, ChevronRight, CheckCircle2 } from "lucide-react";
+import { Globe, ChevronRight, CheckCircle2 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import appStoreBadge from "@/assets/app-store-badge.png";
 import appIcon from "@/assets/app-icon.png";
 import poweredByStrava from "@/assets/powered-by-strava.png";
+import heroRunners from "@/assets/landing-hero-runners.jpg";
 import IPhoneFrame from "@/components/landing/IPhoneFrame";
 import FeatureShowcase from "@/components/landing/FeatureShowcase";
 

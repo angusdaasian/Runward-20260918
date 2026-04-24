@@ -59,6 +59,138 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_coach_conversations: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          metadata: Json | null
+          role: string
+          session_id: string
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          role: string
+          session_id: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          role?: string
+          session_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      ai_coach_insights: {
+        Row: {
+          confidence: number
+          created_at: string
+          id: string
+          insight_key: string
+          insight_type: string
+          insight_value: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          confidence?: number
+          created_at?: string
+          id?: string
+          insight_key: string
+          insight_type: string
+          insight_value: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          confidence?: number
+          created_at?: string
+          id?: string
+          insight_key?: string
+          insight_type?: string
+          insight_value?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      ai_coach_preferences: {
+        Row: {
+          created_at: string
+          experience_level: string | null
+          id: string
+          injuries_concerns: string | null
+          preferred_units: string
+          target_race_date: string | null
+          training_days: Json
+          training_goal: string | null
+          training_intensity: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          experience_level?: string | null
+          id?: string
+          injuries_concerns?: string | null
+          preferred_units?: string
+          target_race_date?: string | null
+          training_days?: Json
+          training_goal?: string | null
+          training_intensity?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          experience_level?: string | null
+          id?: string
+          injuries_concerns?: string | null
+          preferred_units?: string
+          target_race_date?: string | null
+          training_days?: Json
+          training_goal?: string | null
+          training_intensity?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      ai_coach_usage: {
+        Row: {
+          created_at: string
+          date: string
+          id: string
+          message_count: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          date?: string
+          id?: string
+          message_count?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          id?: string
+          message_count?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       announcements: {
         Row: {
           created_at: string

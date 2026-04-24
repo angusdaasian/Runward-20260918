@@ -188,6 +188,54 @@ serve(async (req) => {
       return json({ messages: data || [], session_id: resolvedSession });
     }
 
+    // ── SESSIONS LIST (read) ──
+    if (action === "sessions" && req.method === "GET") {
+      const { data } = await admin
+        .from("ai_coach_conversations")
+        .select("session_id, content, role, created_at")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(500);
+      const map = new Map<string, { session_id: string; last_at: string; first_user_message: string; message_count: number }>();
+      const firstUserBySession = new Map<string, string>();
+      // Walk oldest→newest to capture first user message per session
+      const ordered = [...(data || [])].reverse();
+      for (const row of ordered) {
+        if (row.role === "user" && !firstUserBySession.has(row.session_id)) {
+          firstUserBySession.set(row.session_id, row.content);
+        }
+      }
+      for (const row of (data || [])) {
+        const existing = map.get(row.session_id);
+        if (!existing) {
+          map.set(row.session_id, {
+            session_id: row.session_id,
+            last_at: row.created_at,
+            first_user_message: firstUserBySession.get(row.session_id) || row.content,
+            message_count: 1,
+          });
+        } else {
+          existing.message_count += 1;
+        }
+      }
+      const sessions = Array.from(map.values())
+        .sort((a, b) => new Date(b.last_at).getTime() - new Date(a.last_at).getTime())
+        .slice(0, 50);
+      return json({ sessions });
+    }
+
+    // ── DELETE SESSION ──
+    if (action === "delete_session" && req.method === "POST") {
+      const { session_id } = await req.json();
+      if (!session_id) return json({ error: "session_id required" }, 400);
+      await admin
+        .from("ai_coach_conversations")
+        .delete()
+        .eq("user_id", user.id)
+        .eq("session_id", session_id);
+      return json({ ok: true });
+    }
+
     // ── RESET MEMORY ──
     if (action === "reset" && req.method === "POST") {
       await admin.from("ai_coach_conversations").delete().eq("user_id", user.id);

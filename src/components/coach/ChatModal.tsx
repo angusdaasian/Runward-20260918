@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { X, Settings, Send, Plus, Loader2 } from "lucide-react";
+import { X, Settings, Send, ChevronDown, Loader2, Plus, Trash2, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useAICoach } from "@/hooks/use-ai-coach";
 import { useAuth } from "@/contexts/AuthContext";
 import MessageBubble from "./MessageBubble";
@@ -19,6 +20,7 @@ const ChatModal = ({ open, onClose, lang }: Props) => {
   const { user } = useAuth();
   const [input, setInput] = useState("");
   const [showSettings, setShowSettings] = useState(false);
+  const [sessionMenuOpen, setSessionMenuOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -28,9 +30,13 @@ const ChatModal = ({ open, onClose, lang }: Props) => {
     remaining,
     prefs,
     insights,
+    sessions,
     loadingHistory,
+    sessionId,
     send,
     newConversation,
+    switchSession,
+    deleteSession,
     savePreferences,
     resetMemory,
   } = useAICoach(open);
@@ -99,21 +105,105 @@ const ChatModal = ({ open, onClose, lang }: Props) => {
             </div>
           </div>
           <div className="flex items-center gap-1 shrink-0">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8"
-              onClick={() => {
-                if (messages.length > 0) {
-                  if (confirm(t("Start a new conversation?", "開始新對話？"))) {
+            <Popover open={sessionMenuOpen} onOpenChange={setSessionMenuOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  title={t("Conversations", "對話記錄")}
+                >
+                  <ChevronDown size={16} />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent
+                align="end"
+                className="w-72 p-1 z-[10000]"
+                sideOffset={6}
+              >
+                <button
+                  onClick={() => {
                     newConversation();
-                  }
-                }
-              }}
-              title={t("New conversation", "新對話")}
-            >
-              <Plus size={16} />
-            </Button>
+                    setSessionMenuOpen(false);
+                  }}
+                  className="w-full flex items-center gap-2 px-2 py-2 rounded-md hover:bg-muted text-sm text-left"
+                >
+                  <Plus size={14} />
+                  <span className="font-medium">
+                    {t("New conversation", "新對話")}
+                  </span>
+                </button>
+                {sessions.length > 0 && (
+                  <div className="my-1 h-px bg-border" />
+                )}
+                <div className="max-h-72 overflow-y-auto">
+                  {sessions.length === 0 ? (
+                    <div className="px-2 py-3 text-xs text-muted-foreground text-center">
+                      {t("No previous chats", "沒有過往對話")}
+                    </div>
+                  ) : (
+                    sessions.map((s) => {
+                      const isActive = s.session_id === sessionId;
+                      const date = new Date(s.last_at);
+                      const dateLabel = date.toLocaleDateString(
+                        lang === "zh" ? "zh-HK" : "en-US",
+                        { month: "short", day: "numeric" },
+                      );
+                      return (
+                        <div
+                          key={s.session_id}
+                          className={`group flex items-center gap-1 rounded-md ${
+                            isActive ? "bg-muted" : "hover:bg-muted/60"
+                          }`}
+                        >
+                          <button
+                            onClick={() => {
+                              switchSession(s.session_id);
+                              setSessionMenuOpen(false);
+                            }}
+                            className="flex-1 flex items-start gap-2 px-2 py-2 text-left min-w-0"
+                          >
+                            <MessageSquare
+                              size={14}
+                              className="mt-0.5 shrink-0 text-muted-foreground"
+                            />
+                            <div className="min-w-0 flex-1">
+                              <p className="text-xs font-medium truncate">
+                                {s.first_user_message ||
+                                  t("(empty)", "（空對話）")}
+                              </p>
+                              <p className="text-[10px] text-muted-foreground">
+                                {dateLabel} · {s.message_count}{" "}
+                                {t("msgs", "則")}
+                              </p>
+                            </div>
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (
+                                confirm(
+                                  t(
+                                    "Delete this conversation?",
+                                    "刪除此對話？",
+                                  ),
+                                )
+                              ) {
+                                deleteSession(s.session_id);
+                              }
+                            }}
+                            className="opacity-0 group-hover:opacity-100 p-1.5 mr-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-opacity"
+                            title={t("Delete", "刪除")}
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </PopoverContent>
+            </Popover>
             <Button
               variant="ghost"
               size="icon"

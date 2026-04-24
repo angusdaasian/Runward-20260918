@@ -42,6 +42,9 @@ export function useAICoach(open: boolean) {
   const [insights, setInsights] = useState<
     Array<{ insight_key: string; insight_value: string }>
   >([]);
+  const [sessions, setSessions] = useState<
+    Array<{ session_id: string; last_at: string; first_user_message: string; message_count: number }>
+  >([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const initRef = useRef(false);
 
@@ -83,15 +86,17 @@ export function useAICoach(open: boolean) {
         ? `?action=history&session_id=${storedSid}`
         : `?action=history`;
 
-      const [prefsRes, insightsRes, histRes, usageRes] = await Promise.all([
+      const [prefsRes, insightsRes, histRes, usageRes, sessionsRes] = await Promise.all([
         callFn("?action=preferences", { method: "GET" }),
         callFn("?action=insights", { method: "GET" }),
         callFn(histPath, { method: "GET" }),
         callFn("?action=usage", { method: "GET" }),
+        callFn("?action=sessions", { method: "GET" }),
       ]);
       setPrefs(prefsRes.preferences || null);
       setInsights(insightsRes.insights || []);
       setRemaining(usageRes.remaining ?? null);
+      setSessions(sessionsRes.sessions || []);
 
       const msgs = histRes.messages || [];
       // Resolve session id: stored > server-returned (from latest msg) > new
@@ -161,9 +166,12 @@ export function useAICoach(open: boolean) {
               : x,
           ),
         );
-        // Refresh insights in background
+        // Refresh insights + sessions in background
         callFn("?action=insights", { method: "GET" })
           .then((r) => setInsights(r.insights || []))
+          .catch(() => {});
+        callFn("?action=sessions", { method: "GET" })
+          .then((r) => setSessions(r.sessions || []))
           .catch(() => {});
       } catch (e: any) {
         setMessages((m) => m.filter((x) => x.id !== placeholder.id));
@@ -201,6 +209,52 @@ export function useAICoach(open: boolean) {
     setMessages([]);
   }, []);
 
+  const switchSession = useCallback(
+    async (sid: string) => {
+      if (sid === sessionId) return;
+      setLoadingHistory(true);
+      localStorage.setItem(SESSION_KEY, sid);
+      setSessionId(sid);
+      setMessages([]);
+      try {
+        const histRes = await callFn(`?action=history&session_id=${sid}`, {
+          method: "GET",
+        });
+        const msgs = histRes.messages || [];
+        setMessages(
+          msgs.map((m: any) => ({
+            id: m.id || newId(),
+            role: m.role,
+            content: m.content,
+          })),
+        );
+      } catch (e) {
+        toast.error(getLang() === "zh" ? "載入失敗" : "Failed to load");
+      } finally {
+        setLoadingHistory(false);
+      }
+    },
+    [callFn, sessionId],
+  );
+
+  const deleteSession = useCallback(
+    async (sid: string) => {
+      try {
+        await callFn("?action=delete_session", {
+          method: "POST",
+          body: JSON.stringify({ session_id: sid }),
+        });
+        setSessions((prev) => prev.filter((s) => s.session_id !== sid));
+        if (sid === sessionId) {
+          newConversation();
+        }
+      } catch (e) {
+        toast.error(getLang() === "zh" ? "刪除失敗" : "Failed to delete");
+      }
+    },
+    [callFn, sessionId, newConversation],
+  );
+
   const savePreferences = useCallback(
     async (patch: Partial<CoachPreferences>) => {
       try {
@@ -222,6 +276,7 @@ export function useAICoach(open: boolean) {
     try {
       await callFn("?action=reset", { method: "POST" });
       setInsights([]);
+      setSessions([]);
       newConversation();
       toast.success(getLang() === "zh" ? "記憶已重置" : "Memory cleared");
     } catch (e) {
@@ -235,9 +290,12 @@ export function useAICoach(open: boolean) {
     remaining,
     prefs,
     insights,
+    sessions,
     loadingHistory,
     send,
     newConversation,
+    switchSession,
+    deleteSession,
     savePreferences,
     resetMemory,
     sessionId,

@@ -44,13 +44,15 @@ function getLang(): "en" | "zh" {
   return (localStorage.getItem("app_lang") as "en" | "zh") || "en";
 }
 
-export function useAICoach(open: boolean) {
+export function useAICoach(open: boolean, onFreeLimit?: () => void) {
   const { user, session } = useAuth();
   const { isPremium } = usePremium();
   const [messages, setMessages] = useState<CoachMessage[]>([]);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [remaining, setRemaining] = useState<number | null>(null);
+  const [dailyLimit, setDailyLimit] = useState<number | null>(null);
+  const [isFree, setIsFree] = useState<boolean>(!isPremium);
   const [prefs, setPrefs] = useState<CoachPreferences | null>(null);
   const [insights, setInsights] = useState<
     Array<{ insight_key: string; insight_value: string }>
@@ -89,7 +91,7 @@ export function useAICoach(open: boolean) {
   );
 
   const loadAll = useCallback(async () => {
-    if (!user || !isPremium) return;
+    if (!user) return;
     setLoadingHistory(true);
     try {
       const storedSidRaw = localStorage.getItem(SESSION_KEY);
@@ -113,6 +115,8 @@ export function useAICoach(open: boolean) {
       setPrefs(prefsRes.preferences || null);
       setInsights(insightsRes.insights || []);
       setRemaining(usageRes.remaining ?? null);
+      setDailyLimit(usageRes.limit ?? null);
+      setIsFree(!!usageRes.is_free);
       setSessions(sessionsRes.sessions || []);
 
       const msgs = histRes.messages || [];
@@ -139,15 +143,15 @@ export function useAICoach(open: boolean) {
     } finally {
       setLoadingHistory(false);
     }
-  }, [user, isPremium, callFn]);
+  }, [user, callFn]);
 
   useEffect(() => {
-    if (open && user && isPremium && !initRef.current) {
+    if (open && user && !initRef.current) {
       initRef.current = true;
       loadAll();
     }
     if (!open) initRef.current = false;
-  }, [open, user, isPremium, loadAll]);
+  }, [open, user, loadAll]);
 
   const send = useCallback(
     async (text: string) => {
@@ -194,7 +198,10 @@ export function useAICoach(open: boolean) {
           .catch(() => {});
       } catch (e: any) {
         setMessages((m) => m.filter((x) => x.id !== placeholder.id));
-        if (e.status === 429) {
+        if (e.status === 403 && e.code === "free_limit_reached") {
+          setRemaining(0);
+          onFreeLimit?.();
+        } else if (e.status === 429) {
           setRemaining(0);
           toast.error(
             getLang() === "zh"
@@ -218,7 +225,7 @@ export function useAICoach(open: boolean) {
         setSending(false);
       }
     },
-    [callFn, sending, sessionId],
+    [callFn, sending, sessionId, onFreeLimit],
   );
 
   const newConversation = useCallback(() => {
@@ -316,6 +323,8 @@ export function useAICoach(open: boolean) {
     messages,
     sending,
     remaining,
+    dailyLimit,
+    isFree,
     prefs,
     insights,
     sessions,

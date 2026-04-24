@@ -14,9 +14,10 @@ interface Props {
   open: boolean;
   onClose: () => void;
   lang: "en" | "zh";
+  onUpgradeNeeded?: () => void;
 }
 
-const ChatModal = ({ open, onClose, lang }: Props) => {
+const ChatModal = ({ open, onClose, lang, onUpgradeNeeded }: Props) => {
   const { user } = useAuth();
   const [input, setInput] = useState("");
   const [showSettings, setShowSettings] = useState(false);
@@ -28,6 +29,8 @@ const ChatModal = ({ open, onClose, lang }: Props) => {
     messages,
     sending,
     remaining,
+    dailyLimit,
+    isFree,
     prefs,
     insights,
     sessions,
@@ -39,7 +42,7 @@ const ChatModal = ({ open, onClose, lang }: Props) => {
     deleteSession,
     savePreferences,
     resetMemory,
-  } = useAICoach(open);
+  } = useAICoach(open, onUpgradeNeeded);
 
   const t = (en: string, zh: string) => (lang === "zh" ? zh : en);
 
@@ -97,10 +100,15 @@ const ChatModal = ({ open, onClose, lang }: Props) => {
               </h3>
               {remaining !== null && (
                 <p className="text-[10px] text-muted-foreground">
-                  {t(
-                    `${remaining} messages left today`,
-                    `今日剩餘 ${remaining} 則訊息`,
-                  )}
+                  {isFree
+                    ? t(
+                        `${remaining} / ${dailyLimit ?? 15} free messages today`,
+                        `今日免費剩餘 ${remaining} / ${dailyLimit ?? 15} 則`,
+                      )
+                    : t(
+                        `${remaining} messages left today`,
+                        `今日剩餘 ${remaining} 則訊息`,
+                      )}
                 </p>
               )}
             </div>
@@ -271,35 +279,54 @@ const ChatModal = ({ open, onClose, lang }: Props) => {
         </div>
 
         {/* Input */}
-        <form
-          onSubmit={handleSend}
-          className="border-t border-border p-3 flex gap-2 shrink-0"
-        >
-          <Input
-            ref={inputRef}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder={
-              limitReached
-                ? t("Daily limit reached — resets at midnight", "已達每日上限")
-                : t("Ask your coach anything...", "問你的教練任何問題...")
-            }
-            disabled={sending || limitReached}
-            maxLength={2000}
-            className="flex-1"
-          />
-          <Button
-            type="submit"
-            size="icon"
-            disabled={!input.trim() || sending || limitReached}
+        {isFree && limitReached ? (
+          <div className="border-t border-border p-3 shrink-0 space-y-2 bg-muted/30">
+            <p className="text-xs text-center text-muted-foreground">
+              {t(
+                `You've used all ${dailyLimit ?? 15} free messages today. Upgrade for unlimited coaching.`,
+                `你已用完今日 ${dailyLimit ?? 15} 則免費訊息。升級以獲得無限教練服務。`,
+              )}
+            </p>
+            <Button
+              type="button"
+              className="w-full"
+              size="sm"
+              onClick={() => onUpgradeNeeded?.()}
+            >
+              {t("Upgrade to Premium", "升級至 Premium")}
+            </Button>
+          </div>
+        ) : (
+          <form
+            onSubmit={handleSend}
+            className="border-t border-border p-3 flex gap-2 shrink-0"
           >
-            {sending ? (
-              <Loader2 className="animate-spin" size={16} />
-            ) : (
-              <Send size={16} />
-            )}
-          </Button>
-        </form>
+            <Input
+              ref={inputRef}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder={
+                limitReached
+                  ? t("Daily limit reached — resets at midnight", "已達每日上限")
+                  : t("Ask your coach anything...", "問你的教練任何問題...")
+              }
+              disabled={sending || limitReached}
+              maxLength={2000}
+              className="flex-1"
+            />
+            <Button
+              type="submit"
+              size="icon"
+              disabled={!input.trim() || sending || limitReached}
+            >
+              {sending ? (
+                <Loader2 className="animate-spin" size={16} />
+              ) : (
+                <Send size={16} />
+              )}
+            </Button>
+          </form>
+        )}
       </div>
 
       <CoachSettings
@@ -310,6 +337,8 @@ const ChatModal = ({ open, onClose, lang }: Props) => {
         onSave={savePreferences}
         onResetMemory={resetMemory}
         lang={lang}
+        isFree={isFree}
+        onUpgradeNeeded={onUpgradeNeeded}
       />
     </>
   );

@@ -21,6 +21,7 @@ const PostureTab = lazy(() => import("@/components/PostureTab"));
 const ConnectApps = lazy(() => import("@/components/ConnectApps"));
 const RewardsTab = lazy(() => import("@/components/RewardsTab"));
 const RaceTab = lazy(() => import("@/components/RaceTab"));
+const FloatingChatButton = lazy(() => import("@/components/coach/FloatingChatButton"));
 
 type Tab = "training" | "posture" | "activities" | "more" | "community" | "races";
 const ONBOARDING_DELAY_MS = 500;
@@ -285,6 +286,12 @@ const Index = () => {
       </div>
 
       <PromoBanner lang={lang} userId={user?.id ?? null} triggerKey={promoTrigger} />
+
+      {!isGuest && user && (
+        <Suspense fallback={null}>
+          <FloatingChatButton lang={lang} />
+        </Suspense>
+      )}
     </div>
   );
 };

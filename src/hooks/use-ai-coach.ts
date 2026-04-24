@@ -196,7 +196,7 @@ export function useAICoach(open: boolean) {
 
   const newConversation = useCallback(() => {
     const sid = newId();
-    sessionStorage.setItem(SESSION_KEY, sid);
+    localStorage.setItem(SESSION_KEY, sid);
     setSessionId(sid);
     setMessages([]);
   }, []);

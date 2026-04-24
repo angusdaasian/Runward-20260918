@@ -77,16 +77,17 @@ export function useGarmin(lang: Lang) {
 
         const mobileEmbedUrl = startData.mobile_embed_url ?? startData.url ?? "";
         const mobileServiceUrl = startData.service_url ?? "https://sso.garmin.com/sso/embed";
+        const nativeServiceUrl = startData.native_service_url ?? mobileServiceUrl;
 
         clearGarminSsoTransientState();
         setGarminSsoValue(GARMIN_SSO_KEYS.callback, startData.callback ?? "");
         setGarminSsoValue(GARMIN_SSO_KEYS.pending, "1");
         setGarminSsoValue(GARMIN_SSO_KEYS.mobileEmbedUrl, mobileEmbedUrl);
-        setGarminSsoValue(GARMIN_SSO_KEYS.mobileServiceUrl, mobileServiceUrl);
+        setGarminSsoValue(GARMIN_SSO_KEYS.mobileServiceUrl, isNative ? nativeServiceUrl : mobileServiceUrl);
 
         if (isNative) {
-          const nativeBridgeUrl = `${window.location.origin}/garmin-mobile-auth?native=1&embedUrl=${encodeURIComponent(mobileEmbedUrl)}&serviceUrl=${encodeURIComponent(mobileServiceUrl)}&deeplinkScheme=${encodeURIComponent(GARMIN_NATIVE_DEEPLINK_SCHEME)}`;
-          await despia(`oauth://?url=${encodeURIComponent(nativeBridgeUrl)}`);
+          const nativeAuthUrl = startData.native_url ?? startData.url;
+          await despia(`oauth://?url=${encodeURIComponent(nativeAuthUrl)}`);
           return { ok: false };
         }
 

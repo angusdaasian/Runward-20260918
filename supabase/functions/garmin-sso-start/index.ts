@@ -11,11 +11,14 @@ serve(async (req) => {
 
   try {
     let origin: string | null = null;
+    let deeplinkScheme: string | null = null;
     try {
       const body = await req.json().catch(() => ({}));
       origin = body?.origin ?? null;
+      deeplinkScheme = typeof body?.deeplink_scheme === "string" ? body.deeplink_scheme.trim() : null;
     } catch {
       origin = null;
+      deeplinkScheme = null;
     }
 
     // Fall back to the request's Origin / Referer header so we always have a callback host.
@@ -33,8 +36,11 @@ serve(async (req) => {
 
     const callback = `${origin}/garmin-callback`;
     const mobileBridge = `${origin}/garmin-mobile-auth`;
-    const nativeCallback = `${origin}/garmin-native-callback.html`;
+    const nativeCallbackBase = `${origin}/garmin-native-callback.html`;
+    const normalizedDeeplinkScheme = deeplinkScheme || "runward";
+    const nativeCallback = `${nativeCallbackBase}?deeplinkScheme=${encodeURIComponent(normalizedDeeplinkScheme)}`;
     const serviceUrl = "https://sso.garmin.com/sso/embed";
+    const nativeServiceUrl = `${nativeCallback}&serviceUrl=${encodeURIComponent(nativeCallback)}`;
     // Use the embed-widget SSO flow. Unlike the bare `clientId=GarminConnect`
     // sign-in (which redirects to Connect's own post-auth landing page after
     // MFA — bypassing our `service` callback), the embed widget flow always
@@ -111,11 +117,11 @@ serve(async (req) => {
     const mobileEmbedUrl = `https://sso.garmin.com/sso/embed?${mobileParams.toString()}`;
 
     const nativeParams = new URLSearchParams({
-      service: nativeCallback,
+      service: nativeServiceUrl,
       webhost: "https://sso.garmin.com",
-      source: nativeCallback,
-      redirectAfterAccountLoginUrl: nativeCallback,
-      redirectAfterAccountCreationUrl: nativeCallback,
+      source: nativeServiceUrl,
+      redirectAfterAccountLoginUrl: nativeServiceUrl,
+      redirectAfterAccountCreationUrl: nativeServiceUrl,
       gauthHost: "https://sso.garmin.com/sso",
       locale: "en_US",
       id: "gauth-widget",
@@ -151,7 +157,7 @@ serve(async (req) => {
 
     const nativeUrl = `https://sso.garmin.com/sso/signin?${nativeParams.toString()}`;
 
-    return new Response(JSON.stringify({ url, callback, mobile_embed_url: mobileEmbedUrl, service_url: serviceUrl, native_url: nativeUrl, native_service_url: nativeCallback }), {
+    return new Response(JSON.stringify({ url, callback, mobile_embed_url: mobileEmbedUrl, service_url: serviceUrl, native_url: nativeUrl, native_service_url: nativeServiceUrl }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {

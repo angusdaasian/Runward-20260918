@@ -43,11 +43,11 @@ serve(async (req) => {
     const nativeCallback = `${nativeCallbackBase}?deeplinkScheme=${encodeURIComponent(normalizedDeeplinkScheme)}`;
     const serviceUrl = "https://sso.garmin.com/sso/embed";
     const nativeServiceUrl = nativeCallback;
-    // Use the embed-widget SSO flow. Unlike the bare `clientId=GarminConnect`
-    // sign-in (which redirects to Connect's own post-auth landing page after
-    // MFA — bypassing our `service` callback), the embed widget flow always
-    // redirects back to the `service` URL with `?ticket=ST-...` appended on
-    // success, which is exactly what we need to exchange.
+    // Desktop popup is a TOP-LEVEL browsing context (separate window, not an
+    // iframe), so we must NOT use embedWidget mode. Embed mode causes CAS to
+    // redirect to its own embed landing page after credentials submit instead
+    // of redirecting back to our `service` URL with a ticket — which is why
+    // the popup loops back to the sign-in page.
     const params = new URLSearchParams({
       service: callback,
       webhost: "https://sso.garmin.com",
@@ -67,7 +67,6 @@ serve(async (req) => {
       displayNameShown: "false",
       consumeServiceTicket: "false",
       initialFocus: "true",
-      embedWidget: "true",
       generateExtraServiceTicket: "true",
       generateTwoExtraServiceTickets: "false",
       generateNoServiceTicket: "false",
@@ -81,9 +80,7 @@ serve(async (req) => {
       locationPromptShown: "true",
       showPassword: "true",
       useCustomHeader: "false",
-      mfaRequired: "false",
-      performMFACheck: "false",
-      rememberMyBrowserShown: "false",
+      rememberMyBrowserShown: "true",
       rememberMyBrowserChecked: "false",
     });
 

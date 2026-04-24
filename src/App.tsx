@@ -11,8 +11,6 @@ import Index from "./pages/Index.tsx";
 import NotFound from "./pages/NotFound.tsx";
 import AdminPanel from "./pages/AdminPanel.tsx";
 import AppleCallback from "./pages/AppleCallback.tsx";
-import GarminCallback from "./pages/GarminCallback.tsx";
-import GarminMobileAuth from "./pages/GarminMobileAuth.tsx";
 import Support from "./pages/Support.tsx";
 import Privacy from "./pages/Privacy.tsx";
 import Landing from "./pages/Landing.tsx";
@@ -25,7 +23,7 @@ registerShareIntent();
 // Route `/` → Index when:
 //  - we're inside the native app, OR
 //  - the URL carries in-app query params (e.g. ?tab=more&page=connect-apps)
-//    used by post-OAuth/SSO redirects. Otherwise show the marketing Landing.
+//    used by post-OAuth redirects. Otherwise show the marketing Landing.
 const RootRoute = () => {
   if (native) return <Index />;
   const params = new URLSearchParams(window.location.search);
@@ -44,8 +42,6 @@ const App = () => (
             <Routes>
               <Route path="/" element={<RootRoute />} />
               <Route path="/callback/apple" element={<AppleCallback />} />
-              <Route path="/garmin-callback" element={<GarminCallback />} />
-              <Route path="/garmin-mobile-auth" element={<GarminMobileAuth />} />
               <Route path="/admin" element={<AdminPanel />} />
               <Route path="/support" element={<Support />} />
               <Route path="/privacy" element={<Privacy />} />

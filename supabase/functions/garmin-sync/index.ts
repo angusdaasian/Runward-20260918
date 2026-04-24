@@ -81,7 +81,7 @@ serve(async (req) => {
     if (action === "sync") {
       const { data: conn } = await supabase
         .from("garmin_connections")
-        .select("access_token, refresh_token")
+        .select("garmin_email_encrypted, access_token")
         .eq("user_id", user.id)
         .maybeSingle();
 
@@ -92,7 +92,25 @@ serve(async (req) => {
         });
       }
 
-      const garminEmail = conn.access_token;
+      // Prefer the new encrypted column; fall back to legacy `access_token`
+      // (which used to hold the plaintext email) for already-connected users.
+      let garminEmail: string | null = null;
+      if (conn.garmin_email_encrypted) {
+        try {
+          const { decryptString } = await import("../_shared/garminCrypto.ts");
+          garminEmail = await decryptString(conn.garmin_email_encrypted);
+        } catch (e) {
+          console.error("Failed to decrypt garmin_email_encrypted:", e);
+        }
+      }
+      if (!garminEmail) garminEmail = conn.access_token;
+
+      if (!garminEmail) {
+        return new Response(JSON.stringify({ error: "Garmin sign-in expired", reauth_required: true }), {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
 
       // ── Phase 1: Fetch basic activity list (token-based, no password) ──
       const actRes = await fetch(`${GARMIN_RAILWAY_URL}/garmin-activities`, {

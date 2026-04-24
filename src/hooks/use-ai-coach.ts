@@ -209,6 +209,52 @@ export function useAICoach(open: boolean) {
     setMessages([]);
   }, []);
 
+  const switchSession = useCallback(
+    async (sid: string) => {
+      if (sid === sessionId) return;
+      setLoadingHistory(true);
+      localStorage.setItem(SESSION_KEY, sid);
+      setSessionId(sid);
+      setMessages([]);
+      try {
+        const histRes = await callFn(`?action=history&session_id=${sid}`, {
+          method: "GET",
+        });
+        const msgs = histRes.messages || [];
+        setMessages(
+          msgs.map((m: any) => ({
+            id: m.id || newId(),
+            role: m.role,
+            content: m.content,
+          })),
+        );
+      } catch (e) {
+        toast.error(getLang() === "zh" ? "載入失敗" : "Failed to load");
+      } finally {
+        setLoadingHistory(false);
+      }
+    },
+    [callFn, sessionId],
+  );
+
+  const deleteSession = useCallback(
+    async (sid: string) => {
+      try {
+        await callFn("?action=delete_session", {
+          method: "POST",
+          body: JSON.stringify({ session_id: sid }),
+        });
+        setSessions((prev) => prev.filter((s) => s.session_id !== sid));
+        if (sid === sessionId) {
+          newConversation();
+        }
+      } catch (e) {
+        toast.error(getLang() === "zh" ? "刪除失敗" : "Failed to delete");
+      }
+    },
+    [callFn, sessionId, newConversation],
+  );
+
   const savePreferences = useCallback(
     async (patch: Partial<CoachPreferences>) => {
       try {
@@ -230,6 +276,7 @@ export function useAICoach(open: boolean) {
     try {
       await callFn("?action=reset", { method: "POST" });
       setInsights([]);
+      setSessions([]);
       newConversation();
       toast.success(getLang() === "zh" ? "記憶已重置" : "Memory cleared");
     } catch (e) {
@@ -243,9 +290,12 @@ export function useAICoach(open: boolean) {
     remaining,
     prefs,
     insights,
+    sessions,
     loadingHistory,
     send,
     newConversation,
+    switchSession,
+    deleteSession,
     savePreferences,
     resetMemory,
     sessionId,

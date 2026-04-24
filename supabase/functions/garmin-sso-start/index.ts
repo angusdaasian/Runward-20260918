@@ -45,9 +45,9 @@ serve(async (req) => {
     const iframeParams = new URLSearchParams({
       id: "gauth-widget",
       embedWidget: "true",
-      gauthHost: "https://sso.garmin.com/sso",
+      gauthHost: "https://sso.garmin.com/sso/embed",
       service: embedServiceUrl,
-      source: origin, // becomes parent_url in casEmbedSuccess.html — required for postMessage
+      source: embedServiceUrl, // CRITICAL: must be a Garmin URL — becomes parent_url in casEmbedSuccess.html
       redirectAfterAccountLoginUrl: embedServiceUrl,
       redirectAfterAccountCreationUrl: embedServiceUrl,
       consumeServiceTicket: "false",

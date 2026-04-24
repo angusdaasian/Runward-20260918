@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { X, Settings, Send, Plus, Loader2 } from "lucide-react";
+import { X, Settings, Send, ChevronDown, Loader2, Plus, Trash2, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useAICoach } from "@/hooks/use-ai-coach";
 import { useAuth } from "@/contexts/AuthContext";
 import MessageBubble from "./MessageBubble";
@@ -19,6 +20,7 @@ const ChatModal = ({ open, onClose, lang }: Props) => {
   const { user } = useAuth();
   const [input, setInput] = useState("");
   const [showSettings, setShowSettings] = useState(false);
+  const [sessionMenuOpen, setSessionMenuOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -28,9 +30,13 @@ const ChatModal = ({ open, onClose, lang }: Props) => {
     remaining,
     prefs,
     insights,
+    sessions,
     loadingHistory,
+    sessionId,
     send,
     newConversation,
+    switchSession,
+    deleteSession,
     savePreferences,
     resetMemory,
   } = useAICoach(open);

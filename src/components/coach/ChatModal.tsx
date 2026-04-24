@@ -67,44 +67,11 @@ const ChatModal = ({ open, onClose, lang }: Props) => {
 
   const limitReached = remaining === 0;
 
-  const handleHandlePointerDown = (e: React.PointerEvent) => {
-    // Only enable swipe-to-close on mobile (no sm: backdrop)
-    if (window.innerWidth >= 640) return;
-    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-    dragStartRef.current = {
-      y: e.clientY,
-      pointerId: e.pointerId,
-      scrollTop: 0,
-    };
-    setIsDragging(true);
-  };
-
-  const handleHandlePointerMove = (e: React.PointerEvent) => {
-    const s = dragStartRef.current;
-    if (!s || s.pointerId !== e.pointerId) return;
-    const dy = e.clientY - s.y;
-    setDragY(Math.max(0, dy));
-  };
-
-  const handleHandlePointerUp = (e: React.PointerEvent) => {
-    const s = dragStartRef.current;
-    if (!s || s.pointerId !== e.pointerId) return;
-    const dy = e.clientY - s.y;
-    dragStartRef.current = null;
-    setIsDragging(false);
-    if (dy > SWIPE_CLOSE_THRESHOLD) {
-      setDragY(0);
-      onClose();
-    } else {
-      setDragY(0);
-    }
-  };
-
   return (
     <>
-      {/* Backdrop (desktop only) */}
+      {/* Backdrop */}
       <div
-        className="fixed inset-0 z-[9998] bg-black/40 hidden sm:block animate-in fade-in-0 duration-200"
+        className="fixed inset-0 z-[9998] bg-black/40 animate-in fade-in-0 duration-200"
         onClick={onClose}
       />
       {/* Modal — floating card on all screen sizes */}
@@ -116,25 +83,8 @@ const ChatModal = ({ open, onClose, lang }: Props) => {
         style={{
           paddingTop: "var(--safe-area-top, 0px)",
           paddingBottom: "var(--safe-area-bottom, 0px)",
-          transform: dragY > 0 ? `translateY(${dragY}px)` : undefined,
-          transition: isDragging ? "none" : "transform 200ms ease-out",
-          opacity: dragY > 0 ? Math.max(0.4, 1 - dragY / 400) : 1,
         }}
       >
-        {/* Drag handle (mobile only) */}
-        <div
-          className="sm:hidden flex justify-center pt-2 pb-1 touch-none cursor-grab active:cursor-grabbing"
-          onPointerDown={handleHandlePointerDown}
-          onPointerMove={handleHandlePointerMove}
-          onPointerUp={handleHandlePointerUp}
-          onPointerCancel={() => {
-            dragStartRef.current = null;
-            setIsDragging(false);
-            setDragY(0);
-          }}
-        >
-          <div className="w-10 h-1.5 rounded-full bg-muted-foreground/30" />
-        </div>
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
           <div className="flex items-center gap-2 min-w-0">

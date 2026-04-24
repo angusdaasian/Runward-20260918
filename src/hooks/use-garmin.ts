@@ -9,6 +9,8 @@ import { clearGarminSsoTransientState, GARMIN_SSO_KEYS, getGarminSsoValue, setGa
 import { isNativeApp } from "@/lib/nativeDetection";
 import despia from "despia-native";
 
+const GARMIN_NATIVE_DEEPLINK_SCHEME = "runward";
+
 async function extractFunctionErrorMessage(error: unknown): Promise<string | null> {
   if (error instanceof FunctionsHttpError) {
     try {
@@ -84,8 +86,8 @@ export function useGarmin(lang: Lang) {
         setGarminSsoValue(GARMIN_SSO_KEYS.mobileServiceUrl, isNative ? nativeServiceUrl : mobileServiceUrl);
 
         if (isNative) {
-          const nativeAuthUrl = startData.native_url ?? startData.url;
-          await despia(`oauth://?url=${encodeURIComponent(nativeAuthUrl)}`);
+          const nativeBridgeUrl = `${window.location.origin}/garmin-mobile-auth?native=1&embedUrl=${encodeURIComponent(mobileEmbedUrl)}&serviceUrl=${encodeURIComponent(mobileServiceUrl)}&deeplinkScheme=${encodeURIComponent(GARMIN_NATIVE_DEEPLINK_SCHEME)}`;
+          await despia(`oauth://?url=${encodeURIComponent(nativeBridgeUrl)}`);
           return { ok: false };
         }
 

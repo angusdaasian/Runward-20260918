@@ -1,72 +1,134 @@
+# Plan — Add Sahha.ai test connection in Connect Apps
 
+## Goal
+Add a **Sahha.ai** card to the Connect Apps screen (alongside Apple Health / Garmin / Strava) so you can:
+1. Register the current user as a Sahha "profile" (using their Supabase `user.id` as the `externalId`)
+2. Pull back data (scores + biomarkers) on demand to verify the API works end-to-end
+3. Display fetched data inline (raw JSON + a small summary) for testing
 
-## AI Running Coach — Premium Floating Chat
+This is **test-only scaffolding** — no Garmin tie-in yet. Later we can swap the data source from Sahha sandbox → Sahha Garmin once you've verified the pipeline.
 
-A draggable floating chat button + modal, gated to premium users, with per-user memory, conversation history, and Vertex AI Gemini 3.1 Flash Lite as the brain.
+---
 
-### Files to create
+## How Sahha works (relevant facts)
 
-**Frontend**
-- `src/components/coach/FloatingChatButton.tsx` — draggable circular button (56/64px), gradient + bounce, snaps to nearest edge, position persisted to `localStorage`, lock overlay for non-premium, X transform when open, z-index 9999.
-- `src/components/coach/ChatModal.tsx` — full-screen on mobile (slide-up), 500×700 modal on desktop (fade-in), header, context bar, message list, input, "new conversation", remaining-message counter.
-- `src/components/coach/MessageBubble.tsx` — user-right/AI-left chat bubbles with markdown rendering.
-- `src/components/coach/TypingIndicator.tsx` — three-dot pulsing animation.
-- `src/components/coach/ContextBar.tsx` — "Coach knows: …" summary line.
-- `src/components/coach/CoachSettings.tsx` — sheet with units, goal, race date, experience, training days, injuries, intensity, "what coach knows" list, reset memory button.
-- `src/components/coach/UpgradeModal.tsx` — premium upsell shown to non-premium taps (reuses existing `launchPaywall` from `useDespiaPurchases`).
-- `src/hooks/use-ai-coach.ts` — manages session id, message list, send/receive, remaining-messages count, error toasts.
+- Two credential pairs in the Sahha dashboard:
+  - **`clientId` / `clientSecret`** → exchange for an **account token** (server-side, 24h expiry)
+  - **`appId` / `appSecret`** → only used by mobile SDK
+- We use the **server-side / REST** path because we don't have a mobile SDK in this web app
+- Flow:
+  1. `POST /api/v1/oauth/account/token` with clientId/secret → `accountToken`
+  2. `POST /api/v1/oauth/profile/register` with `{ externalId: user.id }` → `profileToken` + `refreshToken`
+  3. `GET /api/v1/profile/score/{externalId}` with account token → scores
+  4. `GET /api/v1/profile/biomarker/{externalId}` → biomarkers
+- Sandbox base URL: `https://sandbox-api.sahha.ai`
+- Test data: you can create a **Sample Profile** in the Sahha dashboard and use that profile's externalId, OR use the Demo App to push real phone data
 
-**Mounting**: render `<FloatingChatButton />` once inside `src/pages/Index.tsx` (after the bottom nav, fixed position so it floats above all tabs). Hidden during onboarding, guest mode, and on `/admin`, `/support`, `/privacy`.
+---
 
-**Backend (Supabase Edge Function)**
-- `supabase/functions/ai-running-coach/index.ts` — handles chat. Reuses the existing `callVertexAI` pattern from `analyze-activity` (model: `gemini-3.1-flash-lite-preview`, temperature 0.7, maxOutputTokens 1024). Uses existing `GOOGLE_VERTEX_API_KEY` secret — no new keys needed.
+## Architecture
 
-Endpoint logic:
-1. Validate JWT → load user.
-2. Check `profiles.is_premium` → 403 if false.
-3. Check `ai_coach_usage` for today → 429 if ≥100.
-4. Load `ai_coach_preferences`, last 10 messages from `ai_coach_conversations` (filtered by `session_id`), top insights from `ai_coach_insights`, recent 7-day activities from `garmin_activities` + `strava_activities` + `apple_health_activities`, and `profiles` (display_name, experience).
-5. Build system prompt with all context + safety rules.
-6. Call Vertex AI.
-7. Insert user + assistant messages into `ai_coach_conversations`, increment `ai_coach_usage` (upsert).
-8. Fire-and-forget secondary Vertex call to extract insights from the latest exchange → upsert into `ai_coach_insights` (best-effort, ignore failures).
-9. Return `{ response, session_id, remaining_messages_today }`.
+### 1. Secrets (Supabase)
+Two new secrets to add to the Supabase project:
+- `SAHHA_CLIENT_ID`
+- `SAHHA_CLIENT_SECRET`
 
-Also handles a `?action=preferences` POST/GET for reading/updating preferences from the settings sheet (so the client never writes directly with elevated trust — keeps validation server-side).
+(I'll prompt you for these via the secrets tool once you approve the plan. You'll get them from https://app.sahha.ai/dashboard/credentials)
 
-### Database migration
+### 2. Database (one new table)
+`sahha_connections` — tracks which users have "connected" Sahha (i.e. been registered as a profile):
 
-Four new tables, all RLS-enabled with owner-only policies:
+| Column | Type | Notes |
+|---|---|---|
+| `id` | uuid PK | |
+| `user_id` | uuid | not null, unique |
+| `external_id` | text | what we sent to Sahha (= user.id as string) |
+| `profile_token` | text | encrypted at rest? for test phase: plain. Note below. |
+| `refresh_token` | text | |
+| `connected_at` | timestamptz | default now() |
+| `last_synced_at` | timestamptz | nullable |
 
-- **ai_coach_preferences** — `user_id` unique, `preferred_units` text default `'kilometers'`, `training_goal` text, `target_race_date` date, `experience_level` text, `training_days` jsonb default `'[]'`, `injuries_concerns` text, `training_intensity` text, timestamps.
-- **ai_coach_conversations** — `user_id`, `session_id` uuid, `role` text (`user`|`assistant`), `content` text, `metadata` jsonb, `created_at`. Index on `(user_id, session_id, created_at)`.
-- **ai_coach_insights** — `user_id`, `insight_type` text, `insight_key` text, `insight_value` text, `confidence` numeric, timestamps. Unique `(user_id, insight_key)`.
-- **ai_coach_usage** — `user_id`, `date` date, `message_count` int default 0. Unique `(user_id, date)`.
+RLS: only the owning user can `SELECT` their row. Inserts/updates only via edge function with service-role key.
 
-RLS: each table — users can SELECT/INSERT/UPDATE/DELETE their own rows (`auth.uid() = user_id`). Edge function uses service role to bypass for cross-table reads.
+> **Security note:** for a test integration storing the profile token in plaintext is acceptable. If you later promote this to production we'd encrypt it the same way Garmin tokens are (using `GARMIN_ENC_KEY`-style approach). I'll flag this in a code comment.
 
-### UX details
+### 3. Edge function — `sahha-connect`
+Single function with action-based dispatch (mirrors how `garmin-sync` works in your codebase):
 
-- **First-time premium**: opening the modal with no prior conversation triggers a welcome message + onboarding questions; answers are saved to `ai_coach_preferences` as the user replies (the AI is prompted to call out preference updates, parsed server-side).
-- **Returning user**: greeting references most recent activity from connected sources.
-- **Non-premium tap**: lock-icon button → `UpgradeModal` → `launchPaywall()`.
-- **Rate-limit hit**: input disabled, banner shows reset time.
-- **New conversation**: generates a fresh `session_id` (uuid) client-side, posts with `new_session: true`.
-- **Reset memory**: deletes user's rows from `ai_coach_conversations` and `ai_coach_insights` (preferences kept).
-- **Bilingual**: respects existing `app_lang` localStorage; system prompt instructs AI to reply in user's language.
-- **Dark mode**: uses semantic tokens (`bg-card`, `text-foreground`, `border-border`, `bg-primary`) so it matches existing theme.
-- **Drag**: pointer events (works for touch + mouse), constrained to viewport minus button size, snaps left/right on release with spring transition.
+| `action` | What it does |
+|---|---|
+| `connect` | 1) Get account token from clientId/secret. 2) Register profile with `externalId = user.id`. 3) Upsert into `sahha_connections`. Returns `{ success: true }`. |
+| `fetch_scores` | Get account token, call `/profile/score/{externalId}?types=activity,sleep,wellbeing,readiness,mental_wellbeing` for the connected user. Returns raw scores JSON. |
+| `fetch_biomarkers` | Same pattern, calls `/profile/biomarker/{externalId}` (with default `categories` and last-7-days date range). Returns raw JSON. |
+| `disconnect` | Delete row from `sahha_connections`. |
 
-### Out of scope (not built)
+The function:
+- Reads `SAHHA_CLIENT_ID` / `SAHHA_CLIENT_SECRET` from `Deno.env`
+- Caches the account token in-memory per cold start (24h expiry, so usually just one fetch per warm container)
+- Uses sandbox URL `https://sandbox-api.sahha.ai` (hardcoded for test phase; can be made configurable later)
+- Verifies the caller's JWT via the Supabase service-role client, derives `user_id` server-side (never trusts client-provided IDs)
 
-- Streaming responses (request/response only — keeps the edge function simple and matches `analyze-activity` style).
-- Conversation history browser UI (sessions exist in DB but only the active session is shown; can be added later).
-- Voice input.
-- Push-notification reminders from coach.
+### 4. Frontend — new hook `src/hooks/use-sahha.ts`
+Mirrors the shape of `use-garmin.ts`:
+- `connect()` → invokes `sahha-connect` with `action: "connect"`
+- `fetchScores()` → returns scores JSON
+- `fetchBiomarkers()` → returns biomarkers JSON
+- `disconnect()`
+- `loading`, `lastResult` state
 
-### Open questions before implementation
+### 5. Frontend — Connect Apps card
+Add a new card to `src/components/ConnectApps.tsx` between Garmin and Strava sections:
 
-1. **Mounting scope** — show the floating button only inside `Index` (the in-app tabs), or also on `/support`, `/privacy`, `/admin`? Default: Index only.
-2. **Daily limit** — keep 100 hard-coded, or store in a config table for future tuning? Default: hard-coded constant in the edge function.
-3. **Insight extraction** — do the secondary AI call (richer memory, ~2x token cost) or skip it for v1? Default: include it, since "remembers everything" is a stated requirement.
+- **Heading:** "Sahha.ai (Test)"
+- **Subtitle:** "Test passive health data collection — sandbox environment"
+- **Connect button** when not connected → calls `sahha.connect()`
+- **When connected:** show
+  - ✅ Connected status
+  - Two test buttons: **"Fetch Scores"** and **"Fetch Biomarkers"**
+  - A collapsible `<pre>` block below showing the last raw JSON response (so you can verify what's actually coming back)
+  - **Disconnect** link
+- A small info banner explaining: *"This is a test integration. To see real data, create a Sample Profile or use the Demo App in the Sahha dashboard with externalId = your user ID: `<user.id>`"* — with a copy-to-clipboard button for the user ID.
 
+The card sits **outside** the "one fitness app at a time" exclusivity rule (it doesn't write to `garmin_activities` etc.), so it can be connected alongside anything.
+
+### 6. i18n
+Add translation keys (en/zh):
+- `sahhaTitle`: "Sahha.ai (Test)" / "Sahha.ai（測試）"
+- `sahhaDesc`: "Test health intelligence integration" / "測試健康數據整合"
+- `sahhaFetchScores`, `sahhaFetchBiomarkers`, `sahhaCopyUserId`, etc.
+
+---
+
+## What I'll build (file-by-file)
+
+| File | Change |
+|---|---|
+| `supabase/migrations/<ts>_sahha_connections.sql` | new table + RLS policies |
+| `supabase/functions/sahha-connect/index.ts` | new edge function (4 actions) |
+| `supabase/config.toml` | register the new function (verify_jwt = true) |
+| `src/hooks/use-sahha.ts` | new hook |
+| `src/components/ConnectApps.tsx` | add Sahha card with test UI |
+| `src/lib/i18n.ts` | new keys |
+
+Two new secrets to add: `SAHHA_CLIENT_ID`, `SAHHA_CLIENT_SECRET`.
+
+---
+
+## Testing path after implementation
+1. You add Sahha credentials when prompted
+2. Open Connect Apps → tap "Connect" on Sahha card → row created in `sahha_connections`
+3. Go to https://app.sahha.ai/dashboard/profiles → create a Sample Profile with externalId = (the user ID shown in the card)
+4. Back in app → tap "Fetch Scores" → JSON appears below the card
+5. Tap "Fetch Biomarkers" → JSON appears
+
+Once that pipeline is verified, the next step (separate task) would be: enable Garmin as a data source inside Sahha's dashboard → swap our backend to fetch real Garmin data via Sahha → eventually replace the Railway `garmin-sync` flow.
+
+---
+
+## Open questions before I build
+
+1. **Environment** — start with **sandbox** (`sandbox-api.sahha.ai`)? Production base URL is the same but at `api.sahha.ai`. I'll hardcode sandbox for testing; easy to switch via a constant later.
+2. **Token storage** — store profile token plaintext for the test phase (with a code-comment TODO to encrypt before production)?
+3. **Score types to fetch** — default to all five (`activity, sleep, wellbeing, readiness, mental_wellbeing`)? You can untick in the UI later if you want.
+
+If those defaults are fine, just say "go" and I'll switch to default mode and ask you to paste the two Sahha credentials.

@@ -323,6 +323,8 @@ export function useAICoach(open: boolean, onFreeLimit?: () => void) {
     messages,
     sending,
     remaining,
+    dailyLimit,
+    isFree,
     prefs,
     insights,
     sessions,

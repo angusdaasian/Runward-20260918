@@ -87,6 +87,8 @@ export function useGarmin(lang: Lang) {
 
         if (isNative) {
           const nativeAuthUrl = startData.native_url ?? startData.url;
+          setGarminSsoValue(GARMIN_SSO_KEYS.pending, "1");
+          console.log("[useGarmin] Opening native auth", { nativeAuthUrl, nativeServiceUrl });
           await despia(`oauth://?url=${encodeURIComponent(nativeAuthUrl)}`);
           return { ok: false };
         }

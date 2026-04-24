@@ -9,6 +9,8 @@ import { clearGarminSsoTransientState, GARMIN_SSO_KEYS, getGarminSsoValue, setGa
 import { isNativeApp } from "@/lib/nativeDetection";
 import despia from "despia-native";
 
+const GARMIN_NATIVE_DEEPLINK_SCHEME = "runward";
+
 async function extractFunctionErrorMessage(error: unknown): Promise<string | null> {
   if (error instanceof FunctionsHttpError) {
     try {
@@ -63,7 +65,7 @@ export function useGarmin(lang: Lang) {
       setConnecting(true);
       try {
         const { data: startData, error: startErr } = await supabase.functions.invoke("garmin-sso-start", {
-          body: { origin: window.location.origin },
+          body: { origin: window.location.origin, deeplink_scheme: GARMIN_NATIVE_DEEPLINK_SCHEME },
         });
         if (startErr || !startData?.url) {
           const msg = await extractFunctionErrorMessage(startErr) || "Failed to start Garmin sign-in";
@@ -75,17 +77,16 @@ export function useGarmin(lang: Lang) {
 
         const mobileEmbedUrl = startData.mobile_embed_url ?? startData.url ?? "";
         const mobileServiceUrl = startData.service_url ?? "https://sso.garmin.com/sso/embed";
-        const nativeServiceUrl = startData.native_service_url ?? mobileServiceUrl;
 
         clearGarminSsoTransientState();
         setGarminSsoValue(GARMIN_SSO_KEYS.callback, startData.callback ?? "");
         setGarminSsoValue(GARMIN_SSO_KEYS.pending, "1");
         setGarminSsoValue(GARMIN_SSO_KEYS.mobileEmbedUrl, mobileEmbedUrl);
-        setGarminSsoValue(GARMIN_SSO_KEYS.mobileServiceUrl, isNative ? nativeServiceUrl : mobileServiceUrl);
+        setGarminSsoValue(GARMIN_SSO_KEYS.mobileServiceUrl, mobileServiceUrl);
 
         if (isNative) {
-          const nativeAuthUrl = startData.native_url ?? startData.url;
-          await despia(`oauth://?url=${encodeURIComponent(nativeAuthUrl)}`);
+          const nativeBridgeUrl = `${window.location.origin}/garmin-mobile-auth?native=1&embedUrl=${encodeURIComponent(mobileEmbedUrl)}&serviceUrl=${encodeURIComponent(mobileServiceUrl)}&deeplinkScheme=${encodeURIComponent(GARMIN_NATIVE_DEEPLINK_SCHEME)}`;
+          await despia(`oauth://?url=${encodeURIComponent(nativeBridgeUrl)}`);
           return { ok: false };
         }
 

@@ -12,7 +12,12 @@
         var ticket = params.get("ticket") || params.get("serviceTicket");
         var error = params.get("error") || params.get("errorMessage") || "";
         var deeplinkScheme = params.get("deeplinkScheme") || "runward";
-        var serviceUrl = params.get("serviceUrl") || "https://sso.garmin.com/sso/embed";
+        var currentUrl = new URL(window.location.href);
+        currentUrl.searchParams.delete("ticket");
+        currentUrl.searchParams.delete("serviceTicket");
+        currentUrl.searchParams.delete("error");
+        currentUrl.searchParams.delete("errorMessage");
+        var serviceUrl = currentUrl.toString();
         var target = new URL(deeplinkScheme + "://oauth/garmin-mobile-auth");
 
         if (ticket) {
@@ -22,7 +27,6 @@
         } else {
           target.searchParams.set("error", "No sign-in ticket received");
         }
-
         target.searchParams.set("serviceUrl", serviceUrl);
 
         window.location.replace(target.toString());

@@ -315,41 +315,78 @@ serve(async (req) => {
 
     // ── USAGE (read) ──
     if (action === "usage" && req.method === "GET") {
+      const { data: prof } = await admin
+        .from("profiles")
+        .select("is_premium")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      const isFree = !prof?.is_premium;
+      if (isFree) {
+        const today = new Date().toISOString().slice(0, 10);
+        const { data: row } = await admin
+          .from("ai_coach_usage")
+          .select("message_count")
+          .eq("user_id", user.id)
+          .eq("date", today)
+          .maybeSingle();
+        const used = row?.message_count ?? 0;
+        return json({
+          remaining: Math.max(0, FREE_DAILY_LIMIT - used),
+          used,
+          limit: FREE_DAILY_LIMIT,
+          thinking_level: "minimal",
+          is_free: true,
+        });
+      }
       const level = await getThinkingLevel();
       const { used, limit, remaining } = await getTodayUsage(admin, user.id, level);
-      return json({ remaining, used, limit, thinking_level: level });
+      return json({ remaining, used, limit, thinking_level: level, is_free: false });
     }
 
     // ── CHAT ──
     if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
 
-    // Premium check
+    // Determine premium status — free users get FREE_DAILY_LIMIT messages/day at minimal.
     const { data: profile } = await admin
       .from("profiles")
       .select("is_premium, display_name")
       .eq("user_id", user.id)
       .maybeSingle();
-    if (!profile?.is_premium) {
-      return json({ error: "Premium required", code: "premium_required" }, 403);
+    const isFree = !profile?.is_premium;
+
+    const thinkingLevel: ThinkingLevel = isFree ? "minimal" : await getThinkingLevel();
+    const today = new Date().toISOString().slice(0, 10);
+
+    let usedToday: number;
+    let dailyLimit: number;
+    if (isFree) {
+      const { data: row } = await admin
+        .from("ai_coach_usage")
+        .select("message_count")
+        .eq("user_id", user.id)
+        .eq("date", today)
+        .maybeSingle();
+      usedToday = row?.message_count ?? 0;
+      dailyLimit = FREE_DAILY_LIMIT;
+    } else {
+      const u = await getTodayUsage(admin, user.id, thinkingLevel);
+      usedToday = u.used;
+      dailyLimit = u.limit;
     }
 
-    const thinkingLevel = await getThinkingLevel();
-    const today = new Date().toISOString().slice(0, 10);
-    const { used: usedToday, limit: dailyLimit } = await getTodayUsage(
-      admin,
-      user.id,
-      thinkingLevel,
-    );
     if (usedToday >= dailyLimit) {
       return json(
         {
-          error: "Daily limit reached",
-          code: "rate_limited",
+          error: isFree
+            ? "Free daily limit reached"
+            : "Daily limit reached",
+          code: isFree ? "free_limit_reached" : "rate_limited",
           remaining_messages_today: 0,
           limit: dailyLimit,
           thinking_level: thinkingLevel,
+          is_free: isFree,
         },
-        429,
+        isFree ? 403 : 429,
       );
     }
 

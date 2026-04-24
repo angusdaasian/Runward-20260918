@@ -100,10 +100,15 @@ const ChatModal = ({ open, onClose, lang, onUpgradeNeeded }: Props) => {
               </h3>
               {remaining !== null && (
                 <p className="text-[10px] text-muted-foreground">
-                  {t(
-                    `${remaining} messages left today`,
-                    `今日剩餘 ${remaining} 則訊息`,
-                  )}
+                  {isFree
+                    ? t(
+                        `${remaining} / ${dailyLimit ?? 15} free messages today`,
+                        `今日免費剩餘 ${remaining} / ${dailyLimit ?? 15} 則`,
+                      )
+                    : t(
+                        `${remaining} messages left today`,
+                        `今日剩餘 ${remaining} 則訊息`,
+                      )}
                 </p>
               )}
             </div>

@@ -113,10 +113,11 @@ const ChatModal = ({ open, onClose, lang }: Props) => {
         className="fixed inset-0 z-[9998] bg-black/40 hidden sm:block animate-in fade-in-0 duration-200"
         onClick={onClose}
       />
-      {/* Modal */}
+      {/* Modal — floating card on all screen sizes */}
       <div
-        className="fixed z-[9999] bg-background border border-border shadow-2xl flex flex-col
-          inset-0 sm:inset-auto sm:bottom-6 sm:right-6 sm:w-[500px] sm:h-[700px] sm:max-h-[calc(100vh-3rem)] sm:rounded-2xl
+        className="fixed z-[9999] bg-background border border-border shadow-2xl flex flex-col rounded-2xl overflow-hidden
+          left-3 right-3 bottom-3 top-auto h-[80vh] max-h-[calc(100vh-1.5rem)]
+          sm:left-auto sm:right-6 sm:bottom-6 sm:w-[500px] sm:h-[700px] sm:max-h-[calc(100vh-3rem)]
           animate-in slide-in-from-bottom-4 sm:fade-in-0 sm:zoom-in-95 duration-300"
         style={{
           paddingTop: "var(--safe-area-top, 0px)",

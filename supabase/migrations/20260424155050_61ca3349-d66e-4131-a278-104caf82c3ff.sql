@@ -1,0 +1,2 @@
+ALTER TABLE public.ai_coach_preferences ADD COLUMN IF NOT EXISTS thinking_level TEXT NOT NULL DEFAULT 'minimal';
+ALTER TABLE public.ai_coach_usage ADD COLUMN IF NOT EXISTS thinking_level TEXT NOT NULL DEFAULT 'minimal';

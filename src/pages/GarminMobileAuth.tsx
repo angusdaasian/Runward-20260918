@@ -12,6 +12,7 @@ import {
 
 const GarminMobileAuth = () => {
   const [message, setMessage] = useState("Continue in Garmin to finish sign-in…");
+  const [diagnostics, setDiagnostics] = useState<string>("");
   const lang = useMemo(() => (localStorage.getItem("app_lang") as "en" | "zh") || "en", []);
   const query = useMemo(() => new URLSearchParams(window.location.search), []);
   const isPopupMode = query.get("popup") === "1";
@@ -47,7 +48,21 @@ const GarminMobileAuth = () => {
         window.close();
         return;
       }
-      window.location.replace(GARMIN_SSO_RETURN_URL);
+      // Delay redirect so on-screen diagnostics remain visible briefly.
+      window.setTimeout(() => {
+        window.location.replace(GARMIN_SSO_RETURN_URL);
+      }, 2000);
+    };
+
+    const waitForSession = async () => {
+      const maxAttempts = 6; // 6 × 500ms = 3s
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        const { data } = await supabase.auth.getSession();
+        if (data.session) return data.session;
+        console.log(`[GarminMobileAuth] no session yet, retrying… (${attempt + 1}/${maxAttempts})`);
+        await new Promise((resolve) => setTimeout(resolve, 500));
+      }
+      return null;
     };
 
     const finish = async (ticket: string) => {
@@ -56,6 +71,34 @@ const GarminMobileAuth = () => {
       setMessage(lang === "zh" ? "正在完成 Garmin 登入…" : "Finishing Garmin sign-in…");
       console.log("[GarminMobileAuth] exchanging ticket", { ticket, serviceUrl });
 
+      setDiagnostics(
+        `Ticket: ${ticket.substring(0, 20)}…\n` +
+        `Service URL: ${serviceUrl}\n` +
+        `Session: ⏳ checking…`,
+      );
+
+      const session = await waitForSession();
+      if (!session) {
+        const msg = lang === "zh"
+          ? "登入工作階段未載入。請重新開啟應用程式並重試。"
+          : "Session not loaded. Please reopen the app and retry.";
+        setDiagnostics(
+          `Ticket: ${ticket.substring(0, 20)}…\n` +
+          `Service URL: ${serviceUrl}\n` +
+          `Session: ❌ not found after 3s\n` +
+          `Error: ${msg}`,
+        );
+        finishAndReturn({ ok: false, error: msg });
+        return;
+      }
+
+      setDiagnostics(
+        `Ticket: ${ticket.substring(0, 20)}…\n` +
+        `Service URL: ${serviceUrl}\n` +
+        `Session: ✅ found\n` +
+        `Exchanging…`,
+      );
+
       try {
         const { data, error } = await supabase.functions.invoke("garmin-sso-exchange", {
           body: { ticket, callback: serviceUrl, serviceUrl },
@@ -63,15 +106,33 @@ const GarminMobileAuth = () => {
 
         if (error || !data?.success) {
           const msg = data?.error || (error instanceof Error ? error.message : "Garmin connection failed");
+          setDiagnostics(
+            `Ticket: ${ticket.substring(0, 20)}…\n` +
+            `Service URL: ${serviceUrl}\n` +
+            `Session: ✅ found\n` +
+            `❌ Exchange failed\n` +
+            `Error: ${msg}`,
+          );
           finishAndReturn({ ok: false, error: msg });
         } else {
+          setDiagnostics(
+            `Ticket: ${ticket.substring(0, 20)}…\n` +
+            `Service URL: ${serviceUrl}\n` +
+            `Session: ✅ found\n` +
+            `✅ Success!\n` +
+            `Display name: ${data.display_name}`,
+          );
           finishAndReturn({ ok: true, displayName: data.display_name });
         }
       } catch (error) {
-        finishAndReturn({
-          ok: false,
-          error: error instanceof Error ? error.message : "Unknown error",
-        });
+        const msg = error instanceof Error ? error.message : "Unknown error";
+        setDiagnostics(
+          `Ticket: ${ticket.substring(0, 20)}…\n` +
+          `Service URL: ${serviceUrl}\n` +
+          `❌ Exception\n` +
+          `Error: ${msg}`,
+        );
+        finishAndReturn({ ok: false, error: msg });
       }
     };
 
@@ -86,6 +147,7 @@ const GarminMobileAuth = () => {
     }
 
     if (errorParam) {
+      setDiagnostics(`Garmin returned error: ${errorParam}`);
       finishAndReturn({ ok: false, error: errorParam });
       return;
     }
@@ -150,11 +212,18 @@ const GarminMobileAuth = () => {
     };
   }, [deeplinkScheme, embedUrl, errorParam, isNativeBridgeMode, isPopupMode, lang, serviceUrl, ticketFromQuery]);
 
+  const showDiagnostics = Boolean(diagnostics);
+
   return (
     <div className="flex min-h-screen flex-col bg-background text-foreground">
       <div className="flex items-center justify-center border-b border-border px-4 py-3 text-sm text-muted-foreground">
         {message}
       </div>
+      {showDiagnostics && (
+        <div className="mx-4 mt-4 rounded-lg border border-border bg-muted p-4">
+          <div className="font-mono text-xs whitespace-pre-wrap break-all text-foreground">{diagnostics}</div>
+        </div>
+      )}
       <div className="flex-1 bg-background">
         {ticketFromQuery || errorParam ? null : (
           <iframe

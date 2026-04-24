@@ -22,11 +22,19 @@ serve(async (req) => {
     }
     const accessToken = authHeader.replace(/^Bearer\s+/i, "").trim();
 
-    const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     const GARMIN_RAILWAY_URL = Deno.env.get("GARMIN_RAILWAY_URL");
-    if (!GARMIN_RAILWAY_URL) {
-      return new Response(JSON.stringify({ error: "Garmin service not configured" }), {
+    const GARMIN_ENC_KEY = Deno.env.get("GARMIN_ENC_KEY");
+
+    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !GARMIN_RAILWAY_URL || !GARMIN_ENC_KEY) {
+      console.error("garmin-credential-login missing required secrets", {
+        hasSupabaseUrl: !!SUPABASE_URL,
+        hasServiceRoleKey: !!SUPABASE_SERVICE_ROLE_KEY,
+        hasGarminRailwayUrl: !!GARMIN_RAILWAY_URL,
+        hasGarminEncKey: !!GARMIN_ENC_KEY,
+      });
+      return new Response(JSON.stringify({ error: "Server configuration error" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -125,8 +133,14 @@ serve(async (req) => {
     const oauth1 = typeof loginData?.oauth1_token === "string" ? loginData.oauth1_token : null;
     const oauth2 = typeof loginData?.oauth2_token === "string" ? loginData.oauth2_token : null;
     if (!oauth1 || !oauth2) {
-      console.error("Railway login succeeded but did not return tokens", loginData);
-      return new Response(JSON.stringify({ error: "Garmin service did not return tokens" }), {
+      console.error("Railway login succeeded but did not return tokens", {
+        status: loginRes.status,
+        body: loginData,
+        rawText,
+      });
+      return new Response(JSON.stringify({
+        error: "Garmin service did not return tokens. Redeploy Railway with the token-returning main.py.",
+      }), {
         status: 502,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });

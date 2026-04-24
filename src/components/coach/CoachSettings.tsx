@@ -70,25 +70,38 @@ const CoachSettings = ({ open, onOpenChange, prefs, insights, onSave, onResetMem
             <div className="flex items-center gap-2">
               <Brain size={14} className="text-primary" />
               <Label className="m-0">{t("Thinking level", "思考強度")}</Label>
+              {isFree && (
+                <span className="ml-auto inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary">
+                  <Lock size={10} /> {t("Premium", "Premium")}
+                </span>
+              )}
             </div>
             <p className="text-[11px] text-muted-foreground leading-relaxed">
-              {t(
-                "Higher thinking gives smarter answers but uses more of your daily quota.",
-                "思考越深答案越聰明,但每日可用訊息數會減少。",
-              )}
+              {isFree
+                ? t(
+                    "Free plan: 15 messages/day at minimal thinking. Upgrade to unlock higher thinking levels and more daily messages.",
+                    "免費方案:每日 15 則最低思考訊息。升級可解鎖更高思考強度與更多每日訊息。",
+                  )
+                : t(
+                    "Higher thinking gives smarter answers but uses more of your daily quota.",
+                    "思考越深答案越聰明,但每日可用訊息數會減少。",
+                  )}
             </p>
             <Select
               value={(local.thinking_level as string) || "minimal"}
               onValueChange={(v) =>
                 setLocal({ ...local, thinking_level: v as any })
               }
+              disabled={isFree}
             >
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent className="z-[10002]">
                 <SelectItem value="minimal">
-                  {t("Minimal — 100 messages/day", "最低 — 每日 100 則")}
+                  {isFree
+                    ? t("Minimal — 15 messages/day (free)", "最低 — 每日 15 則 (免費)")
+                    : t("Minimal — 100 messages/day", "最低 — 每日 100 則")}
                 </SelectItem>
                 <SelectItem value="low">
                   {t("Low — 80 messages/day", "低 — 每日 80 則")}
@@ -101,12 +114,25 @@ const CoachSettings = ({ open, onOpenChange, prefs, insights, onSave, onResetMem
                 </SelectItem>
               </SelectContent>
             </Select>
-            <p className="text-[10px] text-muted-foreground">
-              {t(
-                "Switching levels mid-day converts your used count proportionally.",
-                "中途切換等級時,已使用次數會按比例換算。",
-              )}
-            </p>
+            {isFree ? (
+              <Button
+                size="sm"
+                className="w-full mt-1"
+                onClick={() => {
+                  onOpenChange(false);
+                  onUpgradeNeeded?.();
+                }}
+              >
+                {t("Upgrade to unlock", "升級以解鎖")}
+              </Button>
+            ) : (
+              <p className="text-[10px] text-muted-foreground">
+                {t(
+                  "Switching levels mid-day converts your used count proportionally.",
+                  "中途切換等級時,已使用次數會按比例換算。",
+                )}
+              </p>
+            )}
           </div>
 
           {/* Units */}

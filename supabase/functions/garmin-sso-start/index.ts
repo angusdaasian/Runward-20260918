@@ -38,9 +38,11 @@ serve(async (req) => {
     const mobileBridge = `${origin}/garmin-mobile-auth`;
     const nativeCallbackBase = `${origin}/garmin-native-callback.html`;
     const normalizedDeeplinkScheme = deeplinkScheme || "runward";
+    // Canonical native service URL — must be byte-for-byte identical here and in
+    // the static callback page so Garmin CAS accepts the ticket exchange.
     const nativeCallback = `${nativeCallbackBase}?deeplinkScheme=${encodeURIComponent(normalizedDeeplinkScheme)}`;
     const serviceUrl = "https://sso.garmin.com/sso/embed";
-    const nativeServiceUrl = `${nativeCallback}&serviceUrl=${encodeURIComponent(nativeCallback)}`;
+    const nativeServiceUrl = nativeCallback;
     // Use the embed-widget SSO flow. Unlike the bare `clientId=GarminConnect`
     // sign-in (which redirects to Connect's own post-auth landing page after
     // MFA — bypassing our `service` callback), the embed widget flow always

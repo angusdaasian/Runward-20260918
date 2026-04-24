@@ -22,9 +22,19 @@ export type CoachPreferences = {
 };
 
 const SESSION_KEY = "ai_coach_session_id";
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function newId() {
   return Math.random().toString(36).slice(2) + Date.now().toString(36);
+}
+
+function isUuid(value: string | null | undefined): value is string {
+  return !!value && UUID_RE.test(value);
+}
+
+function newSessionId() {
+  return crypto.randomUUID();
 }
 
 function getLang(): "en" | "zh" {
@@ -79,7 +89,11 @@ export function useAICoach(open: boolean) {
     if (!user || !isPremium) return;
     setLoadingHistory(true);
     try {
-      const storedSid = localStorage.getItem(SESSION_KEY);
+      const storedSidRaw = localStorage.getItem(SESSION_KEY);
+      const storedSid = isUuid(storedSidRaw) ? storedSidRaw : null;
+      if (storedSidRaw && !storedSid) {
+        localStorage.removeItem(SESSION_KEY);
+      }
       // If we have a stored session id, fetch its history; otherwise fetch the
       // most recent conversation (server returns latest session when no id is given).
       const histPath = storedSid
@@ -102,9 +116,11 @@ export function useAICoach(open: boolean) {
       // Resolve session id: stored > server-returned (from latest msg) > new
       const resolvedSid =
         storedSid ||
-        histRes.session_id ||
-        (msgs.length ? msgs[msgs.length - 1].session_id : null) ||
-        newId();
+        (isUuid(histRes.session_id) ? histRes.session_id : null) ||
+        (msgs.length && isUuid(msgs[msgs.length - 1].session_id)
+          ? msgs[msgs.length - 1].session_id
+          : null) ||
+        newSessionId();
       localStorage.setItem(SESSION_KEY, resolvedSid);
       setSessionId(resolvedSid);
 
@@ -203,7 +219,7 @@ export function useAICoach(open: boolean) {
   );
 
   const newConversation = useCallback(() => {
-    const sid = newId();
+    const sid = newSessionId();
     localStorage.setItem(SESSION_KEY, sid);
     setSessionId(sid);
     setMessages([]);

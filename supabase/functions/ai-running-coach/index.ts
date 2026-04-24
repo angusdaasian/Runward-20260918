@@ -9,6 +9,8 @@ const corsHeaders = {
 const jsonHeaders = { ...corsHeaders, "Content-Type": "application/json" };
 const json = (body: Record<string, unknown>, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: jsonHeaders });
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 const DAILY_LIMIT = 100;
 const MODEL = "gemini-3.1-flash-lite-preview";
@@ -160,7 +162,7 @@ serve(async (req) => {
     // ── HISTORY (read) ──
     if (action === "history" && req.method === "GET") {
       const sessionId = url.searchParams.get("session_id");
-      let resolvedSession = sessionId;
+      let resolvedSession = sessionId && UUID_RE.test(sessionId) ? sessionId : null;
 
       // If no session_id provided, find the most recent session for this user
       if (!resolvedSession) {
@@ -289,8 +291,9 @@ serve(async (req) => {
     if (!message || typeof message !== "string" || message.length > 4000) {
       return json({ error: "Invalid message" }, 400);
     }
-    const sessionId =
-      new_session || !session_id ? crypto.randomUUID() : session_id;
+    const requestedSessionId =
+      typeof session_id === "string" && UUID_RE.test(session_id) ? session_id : null;
+    const sessionId = new_session || !requestedSessionId ? crypto.randomUUID() : requestedSessionId;
 
     // Load context in parallel
     const [prefsR, historyR, insightsR, garminR, stravaR, appleR] =
@@ -412,10 +415,14 @@ If the user has no preferences set yet, ask ONE friendly onboarding question per
     });
 
     // Persist messages + usage
-    await admin.from("ai_coach_conversations").insert([
+    const { error: insertError } = await admin.from("ai_coach_conversations").insert([
       { user_id: user.id, session_id: sessionId, role: "user", content: message },
       { user_id: user.id, session_id: sessionId, role: "assistant", content: aiText },
     ]);
+    if (insertError) {
+      console.error("failed to persist ai coach conversation", insertError);
+      return json({ error: "Failed to save conversation" }, 500);
+    }
     await admin
       .from("ai_coach_usage")
       .upsert(

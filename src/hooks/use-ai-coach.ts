@@ -166,9 +166,12 @@ export function useAICoach(open: boolean) {
               : x,
           ),
         );
-        // Refresh insights in background
+        // Refresh insights + sessions in background
         callFn("?action=insights", { method: "GET" })
           .then((r) => setInsights(r.insights || []))
+          .catch(() => {});
+        callFn("?action=sessions", { method: "GET" })
+          .then((r) => setSessions(r.sessions || []))
           .catch(() => {});
       } catch (e: any) {
         setMessages((m) => m.filter((x) => x.id !== placeholder.id));

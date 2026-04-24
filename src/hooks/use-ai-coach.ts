@@ -91,7 +91,7 @@ export function useAICoach(open: boolean, onFreeLimit?: () => void) {
   );
 
   const loadAll = useCallback(async () => {
-    if (!user || !isPremium) return;
+    if (!user) return;
     setLoadingHistory(true);
     try {
       const storedSidRaw = localStorage.getItem(SESSION_KEY);
@@ -115,6 +115,8 @@ export function useAICoach(open: boolean, onFreeLimit?: () => void) {
       setPrefs(prefsRes.preferences || null);
       setInsights(insightsRes.insights || []);
       setRemaining(usageRes.remaining ?? null);
+      setDailyLimit(usageRes.limit ?? null);
+      setIsFree(!!usageRes.is_free);
       setSessions(sessionsRes.sessions || []);
 
       const msgs = histRes.messages || [];
@@ -141,15 +143,15 @@ export function useAICoach(open: boolean, onFreeLimit?: () => void) {
     } finally {
       setLoadingHistory(false);
     }
-  }, [user, isPremium, callFn]);
+  }, [user, callFn]);
 
   useEffect(() => {
-    if (open && user && isPremium && !initRef.current) {
+    if (open && user && !initRef.current) {
       initRef.current = true;
       loadAll();
     }
     if (!open) initRef.current = false;
-  }, [open, user, isPremium, loadAll]);
+  }, [open, user, loadAll]);
 
   const send = useCallback(
     async (text: string) => {

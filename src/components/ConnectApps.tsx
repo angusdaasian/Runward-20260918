@@ -7,8 +7,7 @@ import { toast } from "sonner";
 import { useAppleHealth } from "@/hooks/use-apple-health";
 import { useGarmin } from "@/hooks/use-garmin";
 import { getAppEnvironment } from "@/lib/environment";
-import { GARMIN_SSO_KEYS, getGarminSsoValue } from "@/lib/garminSso";
-import GarminIframeDialog from "@/components/GarminIframeDialog";
+import GarminCredentialDialog from "@/components/GarminCredentialDialog";
 
 interface Props {
   lang: Lang;
@@ -23,9 +22,7 @@ const ConnectApps = ({ lang, onBack }: Props) => {
   const [loading, setLoading] = useState(true);
   const appleHealth = useAppleHealth(lang);
   const garmin = useGarmin(lang);
-  const [garminIframeUrl, setGarminIframeUrl] = useState<string | null>(null);
-
-  // Garmin SSO runs in an iframe (Garmin's CAS rejects custom-domain callbacks).
+  const [garminDialogOpen, setGarminDialogOpen] = useState(false);
 
   // A fitness app is Strava, Garmin, or Coros
   const hasFitnessApp = stravaConnected || garminConnected;
@@ -51,71 +48,16 @@ const ConnectApps = ({ lang, onBack }: Props) => {
     }
   }, [appleHealthConnected]);
 
-  // Pick up the result of a Garmin redirect-flow sign-in (mobile).
-  useEffect(() => {
-    if (!user) return;
-    const raw = getGarminSsoValue(GARMIN_SSO_KEYS.result);
-    const pending = getGarminSsoValue(GARMIN_SSO_KEYS.pending);
-
-    // If we returned without ever hitting /garmin-callback (Garmin redirected
-    // us elsewhere, e.g. to Connect's own landing page), surface that.
-    if (!raw && pending) {
-      sessionStorage.removeItem(GARMIN_SSO_KEYS.pending);
-      localStorage.removeItem(GARMIN_SSO_KEYS.pending);
-      sessionStorage.removeItem(GARMIN_SSO_KEYS.callback);
-      localStorage.removeItem(GARMIN_SSO_KEYS.callback);
-      toast.error(
-        lang === "zh"
-          ? "Garmin 登入後沒有返回 — 請再試一次,或在桌面瀏覽器使用。"
-          : "Garmin didn't redirect back after sign-in — please try again, or use a desktop browser."
-      );
-      return;
-    }
-
-    if (!raw) return;
-    sessionStorage.removeItem(GARMIN_SSO_KEYS.result);
-    localStorage.removeItem(GARMIN_SSO_KEYS.result);
-    sessionStorage.removeItem(GARMIN_SSO_KEYS.pending);
-    localStorage.removeItem(GARMIN_SSO_KEYS.pending);
-    sessionStorage.removeItem(GARMIN_SSO_KEYS.callback);
-    localStorage.removeItem(GARMIN_SSO_KEYS.callback);
-    try {
-      const result = JSON.parse(raw) as { ok: boolean; displayName?: string; error?: string };
-      if (result.ok) {
-        toast.success(lang === "zh" ? "Garmin 已連結!" : "Garmin connected!");
-        setGarminConnected(true);
-        (async () => {
-          if (appleHealthConnected) {
-            await supabase.from("apple_health_activities").delete().eq("user_id", user.id);
-            toast.info(
-              lang === "zh"
-                ? "Apple Health 活動已清除,活動數據將由 Garmin 提供"
-                : "Apple Health activities cleared, activities will come from Garmin"
-            );
-          }
-          garmin.syncActivities();
-        })();
-      } else if (result.error) {
-        toast.error(lang === "zh" ? `Garmin 連結失敗:${result.error}` : `Garmin sign-in failed: ${result.error}`);
-      }
-    } catch (e) {
-      console.error("Failed to parse garmin-sso-result:", e);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
-
   // Apple Health can always be connected (alone or alongside a fitness app)
   const handleConnectAppleHealth = async () => {
     const success = await appleHealth.connect();
     if (success) {
       setAppleHealthConnected(true);
-      // If a fitness app is already connected, delete Apple Health activities
-      // since fitness app takes priority for activities
       if (hasFitnessApp && user) {
         await supabase.from("apple_health_activities").delete().eq("user_id", user.id);
         toast.info(
           lang === "zh"
-            ? "Apple Health 已連結（僅用於健康數據，活動由健身應用提供）"
+            ? "Apple Health 已連結（僅用於健康數據,活動由健身應用提供）"
             : "Apple Health connected (health stats only, activities from fitness app)"
         );
       }
@@ -129,7 +71,6 @@ const ConnectApps = ({ lang, onBack }: Props) => {
 
   const handleConnectStrava = async () => {
     if (!user) return;
-    // Only 1 fitness app allowed
     if (hasFitnessApp) {
       toast.error(lang === "zh" ? "請先中斷現有健身應用再連接新的" : "Please disconnect the current fitness app before connecting a new one");
       return;
@@ -141,7 +82,6 @@ const ConnectApps = ({ lang, onBack }: Props) => {
       toast.error(lang === "zh" ? "無法啟動 Strava 連結" : "Failed to start Strava connection");
       return;
     }
-    // If Apple Health activities exist, they'll be cleaned up after Strava sync
     window.location.href = data.url;
   };
 
@@ -155,21 +95,15 @@ const ConnectApps = ({ lang, onBack }: Props) => {
     }
   };
 
-  const handleConnectGarmin = async () => {
-    // Only 1 fitness app allowed
+  const handleConnectGarmin = () => {
     if (hasFitnessApp) {
       toast.error(lang === "zh" ? "請先中斷現有健身應用再連接新的" : "Please disconnect the current fitness app before connecting a new one");
       return;
     }
-    const prep = await garmin.prepareConnect();
-    if (!prep) return;
-    setGarminIframeUrl(prep.iframeUrl);
+    setGarminDialogOpen(true);
   };
 
-  const handleGarminTicket = async (ticket: string) => {
-    const result = await garmin.completeConnect(ticket);
-    setGarminIframeUrl(null);
-    if (!result.ok) return;
+  const handleGarminConnected = async () => {
     setGarminConnected(true);
     if (appleHealthConnected && user) {
       await supabase.from("apple_health_activities").delete().eq("user_id", user.id);
@@ -180,11 +114,6 @@ const ConnectApps = ({ lang, onBack }: Props) => {
       );
     }
     garmin.syncActivities();
-  };
-
-  const handleGarminIframeClose = () => {
-    setGarminIframeUrl(null);
-    garmin.cancelConnect();
   };
 
   const handleDisconnectGarmin = async () => {
@@ -222,7 +151,7 @@ const ConnectApps = ({ lang, onBack }: Props) => {
         <AlertTriangle size={16} className="text-muted-foreground mt-0.5 flex-shrink-0" />
         <p className="text-xs text-muted-foreground">
           {lang === "zh"
-            ? "你只能連接一個健身應用（Strava / Garmin / COROS 擇一）。如果同時連接 Apple Health 和健身應用，活動數據將以健身應用為主（數據更精確），Apple Health 則用於提供每日健康統計（步數、睡眠、卡路里等）。"
+            ? "你只能連接一個健身應用（Strava / Garmin / COROS 擇一）。如果同時連接 Apple Health 和健身應用,活動數據將以健身應用為主（數據更精確）,Apple Health 則用於提供每日健康統計（步數、睡眠、卡路里等）。"
             : "You can only connect one fitness app (Strava / Garmin / COROS). If you connect Apple Health alongside a fitness app, activities will come from the fitness app (more accurate data). Apple Health will be used for daily health stats (steps, sleep, calories, etc.) only."}
         </p>
       </div>
@@ -231,13 +160,13 @@ const ConnectApps = ({ lang, onBack }: Props) => {
         <Info size={16} className="text-muted-foreground mt-0.5 flex-shrink-0" />
         <p className="text-xs text-muted-foreground">
           {lang === "zh"
-            ? "XP 和訓練分數只會從你連接的健身應用計算。如需更換健身應用，請先中斷現有連結。"
+            ? "XP 和訓練分數只會從你連接的健身應用計算。如需更換健身應用,請先中斷現有連結。"
             : "XP and training scores are calculated from your connected fitness app only. To switch fitness apps, disconnect the current one first."}
         </p>
       </div>
 
       <div className="space-y-3">
-        {/* Apple Health — can be connected alongside fitness apps */}
+        {/* Apple Health */}
         <div className="bg-card border border-border rounded-xl p-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -306,22 +235,19 @@ const ConnectApps = ({ lang, onBack }: Props) => {
             ) : (
               <button
                 onClick={handleConnectGarmin}
-                disabled={hasFitnessApp || garmin.connecting}
+                disabled={hasFitnessApp}
                 className={`text-xs font-medium px-3 py-1 rounded-full ${hasFitnessApp ? "bg-muted text-muted-foreground cursor-not-allowed" : "text-primary-foreground bg-primary"}`}
               >
-                {garmin.connecting
-                  ? (lang === "zh" ? "連結中..." : "Connecting...")
-                  : (lang === "zh" ? "連結" : "Connect")}
+                {lang === "zh" ? "連結" : "Connect"}
               </button>
             )}
           </div>
 
-          {/* Garmin sign-in is handled in a popup to Garmin's secure SSO page */}
           {!garminConnected && (
-            <p className="mt-3 pt-3 border-t border-border text-[11px] text-muted-foreground">
+            <p className="mt-3 pt-3 border-t border-border text-[11px] text-muted-foreground leading-relaxed">
               {lang === "zh"
-                ? "點擊「連結」會在彈出視窗中開啟 Garmin 的官方登入頁面，由 Garmin 處理你的密碼及兩步驟驗證 — 我們不會看到。"
-                : "Click Connect to open Garmin's secure sign-in page in a popup. Garmin handles your password and 2-step verification — we never see them."}
+                ? "使用你的 Garmin Connect 電郵及密碼登入。我們會將憑證直接傳送至我們的 Garmin 認證服務以取得權杖,密碼不會儲存。如已啟用兩步驟驗證,我們會提示你輸入驗證碼。"
+                : "Sign in with your Garmin Connect email and password. We send your credentials directly to our Garmin authentication service to fetch tokens — your password is never stored. If you have 2-step verification enabled, we'll prompt you for the code."}
             </p>
           )}
         </div>
@@ -371,12 +297,11 @@ const ConnectApps = ({ lang, onBack }: Props) => {
         ))}
       </div>
 
-      <GarminIframeDialog
-        open={!!garminIframeUrl}
-        iframeUrl={garminIframeUrl ?? ""}
+      <GarminCredentialDialog
+        open={garminDialogOpen}
         lang={lang}
-        onTicket={handleGarminTicket}
-        onClose={handleGarminIframeClose}
+        onOpenChange={setGarminDialogOpen}
+        onSuccess={handleGarminConnected}
       />
     </div>
   );

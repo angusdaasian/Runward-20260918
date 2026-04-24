@@ -14,9 +14,10 @@ interface Props {
   open: boolean;
   onClose: () => void;
   lang: "en" | "zh";
+  onUpgradeNeeded?: () => void;
 }
 
-const ChatModal = ({ open, onClose, lang }: Props) => {
+const ChatModal = ({ open, onClose, lang, onUpgradeNeeded }: Props) => {
   const { user } = useAuth();
   const [input, setInput] = useState("");
   const [showSettings, setShowSettings] = useState(false);
@@ -28,6 +29,8 @@ const ChatModal = ({ open, onClose, lang }: Props) => {
     messages,
     sending,
     remaining,
+    dailyLimit,
+    isFree,
     prefs,
     insights,
     sessions,
@@ -39,7 +42,7 @@ const ChatModal = ({ open, onClose, lang }: Props) => {
     deleteSession,
     savePreferences,
     resetMemory,
-  } = useAICoach(open);
+  } = useAICoach(open, onUpgradeNeeded);
 
   const t = (en: string, zh: string) => (lang === "zh" ? zh : en);
 

@@ -84,7 +84,7 @@ const CoachSettings = ({ open, onOpenChange, prefs, insights, onSave, onResetMem
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="z-[10002]">
                 <SelectItem value="minimal">
                   {t("Minimal — 100 messages/day", "最低 — 每日 100 則")}
                 </SelectItem>
@@ -129,7 +129,7 @@ const CoachSettings = ({ open, onOpenChange, prefs, insights, onSave, onResetMem
               <SelectTrigger>
                 <SelectValue placeholder={t("Select goal", "選擇目標")} />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="z-[10002]">
                 <SelectItem value="5K">5K</SelectItem>
                 <SelectItem value="10K">10K</SelectItem>
                 <SelectItem value="Half Marathon">{t("Half Marathon", "半馬")}</SelectItem>
@@ -162,7 +162,7 @@ const CoachSettings = ({ open, onOpenChange, prefs, insights, onSave, onResetMem
               <SelectTrigger>
                 <SelectValue placeholder={t("Select level", "選擇程度")} />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="z-[10002]">
                 <SelectItem value="Beginner">{t("Beginner", "初學者")}</SelectItem>
                 <SelectItem value="Intermediate">{t("Intermediate", "中階")}</SelectItem>
                 <SelectItem value="Advanced">{t("Advanced", "進階")}</SelectItem>
@@ -205,7 +205,7 @@ const CoachSettings = ({ open, onOpenChange, prefs, insights, onSave, onResetMem
               <SelectTrigger>
                 <SelectValue placeholder={t("Select intensity", "選擇強度")} />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="z-[10002]">
                 <SelectItem value="Easy">{t("Easy", "輕鬆")}</SelectItem>
                 <SelectItem value="Moderate">{t("Moderate", "適中")}</SelectItem>
                 <SelectItem value="Aggressive">{t("Aggressive", "積極")}</SelectItem>

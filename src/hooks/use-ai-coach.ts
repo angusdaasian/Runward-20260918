@@ -11,6 +11,8 @@ export type CoachMessage = {
   pending?: boolean;
 };
 
+export type ThinkingLevel = "minimal" | "low" | "medium" | "high";
+
 export type CoachPreferences = {
   preferred_units: "kilometers" | "miles";
   training_goal: string | null;
@@ -19,6 +21,7 @@ export type CoachPreferences = {
   training_days: string[];
   injuries_concerns: string | null;
   training_intensity: string | null;
+  thinking_level: ThinkingLevel;
 };
 
 const SESSION_KEY = "ai_coach_session_id";

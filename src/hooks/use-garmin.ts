@@ -5,11 +5,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { Lang } from "@/lib/i18n";
-import { clearGarminSsoTransientState, GARMIN_SSO_KEYS, getGarminSsoValue, setGarminSsoValue } from "@/lib/garminSso";
-import { isNativeApp } from "@/lib/nativeDetection";
-import despia from "despia-native";
-
-const GARMIN_NATIVE_DEEPLINK_SCHEME = "runward";
 
 async function extractFunctionErrorMessage(error: unknown): Promise<string | null> {
   if (error instanceof FunctionsHttpError) {
@@ -22,18 +17,13 @@ async function extractFunctionErrorMessage(error: unknown): Promise<string | nul
       return error.message;
     }
   }
-
-  if (error instanceof Error && error.message) {
-    return error.message;
-  }
-
+  if (error instanceof Error && error.message) return error.message;
   return null;
 }
 
 export function useGarmin(lang: Lang) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const [connecting, setConnecting] = useState(false);
   const [syncing, setSyncing] = useState(false);
 
   const invalidateActivities = useCallback(() => {
@@ -45,84 +35,6 @@ export function useGarmin(lang: Lang) {
     queryClient.invalidateQueries({ queryKey: ["fitness-connection", user.id] });
     queryClient.invalidateQueries({ queryKey: ["planned-workouts", user.id] });
   }, [user, queryClient]);
-
-  /**
-   * Iframe-based Garmin connect flow.
-   *
-   * Step 1: prepareConnect() — fetches the iframe URL from the backend.
-   * Step 2: parent component renders <GarminIframeDialog> with that URL.
-   * Step 3: dialog receives a postMessage with `serviceTicket` from Garmin's
-   *         casEmbedSuccess.html and calls completeConnect(ticket).
-   *
-   * This is the only flow that works on custom domains — Garmin's CAS
-   * silently rejects non-Garmin `service` URLs, so we use
-   * `service=https://sso.garmin.com/sso/embed` and grab the ticket via
-   * window.postMessage from inside an iframe.
-   */
-  const prepareConnect = useCallback(async (): Promise<{ iframeUrl: string } | null> => {
-    if (!user) return null;
-    setConnecting(true);
-    try {
-      console.log("[useGarmin] prepareConnect requesting from origin:", window.location.origin);
-      const { data, error } = await supabase.functions.invoke("garmin-sso-start", {
-        body: { origin: window.location.origin },
-      });
-      if (error || !data?.iframe_url) {
-        const msg = await extractFunctionErrorMessage(error) || "Failed to start Garmin sign-in";
-        toast.error(lang === "zh" ? `Garmin 連結失敗:${msg}` : msg);
-        setConnecting(false);
-        return null;
-      }
-      console.log("[useGarmin] iframe URL ready", {
-        iframe_url: data.iframe_url,
-        diagnostics: data.diagnostics,
-      });
-      return { iframeUrl: data.iframe_url };
-    } catch (err) {
-      console.error("[useGarmin] prepareConnect error:", err);
-      const msg = await extractFunctionErrorMessage(err);
-      toast.error(lang === "zh" ? `Garmin 連結失敗${msg ? `:${msg}` : ""}` : msg || "Garmin connection failed");
-      setConnecting(false);
-      return null;
-    }
-  }, [user, lang]);
-
-  const completeConnect = useCallback(async (ticket: string): Promise<{ ok: boolean; displayName?: string }> => {
-    console.log("[useGarmin] completeConnect called", { hasUser: !!user, ticketPrefix: ticket?.slice(0, 12) });
-    if (!user) {
-      console.warn("[useGarmin] completeConnect aborted: no user in context");
-      toast.error(lang === "zh" ? "請先登入" : "Please sign in first");
-      return { ok: false };
-    }
-    try {
-      console.log("[useGarmin] invoking garmin-sso-exchange...");
-      const { data, error } = await supabase.functions.invoke("garmin-sso-exchange", {
-        body: { ticket },
-      });
-      console.log("[useGarmin] garmin-sso-exchange returned", { data, error });
-      if (error || !data?.success) {
-        const msg = data?.error || await extractFunctionErrorMessage(error) || "Garmin connection failed";
-        toast.error(lang === "zh" ? `Garmin 連結失敗:${msg}` : msg);
-        return { ok: false };
-      }
-      toast.success(lang === "zh" ? "Garmin 已連結!" : "Garmin connected!");
-      invalidateActivities();
-      return { ok: true, displayName: data.display_name };
-    } catch (err) {
-      console.error("[useGarmin] completeConnect error:", err);
-      const msg = await extractFunctionErrorMessage(err);
-      toast.error(lang === "zh" ? `Garmin 連結失敗${msg ? `:${msg}` : ""}` : msg || "Garmin connection failed");
-      return { ok: false };
-    } finally {
-      setConnecting(false);
-    }
-  }, [user, lang, invalidateActivities]);
-
-  const cancelConnect = useCallback(() => {
-    setConnecting(false);
-    clearGarminSsoTransientState();
-  }, []);
-
 
   const syncActivities = useCallback(async (days = 30): Promise<boolean> => {
     if (!user) return false;
@@ -136,7 +48,7 @@ export function useGarmin(lang: Lang) {
         if (data?.reauth_required) {
           toast.error(
             lang === "zh"
-              ? "Garmin 連結已過期，請重新登入"
+              ? "Garmin 連結已過期,請重新登入"
               : "Garmin sign-in expired — please reconnect"
           );
         } else {
@@ -186,5 +98,5 @@ export function useGarmin(lang: Lang) {
     }
   }, [user, lang, invalidateActivities]);
 
-  return { prepareConnect, completeConnect, cancelConnect, syncActivities, disconnect, connecting, syncing };
+  return { syncActivities, disconnect, syncing };
 }

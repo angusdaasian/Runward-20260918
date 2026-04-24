@@ -86,15 +86,17 @@ export function useAICoach(open: boolean) {
         ? `?action=history&session_id=${storedSid}`
         : `?action=history`;
 
-      const [prefsRes, insightsRes, histRes, usageRes] = await Promise.all([
+      const [prefsRes, insightsRes, histRes, usageRes, sessionsRes] = await Promise.all([
         callFn("?action=preferences", { method: "GET" }),
         callFn("?action=insights", { method: "GET" }),
         callFn(histPath, { method: "GET" }),
         callFn("?action=usage", { method: "GET" }),
+        callFn("?action=sessions", { method: "GET" }),
       ]);
       setPrefs(prefsRes.preferences || null);
       setInsights(insightsRes.insights || []);
       setRemaining(usageRes.remaining ?? null);
+      setSessions(sessionsRes.sessions || []);
 
       const msgs = histRes.messages || [];
       // Resolve session id: stored > server-returned (from latest msg) > new

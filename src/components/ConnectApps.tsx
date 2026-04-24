@@ -8,6 +8,7 @@ import { useAppleHealth } from "@/hooks/use-apple-health";
 import { useGarmin } from "@/hooks/use-garmin";
 import { getAppEnvironment } from "@/lib/environment";
 import { GARMIN_SSO_KEYS, getGarminSsoValue } from "@/lib/garminSso";
+import GarminIframeDialog from "@/components/GarminIframeDialog";
 
 interface Props {
   lang: Lang;
@@ -22,8 +23,9 @@ const ConnectApps = ({ lang, onBack }: Props) => {
   const [loading, setLoading] = useState(true);
   const appleHealth = useAppleHealth(lang);
   const garmin = useGarmin(lang);
+  const [garminIframeUrl, setGarminIframeUrl] = useState<string | null>(null);
 
-  // Garmin uses a popup to Garmin's real SSO page — no local form state needed.
+  // Garmin SSO runs in an iframe (Garmin's CAS rejects custom-domain callbacks).
 
   // A fitness app is Strava, Garmin, or Coros
   const hasFitnessApp = stravaConnected || garminConnected;
@@ -159,10 +161,16 @@ const ConnectApps = ({ lang, onBack }: Props) => {
       toast.error(lang === "zh" ? "請先中斷現有健身應用再連接新的" : "Please disconnect the current fitness app before connecting a new one");
       return;
     }
-    const result = await garmin.connectViaPopup();
+    const prep = await garmin.prepareConnect();
+    if (!prep) return;
+    setGarminIframeUrl(prep.iframeUrl);
+  };
+
+  const handleGarminTicket = async (ticket: string) => {
+    const result = await garmin.completeConnect(ticket);
+    setGarminIframeUrl(null);
     if (!result.ok) return;
     setGarminConnected(true);
-    // Delete Apple Health activities if they exist (fitness app takes priority)
     if (appleHealthConnected && user) {
       await supabase.from("apple_health_activities").delete().eq("user_id", user.id);
       toast.info(
@@ -171,8 +179,12 @@ const ConnectApps = ({ lang, onBack }: Props) => {
           : "Apple Health activities cleared, activities will come from Garmin"
       );
     }
-    // Auto-sync after connecting
     garmin.syncActivities();
+  };
+
+  const handleGarminIframeClose = () => {
+    setGarminIframeUrl(null);
+    garmin.cancelConnect();
   };
 
   const handleDisconnectGarmin = async () => {
@@ -358,6 +370,14 @@ const ConnectApps = ({ lang, onBack }: Props) => {
           </div>
         ))}
       </div>
+
+      <GarminIframeDialog
+        open={!!garminIframeUrl}
+        iframeUrl={garminIframeUrl ?? ""}
+        lang={lang}
+        onTicket={handleGarminTicket}
+        onClose={handleGarminIframeClose}
+      />
     </div>
   );
 };

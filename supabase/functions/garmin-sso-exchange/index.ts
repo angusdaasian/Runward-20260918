@@ -41,10 +41,10 @@ serve(async (req) => {
     }
 
     const body = await req.json().catch(() => ({}));
-    const { ticket, callback, serviceUrl } = body;
-    const exchangeServiceUrl = typeof serviceUrl === "string" && serviceUrl.trim()
-      ? serviceUrl.trim()
-      : (typeof callback === "string" && callback.trim() ? callback.trim() : null);
+    const { ticket } = body;
+    // CRITICAL: Garmin DI ticket exchange requires service_url to MATCH the
+    // `service` param used during SSO. We always use the embed service URL.
+    const exchangeServiceUrl = "https://sso.garmin.com/sso/embed";
 
     if (!ticket || typeof ticket !== "string") {
       return new Response(JSON.stringify({ error: "ticket required" }), {

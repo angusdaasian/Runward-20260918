@@ -1,60 +1,72 @@
 
-Goal: make the Garmin iframe flow follow the working pattern from the GitHub issue so a successful Garmin login yields a service ticket instead of looping back to the Garmin sign-in screen.
 
-1. Fix the SSO URL construction in `supabase/functions/garmin-sso-start/index.ts`
-- Revert `gauthHost` to `https://sso.garmin.com/sso` instead of `/sso/embed`.
-- Keep `service=https://sso.garmin.com/sso/embed`.
-- Keep `source=<window.location.origin>`.
-- Keep `consumeServiceTicket=false`.
-- Trim the parameter set down to the proven working core and only retain clearly harmless UI options. The current URL has many extras, and one prior change already diverged from the known-good recipe.
-- Return explicit diagnostics in the JSON response so the frontend can log the exact `service`, `source`, and `gauthHost` values being used.
+## AI Running Coach — Premium Floating Chat
 
-2. Harden the iframe flow on the frontend
-- Update `src/hooks/use-garmin.ts` to log the exact iframe URL returned by `garmin-sso-start` and the browser origin used to request it.
-- Update `src/components/GarminIframeDialog.tsx` to:
-  - keep the permissive `message` listener,
-  - log iframe load/error state,
-  - add a visible fallback action if no ticket arrives after login,
-  - avoid assuming only one Garmin-origin message format.
-- Preserve the current direct `onTicket -> garmin-sso-exchange` path, since the missing step is ticket delivery, not the exchange function itself.
+A draggable floating chat button + modal, gated to premium users, with per-user memory, conversation history, and Vertex AI Gemini 3.1 Flash Lite as the brain.
 
-3. Remove the mismatch between web routing and Garmin return URLs
-- Review `src/lib/garminSso.ts`, `src/pages/GarminCallback.tsx`, and `src/pages/GarminMobileAuth.tsx`.
-- Ensure any non-iframe fallback return URL lands on a route that actually renders the full app for web users.
-- Today `/?tab=more&page=connect-apps` can be risky because `/` renders `Landing` on web, while the in-app connect screen lives inside `Index`. I’ll align this so any redirect-based fallback opens the app state reliably instead of dropping users onto the marketing page/onboarding.
+### Files to create
 
-4. Clean up stale hybrid logic so the iframe path is the single source of truth
-- `ConnectApps.tsx`, `use-garmin.ts`, `GarminCallback.tsx`, and `GarminMobileAuth.tsx` currently contain a mix of iframe, popup, native, and redirect assumptions.
-- I’ll separate:
-  - desktop/web iframe flow,
-  - native/mobile fallback flow,
-  - legacy callback/popup code.
-- That reduces conflicting behavior and makes it easier to tell whether a failure is Garmin-side or app-side.
+**Frontend**
+- `src/components/coach/FloatingChatButton.tsx` — draggable circular button (56/64px), gradient + bounce, snaps to nearest edge, position persisted to `localStorage`, lock overlay for non-premium, X transform when open, z-index 9999.
+- `src/components/coach/ChatModal.tsx` — full-screen on mobile (slide-up), 500×700 modal on desktop (fade-in), header, context bar, message list, input, "new conversation", remaining-message counter.
+- `src/components/coach/MessageBubble.tsx` — user-right/AI-left chat bubbles with markdown rendering.
+- `src/components/coach/TypingIndicator.tsx` — three-dot pulsing animation.
+- `src/components/coach/ContextBar.tsx` — "Coach knows: …" summary line.
+- `src/components/coach/CoachSettings.tsx` — sheet with units, goal, race date, experience, training days, injuries, intensity, "what coach knows" list, reset memory button.
+- `src/components/coach/UpgradeModal.tsx` — premium upsell shown to non-premium taps (reuses existing `launchPaywall` from `useDespiaPurchases`).
+- `src/hooks/use-ai-coach.ts` — manages session id, message list, send/receive, remaining-messages count, error toasts.
 
-5. Add explicit user-facing failure handling
-- If Garmin returns to sign-in again or no `postMessage` arrives within a timeout, show a precise error:
-  - third-party cookies blocked,
-  - Garmin did not emit a ticket,
-  - session not loaded,
-  - exchange failed after ticket receipt.
-- This avoids the current silent “stuck” state.
+**Mounting**: render `<FloatingChatButton />` once inside `src/pages/Index.tsx` (after the bottom nav, fixed position so it floats above all tabs). Hidden during onboarding, guest mode, and on `/admin`, `/support`, `/privacy`.
 
-6. Validate end-to-end after implementation
-- Confirm the start function emits the corrected SSO URL.
-- Confirm the iframe either:
-  - posts a ticket and triggers `garmin-sso-exchange`, or
-  - shows a clear timeout/error state with diagnostics.
-- Confirm fallback redirects land inside the app correctly on web and do not send users back to onboarding/marketing.
+**Backend (Supabase Edge Function)**
+- `supabase/functions/ai-running-coach/index.ts` — handles chat. Reuses the existing `callVertexAI` pattern from `analyze-activity` (model: `gemini-3.1-flash-lite-preview`, temperature 0.7, maxOutputTokens 1024). Uses existing `GOOGLE_VERTEX_API_KEY` secret — no new keys needed.
 
-Technical details
-- Most likely root cause in current code: `gauthHost` was changed to `https://sso.garmin.com/sso/embed`, but the working reference uses `https://sso.garmin.com/sso`. `service` should remain `/sso/embed`; `gauthHost` should not.
-- Secondary issue: redirect-based fallback currently points to `/?tab=more&page=connect-apps`, but `/` renders `Landing` for web in `src/App.tsx`, while the real app UI is `Index` only when native detection says true or callback routes are used.
-- Files involved:
-  - `supabase/functions/garmin-sso-start/index.ts`
-  - `src/hooks/use-garmin.ts`
-  - `src/components/GarminIframeDialog.tsx`
-  - `src/components/ConnectApps.tsx`
-  - `src/lib/garminSso.ts`
-  - `src/pages/GarminCallback.tsx`
-  - `src/pages/GarminMobileAuth.tsx`
-  - possibly `src/App.tsx` / `src/pages/Index.tsx` for fallback routing alignment
+Endpoint logic:
+1. Validate JWT → load user.
+2. Check `profiles.is_premium` → 403 if false.
+3. Check `ai_coach_usage` for today → 429 if ≥100.
+4. Load `ai_coach_preferences`, last 10 messages from `ai_coach_conversations` (filtered by `session_id`), top insights from `ai_coach_insights`, recent 7-day activities from `garmin_activities` + `strava_activities` + `apple_health_activities`, and `profiles` (display_name, experience).
+5. Build system prompt with all context + safety rules.
+6. Call Vertex AI.
+7. Insert user + assistant messages into `ai_coach_conversations`, increment `ai_coach_usage` (upsert).
+8. Fire-and-forget secondary Vertex call to extract insights from the latest exchange → upsert into `ai_coach_insights` (best-effort, ignore failures).
+9. Return `{ response, session_id, remaining_messages_today }`.
+
+Also handles a `?action=preferences` POST/GET for reading/updating preferences from the settings sheet (so the client never writes directly with elevated trust — keeps validation server-side).
+
+### Database migration
+
+Four new tables, all RLS-enabled with owner-only policies:
+
+- **ai_coach_preferences** — `user_id` unique, `preferred_units` text default `'kilometers'`, `training_goal` text, `target_race_date` date, `experience_level` text, `training_days` jsonb default `'[]'`, `injuries_concerns` text, `training_intensity` text, timestamps.
+- **ai_coach_conversations** — `user_id`, `session_id` uuid, `role` text (`user`|`assistant`), `content` text, `metadata` jsonb, `created_at`. Index on `(user_id, session_id, created_at)`.
+- **ai_coach_insights** — `user_id`, `insight_type` text, `insight_key` text, `insight_value` text, `confidence` numeric, timestamps. Unique `(user_id, insight_key)`.
+- **ai_coach_usage** — `user_id`, `date` date, `message_count` int default 0. Unique `(user_id, date)`.
+
+RLS: each table — users can SELECT/INSERT/UPDATE/DELETE their own rows (`auth.uid() = user_id`). Edge function uses service role to bypass for cross-table reads.
+
+### UX details
+
+- **First-time premium**: opening the modal with no prior conversation triggers a welcome message + onboarding questions; answers are saved to `ai_coach_preferences` as the user replies (the AI is prompted to call out preference updates, parsed server-side).
+- **Returning user**: greeting references most recent activity from connected sources.
+- **Non-premium tap**: lock-icon button → `UpgradeModal` → `launchPaywall()`.
+- **Rate-limit hit**: input disabled, banner shows reset time.
+- **New conversation**: generates a fresh `session_id` (uuid) client-side, posts with `new_session: true`.
+- **Reset memory**: deletes user's rows from `ai_coach_conversations` and `ai_coach_insights` (preferences kept).
+- **Bilingual**: respects existing `app_lang` localStorage; system prompt instructs AI to reply in user's language.
+- **Dark mode**: uses semantic tokens (`bg-card`, `text-foreground`, `border-border`, `bg-primary`) so it matches existing theme.
+- **Drag**: pointer events (works for touch + mouse), constrained to viewport minus button size, snaps left/right on release with spring transition.
+
+### Out of scope (not built)
+
+- Streaming responses (request/response only — keeps the edge function simple and matches `analyze-activity` style).
+- Conversation history browser UI (sessions exist in DB but only the active session is shown; can be added later).
+- Voice input.
+- Push-notification reminders from coach.
+
+### Open questions before implementation
+
+1. **Mounting scope** — show the floating button only inside `Index` (the in-app tabs), or also on `/support`, `/privacy`, `/admin`? Default: Index only.
+2. **Daily limit** — keep 100 hard-coded, or store in a config table for future tuning? Default: hard-coded constant in the edge function.
+3. **Insight extraction** — do the secondary AI call (richer memory, ~2x token cost) or skip it for v1? Default: include it, since "remembers everything" is a stated requirement.
+

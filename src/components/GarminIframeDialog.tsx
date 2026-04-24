@@ -32,22 +32,34 @@ const GarminIframeDialog = ({ open, iframeUrl, lang, onTicket, onClose }: Props)
     }
 
     const onMessage = (ev: MessageEvent) => {
-      // Log EVERY message so we can see what Garmin actually sends
-      console.log("[GarminIframe] postMessage received", {
+      // Log EVERY message — origin may be "null" with EasyXDM shim
+      console.log("[GarminIframe] 📬 postMessage", {
         origin: ev.origin,
         dataType: typeof ev.data,
-        data: ev.data,
+        data: typeof ev.data === "string" ? ev.data.slice(0, 300) : ev.data,
       });
 
-      // Accept messages from any garmin.com subdomain
-      if (!ev.origin.includes("garmin.com")) return;
       if (handledRef.current) return;
 
       const raw = ev.data;
       let payload: { serviceTicket?: string; serviceUrl?: string } | null = null;
 
       if (typeof raw === "string") {
-        try { payload = JSON.parse(raw); } catch { payload = null; }
+        // Garmin's casEmbedSuccess.html sends JSON; EasyXDM may wrap it.
+        // Try direct parse first, then look for an embedded JSON blob.
+        try { payload = JSON.parse(raw); } catch { /* not JSON */ }
+        if (!payload) {
+          const match = raw.match(/\{[^}]*serviceTicket[^}]*\}/);
+          if (match) {
+            try { payload = JSON.parse(match[0]); } catch { /* ignore */ }
+          }
+        }
+        // EasyXDM messages look like "easyXDM_default_provider_message_..."
+        // and may contain the ticket as a substring.
+        if (!payload) {
+          const tMatch = raw.match(/ST-[A-Za-z0-9_-]+/);
+          if (tMatch) payload = { serviceTicket: tMatch[0] };
+        }
       } else if (raw && typeof raw === "object") {
         payload = raw as { serviceTicket?: string; serviceUrl?: string };
       }
@@ -59,7 +71,7 @@ const GarminIframeDialog = ({ open, iframeUrl, lang, onTicket, onClose }: Props)
         console.log("[GarminIframe] ✅ ticket extracted:", ticket.slice(0, 20));
         onTicket(ticket);
       } else {
-        console.log("[GarminIframe] message ignored — no valid serviceTicket");
+        console.log("[GarminIframe] ⏭ no serviceTicket in this message");
       }
     };
 

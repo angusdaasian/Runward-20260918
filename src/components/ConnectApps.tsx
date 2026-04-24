@@ -161,10 +161,16 @@ const ConnectApps = ({ lang, onBack }: Props) => {
       toast.error(lang === "zh" ? "請先中斷現有健身應用再連接新的" : "Please disconnect the current fitness app before connecting a new one");
       return;
     }
-    const result = await garmin.connectViaPopup();
+    const prep = await garmin.prepareConnect();
+    if (!prep) return;
+    setGarminIframeUrl(prep.iframeUrl);
+  };
+
+  const handleGarminTicket = async (ticket: string) => {
+    const result = await garmin.completeConnect(ticket);
+    setGarminIframeUrl(null);
     if (!result.ok) return;
     setGarminConnected(true);
-    // Delete Apple Health activities if they exist (fitness app takes priority)
     if (appleHealthConnected && user) {
       await supabase.from("apple_health_activities").delete().eq("user_id", user.id);
       toast.info(
@@ -173,8 +179,12 @@ const ConnectApps = ({ lang, onBack }: Props) => {
           : "Apple Health activities cleared, activities will come from Garmin"
       );
     }
-    // Auto-sync after connecting
     garmin.syncActivities();
+  };
+
+  const handleGarminIframeClose = () => {
+    setGarminIframeUrl(null);
+    garmin.cancelConnect();
   };
 
   const handleDisconnectGarmin = async () => {

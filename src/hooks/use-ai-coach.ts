@@ -149,7 +149,7 @@ export function useAICoach(open: boolean) {
         });
         if (data.session_id && data.session_id !== sessionId) {
           setSessionId(data.session_id);
-          sessionStorage.setItem(SESSION_KEY, data.session_id);
+          localStorage.setItem(SESSION_KEY, data.session_id);
         }
         if (typeof data.remaining_messages_today === "number") {
           setRemaining(data.remaining_messages_today);

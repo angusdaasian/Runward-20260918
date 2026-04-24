@@ -63,6 +63,7 @@ export function useGarmin(lang: Lang) {
     if (!user) return null;
     setConnecting(true);
     try {
+      console.log("[useGarmin] prepareConnect requesting from origin:", window.location.origin);
       const { data, error } = await supabase.functions.invoke("garmin-sso-start", {
         body: { origin: window.location.origin },
       });
@@ -72,6 +73,10 @@ export function useGarmin(lang: Lang) {
         setConnecting(false);
         return null;
       }
+      console.log("[useGarmin] iframe URL ready", {
+        iframe_url: data.iframe_url,
+        diagnostics: data.diagnostics,
+      });
       return { iframeUrl: data.iframe_url };
     } catch (err) {
       console.error("[useGarmin] prepareConnect error:", err);

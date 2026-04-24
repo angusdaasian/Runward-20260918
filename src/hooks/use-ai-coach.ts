@@ -282,6 +282,15 @@ export function useAICoach(open: boolean) {
           body: JSON.stringify(patch),
         });
         setPrefs(data.preferences || null);
+        // If thinking level changed, the remaining-message count needs to be
+        // recomputed against the new daily limit (server applies ratio rule).
+        if ("thinking_level" in patch) {
+          callFn("?action=usage", { method: "GET" })
+            .then((u) => {
+              if (typeof u.remaining === "number") setRemaining(u.remaining);
+            })
+            .catch(() => {});
+        }
         return true;
       } catch (e) {
         toast.error(getLang() === "zh" ? "儲存失敗" : "Failed to save");

@@ -160,15 +160,32 @@ serve(async (req) => {
     // ── HISTORY (read) ──
     if (action === "history" && req.method === "GET") {
       const sessionId = url.searchParams.get("session_id");
-      let q = admin
+      let resolvedSession = sessionId;
+
+      // If no session_id provided, find the most recent session for this user
+      if (!resolvedSession) {
+        const { data: latest } = await admin
+          .from("ai_coach_conversations")
+          .select("session_id, created_at")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        resolvedSession = latest?.session_id || null;
+      }
+
+      if (!resolvedSession) {
+        return json({ messages: [], session_id: null });
+      }
+
+      const { data } = await admin
         .from("ai_coach_conversations")
-        .select("*")
+        .select("id, role, content, session_id, created_at")
         .eq("user_id", user.id)
+        .eq("session_id", resolvedSession)
         .order("created_at", { ascending: true })
         .limit(50);
-      if (sessionId) q = q.eq("session_id", sessionId);
-      const { data } = await q;
-      return json({ messages: data || [] });
+      return json({ messages: data || [], session_id: resolvedSession });
     }
 
     // ── RESET MEMORY ──

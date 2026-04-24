@@ -370,6 +370,14 @@ const ConnectApps = ({ lang, onBack }: Props) => {
           </div>
         ))}
       </div>
+
+      <GarminIframeDialog
+        open={!!garminIframeUrl}
+        iframeUrl={garminIframeUrl ?? ""}
+        lang={lang}
+        onTicket={handleGarminTicket}
+        onClose={handleGarminIframeClose}
+      />
     </div>
   );
 };

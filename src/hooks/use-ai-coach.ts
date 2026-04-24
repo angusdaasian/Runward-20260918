@@ -76,21 +76,35 @@ export function useAICoach(open: boolean) {
     if (!user || !isPremium) return;
     setLoadingHistory(true);
     try {
-      const sid = sessionStorage.getItem(SESSION_KEY) || newId();
-      sessionStorage.setItem(SESSION_KEY, sid);
-      setSessionId(sid);
+      const storedSid = localStorage.getItem(SESSION_KEY);
+      // If we have a stored session id, fetch its history; otherwise fetch the
+      // most recent conversation (server returns latest session when no id is given).
+      const histPath = storedSid
+        ? `?action=history&session_id=${storedSid}`
+        : `?action=history`;
 
       const [prefsRes, insightsRes, histRes, usageRes] = await Promise.all([
         callFn("?action=preferences", { method: "GET" }),
         callFn("?action=insights", { method: "GET" }),
-        callFn(`?action=history&session_id=${sid}`, { method: "GET" }),
+        callFn(histPath, { method: "GET" }),
         callFn("?action=usage", { method: "GET" }),
       ]);
       setPrefs(prefsRes.preferences || null);
       setInsights(insightsRes.insights || []);
       setRemaining(usageRes.remaining ?? null);
+
+      const msgs = histRes.messages || [];
+      // Resolve session id: stored > server-returned (from latest msg) > new
+      const resolvedSid =
+        storedSid ||
+        histRes.session_id ||
+        (msgs.length ? msgs[msgs.length - 1].session_id : null) ||
+        newId();
+      localStorage.setItem(SESSION_KEY, resolvedSid);
+      setSessionId(resolvedSid);
+
       setMessages(
-        (histRes.messages || []).map((m: any) => ({
+        msgs.map((m: any) => ({
           id: m.id || newId(),
           role: m.role,
           content: m.content,
@@ -135,7 +149,7 @@ export function useAICoach(open: boolean) {
         });
         if (data.session_id && data.session_id !== sessionId) {
           setSessionId(data.session_id);
-          sessionStorage.setItem(SESSION_KEY, data.session_id);
+          localStorage.setItem(SESSION_KEY, data.session_id);
         }
         if (typeof data.remaining_messages_today === "number") {
           setRemaining(data.remaining_messages_today);
@@ -182,7 +196,7 @@ export function useAICoach(open: boolean) {
 
   const newConversation = useCallback(() => {
     const sid = newId();
-    sessionStorage.setItem(SESSION_KEY, sid);
+    localStorage.setItem(SESSION_KEY, sid);
     setSessionId(sid);
     setMessages([]);
   }, []);

@@ -854,36 +854,6 @@ export type Database = {
         }
         Relationships: []
       }
-      sahha_connections: {
-        Row: {
-          connected_at: string
-          external_id: string
-          id: string
-          last_synced_at: string | null
-          profile_token: string | null
-          refresh_token: string | null
-          user_id: string
-        }
-        Insert: {
-          connected_at?: string
-          external_id: string
-          id?: string
-          last_synced_at?: string | null
-          profile_token?: string | null
-          refresh_token?: string | null
-          user_id: string
-        }
-        Update: {
-          connected_at?: string
-          external_id?: string
-          id?: string
-          last_synced_at?: string | null
-          profile_token?: string | null
-          refresh_token?: string | null
-          user_id?: string
-        }
-        Relationships: []
-      }
       strava_activities: {
         Row: {
           average_heartrate: number | null

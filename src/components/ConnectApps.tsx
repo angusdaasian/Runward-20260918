@@ -1,4 +1,4 @@
-import { ArrowLeft, Check, RefreshCw, Info, AlertTriangle, Copy, FlaskConical } from "lucide-react";
+import { ArrowLeft, Check, RefreshCw, Info, AlertTriangle } from "lucide-react";
 import { Lang, t } from "@/lib/i18n";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -6,7 +6,6 @@ import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 import { useAppleHealth } from "@/hooks/use-apple-health";
 import { useGarmin } from "@/hooks/use-garmin";
-import { useSahha } from "@/hooks/use-sahha";
 import { getAppEnvironment } from "@/lib/environment";
 import GarminCredentialDialog from "@/components/GarminCredentialDialog";
 
@@ -20,11 +19,9 @@ const ConnectApps = ({ lang, onBack }: Props) => {
   const [stravaConnected, setStravaConnected] = useState(false);
   const [appleHealthConnected, setAppleHealthConnected] = useState(false);
   const [garminConnected, setGarminConnected] = useState(false);
-  const [sahhaConnected, setSahhaConnected] = useState(false);
   const [loading, setLoading] = useState(true);
   const appleHealth = useAppleHealth(lang);
   const garmin = useGarmin(lang);
-  const sahha = useSahha(lang);
   const [garminDialogOpen, setGarminDialogOpen] = useState(false);
 
   // A fitness app is Strava, Garmin, or Coros
@@ -32,16 +29,14 @@ const ConnectApps = ({ lang, onBack }: Props) => {
 
   const checkConnections = useCallback(async () => {
     if (!user) { setLoading(false); return; }
-    const [stravaRes, ahRes, garminRes, sahhaRes] = await Promise.all([
+    const [stravaRes, ahRes, garminRes] = await Promise.all([
       supabase.from("strava_connections").select("id").eq("user_id", user.id).maybeSingle(),
       supabase.from("apple_health_connections").select("id").eq("user_id", user.id).maybeSingle(),
       supabase.from("garmin_connections").select("id").eq("user_id", user.id).maybeSingle(),
-      supabase.from("sahha_connections").select("id").eq("user_id", user.id).maybeSingle(),
     ]);
     setStravaConnected(!!stravaRes.data);
     setAppleHealthConnected(!!ahRes.data);
     setGarminConnected(!!garminRes.data);
-    setSahhaConnected(!!sahhaRes.data);
     setLoading(false);
   }, [user]);
 
@@ -254,111 +249,6 @@ const ConnectApps = ({ lang, onBack }: Props) => {
                 ? "使用你的 Garmin Connect 電郵及密碼登入。我們會將憑證直接傳送至我們的 Garmin 認證服務以取得權杖,密碼不會儲存。如已啟用兩步驟驗證,我們會提示你輸入驗證碼。"
                 : "Sign in with your Garmin Connect email and password. We send your credentials directly to our Garmin authentication service to fetch tokens — your password is never stored. If you have 2-step verification enabled, we'll prompt you for the code."}
             </p>
-          )}
-        </div>
-
-        {/* Sahha.ai — TEST integration */}
-        <div className="bg-card border border-border rounded-xl p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-purple-500/10 flex items-center justify-center">
-                <FlaskConical size={20} className="text-purple-500" />
-              </div>
-              <div>
-                <span className="font-medium text-foreground block">
-                  Sahha.ai <span className="text-[10px] uppercase tracking-wide text-muted-foreground">(test)</span>
-                </span>
-                <span className="text-xs text-muted-foreground">
-                  {lang === "zh"
-                    ? "測試健康數據（沙盒環境）"
-                    : "Test health data integration (sandbox)"}
-                </span>
-              </div>
-            </div>
-            {sahhaConnected ? (
-              <div className="flex items-center gap-2">
-                <Check size={16} className="text-green-500" />
-                <button
-                  onClick={async () => {
-                    const ok = await sahha.disconnect();
-                    if (ok) setSahhaConnected(false);
-                  }}
-                  className="text-xs text-destructive hover:underline"
-                >
-                  {lang === "zh" ? "中斷" : "Disconnect"}
-                </button>
-              </div>
-            ) : (
-              <button
-                onClick={async () => {
-                  const ok = await sahha.connect();
-                  if (ok) setSahhaConnected(true);
-                }}
-                disabled={sahha.loading}
-                className="text-xs font-medium px-3 py-1 rounded-full text-primary-foreground bg-primary disabled:opacity-50"
-              >
-                {sahha.loading
-                  ? (lang === "zh" ? "連結中..." : "Connecting...")
-                  : (lang === "zh" ? "連結" : "Connect")}
-              </button>
-            )}
-          </div>
-
-          {sahhaConnected && (
-            <div className="mt-3 pt-3 border-t border-border space-y-3">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-[11px] text-muted-foreground truncate">
-                  {lang === "zh" ? "外部 ID（externalId）：" : "Your externalId:"}{" "}
-                  <code className="text-foreground">{user?.id}</code>
-                </span>
-                <button
-                  onClick={() => {
-                    if (user?.id) {
-                      navigator.clipboard.writeText(user.id);
-                      toast.success(lang === "zh" ? "已複製" : "Copied");
-                    }
-                  }}
-                  className="p-1 text-muted-foreground hover:text-foreground"
-                  aria-label="Copy externalId"
-                >
-                  <Copy size={14} />
-                </button>
-              </div>
-
-              <div className="flex gap-2">
-                <button
-                  onClick={() => sahha.fetchScores()}
-                  disabled={sahha.loading}
-                  className="flex-1 text-xs font-medium px-3 py-2 rounded-lg bg-secondary text-secondary-foreground hover:bg-secondary/80 disabled:opacity-50"
-                >
-                  {lang === "zh" ? "取得分數" : "Fetch Scores"}
-                </button>
-                <button
-                  onClick={() => sahha.fetchBiomarkers()}
-                  disabled={sahha.loading}
-                  className="flex-1 text-xs font-medium px-3 py-2 rounded-lg bg-secondary text-secondary-foreground hover:bg-secondary/80 disabled:opacity-50"
-                >
-                  {lang === "zh" ? "取得生物指標" : "Fetch Biomarkers"}
-                </button>
-              </div>
-
-              {sahha.lastResult != null && (
-                <details open className="text-[11px]">
-                  <summary className="cursor-pointer text-muted-foreground select-none">
-                    {lang === "zh" ? "上次回應 (JSON)" : "Last response (JSON)"}
-                  </summary>
-                  <pre className="mt-2 p-2 rounded-lg bg-muted text-foreground overflow-auto max-h-64 text-[10px] leading-snug">
-                    {JSON.stringify(sahha.lastResult, null, 2)}
-                  </pre>
-                </details>
-              )}
-
-              <p className="text-[11px] text-muted-foreground leading-relaxed">
-                {lang === "zh"
-                  ? "提示：在 Sahha 控制台用上述 externalId 建立 Sample Profile,或用 Demo App 推送資料,然後按「取得分數」驗證。"
-                  : "Tip: In the Sahha dashboard, create a Sample Profile using the externalId above (or use the Demo App to push real phone data), then press Fetch Scores to verify."}
-              </p>
-            </div>
           )}
         </div>
 

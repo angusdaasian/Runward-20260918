@@ -83,11 +83,18 @@ export function useGarmin(lang: Lang) {
   }, [user, lang]);
 
   const completeConnect = useCallback(async (ticket: string): Promise<{ ok: boolean; displayName?: string }> => {
-    if (!user) return { ok: false };
+    console.log("[useGarmin] completeConnect called", { hasUser: !!user, ticketPrefix: ticket?.slice(0, 12) });
+    if (!user) {
+      console.warn("[useGarmin] completeConnect aborted: no user in context");
+      toast.error(lang === "zh" ? "請先登入" : "Please sign in first");
+      return { ok: false };
+    }
     try {
+      console.log("[useGarmin] invoking garmin-sso-exchange...");
       const { data, error } = await supabase.functions.invoke("garmin-sso-exchange", {
         body: { ticket },
       });
+      console.log("[useGarmin] garmin-sso-exchange returned", { data, error });
       if (error || !data?.success) {
         const msg = data?.error || await extractFunctionErrorMessage(error) || "Garmin connection failed";
         toast.error(lang === "zh" ? `Garmin 連結失敗:${msg}` : msg);

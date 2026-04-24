@@ -23,12 +23,14 @@ interface Props {
   onSave: (patch: Partial<CoachPreferences>) => Promise<boolean>;
   onResetMemory: () => Promise<void>;
   lang: "en" | "zh";
+  isFree?: boolean;
+  onUpgradeNeeded?: () => void;
 }
 
 const DAYS_EN = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const DAYS_ZH = ["一", "二", "三", "四", "五", "六", "日"];
 
-const CoachSettings = ({ open, onOpenChange, prefs, insights, onSave, onResetMemory, lang }: Props) => {
+const CoachSettings = ({ open, onOpenChange, prefs, insights, onSave, onResetMemory, lang, isFree, onUpgradeNeeded }: Props) => {
   const t = (en: string, zh: string) => (lang === "zh" ? zh : en);
   const [local, setLocal] = useState<Partial<CoachPreferences>>({});
   const [saving, setSaving] = useState(false);

@@ -12,6 +12,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
+    console.log("garmin-credential-login: invoked");
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
@@ -59,13 +60,26 @@ serve(async (req) => {
 
     // Call Railway /garmin-login. May block up to ~15s while Railway either
     // completes login or detects an MFA prompt.
-    const loginRes = await fetch(`${GARMIN_RAILWAY_URL}/garmin-login`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
-    });
+    console.log("garmin-credential-login: calling Railway", { url: GARMIN_RAILWAY_URL, email_len: email.length });
+    let loginRes: Response;
+    try {
+      loginRes = await fetch(`${GARMIN_RAILWAY_URL}/garmin-login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+    } catch (fetchErr) {
+      console.error("Railway fetch failed:", fetchErr);
+      return new Response(JSON.stringify({ error: `Cannot reach Garmin service: ${fetchErr instanceof Error ? fetchErr.message : "network error"}` }), {
+        status: 502,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
-    const loginData = await loginRes.json().catch(() => ({} as any));
+    const rawText = await loginRes.text();
+    console.log("garmin-credential-login: Railway responded", { status: loginRes.status, body_preview: rawText.slice(0, 300) });
+    let loginData: any = {};
+    try { loginData = rawText ? JSON.parse(rawText) : {}; } catch { /* leave empty */ }
 
     if (!loginRes.ok) {
       const detail = typeof loginData?.detail === "string" ? loginData.detail : "Garmin login failed";

@@ -67,6 +67,12 @@ serve(async (req) => {
       });
     }
 
+    console.log("[garmin-sso-exchange] Forwarding to Railway:", {
+      ticket: ticket.substring(0, 20) + "...",
+      serviceUrl: exchangeServiceUrl,
+      user_id: user.id,
+    });
+
     const exchangeRes = await fetch(`${GARMIN_RAILWAY_URL}/garmin-exchange-ticket`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -75,7 +81,11 @@ serve(async (req) => {
 
     if (!exchangeRes.ok) {
       const errData = await exchangeRes.json().catch(() => ({}));
-      console.error("Garmin ticket exchange failed:", errData);
+      console.error("[garmin-sso-exchange] Railway ticket exchange failed:", {
+        status: exchangeRes.status,
+        error: errData,
+        serviceUrl: exchangeServiceUrl,
+      });
       return new Response(JSON.stringify({ error: errData.detail || errData.error || "Garmin ticket exchange failed" }), {
         status: exchangeRes.status === 429 ? 429 : 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },

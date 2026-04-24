@@ -133,8 +133,14 @@ serve(async (req) => {
     const oauth1 = typeof loginData?.oauth1_token === "string" ? loginData.oauth1_token : null;
     const oauth2 = typeof loginData?.oauth2_token === "string" ? loginData.oauth2_token : null;
     if (!oauth1 || !oauth2) {
-      console.error("Railway login succeeded but did not return tokens", loginData);
-      return new Response(JSON.stringify({ error: "Garmin service did not return tokens" }), {
+      console.error("Railway login succeeded but did not return tokens", {
+        status: loginRes.status,
+        body: loginData,
+        rawText,
+      });
+      return new Response(JSON.stringify({
+        error: "Garmin service did not return tokens. Redeploy Railway with the token-returning main.py.",
+      }), {
         status: 502,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });

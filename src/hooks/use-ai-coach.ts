@@ -198,7 +198,10 @@ export function useAICoach(open: boolean, onFreeLimit?: () => void) {
           .catch(() => {});
       } catch (e: any) {
         setMessages((m) => m.filter((x) => x.id !== placeholder.id));
-        if (e.status === 429) {
+        if (e.status === 403 && e.code === "free_limit_reached") {
+          setRemaining(0);
+          onFreeLimit?.();
+        } else if (e.status === 429) {
           setRemaining(0);
           toast.error(
             getLang() === "zh"
@@ -222,7 +225,7 @@ export function useAICoach(open: boolean, onFreeLimit?: () => void) {
         setSending(false);
       }
     },
-    [callFn, sending, sessionId],
+    [callFn, sending, sessionId, onFreeLimit],
   );
 
   const newConversation = useCallback(() => {

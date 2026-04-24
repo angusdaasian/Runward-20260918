@@ -8,6 +8,7 @@ import { useAppleHealth } from "@/hooks/use-apple-health";
 import { useGarmin } from "@/hooks/use-garmin";
 import { getAppEnvironment } from "@/lib/environment";
 import { GARMIN_SSO_KEYS, getGarminSsoValue } from "@/lib/garminSso";
+import GarminIframeDialog from "@/components/GarminIframeDialog";
 
 interface Props {
   lang: Lang;

@@ -118,14 +118,30 @@ serve(async (req) => {
       });
     }
 
-    // Case 2: full login succeeded. Persist the encrypted email.
+    // Case 2: full login succeeded. Persist the encrypted email AND tokens.
     const emailEncrypted = await encryptString(email);
+
+    // Railway returns oauth1_token and oauth2_token JSON strings on success.
+    const oauth1 = typeof loginData?.oauth1_token === "string" ? loginData.oauth1_token : null;
+    const oauth2 = typeof loginData?.oauth2_token === "string" ? loginData.oauth2_token : null;
+    if (!oauth1 || !oauth2) {
+      console.error("Railway login succeeded but did not return tokens", loginData);
+      return new Response(JSON.stringify({ error: "Garmin service did not return tokens" }), {
+        status: 502,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const oauth1Encrypted = await encryptString(oauth1);
+    const oauth2Encrypted = await encryptString(oauth2);
+
     const { error: upsertError } = await supabase
       .from("garmin_connections")
       .upsert({
         user_id: user.id,
         garmin_email_encrypted: emailEncrypted,
         garmin_display_name: email,
+        oauth1_token_encrypted: oauth1Encrypted,
+        oauth2_token_encrypted: oauth2Encrypted,
         needs_reauth: false,
         // Legacy column kept for backwards compat — no longer used.
         access_token: email,

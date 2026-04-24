@@ -47,247 +47,70 @@ export function useGarmin(lang: Lang) {
   }, [user, queryClient]);
 
   /**
-   * Connects Garmin. On desktop, opens a popup to Garmin's real SSO page.
-   * On mobile (where popups are unreliable / often blocked), does a full-page redirect
-   * and resumes the exchange when the user lands back on the app.
+   * Iframe-based Garmin connect flow.
+   *
+   * Step 1: prepareConnect() — fetches the iframe URL from the backend.
+   * Step 2: parent component renders <GarminIframeDialog> with that URL.
+   * Step 3: dialog receives a postMessage with `serviceTicket` from Garmin's
+   *         casEmbedSuccess.html and calls completeConnect(ticket).
+   *
+   * This is the only flow that works on custom domains — Garmin's CAS
+   * silently rejects non-Garmin `service` URLs, so we use
+   * `service=https://sso.garmin.com/sso/embed` and grab the ticket via
+   * window.postMessage from inside an iframe.
    */
-  const connectViaPopup = useCallback(async (): Promise<{ ok: boolean; displayName?: string }> => {
-    if (!user) return { ok: false };
-
-    // Mobile: prefer a real popup / in-app browser window so Garmin MFA runs in a
-    // top-level browsing context instead of inside our iframe bridge page.
-    // If popups are unavailable, fall back to the full-page bridge route.
-    const isMobile = /iphone|ipad|ipod|android/i.test(navigator.userAgent);
-    const isNative = isNativeApp() || /despia/i.test(navigator.userAgent) || typeof (window as Window & { despia?: unknown }).despia !== "undefined";
-
-    if (isMobile) {
-      const popup = isNative ? null : window.open("about:blank", "garmin-sso-mobile", "width=520,height=720");
-      setConnecting(true);
-      try {
-        const { data: startData, error: startErr } = await supabase.functions.invoke("garmin-sso-start", {
-          body: { origin: window.location.origin, deeplink_scheme: GARMIN_NATIVE_DEEPLINK_SCHEME },
-        });
-        if (startErr || !startData?.url) {
-          const msg = await extractFunctionErrorMessage(startErr) || "Failed to start Garmin sign-in";
-          toast.error(lang === "zh" ? `Garmin 連結失敗:${msg}` : msg);
-          if (popup && !popup.closed) popup.close();
-          setConnecting(false);
-          return { ok: false };
-        }
-
-        const mobileEmbedUrl = startData.mobile_embed_url ?? startData.url ?? "";
-        const mobileServiceUrl = startData.service_url ?? "https://sso.garmin.com/sso/embed";
-        const nativeServiceUrl = startData.native_service_url ?? mobileServiceUrl;
-
-        clearGarminSsoTransientState();
-        setGarminSsoValue(GARMIN_SSO_KEYS.callback, startData.callback ?? "");
-        setGarminSsoValue(GARMIN_SSO_KEYS.pending, "1");
-        setGarminSsoValue(GARMIN_SSO_KEYS.mobileEmbedUrl, mobileEmbedUrl);
-        setGarminSsoValue(GARMIN_SSO_KEYS.mobileServiceUrl, isNative ? nativeServiceUrl : mobileServiceUrl);
-
-        if (isNative) {
-          const nativeAuthUrl = startData.native_url ?? startData.url;
-          setGarminSsoValue(GARMIN_SSO_KEYS.pending, "1");
-          console.log("[useGarmin] Opening native auth", { nativeAuthUrl, nativeServiceUrl });
-          await despia(`oauth://?url=${encodeURIComponent(nativeAuthUrl)}`);
-          return { ok: false };
-        }
-
-        if (!popup) {
-          window.location.href = "/garmin-mobile-auth";
-          return { ok: false };
-        }
-
-        const popupUrl = `/garmin-mobile-auth?popup=1&embedUrl=${encodeURIComponent(mobileEmbedUrl)}&serviceUrl=${encodeURIComponent(mobileServiceUrl)}`;
-        popup.location.href = popupUrl;
-
-        const result = await new Promise<{ ok: boolean; displayName?: string; error?: string } | null>((resolve) => {
-          const TIMEOUT_MS = 5 * 60 * 1000;
-          let pollTimer: number | undefined;
-          let timeoutTimer: number | undefined;
-
-          const cleanup = () => {
-            window.removeEventListener("message", onMessage);
-            window.removeEventListener("storage", onStorage);
-            if (pollTimer) window.clearInterval(pollTimer);
-            if (timeoutTimer) window.clearTimeout(timeoutTimer);
-          };
-
-          const resolveFromStoredResult = () => {
-            const raw = getGarminSsoValue(GARMIN_SSO_KEYS.result);
-            if (!raw) return false;
-            try {
-              const parsed = JSON.parse(raw) as { ok: boolean; displayName?: string; error?: string };
-              cleanup();
-              resolve(parsed);
-              return true;
-            } catch {
-              return false;
-            }
-          };
-
-          const onMessage = (ev: MessageEvent) => {
-            if (ev.origin !== window.location.origin) return;
-            const data = ev.data;
-            if (!data || typeof data !== "object") return;
-            if (data.type === "garmin-mobile-result" && data.result && typeof data.result === "object") {
-              console.log("[Garmin] mobile popup result received", data.result);
-              cleanup();
-              resolve(data.result as { ok: boolean; displayName?: string; error?: string });
-            }
-          };
-
-          const onStorage = (ev: StorageEvent) => {
-            if (ev.key === GARMIN_SSO_KEYS.result && ev.newValue) {
-              resolveFromStoredResult();
-            }
-          };
-
-          window.addEventListener("message", onMessage);
-          window.addEventListener("storage", onStorage);
-
-          if (resolveFromStoredResult()) return;
-
-          pollTimer = window.setInterval(() => {
-            if (resolveFromStoredResult()) return;
-            if (popup.closed) {
-              cleanup();
-              resolve({ ok: false, error: lang === "zh" ? "Garmin 登入視窗已關閉" : "Garmin sign-in window was closed" });
-            }
-          }, 500);
-
-          timeoutTimer = window.setTimeout(() => {
-            cleanup();
-            if (!popup.closed) popup.close();
-            resolve({ ok: false, error: lang === "zh" ? "Garmin 登入逾時，請再試一次" : "Garmin sign-in timed out. Please try again." });
-          }, TIMEOUT_MS);
-        });
-
-        clearGarminSsoTransientState();
-
-        if (!result?.ok) {
-          if (result?.error) toast.error(result.error);
-          return { ok: false };
-        }
-
-        toast.success(lang === "zh" ? "Garmin 已連結！" : "Garmin connected!");
-        invalidateActivities();
-        return { ok: true, displayName: result.displayName };
-      } catch (err) {
-        console.error("Garmin redirect start error:", err);
-        clearGarminSsoTransientState();
-        const msg = await extractFunctionErrorMessage(err);
-        toast.error(lang === "zh" ? `Garmin 連結失敗${msg ? `:${msg}` : ""}` : msg || "Garmin connection failed");
-        if (popup && !popup.closed) popup.close();
-        setConnecting(false);
-        return { ok: false };
-      } finally {
-        setConnecting(false);
-      }
-    }
-
-    // Desktop: popup flow.
-    // Open a placeholder popup *synchronously* from the click handler so popup blockers don't trip.
-    const popup = window.open("about:blank", "garmin-sso", "width=520,height=720");
-    if (!popup) {
-      toast.error(
-        lang === "zh"
-          ? "請允許彈出視窗以登入 Garmin"
-          : "Please allow popups to sign in to Garmin"
-      );
-      return { ok: false };
-    }
-
+  const prepareConnect = useCallback(async (): Promise<{ iframeUrl: string } | null> => {
+    if (!user) return null;
     setConnecting(true);
     try {
-      // 1) Get the SSO URL (and the callback we registered) from the edge function.
-      const { data: startData, error: startErr } = await supabase.functions.invoke("garmin-sso-start", {
+      const { data, error } = await supabase.functions.invoke("garmin-sso-start", {
         body: { origin: window.location.origin },
       });
-      if (startErr || !startData?.url) {
-        const msg = await extractFunctionErrorMessage(startErr) || "Failed to start Garmin sign-in";
-        toast.error(lang === "zh" ? `Garmin 連結失敗：${msg}` : msg);
-        popup.close();
-        return { ok: false };
+      if (error || !data?.iframe_url) {
+        const msg = await extractFunctionErrorMessage(error) || "Failed to start Garmin sign-in";
+        toast.error(lang === "zh" ? `Garmin 連結失敗:${msg}` : msg);
+        setConnecting(false);
+        return null;
       }
-
-      popup.location.href = startData.url;
-
-      // 2) Wait for postMessage from /garmin-callback (or popup-closed timeout).
-      const ticket = await new Promise<string | null>((resolve) => {
-        const TIMEOUT_MS = 5 * 60 * 1000;
-        let pollTimer: number | undefined;
-        let timeoutTimer: number | undefined;
-
-        const cleanup = () => {
-          window.removeEventListener("message", onMessage);
-          if (pollTimer) window.clearInterval(pollTimer);
-          if (timeoutTimer) window.clearTimeout(timeoutTimer);
-        };
-
-        const onMessage = (ev: MessageEvent) => {
-          if (ev.origin !== window.location.origin) return;
-          const data = ev.data;
-          if (!data || typeof data !== "object") return;
-          if (data.type === "garmin-ticket" && typeof data.ticket === "string") {
-            cleanup();
-            resolve(data.ticket);
-          } else if (data.type === "garmin-ticket-error") {
-            cleanup();
-            toast.error(
-              lang === "zh"
-                ? `Garmin 登入失敗：${data.error || "未知錯誤"}`
-                : `Garmin sign-in failed: ${data.error || "unknown error"}`
-            );
-            resolve(null);
-          }
-        };
-
-        window.addEventListener("message", onMessage);
-
-        // Detect manual close.
-        pollTimer = window.setInterval(() => {
-          if (popup.closed) {
-            cleanup();
-            resolve(null);
-          }
-        }, 500);
-
-        timeoutTimer = window.setTimeout(() => {
-          cleanup();
-          if (!popup.closed) popup.close();
-          resolve(null);
-        }, TIMEOUT_MS);
-      });
-
-      if (!ticket) {
-        return { ok: false };
-      }
-
-      // 3) Exchange the ticket on the backend.
-      const { data: exData, error: exErr } = await supabase.functions.invoke("garmin-sso-exchange", {
-        body: { ticket, callback: startData.callback },
-      });
-
-      if (exErr || !exData?.success) {
-        const msg = exData?.error || await extractFunctionErrorMessage(exErr) || "Garmin connection failed";
-        toast.error(lang === "zh" ? `Garmin 連結失敗：${msg}` : msg);
-        return { ok: false };
-      }
-
-      toast.success(lang === "zh" ? "Garmin 已連結！" : "Garmin connected!");
-      invalidateActivities();
-      return { ok: true, displayName: exData.display_name };
+      return { iframeUrl: data.iframe_url };
     } catch (err) {
-      console.error("Garmin connectViaPopup error:", err);
+      console.error("[useGarmin] prepareConnect error:", err);
       const msg = await extractFunctionErrorMessage(err);
-      toast.error(lang === "zh" ? `Garmin 連結失敗${msg ? `：${msg}` : ""}` : msg || "Garmin connection failed");
+      toast.error(lang === "zh" ? `Garmin 連結失敗${msg ? `:${msg}` : ""}` : msg || "Garmin connection failed");
+      setConnecting(false);
+      return null;
+    }
+  }, [user, lang]);
+
+  const completeConnect = useCallback(async (ticket: string): Promise<{ ok: boolean; displayName?: string }> => {
+    if (!user) return { ok: false };
+    try {
+      const { data, error } = await supabase.functions.invoke("garmin-sso-exchange", {
+        body: { ticket },
+      });
+      if (error || !data?.success) {
+        const msg = data?.error || await extractFunctionErrorMessage(error) || "Garmin connection failed";
+        toast.error(lang === "zh" ? `Garmin 連結失敗:${msg}` : msg);
+        return { ok: false };
+      }
+      toast.success(lang === "zh" ? "Garmin 已連結!" : "Garmin connected!");
+      invalidateActivities();
+      return { ok: true, displayName: data.display_name };
+    } catch (err) {
+      console.error("[useGarmin] completeConnect error:", err);
+      const msg = await extractFunctionErrorMessage(err);
+      toast.error(lang === "zh" ? `Garmin 連結失敗${msg ? `:${msg}` : ""}` : msg || "Garmin connection failed");
       return { ok: false };
     } finally {
       setConnecting(false);
-      if (!popup.closed) popup.close();
     }
   }, [user, lang, invalidateActivities]);
+
+  const cancelConnect = useCallback(() => {
+    setConnecting(false);
+    clearGarminSsoTransientState();
+  }, []);
+
 
   const syncActivities = useCallback(async (days = 30): Promise<boolean> => {
     if (!user) return false;

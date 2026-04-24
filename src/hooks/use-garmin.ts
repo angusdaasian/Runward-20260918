@@ -174,5 +174,5 @@ export function useGarmin(lang: Lang) {
     }
   }, [user, lang, invalidateActivities]);
 
-  return { connectViaPopup, syncActivities, disconnect, connecting, syncing };
+  return { prepareConnect, completeConnect, cancelConnect, syncActivities, disconnect, connecting, syncing };
 }

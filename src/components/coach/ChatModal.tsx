@@ -21,14 +21,8 @@ const ChatModal = ({ open, onClose, lang }: Props) => {
   const [input, setInput] = useState("");
   const [showSettings, setShowSettings] = useState(false);
   const [sessionMenuOpen, setSessionMenuOpen] = useState(false);
-  const [dragY, setDragY] = useState(0);
-  const [isDragging, setIsDragging] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const dragStartRef = useRef<{ y: number; pointerId: number; scrollTop: number } | null>(null);
-  const messagesContainerRef = useRef<HTMLDivElement>(null);
-
-  const SWIPE_CLOSE_THRESHOLD = 120;
 
   const {
     messages,

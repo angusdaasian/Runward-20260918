@@ -257,6 +257,111 @@ const ConnectApps = ({ lang, onBack }: Props) => {
           )}
         </div>
 
+        {/* Sahha.ai — TEST integration */}
+        <div className="bg-card border border-border rounded-xl p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-purple-500/10 flex items-center justify-center">
+                <FlaskConical size={20} className="text-purple-500" />
+              </div>
+              <div>
+                <span className="font-medium text-foreground block">
+                  Sahha.ai <span className="text-[10px] uppercase tracking-wide text-muted-foreground">(test)</span>
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  {lang === "zh"
+                    ? "測試健康數據（沙盒環境）"
+                    : "Test health data integration (sandbox)"}
+                </span>
+              </div>
+            </div>
+            {sahhaConnected ? (
+              <div className="flex items-center gap-2">
+                <Check size={16} className="text-green-500" />
+                <button
+                  onClick={async () => {
+                    const ok = await sahha.disconnect();
+                    if (ok) setSahhaConnected(false);
+                  }}
+                  className="text-xs text-destructive hover:underline"
+                >
+                  {lang === "zh" ? "中斷" : "Disconnect"}
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={async () => {
+                  const ok = await sahha.connect();
+                  if (ok) setSahhaConnected(true);
+                }}
+                disabled={sahha.loading}
+                className="text-xs font-medium px-3 py-1 rounded-full text-primary-foreground bg-primary disabled:opacity-50"
+              >
+                {sahha.loading
+                  ? (lang === "zh" ? "連結中..." : "Connecting...")
+                  : (lang === "zh" ? "連結" : "Connect")}
+              </button>
+            )}
+          </div>
+
+          {sahhaConnected && (
+            <div className="mt-3 pt-3 border-t border-border space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[11px] text-muted-foreground truncate">
+                  {lang === "zh" ? "外部 ID（externalId）：" : "Your externalId:"}{" "}
+                  <code className="text-foreground">{user?.id}</code>
+                </span>
+                <button
+                  onClick={() => {
+                    if (user?.id) {
+                      navigator.clipboard.writeText(user.id);
+                      toast.success(lang === "zh" ? "已複製" : "Copied");
+                    }
+                  }}
+                  className="p-1 text-muted-foreground hover:text-foreground"
+                  aria-label="Copy externalId"
+                >
+                  <Copy size={14} />
+                </button>
+              </div>
+
+              <div className="flex gap-2">
+                <button
+                  onClick={() => sahha.fetchScores()}
+                  disabled={sahha.loading}
+                  className="flex-1 text-xs font-medium px-3 py-2 rounded-lg bg-secondary text-secondary-foreground hover:bg-secondary/80 disabled:opacity-50"
+                >
+                  {lang === "zh" ? "取得分數" : "Fetch Scores"}
+                </button>
+                <button
+                  onClick={() => sahha.fetchBiomarkers()}
+                  disabled={sahha.loading}
+                  className="flex-1 text-xs font-medium px-3 py-2 rounded-lg bg-secondary text-secondary-foreground hover:bg-secondary/80 disabled:opacity-50"
+                >
+                  {lang === "zh" ? "取得生物指標" : "Fetch Biomarkers"}
+                </button>
+              </div>
+
+              {sahha.lastResult != null && (
+                <details open className="text-[11px]">
+                  <summary className="cursor-pointer text-muted-foreground select-none">
+                    {lang === "zh" ? "上次回應 (JSON)" : "Last response (JSON)"}
+                  </summary>
+                  <pre className="mt-2 p-2 rounded-lg bg-muted text-foreground overflow-auto max-h-64 text-[10px] leading-snug">
+                    {JSON.stringify(sahha.lastResult, null, 2)}
+                  </pre>
+                </details>
+              )}
+
+              <p className="text-[11px] text-muted-foreground leading-relaxed">
+                {lang === "zh"
+                  ? "提示：在 Sahha 控制台用上述 externalId 建立 Sample Profile,或用 Demo App 推送資料,然後按「取得分數」驗證。"
+                  : "Tip: In the Sahha dashboard, create a Sample Profile using the externalId above (or use the Demo App to push real phone data), then press Fetch Scores to verify."}
+              </p>
+            </div>
+          )}
+        </div>
+
         {/* Strava — temporarily disabled */}
         <div className="bg-card border border-border rounded-xl p-4 opacity-50">
           <div className="flex items-center justify-between">

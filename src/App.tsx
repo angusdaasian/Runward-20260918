@@ -22,6 +22,17 @@ const queryClient = new QueryClient();
 const native = isNativeApp();
 registerShareIntent();
 
+// Route `/` → Index when:
+//  - we're inside the native app, OR
+//  - the URL carries in-app query params (e.g. ?tab=more&page=connect-apps)
+//    used by post-OAuth/SSO redirects. Otherwise show the marketing Landing.
+const RootRoute = () => {
+  if (native) return <Index />;
+  const params = new URLSearchParams(window.location.search);
+  if (params.has("tab") || params.has("page")) return <Index />;
+  return <Landing />;
+};
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
@@ -31,7 +42,7 @@ const App = () => (
           <Sonner />
           <BrowserRouter>
             <Routes>
-              <Route path="/" element={native ? <Index /> : <Landing />} />
+              <Route path="/" element={<RootRoute />} />
               <Route path="/callback/apple" element={<AppleCallback />} />
               <Route path="/garmin-callback" element={<GarminCallback />} />
               <Route path="/garmin-mobile-auth" element={<GarminMobileAuth />} />

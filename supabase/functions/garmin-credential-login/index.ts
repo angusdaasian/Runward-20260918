@@ -60,7 +60,6 @@ serve(async (req) => {
 
     // Call Railway /garmin-login. May block up to ~15s while Railway either
     // completes login or detects an MFA prompt.
-    console.log("garmin-credential-login: calling Railway", { url: GARMIN_RAILWAY_URL, email_len: email.length });
     let loginRes: Response;
     try {
       loginRes = await fetch(`${GARMIN_RAILWAY_URL}/garmin-login`, {
@@ -77,9 +76,16 @@ serve(async (req) => {
     }
 
     const rawText = await loginRes.text();
-    console.log("garmin-credential-login: Railway responded", { status: loginRes.status, body_preview: rawText.slice(0, 300) });
     let loginData: any = {};
     try { loginData = rawText ? JSON.parse(rawText) : {}; } catch { /* leave empty */ }
+
+    if (loginRes.status === 404) {
+      console.error("Railway /garmin-login returned 404 — backend not updated to MFA version");
+      return new Response(JSON.stringify({ error: "Garmin service is outdated — please redeploy the Railway backend with /garmin-login and /garmin-login-mfa endpoints" }), {
+        status: 502,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     if (!loginRes.ok) {
       const detail = typeof loginData?.detail === "string" ? loginData.detail : "Garmin login failed";

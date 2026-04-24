@@ -1,4 +1,4 @@
-import { ArrowLeft, Check, RefreshCw, Info, AlertTriangle } from "lucide-react";
+import { ArrowLeft, Check, RefreshCw, Info, AlertTriangle, Copy, FlaskConical } from "lucide-react";
 import { Lang, t } from "@/lib/i18n";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -6,6 +6,7 @@ import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 import { useAppleHealth } from "@/hooks/use-apple-health";
 import { useGarmin } from "@/hooks/use-garmin";
+import { useSahha } from "@/hooks/use-sahha";
 import { getAppEnvironment } from "@/lib/environment";
 import GarminCredentialDialog from "@/components/GarminCredentialDialog";
 

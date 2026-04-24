@@ -23,6 +23,9 @@ const THINKING_LIMITS: Record<ThinkingLevel, number> = {
   high: 40,
 };
 
+// Free (non-premium) users get a small daily allowance, locked to minimal.
+const FREE_DAILY_LIMIT = 15;
+
 // Token budget passed to Gemini's thinkingConfig.thinkingBudget.
 // 0 disables thinking; higher = more deliberation.
 const THINKING_BUDGETS: Record<ThinkingLevel, number> = {

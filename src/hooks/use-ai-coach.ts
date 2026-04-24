@@ -198,8 +198,8 @@ export function useAICoach(open: boolean) {
           setRemaining(0);
           toast.error(
             getLang() === "zh"
-              ? "已達到每日訊息上限 (100 則)。將於午夜重置。"
-              : "Daily message limit reached (100/day). Resets at midnight.",
+              ? "已達到今日訊息上限。將於午夜重置。"
+              : "Daily message limit reached. Resets at midnight.",
           );
         } else if (e.status === 403) {
           toast.error(

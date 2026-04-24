@@ -1,0 +1,407 @@
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+};
+const jsonHeaders = { ...corsHeaders, "Content-Type": "application/json" };
+const json = (body: Record<string, unknown>, status = 200) =>
+  new Response(JSON.stringify(body), { status, headers: jsonHeaders });
+
+const DAILY_LIMIT = 100;
+const MODEL = "gemini-3.1-flash-lite-preview";
+
+// ── Vertex AI helper ──
+async function callVertexAI(opts: {
+  apiKey: string;
+  systemPrompt?: string;
+  messages: Array<{ role: "user" | "assistant" | "system"; content: string }>;
+  temperature?: number;
+  maxOutputTokens?: number;
+}): Promise<string> {
+  const url = `https://aiplatform.googleapis.com/v1/publishers/google/models/${MODEL}:generateContent?key=${opts.apiKey}`;
+  const systemParts: any[] = [];
+  const contents: any[] = [];
+  if (opts.systemPrompt) systemParts.push({ text: opts.systemPrompt });
+  for (const m of opts.messages) {
+    if (m.role === "system") {
+      systemParts.push({ text: m.content });
+      continue;
+    }
+    contents.push({
+      role: m.role === "assistant" ? "model" : "user",
+      parts: [{ text: m.content }],
+    });
+  }
+  const body: any = {
+    contents,
+    generationConfig: {
+      temperature: opts.temperature ?? 0.7,
+      maxOutputTokens: opts.maxOutputTokens ?? 1024,
+    },
+  };
+  if (systemParts.length) body.systemInstruction = { parts: systemParts };
+
+  const r = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!r.ok) {
+    const t = await r.text();
+    throw new Error(`Vertex AI error ${r.status}: ${t.slice(0, 300)}`);
+  }
+  const data = await r.json();
+  return (
+    data?.candidates?.[0]?.content?.parts?.map((p: any) => p.text || "").join("") || ""
+  );
+}
+
+function pace(distMeters: number, secs: number): string {
+  if (!distMeters || !secs) return "—";
+  const km = distMeters / 1000;
+  if (km < 0.05) return "—";
+  const paceSecPerKm = secs / km;
+  const m = Math.floor(paceSecPerKm / 60);
+  const s = Math.round(paceSecPerKm % 60);
+  return `${m}:${s.toString().padStart(2, "0")}/km`;
+}
+
+function buildActivitySummary(rows: any[], units: string): string {
+  if (!rows.length) return "No recent runs in last 7 days.";
+  const conv = units === "miles" ? 0.000621371 : 0.001;
+  const unit = units === "miles" ? "mi" : "km";
+  return rows
+    .slice(0, 10)
+    .map((a) => {
+      const date = new Date(a.start_time || a.start_date).toISOString().slice(0, 10);
+      const distRaw = a.distance_meters ?? (a.distance ? a.distance : 0);
+      const dist = (distRaw * conv).toFixed(2);
+      const dur = a.duration_seconds ?? a.moving_time ?? 0;
+      const min = Math.round(dur / 60);
+      return `- ${date}: ${dist}${unit}, ${min}min, ${pace(distRaw, dur)}, HR avg ${a.average_hr ?? a.average_heartrate ?? "—"}`;
+    })
+    .join("\n");
+}
+
+serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+
+  try {
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+    const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const VERTEX_API_KEY = Deno.env.get("GOOGLE_VERTEX_API_KEY");
+    if (!VERTEX_API_KEY) return json({ error: "AI not configured" }, 500);
+
+    const authHeader = req.headers.get("Authorization") || "";
+    const token = authHeader.replace("Bearer ", "");
+    if (!token) return json({ error: "Unauthorized" }, 401);
+
+    const userClient = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_ANON_KEY")!, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const {
+      data: { user },
+      error: authErr,
+    } = await userClient.auth.getUser(token);
+    if (authErr || !user) return json({ error: "Unauthorized" }, 401);
+
+    const admin = createClient(SUPABASE_URL, SERVICE_ROLE);
+
+    const url = new URL(req.url);
+    const action = url.searchParams.get("action");
+
+    // ── PREFERENCES (read/write) ──
+    if (action === "preferences") {
+      if (req.method === "GET") {
+        const { data } = await admin
+          .from("ai_coach_preferences")
+          .select("*")
+          .eq("user_id", user.id)
+          .maybeSingle();
+        return json({ preferences: data || null });
+      }
+      if (req.method === "POST") {
+        const patch = await req.json();
+        const allowed = [
+          "preferred_units",
+          "training_goal",
+          "target_race_date",
+          "experience_level",
+          "training_days",
+          "injuries_concerns",
+          "training_intensity",
+        ];
+        const cleaned: any = { user_id: user.id };
+        for (const k of allowed) if (k in patch) cleaned[k] = patch[k];
+        const { data, error } = await admin
+          .from("ai_coach_preferences")
+          .upsert(cleaned, { onConflict: "user_id" })
+          .select()
+          .single();
+        if (error) return json({ error: error.message }, 400);
+        return json({ preferences: data });
+      }
+    }
+
+    // ── INSIGHTS (read) ──
+    if (action === "insights" && req.method === "GET") {
+      const { data } = await admin
+        .from("ai_coach_insights")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("confidence", { ascending: false })
+        .limit(20);
+      return json({ insights: data || [] });
+    }
+
+    // ── HISTORY (read) ──
+    if (action === "history" && req.method === "GET") {
+      const sessionId = url.searchParams.get("session_id");
+      let q = admin
+        .from("ai_coach_conversations")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: true })
+        .limit(50);
+      if (sessionId) q = q.eq("session_id", sessionId);
+      const { data } = await q;
+      return json({ messages: data || [] });
+    }
+
+    // ── RESET MEMORY ──
+    if (action === "reset" && req.method === "POST") {
+      await admin.from("ai_coach_conversations").delete().eq("user_id", user.id);
+      await admin.from("ai_coach_insights").delete().eq("user_id", user.id);
+      return json({ ok: true });
+    }
+
+    // ── USAGE (read) ──
+    if (action === "usage" && req.method === "GET") {
+      const today = new Date().toISOString().slice(0, 10);
+      const { data } = await admin
+        .from("ai_coach_usage")
+        .select("message_count")
+        .eq("user_id", user.id)
+        .eq("date", today)
+        .maybeSingle();
+      const used = data?.message_count ?? 0;
+      return json({ remaining: Math.max(0, DAILY_LIMIT - used), used, limit: DAILY_LIMIT });
+    }
+
+    // ── CHAT ──
+    if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
+
+    // Premium check
+    const { data: profile } = await admin
+      .from("profiles")
+      .select("is_premium, display_name")
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (!profile?.is_premium) {
+      return json({ error: "Premium required", code: "premium_required" }, 403);
+    }
+
+    // Rate limit
+    const today = new Date().toISOString().slice(0, 10);
+    const { data: usageRow } = await admin
+      .from("ai_coach_usage")
+      .select("message_count")
+      .eq("user_id", user.id)
+      .eq("date", today)
+      .maybeSingle();
+    const usedToday = usageRow?.message_count ?? 0;
+    if (usedToday >= DAILY_LIMIT) {
+      return json(
+        { error: "Daily limit reached", code: "rate_limited", remaining_messages_today: 0 },
+        429,
+      );
+    }
+
+    const { message, session_id, new_session, lang } = await req.json();
+    if (!message || typeof message !== "string" || message.length > 4000) {
+      return json({ error: "Invalid message" }, 400);
+    }
+    const sessionId =
+      new_session || !session_id ? crypto.randomUUID() : session_id;
+
+    // Load context in parallel
+    const [prefsR, historyR, insightsR, garminR, stravaR, appleR] =
+      await Promise.all([
+        admin.from("ai_coach_preferences").select("*").eq("user_id", user.id).maybeSingle(),
+        admin
+          .from("ai_coach_conversations")
+          .select("role, content")
+          .eq("user_id", user.id)
+          .eq("session_id", sessionId)
+          .order("created_at", { ascending: true })
+          .limit(10),
+        admin
+          .from("ai_coach_insights")
+          .select("insight_key, insight_value, confidence")
+          .eq("user_id", user.id)
+          .order("confidence", { ascending: false })
+          .limit(15),
+        admin
+          .from("garmin_activities")
+          .select("start_time, distance_meters, duration_seconds, average_hr, activity_type")
+          .eq("user_id", user.id)
+          .gte("start_time", new Date(Date.now() - 7 * 86400000).toISOString())
+          .order("start_time", { ascending: false })
+          .limit(10),
+        admin
+          .from("strava_activities")
+          .select("start_date, distance, moving_time, average_heartrate, sport_type")
+          .eq("user_id", user.id)
+          .gte("start_date", new Date(Date.now() - 7 * 86400000).toISOString())
+          .order("start_date", { ascending: false })
+          .limit(10),
+        admin
+          .from("apple_health_activities")
+          .select("start_date, distance, moving_time, average_heartrate, sport_type")
+          .eq("user_id", user.id)
+          .gte("start_date", new Date(Date.now() - 7 * 86400000).toISOString())
+          .order("start_date", { ascending: false })
+          .limit(10),
+      ]);
+
+    const prefs = prefsR.data;
+    const history = historyR.data || [];
+    const insights = insightsR.data || [];
+    const allActs = [
+      ...(garminR.data || []).map((a: any) => ({
+        ...a,
+        start_date: a.start_time,
+        distance: a.distance_meters,
+        moving_time: a.duration_seconds,
+        average_heartrate: a.average_hr,
+      })),
+      ...(stravaR.data || []),
+      ...(appleR.data || []),
+    ].sort(
+      (a: any, b: any) =>
+        new Date(b.start_date).getTime() - new Date(a.start_date).getTime(),
+    );
+
+    const units = prefs?.preferred_units || "kilometers";
+    const userLang = lang === "zh" ? "Traditional Chinese (Hong Kong)" : "English";
+    const distUnit = units === "miles" ? "miles" : "kilometers";
+
+    const insightsBlock = insights.length
+      ? insights
+          .map((i: any) => `- ${i.insight_key}: ${i.insight_value} (conf ${i.confidence})`)
+          .join("\n")
+      : "(none yet)";
+
+    const prefsBlock = prefs
+      ? `
+- Preferred units: ${prefs.preferred_units}
+- Training goal: ${prefs.training_goal || "not set"}
+- Target race date: ${prefs.target_race_date || "not set"}
+- Experience level: ${prefs.experience_level || "not set"}
+- Available training days: ${JSON.stringify(prefs.training_days || [])}
+- Injuries/concerns: ${prefs.injuries_concerns || "none reported"}
+- Training intensity preference: ${prefs.training_intensity || "moderate"}`
+      : "(no preferences set yet — gently ask onboarding questions across replies)";
+
+    const systemPrompt = `You are an expert AI Running Coach for an athlete named ${profile?.display_name || "the runner"}.
+
+REPLY LANGUAGE: ${userLang}. Always answer in this language regardless of the language of the user's question.
+
+USER PROFILE:${prefsBlock}
+
+LEARNED INSIGHTS:
+${insightsBlock}
+
+RECENT 7-DAY ACTIVITY:
+${buildActivitySummary(allActs, units)}
+
+COACHING STYLE:
+- Address the runner by name when natural.
+- Reference their actual recent runs and past conversations ("I see you ran X on Y…", "as we discussed…").
+- Use ${distUnit} for all distances and paces.
+- Adapt to experience level (beginner gets simple language; elite gets technical detail).
+- Keep responses concise: 2-4 short paragraphs. Use markdown for lists where it helps.
+- Be encouraging, supportive, consistent.
+
+SAFETY:
+- Never diagnose injuries — recommend a medical professional for any pain.
+- Encourage rest days and listening to the body.
+- Don't prescribe extreme training jumps.
+
+If the user has no preferences set yet, ask ONE friendly onboarding question per reply (experience, goal, days/week) — not all at once.`;
+
+    const messages: Array<{ role: "user" | "assistant"; content: string }> = [
+      ...history.map((m: any) => ({ role: m.role as "user" | "assistant", content: m.content })),
+      { role: "user", content: message },
+    ];
+
+    const aiText = await callVertexAI({
+      apiKey: VERTEX_API_KEY,
+      systemPrompt,
+      messages,
+      temperature: 0.7,
+      maxOutputTokens: 1024,
+    });
+
+    // Persist messages + usage
+    await admin.from("ai_coach_conversations").insert([
+      { user_id: user.id, session_id: sessionId, role: "user", content: message },
+      { user_id: user.id, session_id: sessionId, role: "assistant", content: aiText },
+    ]);
+    await admin
+      .from("ai_coach_usage")
+      .upsert(
+        { user_id: user.id, date: today, message_count: usedToday + 1 },
+        { onConflict: "user_id,date" },
+      );
+
+    // Fire-and-forget insight extraction
+    (async () => {
+      try {
+        const extractPrompt = `From this exchange, extract up to 3 short, durable insights about the runner (preferences, goals, challenges, achievements, style). Return ONLY a JSON array, no other text. Each item: {"type":"preference|goal|challenge|achievement","key":"snake_case_key","value":"short value","confidence":0..1}. If nothing notable, return [].
+
+USER: ${message}
+COACH: ${aiText}`;
+        const out = await callVertexAI({
+          apiKey: VERTEX_API_KEY,
+          messages: [{ role: "user", content: extractPrompt }],
+          temperature: 0.2,
+          maxOutputTokens: 400,
+        });
+        const m = out.match(/\[[\s\S]*\]/);
+        if (!m) return;
+        const arr = JSON.parse(m[0]);
+        if (!Array.isArray(arr)) return;
+        const rows = arr
+          .filter((x: any) => x?.key && x?.value)
+          .slice(0, 3)
+          .map((x: any) => ({
+            user_id: user.id,
+            insight_type: String(x.type || "preference").slice(0, 32),
+            insight_key: String(x.key).slice(0, 64),
+            insight_value: String(x.value).slice(0, 240),
+            confidence: Math.max(0, Math.min(1, Number(x.confidence) || 0.5)),
+          }));
+        if (rows.length) {
+          await admin
+            .from("ai_coach_insights")
+            .upsert(rows, { onConflict: "user_id,insight_key" });
+        }
+      } catch (e) {
+        console.warn("insight extraction failed", e);
+      }
+    })();
+
+    return json({
+      response: aiText,
+      session_id: sessionId,
+      remaining_messages_today: Math.max(0, DAILY_LIMIT - (usedToday + 1)),
+    });
+  } catch (e) {
+    console.error("ai-running-coach error", e);
+    return json({ error: e instanceof Error ? e.message : "Unknown error" }, 500);
+  }
+});

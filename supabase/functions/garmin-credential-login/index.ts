@@ -66,8 +66,6 @@ serve(async (req) => {
       });
     }
 
-    // Call Railway /garmin-login. May block up to ~15s while Railway either
-    // completes login or detects an MFA prompt.
     console.log("garmin-credential-login: calling Railway login");
     let loginRes: Response;
     try {
@@ -94,8 +92,8 @@ serve(async (req) => {
     }
 
     if (loginRes.status === 404) {
-      console.error("Railway /garmin-login returned 404 — backend not updated to MFA version");
-      return new Response(JSON.stringify({ error: "Garmin service is outdated — please redeploy the Railway backend with /garmin-login and /garmin-login-mfa endpoints" }), {
+      console.error("Railway /garmin-login returned 404 — backend not updated");
+      return new Response(JSON.stringify({ error: "Garmin service is outdated — please redeploy the Railway backend" }), {
         status: 502,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -110,23 +108,25 @@ serve(async (req) => {
       });
     }
 
-    // Case 1: MFA needed — pass the session_id back to the client. We do NOT
-    // store the email yet; we'll store it after MFA succeeds.
+    // Case 1: MFA required — return mfa_state + encrypted credentials so the
+    // client can submit the code without us holding any session in memory.
     if (loginData?.needs_mfa) {
       console.log("garmin-credential-login: MFA required");
-      const sessionId = loginData.session_id;
-      if (!sessionId) {
-        return new Response(JSON.stringify({ error: "Garmin returned MFA requirement without a session id" }), {
+      const mfaState = loginData.mfa_state;
+      if (!mfaState || typeof mfaState !== "string") {
+        return new Response(JSON.stringify({ error: "Garmin returned MFA requirement without state" }), {
           status: 502,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
       const emailEncrypted = await encryptString(email);
+      const passwordEncrypted = await encryptString(password);
       return new Response(JSON.stringify({
         success: true,
         mfa_required: true,
-        session_id: sessionId,
+        mfa_state: mfaState,
         email_encrypted: emailEncrypted,
+        password_encrypted: passwordEncrypted,
       }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });

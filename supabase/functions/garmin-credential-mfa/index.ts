@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { decryptString } from "../_shared/garminCrypto.ts";
+import { decryptString, encryptString } from "../_shared/garminCrypto.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -41,12 +41,13 @@ serve(async (req) => {
     }
 
     const body = await req.json().catch(() => ({}));
-    const sessionId = typeof body.session_id === "string" ? body.session_id : "";
+    const mfaState = typeof body.mfa_state === "string" ? body.mfa_state : "";
     const mfaCode = typeof body.mfa_code === "string" ? body.mfa_code.trim() : "";
     const emailEncrypted = typeof body.email_encrypted === "string" ? body.email_encrypted : "";
+    const passwordEncrypted = typeof body.password_encrypted === "string" ? body.password_encrypted : "";
 
-    if (!sessionId || !mfaCode || !emailEncrypted) {
-      return new Response(JSON.stringify({ error: "session_id, mfa_code and email_encrypted are required" }), {
+    if (!mfaState || !mfaCode || !emailEncrypted || !passwordEncrypted) {
+      return new Response(JSON.stringify({ error: "mfa_state, mfa_code, email_encrypted and password_encrypted are required" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -58,12 +59,13 @@ serve(async (req) => {
       });
     }
 
-    // Decrypt the email so we can persist it after MFA succeeds.
     let email: string;
+    let password: string;
     try {
       email = await decryptString(emailEncrypted);
+      password = await decryptString(passwordEncrypted);
     } catch (e) {
-      console.error("Failed to decrypt email_encrypted:", e);
+      console.error("Failed to decrypt credentials:", e);
       return new Response(JSON.stringify({ error: "Invalid session — please start over" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -73,19 +75,24 @@ serve(async (req) => {
     const mfaRes = await fetch(`${GARMIN_RAILWAY_URL}/garmin-login-mfa`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ session_id: sessionId, mfa_code: mfaCode }),
+      body: JSON.stringify({
+        mfa_state: mfaState,
+        mfa_code: mfaCode,
+        email,
+        password,
+      }),
     });
 
     const mfaData = await mfaRes.json().catch(() => ({} as any));
     if (!mfaRes.ok || !mfaData?.success) {
       const detail = typeof mfaData?.detail === "string" ? mfaData.detail : "MFA verification failed";
+      console.error("Railway MFA error:", { status: mfaRes.status, detail });
       return new Response(JSON.stringify({ error: detail }), {
         status: mfaRes.status >= 400 && mfaRes.status < 500 ? mfaRes.status : 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Railway returns oauth1_token and oauth2_token JSON strings after MFA succeeds.
     const oauth1 = typeof mfaData?.oauth1_token === "string" ? mfaData.oauth1_token : null;
     const oauth2 = typeof mfaData?.oauth2_token === "string" ? mfaData.oauth2_token : null;
     if (!oauth1 || !oauth2) {
@@ -95,11 +102,10 @@ serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    const { encryptString } = await import("../_shared/garminCrypto.ts");
+
     const oauth1Encrypted = await encryptString(oauth1);
     const oauth2Encrypted = await encryptString(oauth2);
 
-    // Persist the connection with tokens.
     const { error: upsertError } = await supabase
       .from("garmin_connections")
       .upsert({
@@ -109,7 +115,7 @@ serve(async (req) => {
         oauth1_token_encrypted: oauth1Encrypted,
         oauth2_token_encrypted: oauth2Encrypted,
         needs_reauth: false,
-        access_token: email, // legacy column, kept in sync
+        access_token: email,
       }, { onConflict: "user_id" });
 
     if (upsertError) {

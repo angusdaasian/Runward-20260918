@@ -31,8 +31,9 @@ const GarminCredentialDialog = ({ open, lang, onOpenChange, onSuccess }: Props) 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [mfaCode, setMfaCode] = useState("");
-  const [sessionId, setSessionId] = useState("");
+  const [mfaState, setMfaState] = useState("");
   const [emailEncrypted, setEmailEncrypted] = useState("");
+  const [passwordEncrypted, setPasswordEncrypted] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   const reset = () => {
@@ -40,8 +41,9 @@ const GarminCredentialDialog = ({ open, lang, onOpenChange, onSuccess }: Props) 
     setEmail("");
     setPassword("");
     setMfaCode("");
-    setSessionId("");
+    setMfaState("");
     setEmailEncrypted("");
+    setPasswordEncrypted("");
     setSubmitting(false);
   };
 
@@ -71,9 +73,10 @@ const GarminCredentialDialog = ({ open, lang, onOpenChange, onSuccess }: Props) 
       }
 
       if (data.mfa_required) {
-        setSessionId(data.session_id);
+        setMfaState(data.mfa_state);
         setEmailEncrypted(data.email_encrypted);
-        setPassword(""); // wipe password from memory once Railway has the session
+        setPasswordEncrypted(data.password_encrypted);
+        setPassword(""); // wipe plaintext password from memory
         setStep("mfa");
         toast.info(lang === "zh" ? "請輸入 Garmin 寄送的驗證碼" : "Enter the verification code Garmin sent you");
         return;
@@ -102,9 +105,10 @@ const GarminCredentialDialog = ({ open, lang, onOpenChange, onSuccess }: Props) 
     try {
       const { data, error } = await supabase.functions.invoke("garmin-credential-mfa", {
         body: {
-          session_id: sessionId,
+          mfa_state: mfaState,
           mfa_code: parsed.data.code,
           email_encrypted: emailEncrypted,
+          password_encrypted: passwordEncrypted,
         },
       });
 

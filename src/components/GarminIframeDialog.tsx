@@ -32,8 +32,15 @@ const GarminIframeDialog = ({ open, iframeUrl, lang, onTicket, onClose }: Props)
     }
 
     const onMessage = (ev: MessageEvent) => {
-      // Only accept messages from Garmin's SSO origin
-      if (ev.origin !== "https://sso.garmin.com") return;
+      // Log EVERY message so we can see what Garmin actually sends
+      console.log("[GarminIframe] postMessage received", {
+        origin: ev.origin,
+        dataType: typeof ev.data,
+        data: ev.data,
+      });
+
+      // Accept messages from any garmin.com subdomain
+      if (!ev.origin.includes("garmin.com")) return;
       if (handledRef.current) return;
 
       const raw = ev.data;
@@ -49,8 +56,10 @@ const GarminIframeDialog = ({ open, iframeUrl, lang, onTicket, onClose }: Props)
       if (typeof ticket === "string" && ticket.startsWith("ST-")) {
         handledRef.current = true;
         setReceived(true);
-        console.log("[GarminIframe] received ticket via postMessage");
+        console.log("[GarminIframe] ✅ ticket extracted:", ticket.slice(0, 20));
         onTicket(ticket);
+      } else {
+        console.log("[GarminIframe] message ignored — no valid serviceTicket");
       }
     };
 

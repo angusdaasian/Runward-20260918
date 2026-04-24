@@ -68,6 +68,7 @@ serve(async (req) => {
 
     // Call Railway /garmin-login. May block up to ~15s while Railway either
     // completes login or detects an MFA prompt.
+    console.log("garmin-credential-login: calling Railway login");
     let loginRes: Response;
     try {
       loginRes = await fetch(`${GARMIN_RAILWAY_URL}/garmin-login`, {
@@ -83,9 +84,14 @@ serve(async (req) => {
       });
     }
 
+    console.log("garmin-credential-login: Railway responded", { status: loginRes.status, ok: loginRes.ok });
     const rawText = await loginRes.text();
     let loginData: any = {};
-    try { loginData = rawText ? JSON.parse(rawText) : {}; } catch { /* leave empty */ }
+    try {
+      loginData = rawText ? JSON.parse(rawText) : {};
+    } catch (parseError) {
+      console.error("garmin-credential-login: failed to parse Railway JSON", { rawText, parseError });
+    }
 
     if (loginRes.status === 404) {
       console.error("Railway /garmin-login returned 404 — backend not updated to MFA version");
@@ -96,6 +102,7 @@ serve(async (req) => {
     }
 
     if (!loginRes.ok) {
+      console.error("garmin-credential-login: Railway returned non-OK response", { status: loginRes.status, rawText, loginData });
       const detail = typeof loginData?.detail === "string" ? loginData.detail : "Garmin login failed";
       return new Response(JSON.stringify({ error: detail }), {
         status: loginRes.status === 401 ? 401 : 500,
@@ -106,6 +113,7 @@ serve(async (req) => {
     // Case 1: MFA needed — pass the session_id back to the client. We do NOT
     // store the email yet; we'll store it after MFA succeeds.
     if (loginData?.needs_mfa) {
+      console.log("garmin-credential-login: MFA required");
       const sessionId = loginData.session_id;
       if (!sessionId) {
         return new Response(JSON.stringify({ error: "Garmin returned MFA requirement without a session id" }), {
@@ -113,8 +121,6 @@ serve(async (req) => {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      // We need the email later when MFA completes. Encrypt and stash it
-      // briefly on the client — it'll come back with the MFA submit.
       const emailEncrypted = await encryptString(email);
       return new Response(JSON.stringify({
         success: true,
@@ -126,10 +132,9 @@ serve(async (req) => {
       });
     }
 
-    // Case 2: full login succeeded. Persist the encrypted email AND tokens.
+    console.log("garmin-credential-login: login succeeded without MFA, validating token payload");
     const emailEncrypted = await encryptString(email);
 
-    // Railway returns oauth1_token and oauth2_token JSON strings on success.
     const oauth1 = typeof loginData?.oauth1_token === "string" ? loginData.oauth1_token : null;
     const oauth2 = typeof loginData?.oauth2_token === "string" ? loginData.oauth2_token : null;
     if (!oauth1 || !oauth2) {
@@ -145,9 +150,12 @@ serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    console.log("garmin-credential-login: encrypting oauth tokens");
     const oauth1Encrypted = await encryptString(oauth1);
     const oauth2Encrypted = await encryptString(oauth2);
 
+    console.log("garmin-credential-login: upserting garmin connection");
     const { error: upsertError } = await supabase
       .from("garmin_connections")
       .upsert({
@@ -157,7 +165,6 @@ serve(async (req) => {
         oauth1_token_encrypted: oauth1Encrypted,
         oauth2_token_encrypted: oauth2Encrypted,
         needs_reauth: false,
-        // Legacy column kept for backwards compat — no longer used.
         access_token: email,
       }, { onConflict: "user_id" });
 
@@ -169,6 +176,7 @@ serve(async (req) => {
       });
     }
 
+    console.log("garmin-credential-login: success");
     return new Response(JSON.stringify({
       success: true,
       mfa_required: false,

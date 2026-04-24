@@ -130,6 +130,7 @@ export type Database = {
           injuries_concerns: string | null
           preferred_units: string
           target_race_date: string | null
+          thinking_level: string
           training_days: Json
           training_goal: string | null
           training_intensity: string | null
@@ -143,6 +144,7 @@ export type Database = {
           injuries_concerns?: string | null
           preferred_units?: string
           target_race_date?: string | null
+          thinking_level?: string
           training_days?: Json
           training_goal?: string | null
           training_intensity?: string | null
@@ -156,6 +158,7 @@ export type Database = {
           injuries_concerns?: string | null
           preferred_units?: string
           target_race_date?: string | null
+          thinking_level?: string
           training_days?: Json
           training_goal?: string | null
           training_intensity?: string | null
@@ -170,6 +173,7 @@ export type Database = {
           date: string
           id: string
           message_count: number
+          thinking_level: string
           updated_at: string
           user_id: string
         }
@@ -178,6 +182,7 @@ export type Database = {
           date?: string
           id?: string
           message_count?: number
+          thinking_level?: string
           updated_at?: string
           user_id: string
         }
@@ -186,6 +191,7 @@ export type Database = {
           date?: string
           id?: string
           message_count?: number
+          thinking_level?: string
           updated_at?: string
           user_id?: string
         }

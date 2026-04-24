@@ -12,8 +12,29 @@ const json = (body: Record<string, unknown>, status = 200) =>
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-const DAILY_LIMIT = 100;
 const MODEL = "gemini-3.1-flash-lite-preview";
+
+type ThinkingLevel = "minimal" | "low" | "medium" | "high";
+
+const THINKING_LIMITS: Record<ThinkingLevel, number> = {
+  minimal: 100,
+  low: 80,
+  medium: 60,
+  high: 40,
+};
+
+// Token budget passed to Gemini's thinkingConfig.thinkingBudget.
+// 0 disables thinking; higher = more deliberation.
+const THINKING_BUDGETS: Record<ThinkingLevel, number> = {
+  minimal: 0,
+  low: 512,
+  medium: 2048,
+  high: 8192,
+};
+
+function normalizeThinking(v: unknown): ThinkingLevel {
+  return v === "low" || v === "medium" || v === "high" ? v : "minimal";
+}
 
 // ── Vertex AI helper ──
 async function callVertexAI(opts: {
@@ -22,6 +43,7 @@ async function callVertexAI(opts: {
   messages: Array<{ role: "user" | "assistant" | "system"; content: string }>;
   temperature?: number;
   maxOutputTokens?: number;
+  thinkingBudget?: number;
 }): Promise<string> {
   const url = `https://aiplatform.googleapis.com/v1/publishers/google/models/${MODEL}:generateContent?key=${opts.apiKey}`;
   const systemParts: any[] = [];
@@ -37,13 +59,14 @@ async function callVertexAI(opts: {
       parts: [{ text: m.content }],
     });
   }
-  const body: any = {
-    contents,
-    generationConfig: {
-      temperature: opts.temperature ?? 0.7,
-      maxOutputTokens: opts.maxOutputTokens ?? 1024,
-    },
+  const generationConfig: any = {
+    temperature: opts.temperature ?? 0.7,
+    maxOutputTokens: opts.maxOutputTokens ?? 1024,
   };
+  if (typeof opts.thinkingBudget === "number") {
+    generationConfig.thinkingConfig = { thinkingBudget: opts.thinkingBudget };
+  }
+  const body: any = { contents, generationConfig };
   if (systemParts.length) body.systemInstruction = { parts: systemParts };
 
   const r = await fetch(url, {
@@ -88,6 +111,35 @@ function buildActivitySummary(rows: any[], units: string): string {
     .join("\n");
 }
 
+// Read today's usage row and return the effective used count converted to the
+// CURRENT thinking level using the ratio rule.
+async function getTodayUsage(
+  admin: any,
+  userId: string,
+  currentLevel: ThinkingLevel,
+): Promise<{ used: number; limit: number; remaining: number; row: any }> {
+  const today = new Date().toISOString().slice(0, 10);
+  const { data: row } = await admin
+    .from("ai_coach_usage")
+    .select("message_count, thinking_level")
+    .eq("user_id", userId)
+    .eq("date", today)
+    .maybeSingle();
+
+  const limit = THINKING_LIMITS[currentLevel];
+  if (!row) {
+    return { used: 0, limit, remaining: limit, row: null };
+  }
+  const storedLevel = normalizeThinking(row.thinking_level);
+  const storedLimit = THINKING_LIMITS[storedLevel];
+  let used = row.message_count ?? 0;
+  if (storedLevel !== currentLevel) {
+    // Convert by ratio: ceil(used / oldLimit * newLimit)
+    used = Math.min(limit, Math.ceil((used / storedLimit) * limit));
+  }
+  return { used, limit, remaining: Math.max(0, limit - used), row };
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -115,6 +167,16 @@ serve(async (req) => {
     const url = new URL(req.url);
     const action = url.searchParams.get("action");
 
+    // Helper to get the user's current thinking level.
+    const getThinkingLevel = async (): Promise<ThinkingLevel> => {
+      const { data } = await admin
+        .from("ai_coach_preferences")
+        .select("thinking_level")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      return normalizeThinking(data?.thinking_level);
+    };
+
     // ── PREFERENCES (read/write) ──
     if (action === "preferences") {
       if (req.method === "GET") {
@@ -135,9 +197,13 @@ serve(async (req) => {
           "training_days",
           "injuries_concerns",
           "training_intensity",
+          "thinking_level",
         ];
         const cleaned: any = { user_id: user.id };
         for (const k of allowed) if (k in patch) cleaned[k] = patch[k];
+        if ("thinking_level" in cleaned) {
+          cleaned.thinking_level = normalizeThinking(cleaned.thinking_level);
+        }
         const { data, error } = await admin
           .from("ai_coach_preferences")
           .upsert(cleaned, { onConflict: "user_id" })
@@ -200,7 +266,6 @@ serve(async (req) => {
         .limit(500);
       const map = new Map<string, { session_id: string; last_at: string; first_user_message: string; message_count: number }>();
       const firstUserBySession = new Map<string, string>();
-      // Walk oldest→newest to capture first user message per session
       const ordered = [...(data || [])].reverse();
       for (const row of ordered) {
         if (row.role === "user" && !firstUserBySession.has(row.session_id)) {
@@ -247,15 +312,9 @@ serve(async (req) => {
 
     // ── USAGE (read) ──
     if (action === "usage" && req.method === "GET") {
-      const today = new Date().toISOString().slice(0, 10);
-      const { data } = await admin
-        .from("ai_coach_usage")
-        .select("message_count")
-        .eq("user_id", user.id)
-        .eq("date", today)
-        .maybeSingle();
-      const used = data?.message_count ?? 0;
-      return json({ remaining: Math.max(0, DAILY_LIMIT - used), used, limit: DAILY_LIMIT });
+      const level = await getThinkingLevel();
+      const { used, limit, remaining } = await getTodayUsage(admin, user.id, level);
+      return json({ remaining, used, limit, thinking_level: level });
     }
 
     // ── CHAT ──
@@ -271,18 +330,22 @@ serve(async (req) => {
       return json({ error: "Premium required", code: "premium_required" }, 403);
     }
 
-    // Rate limit
+    const thinkingLevel = await getThinkingLevel();
     const today = new Date().toISOString().slice(0, 10);
-    const { data: usageRow } = await admin
-      .from("ai_coach_usage")
-      .select("message_count")
-      .eq("user_id", user.id)
-      .eq("date", today)
-      .maybeSingle();
-    const usedToday = usageRow?.message_count ?? 0;
-    if (usedToday >= DAILY_LIMIT) {
+    const { used: usedToday, limit: dailyLimit } = await getTodayUsage(
+      admin,
+      user.id,
+      thinkingLevel,
+    );
+    if (usedToday >= dailyLimit) {
       return json(
-        { error: "Daily limit reached", code: "rate_limited", remaining_messages_today: 0 },
+        {
+          error: "Daily limit reached",
+          code: "rate_limited",
+          remaining_messages_today: 0,
+          limit: dailyLimit,
+          thinking_level: thinkingLevel,
+        },
         429,
       );
     }
@@ -412,9 +475,11 @@ If the user has no preferences set yet, ask ONE friendly onboarding question per
       messages,
       temperature: 0.7,
       maxOutputTokens: 1024,
+      thinkingBudget: THINKING_BUDGETS[thinkingLevel],
     });
 
-    // Persist messages + usage
+    // Persist messages + usage (write under current thinking level so future
+    // ratio conversions stay consistent)
     const { error: insertError } = await admin.from("ai_coach_conversations").insert([
       { user_id: user.id, session_id: sessionId, role: "user", content: message },
       { user_id: user.id, session_id: sessionId, role: "assistant", content: aiText },
@@ -426,7 +491,12 @@ If the user has no preferences set yet, ask ONE friendly onboarding question per
     await admin
       .from("ai_coach_usage")
       .upsert(
-        { user_id: user.id, date: today, message_count: usedToday + 1 },
+        {
+          user_id: user.id,
+          date: today,
+          message_count: usedToday + 1,
+          thinking_level: thinkingLevel,
+        },
         { onConflict: "user_id,date" },
       );
 
@@ -442,6 +512,7 @@ COACH: ${aiText}`;
           messages: [{ role: "user", content: extractPrompt }],
           temperature: 0.2,
           maxOutputTokens: 400,
+          thinkingBudget: 0,
         });
         const m = out.match(/\[[\s\S]*\]/);
         if (!m) return;
@@ -470,7 +541,9 @@ COACH: ${aiText}`;
     return json({
       response: aiText,
       session_id: sessionId,
-      remaining_messages_today: Math.max(0, DAILY_LIMIT - (usedToday + 1)),
+      remaining_messages_today: Math.max(0, dailyLimit - (usedToday + 1)),
+      limit: dailyLimit,
+      thinking_level: thinkingLevel,
     });
   } catch (e) {
     console.error("ai-running-coach error", e);

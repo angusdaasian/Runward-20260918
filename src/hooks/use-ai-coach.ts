@@ -11,6 +11,8 @@ export type CoachMessage = {
   pending?: boolean;
 };
 
+export type ThinkingLevel = "minimal" | "low" | "medium" | "high";
+
 export type CoachPreferences = {
   preferred_units: "kilometers" | "miles";
   training_goal: string | null;
@@ -19,6 +21,7 @@ export type CoachPreferences = {
   training_days: string[];
   injuries_concerns: string | null;
   training_intensity: string | null;
+  thinking_level: ThinkingLevel;
 };
 
 const SESSION_KEY = "ai_coach_session_id";
@@ -195,8 +198,8 @@ export function useAICoach(open: boolean) {
           setRemaining(0);
           toast.error(
             getLang() === "zh"
-              ? "已達到每日訊息上限 (100 則)。將於午夜重置。"
-              : "Daily message limit reached (100/day). Resets at midnight.",
+              ? "已達到今日訊息上限。將於午夜重置。"
+              : "Daily message limit reached. Resets at midnight.",
           );
         } else if (e.status === 403) {
           toast.error(
@@ -279,6 +282,15 @@ export function useAICoach(open: boolean) {
           body: JSON.stringify(patch),
         });
         setPrefs(data.preferences || null);
+        // If thinking level changed, the remaining-message count needs to be
+        // recomputed against the new daily limit (server applies ratio rule).
+        if ("thinking_level" in patch) {
+          callFn("?action=usage", { method: "GET" })
+            .then((u) => {
+              if (typeof u.remaining === "number") setRemaining(u.remaining);
+            })
+            .catch(() => {});
+        }
         return true;
       } catch (e) {
         toast.error(getLang() === "zh" ? "儲存失敗" : "Failed to save");

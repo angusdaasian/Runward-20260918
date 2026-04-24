@@ -35,37 +35,31 @@ serve(async (req) => {
     }
 
     const callback = `${origin}/garmin-callback`;
-    const mobileBridge = `${origin}/garmin-mobile-auth`;
-    const nativeCallbackBase = `${origin}/garmin-native-callback.html`;
-    const normalizedDeeplinkScheme = deeplinkScheme || "runward";
-    // Canonical native service URL — must be byte-for-byte identical here and in
-    // the static callback page so Garmin CAS accepts the ticket exchange.
-    const nativeCallback = `${nativeCallbackBase}?deeplinkScheme=${encodeURIComponent(normalizedDeeplinkScheme)}`;
-    const serviceUrl = "https://sso.garmin.com/sso/embed";
-    const nativeServiceUrl = nativeCallback;
-    // Desktop popup is a TOP-LEVEL browsing context (separate window, not an
-    // iframe), so we must NOT use embedWidget mode. Embed mode causes CAS to
-    // redirect to its own embed landing page after credentials submit instead
-    // of redirecting back to our `service` URL with a ticket — which is why
-    // the popup loops back to the sign-in page.
-    const params = new URLSearchParams({
-      service: callback,
-      webhost: "https://sso.garmin.com",
-      source: callback,
-      redirectAfterAccountLoginUrl: callback,
-      redirectAfterAccountCreationUrl: callback,
-      gauthHost: "https://sso.garmin.com/sso",
-      locale: "en_US",
+    // CRITICAL: Garmin's CAS only accepts Garmin-owned domains as the `service`
+    // URL. Custom domains are silently rejected after MFA (loops back to login).
+    // We MUST use https://sso.garmin.com/sso/embed and run the SSO inside an
+    // iframe; Garmin's casEmbedSuccess.html will postMessage the ticket to
+    // window.parent (our app) using the `source` param as the parent origin.
+    const embedServiceUrl = "https://sso.garmin.com/sso/embed";
+
+    const iframeParams = new URLSearchParams({
       id: "gauth-widget",
+      embedWidget: "true",
+      gauthHost: "https://sso.garmin.com/sso",
+      service: embedServiceUrl,
+      source: origin, // becomes parent_url in casEmbedSuccess.html — required for postMessage
+      redirectAfterAccountLoginUrl: embedServiceUrl,
+      redirectAfterAccountCreationUrl: embedServiceUrl,
+      consumeServiceTicket: "false",
+      locale: "en_US",
+      clientId: "GarminConnect",
       cssUrl: "https://static.garmincdn.com/com.garmin.connect/ui/css/gauth-custom-v1.2-min.css",
       privacyStatementUrl: "https://www.garmin.com/en-US/privacy/connect/",
-      clientId: "GarminConnect",
       rememberMeShown: "true",
       rememberMeChecked: "false",
       createAccountShown: "true",
       openCreateAccount: "false",
       displayNameShown: "false",
-      consumeServiceTicket: "false",
       initialFocus: "true",
       generateExtraServiceTicket: "true",
       generateTwoExtraServiceTickets: "false",
@@ -84,79 +78,15 @@ serve(async (req) => {
       rememberMyBrowserChecked: "false",
     });
 
-    const url = `https://sso.garmin.com/sso/signin?${params.toString()}`;
+    const iframeUrl = `https://sso.garmin.com/sso/signin?${iframeParams.toString()}`;
 
-    const mobileParams = new URLSearchParams({
-      id: "gauth-widget",
-      embedWidget: "true",
-      gauthHost: "https://sso.garmin.com/sso",
-      locale: "en_US",
-      clientId: "GarminConnect",
-      service: serviceUrl,
-      source: mobileBridge,
-      redirectAfterAccountLoginUrl: serviceUrl,
-      redirectAfterAccountCreationUrl: serviceUrl,
-      rememberMeShown: "true",
-      rememberMeChecked: "false",
-      createAccountShown: "true",
-      openCreateAccount: "false",
-      displayNameShown: "false",
-      consumeServiceTicket: "false",
-      generateExtraServiceTicket: "true",
-      generateTwoExtraServiceTickets: "false",
-      generateNoServiceTicket: "false",
-      showTermsOfUse: "false",
-      showPrivacyPolicy: "false",
-      connectLegalTerms: "true",
-      showConnectLegalAge: "false",
-      locationPromptShown: "true",
-      useCustomHeader: "false",
-    });
-
-    const mobileEmbedUrl = `https://sso.garmin.com/sso/embed?${mobileParams.toString()}`;
-
-    // Native (in-app browser) flow: NOT an iframe, so do NOT use embedWidget/embed.
-    // Using embed mode here causes CAS to hang on the post-MFA logintoken handoff
-    // and never redirect to the `service` URL with a ticket.
-    const nativeParams = new URLSearchParams({
-      service: nativeServiceUrl,
-      webhost: "https://sso.garmin.com",
-      source: nativeServiceUrl,
-      redirectAfterAccountLoginUrl: nativeServiceUrl,
-      redirectAfterAccountCreationUrl: nativeServiceUrl,
-      gauthHost: "https://sso.garmin.com/sso",
-      locale: "en_US",
-      id: "gauth-widget",
-      cssUrl: "https://static.garmincdn.com/com.garmin.connect/ui/css/gauth-custom-v1.2-min.css",
-      privacyStatementUrl: "https://www.garmin.com/en-US/privacy/connect/",
-      clientId: "GarminConnect",
-      rememberMeShown: "true",
-      rememberMeChecked: "false",
-      createAccountShown: "true",
-      openCreateAccount: "false",
-      displayNameShown: "false",
-      consumeServiceTicket: "false",
-      initialFocus: "true",
-      generateExtraServiceTicket: "true",
-      generateTwoExtraServiceTickets: "false",
-      generateNoServiceTicket: "false",
-      globalOptInShown: "true",
-      globalOptInChecked: "false",
-      mobile: "true",
-      connectLegalTerms: "true",
-      showTermsOfUse: "false",
-      showPrivacyPolicy: "false",
-      showConnectLegalAge: "false",
-      locationPromptShown: "true",
-      showPassword: "true",
-      useCustomHeader: "false",
-      rememberMyBrowserShown: "true",
-      rememberMyBrowserChecked: "false",
-    });
-
-    const nativeUrl = `https://sso.garmin.com/sso/signin?${nativeParams.toString()}`;
-
-    return new Response(JSON.stringify({ url, callback, mobile_embed_url: mobileEmbedUrl, service_url: serviceUrl, native_url: nativeUrl, native_service_url: nativeServiceUrl }), {
+    return new Response(JSON.stringify({
+      url: iframeUrl,
+      iframe_url: iframeUrl,
+      service_url: embedServiceUrl,
+      callback,
+      parent_origin: origin,
+    }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {

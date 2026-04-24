@@ -42,12 +42,16 @@ serve(async (req) => {
     // window.parent (our app) using the `source` param as the parent origin.
     const embedServiceUrl = "https://sso.garmin.com/sso/embed";
 
+    // CRITICAL: `source` is the parent_url passed to XD.postMessage as
+    // targetOrigin — it MUST be our app's origin (not a Garmin URL),
+    // otherwise Garmin posts the ticket back to itself instead of us.
+    // Reference: sso.garmin.com/sso/js/postmessage.js
     const iframeParams = new URLSearchParams({
       id: "gauth-widget",
       embedWidget: "true",
-      gauthHost: "https://sso.garmin.com/sso",
+      gauthHost: "https://sso.garmin.com/sso/embed",
       service: embedServiceUrl,
-      source: origin, // becomes parent_url in casEmbedSuccess.html — required for postMessage
+      source: origin,
       redirectAfterAccountLoginUrl: embedServiceUrl,
       redirectAfterAccountCreationUrl: embedServiceUrl,
       consumeServiceTicket: "false",

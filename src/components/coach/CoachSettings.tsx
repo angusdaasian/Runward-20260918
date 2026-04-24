@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Trash2, Sparkles, Brain, Lock } from "lucide-react";
+import { Trash2, Sparkles, Brain } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -23,14 +23,12 @@ interface Props {
   onSave: (patch: Partial<CoachPreferences>) => Promise<boolean>;
   onResetMemory: () => Promise<void>;
   lang: "en" | "zh";
-  isFree?: boolean;
-  onUpgradeNeeded?: () => void;
 }
 
 const DAYS_EN = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const DAYS_ZH = ["一", "二", "三", "四", "五", "六", "日"];
 
-const CoachSettings = ({ open, onOpenChange, prefs, insights, onSave, onResetMemory, lang, isFree, onUpgradeNeeded }: Props) => {
+const CoachSettings = ({ open, onOpenChange, prefs, insights, onSave, onResetMemory, lang }: Props) => {
   const t = (en: string, zh: string) => (lang === "zh" ? zh : en);
   const [local, setLocal] = useState<Partial<CoachPreferences>>({});
   const [saving, setSaving] = useState(false);
@@ -70,38 +68,25 @@ const CoachSettings = ({ open, onOpenChange, prefs, insights, onSave, onResetMem
             <div className="flex items-center gap-2">
               <Brain size={14} className="text-primary" />
               <Label className="m-0">{t("Thinking level", "思考強度")}</Label>
-              {isFree && (
-                <span className="ml-auto inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary">
-                  <Lock size={10} /> {t("Premium", "Premium")}
-                </span>
-              )}
             </div>
             <p className="text-[11px] text-muted-foreground leading-relaxed">
-              {isFree
-                ? t(
-                    "Free plan: 15 messages/day at minimal thinking. Upgrade to unlock higher thinking levels and more daily messages.",
-                    "免費方案:每日 15 則最低思考訊息。升級可解鎖更高思考強度與更多每日訊息。",
-                  )
-                : t(
-                    "Higher thinking gives smarter answers but uses more of your daily quota.",
-                    "思考越深答案越聰明,但每日可用訊息數會減少。",
-                  )}
+              {t(
+                "Higher thinking gives smarter answers but uses more of your daily quota.",
+                "思考越深答案越聰明,但每日可用訊息數會減少。",
+              )}
             </p>
             <Select
               value={(local.thinking_level as string) || "minimal"}
               onValueChange={(v) =>
                 setLocal({ ...local, thinking_level: v as any })
               }
-              disabled={isFree}
             >
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent className="z-[10002]">
                 <SelectItem value="minimal">
-                  {isFree
-                    ? t("Minimal — 15 messages/day (free)", "最低 — 每日 15 則 (免費)")
-                    : t("Minimal — 100 messages/day", "最低 — 每日 100 則")}
+                  {t("Minimal — 100 messages/day", "最低 — 每日 100 則")}
                 </SelectItem>
                 <SelectItem value="low">
                   {t("Low — 80 messages/day", "低 — 每日 80 則")}
@@ -114,25 +99,12 @@ const CoachSettings = ({ open, onOpenChange, prefs, insights, onSave, onResetMem
                 </SelectItem>
               </SelectContent>
             </Select>
-            {isFree ? (
-              <Button
-                size="sm"
-                className="w-full mt-1"
-                onClick={() => {
-                  onOpenChange(false);
-                  onUpgradeNeeded?.();
-                }}
-              >
-                {t("Upgrade to unlock", "升級以解鎖")}
-              </Button>
-            ) : (
-              <p className="text-[10px] text-muted-foreground">
-                {t(
-                  "Switching levels mid-day converts your used count proportionally.",
-                  "中途切換等級時,已使用次數會按比例換算。",
-                )}
-              </p>
-            )}
+            <p className="text-[10px] text-muted-foreground">
+              {t(
+                "Switching levels mid-day converts your used count proportionally.",
+                "中途切換等級時,已使用次數會按比例換算。",
+              )}
+            </p>
           </div>
 
           {/* Units */}

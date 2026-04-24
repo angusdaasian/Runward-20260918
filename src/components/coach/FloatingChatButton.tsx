@@ -135,8 +135,12 @@ const FloatingChatButton = ({ lang }: Props) => {
 
   const handleClick = useCallback(() => {
     if (!user) return;
+    if (!isPremium) {
+      setShowUpgrade(true);
+      return;
+    }
     setOpen((v) => !v);
-  }, [user]);
+  }, [user, isPremium]);
 
   if (!user) return null;
 
@@ -181,12 +185,7 @@ const FloatingChatButton = ({ lang }: Props) => {
         )}
       </button>
 
-      <ChatModal
-        open={open}
-        onClose={() => setOpen(false)}
-        lang={lang}
-        onUpgradeNeeded={() => setShowUpgrade(true)}
-      />
+      <ChatModal open={open} onClose={() => setOpen(false)} lang={lang} />
       <UpgradeModal open={showUpgrade} onOpenChange={setShowUpgrade} lang={lang} />
     </>
   );

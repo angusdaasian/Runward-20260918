@@ -44,13 +44,15 @@ function getLang(): "en" | "zh" {
   return (localStorage.getItem("app_lang") as "en" | "zh") || "en";
 }
 
-export function useAICoach(open: boolean) {
+export function useAICoach(open: boolean, onFreeLimit?: () => void) {
   const { user, session } = useAuth();
   const { isPremium } = usePremium();
   const [messages, setMessages] = useState<CoachMessage[]>([]);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [remaining, setRemaining] = useState<number | null>(null);
+  const [dailyLimit, setDailyLimit] = useState<number | null>(null);
+  const [isFree, setIsFree] = useState<boolean>(!isPremium);
   const [prefs, setPrefs] = useState<CoachPreferences | null>(null);
   const [insights, setInsights] = useState<
     Array<{ insight_key: string; insight_value: string }>

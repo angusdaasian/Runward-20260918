@@ -15,6 +15,8 @@ const GarminMobileAuth = () => {
   const lang = useMemo(() => (localStorage.getItem("app_lang") as "en" | "zh") || "en", []);
   const query = useMemo(() => new URLSearchParams(window.location.search), []);
   const isPopupMode = query.get("popup") === "1";
+  const isNativeBridgeMode = query.get("native") === "1";
+  const deeplinkScheme = query.get("deeplinkScheme") || "runward";
   const ticketFromQuery = query.get("ticket");
   const errorParam = query.get("error");
   const embedUrl = query.get("embedUrl") || getGarminSsoValue(GARMIN_SSO_KEYS.mobileEmbedUrl) || "";
@@ -23,6 +25,14 @@ const GarminMobileAuth = () => {
   useEffect(() => {
     let settled = false;
     let timeoutId: number | undefined;
+
+    const returnToNativeApp = (params: { ticket?: string; error?: string }) => {
+      const target = new URL(`${deeplinkScheme}://oauth/garmin-mobile-auth`);
+      if (params.ticket) target.searchParams.set("ticket", params.ticket);
+      if (params.error) target.searchParams.set("error", params.error);
+      if (serviceUrl) target.searchParams.set("serviceUrl", serviceUrl);
+      window.location.replace(target.toString());
+    };
 
     const finishAndReturn = (result: { ok: boolean; displayName?: string; error?: string }) => {
       console.log("[GarminMobileAuth] finishing", { result, isPopupMode, serviceUrl });
@@ -65,6 +75,16 @@ const GarminMobileAuth = () => {
       }
     };
 
+    if (isNativeBridgeMode && errorParam) {
+      returnToNativeApp({ error: errorParam });
+      return;
+    }
+
+    if (isNativeBridgeMode && ticketFromQuery) {
+      returnToNativeApp({ ticket: ticketFromQuery });
+      return;
+    }
+
     if (errorParam) {
       finishAndReturn({ ok: false, error: errorParam });
       return;
@@ -100,13 +120,23 @@ const GarminMobileAuth = () => {
 
       const ticket = "serviceTicket" in payload ? payload.serviceTicket : ("ticket" in payload ? payload.ticket : null);
       if (typeof ticket === "string" && ticket.startsWith("ST-")) {
-        console.log("[GarminMobileAuth] received Garmin postMessage ticket", { ticket, serviceUrl });
+        console.log("[GarminMobileAuth] received Garmin postMessage ticket", { ticket, serviceUrl, isNativeBridgeMode });
+        if (isNativeBridgeMode) {
+          returnToNativeApp({ ticket });
+          return;
+        }
         void finish(ticket);
       }
     };
 
     timeoutId = window.setTimeout(() => {
       if (settled) return;
+      if (isNativeBridgeMode) {
+        returnToNativeApp({
+          error: lang === "zh" ? "Garmin 登入逾時，請再試一次" : "Garmin sign-in timed out. Please try again.",
+        });
+        return;
+      }
       finishAndReturn({
         ok: false,
         error: lang === "zh" ? "Garmin 登入逾時，請再試一次" : "Garmin sign-in timed out. Please try again.",
@@ -118,7 +148,7 @@ const GarminMobileAuth = () => {
       window.removeEventListener("message", onMessage);
       if (timeoutId) window.clearTimeout(timeoutId);
     };
-  }, [embedUrl, errorParam, isPopupMode, lang, serviceUrl, ticketFromQuery]);
+  }, [deeplinkScheme, embedUrl, errorParam, isNativeBridgeMode, isPopupMode, lang, serviceUrl, ticketFromQuery]);
 
   return (
     <div className="flex min-h-screen flex-col bg-background text-foreground">

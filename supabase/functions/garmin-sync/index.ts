@@ -74,8 +74,8 @@ serve(async (req) => {
     const body = await req.json();
     const { action } = body;
 
-    // Note: login is now handled by garmin-sso-start + garmin-sso-exchange (popup flow).
-    // The legacy "login" and "login_mfa" actions have been removed.
+    // Note: login is handled by the garmin-credential-login + garmin-credential-mfa
+    // edge functions, which proxy to the Railway garth service.
 
     // ── SYNC ──
     if (action === "sync") {

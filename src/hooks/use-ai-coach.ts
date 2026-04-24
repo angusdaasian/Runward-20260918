@@ -42,6 +42,9 @@ export function useAICoach(open: boolean) {
   const [insights, setInsights] = useState<
     Array<{ insight_key: string; insight_value: string }>
   >([]);
+  const [sessions, setSessions] = useState<
+    Array<{ session_id: string; last_at: string; first_user_message: string; message_count: number }>
+  >([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const initRef = useRef(false);
 

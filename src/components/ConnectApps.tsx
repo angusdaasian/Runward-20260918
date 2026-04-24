@@ -23,8 +23,9 @@ const ConnectApps = ({ lang, onBack }: Props) => {
   const [loading, setLoading] = useState(true);
   const appleHealth = useAppleHealth(lang);
   const garmin = useGarmin(lang);
+  const [garminIframeUrl, setGarminIframeUrl] = useState<string | null>(null);
 
-  // Garmin uses a popup to Garmin's real SSO page — no local form state needed.
+  // Garmin SSO runs in an iframe (Garmin's CAS rejects custom-domain callbacks).
 
   // A fitness app is Strava, Garmin, or Coros
   const hasFitnessApp = stravaConnected || garminConnected;

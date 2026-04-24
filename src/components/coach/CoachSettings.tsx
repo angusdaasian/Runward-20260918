@@ -54,7 +54,7 @@ const CoachSettings = ({ open, onOpenChange, prefs, insights, onSave, onResetMem
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto">
+      <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto z-[10001]">
         <SheetHeader>
           <SheetTitle>{t("Coach Settings", "教練設定")}</SheetTitle>
           <SheetDescription>

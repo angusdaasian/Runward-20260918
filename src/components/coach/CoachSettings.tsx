@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Trash2, Sparkles } from "lucide-react";
+import { Trash2, Sparkles, Brain } from "lucide-react";
 import {
   Select,
   SelectContent,

@@ -20,9 +20,11 @@ const ConnectApps = ({ lang, onBack }: Props) => {
   const [stravaConnected, setStravaConnected] = useState(false);
   const [appleHealthConnected, setAppleHealthConnected] = useState(false);
   const [garminConnected, setGarminConnected] = useState(false);
+  const [sahhaConnected, setSahhaConnected] = useState(false);
   const [loading, setLoading] = useState(true);
   const appleHealth = useAppleHealth(lang);
   const garmin = useGarmin(lang);
+  const sahha = useSahha(lang);
   const [garminDialogOpen, setGarminDialogOpen] = useState(false);
 
   // A fitness app is Strava, Garmin, or Coros
@@ -30,14 +32,16 @@ const ConnectApps = ({ lang, onBack }: Props) => {
 
   const checkConnections = useCallback(async () => {
     if (!user) { setLoading(false); return; }
-    const [stravaRes, ahRes, garminRes] = await Promise.all([
+    const [stravaRes, ahRes, garminRes, sahhaRes] = await Promise.all([
       supabase.from("strava_connections").select("id").eq("user_id", user.id).maybeSingle(),
       supabase.from("apple_health_connections").select("id").eq("user_id", user.id).maybeSingle(),
       supabase.from("garmin_connections").select("id").eq("user_id", user.id).maybeSingle(),
+      supabase.from("sahha_connections").select("id").eq("user_id", user.id).maybeSingle(),
     ]);
     setStravaConnected(!!stravaRes.data);
     setAppleHealthConnected(!!ahRes.data);
     setGarminConnected(!!garminRes.data);
+    setSahhaConnected(!!sahhaRes.data);
     setLoading(false);
   }, [user]);
 

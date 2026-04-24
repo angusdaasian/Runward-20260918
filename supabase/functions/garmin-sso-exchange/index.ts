@@ -96,6 +96,12 @@ serve(async (req) => {
     const garminEmail = exchangeData.email || null;
     const displayName = exchangeData.display_name || garminEmail || "Garmin user";
 
+    console.log("[garmin-sso-exchange] Railway exchange succeeded:", {
+      email: garminEmail,
+      display_name: displayName,
+      serviceUrl: exchangeServiceUrl,
+    });
+
     // Store a placeholder access_token (the Garmin email) so Railway can locate the
     // user's token folder on subsequent /garmin-activities calls. No password is stored.
     await supabase.from("garmin_connections").upsert({

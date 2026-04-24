@@ -118,6 +118,9 @@ serve(async (req) => {
 
     const mobileEmbedUrl = `https://sso.garmin.com/sso/embed?${mobileParams.toString()}`;
 
+    // Native (in-app browser) flow: NOT an iframe, so do NOT use embedWidget/embed.
+    // Using embed mode here causes CAS to hang on the post-MFA logintoken handoff
+    // and never redirect to the `service` URL with a ticket.
     const nativeParams = new URLSearchParams({
       service: nativeServiceUrl,
       webhost: "https://sso.garmin.com",
@@ -137,13 +140,12 @@ serve(async (req) => {
       displayNameShown: "false",
       consumeServiceTicket: "false",
       initialFocus: "true",
-      embedWidget: "true",
       generateExtraServiceTicket: "true",
       generateTwoExtraServiceTickets: "false",
       generateNoServiceTicket: "false",
       globalOptInShown: "true",
       globalOptInChecked: "false",
-      mobile: "false",
+      mobile: "true",
       connectLegalTerms: "true",
       showTermsOfUse: "false",
       showPrivacyPolicy: "false",
@@ -151,9 +153,7 @@ serve(async (req) => {
       locationPromptShown: "true",
       showPassword: "true",
       useCustomHeader: "false",
-      mfaRequired: "false",
-      performMFACheck: "false",
-      rememberMyBrowserShown: "false",
+      rememberMyBrowserShown: "true",
       rememberMyBrowserChecked: "false",
     });
 

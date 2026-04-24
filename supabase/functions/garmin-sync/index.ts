@@ -81,7 +81,7 @@ serve(async (req) => {
     if (action === "sync") {
       const { data: conn } = await supabase
         .from("garmin_connections")
-        .select("garmin_email_encrypted, access_token")
+        .select("garmin_email_encrypted, access_token, oauth1_token_encrypted, oauth2_token_encrypted")
         .eq("user_id", user.id)
         .maybeSingle();
 
@@ -92,32 +92,41 @@ serve(async (req) => {
         });
       }
 
-      // Prefer the new encrypted column; fall back to legacy `access_token`
-      // (which used to hold the plaintext email) for already-connected users.
+      // Decrypt email + tokens.
       let garminEmail: string | null = null;
+      let oauth1Token: string | null = null;
+      let oauth2Token: string | null = null;
+      const { decryptString } = await import("../_shared/garminCrypto.ts");
       if (conn.garmin_email_encrypted) {
-        try {
-          const { decryptString } = await import("../_shared/garminCrypto.ts");
-          garminEmail = await decryptString(conn.garmin_email_encrypted);
-        } catch (e) {
-          console.error("Failed to decrypt garmin_email_encrypted:", e);
-        }
+        try { garminEmail = await decryptString(conn.garmin_email_encrypted); }
+        catch (e) { console.error("Failed to decrypt email:", e); }
       }
       if (!garminEmail) garminEmail = conn.access_token;
 
-      if (!garminEmail) {
+      if (conn.oauth1_token_encrypted) {
+        try { oauth1Token = await decryptString(conn.oauth1_token_encrypted); }
+        catch (e) { console.error("Failed to decrypt oauth1:", e); }
+      }
+      if (conn.oauth2_token_encrypted) {
+        try { oauth2Token = await decryptString(conn.oauth2_token_encrypted); }
+        catch (e) { console.error("Failed to decrypt oauth2:", e); }
+      }
+
+      if (!garminEmail || !oauth1Token || !oauth2Token) {
         return new Response(JSON.stringify({ error: "Garmin sign-in expired", reauth_required: true }), {
           status: 401,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
-      // ── Phase 1: Fetch basic activity list (token-based, no password) ──
+      // ── Phase 1: Fetch basic activity list (using stored tokens) ──
       const actRes = await fetch(`${GARMIN_RAILWAY_URL}/garmin-activities`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           email: garminEmail,
+          oauth1_token: oauth1Token,
+          oauth2_token: oauth2Token,
           days: body.days || 30,
           detail_limit: 0,
         }),
@@ -209,6 +218,8 @@ serve(async (req) => {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               email: garminEmail,
+              oauth1_token: oauth1Token,
+              oauth2_token: oauth2Token,
               activity_ids: activityIds,
             }),
           });

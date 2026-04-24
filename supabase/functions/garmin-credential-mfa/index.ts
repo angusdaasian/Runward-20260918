@@ -85,13 +85,29 @@ serve(async (req) => {
       });
     }
 
-    // Persist the connection now that tokens are saved on Railway.
+    // Railway returns oauth1_token and oauth2_token JSON strings after MFA succeeds.
+    const oauth1 = typeof mfaData?.oauth1_token === "string" ? mfaData.oauth1_token : null;
+    const oauth2 = typeof mfaData?.oauth2_token === "string" ? mfaData.oauth2_token : null;
+    if (!oauth1 || !oauth2) {
+      console.error("Railway MFA succeeded but did not return tokens", mfaData);
+      return new Response(JSON.stringify({ error: "Garmin service did not return tokens" }), {
+        status: 502,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const { encryptString } = await import("../_shared/garminCrypto.ts");
+    const oauth1Encrypted = await encryptString(oauth1);
+    const oauth2Encrypted = await encryptString(oauth2);
+
+    // Persist the connection with tokens.
     const { error: upsertError } = await supabase
       .from("garmin_connections")
       .upsert({
         user_id: user.id,
         garmin_email_encrypted: emailEncrypted,
         garmin_display_name: email,
+        oauth1_token_encrypted: oauth1Encrypted,
+        oauth2_token_encrypted: oauth2Encrypted,
         needs_reauth: false,
         access_token: email, // legacy column, kept in sync
       }, { onConflict: "user_id" });

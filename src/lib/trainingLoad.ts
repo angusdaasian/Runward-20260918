@@ -141,7 +141,7 @@ export function buildWeeklyLoadSeries(
     if (!load) continue;
     const ws = weekStart(date);
     const idx = Math.round((ws.getTime() - startWeek.getTime()) / (7 * 86400 * 1000));
-    if (idx >= 0 && idx < weeks) {
+    if (idx >= 0 && idx < actualWeeks) {
       buckets[idx].load += load;
     }
   }

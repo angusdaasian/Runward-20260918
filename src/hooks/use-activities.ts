@@ -34,6 +34,7 @@ export interface StravaActivity {
   weather?: ActivityWeather | null;
   laps?: any[] | null;
   map_screenshot_url?: string | null;
+  garmin_training_load?: number | null;
 }
 
 export interface PlannedWorkout {

@@ -27,10 +27,13 @@ import ActivityDetail from "@/components/activities/ActivityDetail";
 import ManualImportTabs from "@/components/activities/ManualImportTabs";
 import SuggestedNextWorkout from "@/components/activities/SuggestedNextWorkout";
 import { calculateRunningScore } from "@/lib/vdot";
+import { loadForActivity } from "@/lib/trainingLoad";
 import { useActivities, type StravaActivity } from "@/hooks/use-activities";
 import FadeIn from "@/components/ui/FadeIn";
 import { ActivityListSkeleton } from "@/components/ui/PageSkeleton";
 import { useAppleHealth, type HealthStats } from "@/hooks/use-apple-health";
+import TrainingLoadChart from "@/components/activities/TrainingLoadChart";
+import TrainingLoadChartLocked from "@/components/activities/TrainingLoadChartLocked";
 
 interface Props {
   lang: Lang;
@@ -157,11 +160,15 @@ const ActivityCard = ({
   act,
   lang,
   score,
+  load,
+  isPremium,
   onClick,
 }: {
   act: StravaActivity;
   lang: Lang;
   score: number | null;
+  load: number | null;
+  isPremium: boolean;
   onClick?: () => void;
 }) => (
   <div
@@ -225,6 +232,15 @@ const ActivityCard = ({
           </div>
         </div>
         <div className="grid grid-cols-3 gap-3 mt-2">
+          {isPremium && load !== null && (
+            <div>
+              <span className="text-xs font-medium text-orange-500 block mb-0.5">{lang === "zh" ? "負荷" : "Load"}</span>
+              <div className="flex items-center gap-1">
+                <Flame size={12} className="text-orange-500" />
+                <span className="text-sm font-semibold text-foreground">{load}</span>
+              </div>
+            </div>
+          )}
           {score !== null && (
             <div>
               <span className="text-xs font-medium text-primary block mb-0.5">{lang === "zh" ? "訓練分數" : "Score"}</span>
@@ -291,6 +307,15 @@ const ActivityCard = ({
         </div>
 
         <div className="grid grid-cols-3 gap-3 mt-2">
+          {isPremium && load !== null && (
+            <div>
+              <span className="text-xs font-medium text-orange-500 block mb-0.5">{lang === "zh" ? "負荷" : "Load"}</span>
+              <div className="flex items-center gap-1">
+                <Flame size={12} className="text-orange-500" />
+                <span className="text-sm font-semibold text-foreground">{load}</span>
+              </div>
+            </div>
+          )}
           {score !== null && (
             <div>
               <span className="text-xs font-medium text-primary block mb-0.5">{lang === "zh" ? "訓練分數" : "Score"}</span>
@@ -402,9 +427,11 @@ const ActivitiesTab = ({ lang }: Props) => {
     };
   }, [user, invalidateAll]);
 
-  const { activityScores, averageScore } = useMemo(() => {
+  const { activityScores, activityLoads, averageScore } = useMemo(() => {
     const scores: Record<string, number | null> = {};
+    const loads: Record<string, number | null> = {};
     const validScores: number[] = [];
+    const profileAge = (profile as any)?.age ?? null;
     for (const act of activities) {
       if (runningSportTypes.has(act.sport_type)) {
         const s = getActivityScore(act.distance, act.moving_time);
@@ -413,14 +440,26 @@ const ActivitiesTab = ({ lang }: Props) => {
       } else {
         scores[act.id] = null;
       }
+      loads[act.id] = loadForActivity(
+        {
+          start_date: act.start_date,
+          moving_time: act.moving_time,
+          average_heartrate: act.average_heartrate,
+          max_heartrate: act.max_heartrate,
+          sport_type: act.sport_type,
+          source: act.source,
+          garmin_training_load: (act as any).garmin_training_load ?? null,
+        },
+        profileAge,
+      );
     }
     const recentScores = validScores.slice(0, 20);
     const avg =
       recentScores.length >= 1
         ? Math.round((recentScores.reduce((a, b) => a + b, 0) / recentScores.length) * 10) / 10
         : 0;
-    return { activityScores: scores, averageScore: avg };
-  }, [activities]);
+    return { activityScores: scores, activityLoads: loads, averageScore: avg };
+  }, [activities, profile]);
 
   const [resyncing, setResyncing] = useState(false);
 
@@ -486,6 +525,8 @@ const ActivitiesTab = ({ lang }: Props) => {
               act={act}
               lang={lang}
               score={activityScores[act.id]}
+              load={activityLoads[act.id]}
+              isPremium={isPremium}
               onClick={() => setSelectedActivity(act)}
             />
           ))}
@@ -549,6 +590,8 @@ const ActivitiesTab = ({ lang }: Props) => {
               act={latestActivity}
               lang={lang}
               score={activityScores[latestActivity.id]}
+              load={activityLoads[latestActivity.id]}
+              isPremium={isPremium}
               onClick={() => setSelectedActivity(latestActivity)}
             />
           </div>
@@ -559,6 +602,27 @@ const ActivitiesTab = ({ lang }: Props) => {
           </div>
         )}
       </div>
+
+      {/* Training Load curve (Premium) */}
+      {activities.length > 0 && (
+        isPremium ? (
+          <TrainingLoadChart
+            lang={lang}
+            activities={activities.map((a) => ({
+              start_date: a.start_date,
+              moving_time: a.moving_time,
+              average_heartrate: a.average_heartrate,
+              max_heartrate: a.max_heartrate,
+              sport_type: a.sport_type,
+              source: a.source,
+              garmin_training_load: (a as any).garmin_training_load ?? null,
+            }))}
+            profileAge={(profile as any)?.age ?? null}
+          />
+        ) : (
+          <TrainingLoadChartLocked lang={lang} />
+        )
+      )}
 
       {/* Today's Suggestion (analysis-derived if fresh, else generated, else expired prompt) */}
       <SuggestedNextWorkout

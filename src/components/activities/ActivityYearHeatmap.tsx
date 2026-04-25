@@ -51,7 +51,7 @@ const ActivityYearHeatmap = ({ lang, activities }: Props) => {
     return Array.from(set).sort((a, b) => b - a);
   }, [activities]);
 
-  const [year, setYear] = useState<number>(() => availableYears[0] ?? new Date().getFullYear());
+  const [year, setYear] = useState<number>(() => new Date().getFullYear());
 
   // Build the day grid for the chosen year (Jan 1 .. Dec 31), padded so each
   // column is a Mon-Sun week.

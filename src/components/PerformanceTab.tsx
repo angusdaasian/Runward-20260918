@@ -77,6 +77,9 @@ const PerformanceTab = ({ lang }: Props) => {
         </div>
       )}
 
+      {/* Free for all users */}
+      <ActivityYearHeatmap lang={lang} activities={loadActivities} />
+
       {isPremium ? (
         <TrainingLoadChart
           lang={lang}
@@ -87,9 +90,7 @@ const PerformanceTab = ({ lang }: Props) => {
         <TrainingLoadChartLocked lang={lang} />
       )}
 
-      {/* Free for all users */}
       <TrendsCard lang={lang} activities={loadActivities} />
-      <ActivityYearHeatmap lang={lang} activities={loadActivities} />
     </div>
   );
 };

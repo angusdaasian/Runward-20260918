@@ -1,5 +1,5 @@
 import { useState, useEffect, lazy, Suspense } from "react";
-import { Activity, Dumbbell, Loader2, ScanEye, Shield, Award, Trophy, WifiOff } from "lucide-react";
+import { Activity, Dumbbell, Loader2, BarChart3, Shield, Award, Trophy, WifiOff } from "lucide-react";
 import { Lang, t } from "@/lib/i18n";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAdmin } from "@/hooks/use-admin";
@@ -17,13 +17,13 @@ import PromoBanner from "@/components/PromoBanner";
 
 const TrainingTab = lazy(() => import("@/components/TrainingTab"));
 const MoreTab = lazy(() => import("@/components/MoreTab"));
-const PostureTab = lazy(() => import("@/components/PostureTab"));
+const AnalyticsTab = lazy(() => import("@/components/AnalyticsTab"));
 const ConnectApps = lazy(() => import("@/components/ConnectApps"));
 const RewardsTab = lazy(() => import("@/components/RewardsTab"));
 const RaceTab = lazy(() => import("@/components/RaceTab"));
 const FloatingChatButton = lazy(() => import("@/components/coach/FloatingChatButton"));
 
-type Tab = "training" | "posture" | "activities" | "more" | "community" | "races";
+type Tab = "training" | "analytics" | "activities" | "more" | "community" | "races";
 const ONBOARDING_DELAY_MS = 500;
 const ONBOARDING_SIGNUP_IN_PROGRESS_KEY = "onboarding_signup_in_progress";
 
@@ -35,7 +35,9 @@ const Index = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState<Tab>(() => {
     const tabParam = searchParams.get("tab");
-    return (tabParam === "training" || tabParam === "posture" || tabParam === "activities" || tabParam === "more" || tabParam === "community" || tabParam === "races") ? tabParam : "activities";
+    // Back-compat: redirect old `posture` deeplinks into `analytics`
+    if (tabParam === "posture") return "analytics";
+    return (tabParam === "training" || tabParam === "analytics" || tabParam === "activities" || tabParam === "more" || tabParam === "community" || tabParam === "races") ? tabParam : "activities";
   });
   const [showConnectApps, setShowConnectApps] = useState(() => searchParams.get("page") === "connect-apps");
   const [promoTrigger, setPromoTrigger] = useState(0);
@@ -170,7 +172,7 @@ const Index = () => {
     { id: "training", icon: Dumbbell, labelKey: "training" },
     { id: "races", icon: Trophy, labelKey: "races" },
     { id: "community", icon: Award, labelKey: "community" },
-    { id: "posture", icon: ScanEye, labelKey: "posture" },
+    { id: "analytics", icon: BarChart3, labelKey: "analytics" },
   ];
 
   return (
@@ -217,9 +219,9 @@ const Index = () => {
             }} />
           </Suspense>
         )}
-        <div style={{ display: activeTab === "posture" ? "block" : "none" }}>
+        <div style={{ display: activeTab === "analytics" ? "block" : "none" }}>
           <Suspense fallback={<PostureSkeleton />}>
-            <PostureTab lang={lang} />
+            <AnalyticsTab lang={lang} />
           </Suspense>
         </div>
         {activeTab === "activities" && (

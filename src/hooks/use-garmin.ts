@@ -59,12 +59,21 @@ export function useGarmin(lang: Lang) {
 
       const synced = data.synced ?? 0;
       const detailsFetched = data.details_fetched ?? 0;
-      toast.success(
-        lang === "zh"
-          ? `同步成功！已同步 ${synced} 筆活動${detailsFetched > 0 ? `,已取得 ${detailsFetched} 筆詳細資料` : ""}`
-          : `Sync successful! ${synced} activities synced${detailsFetched > 0 ? `, ${detailsFetched} details fetched` : ""}`,
-        { duration: 4000 }
-      );
+      if (synced === 0 && detailsFetched === 0) {
+        toast.success(
+          lang === "zh"
+            ? "已是最新！所有活動都已同步"
+            : "You're up to date! All activities are already synced",
+          { duration: 4000 }
+        );
+      } else {
+        toast.success(
+          lang === "zh"
+            ? `同步成功！已同步 ${synced} 筆活動${detailsFetched > 0 ? `,已取得 ${detailsFetched} 筆詳細資料` : ""}`
+            : `Sync successful! ${synced} activities synced${detailsFetched > 0 ? `, ${detailsFetched} details fetched` : ""}`,
+          { duration: 4000 }
+        );
+      }
 
       invalidateActivities();
       return true;

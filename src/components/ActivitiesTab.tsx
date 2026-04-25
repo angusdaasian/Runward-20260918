@@ -427,9 +427,11 @@ const ActivitiesTab = ({ lang }: Props) => {
     };
   }, [user, invalidateAll]);
 
-  const { activityScores, averageScore } = useMemo(() => {
+  const { activityScores, activityLoads, averageScore } = useMemo(() => {
     const scores: Record<string, number | null> = {};
+    const loads: Record<string, number | null> = {};
     const validScores: number[] = [];
+    const profileAge = (profile as any)?.age ?? null;
     for (const act of activities) {
       if (runningSportTypes.has(act.sport_type)) {
         const s = getActivityScore(act.distance, act.moving_time);
@@ -438,6 +440,18 @@ const ActivitiesTab = ({ lang }: Props) => {
       } else {
         scores[act.id] = null;
       }
+      loads[act.id] = loadForActivity(
+        {
+          start_date: act.start_date,
+          moving_time: act.moving_time,
+          average_heartrate: act.average_heartrate,
+          max_heartrate: act.max_heartrate,
+          sport_type: act.sport_type,
+          source: act.source,
+          garmin_training_load: (act as any).garmin_training_load ?? null,
+        },
+        profileAge,
+      );
     }
     const recentScores = validScores.slice(0, 20);
     const avg =

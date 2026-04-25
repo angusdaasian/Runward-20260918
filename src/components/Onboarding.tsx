@@ -276,7 +276,11 @@ const Onboarding = ({
   const { launchPaywall, redeemOfferCode } = useDespiaPurchases();
   const [step, setStep] = useState<OnboardingStep>(() => {
     if (sessionStorage.getItem(ONBOARDING_SIGNUP_IN_PROGRESS_KEY) === "true") return 11;
-    if (localStorage.getItem("onboarding_show_plan_prompt") === "true") return 10;
+    // Only honor the persisted plan-prompt flag if we actually have an authed
+    // user. Otherwise (e.g. user bailed mid Apple/Google OAuth and reopened
+    // the app) we'd show the plan prompt to a null-user, who then taps
+    // through and lands inside the app with no auth and no guest mode.
+    if (localStorage.getItem("onboarding_show_plan_prompt") === "true" && user?.id) return 10;
     return 0;
   });
   const [isSignInMode, setIsSignInMode] = useState(false);
@@ -371,6 +375,18 @@ const Onboarding = ({
     }
   }, [step]);
 
+  // Safety net: if we ever land on step 10 (plan prompt) without an authed
+  // user (e.g. abandoned OAuth flow restored a stale flag), bounce back to
+  // step 0. Without this, tapping through step 10 would send the user into
+  // the app with no auth.
+  useEffect(() => {
+    if (step !== 10) return;
+    if (user?.id || onboardingUserId) return;
+    localStorage.removeItem("onboarding_show_plan_prompt");
+    localStorage.removeItem("pending_onboarding_data");
+    setStep(0);
+  }, [step, user?.id, onboardingUserId]);
+
   // Auto-advance welcome step
   useEffect(() => {
     if (step === 2 && welcomeVisible) {
@@ -379,10 +395,13 @@ const Onboarding = ({
     }
   }, [step, welcomeVisible]);
 
+  // Persist just the form data — DO NOT set the plan-prompt flag here.
+  // The flag must only be set once we have a confirmed authenticated user,
+  // otherwise an abandoned OAuth flow would leave the flag set and trick a
+  // future cold-start into showing the plan prompt with no real user.
   const saveOnboardingDataToStorage = () => {
     const onboardingData = { displayName, sex, age, runsPerWeek, estDistance, estHours, estMinutes, estSeconds };
     localStorage.setItem("pending_onboarding_data", JSON.stringify(onboardingData));
-    localStorage.setItem("onboarding_show_plan_prompt", "true");
   };
 
   useEffect(() => {
@@ -440,12 +459,16 @@ const Onboarding = ({
       }
       if (signupInProgress || isAccountCreationInFlight || (step >= 8 && step <= 11) || !!onboardingUserId) return;
 
-      if (localStorage.getItem("onboarding_show_plan_prompt") === "true") {
-        setStep(10);
-        const pendingData = localStorage.getItem("pending_onboarding_data");
-        if (pendingData) {
+      // Returning from an OAuth (Apple/Google) signup: pending_onboarding_data
+      // was stashed before the redirect. Now that we have a real authed user,
+      // hydrate the profile and show the plan prompt (step 10).
+      const pendingData = localStorage.getItem("pending_onboarding_data");
+      if (pendingData) {
+        try {
           const parsed = JSON.parse(pendingData);
           localStorage.removeItem("pending_onboarding_data");
+          localStorage.setItem("onboarding_show_plan_prompt", "true");
+          setStep(10);
           (async () => {
             await new Promise((r) => setTimeout(r, 500));
             await supabase.from("profiles").update({
@@ -456,9 +479,19 @@ const Onboarding = ({
               onboarding_completed: false,
             }).eq("user_id", user.id);
           })();
+          return;
+        } catch {
+          localStorage.removeItem("pending_onboarding_data");
         }
+      }
+
+      // Plan-prompt flag is already set (e.g. user reloaded mid-step-10) AND
+      // we have a real user → safe to resume on step 10.
+      if (localStorage.getItem("onboarding_show_plan_prompt") === "true") {
+        setStep(10);
         return;
       }
+
       if (step === 0) {
         supabase.from("profiles").select("onboarding_completed").eq("user_id", user.id).single()
           .then(({ data }) => {
@@ -575,16 +608,32 @@ const Onboarding = ({
   };
 
   const finalizeOnboarding = async (launchPlanPaywall = false) => {
-    setSignupInProgress(false);
-    localStorage.removeItem("onboarding_show_plan_prompt");
     const targetUserId = onboardingUserId ?? user?.id;
 
-    if (targetUserId) {
-      await supabase
-        .from("profiles")
-        .update({ onboarding_completed: true })
-        .eq("user_id", targetUserId);
+    // Hard guard: never let the user "finish" onboarding with no auth.
+    // This used to slip through if e.g. they bailed out of Apple OAuth and
+    // then tapped Skip on the plan prompt — landing them in the app with
+    // null user info. Bounce them back to the welcome screen instead.
+    if (!targetUserId) {
+      setSignupInProgress(false);
+      localStorage.removeItem("onboarding_show_plan_prompt");
+      localStorage.removeItem("pending_onboarding_data");
+      toast({
+        title: lang === "zh" ? "請先登入" : "Please sign in",
+        description: lang === "zh" ? "完成註冊後再繼續。" : "Finish creating your account to continue.",
+        variant: "destructive",
+      });
+      setStep(0);
+      return;
     }
+
+    setSignupInProgress(false);
+    localStorage.removeItem("onboarding_show_plan_prompt");
+
+    await supabase
+      .from("profiles")
+      .update({ onboarding_completed: true })
+      .eq("user_id", targetUserId);
 
     if (launchPlanPaywall) {
       const locale = lang === "zh" ? "zh_Hant" : "en";

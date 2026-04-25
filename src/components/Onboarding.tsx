@@ -447,12 +447,16 @@ const Onboarding = ({
       }
       if (signupInProgress || isAccountCreationInFlight || (step >= 8 && step <= 11) || !!onboardingUserId) return;
 
-      if (localStorage.getItem("onboarding_show_plan_prompt") === "true") {
-        setStep(10);
-        const pendingData = localStorage.getItem("pending_onboarding_data");
-        if (pendingData) {
+      // Returning from an OAuth (Apple/Google) signup: pending_onboarding_data
+      // was stashed before the redirect. Now that we have a real authed user,
+      // hydrate the profile and show the plan prompt (step 10).
+      const pendingData = localStorage.getItem("pending_onboarding_data");
+      if (pendingData) {
+        try {
           const parsed = JSON.parse(pendingData);
           localStorage.removeItem("pending_onboarding_data");
+          localStorage.setItem("onboarding_show_plan_prompt", "true");
+          setStep(10);
           (async () => {
             await new Promise((r) => setTimeout(r, 500));
             await supabase.from("profiles").update({
@@ -463,9 +467,19 @@ const Onboarding = ({
               onboarding_completed: false,
             }).eq("user_id", user.id);
           })();
+          return;
+        } catch {
+          localStorage.removeItem("pending_onboarding_data");
         }
+      }
+
+      // Plan-prompt flag is already set (e.g. user reloaded mid-step-10) AND
+      // we have a real user → safe to resume on step 10.
+      if (localStorage.getItem("onboarding_show_plan_prompt") === "true") {
+        setStep(10);
         return;
       }
+
       if (step === 0) {
         supabase.from("profiles").select("onboarding_completed").eq("user_id", user.id).single()
           .then(({ data }) => {

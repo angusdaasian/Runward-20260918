@@ -96,8 +96,12 @@ export interface WeekPoint {
 }
 
 /**
- * Build a 26-week weekly series with EWMA-based CTL/ATL/TSB.
+ * Build a weekly series with EWMA-based CTL/ATL/TSB.
  * τ_CTL = 6 weeks, τ_ATL = 1 week.
+ *
+ * The series never starts earlier than the first week of 2026 — that's the
+ * earliest point we have activity data for, and matches the rest of the
+ * app's analytics window.
  */
 export function buildWeeklyLoadSeries(
   activities: LoadActivity[],
@@ -106,12 +110,22 @@ export function buildWeeklyLoadSeries(
 ): WeekPoint[] {
   const now = new Date();
   const currentWeek = weekStart(now);
-  const startWeek = new Date(currentWeek);
+  let startWeek = new Date(currentWeek);
   startWeek.setDate(startWeek.getDate() - (weeks - 1) * 7);
+
+  // Clamp to the first week containing 2026-01-01.
+  const earliest = weekStart(new Date(2026, 0, 1));
+  if (startWeek < earliest) startWeek = earliest;
+
+  // Recompute actual week count after clamping (≥ 1).
+  const actualWeeks = Math.max(
+    1,
+    Math.round((currentWeek.getTime() - startWeek.getTime()) / (7 * 86400 * 1000)) + 1,
+  );
 
   // Init week buckets
   const buckets: { ws: Date; load: number }[] = [];
-  for (let i = 0; i < weeks; i++) {
+  for (let i = 0; i < actualWeeks; i++) {
     const ws = new Date(startWeek);
     ws.setDate(ws.getDate() + i * 7);
     buckets.push({ ws, load: 0 });
@@ -127,7 +141,7 @@ export function buildWeeklyLoadSeries(
     if (!load) continue;
     const ws = weekStart(date);
     const idx = Math.round((ws.getTime() - startWeek.getTime()) / (7 * 86400 * 1000));
-    if (idx >= 0 && idx < weeks) {
+    if (idx >= 0 && idx < actualWeeks) {
       buckets[idx].load += load;
     }
   }

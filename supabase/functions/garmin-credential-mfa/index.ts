@@ -126,6 +126,15 @@ serve(async (req) => {
       });
     }
 
+    // Purge any existing Apple Health activities — Garmin is now the source of truth.
+    const { error: ahPurgeError } = await supabase
+      .from("apple_health_activities")
+      .delete()
+      .eq("user_id", user.id);
+    if (ahPurgeError) {
+      console.warn("garmin-credential-mfa: failed to purge apple_health_activities:", ahPurgeError.message);
+    }
+
     return new Response(JSON.stringify({ success: true, display_name: email }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

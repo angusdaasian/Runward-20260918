@@ -466,6 +466,7 @@ export type Database = {
           access_token: string | null
           created_at: string | null
           expires_at: string | null
+          full_resync_done: boolean
           garmin_display_name: string | null
           garmin_email_encrypted: string | null
           id: string
@@ -482,6 +483,7 @@ export type Database = {
           access_token?: string | null
           created_at?: string | null
           expires_at?: string | null
+          full_resync_done?: boolean
           garmin_display_name?: string | null
           garmin_email_encrypted?: string | null
           id?: string
@@ -498,6 +500,7 @@ export type Database = {
           access_token?: string | null
           created_at?: string | null
           expires_at?: string | null
+          full_resync_done?: boolean
           garmin_display_name?: string | null
           garmin_email_encrypted?: string | null
           id?: string

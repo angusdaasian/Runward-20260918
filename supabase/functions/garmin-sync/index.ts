@@ -311,13 +311,16 @@ serve(async (req) => {
         });
       }
 
-      // Mark the one-time full 2026 resync as complete so subsequent syncs go incremental.
-      if (needsFullResync) {
+      // Mark the one-time full 2026 resync as complete only if all chunks succeeded.
+      // If any chunk failed, leave the flag false so the next sync retries the full window.
+      if (needsFullResync && chunkErrors.length === 0) {
         const { error: flagErr } = await supabase
           .from("garmin_connections")
           .update({ full_resync_done: true })
           .eq("user_id", user.id);
         if (flagErr) console.error("[garmin-sync] failed to set full_resync_done:", flagErr);
+      } else if (needsFullResync) {
+        console.warn(`[garmin-sync] full resync had ${chunkErrors.length} chunk error(s); leaving full_resync_done=false to retry next sync`);
       }
 
       // ── Phase 2: Loop through missing details (up to 3 batches of 5) ──

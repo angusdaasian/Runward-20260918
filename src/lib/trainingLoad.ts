@@ -166,6 +166,181 @@ export type LoadStatusKey =
   | "maintenance"
   | "detraining";
 
+// ---------- 4-week vs previous-4-week trend comparison ----------
+
+export interface TrendMetric {
+  key: string;
+  current: number;
+  previous: number;
+  /** Percent change (current vs previous), positive = current is higher */
+  pctChange: number;
+  /** True when an increase counts as an improvement (e.g. distance ↑ good, HR ↑ bad). */
+  higherIsBetter: boolean;
+  /** Direction relative to "good": "improving" | "declining" | "flat" */
+  direction: "improving" | "declining" | "flat";
+}
+
+export interface TrendComparison {
+  metrics: Record<string, TrendMetric>;
+  hasData: boolean;
+  currentWeeks: number;
+  previousWeeks: number;
+}
+
+interface WindowAgg {
+  totalDistanceM: number;
+  totalMovingS: number;
+  totalElevationM: number;
+  sessions: number;
+  hrSum: number;
+  hrCount: number;
+  paceWeightedSum: number; // sum of (sec/m * distance)
+  paceWeightDist: number;  // sum of distance for paced sessions
+  cardioEffSum: number;    // sum of (speed_m_s * 60 / hr) per session
+  cardioEffCount: number;
+  weeksSpan: number;
+}
+
+function emptyAgg(): WindowAgg {
+  return {
+    totalDistanceM: 0,
+    totalMovingS: 0,
+    totalElevationM: 0,
+    sessions: 0,
+    hrSum: 0,
+    hrCount: 0,
+    paceWeightedSum: 0,
+    paceWeightDist: 0,
+    cardioEffSum: 0,
+    cardioEffCount: 0,
+    weeksSpan: 4,
+  };
+}
+
+const runningSports = new Set([
+  "Run", "TrailRun", "VirtualRun", "Treadmill",
+  "running", "trail_running", "treadmill_running",
+]);
+
+function pctChange(curr: number, prev: number): number {
+  if (prev === 0) return curr === 0 ? 0 : 100;
+  return ((curr - prev) / prev) * 100;
+}
+
+/**
+ * Compare last 4 weeks vs the prior 4 weeks across key metrics.
+ * Window boundaries are based on `weekStart()` of "now".
+ */
+export function buildTrendComparison(
+  activities: LoadActivity[] & { distance?: number; total_elevation_gain?: number; average_speed?: number }[] | any[],
+): TrendComparison {
+  const now = new Date();
+  const currentWeekStart = weekStart(now);
+  // Current window = the 4 weeks ending with the current week (inclusive)
+  const currentWindowStart = new Date(currentWeekStart);
+  currentWindowStart.setDate(currentWindowStart.getDate() - 3 * 7);
+  const previousWindowStart = new Date(currentWindowStart);
+  previousWindowStart.setDate(previousWindowStart.getDate() - 4 * 7);
+
+  const curr = emptyAgg();
+  const prev = emptyAgg();
+
+  for (const act of activities as any[]) {
+    const date = new Date(act.start_date);
+    if (isNaN(date.getTime())) continue;
+
+    let bucket: WindowAgg | null = null;
+    if (date >= currentWindowStart) bucket = curr;
+    else if (date >= previousWindowStart) bucket = prev;
+    else continue;
+
+    const distance = Number(act.distance) || 0;
+    const moving = Number(act.moving_time) || 0;
+    const elev = Number(act.total_elevation_gain) || 0;
+    const avgHr = act.average_heartrate ? Number(act.average_heartrate) : null;
+    const avgSpeed = Number(act.average_speed) || 0;
+
+    bucket.totalDistanceM += distance;
+    bucket.totalMovingS += moving;
+    bucket.totalElevationM += elev;
+    bucket.sessions += 1;
+
+    if (avgHr && avgHr > 30) {
+      bucket.hrSum += avgHr;
+      bucket.hrCount += 1;
+      if (avgSpeed > 0) {
+        // simple cardiac efficiency proxy: meters per heartbeat per minute
+        bucket.cardioEffSum += (avgSpeed * 60) / avgHr;
+        bucket.cardioEffCount += 1;
+      }
+    }
+
+    // Running pace only — weighted by distance
+    if (runningSports.has(act.sport_type) && distance > 400 && moving > 60) {
+      const secPerM = moving / distance;
+      bucket.paceWeightedSum += secPerM * distance;
+      bucket.paceWeightDist += distance;
+    }
+  }
+
+  const hasData = curr.sessions > 0 || prev.sessions > 0;
+
+  const buildMetric = (
+    key: string,
+    currVal: number,
+    prevVal: number,
+    higherIsBetter: boolean,
+  ): TrendMetric => {
+    const change = pctChange(currVal, prevVal);
+    const epsilon = 1; // <1% delta = flat
+    let direction: TrendMetric["direction"] = "flat";
+    if (Math.abs(change) >= epsilon) {
+      const positive = change > 0;
+      direction = positive === higherIsBetter ? "improving" : "declining";
+    }
+    return { key, current: currVal, previous: prevVal, pctChange: change, higherIsBetter, direction };
+  };
+
+  // Per-week averages for volume/distance/sessions/elevation
+  const W = 4;
+  const weeklyVolumeS_curr = curr.totalMovingS / W;
+  const weeklyVolumeS_prev = prev.totalMovingS / W;
+  const weeklyDistKm_curr = curr.totalDistanceM / 1000 / W;
+  const weeklyDistKm_prev = prev.totalDistanceM / 1000 / W;
+  const weeklyElev_curr = curr.totalElevationM / W;
+  const weeklyElev_prev = prev.totalElevationM / W;
+  const sessionsPerWk_curr = curr.sessions / W;
+  const sessionsPerWk_prev = prev.sessions / W;
+
+  const avgSessionMin_curr = curr.sessions > 0 ? curr.totalMovingS / curr.sessions / 60 : 0;
+  const avgSessionMin_prev = prev.sessions > 0 ? prev.totalMovingS / prev.sessions / 60 : 0;
+
+  const avgHr_curr = curr.hrCount > 0 ? curr.hrSum / curr.hrCount : 0;
+  const avgHr_prev = prev.hrCount > 0 ? prev.hrSum / prev.hrCount : 0;
+
+  // Pace = sec/km (lower is better)
+  const paceSecPerKm_curr =
+    curr.paceWeightDist > 0 ? (curr.paceWeightedSum / curr.paceWeightDist) * 1000 : 0;
+  const paceSecPerKm_prev =
+    prev.paceWeightDist > 0 ? (prev.paceWeightedSum / prev.paceWeightDist) * 1000 : 0;
+
+  const cardioEff_curr = curr.cardioEffCount > 0 ? curr.cardioEffSum / curr.cardioEffCount : 0;
+  const cardioEff_prev = prev.cardioEffCount > 0 ? prev.cardioEffSum / prev.cardioEffCount : 0;
+
+  const metrics: Record<string, TrendMetric> = {
+    weeklyVolume: buildMetric("weeklyVolume", weeklyVolumeS_curr, weeklyVolumeS_prev, true),
+    weeklyDistance: buildMetric("weeklyDistance", weeklyDistKm_curr, weeklyDistKm_prev, true),
+    weeklyElevation: buildMetric("weeklyElevation", weeklyElev_curr, weeklyElev_prev, true),
+    sessionsPerWeek: buildMetric("sessionsPerWeek", sessionsPerWk_curr, sessionsPerWk_prev, true),
+    avgSessionLength: buildMetric("avgSessionLength", avgSessionMin_curr, avgSessionMin_prev, true),
+    avgHr: buildMetric("avgHr", avgHr_curr, avgHr_prev, false),
+    runningPace: buildMetric("runningPace", paceSecPerKm_curr, paceSecPerKm_prev, false),
+    cardiacEfficiency: buildMetric("cardiacEfficiency", cardioEff_curr, cardioEff_prev, true),
+  };
+
+  return { metrics, hasData, currentWeeks: W, previousWeeks: W };
+}
+
 export function classifyLoadStatus(series: WeekPoint[]): LoadStatusKey {
   if (series.length === 0) return "maintenance";
   const last = series[series.length - 1];

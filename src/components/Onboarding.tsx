@@ -1497,7 +1497,19 @@ const Onboarding = ({
               setVerifyingOtp(false);
               if (error) {
                 toast({ title: "Error", description: error.message, variant: "destructive" });
+                // OTP verification failed — wipe the half-finished signup
+                // state and send the user back to the welcome screen so they
+                // can start over (or sign in) instead of being stuck on a
+                // dead-end verify screen.
                 setOtpCode("");
+                setSignupInProgress(false);
+                setIsAccountCreationInFlight(false);
+                localStorage.removeItem("onboarding_show_plan_prompt");
+                localStorage.removeItem("pending_onboarding_data");
+                setOnboardingUserId(null);
+                setPassword("");
+                setConfirmPassword("");
+                setStep(0);
                 return;
               }
               if (data.user) {

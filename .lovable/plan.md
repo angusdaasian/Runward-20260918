@@ -1,72 +1,151 @@
+## Goal
 
+1. Compute a **Training Load (TRIMP-style)** value for every activity (Strava / Apple Health / Garmin / COROS).
+2. Show that value on the activity card.
+3. Add a **Training Load chart** to the Activities tab showing weekly **Fitness (CTL) / Fatigue (ATL) / Form (TSB)** curves — same concept as araujo.zip, but bucketed weekly instead of daily/monthly.
+4. Gate the whole Training Load feature (card badge + chart) behind **Premium**, with a locked teaser for free users.
 
-## AI Running Coach — Premium Floating Chat
+---
 
-A draggable floating chat button + modal, gated to premium users, with per-user memory, conversation history, and Vertex AI Gemini 3.1 Flash Lite as the brain.
+## 1. Training Load formula (per activity)
 
-### Files to create
+We will use a duration × HR-intensity TRIMP approximation. This works for all sources because it only needs `moving_time` + `average_heartrate` (or a fallback).
 
-**Frontend**
-- `src/components/coach/FloatingChatButton.tsx` — draggable circular button (56/64px), gradient + bounce, snaps to nearest edge, position persisted to `localStorage`, lock overlay for non-premium, X transform when open, z-index 9999.
-- `src/components/coach/ChatModal.tsx` — full-screen on mobile (slide-up), 500×700 modal on desktop (fade-in), header, context bar, message list, input, "new conversation", remaining-message counter.
-- `src/components/coach/MessageBubble.tsx` — user-right/AI-left chat bubbles with markdown rendering.
-- `src/components/coach/TypingIndicator.tsx` — three-dot pulsing animation.
-- `src/components/coach/ContextBar.tsx` — "Coach knows: …" summary line.
-- `src/components/coach/CoachSettings.tsx` — sheet with units, goal, race date, experience, training days, injuries, intensity, "what coach knows" list, reset memory button.
-- `src/components/coach/UpgradeModal.tsx` — premium upsell shown to non-premium taps (reuses existing `launchPaywall` from `useDespiaPurchases`).
-- `src/hooks/use-ai-coach.ts` — manages session id, message list, send/receive, remaining-messages count, error toasts.
+```ts
+// src/lib/trainingLoad.ts
+export function computeTrainingLoad(act: {
+  moving_time: number;          // seconds
+  average_heartrate: number | null;
+  max_heartrate: number | null;
+  age?: number | null;          // from profile
+  sport_type?: string;
+}): number | null {
+  if (!act.moving_time || act.moving_time < 60) return null;
+  const minutes = act.moving_time / 60;
 
-**Mounting**: render `<FloatingChatButton />` once inside `src/pages/Index.tsx` (after the bottom nav, fixed position so it floats above all tabs). Hidden during onboarding, guest mode, and on `/admin`, `/support`, `/privacy`.
+  // Resting HR assumed 60; max HR = profile max HR or 220 - age, fallback 190
+  const hrMax = act.max_heartrate || (act.age ? 220 - act.age : 190);
+  const hrRest = 60;
+  const hrAvg = act.average_heartrate ?? hrMax * 0.7; // assume zone 2 if missing
 
-**Backend (Supabase Edge Function)**
-- `supabase/functions/ai-running-coach/index.ts` — handles chat. Reuses the existing `callVertexAI` pattern from `analyze-activity` (model: `gemini-3.1-flash-lite-preview`, temperature 0.7, maxOutputTokens 1024). Uses existing `GOOGLE_VERTEX_API_KEY` secret — no new keys needed.
+  const hrr = Math.max(0, Math.min(1, (hrAvg - hrRest) / (hrMax - hrRest)));
+  // Banister TRIMP weighting: y = 0.64 * e^(1.92 * HRR)  (men); use 0.86 * e^(1.67 * HRR) average
+  const y = 0.75 * Math.exp(1.8 * hrr);
+  const trimp = minutes * hrr * y;
+  return Math.round(trimp);
+}
+```
 
-Endpoint logic:
-1. Validate JWT → load user.
-2. Check `profiles.is_premium` → 403 if false.
-3. Check `ai_coach_usage` for today → 429 if ≥100.
-4. Load `ai_coach_preferences`, last 10 messages from `ai_coach_conversations` (filtered by `session_id`), top insights from `ai_coach_insights`, recent 7-day activities from `garmin_activities` + `strava_activities` + `apple_health_activities`, and `profiles` (display_name, experience).
-5. Build system prompt with all context + safety rules.
-6. Call Vertex AI.
-7. Insert user + assistant messages into `ai_coach_conversations`, increment `ai_coach_usage` (upsert).
-8. Fire-and-forget secondary Vertex call to extract insights from the latest exchange → upsert into `ai_coach_insights` (best-effort, ignore failures).
-9. Return `{ response, session_id, remaining_messages_today }`.
+This is the same "duration × HR intensity" approach araujo.zip describes.
 
-Also handles a `?action=preferences` POST/GET for reading/updating preferences from the settings sheet (so the client never writes directly with elevated trust — keeps validation server-side).
+**Implementation location:** computed on the **client** inside `useActivities` (memoized per activity) so we don't need to backfill DB rows or run any sync. We already have access to all required fields.
 
-### Database migration
+For Garmin activities, if `garmin_activities.training_load` is already populated from Garmin (column already exists per `types.ts:401`), prefer that value over the computed one.
 
-Four new tables, all RLS-enabled with owner-only policies:
+---
 
-- **ai_coach_preferences** — `user_id` unique, `preferred_units` text default `'kilometers'`, `training_goal` text, `target_race_date` date, `experience_level` text, `training_days` jsonb default `'[]'`, `injuries_concerns` text, `training_intensity` text, timestamps.
-- **ai_coach_conversations** — `user_id`, `session_id` uuid, `role` text (`user`|`assistant`), `content` text, `metadata` jsonb, `created_at`. Index on `(user_id, session_id, created_at)`.
-- **ai_coach_insights** — `user_id`, `insight_type` text, `insight_key` text, `insight_value` text, `confidence` numeric, timestamps. Unique `(user_id, insight_key)`.
-- **ai_coach_usage** — `user_id`, `date` date, `message_count` int default 0. Unique `(user_id, date)`.
+## 2. Activity card update
 
-RLS: each table — users can SELECT/INSERT/UPDATE/DELETE their own rows (`auth.uid() = user_id`). Edge function uses service role to bypass for cross-table reads.
+In `src/components/ActivitiesTab.tsx` `ActivityCard`, add a new metric in the secondary stat grid (alongside Score / HR / Elev):
 
-### UX details
+```tsx
+{isPremium && load !== null && (
+  <div>
+    <span className="text-xs font-medium text-orange-500 block mb-0.5">Load</span>
+    <div className="flex items-center gap-1">
+      <Flame size={12} className="text-orange-500" />
+      <span className="text-sm font-semibold text-foreground">{load}</span>
+    </div>
+  </div>
+)}
+{!isPremium && (
+  <div className="opacity-60">
+    <span className="text-xs font-medium text-muted-foreground block mb-0.5 flex items-center gap-1">
+      <Lock size={10}/> Load
+    </span>
+    <span className="text-sm font-semibold text-muted-foreground">--</span>
+  </div>
+)}
+```
 
-- **First-time premium**: opening the modal with no prior conversation triggers a welcome message + onboarding questions; answers are saved to `ai_coach_preferences` as the user replies (the AI is prompted to call out preference updates, parsed server-side).
-- **Returning user**: greeting references most recent activity from connected sources.
-- **Non-premium tap**: lock-icon button → `UpgradeModal` → `launchPaywall()`.
-- **Rate-limit hit**: input disabled, banner shows reset time.
-- **New conversation**: generates a fresh `session_id` (uuid) client-side, posts with `new_session: true`.
-- **Reset memory**: deletes user's rows from `ai_coach_conversations` and `ai_coach_insights` (preferences kept).
-- **Bilingual**: respects existing `app_lang` localStorage; system prompt instructs AI to reply in user's language.
-- **Dark mode**: uses semantic tokens (`bg-card`, `text-foreground`, `border-border`, `bg-primary`) so it matches existing theme.
-- **Drag**: pointer events (works for touch + mouse), constrained to viewport minus button size, snaps left/right on release with spring transition.
+Pass `isPremium` and a `load` value into `ActivityCard` (compute via `computeTrainingLoad` in the parent memo, just like `activityScores`). Same treatment in `ActivityDetail.tsx` stat grid.
 
-### Out of scope (not built)
+---
 
-- Streaming responses (request/response only — keeps the edge function simple and matches `analyze-activity` style).
-- Conversation history browser UI (sessions exist in DB but only the active session is shown; can be added later).
-- Voice input.
-- Push-notification reminders from coach.
+## 3. Weekly Training Load curve component
 
-### Open questions before implementation
+New file: `src/components/activities/TrainingLoadChart.tsx`
 
-1. **Mounting scope** — show the floating button only inside `Index` (the in-app tabs), or also on `/support`, `/privacy`, `/admin`? Default: Index only.
-2. **Daily limit** — keep 100 hard-coded, or store in a config table for future tuning? Default: hard-coded constant in the edge function.
-3. **Insight extraction** — do the secondary AI call (richer memory, ~2x token cost) or skip it for v1? Default: include it, since "remembers everything" is a stated requirement.
+**Algorithm (weekly buckets):**
+1. Take all running/cardio activities from the last **26 weeks** (~6 months).
+2. Compute each activity's TRIMP via `computeTrainingLoad`.
+3. Group by ISO week (Mon–Sun), summing TRIMP per week → `weeklyLoad[]`.
+4. Compute exponentially-weighted moving averages on the **weekly** series:
+   - **Fitness (CTL)** = EWMA with time-constant **6 weeks** (≈42 days)
+   - **Fatigue (ATL)** = EWMA with time-constant **1 week** (≈7 days)
+   - **Form (TSB)** = `CTL - ATL`
+5. Plot the three series with Recharts (already used in `ActivityDetail.tsx`):
+   - X axis = week (label every 4 weeks: "Wk of MMM d")
+   - Y axis = load points
+   - Blue line = Fitness, orange line = Fatigue, red line = Form (with a green/red filled area between Form and 0 — green when Form > 0, red when Form < 0), matching the screenshot.
+6. Header row shows current values: `Fitness X.X · Fatigue X.X · Form ±X.X`.
+7. Status badge below chart based on TSB & CTL trend (last value vs 4 weeks ago):
+   - `TSB < -10` → "Overreaching"
+   - `-10 ≤ TSB < 5` and CTL trending up → "Productive overreach"
+   - `TSB ≥ 5` and CTL trending up → "Building fitness"
+   - `TSB > 15` and CTL flat/down → "Detraining / fresh"
+   - `TSB ≈ 0` and CTL flat → "Maintenance"
+8. Footer caption: "Fitness (CTL) = 6w EWMA · Fatigue (ATL) = 1w EWMA · Form = fitness − fatigue · Based on duration × HR intensity".
 
+Bilingual (`lang` prop) for all labels.
+
+---
+
+## 4. Premium gating for the chart
+
+Insert the chart in `ActivitiesTab` **between** "Recent Activity" and `SuggestedNextWorkout`:
+
+```tsx
+{isPremium ? (
+  <TrainingLoadChart lang={lang} activities={activities} profileAge={profile?.age} />
+) : (
+  <TrainingLoadChartLocked lang={lang} />
+)}
+```
+
+`TrainingLoadChartLocked` shows a blurred/skeleton version of the chart with a lock icon overlay and a "Upgrade to Premium" CTA that opens the existing upgrade flow (same pattern as `ActivityDetail.tsx` lines 832–834).
+
+---
+
+## 5. Files to create / edit
+
+**Create**
+- `src/lib/trainingLoad.ts` — `computeTrainingLoad()` + EWMA helper + weekly bucketing.
+- `src/components/activities/TrainingLoadChart.tsx` — the curve component (premium view).
+- `src/components/activities/TrainingLoadChartLocked.tsx` — locked teaser view.
+
+**Edit**
+- `src/components/ActivitiesTab.tsx`
+  - Compute `activityLoads` map alongside `activityScores`.
+  - Pass `load` + `isPremium` into `ActivityCard`.
+  - Mount `<TrainingLoadChart />` / locked variant in the main view.
+  - Also add Load metric inside the bottom-sheet date detail.
+- `src/components/activities/ActivityDetail.tsx`
+  - Add Training Load stat in the stat grid (premium-gated).
+
+**No DB migration needed.** All computation happens client-side from existing fields. The existing `garmin_activities.training_load` column is used as-is when present.
+
+**No edge function changes needed.**
+
+---
+
+## 6. Why weekly EWMA (not daily like araujo.zip)
+
+User explicitly asked for weekly buckets. Daily EWMA would need a daily resampling. Weekly summed TRIMP + weekly EWMA (τ = 6w / 1w) gives the same Fitness/Fatigue/Form interpretation while staying readable on mobile and avoiding noisy single-day spikes.
+
+---
+
+## Out of scope for this iteration
+- Backfilling a historical `training_load` column in the DB.
+- Per-day training load chart.
+- Trends panel ("last 4 weeks vs previous 4") shown on araujo.zip — can be added in a follow-up.

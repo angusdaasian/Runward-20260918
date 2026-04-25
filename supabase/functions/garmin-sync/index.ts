@@ -429,6 +429,7 @@ serve(async (req) => {
         training_score: trainingScore,
         total_xp: totalMonthlyXp,
         first_sync: isFirstSync,
+        full_resync: needsFullResync,
         window_start: fmtDate(windowStart),
         window_end: fmtDate(today),
         chunks_processed: chunks.length,

@@ -128,9 +128,9 @@ const TrainingLoadChart = ({ lang, activities, profileAge }: Props) => {
       </div>
 
       {/* Chart */}
-      <div className="h-48 -mx-2">
+      <div className="h-48">
         <ResponsiveContainer width="100%" height="100%">
-          <ComposedChart data={series} margin={{ top: 8, right: 12, left: -16, bottom: 0 }}>
+          <ComposedChart data={series} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
             <defs>
               <linearGradient id="formPos" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor="hsl(142 71% 45%)" stopOpacity={0.35} />

@@ -107,7 +107,7 @@ serve(async (req) => {
     if (action === "sync") {
       const { data: conn } = await supabase
         .from("garmin_connections")
-        .select("garmin_email_encrypted, access_token, oauth1_token_encrypted, oauth2_token_encrypted")
+        .select("garmin_email_encrypted, access_token, oauth1_token_encrypted, oauth2_token_encrypted, full_resync_done")
         .eq("user_id", user.id)
         .maybeSingle();
 
@@ -145,32 +145,55 @@ serve(async (req) => {
         });
       }
 
-      // ── Determine sync window (first-time vs incremental) ──
+      // ── Determine sync window ──
       const firstSyncStart = new Date(`${FIRST_SYNC_START_ISO}T00:00:00Z`);
       const today = new Date();
 
-      const { data: latestRow } = await supabase
-        .from("garmin_activities")
-        .select("start_time")
-        .eq("user_id", user.id)
-        .not("start_time", "is", null)
-        .order("start_time", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      let windowStart: Date;
+      // If user hasn't done the one-time full 2026 resync yet, wipe their
+      // existing 2026 garmin activities and re-pull the entire window.
+      const needsFullResync = !conn.full_resync_done;
       let isFirstSync = false;
-      if (!latestRow?.start_time) {
+      let windowStart: Date;
+
+      if (needsFullResync) {
+        console.log(`[garmin-sync] user=${user.id} performing one-time full 2026 resync — wiping existing activities`);
+        const { error: wipeErr } = await supabase
+          .from("garmin_activities")
+          .delete()
+          .eq("user_id", user.id)
+          .gte("start_time", firstSyncStart.toISOString());
+        if (wipeErr) {
+          console.error("[garmin-sync] wipe failed:", wipeErr);
+          return new Response(JSON.stringify({ error: `Failed to clear existing activities: ${wipeErr.message}` }), {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
         isFirstSync = true;
         windowStart = firstSyncStart;
       } else {
-        const lastSynced = new Date(latestRow.start_time);
-        const overlap = new Date(lastSynced.getTime() - INCREMENTAL_OVERLAP_DAYS * 24 * 60 * 60 * 1000);
-        windowStart = overlap < firstSyncStart ? firstSyncStart : overlap;
+        const { data: latestRow } = await supabase
+          .from("garmin_activities")
+          .select("start_time")
+          .eq("user_id", user.id)
+          .not("start_time", "is", null)
+          .order("start_time", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (!latestRow?.start_time) {
+          isFirstSync = true;
+          windowStart = firstSyncStart;
+        } else {
+          const lastSynced = new Date(latestRow.start_time);
+          const overlap = new Date(lastSynced.getTime() - INCREMENTAL_OVERLAP_DAYS * 24 * 60 * 60 * 1000);
+          windowStart = overlap < firstSyncStart ? firstSyncStart : overlap;
+        }
       }
 
       const chunks = buildMonthlyChunks(windowStart, today);
-      console.log(`[garmin-sync] user=${user.id} firstSync=${isFirstSync} window=${fmtDate(windowStart)}→${fmtDate(today)} chunks=${chunks.length}`);
+      console.log(`[garmin-sync] user=${user.id} firstSync=${isFirstSync} fullResync=${needsFullResync} window=${fmtDate(windowStart)}→${fmtDate(today)} chunks=${chunks.length}`);
+
 
       // Garmin API returns times in local time (HKT UTC+8) but labels them as UTC,
       // so we subtract 8 hours to get the real UTC time.

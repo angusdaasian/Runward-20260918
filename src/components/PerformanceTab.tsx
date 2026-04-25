@@ -1,11 +1,8 @@
 import { useMemo } from "react";
-import { Crown } from "lucide-react";
 import { Lang } from "@/lib/i18n";
 import { useAuth } from "@/contexts/AuthContext";
-import { usePremium } from "@/contexts/PremiumContext";
 import { useActivities } from "@/hooks/use-activities";
 import TrainingLoadChart from "@/components/activities/TrainingLoadChart";
-import TrainingLoadChartLocked from "@/components/activities/TrainingLoadChartLocked";
 import TrendsCard from "@/components/activities/TrendsCard";
 import ActivityYearHeatmap from "@/components/activities/ActivityYearHeatmap";
 import { ActivityListSkeleton } from "@/components/ui/PageSkeleton";

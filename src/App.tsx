@@ -23,11 +23,20 @@ registerShareIntent();
 // Route `/` → Index when:
 //  - we're inside the native app, OR
 //  - the URL carries in-app query params (e.g. ?tab=more&page=connect-apps)
-//    used by post-OAuth redirects. Otherwise show the marketing Landing.
+//    used by post-OAuth redirects, OR
+//  - the URL hash carries OAuth tokens (e.g. #access_token=...) returned by
+//    Supabase's signInWithOAuth (Apple/Google) — otherwise the user lands
+//    on the marketing page and appears signed-out even though a session was
+//    just created.
+// Otherwise show the marketing Landing.
 const RootRoute = () => {
   if (native) return <Index />;
   const params = new URLSearchParams(window.location.search);
   if (params.has("tab") || params.has("page")) return <Index />;
+  const hash = window.location.hash || "";
+  if (hash.includes("access_token=") || hash.includes("refresh_token=") || hash.includes("type=recovery")) {
+    return <Index />;
+  }
   return <Landing />;
 };
 

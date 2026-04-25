@@ -30,13 +30,42 @@ function computeRankFromXP(monthlyXp: number) {
   return { tier: RANK_TIERS[tierIndex], division: DIVISIONS[divIndex] };
 }
 
-function isCurrentMonth(dateStr: string): boolean {
-  const d = new Date(dateStr);
-  const now = new Date();
-  return d.getUTCFullYear() === now.getUTCFullYear() && d.getUTCMonth() === now.getUTCMonth();
+const runningSportTypes = new Set(["Run", "TrailRun", "VirtualRun", "Treadmill", "Workout", "running", "trail_running", "treadmill_running"]);
+
+// ── Sync window config ──
+// First-ever sync pulls everything from this date forward.
+// Incremental syncs use max(last_synced - OVERLAP_DAYS, FIRST_SYNC_START).
+const FIRST_SYNC_START_ISO = "2026-01-01";
+const INCREMENTAL_OVERLAP_DAYS = 7;
+
+function fmtDate(d: Date): string {
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(d.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }
 
-const runningSportTypes = new Set(["Run", "TrailRun", "VirtualRun", "Treadmill", "Workout", "running", "trail_running", "treadmill_running"]);
+/**
+ * Build month-by-month [start, end] chunks (inclusive) from `start` to `end`.
+ * Each chunk spans at most one calendar month.
+ */
+function buildMonthlyChunks(start: Date, end: Date): Array<{ start: string; end: string }> {
+  const chunks: Array<{ start: string; end: string }> = [];
+  if (start > end) return chunks;
+
+  let cursor = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate()));
+  const finalEnd = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), end.getUTCDate()));
+
+  while (cursor <= finalEnd) {
+    // Last day of cursor's month
+    const monthEnd = new Date(Date.UTC(cursor.getUTCFullYear(), cursor.getUTCMonth() + 1, 0));
+    const chunkEnd = monthEnd > finalEnd ? finalEnd : monthEnd;
+    chunks.push({ start: fmtDate(cursor), end: fmtDate(chunkEnd) });
+    // Move cursor to first day of next month
+    cursor = new Date(Date.UTC(cursor.getUTCFullYear(), cursor.getUTCMonth() + 1, 1));
+  }
+  return chunks;
+}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -73,9 +102,6 @@ serve(async (req) => {
 
     const body = await req.json();
     const { action } = body;
-
-    // Note: login is handled by the garmin-credential-login + garmin-credential-mfa
-    // edge functions, which proxy to the Railway garth service.
 
     // ── SYNC ──
     if (action === "sync") {
@@ -119,42 +145,33 @@ serve(async (req) => {
         });
       }
 
-      // ── Phase 1: Fetch basic activity list (using stored tokens) ──
-      const actRes = await fetch(`${GARMIN_RAILWAY_URL}/garmin-activities`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: garminEmail,
-          oauth1_token: oauth1Token,
-          oauth2_token: oauth2Token,
-          days: body.days || 30,
-          detail_limit: 0,
-        }),
-      });
+      // ── Determine sync window (first-time vs incremental) ──
+      const firstSyncStart = new Date(`${FIRST_SYNC_START_ISO}T00:00:00Z`);
+      const today = new Date();
 
-      if (!actRes.ok) {
-        const errData = await actRes.json().catch(() => ({}));
-        console.error("Garmin activity fetch failed:", errData);
-        if (actRes.status === 401) {
-          return new Response(JSON.stringify({ error: "Garmin sign-in expired", reauth_required: true }), {
-            status: 401,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
-        }
-        return new Response(JSON.stringify({ error: errData.detail || "Failed to fetch Garmin activities" }), {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+      const { data: latestRow } = await supabase
+        .from("garmin_activities")
+        .select("start_time")
+        .eq("user_id", user.id)
+        .not("start_time", "is", null)
+        .order("start_time", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      let windowStart: Date;
+      let isFirstSync = false;
+      if (!latestRow?.start_time) {
+        isFirstSync = true;
+        windowStart = firstSyncStart;
+      } else {
+        const lastSynced = new Date(latestRow.start_time);
+        const overlap = new Date(lastSynced.getTime() - INCREMENTAL_OVERLAP_DAYS * 24 * 60 * 60 * 1000);
+        windowStart = overlap < firstSyncStart ? firstSyncStart : overlap;
       }
 
-      const activities = await actRes.json();
-      if (!Array.isArray(activities) || activities.length === 0) {
-        return new Response(JSON.stringify({ success: true, synced: 0, details_fetched: 0, training_score: 0 }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
+      const chunks = buildMonthlyChunks(windowStart, today);
+      console.log(`[garmin-sync] user=${user.id} firstSync=${isFirstSync} window=${fmtDate(windowStart)}→${fmtDate(today)} chunks=${chunks.length}`);
 
-      // Upsert basic activities (has_details stays false for new ones)
       // Garmin API returns times in local time (HKT UTC+8) but labels them as UTC,
       // so we subtract 8 hours to get the real UTC time.
       function adjustGarminTime(dateStr: string | undefined | null): string | null {
@@ -165,38 +182,90 @@ serve(async (req) => {
         return d.toISOString();
       }
 
-      const rows = activities.map((a: any) => ({
-        user_id: user.id,
-        garmin_activity_id: String(a.garmin_activity_id ?? a.activity_id ?? crypto.randomUUID()),
-        activity_name: a.name ?? a.activity_name ?? "Garmin Activity",
-        activity_type: a.sport_type ?? a.activity_type ?? "Run",
-        start_time: adjustGarminTime(a.start_date ?? a.start_time),
-        duration_seconds: a.moving_time ?? a.duration_seconds ?? 0,
-        distance_meters: a.distance ?? a.distance_meters ?? 0,
-        calories: a.calories ?? null,
-        average_hr: a.average_heartrate ?? a.average_hr ?? null,
-        max_hr: a.max_heartrate ?? a.max_hr ?? null,
-        elevation_gain: a.total_elevation_gain ?? a.elevation_gain ?? null,
-        average_speed: a.average_speed ?? null,
-        average_pace: a.average_pace ?? null,
-        avg_cadence: a.avg_cadence ?? null,
-        aerobic_te: a.aerobic_te ?? null,
-        anaerobic_te: a.anaerobic_te ?? null,
-        vo2max: a.vo2max ?? null,
-        training_load: a.training_load ?? null,
-        has_gps: a.has_gps ?? false,
-        raw_json: a,
-      }));
+      // ── Phase 1: Fetch each monthly chunk and upsert ──
+      let totalSynced = 0;
+      let reauthRequired = false;
+      const chunkErrors: string[] = [];
 
-      const { error: upsertError } = await supabase
-        .from("garmin_activities")
-        .upsert(rows, { onConflict: "garmin_activity_id,user_id", ignoreDuplicates: false });
+      for (const chunk of chunks) {
+        try {
+          const actRes = await fetch(`${GARMIN_RAILWAY_URL}/garmin-activities`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              email: garminEmail,
+              oauth1_token: oauth1Token,
+              oauth2_token: oauth2Token,
+              start_date: chunk.start,
+              end_date: chunk.end,
+            }),
+          });
 
-      if (upsertError) {
-        console.error("Garmin upsert error:", upsertError);
+          if (!actRes.ok) {
+            const errText = await actRes.text().catch(() => "");
+            console.error(`[garmin-sync] chunk ${chunk.start}→${chunk.end} failed:`, actRes.status, errText);
+            if (actRes.status === 401) {
+              reauthRequired = true;
+              break;
+            }
+            chunkErrors.push(`${chunk.start}: ${errText.slice(0, 100)}`);
+            continue;
+          }
+
+          const activities = await actRes.json();
+          if (!Array.isArray(activities) || activities.length === 0) {
+            console.log(`[garmin-sync] chunk ${chunk.start}→${chunk.end}: 0 activities`);
+            continue;
+          }
+
+          const rows = activities.map((a: any) => ({
+            user_id: user.id,
+            garmin_activity_id: String(a.garmin_activity_id ?? a.activity_id ?? crypto.randomUUID()),
+            activity_name: a.name ?? a.activity_name ?? "Garmin Activity",
+            activity_type: a.sport_type ?? a.activity_type ?? "Run",
+            start_time: adjustGarminTime(a.start_date ?? a.start_time),
+            duration_seconds: a.moving_time ?? a.duration_seconds ?? 0,
+            distance_meters: a.distance ?? a.distance_meters ?? 0,
+            calories: a.calories ?? null,
+            average_hr: a.average_heartrate ?? a.average_hr ?? null,
+            max_hr: a.max_heartrate ?? a.max_hr ?? null,
+            elevation_gain: a.total_elevation_gain ?? a.elevation_gain ?? null,
+            average_speed: a.average_speed ?? null,
+            average_pace: a.average_pace ?? null,
+            avg_cadence: a.avg_cadence ?? null,
+            aerobic_te: a.aerobic_te ?? null,
+            anaerobic_te: a.anaerobic_te ?? null,
+            vo2max: a.vo2max ?? null,
+            training_load: a.training_load ?? null,
+            has_gps: a.has_gps ?? false,
+            raw_json: a,
+          }));
+
+          const { error: upsertError } = await supabase
+            .from("garmin_activities")
+            .upsert(rows, { onConflict: "garmin_activity_id,user_id", ignoreDuplicates: false });
+
+          if (upsertError) {
+            console.error(`[garmin-sync] upsert error chunk ${chunk.start}:`, upsertError);
+            chunkErrors.push(`${chunk.start}: upsert failed`);
+          } else {
+            totalSynced += rows.length;
+            console.log(`[garmin-sync] chunk ${chunk.start}→${chunk.end}: synced ${rows.length}`);
+          }
+        } catch (chunkErr) {
+          console.error(`[garmin-sync] chunk ${chunk.start} exception:`, chunkErr);
+          chunkErrors.push(`${chunk.start}: ${chunkErr instanceof Error ? chunkErr.message : "error"}`);
+        }
       }
 
-      // ── Phase 2: Loop through all missing details (up to 3 batches of 5) ──
+      if (reauthRequired) {
+        return new Response(JSON.stringify({ error: "Garmin sign-in expired", reauth_required: true }), {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // ── Phase 2: Loop through missing details (up to 3 batches of 5) ──
       let detailsFetched = 0;
       const MAX_BATCHES = 3;
 
@@ -248,7 +317,7 @@ serve(async (req) => {
             }
           } else {
             console.error("Detail fetch failed batch", batch, ":", await detailRes.text());
-            break; // stop on error (likely rate limit)
+            break;
           }
         } catch (detailErr) {
           console.error("Detail fetch error batch", batch, ":", detailErr);
@@ -322,11 +391,16 @@ serve(async (req) => {
 
       return new Response(JSON.stringify({
         success: true,
-        synced: rows.length,
+        synced: totalSynced,
         details_fetched: detailsFetched,
         details_remaining: 0,
         training_score: trainingScore,
         total_xp: totalMonthlyXp,
+        first_sync: isFirstSync,
+        window_start: fmtDate(windowStart),
+        window_end: fmtDate(today),
+        chunks_processed: chunks.length,
+        chunk_errors: chunkErrors.length > 0 ? chunkErrors : undefined,
       }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });

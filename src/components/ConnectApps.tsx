@@ -224,8 +224,10 @@ const ConnectApps = ({ lang, onBack }: Props) => {
             {garminConnected ? (
               <div className="flex items-center gap-2">
                 {garmin.syncing && <RefreshCw size={14} className="animate-spin text-muted-foreground" />}
-                <button onClick={handleSyncGarmin} disabled={garmin.syncing} className="text-xs text-primary hover:underline">
-                  {lang === "zh" ? "同步" : "Sync"}
+                <button onClick={handleSyncGarmin} disabled={garmin.syncing} className="text-xs text-primary hover:underline disabled:opacity-50 disabled:cursor-not-allowed disabled:no-underline">
+                  {garmin.syncing
+                    ? (lang === "zh" ? "同步中..." : "Syncing...")
+                    : (lang === "zh" ? "同步" : "Sync")}
                 </button>
                 <Check size={16} className="text-green-500" />
                 <button onClick={handleDisconnectGarmin} className="text-xs text-destructive hover:underline">

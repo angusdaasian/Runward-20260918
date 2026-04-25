@@ -152,7 +152,7 @@ const TrainingLoadChart = ({ lang, activities, profileAge }: Props) => {
               tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
               tickLine={false}
               axisLine={false}
-              width={32}
+              width={36}
             />
             <ReferenceLine y={0} stroke="hsl(var(--border))" strokeDasharray="2 2" />
             <Tooltip

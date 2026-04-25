@@ -160,11 +160,15 @@ const ActivityCard = ({
   act,
   lang,
   score,
+  load,
+  isPremium,
   onClick,
 }: {
   act: StravaActivity;
   lang: Lang;
   score: number | null;
+  load: number | null;
+  isPremium: boolean;
   onClick?: () => void;
 }) => (
   <div

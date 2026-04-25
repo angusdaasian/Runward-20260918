@@ -176,6 +176,16 @@ serve(async (req) => {
       });
     }
 
+    // Purge any existing Apple Health activities — Garmin is now the source of truth.
+    // Keeps apple_health_connections so daily health stats (steps, sleep) still sync.
+    const { error: ahPurgeError } = await supabase
+      .from("apple_health_activities")
+      .delete()
+      .eq("user_id", user.id);
+    if (ahPurgeError) {
+      console.warn("garmin-credential-login: failed to purge apple_health_activities:", ahPurgeError.message);
+    }
+
     console.log("garmin-credential-login: success");
     return new Response(JSON.stringify({
       success: true,

@@ -116,6 +116,7 @@ async function fetchGarminActivities(userId: string): Promise<StravaActivity[]> 
       laps: a.laps || [],
       weather: a.weather ?? null,
       map_screenshot_url: a.raw_json?.map_screenshot_url ?? null,
+      garmin_training_load: a.training_load ?? null,
     };
   });
 }

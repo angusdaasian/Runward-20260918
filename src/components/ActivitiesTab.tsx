@@ -590,6 +590,8 @@ const ActivitiesTab = ({ lang }: Props) => {
               act={latestActivity}
               lang={lang}
               score={activityScores[latestActivity.id]}
+              load={activityLoads[latestActivity.id]}
+              isPremium={isPremium}
               onClick={() => setSelectedActivity(latestActivity)}
             />
           </div>

@@ -7,6 +7,7 @@ import { useActivities } from "@/hooks/use-activities";
 import TrainingLoadChart from "@/components/activities/TrainingLoadChart";
 import TrainingLoadChartLocked from "@/components/activities/TrainingLoadChartLocked";
 import TrendsCard from "@/components/activities/TrendsCard";
+import ActivityYearHeatmap from "@/components/activities/ActivityYearHeatmap";
 import { ActivityListSkeleton } from "@/components/ui/PageSkeleton";
 
 interface Props {
@@ -71,8 +72,8 @@ const PerformanceTab = ({ lang }: Props) => {
         <div className="flex items-center gap-2 text-xs text-muted-foreground mb-4 bg-muted/50 rounded-lg px-3 py-2">
           <Crown size={14} className="text-warning shrink-0" />
           {lang === "zh"
-            ? "升級高級版以解鎖完整訓練負荷曲線與趨勢比較"
-            : "Upgrade to Premium to unlock the full training load curve & trend comparison"}
+            ? "升級高級版以解鎖完整訓練負荷曲線"
+            : "Upgrade to Premium to unlock the full training load curve"}
         </div>
       )}
 
@@ -86,7 +87,9 @@ const PerformanceTab = ({ lang }: Props) => {
         <TrainingLoadChartLocked lang={lang} />
       )}
 
-      {isPremium && <TrendsCard lang={lang} activities={loadActivities} />}
+      {/* Free for all users */}
+      <TrendsCard lang={lang} activities={loadActivities} />
+      <ActivityYearHeatmap lang={lang} activities={loadActivities} />
     </div>
   );
 };

@@ -383,10 +383,13 @@ const Onboarding = ({
     }
   }, [step, welcomeVisible]);
 
+  // Persist just the form data — DO NOT set the plan-prompt flag here.
+  // The flag must only be set once we have a confirmed authenticated user,
+  // otherwise an abandoned OAuth flow would leave the flag set and trick a
+  // future cold-start into showing the plan prompt with no real user.
   const saveOnboardingDataToStorage = () => {
     const onboardingData = { displayName, sex, age, runsPerWeek, estDistance, estHours, estMinutes, estSeconds };
     localStorage.setItem("pending_onboarding_data", JSON.stringify(onboardingData));
-    localStorage.setItem("onboarding_show_plan_prompt", "true");
   };
 
   useEffect(() => {

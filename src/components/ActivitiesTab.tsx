@@ -32,8 +32,6 @@ import { useActivities, type StravaActivity } from "@/hooks/use-activities";
 import FadeIn from "@/components/ui/FadeIn";
 import { ActivityListSkeleton } from "@/components/ui/PageSkeleton";
 import { useAppleHealth, type HealthStats } from "@/hooks/use-apple-health";
-import TrainingLoadChart from "@/components/activities/TrainingLoadChart";
-import TrainingLoadChartLocked from "@/components/activities/TrainingLoadChartLocked";
 
 interface Props {
   lang: Lang;
@@ -603,26 +601,7 @@ const ActivitiesTab = ({ lang }: Props) => {
         )}
       </div>
 
-      {/* Training Load curve (Premium) */}
-      {activities.length > 0 && (
-        isPremium ? (
-          <TrainingLoadChart
-            lang={lang}
-            activities={activities.map((a) => ({
-              start_date: a.start_date,
-              moving_time: a.moving_time,
-              average_heartrate: a.average_heartrate,
-              max_heartrate: a.max_heartrate,
-              sport_type: a.sport_type,
-              source: a.source,
-              garmin_training_load: (a as any).garmin_training_load ?? null,
-            }))}
-            profileAge={(profile as any)?.age ?? null}
-          />
-        ) : (
-          <TrainingLoadChartLocked lang={lang} />
-        )
-      )}
+      {/* Training Load curve has moved to Analytics → Performance */}
 
       {/* Today's Suggestion (analysis-derived if fresh, else generated, else expired prompt) */}
       <SuggestedNextWorkout

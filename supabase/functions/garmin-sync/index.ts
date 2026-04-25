@@ -253,17 +253,28 @@ serve(async (req) => {
             continue;
           }
 
+          // Some integer columns (duration_seconds, calories, average_hr, max_hr)
+          // can come back as floats from Garmin (e.g. 4035.0000000000005), which
+          // Postgres rejects with `invalid input syntax for type integer`.
+          // Coerce them to safe ints; leave numeric columns as-is.
+          const toInt = (v: unknown): number | null => {
+            if (v === null || v === undefined || v === "") return null;
+            const n = Number(v);
+            if (!isFinite(n)) return null;
+            return Math.round(n);
+          };
+
           const rows = activities.map((a: any) => ({
             user_id: user.id,
             garmin_activity_id: String(a.garmin_activity_id ?? a.activity_id ?? crypto.randomUUID()),
             activity_name: a.name ?? a.activity_name ?? "Garmin Activity",
             activity_type: a.sport_type ?? a.activity_type ?? "Run",
             start_time: adjustGarminTime(a.start_date ?? a.start_time),
-            duration_seconds: a.moving_time ?? a.duration_seconds ?? 0,
+            duration_seconds: toInt(a.moving_time ?? a.duration_seconds) ?? 0,
             distance_meters: a.distance ?? a.distance_meters ?? 0,
-            calories: a.calories ?? null,
-            average_hr: a.average_heartrate ?? a.average_hr ?? null,
-            max_hr: a.max_heartrate ?? a.max_hr ?? null,
+            calories: toInt(a.calories),
+            average_hr: toInt(a.average_heartrate ?? a.average_hr),
+            max_hr: toInt(a.max_heartrate ?? a.max_hr),
             elevation_gain: a.total_elevation_gain ?? a.elevation_gain ?? null,
             average_speed: a.average_speed ?? null,
             average_pace: a.average_pace ?? null,
@@ -300,13 +311,16 @@ serve(async (req) => {
         });
       }
 
-      // Mark the one-time full 2026 resync as complete so subsequent syncs go incremental.
-      if (needsFullResync) {
+      // Mark the one-time full 2026 resync as complete only if all chunks succeeded.
+      // If any chunk failed, leave the flag false so the next sync retries the full window.
+      if (needsFullResync && chunkErrors.length === 0) {
         const { error: flagErr } = await supabase
           .from("garmin_connections")
           .update({ full_resync_done: true })
           .eq("user_id", user.id);
         if (flagErr) console.error("[garmin-sync] failed to set full_resync_done:", flagErr);
+      } else if (needsFullResync) {
+        console.warn(`[garmin-sync] full resync had ${chunkErrors.length} chunk error(s); leaving full_resync_done=false to retry next sync`);
       }
 
       // ── Phase 2: Loop through missing details (up to 3 batches of 5) ──

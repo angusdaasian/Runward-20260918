@@ -161,11 +161,61 @@ serve(async (req) => {
       const firstSyncStart = new Date(`${FIRST_SYNC_START_ISO}T00:00:00Z`);
       const today = new Date();
 
-      // If user hasn't done the one-time full 2026 resync yet, wipe their
-      // existing 2026 garmin activities and re-pull the entire window.
-      const needsFullResync = !conn.full_resync_done;
+      // If user hasn't done the one-time full 2026 resync yet, normally we wipe
+      // their existing 2026 activities and re-pull. But first check if their data
+      // already looks complete — i.e. they have ≥1 activity in EVERY month from
+      // Jan 2026 up to the current month. If so, the previous sync clearly worked
+      // and we can skip the expensive wipe-and-repull, just mark the flag done
+      // and fall through to the normal incremental path.
+      let needsFullResync = !conn.full_resync_done;
       let isFirstSync = false;
       let windowStart: Date;
+
+      if (needsFullResync) {
+        // Build list of months from Jan 2026 → current month (inclusive)
+        const monthsToCheck: Array<{ start: string; end: string; label: string }> = [];
+        let mCursor = new Date(Date.UTC(firstSyncStart.getUTCFullYear(), firstSyncStart.getUTCMonth(), 1));
+        const mEnd = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1));
+        while (mCursor <= mEnd) {
+          const next = new Date(Date.UTC(mCursor.getUTCFullYear(), mCursor.getUTCMonth() + 1, 1));
+          monthsToCheck.push({
+            start: mCursor.toISOString(),
+            end: next.toISOString(),
+            label: `${mCursor.getUTCFullYear()}-${String(mCursor.getUTCMonth() + 1).padStart(2, "0")}`,
+          });
+          mCursor = next;
+        }
+
+        // Check each month for at least 1 activity
+        const missingMonths: string[] = [];
+        for (const m of monthsToCheck) {
+          const { count, error: countErr } = await supabase
+            .from("garmin_activities")
+            .select("id", { count: "exact", head: true })
+            .eq("user_id", user.id)
+            .gte("start_time", m.start)
+            .lt("start_time", m.end);
+          if (countErr) {
+            console.warn(`[garmin-sync] month-check error for ${m.label}:`, countErr.message);
+            // On error, be safe and assume the month is missing → trigger resync
+            missingMonths.push(m.label);
+          } else if (!count || count === 0) {
+            missingMonths.push(m.label);
+          }
+        }
+
+        if (missingMonths.length === 0) {
+          // Data is intact across all months — skip the wipe, mark flag done.
+          console.log(`[garmin-sync] user=${user.id} already has activities in every month (${monthsToCheck.map(m => m.label).join(",")}) — skipping full resync`);
+          const { error: flagErr } = await supabase
+            .from("garmin_connections")
+            .update({ full_resync_done: true })
+            .eq("user_id", user.id);
+          if (flagErr) console.error("[garmin-sync] failed to set full_resync_done on skip path:", flagErr);
+          needsFullResync = false;
+          // Fall through to incremental logic below
+        }
+      }
 
       if (needsFullResync) {
         console.log(`[garmin-sync] user=${user.id} performing one-time full 2026 resync — wiping existing activities`);

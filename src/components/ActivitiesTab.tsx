@@ -27,10 +27,13 @@ import ActivityDetail from "@/components/activities/ActivityDetail";
 import ManualImportTabs from "@/components/activities/ManualImportTabs";
 import SuggestedNextWorkout from "@/components/activities/SuggestedNextWorkout";
 import { calculateRunningScore } from "@/lib/vdot";
+import { loadForActivity } from "@/lib/trainingLoad";
 import { useActivities, type StravaActivity } from "@/hooks/use-activities";
 import FadeIn from "@/components/ui/FadeIn";
 import { ActivityListSkeleton } from "@/components/ui/PageSkeleton";
 import { useAppleHealth, type HealthStats } from "@/hooks/use-apple-health";
+import TrainingLoadChart from "@/components/activities/TrainingLoadChart";
+import TrainingLoadChartLocked from "@/components/activities/TrainingLoadChartLocked";
 
 interface Props {
   lang: Lang;

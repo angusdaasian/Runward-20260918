@@ -542,10 +542,18 @@ const Onboarding = ({
     });
     if (error) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
+      // Signup failed — clear all in-progress state and bounce the user
+      // back to the welcome/main page so they can restart cleanly instead
+      // of being stranded inside the partially-completed signup flow.
       setSignupInProgress(false);
       setSaving(false);
       setIsAccountCreationInFlight(false);
-      setStep(9);
+      localStorage.removeItem("onboarding_show_plan_prompt");
+      localStorage.removeItem("pending_onboarding_data");
+      setOtpCode("");
+      setPassword("");
+      setConfirmPassword("");
+      setStep(0);
       return;
     }
 
@@ -1489,7 +1497,19 @@ const Onboarding = ({
               setVerifyingOtp(false);
               if (error) {
                 toast({ title: "Error", description: error.message, variant: "destructive" });
+                // OTP verification failed — wipe the half-finished signup
+                // state and send the user back to the welcome screen so they
+                // can start over (or sign in) instead of being stuck on a
+                // dead-end verify screen.
                 setOtpCode("");
+                setSignupInProgress(false);
+                setIsAccountCreationInFlight(false);
+                localStorage.removeItem("onboarding_show_plan_prompt");
+                localStorage.removeItem("pending_onboarding_data");
+                setOnboardingUserId(null);
+                setPassword("");
+                setConfirmPassword("");
+                setStep(0);
                 return;
               }
               if (data.user) {

@@ -13,7 +13,6 @@ interface Props {
 
 const PerformanceTab = ({ lang }: Props) => {
   const { user } = useAuth();
-  const { isPremium } = usePremium();
   const { activities, profile, loading } = useActivities();
 
   const loadActivities = useMemo(

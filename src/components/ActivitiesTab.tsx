@@ -458,8 +458,8 @@ const ActivitiesTab = ({ lang }: Props) => {
       recentScores.length >= 1
         ? Math.round((recentScores.reduce((a, b) => a + b, 0) / recentScores.length) * 10) / 10
         : 0;
-    return { activityScores: scores, averageScore: avg };
-  }, [activities]);
+    return { activityScores: scores, activityLoads: loads, averageScore: avg };
+  }, [activities, profile]);
 
   const [resyncing, setResyncing] = useState(false);
 

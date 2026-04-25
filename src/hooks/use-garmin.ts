@@ -57,11 +57,13 @@ export function useGarmin(lang: Lang) {
         return false;
       }
 
+      const synced = data.synced ?? 0;
       const detailsFetched = data.details_fetched ?? 0;
       toast.success(
         lang === "zh"
-          ? `已同步 ${data.synced} 筆活動${detailsFetched > 0 ? `,已取得 ${detailsFetched} 筆詳細資料` : ""}`
-          : `Synced ${data.synced} activities${detailsFetched > 0 ? `, ${detailsFetched} details fetched` : ""}`
+          ? `同步成功！已同步 ${synced} 筆活動${detailsFetched > 0 ? `,已取得 ${detailsFetched} 筆詳細資料` : ""}`
+          : `Sync successful! ${synced} activities synced${detailsFetched > 0 ? `, ${detailsFetched} details fetched` : ""}`,
+        { duration: 4000 }
       );
 
       invalidateActivities();

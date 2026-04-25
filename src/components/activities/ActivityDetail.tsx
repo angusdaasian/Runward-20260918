@@ -597,6 +597,20 @@ const ActivityDetail = ({ activity, lang, onBack, isPremium, trainingScore }: Pr
             <StatBox icon={Flame} label={lang === "zh" ? "卡路里" : "Calories"} value={activity.calories != null ? activity.calories.toString() : "--"} unit="kcal" />
             <StatBox icon={Timer} label={lang === "zh" ? "總時間" : "Elapsed Time"} value={formatDuration(activity.elapsed_time)} />
           </div>
+          {isPremium && (
+            <div className="grid grid-cols-3 gap-2 mb-4">
+              <StatBox
+                icon={Flame}
+                iconColor="text-orange-500"
+                label={lang === "zh" ? "訓練負荷" : "Training Load"}
+                value={(() => {
+                  const l = loadForActivity({ start_date: activity.start_date, moving_time: activity.moving_time, average_heartrate: activity.average_heartrate, max_heartrate: activity.max_heartrate, sport_type: activity.sport_type });
+                  return l != null ? l.toString() : "--";
+                })()}
+                unit="TRIMP"
+              />
+            </div>
+          )}
         </>
       ) : (
         <>

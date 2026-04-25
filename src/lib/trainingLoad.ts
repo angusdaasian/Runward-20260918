@@ -239,19 +239,44 @@ export function buildTrendComparison(
   // Current window = the 4 weeks ending with the current week (inclusive)
   const currentWindowStart = new Date(currentWeekStart);
   currentWindowStart.setDate(currentWindowStart.getDate() - 3 * 7);
-  const previousWindowStart = new Date(currentWindowStart);
-  previousWindowStart.setDate(previousWindowStart.getDate() - 4 * 7);
+
+  // Previous window: default to the 4 weeks immediately before the current window,
+  // but if that block has no activities, slide back (up to 12 months) to the most
+  // recent 4-week block that DOES have activity. This avoids showing 0s when the
+  // user simply had a gap (e.g. ran in Jan but not in Feb/Mar).
+  const immediatePrevStart = new Date(currentWindowStart);
+  immediatePrevStart.setDate(immediatePrevStart.getDate() - 4 * 7);
+
+  // Pre-parse activity dates once
+  const parsed: { date: Date; act: any }[] = [];
+  for (const act of activities as any[]) {
+    const date = new Date(act.start_date);
+    if (!isNaN(date.getTime())) parsed.push({ date, act });
+  }
+
+  let previousWindowStart = immediatePrevStart;
+  let previousWindowEnd = new Date(currentWindowStart); // exclusive
+  const MAX_SLIDE_BACK_WEEKS = 52;
+  for (let slide = 0; slide < MAX_SLIDE_BACK_WEEKS / 4; slide++) {
+    const winStart = new Date(immediatePrevStart);
+    winStart.setDate(winStart.getDate() - slide * 4 * 7);
+    const winEnd = new Date(winStart);
+    winEnd.setDate(winEnd.getDate() + 4 * 7);
+    const hasAny = parsed.some(({ date }) => date >= winStart && date < winEnd);
+    if (hasAny) {
+      previousWindowStart = winStart;
+      previousWindowEnd = winEnd;
+      break;
+    }
+  }
 
   const curr = emptyAgg();
   const prev = emptyAgg();
 
-  for (const act of activities as any[]) {
-    const date = new Date(act.start_date);
-    if (isNaN(date.getTime())) continue;
-
+  for (const { date, act } of parsed) {
     let bucket: WindowAgg | null = null;
     if (date >= currentWindowStart) bucket = curr;
-    else if (date >= previousWindowStart) bucket = prev;
+    else if (date >= previousWindowStart && date < previousWindowEnd) bucket = prev;
     else continue;
 
     const distance = Number(act.distance) || 0;

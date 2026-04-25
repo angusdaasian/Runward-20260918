@@ -596,16 +596,32 @@ const Onboarding = ({
   };
 
   const finalizeOnboarding = async (launchPlanPaywall = false) => {
-    setSignupInProgress(false);
-    localStorage.removeItem("onboarding_show_plan_prompt");
     const targetUserId = onboardingUserId ?? user?.id;
 
-    if (targetUserId) {
-      await supabase
-        .from("profiles")
-        .update({ onboarding_completed: true })
-        .eq("user_id", targetUserId);
+    // Hard guard: never let the user "finish" onboarding with no auth.
+    // This used to slip through if e.g. they bailed out of Apple OAuth and
+    // then tapped Skip on the plan prompt — landing them in the app with
+    // null user info. Bounce them back to the welcome screen instead.
+    if (!targetUserId) {
+      setSignupInProgress(false);
+      localStorage.removeItem("onboarding_show_plan_prompt");
+      localStorage.removeItem("pending_onboarding_data");
+      toast({
+        title: lang === "zh" ? "請先登入" : "Please sign in",
+        description: lang === "zh" ? "完成註冊後再繼續。" : "Finish creating your account to continue.",
+        variant: "destructive",
+      });
+      setStep(0);
+      return;
     }
+
+    setSignupInProgress(false);
+    localStorage.removeItem("onboarding_show_plan_prompt");
+
+    await supabase
+      .from("profiles")
+      .update({ onboarding_completed: true })
+      .eq("user_id", targetUserId);
 
     if (launchPlanPaywall) {
       const locale = lang === "zh" ? "zh_Hant" : "en";

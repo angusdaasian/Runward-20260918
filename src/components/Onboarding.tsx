@@ -375,6 +375,18 @@ const Onboarding = ({
     }
   }, [step]);
 
+  // Safety net: if we ever land on step 10 (plan prompt) without an authed
+  // user (e.g. abandoned OAuth flow restored a stale flag), bounce back to
+  // step 0. Without this, tapping through step 10 would send the user into
+  // the app with no auth.
+  useEffect(() => {
+    if (step !== 10) return;
+    if (user?.id || onboardingUserId) return;
+    localStorage.removeItem("onboarding_show_plan_prompt");
+    localStorage.removeItem("pending_onboarding_data");
+    setStep(0);
+  }, [step, user?.id, onboardingUserId]);
+
   // Auto-advance welcome step
   useEffect(() => {
     if (step === 2 && welcomeVisible) {

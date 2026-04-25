@@ -1,11 +1,8 @@
 import { useMemo } from "react";
-import { Crown } from "lucide-react";
 import { Lang } from "@/lib/i18n";
 import { useAuth } from "@/contexts/AuthContext";
-import { usePremium } from "@/contexts/PremiumContext";
 import { useActivities } from "@/hooks/use-activities";
 import TrainingLoadChart from "@/components/activities/TrainingLoadChart";
-import TrainingLoadChartLocked from "@/components/activities/TrainingLoadChartLocked";
 import TrendsCard from "@/components/activities/TrendsCard";
 import ActivityYearHeatmap from "@/components/activities/ActivityYearHeatmap";
 import { ActivityListSkeleton } from "@/components/ui/PageSkeleton";
@@ -16,7 +13,6 @@ interface Props {
 
 const PerformanceTab = ({ lang }: Props) => {
   const { user } = useAuth();
-  const { isPremium } = usePremium();
   const { activities, profile, loading } = useActivities();
 
   const loadActivities = useMemo(
@@ -68,27 +64,14 @@ const PerformanceTab = ({ lang }: Props) => {
 
   return (
     <div className="px-5 pt-2 max-w-lg mx-auto pb-4">
-      {!isPremium && (
-        <div className="flex items-center gap-2 text-xs text-muted-foreground mb-4 bg-muted/50 rounded-lg px-3 py-2">
-          <Crown size={14} className="text-warning shrink-0" />
-          {lang === "zh"
-            ? "升級高級版以解鎖完整訓練負荷曲線"
-            : "Upgrade to Premium to unlock the full training load curve"}
-        </div>
-      )}
-
-      {/* Free for all users */}
+      {/* All charts free for everyone */}
       <ActivityYearHeatmap lang={lang} activities={loadActivities} />
 
-      {isPremium ? (
-        <TrainingLoadChart
-          lang={lang}
-          activities={loadActivities}
-          profileAge={(profile as any)?.age ?? null}
-        />
-      ) : (
-        <TrainingLoadChartLocked lang={lang} />
-      )}
+      <TrainingLoadChart
+        lang={lang}
+        activities={loadActivities}
+        profileAge={(profile as any)?.age ?? null}
+      />
 
       <TrendsCard lang={lang} activities={loadActivities} />
     </div>

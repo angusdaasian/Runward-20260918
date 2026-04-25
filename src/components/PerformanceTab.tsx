@@ -68,27 +68,14 @@ const PerformanceTab = ({ lang }: Props) => {
 
   return (
     <div className="px-5 pt-2 max-w-lg mx-auto pb-4">
-      {!isPremium && (
-        <div className="flex items-center gap-2 text-xs text-muted-foreground mb-4 bg-muted/50 rounded-lg px-3 py-2">
-          <Crown size={14} className="text-warning shrink-0" />
-          {lang === "zh"
-            ? "升級高級版以解鎖完整訓練負荷曲線"
-            : "Upgrade to Premium to unlock the full training load curve"}
-        </div>
-      )}
-
-      {/* Free for all users */}
+      {/* All charts free for everyone */}
       <ActivityYearHeatmap lang={lang} activities={loadActivities} />
 
-      {isPremium ? (
-        <TrainingLoadChart
-          lang={lang}
-          activities={loadActivities}
-          profileAge={(profile as any)?.age ?? null}
-        />
-      ) : (
-        <TrainingLoadChartLocked lang={lang} />
-      )}
+      <TrainingLoadChart
+        lang={lang}
+        activities={loadActivities}
+        profileAge={(profile as any)?.age ?? null}
+      />
 
       <TrendsCard lang={lang} activities={loadActivities} />
     </div>

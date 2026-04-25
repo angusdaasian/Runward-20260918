@@ -525,6 +525,8 @@ const ActivitiesTab = ({ lang }: Props) => {
               act={act}
               lang={lang}
               score={activityScores[act.id]}
+              load={activityLoads[act.id]}
+              isPremium={isPremium}
               onClick={() => setSelectedActivity(act)}
             />
           ))}

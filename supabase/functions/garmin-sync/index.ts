@@ -118,6 +118,18 @@ serve(async (req) => {
         });
       }
 
+      // Garmin is the source of truth for activities — purge any leftover Apple Health activities
+      // to prevent duplicates on the same day (e.g. one Garmin run + one Apple Health row).
+      // We only clear activities; the apple_health_connections row is preserved so daily
+      // health stats (steps, sleep, calories) keep flowing.
+      const { error: ahPurgeError } = await supabase
+        .from("apple_health_activities")
+        .delete()
+        .eq("user_id", user.id);
+      if (ahPurgeError) {
+        console.warn(`[garmin-sync] failed to purge apple_health_activities for ${user.id}:`, ahPurgeError.message);
+      }
+
       // Decrypt email + tokens.
       let garminEmail: string | null = null;
       let oauth1Token: string | null = null;

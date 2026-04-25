@@ -232,6 +232,15 @@ const ActivityCard = ({
           </div>
         </div>
         <div className="grid grid-cols-3 gap-3 mt-2">
+          {isPremium && load !== null && (
+            <div>
+              <span className="text-xs font-medium text-orange-500 block mb-0.5">{lang === "zh" ? "負荷" : "Load"}</span>
+              <div className="flex items-center gap-1">
+                <Flame size={12} className="text-orange-500" />
+                <span className="text-sm font-semibold text-foreground">{load}</span>
+              </div>
+            </div>
+          )}
           {score !== null && (
             <div>
               <span className="text-xs font-medium text-primary block mb-0.5">{lang === "zh" ? "訓練分數" : "Score"}</span>

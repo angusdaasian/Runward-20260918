@@ -407,19 +407,21 @@ serve(async (req) => {
 
         const activityIds = missingDetails.map((a) => a.garmin_activity_id).join(",");
         try {
-          const detailRes = await fetch(`${GARMIN_RAILWAY_URL}/garmin-activity-details`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              email: garminEmail,
-              oauth1_token: oauth1Token,
-              oauth2_token: oauth2Token,
-              activity_ids: activityIds,
-            }),
+          const detailResult = await callRailway<Record<string, any>>({
+            supabase,
+            userId: user.id,
+            railwayUrl: GARMIN_RAILWAY_URL,
+            path: "/garmin-activity-details",
+            email: garminEmail!,
+            oauth1Token: oauth1Token!,
+            oauth2Token: oauth2Token!,
+            extraBody: { activity_ids: activityIds },
           });
+          oauth1Token = detailResult.oauth1Token;
+          oauth2Token = detailResult.oauth2Token;
 
-          if (detailRes.ok) {
-            const detailsData = await detailRes.json();
+          if (detailResult.ok && detailResult.data) {
+            const detailsData = detailResult.data as Record<string, any>;
             for (const item of missingDetails) {
               const detail = detailsData[item.garmin_activity_id];
               if (detail) {
@@ -441,7 +443,7 @@ serve(async (req) => {
               }
             }
           } else {
-            console.error("Detail fetch failed batch", batch, ":", await detailRes.text());
+            console.error("Detail fetch failed batch", batch, ":", detailResult.errorText);
             break;
           }
         } catch (detailErr) {

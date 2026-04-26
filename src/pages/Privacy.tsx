@@ -56,25 +56,39 @@ const Privacy = () => {
               {lang === "zh" ? "帳戶資訊：電子郵件地址、顯示名稱、頭像" : "Account information: email address, display name, avatar"}
             </li>
             <li>
-              {lang === "zh" ? "個人檔案資訊：年齡、性別、每週跑步次數、每月目標距離" : "Profile data: age, sex, runs per week, monthly distance goal"}
-            </li>
-            <li>
-              {lang === "zh" ? "訓練資料：個人最佳成績、訓練計畫、訓練分數" : "Training data: personal bests, training plans, training score"}
+              {lang === "zh"
+                ? "個人檔案資訊：年齡、性別、每週跑步次數、每月目標距離、訓練分數、等級與段位"
+                : "Profile data: age, sex, runs per week, monthly distance goal, training score, rank tier and division"}
             </li>
             <li>
               {lang === "zh"
-                ? "活動資料：GPS 路線、配速、心率、海拔、步頻、卡路里"
-                : "Activity data: GPS routes, pace, heart rate, elevation, cadence, calories"}
+                ? "訓練資料：個人最佳成績、訓練計畫、建議訓練、訓練負荷指標 (CTL/ATL/TSB)、VO2max"
+                : "Training data: personal bests, training plans, suggested workouts, training-load metrics (CTL/ATL/TSB), VO2max"}
             </li>
             <li>
               {lang === "zh"
-                ? "第三方健身整合：Strava、Garmin Connect（加密儲存的登入憑證以供同步）、COROS（手動 .fit 檔案上傳）、Apple Health（透過 HealthKit 取得 iOS 上的步數、心率、運動資料）"
-                : "Third-party fitness integrations: Strava, Garmin Connect (login credentials encrypted for sync), COROS (manual .fit file uploads), and Apple Health (steps, heart rate, workouts via HealthKit on iOS)"}
+                ? "活動資料：GPS 路線、配速、心率、海拔、步頻、卡路里、分段資料 (laps)、天氣快照"
+                : "Activity data: GPS routes, pace, heart rate, elevation, cadence, calories, lap splits, and weather snapshots"}
             </li>
             <li>
               {lang === "zh"
-                ? "姿勢分析：上傳的影片僅用於即時分析與畫面擷取，分析完成後立即丟棄，絕不永久儲存"
-                : "Posture analysis: uploaded videos are processed for frame extraction and analysis, then immediately discarded — they are never permanently stored"}
+                ? "第三方健身整合：Strava (OAuth)、Garmin Connect (加密儲存的登入憑證以供同步)、COROS (手動 .fit 檔案上傳)、Apple Health (透過 HealthKit 取得 iOS 上的步數、心率、運動資料)"
+                : "Third-party fitness integrations: Strava (OAuth), Garmin Connect (login credentials encrypted for sync), COROS (manual .fit file uploads), and Apple Health (steps, heart rate, workouts via HealthKit on iOS)"}
+            </li>
+            <li>
+              {lang === "zh"
+                ? "AI 跑步教練對話：您與 AI 教練的訊息、會話歷程、教練偏好設定 (目標、訓練日、經驗等級、傷病備註) 與每日用量計數"
+                : "AI Running Coach conversations: your messages with the coach, session history, coach preferences (goal, training days, experience level, injury notes), and daily usage counts"}
+            </li>
+            <li>
+              {lang === "zh"
+                ? "活動分析與評論：AI 為每筆活動產生的中英文摘要,以及您附加的個人備註"
+                : "Activity analyses & comments: AI-generated English/Chinese summaries per activity, plus any personal comments you attach"}
+            </li>
+            <li>
+              {lang === "zh"
+                ? "姿勢分析：上傳的影片僅用於即時分析與畫面擷取,分析完成後立即丟棄,絕不永久儲存。系統僅保存最終分數 (頭部、肩膀、軀幹、上肢、下肢、整體) 與文字回饋"
+                : "Posture analysis: uploaded videos are processed for frame extraction and analysis, then immediately discarded — they are never permanently stored. Only the resulting scores (head, shoulder, torso, upper-limb, lower-limb, overall) and text feedback are kept"}
             </li>
             <li>
               {lang === "zh"
@@ -83,28 +97,33 @@ const Privacy = () => {
             </li>
             <li>
               {lang === "zh"
-                ? "賽事提交：賽事名稱、距離、完賽時間、選擇性的驗證照片"
-                : "Race submissions: race name, distance, finish time, and optional verification photo"}
+                ? "賽事資料:您瀏覽的賽事日曆、您提交以供審核的賽事 (名稱、日期、城市、國家、類別),以及您回報的個人賽事成績"
+                : "Race data: races you browse in the calendar, races you submit for review (name, date, city, country, category), and personal race results you log"}
             </li>
             <li>
               {lang === "zh"
-                ? "獎勵與經驗值資料：每日簽到、排行榜排名、獎勵代碼兌換紀錄"
-                : "Rewards & XP data: daily check-ins, leaderboard rank, reward code redemptions"}
+                ? "獎勵與經驗值資料：每日簽到、簽到連續天數、每月與終身經驗值、排行榜排名、獎勵代碼兌換紀錄"
+                : "Rewards & XP data: daily check-ins, check-in streaks, monthly and lifetime XP, leaderboard rank, reward code redemptions"}
             </li>
             <li>
               {lang === "zh"
-                ? "訂閱資料：購買收據與會員權限狀態（透過 Apple App Store 處理）"
-                : "Subscription data: purchase receipts and entitlement status (processed via Apple App Store)"}
+                ? "訂閱資料：購買收據與會員權限狀態 (透過 Apple App Store 與 RevenueCat 處理)"
+                : "Subscription data: purchase receipts and entitlement status (processed via Apple App Store and RevenueCat)"}
             </li>
             <li>
               {lang === "zh"
-                ? "推播通知權杖：用於每日訓練提醒的裝置權杖（需選擇加入）"
-                : "Push notification tokens: device tokens used for daily training reminders (opt-in)"}
+                ? "推播通知權杖：用於每日早晨訓練提醒與活動通知的裝置權杖 (需選擇加入)"
+                : "Push notification tokens: device tokens used for daily morning training reminders and activity notifications (opt-in)"}
             </li>
             <li>
               {lang === "zh"
-                ? "支援回饋：您透過支援表單提交的姓名、標題與描述"
+                ? "支援回饋:您透過支援表單提交的姓名、標題與描述"
                 : "Support feedback: name, title, and description you submit via the Support form"}
+            </li>
+            <li>
+              {lang === "zh"
+                ? "診斷紀錄:為了排除錯誤,我們可能保留有限的應用程式事件記錄 (例如同步失敗) 與關聯的使用者 ID"
+                : "Diagnostic logs: for troubleshooting we may retain limited application event logs (e.g. sync failures) tied to your user ID"}
             </li>
           </ul>
         </section>
@@ -121,46 +140,51 @@ const Privacy = () => {
           <ul className="list-disc pl-5 space-y-1">
             <li>
               {lang === "zh"
-                ? "禁止 AI 訓練：我們絕對不會使用透過 Strava、Garmin、COROS 或 Apple Health 取得的資料來訓練、改進或測試任何 AI 或機器學習模型。"
+                ? "禁止 AI 訓練:我們絕對不會使用透過 Strava、Garmin、COROS 或 Apple Health 取得的資料來訓練、改進或測試任何 AI 或機器學習模型。"
                 : "No AI Training: We strictly do NOT use data accessed via Strava, Garmin, COROS, or Apple Health to train, improve, or test any AI or machine learning models."}
             </li>
             <li>
               {lang === "zh"
-                ? "僅限運動員查看：您的健身資料僅顯示於您的個人儀表板中，絕不會與其他用戶或第三方分享。"
+                ? "僅限運動員查看:您的健身資料僅顯示於您的個人儀表板中,絕不會與其他用戶或第三方分享。"
                 : "Athlete-Only Display: Your fitness data is displayed only within your personal dashboard and is never shared with other users or third parties."}
             </li>
             <li>
               {lang === "zh"
-                ? "智慧洞察：此功能僅為您個人提供活動摘要，不涉及模型訓練。"
-                : "Smart Insights: This feature provides personal activity summaries for your eyes only and does not involve model training."}
+                ? "智慧洞察與 AI 教練:活動摘要、建議訓練與 AI 教練回覆僅為您個人服務,內容絕不會被用於模型訓練,也不會與其他使用者分享。"
+                : "Smart Insights & AI Coach: activity summaries, suggested workouts and AI Coach replies are generated for your eyes only — content is never used for model training and is never shared with other users."}
+            </li>
+            <li>
+              {lang === "zh"
+                ? "排行榜:僅顯示彙總後的數值 (顯示名稱、頭像、月度與終身經驗值、段位),不會顯示個別活動細節、GPS 軌跡或心率。"
+                : "Leaderboards: only show aggregated values (display name, avatar, monthly and lifetime XP, rank tier) — never individual activity details, GPS tracks, or heart rate."}
             </li>
           </ul>
         </section>
 
         <section>
           <h2 className="font-semibold text-foreground mb-2">
-            {lang === "zh" ? "4. AI 與天氣服務" : "4. AI & Weather Services"}
+            {lang === "zh" ? "4. AI 功能與天氣服務" : "4. AI Features & Weather Services"}
           </h2>
           <ul className="list-disc pl-5 space-y-1">
             <li>
               {lang === "zh"
-                ? "我們提供 AI 驅動的功能，包括姿勢分析、活動分析、建議訓練與訓練計畫生成。"
-                : "We provide AI-powered features including posture analysis, activity analysis, suggested workouts, and training plan generation."}
+                ? "我們提供多項 AI 驅動的功能,包括:跑步姿勢分析、單筆活動分析與下一步訓練建議、個人化訓練計畫生成、AI 跑步教練 (對話式),以及賽事提交的可信度驗證。"
+                : "We provide several AI-powered features: running posture analysis, per-activity analysis and next-workout suggestions, personalized training plan generation, the conversational AI Running Coach, and credibility verification for user-submitted races."}
             </li>
             <li>
               {lang === "zh"
-                ? "我們提供天氣與每小時預報服務；您選擇的城市會用來取得當地天氣狀況。"
-                : "We provide weather and hourly forecast services; the city you select is used to retrieve local conditions."}
+                ? "送往 AI 服務的內容僅限於該功能所需的資料 (例如:您與教練的對話、活動摘要、訓練偏好、賽事提交的中繼資料,或姿勢分析的擷取畫面)。我們不會傳送您的電子郵件、付款資訊或裝置識別碼。"
+                : "Only data necessary for the feature is sent to the AI service (e.g. your coach conversation, activity summaries, training preferences, race submission metadata, or posture analysis frames). Your email, payment info, and device identifiers are never sent."}
             </li>
             <li>
               {lang === "zh"
-                ? "在「最佳跑步時間」建議中，當前天氣與每小時預報會與您近期的訓練摘要一同提供給 AI，以生成個人化建議。"
-                : "For \"Best time to run\" suggestions, current weather and hourly forecast are sent alongside your recent training summary to generate personalized recommendations."}
+                ? "我們提供天氣與每小時預報服務;您選擇的城市會用來取得當地天氣狀況,並可能與您近期的訓練摘要一同送往 AI 以生成「最佳跑步時間」建議。"
+                : "We provide weather and hourly forecast services; the city you select is used to retrieve local conditions and may be sent alongside your recent training summary to AI to generate \"best time to run\" suggestions."}
             </li>
             <li>
               {lang === "zh"
                 ? "您的資料絕不會被用於 AI 模型訓練。"
-                : "Your data is never used for AI model training."}
+                : "Your data is never used to train any AI model."}
             </li>
           </ul>
         </section>
@@ -171,18 +195,18 @@ const Privacy = () => {
           </h2>
           <ul className="list-disc pl-5 space-y-1">
             <li>{lang === "zh" ? "提供並改善我們的服務" : "To provide and improve our services"}</li>
-            <li>{lang === "zh" ? "生成個人化訓練計畫與建議訓練" : "To generate personalized training plans and suggested workouts"}</li>
-            <li>{lang === "zh" ? "進行跑步姿勢分析" : "To perform running posture analysis"}</li>
-            <li>{lang === "zh" ? "提供天氣感知的跑步建議（包括最佳跑步時間）" : "To provide weather-aware run suggestions (including best time to run)"}</li>
-            <li>{lang === "zh" ? "管理您的訂閱和帳戶" : "To manage your subscription and account"}</li>
+            <li>{lang === "zh" ? "生成個人化訓練計畫、建議訓練與 AI 教練對話" : "To generate personalized training plans, suggested workouts, and AI Coach conversations"}</li>
+            <li>{lang === "zh" ? "進行跑步姿勢分析與活動 AI 分析" : "To perform running posture analysis and per-activity AI analysis"}</li>
+            <li>{lang === "zh" ? "提供天氣感知的跑步建議 (包括最佳跑步時間)" : "To provide weather-aware run suggestions (including best time to run)"}</li>
+            <li>{lang === "zh" ? "管理您的訂閱和帳戶 (包含每月經驗值衰減與賽季重置)" : "To manage your subscription and account (including monthly XP decay and season resets)"}</li>
             <li>
               {lang === "zh"
-                ? "追蹤訓練進度（使用第三方健身資料進行視覺化）"
-                : "To track training progress (using third-party fitness data for visualization)"}
+                ? "追蹤訓練進度 (使用第三方健身資料進行視覺化、訓練負荷與訓練分數計算)"
+                : "To track training progress (using third-party fitness data for visualization, training-load and training-score calculations)"}
             </li>
-            <li>{lang === "zh" ? "傳送每日訓練推播提醒（需選擇加入）" : "To send daily training push reminders (opt-in)"}</li>
-            <li>{lang === "zh" ? "管理排行榜、經驗值與獎勵系統" : "To operate leaderboards, XP, and the rewards system"}</li>
-            <li>{lang === "zh" ? "驗證使用者提交的賽事成績" : "To verify user-submitted race results"}</li>
+            <li>{lang === "zh" ? "傳送每日訓練推播提醒與活動通知 (需選擇加入)" : "To send daily training push reminders and activity notifications (opt-in)"}</li>
+            <li>{lang === "zh" ? "管理排行榜、經驗值、簽到與獎勵系統" : "To operate leaderboards, XP, daily check-ins, and the rewards system"}</li>
+            <li>{lang === "zh" ? "驗證使用者提交的賽事與處理賽事提交的審核流程" : "To verify and review user-submitted races"}</li>
           </ul>
         </section>
 

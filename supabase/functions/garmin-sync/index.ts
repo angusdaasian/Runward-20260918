@@ -425,7 +425,13 @@ serve(async (req) => {
           oauth2Token = detailResult.oauth2Token;
 
           if (detailResult.ok && detailResult.data) {
-            const detailsData = detailResult.data as Record<string, any>;
+            // New shape: { details: {...}, oauth1_token, oauth2_token }.
+            // Old shape: the map directly.
+            const raw = detailResult.data as any;
+            const detailsData: Record<string, any> =
+              raw && typeof raw === "object" && raw.details && typeof raw.details === "object"
+                ? raw.details
+                : raw;
             for (const item of missingDetails) {
               const detail = detailsData[item.garmin_activity_id];
               if (detail) {

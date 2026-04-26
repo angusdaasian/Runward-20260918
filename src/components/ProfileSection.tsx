@@ -5,11 +5,12 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
-import { Camera, Save, LogOut, Trash2, Mail, Pencil, Zap } from "lucide-react";
+import { Camera, Save, LogOut, Trash2, Mail, Pencil, Zap, Sparkles, Loader2 } from "lucide-react";
 import { Lang, t } from "@/lib/i18n";
 import { calculateRunningScore } from "@/lib/vdot";
 import { Skeleton } from "@/components/ui/skeleton";
 import { updateHeaderCache } from "@/components/AppHeader";
+import { useActivities } from "@/hooks/use-activities";
 
 interface Profile {
   display_name: string | null;
@@ -58,6 +59,7 @@ interface PB {
 const ProfileSection = ({ lang }: { lang: Lang }) => {
   const { user, signOut } = useAuth();
   const { toast } = useToast();
+  const { activities } = useActivities();
   const [profile, setProfile] = useState<Profile | null>(
     _cachedUserId === user?.id ? _cachedProfile : null
   );
@@ -67,6 +69,7 @@ const ProfileSection = ({ lang }: { lang: Lang }) => {
   const [editName, setEditName] = useState("");
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [detecting, setDetecting] = useState(false);
 
   // Email editing
   const [editingEmail, setEditingEmail] = useState(false);
@@ -175,6 +178,110 @@ const ProfileSection = ({ lang }: { lang: Lang }) => {
     await supabase.from("personal_bests").delete().eq("id", id);
     setPbs(pbs.filter((p) => p.id !== id));
   };
+
+  // Detect PBs from activities (running only)
+  const handleDetectPBs = async () => {
+    if (!user) return;
+    setDetecting(true);
+
+    const runs = (activities || []).filter((a) => {
+      const t = (a.sport_type || "").toLowerCase();
+      return t.includes("run") && a.distance > 0 && a.moving_time > 0;
+    });
+
+    if (runs.length === 0) {
+      toast({
+        title: lang === "zh" ? "未找到跑步活動" : "No running activities found",
+        variant: "destructive",
+      });
+      setDetecting(false);
+      return;
+    }
+
+    // For each distance category, find best estimated time
+    const detected: Record<string, { seconds: number }> = {};
+    for (const dist of DISTANCES) {
+      const targetMeters = DISTANCE_TO_METERS[dist];
+      if (!targetMeters) continue;
+      // Allow activities within 5% under target (e.g., 4.85K counts toward 5K)
+      const minMeters = targetMeters * 0.95;
+      let bestSeconds = Infinity;
+      for (const a of runs) {
+        if (a.distance < minMeters) continue;
+        // Estimate time at target distance using average pace from activity
+        const estSeconds = (targetMeters / a.distance) * a.moving_time;
+        if (estSeconds > 0 && estSeconds < bestSeconds) bestSeconds = estSeconds;
+      }
+      // Skip if faster than world record (data error)
+      const wr = PB_WORLD_RECORDS[dist];
+      if (bestSeconds !== Infinity && (!wr || bestSeconds >= wr)) {
+        detected[dist] = { seconds: Math.round(bestSeconds) };
+      }
+    }
+
+    if (Object.keys(detected).length === 0) {
+      toast({
+        title: lang === "zh" ? "未發現新的個人最佳" : "No PBs detected",
+        description: lang === "zh" ? "活動距離不足" : "No activities long enough",
+      });
+      setDetecting(false);
+      return;
+    }
+
+    // Compare with existing PBs and only upsert improvements
+    const updates: { distance: string; h: number; m: number; s: number }[] = [];
+    for (const [dist, { seconds }] of Object.entries(detected)) {
+      const existing = pbs.find((p) => p.distance === dist);
+      const existingSec = existing
+        ? existing.hours * 3600 + existing.minutes * 60 + existing.seconds
+        : Infinity;
+      if (seconds < existingSec) {
+        const h = Math.floor(seconds / 3600);
+        const m = Math.floor((seconds % 3600) / 60);
+        const s = seconds % 60;
+        updates.push({ distance: dist, h, m, s });
+      }
+    }
+
+    if (updates.length === 0) {
+      toast({
+        title: lang === "zh" ? "現有紀錄已是最佳" : "Existing PBs are already best",
+      });
+      setDetecting(false);
+      return;
+    }
+
+    // Delete old PBs for the distances we're updating, then insert new ones
+    const distancesToReplace = updates.map((u) => u.distance);
+    const oldIds = pbs.filter((p) => distancesToReplace.includes(p.distance)).map((p) => p.id);
+    if (oldIds.length > 0) {
+      await supabase.from("personal_bests").delete().in("id", oldIds);
+    }
+
+    const { data: inserted } = await supabase
+      .from("personal_bests")
+      .insert(
+        updates.map((u) => ({
+          user_id: user.id,
+          distance: u.distance,
+          hours: u.h,
+          minutes: u.m,
+          seconds: u.s,
+        }))
+      )
+      .select();
+
+    const remainingPbs = pbs.filter((p) => !distancesToReplace.includes(p.distance));
+    const newPbs = [...(inserted || []), ...remainingPbs];
+    setPbs(newPbs);
+    _cachedPbs = newPbs;
+
+    toast({
+      title: lang === "zh" ? `已更新 ${updates.length} 項個人最佳` : `Updated ${updates.length} PB${updates.length > 1 ? "s" : ""}`,
+    });
+    setDetecting(false);
+  };
+
 
   const formatTime = (h: number, m: number, s: number) => {
     if (h > 0) return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
@@ -304,9 +411,21 @@ const ProfileSection = ({ lang }: { lang: Lang }) => {
 
       {/* Personal Bests */}
       <div className="bg-card border border-border rounded-xl p-4">
-        <h3 className="font-display font-semibold text-foreground mb-3">
-          {lang === "zh" ? "個人最佳" : "Personal Bests"}
-        </h3>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-display font-semibold text-foreground">
+            {lang === "zh" ? "個人最佳" : "Personal Bests"}
+          </h3>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleDetectPBs}
+            disabled={detecting}
+            className="h-7 text-xs gap-1.5"
+          >
+            {detecting ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
+            {lang === "zh" ? "從活動偵測" : "Detect from activities"}
+          </Button>
+        </div>
 
         {pbs.length > 0 && (
           <div className="space-y-2 mb-4">

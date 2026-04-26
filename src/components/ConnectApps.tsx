@@ -106,11 +106,28 @@ const ConnectApps = ({ lang, onBack }: Props) => {
   const handleGarminConnected = async () => {
     setGarminConnected(true);
     if (appleHealthConnected && user) {
-      await supabase.from("apple_health_activities").delete().eq("user_id", user.id);
+      // Only clear AH activities that fall inside the Garmin coverage period.
+      // Anything BEFORE the earliest Garmin activity (e.g. logged after a prior
+      // disconnect) is preserved.
+      const { data: earliestGarmin } = await supabase
+        .from("garmin_activities")
+        .select("start_time")
+        .eq("user_id", user.id)
+        .not("start_time", "is", null)
+        .order("start_time", { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      if (earliestGarmin?.start_time) {
+        await supabase
+          .from("apple_health_activities")
+          .delete()
+          .eq("user_id", user.id)
+          .gte("start_date", earliestGarmin.start_time);
+      }
       toast.info(
         lang === "zh"
-          ? "Apple Health 活動已清除,活動數據將由 Garmin 提供"
-          : "Apple Health activities cleared, activities will come from Garmin"
+          ? "Apple Health 重疊活動已清除,活動數據將由 Garmin 提供"
+          : "Overlapping Apple Health activities cleared, activities will come from Garmin"
       );
     }
     garmin.syncActivities();

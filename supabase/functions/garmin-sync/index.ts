@@ -118,16 +118,30 @@ serve(async (req) => {
         });
       }
 
-      // Garmin is the source of truth for activities — purge any leftover Apple Health activities
-      // to prevent duplicates on the same day (e.g. one Garmin run + one Apple Health row).
-      // We only clear activities; the apple_health_connections row is preserved so daily
+      // Garmin is the source of truth for activities — purge any Apple Health
+      // activities that fall inside the Garmin coverage window (i.e. on/after
+      // the earliest Garmin activity). Anything BEFORE the Garmin coverage is
+      // kept (e.g. AH activities the user logged after a previous Garmin
+      // disconnect). The apple_health_connections row is preserved so daily
       // health stats (steps, sleep, calories) keep flowing.
-      const { error: ahPurgeError } = await supabase
-        .from("apple_health_activities")
-        .delete()
-        .eq("user_id", user.id);
-      if (ahPurgeError) {
-        console.warn(`[garmin-sync] failed to purge apple_health_activities for ${user.id}:`, ahPurgeError.message);
+      const { data: earliestGarmin } = await supabase
+        .from("garmin_activities")
+        .select("start_time")
+        .eq("user_id", user.id)
+        .not("start_time", "is", null)
+        .order("start_time", { ascending: true })
+        .limit(1)
+        .maybeSingle();
+
+      if (earliestGarmin?.start_time) {
+        const { error: ahPurgeError } = await supabase
+          .from("apple_health_activities")
+          .delete()
+          .eq("user_id", user.id)
+          .gte("start_date", earliestGarmin.start_time);
+        if (ahPurgeError) {
+          console.warn(`[garmin-sync] failed to purge apple_health_activities for ${user.id}:`, ahPurgeError.message);
+        }
       }
 
       // Decrypt email + tokens.
@@ -516,11 +530,12 @@ serve(async (req) => {
     }
 
     // ── DISCONNECT ──
+    // Intentionally keep garmin_activities so users don't lose their history.
+    // Apple Health (if reconnected) will only fill gaps AFTER the latest Garmin
+    // activity to prevent duplicates. On Garmin reconnect, the existing rows
+    // let us resume incrementally from the last activity.
     if (action === "disconnect") {
-      await Promise.all([
-        supabase.from("garmin_connections").delete().eq("user_id", user.id),
-        supabase.from("garmin_activities").delete().eq("user_id", user.id),
-      ]);
+      await supabase.from("garmin_connections").delete().eq("user_id", user.id);
 
       return new Response(JSON.stringify({ success: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },

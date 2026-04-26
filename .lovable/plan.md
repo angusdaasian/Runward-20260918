@@ -1,151 +1,75 @@
 ## Goal
 
-1. Compute a **Training Load (TRIMP-style)** value for every activity (Strava / Apple Health / Garmin / COROS).
-2. Show that value on the activity card.
-3. Add a **Training Load chart** to the Activities tab showing weekly **Fitness (CTL) / Fatigue (ATL) / Form (TSB)** curves — same concept as araujo.zip, but bucketed weekly instead of daily/monthly.
-4. Gate the whole Training Load feature (card badge + chart) behind **Premium**, with a locked teaser for free users.
+When a user disconnects Garmin, **keep their past Garmin activities** in the database. Apple Health should only fill in activities **after** the most recent Garmin activity (so no duplicates with historical Garmin runs). When the user reconnects Garmin later, resume the sync from the last stored Garmin activity date.
 
----
+## Findings
 
-## 1. Training Load formula (per activity)
+1. **`supabase/functions/garmin-sync/index.ts` (action `disconnect`)** — currently deletes both `garmin_connections` AND `garmin_activities`. This is what we need to change.
+2. **`src/hooks/use-apple-health.ts` → `saveWorkoutsToDb`** — currently checks if a `garmin_connections` row exists; if yes, skips saving Apple Health workouts entirely. After disconnect this guard releases, but there's no per-workout date filter to avoid overwriting/duplicating the historical Garmin window.
+3. **Garmin sync window logic** — already uses the latest `start_time` in `garmin_activities` to compute the incremental window (`windowStart = max(lastSynced - 7d, FIRST_SYNC_START)`). So if we **keep** historical garmin_activities on disconnect, reconnecting will naturally resume from the last activity. No change needed here beyond removing the bug where reconnect triggers a full-resync wipe.
+4. **`full_resync_done` flag** lives on `garmin_connections` — that row gets deleted on disconnect, so on reconnect it starts as `false` and the "month-check" branch runs. Since historical activities still exist (after our fix), the month-check will find activities in every month and skip the wipe — good. But to be safe we'll explicitly set `full_resync_done = true` on the new connection if historical activities exist.
+5. **Railway `main.py`** — lives in the external Garmin service (referenced via `GARMIN_RAILWAY_URL` secret), not in this repo. It already accepts `start_date` / `end_date` parameters and is driven entirely by `garmin-sync`. **No `main.py` change required** — all sync-window logic is server-side in our edge function.
 
-We will use a duration × HR-intensity TRIMP approximation. This works for all sources because it only needs `moving_time` + `average_heartrate` (or a fallback).
+## Changes
+
+### 1. `supabase/functions/garmin-sync/index.ts` — disconnect action
+Stop deleting `garmin_activities`. Only delete the connection row.
 
 ```ts
-// src/lib/trainingLoad.ts
-export function computeTrainingLoad(act: {
-  moving_time: number;          // seconds
-  average_heartrate: number | null;
-  max_heartrate: number | null;
-  age?: number | null;          // from profile
-  sport_type?: string;
-}): number | null {
-  if (!act.moving_time || act.moving_time < 60) return null;
-  const minutes = act.moving_time / 60;
-
-  // Resting HR assumed 60; max HR = profile max HR or 220 - age, fallback 190
-  const hrMax = act.max_heartrate || (act.age ? 220 - act.age : 190);
-  const hrRest = 60;
-  const hrAvg = act.average_heartrate ?? hrMax * 0.7; // assume zone 2 if missing
-
-  const hrr = Math.max(0, Math.min(1, (hrAvg - hrRest) / (hrMax - hrRest)));
-  // Banister TRIMP weighting: y = 0.64 * e^(1.92 * HRR)  (men); use 0.86 * e^(1.67 * HRR) average
-  const y = 0.75 * Math.exp(1.8 * hrr);
-  const trimp = minutes * hrr * y;
-  return Math.round(trimp);
+if (action === "disconnect") {
+  await supabase.from("garmin_connections").delete().eq("user_id", user.id);
+  // Intentionally keep garmin_activities so history is preserved.
+  // Apple Health sync (if any) will only fill in dates AFTER the last
+  // Garmin activity to avoid duplicates.
+  return new Response(JSON.stringify({ success: true }), { ... });
 }
 ```
 
-This is the same "duration × HR intensity" approach araujo.zip describes.
+### 2. `supabase/functions/garmin-sync/index.ts` — sync action
+- Remove the unconditional purge of `apple_health_activities` at the top of `sync` (lines 121-131). It will be replaced by the per-workout filter on the Apple Health side. We still want Garmin to be the source of truth for the period it covers, so instead of full purge, only delete AH rows whose `start_date >= earliest garmin activity start_time` (i.e., the period now covered by Garmin).
+- After successfully fetching tokens on a reconnect, if any historical `garmin_activities` exist for the user, set `full_resync_done = true` on the freshly-created connection so the month-check / wipe branch is skipped.
 
-**Implementation location:** computed on the **client** inside `useActivities` (memoized per activity) so we don't need to backfill DB rows or run any sync. We already have access to all required fields.
+### 3. `src/hooks/use-apple-health.ts` — `saveWorkoutsToDb`
+Replace the "skip entirely if Garmin connected" guard with a date-aware filter:
 
-For Garmin activities, if `garmin_activities.training_load` is already populated from Garmin (column already exists per `types.ts:401`), prefer that value over the computed one.
+- If a Garmin connection exists → keep current behavior (skip all AH workouts; Garmin owns activities live).
+- If no Garmin connection but historical `garmin_activities` exist → fetch the **max `start_time`** from `garmin_activities`, and only insert AH workouts whose `start_date > lastGarminTime`. This stops AH from re-creating duplicates of pre-disconnect Garmin history.
+- If no Garmin connection and no historical Garmin activities → save all AH workouts (current default).
 
----
+```ts
+// pseudo-code inside saveWorkoutsToDb
+const garminConn = await supabase.from("garmin_connections").select("id")...maybeSingle();
+if (garminConn.data) return 0; // live Garmin owns activities
 
-## 2. Activity card update
+const { data: lastGarmin } = await supabase
+  .from("garmin_activities")
+  .select("start_time")
+  .eq("user_id", user.id)
+  .order("start_time", { ascending: false })
+  .limit(1)
+  .maybeSingle();
 
-In `src/components/ActivitiesTab.tsx` `ActivityCard`, add a new metric in the secondary stat grid (alongside Score / HR / Elev):
-
-```tsx
-{isPremium && load !== null && (
-  <div>
-    <span className="text-xs font-medium text-orange-500 block mb-0.5">Load</span>
-    <div className="flex items-center gap-1">
-      <Flame size={12} className="text-orange-500" />
-      <span className="text-sm font-semibold text-foreground">{load}</span>
-    </div>
-  </div>
-)}
-{!isPremium && (
-  <div className="opacity-60">
-    <span className="text-xs font-medium text-muted-foreground block mb-0.5 flex items-center gap-1">
-      <Lock size={10}/> Load
-    </span>
-    <span className="text-sm font-semibold text-muted-foreground">--</span>
-  </div>
-)}
+const cutoff = lastGarmin?.start_time ? new Date(lastGarmin.start_time).getTime() : 0;
+const filtered = normalizedWorkouts.filter(w => new Date(w.start_date).getTime() > cutoff);
+// proceed with insert/update on `filtered` instead of `normalizedWorkouts`
 ```
 
-Pass `isPremium` and a `load` value into `ActivityCard` (compute via `computeTrainingLoad` in the parent memo, just like `activityScores`). Same treatment in `ActivityDetail.tsx` stat grid.
+### 4. `src/components/ConnectApps.tsx` — copy + UX
+- Update the disconnect confirmation copy (toast + the Apple Health info text) to reflect that **past Garmin activities are kept**, and Apple Health will only sync new activities going forward.
+- Optional: when user reconnects Garmin and historical data exists, show "Resuming from {date}" toast.
 
----
+### 5. `src/hooks/use-garmin.ts` — disconnect toast
+Update the success toast to clarify history is preserved:
+- EN: "Garmin disconnected — past activities kept"
+- ZH: "已中斷 Garmin 連結，過往活動已保留"
 
-## 3. Weekly Training Load curve component
+## Out of scope / not changing
+- **Railway `main.py`** — not in this repo, no changes needed; existing `start_date`/`end_date` params suffice for incremental resume.
+- The full-resync month-check logic (works correctly once historical data is preserved).
+- XP / training-score recompute paths (unchanged).
 
-New file: `src/components/activities/TrainingLoadChart.tsx`
-
-**Algorithm (weekly buckets):**
-1. Take all running/cardio activities from the last **26 weeks** (~6 months).
-2. Compute each activity's TRIMP via `computeTrainingLoad`.
-3. Group by ISO week (Mon–Sun), summing TRIMP per week → `weeklyLoad[]`.
-4. Compute exponentially-weighted moving averages on the **weekly** series:
-   - **Fitness (CTL)** = EWMA with time-constant **6 weeks** (≈42 days)
-   - **Fatigue (ATL)** = EWMA with time-constant **1 week** (≈7 days)
-   - **Form (TSB)** = `CTL - ATL`
-5. Plot the three series with Recharts (already used in `ActivityDetail.tsx`):
-   - X axis = week (label every 4 weeks: "Wk of MMM d")
-   - Y axis = load points
-   - Blue line = Fitness, orange line = Fatigue, red line = Form (with a green/red filled area between Form and 0 — green when Form > 0, red when Form < 0), matching the screenshot.
-6. Header row shows current values: `Fitness X.X · Fatigue X.X · Form ±X.X`.
-7. Status badge below chart based on TSB & CTL trend (last value vs 4 weeks ago):
-   - `TSB < -10` → "Overreaching"
-   - `-10 ≤ TSB < 5` and CTL trending up → "Productive overreach"
-   - `TSB ≥ 5` and CTL trending up → "Building fitness"
-   - `TSB > 15` and CTL flat/down → "Detraining / fresh"
-   - `TSB ≈ 0` and CTL flat → "Maintenance"
-8. Footer caption: "Fitness (CTL) = 6w EWMA · Fatigue (ATL) = 1w EWMA · Form = fitness − fatigue · Based on duration × HR intensity".
-
-Bilingual (`lang` prop) for all labels.
-
----
-
-## 4. Premium gating for the chart
-
-Insert the chart in `ActivitiesTab` **between** "Recent Activity" and `SuggestedNextWorkout`:
-
-```tsx
-{isPremium ? (
-  <TrainingLoadChart lang={lang} activities={activities} profileAge={profile?.age} />
-) : (
-  <TrainingLoadChartLocked lang={lang} />
-)}
-```
-
-`TrainingLoadChartLocked` shows a blurred/skeleton version of the chart with a lock icon overlay and a "Upgrade to Premium" CTA that opens the existing upgrade flow (same pattern as `ActivityDetail.tsx` lines 832–834).
-
----
-
-## 5. Files to create / edit
-
-**Create**
-- `src/lib/trainingLoad.ts` — `computeTrainingLoad()` + EWMA helper + weekly bucketing.
-- `src/components/activities/TrainingLoadChart.tsx` — the curve component (premium view).
-- `src/components/activities/TrainingLoadChartLocked.tsx` — locked teaser view.
-
-**Edit**
-- `src/components/ActivitiesTab.tsx`
-  - Compute `activityLoads` map alongside `activityScores`.
-  - Pass `load` + `isPremium` into `ActivityCard`.
-  - Mount `<TrainingLoadChart />` / locked variant in the main view.
-  - Also add Load metric inside the bottom-sheet date detail.
-- `src/components/activities/ActivityDetail.tsx`
-  - Add Training Load stat in the stat grid (premium-gated).
-
-**No DB migration needed.** All computation happens client-side from existing fields. The existing `garmin_activities.training_load` column is used as-is when present.
-
-**No edge function changes needed.**
-
----
-
-## 6. Why weekly EWMA (not daily like araujo.zip)
-
-User explicitly asked for weekly buckets. Daily EWMA would need a daily resampling. Weekly summed TRIMP + weekly EWMA (τ = 6w / 1w) gives the same Fitness/Fatigue/Form interpretation while staying readable on mobile and avoiding noisy single-day spikes.
-
----
-
-## Out of scope for this iteration
-- Backfilling a historical `training_load` column in the DB.
-- Per-day training load chart.
-- Trends panel ("last 4 weeks vs previous 4") shown on araujo.zip — can be added in a follow-up.
+## Edge cases handled
+- User disconnects → reconnects same Garmin: resumes from last activity, no wipe (month-check passes).
+- User disconnects Garmin → uses Apple Health for a few weeks → reconnects Garmin: AH activities for the gap remain; new Garmin activities upsert by `garmin_activity_id` (no conflict with AH rows since they're in a different table).
+- User has only Apple Health (never connected Garmin): unchanged behavior — all AH workouts saved.
+- User connects Garmin for the first time after using Apple Health: first-sync still purges overlapping AH activities (kept this behavior, just scoped by date instead of full wipe).

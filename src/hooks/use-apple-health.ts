@@ -666,7 +666,8 @@ export function useAppleHealth(lang: Lang) {
     async (workouts: AppleHealthWorkout[]) => {
       if (!user || workouts.length === 0) return 0;
       try {
-        // Check if a fitness app (Strava/Garmin) is connected — if so, skip saving AH activities
+        // If a fitness app (Strava/Garmin) is currently connected, skip saving
+        // AH activities entirely — the connected app owns activities live.
         const [stravaConn, garminConn] = await Promise.all([
           supabase.from("strava_connections").select("id").eq("user_id", user.id).maybeSingle(),
           supabase.from("garmin_connections").select("id").eq("user_id", user.id).maybeSingle(),
@@ -675,6 +676,23 @@ export function useAppleHealth(lang: Lang) {
           console.log("[AppleHealth] Fitness app connected, skipping activity save (fitness app takes priority)");
           return 0;
         }
+
+        // No live Garmin connection. But the user may have historical Garmin
+        // activities from a prior connection (we keep those on disconnect).
+        // Only save AH workouts AFTER the most recent Garmin activity to avoid
+        // duplicating historical Garmin runs.
+        const { data: lastGarmin } = await supabase
+          .from("garmin_activities")
+          .select("start_time")
+          .eq("user_id", user.id)
+          .not("start_time", "is", null)
+          .order("start_time", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        const cutoffMs = lastGarmin?.start_time
+          ? new Date(lastGarmin.start_time).getTime()
+          : 0;
+
         const normalizedWorkouts = Array.from(
           new Map(
             workouts.map((w) => [
@@ -682,7 +700,13 @@ export function useAppleHealth(lang: Lang) {
               { ...w, start_date: new Date(w.start_date).toISOString() },
             ]),
           ).values(),
-        );
+        ).filter((w) => new Date(w.start_date).getTime() > cutoffMs);
+
+        if (normalizedWorkouts.length === 0) {
+          console.log("[AppleHealth] All workouts predate latest Garmin activity, nothing new to save");
+          return 0;
+        }
+
         const startDates = normalizedWorkouts.map((w) => w.start_date);
         const { data: existingRows } = await supabase
           .from("apple_health_activities")

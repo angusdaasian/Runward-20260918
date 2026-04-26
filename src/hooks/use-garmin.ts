@@ -98,7 +98,7 @@ export function useGarmin(lang: Lang) {
         toast.error(lang === "zh" ? `中斷連結失敗:${msg}` : msg);
         return false;
       }
-      toast.success(lang === "zh" ? "已中斷 Garmin 連結" : "Garmin disconnected");
+      toast.success(lang === "zh" ? "已中斷 Garmin 連結，過往活動已保留" : "Garmin disconnected — past activities kept");
       invalidateActivities();
       return true;
     } catch (err) {

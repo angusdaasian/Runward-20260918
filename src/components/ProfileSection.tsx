@@ -179,6 +179,110 @@ const ProfileSection = ({ lang }: { lang: Lang }) => {
     setPbs(pbs.filter((p) => p.id !== id));
   };
 
+  // Detect PBs from activities (running only)
+  const handleDetectPBs = async () => {
+    if (!user) return;
+    setDetecting(true);
+
+    const runs = (activities || []).filter((a) => {
+      const t = (a.sport_type || "").toLowerCase();
+      return t.includes("run") && a.distance > 0 && a.moving_time > 0;
+    });
+
+    if (runs.length === 0) {
+      toast({
+        title: lang === "zh" ? "未找到跑步活動" : "No running activities found",
+        variant: "destructive",
+      });
+      setDetecting(false);
+      return;
+    }
+
+    // For each distance category, find best estimated time
+    const detected: Record<string, { seconds: number }> = {};
+    for (const dist of DISTANCES) {
+      const targetMeters = DISTANCE_TO_METERS[dist];
+      if (!targetMeters) continue;
+      // Allow activities within 5% under target (e.g., 4.85K counts toward 5K)
+      const minMeters = targetMeters * 0.95;
+      let bestSeconds = Infinity;
+      for (const a of runs) {
+        if (a.distance < minMeters) continue;
+        // Estimate time at target distance using average pace from activity
+        const estSeconds = (targetMeters / a.distance) * a.moving_time;
+        if (estSeconds > 0 && estSeconds < bestSeconds) bestSeconds = estSeconds;
+      }
+      // Skip if faster than world record (data error)
+      const wr = PB_WORLD_RECORDS[dist];
+      if (bestSeconds !== Infinity && (!wr || bestSeconds >= wr)) {
+        detected[dist] = { seconds: Math.round(bestSeconds) };
+      }
+    }
+
+    if (Object.keys(detected).length === 0) {
+      toast({
+        title: lang === "zh" ? "未發現新的個人最佳" : "No PBs detected",
+        description: lang === "zh" ? "活動距離不足" : "No activities long enough",
+      });
+      setDetecting(false);
+      return;
+    }
+
+    // Compare with existing PBs and only upsert improvements
+    const updates: { distance: string; h: number; m: number; s: number }[] = [];
+    for (const [dist, { seconds }] of Object.entries(detected)) {
+      const existing = pbs.find((p) => p.distance === dist);
+      const existingSec = existing
+        ? existing.hours * 3600 + existing.minutes * 60 + existing.seconds
+        : Infinity;
+      if (seconds < existingSec) {
+        const h = Math.floor(seconds / 3600);
+        const m = Math.floor((seconds % 3600) / 60);
+        const s = seconds % 60;
+        updates.push({ distance: dist, h, m, s });
+      }
+    }
+
+    if (updates.length === 0) {
+      toast({
+        title: lang === "zh" ? "現有紀錄已是最佳" : "Existing PBs are already best",
+      });
+      setDetecting(false);
+      return;
+    }
+
+    // Delete old PBs for the distances we're updating, then insert new ones
+    const distancesToReplace = updates.map((u) => u.distance);
+    const oldIds = pbs.filter((p) => distancesToReplace.includes(p.distance)).map((p) => p.id);
+    if (oldIds.length > 0) {
+      await supabase.from("personal_bests").delete().in("id", oldIds);
+    }
+
+    const { data: inserted } = await supabase
+      .from("personal_bests")
+      .insert(
+        updates.map((u) => ({
+          user_id: user.id,
+          distance: u.distance,
+          hours: u.h,
+          minutes: u.m,
+          seconds: u.s,
+        }))
+      )
+      .select();
+
+    const remainingPbs = pbs.filter((p) => !distancesToReplace.includes(p.distance));
+    const newPbs = [...(inserted || []), ...remainingPbs];
+    setPbs(newPbs);
+    _cachedPbs = newPbs;
+
+    toast({
+      title: lang === "zh" ? `已更新 ${updates.length} 項個人最佳` : `Updated ${updates.length} PB${updates.length > 1 ? "s" : ""}`,
+    });
+    setDetecting(false);
+  };
+
+
   const formatTime = (h: number, m: number, s: number) => {
     if (h > 0) return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
     return `${m}:${String(s).padStart(2, "0")}`;

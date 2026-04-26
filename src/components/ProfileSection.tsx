@@ -411,9 +411,21 @@ const ProfileSection = ({ lang }: { lang: Lang }) => {
 
       {/* Personal Bests */}
       <div className="bg-card border border-border rounded-xl p-4">
-        <h3 className="font-display font-semibold text-foreground mb-3">
-          {lang === "zh" ? "個人最佳" : "Personal Bests"}
-        </h3>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-display font-semibold text-foreground">
+            {lang === "zh" ? "個人最佳" : "Personal Bests"}
+          </h3>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleDetectPBs}
+            disabled={detecting}
+            className="h-7 text-xs gap-1.5"
+          >
+            {detecting ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
+            {lang === "zh" ? "從活動偵測" : "Detect from activities"}
+          </Button>
+        </div>
 
         {pbs.length > 0 && (
           <div className="space-y-2 mb-4">

@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.seed-promo-banner]
 verify_jwt = true
+
+[functions.garmin-daily-health-sync]
+verify_jwt = false

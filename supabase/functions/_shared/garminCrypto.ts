@@ -22,7 +22,7 @@ async function getKey(): Promise<CryptoKey> {
   if (!raw) throw new Error("GARMIN_ENC_KEY not configured");
   const keyBytes = b64ToBytes(raw);
   if (keyBytes.length !== 32) throw new Error("GARMIN_ENC_KEY must decode to 32 bytes");
-  return await crypto.subtle.importKey("raw", keyBytes, { name: "AES-GCM" }, false, ["encrypt", "decrypt"]);
+  return await crypto.subtle.importKey("raw", keyBytes.buffer.slice(0) as ArrayBuffer, { name: "AES-GCM" }, false, ["encrypt", "decrypt"]);
 }
 
 export async function encryptString(plain: string): Promise<string> {

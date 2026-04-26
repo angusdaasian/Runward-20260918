@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { callRailway } from "../_shared/garminRailway.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -288,30 +289,32 @@ serve(async (req) => {
 
       for (const chunk of chunks) {
         try {
-          const actRes = await fetch(`${GARMIN_RAILWAY_URL}/garmin-activities`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              email: garminEmail,
-              oauth1_token: oauth1Token,
-              oauth2_token: oauth2Token,
-              start_date: chunk.start,
-              end_date: chunk.end,
-            }),
+          const actResult = await callRailway<any[]>({
+            supabase,
+            userId: user.id,
+            railwayUrl: GARMIN_RAILWAY_URL,
+            path: "/garmin-activities",
+            email: garminEmail,
+            oauth1Token,
+            oauth2Token,
+            extraBody: { start_date: chunk.start, end_date: chunk.end },
           });
 
-          if (!actRes.ok) {
-            const errText = await actRes.text().catch(() => "");
-            console.error(`[garmin-sync] chunk ${chunk.start}→${chunk.end} failed:`, actRes.status, errText);
-            if (actRes.status === 401) {
+          // Adopt any refreshed tokens for the next chunk in this run.
+          oauth1Token = actResult.oauth1Token;
+          oauth2Token = actResult.oauth2Token;
+
+          if (!actResult.ok) {
+            console.error(`[garmin-sync] chunk ${chunk.start}→${chunk.end} failed:`, actResult.status, actResult.errorText);
+            if (actResult.reauthRequired) {
               reauthRequired = true;
               break;
             }
-            chunkErrors.push(`${chunk.start}: ${errText.slice(0, 100)}`);
+            chunkErrors.push(`${chunk.start}: ${(actResult.errorText ?? "").slice(0, 100)}`);
             continue;
           }
 
-          const activities = await actRes.json();
+          const activities = actResult.data;
           if (!Array.isArray(activities) || activities.length === 0) {
             console.log(`[garmin-sync] chunk ${chunk.start}→${chunk.end}: 0 activities`);
             continue;
@@ -404,19 +407,21 @@ serve(async (req) => {
 
         const activityIds = missingDetails.map((a) => a.garmin_activity_id).join(",");
         try {
-          const detailRes = await fetch(`${GARMIN_RAILWAY_URL}/garmin-activity-details`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              email: garminEmail,
-              oauth1_token: oauth1Token,
-              oauth2_token: oauth2Token,
-              activity_ids: activityIds,
-            }),
+          const detailResult = await callRailway<Record<string, any>>({
+            supabase,
+            userId: user.id,
+            railwayUrl: GARMIN_RAILWAY_URL,
+            path: "/garmin-activity-details",
+            email: garminEmail!,
+            oauth1Token: oauth1Token!,
+            oauth2Token: oauth2Token!,
+            extraBody: { activity_ids: activityIds },
           });
+          oauth1Token = detailResult.oauth1Token;
+          oauth2Token = detailResult.oauth2Token;
 
-          if (detailRes.ok) {
-            const detailsData = await detailRes.json();
+          if (detailResult.ok && detailResult.data) {
+            const detailsData = detailResult.data as Record<string, any>;
             for (const item of missingDetails) {
               const detail = detailsData[item.garmin_activity_id];
               if (detail) {
@@ -438,7 +443,7 @@ serve(async (req) => {
               }
             }
           } else {
-            console.error("Detail fetch failed batch", batch, ":", await detailRes.text());
+            console.error("Detail fetch failed batch", batch, ":", detailResult.errorText);
             break;
           }
         } catch (detailErr) {

@@ -314,7 +314,11 @@ serve(async (req) => {
             continue;
           }
 
-          const activities = actResult.data;
+          // New Railway shape: { activities: [...], oauth1_token, oauth2_token }.
+          // Old shape returned the array directly — keep a fallback for safety.
+          const activities = Array.isArray((actResult.data as any)?.activities)
+            ? (actResult.data as any).activities
+            : (Array.isArray(actResult.data) ? (actResult.data as any[]) : []);
           if (!Array.isArray(activities) || activities.length === 0) {
             console.log(`[garmin-sync] chunk ${chunk.start}→${chunk.end}: 0 activities`);
             continue;

@@ -5,11 +5,12 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
-import { Camera, Save, LogOut, Trash2, Mail, Pencil, Zap } from "lucide-react";
+import { Camera, Save, LogOut, Trash2, Mail, Pencil, Zap, Sparkles, Loader2 } from "lucide-react";
 import { Lang, t } from "@/lib/i18n";
 import { calculateRunningScore } from "@/lib/vdot";
 import { Skeleton } from "@/components/ui/skeleton";
 import { updateHeaderCache } from "@/components/AppHeader";
+import { useActivities } from "@/hooks/use-activities";
 
 interface Profile {
   display_name: string | null;

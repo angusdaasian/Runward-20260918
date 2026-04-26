@@ -576,7 +576,10 @@ export function useAppleHealth(lang: Lang) {
       }
 
       const rawDist = sumQuantitySamples(sData.HKQuantityTypeIdentifierDistanceWalkingRunning || []);
-      const distanceKm = rawDist < 500 ? rawDist : rawDist / 1000;
+      // HealthKit returns meters by default; some Despia builds may return km.
+      // Only treat as already-km if the raw number is implausibly small for meters
+      // (a daily distance of < 5 m is nonsense; 133 m is clearly meters, not km).
+      const distanceKm = rawDist > 0 && rawDist < 5 ? rawDist : rawDist / 1000;
 
       const stats: HealthStats = {
         sleepMinutes: parseSleepMinutes(sData.HKCategoryTypeIdentifierSleepAnalysis || []),

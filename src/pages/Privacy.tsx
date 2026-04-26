@@ -249,8 +249,8 @@ const Privacy = () => {
           </h2>
           <p>
             {lang === "zh"
-              ? "刪除帳戶時,我們會移除您的個人檔案、活動、姿勢分析、賽事提交與獎勵資料。姿勢分析影片從不保留,天氣城市偏好僅儲存於您的裝置本機。"
-              : "When you delete your account, we remove your profile, activities, posture analyses, race submissions, and rewards data. Posture analysis videos are never retained, and your weather city preference stays on your device only."}
+              ? "刪除帳戶時,我們會移除您的個人檔案、活動、AI 教練對話、活動分析、姿勢分析結果、賽事提交、獎勵、簽到與訂閱記錄。第三方連線 (Strava、Garmin、Apple Health) 的權杖與加密憑證會一同撤銷與刪除。姿勢分析影片從不保留,天氣城市偏好僅儲存於您的裝置本機。診斷紀錄會在合理期間後自動清除。"
+              : "When you delete your account, we remove your profile, activities, AI Coach conversations, activity analyses, posture analysis results, race submissions, rewards, check-ins, and subscription records. Tokens and encrypted credentials for third-party connections (Strava, Garmin, Apple Health) are revoked and deleted. Posture analysis videos are never retained, your weather city preference stays on your device only, and diagnostic logs are purged automatically after a reasonable retention window."}
           </p>
         </section>
 
@@ -260,8 +260,8 @@ const Privacy = () => {
           </h2>
           <p>
             {lang === "zh"
-              ? "我們整合下列第三方服務以提供 RunWard 的功能:Strava、Garmin Connect、COROS、Apple HealthKit、Apple 登入,以及 Apple App Store(訂閱)。這些服務各自擁有自己的隱私政策。"
-              : "We integrate the following third-party services to power RunWard's features: Strava, Garmin Connect, COROS, Apple HealthKit, Sign in with Apple, and the Apple App Store (subscriptions). Each of these services has its own privacy policy."}
+              ? "我們整合下列第三方服務以提供 RunWard 的功能:Strava、Garmin Connect、COROS、Apple HealthKit、Apple 登入、Apple App Store 與 RevenueCat (訂閱)、用於託管與資料庫的雲端供應商、用於 AI 推論的 AI 服務供應商,以及用於天氣資料的氣象 API。這些服務各自擁有自己的隱私政策。"
+              : "We integrate the following third-party services to power RunWard's features: Strava, Garmin Connect, COROS, Apple HealthKit, Sign in with Apple, the Apple App Store and RevenueCat (subscriptions), our cloud hosting and database provider, AI service providers used for inference, and a weather data API. Each of these services has its own privacy policy."}
           </p>
         </section>
 

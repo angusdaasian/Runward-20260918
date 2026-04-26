@@ -41,6 +41,15 @@ const Privacy = () => {
           <h2 className="font-semibold text-foreground mb-2">{lang === "zh" ? "1. 簡介" : "1. Introduction"}</h2>
           <p>
             {lang === "zh"
+              ? "向前跑（RunWard）重視您的隱私。本隱私權政策說明我們如何收集、使用和保護您的個人資訊,以及我們提供的所有功能(包括 AI 跑步教練、姿勢分析、訓練計畫、活動同步、賽事與獎勵系統)如何處理您的資料。"
+              : "RunWard values your privacy. This Privacy Policy explains how we collect, use, and protect your personal information across all features — including the AI Running Coach, posture analysis, training plans, activity sync, races, and the rewards system."}
+          </p>
+        </section>
+
+        <section>
+          <h2 className="font-semibold text-foreground mb-2">{lang === "zh" ? "1. 簡介" : "1. Introduction"}</h2>
+          <p>
+            {lang === "zh"
               ? "向前跑（RunWard）重視您的隱私。本隱私權政策說明我們如何收集、使用和保護您的個人資訊。"
               : "RunWard values your privacy. This Privacy Policy explains how we collect, use, and protect your personal information."}
           </p>

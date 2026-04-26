@@ -505,13 +505,31 @@ const Onboarding = ({
       if (onboardingUserId) return;
 
       if (step === 0) {
-        supabase.from("profiles").select("onboarding_completed").eq("user_id", user.id).single()
+        supabase
+          .from("profiles")
+          .select("onboarding_completed, display_name, age, sex, runs_per_week")
+          .eq("user_id", user.id)
+          .single()
           .then(({ data }) => {
             if (data?.onboarding_completed) {
               onComplete();
-            } else {
-              setStep(1);
+              return;
             }
+            // Fresh OAuth signup (Apple/Google direct from welcome screen):
+            // profile exists but has no onboarding fields filled → skip the
+            // questionnaire and route straight to the plan prompt (step 10).
+            const isFreshOAuthUser =
+              !data?.display_name &&
+              data?.age == null &&
+              !data?.sex &&
+              data?.runs_per_week == null;
+            if (isFreshOAuthUser) {
+              localStorage.setItem("onboarding_show_plan_prompt", "true");
+              setOnboardingUserId(user.id);
+              setStep(10);
+              return;
+            }
+            setStep(1);
           });
       }
     }

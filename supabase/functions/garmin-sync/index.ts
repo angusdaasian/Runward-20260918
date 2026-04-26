@@ -516,11 +516,12 @@ serve(async (req) => {
     }
 
     // ── DISCONNECT ──
+    // Intentionally keep garmin_activities so users don't lose their history.
+    // Apple Health (if reconnected) will only fill gaps AFTER the latest Garmin
+    // activity to prevent duplicates. On Garmin reconnect, the existing rows
+    // let us resume incrementally from the last activity.
     if (action === "disconnect") {
-      await Promise.all([
-        supabase.from("garmin_connections").delete().eq("user_id", user.id),
-        supabase.from("garmin_activities").delete().eq("user_id", user.id),
-      ]);
+      await supabase.from("garmin_connections").delete().eq("user_id", user.id);
 
       return new Response(JSON.stringify({ success: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },

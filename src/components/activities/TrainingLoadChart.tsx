@@ -228,11 +228,33 @@ const TrainingLoadChart = ({ lang, activities, profileAge }: Props) => {
       <p className="mt-1.5 text-xs text-foreground leading-relaxed">
         {lang === "zh" ? statusDesc.zh : statusDesc.en}
       </p>
-      <p className="mt-2 text-[10px] text-muted-foreground leading-relaxed">
-        {lang === "zh"
-          ? "體能 (CTL) = 6週 EWMA · 疲勞 (ATL) = 1週 EWMA · 狀態 (TSB) = 體能 − 疲勞 · 基於時間 × 心率強度"
-          : "Fitness (CTL) = 6w EWMA · Fatigue (ATL) = 1w EWMA · Form (TSB) = fitness − fatigue · Based on duration × HR intensity"}
-      </p>
+      <div className="mt-3 pt-3 border-t border-border space-y-1.5 text-[11px] text-muted-foreground leading-relaxed">
+        {lang === "zh" ? (
+          <>
+            <p>
+              <span className="font-semibold text-sky-400">體能</span>：你長期累積的耐力底子(過去約6週的訓練量平均)。數字越高代表你越「練得起來」。
+            </p>
+            <p>
+              <span className="font-semibold text-orange-400">疲勞</span>：你身體最近的累積壓力(過去約一週的訓練量)。數字越高代表你越累。
+            </p>
+            <p>
+              <span className="font-semibold text-rose-400">狀態</span>：體能減去疲勞。正值=狀態好、適合比賽;負值=疲勞中、需要恢復。
+            </p>
+          </>
+        ) : (
+          <>
+            <p>
+              <span className="font-semibold text-sky-400">Fitness</span>: your long-term endurance base — how much training you've absorbed over the past ~6 weeks. Higher = stronger aerobic engine.
+            </p>
+            <p>
+              <span className="font-semibold text-orange-400">Fatigue</span>: how tired your body is right now from recent training (past ~1 week). Higher = more accumulated stress.
+            </p>
+            <p>
+              <span className="font-semibold text-rose-400">Form</span>: fitness minus fatigue. Positive = fresh and race-ready; negative = fatigued and needing recovery.
+            </p>
+          </>
+        )}
+      </div>
     </div>
   );
 };

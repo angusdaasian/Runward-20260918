@@ -470,6 +470,7 @@ export type Database = {
           garmin_display_name: string | null
           garmin_email_encrypted: string | null
           id: string
+          last_refreshed_at: string | null
           needs_reauth: boolean
           oauth1_token_encrypted: string | null
           oauth2_token_encrypted: string | null
@@ -487,6 +488,7 @@ export type Database = {
           garmin_display_name?: string | null
           garmin_email_encrypted?: string | null
           id?: string
+          last_refreshed_at?: string | null
           needs_reauth?: boolean
           oauth1_token_encrypted?: string | null
           oauth2_token_encrypted?: string | null
@@ -504,6 +506,7 @@ export type Database = {
           garmin_display_name?: string | null
           garmin_email_encrypted?: string | null
           id?: string
+          last_refreshed_at?: string | null
           needs_reauth?: boolean
           oauth1_token_encrypted?: string | null
           oauth2_token_encrypted?: string | null
@@ -512,6 +515,39 @@ export type Database = {
           token_type?: string | null
           updated_at?: string | null
           user_id?: string
+        }
+        Relationships: []
+      }
+      garmin_daily_health: {
+        Row: {
+          date: string
+          fetched_at: string
+          id: string
+          resting_hr: number | null
+          sleep_score: number | null
+          sleep_seconds: number | null
+          user_id: string
+          vo2max: number | null
+        }
+        Insert: {
+          date: string
+          fetched_at?: string
+          id?: string
+          resting_hr?: number | null
+          sleep_score?: number | null
+          sleep_seconds?: number | null
+          user_id: string
+          vo2max?: number | null
+        }
+        Update: {
+          date?: string
+          fetched_at?: string
+          id?: string
+          resting_hr?: number | null
+          sleep_score?: number | null
+          sleep_seconds?: number | null
+          user_id?: string
+          vo2max?: number | null
         }
         Relationships: []
       }

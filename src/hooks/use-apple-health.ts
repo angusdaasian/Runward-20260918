@@ -403,8 +403,16 @@ function getHeartRateStatsForWorkout(workout: any, samples: any[]) {
 function normalizeDistanceToMeters(raw: number, unit?: string | null): number {
   if (raw <= 0) return 0;
   const u = normalizeUnitToken(unit);
-  // HEURISTIC: Fixes 0.00km bug. If value is low (e.g. 15), convert KM to Meters.
-  if (/^(km|kilometer|kilometers)$/.test(u) || (!u && raw < 500)) return raw * 1000;
+  // Explicit meters
+  if (/^(m|meter|meters|metre|metres)$/.test(u)) return raw;
+  // Explicit kilometers
+  if (/^(km|kilometer|kilometers|kilometre|kilometres)$/.test(u)) return raw * 1000;
+  // Miles / yards (rare from HealthKit, but be safe)
+  if (/^(mi|mile|miles)$/.test(u)) return raw * 1609.344;
+  if (/^(yd|yard|yards)$/.test(u)) return raw * 0.9144;
+  // No/unknown unit: only assume km if value is implausibly small for meters
+  // (a workout < 5 m is nonsense; a workout of 50–500 is clearly meters, not km)
+  if (!u && raw > 0 && raw < 5) return raw * 1000;
   return raw;
 }
 

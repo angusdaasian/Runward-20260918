@@ -2,6 +2,7 @@ import { useState, lazy, Suspense } from "react";
 import { ScanEye, LineChart } from "lucide-react";
 import { Lang } from "@/lib/i18n";
 import { PostureSkeleton } from "@/components/ui/PageSkeleton";
+import GarminHealthCard from "@/components/analytics/GarminHealthCard";
 
 const PostureTab = lazy(() => import("@/components/PostureTab"));
 const PerformanceTab = lazy(() => import("@/components/PerformanceTab"));
@@ -62,6 +63,9 @@ const AnalyticsTab = ({ lang }: Props) => {
       </div>
 
       <div style={{ display: sub === "performance" ? "block" : "none" }}>
+        <div className="px-5 pt-4 max-w-lg mx-auto">
+          <GarminHealthCard lang={lang} />
+        </div>
         <Suspense fallback={<div className="px-5 pt-4"><PostureSkeleton /></div>}>
           <PerformanceTab lang={lang} />
         </Suspense>

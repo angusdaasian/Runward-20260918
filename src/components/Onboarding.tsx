@@ -457,17 +457,23 @@ const Onboarding = ({
         setStep(11);
         return;
       }
-      if (signupInProgress || isAccountCreationInFlight || (step >= 8 && step <= 11) || !!onboardingUserId) return;
+      if (signupInProgress || isAccountCreationInFlight || (step >= 8 && step <= 11)) return;
 
       // Returning from an OAuth (Apple/Google) signup: pending_onboarding_data
       // was stashed before the redirect. Now that we have a real authed user,
       // hydrate the profile and show the plan prompt (step 10).
+      // IMPORTANT: this must run even when `onboardingUserId` is already set
+      // (which happens immediately on mount because we seed it from `user.id`).
+      // Previously the early-return on `onboardingUserId` skipped this whole
+      // block, leaving the OAuth-returning user stranded on step 0 and forcing
+      // them through the questionnaire again.
       const pendingData = localStorage.getItem("pending_onboarding_data");
       if (pendingData) {
         try {
           const parsed = JSON.parse(pendingData);
           localStorage.removeItem("pending_onboarding_data");
           localStorage.setItem("onboarding_show_plan_prompt", "true");
+          setOnboardingUserId(user.id);
           setStep(10);
           (async () => {
             await new Promise((r) => setTimeout(r, 500));
@@ -488,9 +494,15 @@ const Onboarding = ({
       // Plan-prompt flag is already set (e.g. user reloaded mid-step-10) AND
       // we have a real user → safe to resume on step 10.
       if (localStorage.getItem("onboarding_show_plan_prompt") === "true") {
+        setOnboardingUserId(user.id);
         setStep(10);
         return;
       }
+
+      // From here on, only the "first time we see this user mid-flow" branch
+      // should run. If we've already recorded an onboardingUserId (e.g. user
+      // is mid-questionnaire), don't re-trigger the profile lookup.
+      if (onboardingUserId) return;
 
       if (step === 0) {
         supabase.from("profiles").select("onboarding_completed").eq("user_id", user.id).single()

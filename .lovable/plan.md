@@ -1,75 +1,162 @@
 ## Goal
 
-When a user disconnects Garmin, **keep their past Garmin activities** in the database. Apple Health should only fill in activities **after** the most recent Garmin activity (so no duplicates with historical Garmin runs). When the user reconnects Garmin later, resume the sync from the last stored Garmin activity date.
+Two combined changes:
 
-## Findings
+1. **Garmin OAuth2 auto-refresh** — stop the ~24h "sign-in expired" toasts by transparently refreshing OAuth2 tokens using the long-lived OAuth1 ticket (`garth` / `garminconnect` does this internally on `Garmin().login(tokenstore)`).
+2. **Daily Garmin health stats card** — fetch `vo2max`, `resting heart rate`, `sleep duration`, and `sleep score` once per day at **10:00 HKT (02:00 UTC)** and display them at the **top of the Analytics tab** — only if the user has a connected Garmin account. The single daily sync naturally exercises the OAuth2 refresh path so tokens stay fresh without extra calls.
 
-1. **`supabase/functions/garmin-sync/index.ts` (action `disconnect`)** — currently deletes both `garmin_connections` AND `garmin_activities`. This is what we need to change.
-2. **`src/hooks/use-apple-health.ts` → `saveWorkoutsToDb`** — currently checks if a `garmin_connections` row exists; if yes, skips saving Apple Health workouts entirely. After disconnect this guard releases, but there's no per-workout date filter to avoid overwriting/duplicating the historical Garmin window.
-3. **Garmin sync window logic** — already uses the latest `start_time` in `garmin_activities` to compute the incremental window (`windowStart = max(lastSynced - 7d, FIRST_SYNC_START)`). So if we **keep** historical garmin_activities on disconnect, reconnecting will naturally resume from the last activity. No change needed here beyond removing the bug where reconnect triggers a full-resync wipe.
-4. **`full_resync_done` flag** lives on `garmin_connections` — that row gets deleted on disconnect, so on reconnect it starts as `false` and the "month-check" branch runs. Since historical activities still exist (after our fix), the month-check will find activities in every month and skip the wipe — good. But to be safe we'll explicitly set `full_resync_done = true` on the new connection if historical activities exist.
-5. **Railway `main.py`** — lives in the external Garmin service (referenced via `GARMIN_RAILWAY_URL` secret), not in this repo. It already accepts `start_date` / `end_date` parameters and is driven entirely by `garmin-sync`. **No `main.py` change required** — all sync-window logic is server-side in our edge function.
+---
 
-## Changes
+## Part 1 — OAuth2 Auto-Refresh
 
-### 1. `supabase/functions/garmin-sync/index.ts` — disconnect action
-Stop deleting `garmin_activities`. Only delete the connection row.
+### 1a. Railway backend (`main.py`) — *prepared as a copy-paste patch; not in this repo*
+Add two endpoints (or modify existing ones to return refreshed tokens):
 
-```ts
-if (action === "disconnect") {
-  await supabase.from("garmin_connections").delete().eq("user_id", user.id);
-  // Intentionally keep garmin_activities so history is preserved.
-  // Apple Health sync (if any) will only fill in dates AFTER the last
-  // Garmin activity to avoid duplicates.
-  return new Response(JSON.stringify({ success: true }), { ... });
-}
+```python
+import json, tempfile
+from pathlib import Path
+from garminconnect import Garmin
+
+def _login_with_autorefresh(oauth1: str, oauth2: str):
+    """Restore session from stored tokens; garth auto-refreshes OAuth2 if expired."""
+    tdir = tempfile.mkdtemp()
+    Path(tdir, "oauth1_token.json").write_text(oauth1)
+    Path(tdir, "oauth2_token.json").write_text(oauth2)
+    g = Garmin()
+    g.login(tdir)               # <-- triggers internal refresh if needed
+    new_oauth1 = Path(tdir, "oauth1_token.json").read_text()
+    new_oauth2 = Path(tdir, "oauth2_token.json").read_text()
+    return g, new_oauth1, new_oauth2
+
+@app.post("/garmin-refresh")
+def garmin_refresh(body: RefreshBody):
+    _, o1, o2 = _login_with_autorefresh(body.oauth1_token, body.oauth2_token)
+    return {"oauth1_token": o1, "oauth2_token": o2}
+
+@app.post("/garmin-health-stats")
+def garmin_health_stats(body: HealthBody):
+    """Return today's vo2max, RHR, sleep duration, sleep score."""
+    g, o1, o2 = _login_with_autorefresh(body.oauth1_token, body.oauth2_token)
+    today = body.date  # YYYY-MM-DD
+    summary  = g.get_user_summary(today) or {}
+    sleep    = g.get_sleep_data(today) or {}
+    max_metrics = g.get_max_metrics(today) or {}
+    return {
+        "date": today,
+        "vo2max": (max_metrics.get("generic", {}) or {}).get("vo2MaxValue"),
+        "resting_hr": summary.get("restingHeartRate"),
+        "sleep_seconds": (sleep.get("dailySleepDTO", {}) or {}).get("sleepTimeSeconds"),
+        "sleep_score": ((sleep.get("dailySleepDTO", {}) or {}).get("sleepScores", {}) or {}).get("overall", {}).get("value"),
+        "oauth1_token": o1,   # always echo back so Supabase can persist any refresh
+        "oauth2_token": o2,
+    }
 ```
 
-### 2. `supabase/functions/garmin-sync/index.ts` — sync action
-- Remove the unconditional purge of `apple_health_activities` at the top of `sync` (lines 121-131). It will be replaced by the per-workout filter on the Apple Health side. We still want Garmin to be the source of truth for the period it covers, so instead of full purge, only delete AH rows whose `start_date >= earliest garmin activity start_time` (i.e., the period now covered by Garmin).
-- After successfully fetching tokens on a reconnect, if any historical `garmin_activities` exist for the user, set `full_resync_done = true` on the freshly-created connection so the month-check / wipe branch is skipped.
+If the existing activities/details endpoints also return updated tokens (they do internally via `garth`), update them to echo `oauth1_token`/`oauth2_token` in the response so Supabase can re-encrypt and persist them. Existing endpoints continue to work; only the response payload grows.
 
-### 3. `src/hooks/use-apple-health.ts` — `saveWorkoutsToDb`
-Replace the "skip entirely if Garmin connected" guard with a date-aware filter:
+### 1b. Supabase edge function `garmin-sync`
+Add a shared helper `callRailwayWithTokenSync()` that:
+- POSTs to Railway, including current decrypted `oauth1_token` / `oauth2_token`.
+- If response contains updated `oauth1_token` / `oauth2_token`, re-encrypts via `_shared/garminCrypto.ts` and updates `garmin_connections` (`oauth1_token_encrypted`, `oauth2_token_encrypted`, `last_refreshed_at = now()`).
+- On `401`: sets `needs_reauth = true` so the existing UI flow prompts the user to re-link.
 
-- If a Garmin connection exists → keep current behavior (skip all AH workouts; Garmin owns activities live).
-- If no Garmin connection but historical `garmin_activities` exist → fetch the **max `start_time`** from `garmin_activities`, and only insert AH workouts whose `start_date > lastGarminTime`. This stops AH from re-creating duplicates of pre-disconnect Garmin history.
-- If no Garmin connection and no historical Garmin activities → save all AH workouts (current default).
+Wrap all existing Railway fetches (`/garmin-activities`, `/garmin-activity-details`) with this helper. No business logic changes elsewhere in `garmin-sync`.
 
-```ts
-// pseudo-code inside saveWorkoutsToDb
-const garminConn = await supabase.from("garmin_connections").select("id")...maybeSingle();
-if (garminConn.data) return 0; // live Garmin owns activities
-
-const { data: lastGarmin } = await supabase
-  .from("garmin_activities")
-  .select("start_time")
-  .eq("user_id", user.id)
-  .order("start_time", { ascending: false })
-  .limit(1)
-  .maybeSingle();
-
-const cutoff = lastGarmin?.start_time ? new Date(lastGarmin.start_time).getTime() : 0;
-const filtered = normalizedWorkouts.filter(w => new Date(w.start_date).getTime() > cutoff);
-// proceed with insert/update on `filtered` instead of `normalizedWorkouts`
+### 1c. Database migration
+```sql
+ALTER TABLE public.garmin_connections
+  ADD COLUMN IF NOT EXISTS last_refreshed_at timestamptz;
 ```
 
-### 4. `src/components/ConnectApps.tsx` — copy + UX
-- Update the disconnect confirmation copy (toast + the Apple Health info text) to reflect that **past Garmin activities are kept**, and Apple Health will only sync new activities going forward.
-- Optional: when user reconnects Garmin and historical data exists, show "Resuming from {date}" toast.
+---
 
-### 5. `src/hooks/use-garmin.ts` — disconnect toast
-Update the success toast to clarify history is preserved:
-- EN: "Garmin disconnected — past activities kept"
-- ZH: "已中斷 Garmin 連結，過往活動已保留"
+## Part 2 — Daily Garmin Health Stats
 
-## Out of scope / not changing
-- **Railway `main.py`** — not in this repo, no changes needed; existing `start_date`/`end_date` params suffice for incremental resume.
-- The full-resync month-check logic (works correctly once historical data is preserved).
-- XP / training-score recompute paths (unchanged).
+### 2a. New table `garmin_daily_health`
+```sql
+CREATE TABLE public.garmin_daily_health (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  date date NOT NULL,
+  vo2max numeric,
+  resting_hr integer,
+  sleep_seconds integer,
+  sleep_score integer,
+  fetched_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (user_id, date)
+);
+ALTER TABLE public.garmin_daily_health ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users read own daily health"
+  ON public.garmin_daily_health FOR SELECT
+  TO authenticated USING (auth.uid() = user_id);
+
+CREATE POLICY "Service role full access"
+  ON public.garmin_daily_health FOR ALL
+  TO service_role USING (true) WITH CHECK (true);
+```
+(Inserts/updates are done by the edge function using the service role.)
+
+### 2b. New edge function `garmin-daily-health-sync`
+- Accepts no user JWT (cron-invoked); validates a header secret (`WEBHOOK_AUTH_KEY`, already in secrets).
+- Selects every row from `garmin_connections` where `needs_reauth = false`.
+- For each user:
+  - Decrypts tokens.
+  - POSTs to Railway `/garmin-health-stats` (using the helper from Part 1b — so OAuth2 tokens auto-refresh on this single daily call).
+  - Upserts result into `garmin_daily_health` for `date = today HKT`.
+  - On 401 → sets `needs_reauth = true`, skips user.
+- Logs per-user success/error counts.
+
+Also add a small per-user variant invocation (so the user can manually pull-to-refresh from Analytics): the same function accepts an authenticated user JWT and, when present, syncs only that user.
+
+### 2c. Cron schedule (10:00 HKT daily = 02:00 UTC)
+Use `pg_cron` + `pg_net` (insert via insert-tool, not migration, since URL/key are project-specific):
+```sql
+SELECT cron.schedule(
+  'garmin-daily-health-10am-hkt',
+  '0 2 * * *',  -- 02:00 UTC daily
+  $$ SELECT net.http_post(
+       url := 'https://kbghvclwhxnjeskdodeh.supabase.co/functions/v1/garmin-daily-health-sync',
+       headers := jsonb_build_object(
+         'Content-Type','application/json',
+         'x-webhook-key', '<WEBHOOK_AUTH_KEY value>'
+       ),
+       body := jsonb_build_object('source','cron')
+     ); $$
+);
+```
+
+### 2d. Frontend — new hook & card
+- **Hook** `src/hooks/use-garmin-daily-health.ts` — TanStack Query reading `garmin_daily_health` for the current user (latest 7 rows for sparkline-ready data; latest row used for headline values).
+- **Component** `src/components/analytics/GarminHealthCard.tsx` — 4-stat grid:
+  - VO₂max (ml/kg/min)
+  - Resting HR (bpm)
+  - Sleep (formatted `Hh Mm`)
+  - Sleep score (with colored badge: red <60, yellow 60-79, green ≥80)
+  - "Last updated {date}" footer + manual refresh button (calls `garmin-daily-health-sync` with the user's JWT).
+- **Visibility**: render only if a `garmin_connections` row exists for the user (use existing `use-garmin` / a lightweight existence query). Card hidden entirely otherwise.
+
+### 2e. Mount in Analytics
+Edit `src/components/AnalyticsTab.tsx` so that when `sub === "performance"` the new `GarminHealthCard` renders **above** `PerformanceTab` (inside the same scroll container, so the sub-tab switcher stays sticky-feeling at top). For `posture` sub-tab the card does NOT show.
+
+`PerformanceTab.tsx` is left untouched — the card lives in `AnalyticsTab` to avoid duplicating the "is Garmin connected" check.
+
+---
+
+## Part 3 — Toasts / UX polish
+- `src/hooks/use-garmin.ts`: keep existing 401 toast wording but no longer surfaces it for routine 24h expiry (auto-refresh handles it).
+- Optional: small "Synced {time}" subtitle on `GarminHealthCard`.
+
+---
+
+## Out of scope
+- Strava / Apple Health stats (Garmin only).
+- Backfilling historical daily health (only forward-going from first cron tick; user can also tap manual refresh for today).
+- Railway deployment is external — I'll provide the ready-to-paste `main.py` patch in chat after approval; everything else lands in this repo.
 
 ## Edge cases handled
-- User disconnects → reconnects same Garmin: resumes from last activity, no wipe (month-check passes).
-- User disconnects Garmin → uses Apple Health for a few weeks → reconnects Garmin: AH activities for the gap remain; new Garmin activities upsert by `garmin_activity_id` (no conflict with AH rows since they're in a different table).
-- User has only Apple Health (never connected Garmin): unchanged behavior — all AH workouts saved.
-- User connects Garmin for the first time after using Apple Health: first-sync still purges overlapping AH activities (kept this behavior, just scoped by date instead of full wipe).
+- User with no Garmin → card hidden, cron skips them.
+- User with `needs_reauth = true` → cron skips, card shows last-known values + a "Reconnect Garmin" CTA.
+- OAuth2 refresh failure (OAuth1 ticket truly dead) → `needs_reauth = true`, existing reconnect flow takes over.
+- Sleep / VO2max may legitimately be null for a given day → render "—" rather than 0.
+- Cron runs at 10:00 HKT each day; if a user already pulled manually that day, upsert overwrites with the latest figures (idempotent).

@@ -289,30 +289,32 @@ serve(async (req) => {
 
       for (const chunk of chunks) {
         try {
-          const actRes = await fetch(`${GARMIN_RAILWAY_URL}/garmin-activities`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              email: garminEmail,
-              oauth1_token: oauth1Token,
-              oauth2_token: oauth2Token,
-              start_date: chunk.start,
-              end_date: chunk.end,
-            }),
+          const actResult = await callRailway<any[]>({
+            supabase,
+            userId: user.id,
+            railwayUrl: GARMIN_RAILWAY_URL,
+            path: "/garmin-activities",
+            email: garminEmail,
+            oauth1Token,
+            oauth2Token,
+            extraBody: { start_date: chunk.start, end_date: chunk.end },
           });
 
-          if (!actRes.ok) {
-            const errText = await actRes.text().catch(() => "");
-            console.error(`[garmin-sync] chunk ${chunk.start}→${chunk.end} failed:`, actRes.status, errText);
-            if (actRes.status === 401) {
+          // Adopt any refreshed tokens for the next chunk in this run.
+          oauth1Token = actResult.oauth1Token;
+          oauth2Token = actResult.oauth2Token;
+
+          if (!actResult.ok) {
+            console.error(`[garmin-sync] chunk ${chunk.start}→${chunk.end} failed:`, actResult.status, actResult.errorText);
+            if (actResult.reauthRequired) {
               reauthRequired = true;
               break;
             }
-            chunkErrors.push(`${chunk.start}: ${errText.slice(0, 100)}`);
+            chunkErrors.push(`${chunk.start}: ${(actResult.errorText ?? "").slice(0, 100)}`);
             continue;
           }
 
-          const activities = await actRes.json();
+          const activities = actResult.data;
           if (!Array.isArray(activities) || activities.length === 0) {
             console.log(`[garmin-sync] chunk ${chunk.start}→${chunk.end}: 0 activities`);
             continue;

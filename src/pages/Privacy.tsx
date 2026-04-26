@@ -46,14 +46,6 @@ const Privacy = () => {
           </p>
         </section>
 
-        <section>
-          <h2 className="font-semibold text-foreground mb-2">{lang === "zh" ? "1. 簡介" : "1. Introduction"}</h2>
-          <p>
-            {lang === "zh"
-              ? "向前跑（RunWard）重視您的隱私。本隱私權政策說明我們如何收集、使用和保護您的個人資訊。"
-              : "RunWard values your privacy. This Privacy Policy explains how we collect, use, and protect your personal information."}
-          </p>
-        </section>
 
         <section>
           <h2 className="font-semibold text-foreground mb-2">

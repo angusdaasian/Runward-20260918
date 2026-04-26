@@ -216,8 +216,8 @@ const Privacy = () => {
           </h2>
           <p>
             {lang === "zh"
-              ? "所有付款皆透過 Apple App Store 安全處理。我們僅接收會員權限狀態與購買收據，絕不會接收或儲存您的信用卡資訊。"
-              : "All payments are securely processed through the Apple App Store. We only receive entitlement status and purchase receipts — we never receive or store your credit card details."}
+              ? "所有付款皆透過 Apple App Store 安全處理,並由 RevenueCat 負責訂閱狀態管理。我們僅接收會員權限狀態與購買收據,絕不會接收或儲存您的信用卡資訊。免費試用使用情形 (是否已使用) 會記錄於您的個人檔案以避免重複領用。"
+              : "All payments are securely processed through the Apple App Store, with subscription state managed via RevenueCat. We only receive entitlement status and purchase receipts — we never receive or store your credit card details. Free-trial usage (whether you've used it) is recorded on your profile to prevent re-use."}
           </p>
         </section>
 

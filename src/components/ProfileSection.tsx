@@ -198,19 +198,19 @@ const ProfileSection = ({ lang }: { lang: Lang }) => {
       return;
     }
 
-    // For each distance category, find best estimated time
+    // For each distance category, find best actual time from activities
+    // that are within ±5% of the target distance
     const detected: Record<string, { seconds: number }> = {};
     for (const dist of DISTANCES) {
       const targetMeters = DISTANCE_TO_METERS[dist];
       if (!targetMeters) continue;
-      // Allow activities within 5% under target (e.g., 4.85K counts toward 5K)
       const minMeters = targetMeters * 0.95;
+      const maxMeters = targetMeters * 1.05;
       let bestSeconds = Infinity;
       for (const a of runs) {
-        if (a.distance < minMeters) continue;
-        // Estimate time at target distance using average pace from activity
-        const estSeconds = (targetMeters / a.distance) * a.moving_time;
-        if (estSeconds > 0 && estSeconds < bestSeconds) bestSeconds = estSeconds;
+        if (a.distance < minMeters || a.distance > maxMeters) continue;
+        // Use actual moving time, no recalculation
+        if (a.moving_time > 0 && a.moving_time < bestSeconds) bestSeconds = a.moving_time;
       }
       // Skip if faster than world record (data error)
       const wr = PB_WORLD_RECORDS[dist];

@@ -59,6 +59,7 @@ interface PB {
 const ProfileSection = ({ lang }: { lang: Lang }) => {
   const { user, signOut } = useAuth();
   const { toast } = useToast();
+  const { activities } = useActivities();
   const [profile, setProfile] = useState<Profile | null>(
     _cachedUserId === user?.id ? _cachedProfile : null
   );
@@ -68,6 +69,7 @@ const ProfileSection = ({ lang }: { lang: Lang }) => {
   const [editName, setEditName] = useState("");
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [detecting, setDetecting] = useState(false);
 
   // Email editing
   const [editingEmail, setEditingEmail] = useState(false);

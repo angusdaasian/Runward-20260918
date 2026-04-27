@@ -482,11 +482,30 @@ const RaceTab = ({ lang }: Props) => {
   return (
     <FadeIn className="px-5 pt-6 max-w-lg mx-auto pb-24">
       <h1 className="font-display text-2xl font-bold text-foreground mb-1">
-        {lang === "zh" ? "賽事日曆" : "Race Calendar"}
+        {lang === "zh" ? "賽事" : "Races"}
       </h1>
-      <p className="text-sm text-muted-foreground mb-1">
-        {lang === "zh" ? "探索即將舉行的跑步賽事" : "Discover upcoming running events"}
+      <p className="text-sm text-muted-foreground mb-3">
+        {lang === "zh" ? "探索與管理你的跑步賽事" : "Discover and manage your running events"}
       </p>
+
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "calendar" | "my")} className="mb-3">
+        <TabsList className="grid grid-cols-2 w-full">
+          <TabsTrigger value="calendar">{lang === "zh" ? "賽事日曆" : "Race Calendar"}</TabsTrigger>
+          <TabsTrigger value="my">
+            {lang === "zh" ? "我的賽事" : "My Races"}
+            {myRaces.length > 0 && (
+              <span className="ml-1.5 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-primary text-primary-foreground text-[10px] font-semibold">
+                {myRaces.length}
+              </span>
+            )}
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="my" className="mt-4">
+          {renderMyRaces()}
+        </TabsContent>
+
+        <TabsContent value="calendar" className="mt-4">
       {(!online || servedFromCache) && (
         <div className="flex items-center gap-1.5 mb-2 text-[11px] text-muted-foreground bg-muted/50 px-2 py-1 rounded-md w-fit">
           <WifiOff size={11} />

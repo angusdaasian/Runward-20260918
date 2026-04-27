@@ -175,6 +175,26 @@ async function fetchPlannedWorkouts(userId: string): Promise<PlannedWorkout[]> {
   return workouts;
 }
 
+async function fetchUserRaces(userId: string): Promise<UserRace[]> {
+  const { data } = await supabase
+    .from("user_races")
+    .select("*")
+    .eq("user_id", userId)
+    .order("race_date", { ascending: true });
+  return ((data as any[]) || []).map((r) => ({
+    id: r.id,
+    race_name: r.race_name,
+    race_name_zh: r.race_name_zh,
+    race_date: r.race_date,
+    city: r.city,
+    country: r.country,
+    category: r.category,
+    source: r.source,
+    website_url: r.website_url,
+    notes: r.notes,
+  }));
+}
+
 export function useActivities() {
   const { user } = useAuth();
   const queryClient = useQueryClient();

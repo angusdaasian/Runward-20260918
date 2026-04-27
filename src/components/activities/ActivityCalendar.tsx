@@ -20,15 +20,25 @@ interface PlannedWorkout {
   pace?: string | null;
 }
 
+interface UserRaceLite {
+  id: string;
+  race_name: string;
+  race_name_zh?: string | null;
+  race_date: string;
+  category: string;
+}
+
 interface Props {
   lang: Lang;
   activities: StravaActivity[];
   plannedWorkouts: PlannedWorkout[];
+  userRaces?: UserRaceLite[];
   onSelectDate?: (info: {
     date: string;
     activity: StravaActivity | null;
     extraActivities: StravaActivity[];
     planned: PlannedWorkout | null;
+    races?: UserRaceLite[];
   }) => void;
 }
 

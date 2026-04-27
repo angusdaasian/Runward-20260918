@@ -304,6 +304,107 @@ const RaceTab = ({ lang }: Props) => {
     fetchRaces();
   }, [online]);
 
+  // Fetch My Races
+  const loadMyRaces = useCallback(async () => {
+    if (!user) {
+      setMyRaces([]);
+      setMyRacesLoading(false);
+      setSavedKeys(new Set());
+      return;
+    }
+    setMyRacesLoading(true);
+    const { data } = await supabase
+      .from("user_races")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("race_date", { ascending: true });
+    const list = (data as any[] as UserRaceRow[]) || [];
+    setMyRaces(list);
+    const keys = new Set<string>();
+    for (const r of list) {
+      keys.add(`${_canon(r.race_name)}__${r.race_date}`);
+    }
+    setSavedKeys(keys);
+    setMyRacesLoading(false);
+  }, [user]);
+
+  useEffect(() => {
+    loadMyRaces();
+  }, [loadMyRaces]);
+
+  const importRace = async (g: GroupedRace) => {
+    if (!user) {
+      toast({ title: lang === "zh" ? "請先登入" : "Please sign in", variant: "destructive" });
+      return;
+    }
+    const key = `${_canon(g.name)}__${g.race_date}`;
+    if (savedKeys.has(key)) {
+      toast({ title: lang === "zh" ? "已加入我的賽事" : "Already in My Races" });
+      return;
+    }
+    const mainCat = g.categories.sort((a, b) => CATEGORY_PRIORITY.indexOf(a) - CATEGORY_PRIORITY.indexOf(b))[0] || g.categories[0] || "Road Race";
+    const { error } = await supabase.from("user_races").insert({
+      user_id: user.id,
+      race_name: g.name,
+      race_name_zh: g.name_zh,
+      race_date: g.race_date,
+      city: g.city,
+      country: g.country,
+      category: mainCat,
+      website_url: g.website_url,
+      source: "imported",
+    });
+    if (error) {
+      toast({ title: lang === "zh" ? "無法新增" : "Failed to add", description: error.message, variant: "destructive" });
+      return;
+    }
+    toast({ title: lang === "zh" ? "已加入我的賽事" : "Added to My Races" });
+    setSavedKeys((s) => new Set(s).add(key));
+    await loadMyRaces();
+    queryClient.invalidateQueries({ queryKey: ["user-races", user.id] });
+  };
+
+  const removeMyRace = async (id: string) => {
+    if (!user) return;
+    const { error } = await supabase.from("user_races").delete().eq("id", id).eq("user_id", user.id);
+    if (error) {
+      toast({ title: lang === "zh" ? "刪除失敗" : "Delete failed", variant: "destructive" });
+      return;
+    }
+    toast({ title: lang === "zh" ? "已刪除" : "Removed" });
+    await loadMyRaces();
+    queryClient.invalidateQueries({ queryKey: ["user-races", user.id] });
+  };
+
+  const addManualMyRace = async () => {
+    if (!user) return;
+    if (!myAddForm.name || !myAddForm.race_date) {
+      toast({ title: lang === "zh" ? "請填寫名稱及日期" : "Please fill name and date", variant: "destructive" });
+      return;
+    }
+    setSavingMy(true);
+    const { error } = await supabase.from("user_races").insert({
+      user_id: user.id,
+      race_name: myAddForm.name,
+      race_date: myAddForm.race_date,
+      city: myAddForm.city || null,
+      country: myAddForm.country || null,
+      category: myAddForm.category,
+      source: "manual",
+    });
+    setSavingMy(false);
+    if (error) {
+      toast({ title: lang === "zh" ? "新增失敗" : "Add failed", description: error.message, variant: "destructive" });
+      return;
+    }
+    toast({ title: lang === "zh" ? "已新增到我的賽事" : "Added to My Races" });
+    setMyAddOpen(false);
+    setMyAddForm({ name: "", race_date: "", city: "", country: "", category: "Full Marathon" });
+    await loadMyRaces();
+    queryClient.invalidateQueries({ queryKey: ["user-races", user.id] });
+  };
+
+
   const grouped = useMemo(() => {
     const map = new Map<string, GroupedRace>();
     for (const r of races) {

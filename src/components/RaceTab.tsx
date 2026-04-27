@@ -762,6 +762,8 @@ const RaceTab = ({ lang }: Props) => {
           const mainCat = sortedCats[0];
           const catColor = CATEGORY_COLORS[mainCat] || "bg-muted-foreground";
 
+          const savedKey = `${_canon(race.name)}__${race.race_date}`;
+          const isSaved = savedKeys.has(savedKey);
           return (
             <div
               key={`${race.name}_${race.race_date}_${idx}`}
@@ -796,6 +798,22 @@ const RaceTab = ({ lang }: Props) => {
                     </span>
                   ))}
                 </div>
+                {user && (
+                  <button
+                    onClick={() => importRace(race)}
+                    disabled={isSaved}
+                    className={`mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                      isSaved
+                        ? "bg-muted text-muted-foreground cursor-default"
+                        : "bg-primary/10 text-primary hover:bg-primary/20"
+                    }`}
+                  >
+                    {isSaved ? <Bookmark size={13} /> : <BookmarkPlus size={13} />}
+                    {isSaved
+                      ? lang === "zh" ? "已加入" : "Saved"
+                      : lang === "zh" ? "加入我的賽事" : "Add to My Races"}
+                  </button>
+                )}
               </div>
             </div>
           );

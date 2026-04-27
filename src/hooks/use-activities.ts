@@ -58,6 +58,9 @@ export interface UserRace {
   source: string;
   website_url: string | null;
   notes: string | null;
+  finish_time_seconds: number | null;
+  finish_time_source: string | null;
+  finish_activity_id: string | null;
 }
 
 const appEnv = getAppEnvironment();

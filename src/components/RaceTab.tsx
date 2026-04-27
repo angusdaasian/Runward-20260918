@@ -858,8 +858,170 @@ const RaceTab = ({ lang }: Props) => {
           </button>
         </div>
       )}
+        </TabsContent>
+      </Tabs>
     </FadeIn>
   );
+
+  function renderMyRaces() {
+    if (!user) {
+      return (
+        <div className="text-center py-12 text-sm text-muted-foreground">
+          {lang === "zh" ? "請先登入以管理你的賽事" : "Please sign in to manage your races"}
+        </div>
+      );
+    }
+
+    if (myRacesLoading) {
+      return (
+        <div className="space-y-3">
+          <Skeleton className="h-24 w-full rounded-xl" />
+          <Skeleton className="h-24 w-full rounded-xl" />
+        </div>
+      );
+    }
+
+    const today = new Date().toISOString().split("T")[0];
+    const upcoming = myRaces.filter((r) => r.race_date >= today);
+    const past = myRaces.filter((r) => r.race_date < today);
+
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <p className="text-xs text-muted-foreground">
+            {lang === "zh"
+              ? `${upcoming.length} 場即將舉行 · ${past.length} 場已完成`
+              : `${upcoming.length} upcoming · ${past.length} past`}
+          </p>
+          <button
+            onClick={() => setMyAddOpen((v) => !v)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors"
+          >
+            <Plus size={13} />
+            {lang === "zh" ? "新增" : "Add"}
+          </button>
+        </div>
+
+        {myAddOpen && (
+          <div className="bg-card border border-border rounded-xl p-4 space-y-3">
+            <h3 className="font-semibold text-sm text-foreground">
+              {lang === "zh" ? "新增賽事到我的賽事" : "Add to My Races"}
+            </h3>
+            <input
+              type="text"
+              placeholder={lang === "zh" ? "賽事名稱 *" : "Race Name *"}
+              value={myAddForm.name}
+              onChange={(e) => setMyAddForm((f) => ({ ...f, name: e.target.value }))}
+              className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground text-sm"
+            />
+            <input
+              type="date"
+              value={myAddForm.race_date}
+              onChange={(e) => setMyAddForm((f) => ({ ...f, race_date: e.target.value }))}
+              className="w-full px-3 py-2 rounded-lg border border-border bg-card text-foreground text-sm appearance-none"
+            />
+            <div className="grid grid-cols-2 gap-2">
+              <input
+                type="text"
+                placeholder={lang === "zh" ? "城市" : "City"}
+                value={myAddForm.city}
+                onChange={(e) => setMyAddForm((f) => ({ ...f, city: e.target.value }))}
+                className="px-3 py-2 rounded-lg border border-border bg-card text-foreground text-sm"
+              />
+              <input
+                type="text"
+                placeholder={lang === "zh" ? "國家/地區" : "Country"}
+                value={myAddForm.country}
+                onChange={(e) => setMyAddForm((f) => ({ ...f, country: e.target.value }))}
+                className="px-3 py-2 rounded-lg border border-border bg-card text-foreground text-sm"
+              />
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {["5K", "10K", "Half Marathon", "Full Marathon", "Ultramarathon", "Road Race"].map((c) => (
+                <button
+                  key={c}
+                  onClick={() => setMyAddForm((f) => ({ ...f, category: c }))}
+                  className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                    myAddForm.category === c
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted text-muted-foreground"
+                  }`}
+                >
+                  {c}
+                </button>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={addManualMyRace}
+                disabled={savingMy || !myAddForm.name || !myAddForm.race_date}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
+              >
+                {savingMy && <Loader2 size={14} className="animate-spin" />}
+                {lang === "zh" ? "儲存" : "Save"}
+              </button>
+              <button
+                onClick={() => {
+                  setMyAddOpen(false);
+                  setMyAddForm({ name: "", race_date: "", city: "", country: "", category: "Full Marathon" });
+                }}
+                className="px-4 py-2 rounded-lg border border-border text-sm font-medium text-muted-foreground hover:bg-muted transition-colors"
+              >
+                {lang === "zh" ? "取消" : "Cancel"}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {myRaces.length === 0 && !myAddOpen && (
+          <div className="text-center py-12 space-y-3 bg-card border border-border rounded-xl">
+            <p className="text-sm text-muted-foreground">
+              {lang === "zh"
+                ? "尚未加入任何賽事。從賽事日曆匯入或手動新增。"
+                : "No races yet. Import from the Race Calendar or add one manually."}
+            </p>
+            <div className="flex justify-center gap-2">
+              <button
+                onClick={() => setActiveTab("calendar")}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-xs font-medium text-foreground hover:bg-muted transition-colors"
+              >
+                {lang === "zh" ? "瀏覽賽事日曆" : "Browse Race Calendar"}
+              </button>
+              <button
+                onClick={() => setMyAddOpen(true)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors"
+              >
+                <Plus size={13} />
+                {lang === "zh" ? "手動新增" : "Add Manually"}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {upcoming.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+              {lang === "zh" ? "即將舉行" : "Upcoming"}
+            </p>
+            {upcoming.map((r) => (
+              <MyRaceCard key={r.id} race={r} lang={lang} onRemove={() => removeMyRace(r.id)} />
+            ))}
+          </div>
+        )}
+
+        {past.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+              {lang === "zh" ? "已完成" : "Past"}
+            </p>
+            {past.map((r) => (
+              <MyRaceCard key={r.id} race={r} lang={lang} onRemove={() => removeMyRace(r.id)} dim />
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
 };
 
 export default RaceTab;

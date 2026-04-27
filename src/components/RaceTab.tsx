@@ -1024,7 +1024,7 @@ const RaceTab = ({ lang }: Props) => {
               {lang === "zh" ? "即將舉行" : "Upcoming"}
             </p>
             {upcoming.map((r) => (
-              <MyRaceCard key={r.id} race={r} lang={lang} onRemove={() => removeMyRace(r.id)} />
+              <MyRaceCard key={r.id} race={r} lang={lang} onRemove={() => removeMyRace(r.id)} onSaveTime={(secs) => updateFinishTime(r.id, secs)} />
             ))}
           </div>
         )}

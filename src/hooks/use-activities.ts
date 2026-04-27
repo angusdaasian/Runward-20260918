@@ -47,6 +47,19 @@ export interface PlannedWorkout {
   pace?: string | null;
 }
 
+export interface UserRace {
+  id: string;
+  race_name: string;
+  race_name_zh: string | null;
+  race_date: string;
+  city: string | null;
+  country: string | null;
+  category: string;
+  source: string;
+  website_url: string | null;
+  notes: string | null;
+}
+
 const appEnv = getAppEnvironment();
 
 async function fetchActivities(userId: string): Promise<StravaActivity[]> {

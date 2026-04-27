@@ -1130,6 +1130,57 @@ export type Database = {
         }
         Relationships: []
       }
+      user_races: {
+        Row: {
+          category: string
+          city: string | null
+          country: string | null
+          created_at: string
+          id: string
+          notes: string | null
+          race_date: string
+          race_name: string
+          race_name_zh: string | null
+          source: string
+          source_race_id: string | null
+          updated_at: string
+          user_id: string
+          website_url: string | null
+        }
+        Insert: {
+          category?: string
+          city?: string | null
+          country?: string | null
+          created_at?: string
+          id?: string
+          notes?: string | null
+          race_date: string
+          race_name: string
+          race_name_zh?: string | null
+          source?: string
+          source_race_id?: string | null
+          updated_at?: string
+          user_id: string
+          website_url?: string | null
+        }
+        Update: {
+          category?: string
+          city?: string | null
+          country?: string | null
+          created_at?: string
+          id?: string
+          notes?: string | null
+          race_date?: string
+          race_name?: string
+          race_name_zh?: string | null
+          source?: string
+          source_race_id?: string | null
+          updated_at?: string
+          user_id?: string
+          website_url?: string | null
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           id: string

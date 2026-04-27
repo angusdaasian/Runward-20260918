@@ -1,5 +1,5 @@
-import { useState, useEffect, useMemo } from "react";
-import { Search, X, MapPin, Calendar, Filter, ChevronDown, ChevronUp, Plus, Loader2 } from "lucide-react";
+import { useState, useEffect, useMemo, useCallback } from "react";
+import { Search, X, MapPin, Calendar, Filter, ChevronDown, ChevronUp, Plus, Loader2, BookmarkPlus, Trash2, Bookmark } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Lang } from "@/lib/i18n";
 import FadeIn from "@/components/ui/FadeIn";
@@ -9,6 +9,9 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useOnlineStatus } from "@/hooks/use-online-status";
 import { getCached, setCached, CacheKeys } from "@/lib/offlineCache";
 import { WifiOff } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "@/hooks/use-toast";
 
 interface Race {
   id: string;

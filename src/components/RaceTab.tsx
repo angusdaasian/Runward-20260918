@@ -1024,4 +1024,77 @@ const RaceTab = ({ lang }: Props) => {
   }
 };
 
+const MyRaceCard = ({
+  race,
+  lang,
+  onRemove,
+  dim = false,
+}: {
+  race: UserRaceRow;
+  lang: Lang;
+  onRemove: () => void;
+  dim?: boolean;
+}) => {
+  const raceDate = new Date(race.race_date + "T00:00:00");
+  const dateStr = raceDate.toLocaleDateString(lang === "zh" ? "zh-HK" : "en-US", {
+    weekday: "short",
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const daysAway = Math.round((raceDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+  const catColor = CATEGORY_COLORS[race.category] || "bg-muted-foreground";
+  return (
+    <div className={`bg-card border border-border rounded-xl overflow-hidden ${dim ? "opacity-60" : ""}`}>
+      <div className={`${catColor} px-3 py-1.5 flex items-center justify-between`}>
+        <span className="text-[11px] font-bold text-white uppercase tracking-wide">{race.category}</span>
+        <span className="text-[10px] font-medium text-white/90 uppercase">
+          {race.source === "manual"
+            ? lang === "zh" ? "手動" : "Manual"
+            : lang === "zh" ? "已匯入" : "Imported"}
+        </span>
+      </div>
+      <div className="p-3 space-y-1.5">
+        <div className="flex items-start justify-between gap-2">
+          <h3 className="font-semibold text-sm text-foreground flex-1">
+            {lang === "zh" && race.race_name_zh ? race.race_name_zh : race.race_name}
+          </h3>
+          <button
+            onClick={onRemove}
+            aria-label="Remove"
+            className="p-1 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+          >
+            <Trash2 size={14} />
+          </button>
+        </div>
+        <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+          <Calendar size={12} />
+          <span>{dateStr}</span>
+          {daysAway > 0 && (
+            <span className="ml-auto text-[10px] font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-full">
+              {lang === "zh" ? `還有 ${daysAway} 天` : `${daysAway} days to go`}
+            </span>
+          )}
+          {daysAway === 0 && (
+            <span className="ml-auto text-[10px] font-semibold text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full">
+              {lang === "zh" ? "今天" : "Today"}
+            </span>
+          )}
+        </div>
+        {(race.city || race.country) && (
+          <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+            <MapPin size={12} />
+            <span>{[race.city, race.country].filter(Boolean).join(", ")}</span>
+          </div>
+        )}
+        {race.notes && (
+          <p className="text-[11px] text-muted-foreground line-clamp-2 pt-1">{race.notes}</p>
+        )}
+      </div>
+    </div>
+  );
+};
+
 export default RaceTab;

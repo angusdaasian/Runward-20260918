@@ -195,6 +195,9 @@ async function fetchUserRaces(userId: string): Promise<UserRace[]> {
     source: r.source,
     website_url: r.website_url,
     notes: r.notes,
+    finish_time_seconds: r.finish_time_seconds ?? null,
+    finish_time_source: r.finish_time_source ?? null,
+    finish_activity_id: r.finish_activity_id ?? null,
   }));
 }
 

@@ -217,6 +217,8 @@ interface UserRaceRow {
   source: string;
   website_url: string | null;
   notes: string | null;
+  finish_time_seconds: number | null;
+  finish_time_source: string | null;
 }
 
 const RaceTab = ({ lang }: Props) => {

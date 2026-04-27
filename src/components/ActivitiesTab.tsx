@@ -355,7 +355,7 @@ const SKELETON_MIN_MS = 400;
 const ActivitiesTab = ({ lang }: Props) => {
   const { user } = useAuth();
   const { isPremium } = usePremium();
-  const { activities, profile, connected, fitnessAppConnected, plannedWorkouts, loading, invalidateAll } = useActivities();
+  const { activities, profile, connected, fitnessAppConnected, plannedWorkouts, userRaces, loading, invalidateAll } = useActivities();
   const [selectedActivity, setSelectedActivity] = useState<StravaActivity | null>(null);
   const [showAllActivities, setShowAllActivities] = useState(false);
   const [dateSheet, setDateSheet] = useState<{
@@ -369,6 +369,7 @@ const ActivitiesTab = ({ lang }: Props) => {
       description?: string | null;
       pace?: string | null;
     } | null;
+    races?: { id: string; race_name: string; race_name_zh?: string | null; category: string }[];
   } | null>(null);
 
   // Mandatory skeleton on every mount

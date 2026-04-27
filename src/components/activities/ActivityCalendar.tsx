@@ -87,7 +87,7 @@ function formatDateKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-const ActivityCalendar = ({ lang, activities, plannedWorkouts, onSelectDate }: Props) => {
+const ActivityCalendar = ({ lang, activities, plannedWorkouts, userRaces = [], onSelectDate }: Props) => {
   const today = new Date();
   const [viewYear, setViewYear] = useState(today.getFullYear());
   const [viewMonth, setViewMonth] = useState(today.getMonth());

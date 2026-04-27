@@ -245,6 +245,13 @@ export function useActivities() {
     staleTime: 5 * 60 * 1000,
   });
 
+  const userRacesQuery = useQuery({
+    queryKey: ["user-races", user?.id],
+    queryFn: () => fetchUserRaces(user!.id),
+    enabled: !!user,
+    staleTime: 5 * 60 * 1000,
+  });
+
   // Merge Strava + Apple Health + Garmin activities
   const mergedActivities = useMemo(() => {
     const strava = activitiesQuery.data || [];
@@ -262,6 +269,7 @@ export function useActivities() {
     queryClient.invalidateQueries({ queryKey: ["user-profile", user?.id] });
     queryClient.invalidateQueries({ queryKey: ["planned-workouts", user?.id] });
     queryClient.invalidateQueries({ queryKey: ["fitness-connection", user?.id] });
+    queryClient.invalidateQueries({ queryKey: ["user-races", user?.id] });
   };
 
   return {
@@ -270,6 +278,7 @@ export function useActivities() {
     connected: connectionQuery.data?.any ?? false,
     fitnessAppConnected: connectionQuery.data?.fitnessApp ?? false,
     plannedWorkouts: workoutsQuery.data || [],
+    userRaces: userRacesQuery.data || [],
     loading: activitiesQuery.isLoading || appleHealthQuery.isLoading || garminQuery.isLoading || profileQuery.isLoading || connectionQuery.isLoading,
     invalidateAll,
   };

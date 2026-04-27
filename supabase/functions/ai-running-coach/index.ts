@@ -359,7 +359,7 @@ serve(async (req) => {
     const sessionId = new_session || !requestedSessionId ? crypto.randomUUID() : requestedSessionId;
 
     // Load context in parallel
-    const [prefsR, historyR, insightsR, garminR, stravaR, appleR] =
+    const [prefsR, historyR, insightsR, garminR, stravaR, appleR, racesR] =
       await Promise.all([
         admin.from("ai_coach_preferences").select("*").eq("user_id", user.id).maybeSingle(),
         admin

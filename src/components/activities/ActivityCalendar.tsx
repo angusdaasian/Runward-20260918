@@ -131,6 +131,16 @@ const ActivityCalendar = ({ lang, activities, plannedWorkouts, userRaces = [], o
     return map;
   }, [plannedWorkouts]);
 
+  // Build lookup: date string -> user races
+  const racesByDate = useMemo(() => {
+    const map: Record<string, UserRaceLite[]> = {};
+    for (const r of userRaces) {
+      if (!map[r.race_date]) map[r.race_date] = [];
+      map[r.race_date].push(r);
+    }
+    return map;
+  }, [userRaces]);
+
   // Monthly total km from Strava
   const monthlyTotalKm = useMemo(() => {
     let total = 0;

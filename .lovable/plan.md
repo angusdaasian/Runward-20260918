@@ -1,162 +1,104 @@
-## Goal
+# Plan — Write `README.md` for Runward
 
-Two combined changes:
+Replace the current placeholder `README.md` with a comprehensive document covering what the app does, its tech stack, how to run it, and how the major integrations (Garmin, Strava, Apple Health, AI coach, posture analysis) fit together.
 
-1. **Garmin OAuth2 auto-refresh** — stop the ~24h "sign-in expired" toasts by transparently refreshing OAuth2 tokens using the long-lived OAuth1 ticket (`garth` / `garminconnect` does this internally on `Garmin().login(tokenstore)`).
-2. **Daily Garmin health stats card** — fetch `vo2max`, `resting heart rate`, `sleep duration`, and `sleep score` once per day at **10:00 HKT (02:00 UTC)** and display them at the **top of the Analytics tab** — only if the user has a connected Garmin account. The single daily sync naturally exercises the OAuth2 refresh path so tokens stay fresh without extra calls.
+## Proposed structure
 
----
+### 1. Header
+- Title: **Runward — Your Running Training Companion**
+- One-line tagline pulled from `index.html` meta description
+- Badges (optional): React 18, Vite, TypeScript, Supabase, Tailwind
 
-## Part 1 — OAuth2 Auto-Refresh
+### 2. Overview
+Short paragraph describing Runward as a mobile-first running app that:
+- Tracks runs from Garmin / Strava / Apple Health / manual upload
+- Analyzes running posture via on-device TensorFlow.js pose detection
+- Generates personalized training programs via AI
+- Gamifies training with XP, ranks, leaderboards, daily check-ins, rewards
+- Provides race discovery, calculators (VDOT, pace equivalents), and an AI running coach
 
-### 1a. Railway backend (`main.py`) — *prepared as a copy-paste patch; not in this repo*
-Add two endpoints (or modify existing ones to return refreshed tokens):
+### 3. Key Features
+Bullet list grouped by tab:
+- **Activities** — calendar, year heatmap, training load, monthly road quest, suggested next workout
+- **Analytics** — performance, posture results, Garmin daily health card (VO₂max, resting HR, sleep)
+- **Training** — AI-generated programs and free plans
+- **Races** — discovery, verification, pending race manager
+- **Rewards** — XP, ranks, leaderboards, daily check-in, claim codes
+- **Coach** — floating AI chat with context-aware running advice
+- **More** — settings, profile, connect apps, language toggle (EN / ZH), admin panel
 
-```python
-import json, tempfile
-from pathlib import Path
-from garminconnect import Garmin
+### 4. Tech Stack
+Pulled from `package.json` + project conventions:
+- **Frontend:** React 18, Vite 5, TypeScript 5, Tailwind CSS v3, shadcn/ui (Radix), TanStack Query, React Router, Framer Motion, Recharts, Leaflet
+- **Backend:** Lovable Cloud (Supabase) — Postgres, Auth, Storage, Edge Functions (Deno)
+- **AI:** Lovable AI Gateway (Vertex/Gemini), TensorFlow.js pose detection
+- **Native shell:** Despia / median-js-bridge for iOS/Android wrappers
+- **Integrations:** Garmin (via Railway Python service using `garminconnect`), Strava OAuth + webhooks, Apple Health (native bridge), RevenueCat (subscriptions)
+- **Tooling:** ESLint, Vitest, Playwright, Bun
 
-def _login_with_autorefresh(oauth1: str, oauth2: str):
-    """Restore session from stored tokens; garth auto-refreshes OAuth2 if expired."""
-    tdir = tempfile.mkdtemp()
-    Path(tdir, "oauth1_token.json").write_text(oauth1)
-    Path(tdir, "oauth2_token.json").write_text(oauth2)
-    g = Garmin()
-    g.login(tdir)               # <-- triggers internal refresh if needed
-    new_oauth1 = Path(tdir, "oauth1_token.json").read_text()
-    new_oauth2 = Path(tdir, "oauth2_token.json").read_text()
-    return g, new_oauth1, new_oauth2
+### 5. Project Structure
+Tree showing top-level layout: `src/pages`, `src/components`, `src/hooks`, `src/contexts`, `src/lib`, `src/integrations/supabase`, `supabase/functions`, `supabase/migrations`.
 
-@app.post("/garmin-refresh")
-def garmin_refresh(body: RefreshBody):
-    _, o1, o2 = _login_with_autorefresh(body.oauth1_token, body.oauth2_token)
-    return {"oauth1_token": o1, "oauth2_token": o2}
+### 6. Getting Started
+- Prerequisites (Node 18+ or Bun, Supabase project / Lovable Cloud)
+- Install: `bun install`
+- Dev server: `bun run dev`
+- Build: `bun run build`
+- Tests: `bun run test`
+- Lint: `bun run lint`
 
-@app.post("/garmin-health-stats")
-def garmin_health_stats(body: HealthBody):
-    """Return today's vo2max, RHR, sleep duration, sleep score."""
-    g, o1, o2 = _login_with_autorefresh(body.oauth1_token, body.oauth2_token)
-    today = body.date  # YYYY-MM-DD
-    summary  = g.get_user_summary(today) or {}
-    sleep    = g.get_sleep_data(today) or {}
-    max_metrics = g.get_max_metrics(today) or {}
-    return {
-        "date": today,
-        "vo2max": (max_metrics.get("generic", {}) or {}).get("vo2MaxValue"),
-        "resting_hr": summary.get("restingHeartRate"),
-        "sleep_seconds": (sleep.get("dailySleepDTO", {}) or {}).get("sleepTimeSeconds"),
-        "sleep_score": ((sleep.get("dailySleepDTO", {}) or {}).get("sleepScores", {}) or {}).get("overall", {}).get("value"),
-        "oauth1_token": o1,   # always echo back so Supabase can persist any refresh
-        "oauth2_token": o2,
-    }
-```
+### 7. Environment & Secrets
+Note that secrets are managed via Lovable Cloud (no local `.env` editing required). List required secrets at a high level:
+- Supabase URL / anon key (auto-injected)
+- Garmin Railway endpoint URL + auth key
+- Strava client ID/secret
+- Lovable AI gateway key
+- RevenueCat webhook secret
+- Apple sign-in keys
+- Mapbox / weather API keys
 
-If the existing activities/details endpoints also return updated tokens (they do internally via `garth`), update them to echo `oauth1_token`/`oauth2_token` in the response so Supabase can re-encrypt and persist them. Existing endpoints continue to work; only the response payload grows.
+### 8. Edge Functions (Supabase)
+Brief table grouping the ~30 functions by domain:
+- **Garmin:** `garmin-credential-login`, `garmin-credential-mfa`, `garmin-sync`, `garmin-manual-import`, `garmin-daily-health-sync`
+- **Strava:** `strava-auth`, `strava-callback`, `strava-sync`, `strava-webhook`, `strava-disconnect`, `strava-activity-streams`
+- **Apple:** `apple-auth-start`, `apple-auth-callback`, `apple-health-post-sync`
+- **AI:** `ai-running-coach`, `analyze-activity`, `analyze-posture`, `generate-program`, `generate-free-plans`, `generate-suggested-workout`
+- **Subscriptions:** `activate-subscription`, `check-revenuecat-status`, `revenuecat-webhook`
+- **Misc:** `get-weather`, `scrape-races`, `verify-race`, `apply-xp-decay`, `reset-season`, `send-notification`, `send-daily-morning-push`, `seed-promo-banner`
 
-### 1b. Supabase edge function `garmin-sync`
-Add a shared helper `callRailwayWithTokenSync()` that:
-- POSTs to Railway, including current decrypted `oauth1_token` / `oauth2_token`.
-- If response contains updated `oauth1_token` / `oauth2_token`, re-encrypts via `_shared/garminCrypto.ts` and updates `garmin_connections` (`oauth1_token_encrypted`, `oauth2_token_encrypted`, `last_refreshed_at = now()`).
-- On `401`: sets `needs_reauth = true` so the existing UI flow prompts the user to re-link.
+### 9. Garmin Integration Architecture
+Short explanation of the Garmin auth flow:
+- Frontend collects credentials → `garmin-credential-login` → Railway `/garmin-login` (uses `garminconnect` Python lib)
+- MFA path via `garmin-credential-mfa` → Railway `/garmin-login-mfa`
+- Tokens encrypted (`_shared/garminCrypto.ts`) and stored in `garmin_connections`
+- Daily cron at 02:00 UTC (10:00 HKT) → `garmin-daily-health-sync` → upserts into `garmin_daily_health`
+- Activities synced via `garmin-sync`
 
-Wrap all existing Railway fetches (`/garmin-activities`, `/garmin-activity-details`) with this helper. No business logic changes elsewhere in `garmin-sync`.
+### 10. Internationalization
+EN / ZH supported via `src/lib/i18n.ts`, toggleable in More tab.
 
-### 1c. Database migration
-```sql
-ALTER TABLE public.garmin_connections
-  ADD COLUMN IF NOT EXISTS last_refreshed_at timestamptz;
-```
+### 11. Testing
+- Unit: Vitest (`src/test/`)
+- E2E: Playwright (`playwright.config.ts`)
 
----
+### 12. Deployment
+- Web: Lovable hosting (`https://welcome-ward-start.lovable.app`) + custom domain (`angustest.site`)
+- Native: Despia builds for iOS / Android
+- Backend: Supabase edge functions auto-deployed via Lovable Cloud
+- Garmin auth microservice: Railway (separate repo)
 
-## Part 2 — Daily Garmin Health Stats
-
-### 2a. New table `garmin_daily_health`
-```sql
-CREATE TABLE public.garmin_daily_health (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id uuid NOT NULL,
-  date date NOT NULL,
-  vo2max numeric,
-  resting_hr integer,
-  sleep_seconds integer,
-  sleep_score integer,
-  fetched_at timestamptz NOT NULL DEFAULT now(),
-  UNIQUE (user_id, date)
-);
-ALTER TABLE public.garmin_daily_health ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Users read own daily health"
-  ON public.garmin_daily_health FOR SELECT
-  TO authenticated USING (auth.uid() = user_id);
-
-CREATE POLICY "Service role full access"
-  ON public.garmin_daily_health FOR ALL
-  TO service_role USING (true) WITH CHECK (true);
-```
-(Inserts/updates are done by the edge function using the service role.)
-
-### 2b. New edge function `garmin-daily-health-sync`
-- Accepts no user JWT (cron-invoked); validates a header secret (`WEBHOOK_AUTH_KEY`, already in secrets).
-- Selects every row from `garmin_connections` where `needs_reauth = false`.
-- For each user:
-  - Decrypts tokens.
-  - POSTs to Railway `/garmin-health-stats` (using the helper from Part 1b — so OAuth2 tokens auto-refresh on this single daily call).
-  - Upserts result into `garmin_daily_health` for `date = today HKT`.
-  - On 401 → sets `needs_reauth = true`, skips user.
-- Logs per-user success/error counts.
-
-Also add a small per-user variant invocation (so the user can manually pull-to-refresh from Analytics): the same function accepts an authenticated user JWT and, when present, syncs only that user.
-
-### 2c. Cron schedule (10:00 HKT daily = 02:00 UTC)
-Use `pg_cron` + `pg_net` (insert via insert-tool, not migration, since URL/key are project-specific):
-```sql
-SELECT cron.schedule(
-  'garmin-daily-health-10am-hkt',
-  '0 2 * * *',  -- 02:00 UTC daily
-  $$ SELECT net.http_post(
-       url := 'https://kbghvclwhxnjeskdodeh.supabase.co/functions/v1/garmin-daily-health-sync',
-       headers := jsonb_build_object(
-         'Content-Type','application/json',
-         'x-webhook-key', '<WEBHOOK_AUTH_KEY value>'
-       ),
-       body := jsonb_build_object('source','cron')
-     ); $$
-);
-```
-
-### 2d. Frontend — new hook & card
-- **Hook** `src/hooks/use-garmin-daily-health.ts` — TanStack Query reading `garmin_daily_health` for the current user (latest 7 rows for sparkline-ready data; latest row used for headline values).
-- **Component** `src/components/analytics/GarminHealthCard.tsx` — 4-stat grid:
-  - VO₂max (ml/kg/min)
-  - Resting HR (bpm)
-  - Sleep (formatted `Hh Mm`)
-  - Sleep score (with colored badge: red <60, yellow 60-79, green ≥80)
-  - "Last updated {date}" footer + manual refresh button (calls `garmin-daily-health-sync` with the user's JWT).
-- **Visibility**: render only if a `garmin_connections` row exists for the user (use existing `use-garmin` / a lightweight existence query). Card hidden entirely otherwise.
-
-### 2e. Mount in Analytics
-Edit `src/components/AnalyticsTab.tsx` so that when `sub === "performance"` the new `GarminHealthCard` renders **above** `PerformanceTab` (inside the same scroll container, so the sub-tab switcher stays sticky-feeling at top). For `posture` sub-tab the card does NOT show.
-
-`PerformanceTab.tsx` is left untouched — the card lives in `AnalyticsTab` to avoid duplicating the "is Garmin connected" check.
+### 13. License & Credits
+- Built with [Lovable](https://lovable.dev)
+- Note that this is a private project (or pick a license — TBD)
 
 ---
 
-## Part 3 — Toasts / UX polish
-- `src/hooks/use-garmin.ts`: keep existing 401 toast wording but no longer surfaces it for routine 24h expiry (auto-refresh handles it).
-- Optional: small "Synced {time}" subtitle on `GarminHealthCard`.
+## File to write
+- `README.md` (overwrite the current placeholder)
 
----
+## Open questions (will assume defaults unless you say otherwise)
+1. **License** — assume "private / proprietary" unless you want MIT/Apache.
+2. **Public-facing vs internal README** — I'll write it as an internal/developer README (assumes reader has repo access). If you'd rather have a marketing-style README, say so.
+3. **Include screenshots?** — I'll skip image embeds since none are in the repo at predictable paths; can add later.
 
-## Out of scope
-- Strava / Apple Health stats (Garmin only).
-- Backfilling historical daily health (only forward-going from first cron tick; user can also tap manual refresh for today).
-- Railway deployment is external — I'll provide the ready-to-paste `main.py` patch in chat after approval; everything else lands in this repo.
-
-## Edge cases handled
-- User with no Garmin → card hidden, cron skips them.
-- User with `needs_reauth = true` → cron skips, card shows last-known values + a "Reconnect Garmin" CTA.
-- OAuth2 refresh failure (OAuth1 ticket truly dead) → `needs_reauth = true`, existing reconnect flow takes over.
-- Sleep / VO2max may legitimately be null for a given day → render "—" rather than 0.
-- Cron runs at 10:00 HKT each day; if a user already pulled manually that day, upsert overwrites with the latest figures (idempotent).
+Once approved I'll write the full `README.md` in default mode.

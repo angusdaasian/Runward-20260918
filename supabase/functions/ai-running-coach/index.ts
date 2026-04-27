@@ -442,6 +442,31 @@ serve(async (req) => {
 - Training intensity preference: ${prefs.training_intensity || "moderate"}`
       : "(no preferences set yet — gently ask onboarding questions across replies)";
 
+    const todayIso = new Date().toISOString().slice(0, 10);
+    const racesData = (racesR.data || []) as any[];
+    const upcomingRaces = racesData.filter((r) => r.race_date >= todayIso).slice(0, 8);
+    const pastRaces = racesData.filter((r) => r.race_date < todayIso).slice(-8);
+    const fmtFinish = (secs: number | null) => {
+      if (!secs || secs <= 0) return null;
+      const h = Math.floor(secs / 3600);
+      const m = Math.floor((secs % 3600) / 60);
+      const s = Math.round(secs % 60);
+      return h > 0
+        ? `${h}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`
+        : `${m}:${s.toString().padStart(2, "0")}`;
+    };
+    const fmtRace = (r: any) => {
+      const loc = [r.city, r.country].filter(Boolean).join(", ");
+      const finish = fmtFinish(r.finish_time_seconds);
+      const parts = [`${r.race_date}: ${r.race_name} (${r.category})`];
+      if (loc) parts.push(`@ ${loc}`);
+      if (finish) parts.push(`— finished ${finish}`);
+      return `- ${parts.join(" ")}`;
+    };
+    const racesBlock = racesData.length
+      ? `UPCOMING RACES (${upcomingRaces.length}):\n${upcomingRaces.length ? upcomingRaces.map(fmtRace).join("\n") : "(none)"}\n\nPAST RACES (most recent):\n${pastRaces.length ? pastRaces.map(fmtRace).join("\n") : "(none)"}`
+      : "USER RACE SCHEDULE: (none yet — encourage them to add races to their schedule)";
+
     const systemPrompt = `You are an expert AI Running Coach for an athlete named ${profile?.display_name || "the runner"}.
 
 REPLY LANGUAGE: ${userLang}. Always answer in this language regardless of the language of the user's question.
@@ -454,9 +479,11 @@ ${insightsBlock}
 RECENT 7-DAY ACTIVITY:
 ${buildActivitySummary(allActs, units)}
 
+${racesBlock}
+
 COACHING STYLE:
 - Address the runner by name when natural.
-- Reference their actual recent runs and past conversations ("I see you ran X on Y…", "as we discussed…").
+- Reference their actual recent runs, past race results, and upcoming races when relevant.
 - Use ${distUnit} for all distances and paces.
 - Adapt to experience level (beginner gets simple language; elite gets technical detail).
 - Keep responses concise: 2-4 short paragraphs. Use markdown for lists where it helps.

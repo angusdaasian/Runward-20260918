@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -58,6 +58,9 @@ export interface UserRace {
   source: string;
   website_url: string | null;
   notes: string | null;
+  finish_time_seconds: number | null;
+  finish_time_source: string | null;
+  finish_activity_id: string | null;
 }
 
 const appEnv = getAppEnvironment();
@@ -192,6 +195,9 @@ async function fetchUserRaces(userId: string): Promise<UserRace[]> {
     source: r.source,
     website_url: r.website_url,
     notes: r.notes,
+    finish_time_seconds: r.finish_time_seconds ?? null,
+    finish_time_source: r.finish_time_source ?? null,
+    finish_activity_id: r.finish_activity_id ?? null,
   }));
 }
 
@@ -261,6 +267,55 @@ export function useActivities() {
     all.sort((a, b) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime());
     return all;
   }, [activitiesQuery.data, appleHealthQuery.data, garminQuery.data]);
+
+  // Auto-link races to activities: when an activity exists on a race day and
+  // the race has no finish time yet, fill it from the activity's elapsed_time.
+  const autoLinkedRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (!user) return;
+    const races = userRacesQuery.data || [];
+    if (!races.length || !mergedActivities.length) return;
+
+    const toLink: Array<{ raceId: string; seconds: number; activityId: string }> = [];
+    for (const race of races) {
+      if (race.finish_time_seconds && race.finish_time_seconds > 0) continue;
+      if (autoLinkedRef.current.has(race.id)) continue;
+      // Find an activity (Run-ish) on this race date
+      const match = mergedActivities.find((a) => {
+        const sport = (a.sport_type || "").toLowerCase();
+        if (!sport.includes("run")) return false;
+        const d = new Date(a.start_date);
+        const localDate = new Date(d.getTime() - d.getTimezoneOffset() * 60000)
+          .toISOString()
+          .slice(0, 10);
+        return localDate === race.race_date;
+      });
+      if (match) {
+        const secs = match.elapsed_time || match.moving_time || 0;
+        if (secs > 0) {
+          toLink.push({ raceId: race.id, seconds: Math.round(secs), activityId: match.id });
+          autoLinkedRef.current.add(race.id);
+        }
+      }
+    }
+
+    if (toLink.length) {
+      (async () => {
+        for (const item of toLink) {
+          await supabase
+            .from("user_races")
+            .update({
+              finish_time_seconds: item.seconds,
+              finish_time_source: "auto",
+              finish_activity_id: item.activityId,
+            } as any)
+            .eq("id", item.raceId)
+            .eq("user_id", user.id);
+        }
+        queryClient.invalidateQueries({ queryKey: ["user-races", user.id] });
+      })();
+    }
+  }, [user, userRacesQuery.data, mergedActivities, queryClient]);
 
   const invalidateAll = () => {
     queryClient.invalidateQueries({ queryKey: ["strava-activities", user?.id] });

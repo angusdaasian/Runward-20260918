@@ -1136,6 +1136,9 @@ export type Database = {
           city: string | null
           country: string | null
           created_at: string
+          finish_activity_id: string | null
+          finish_time_seconds: number | null
+          finish_time_source: string | null
           id: string
           notes: string | null
           race_date: string
@@ -1152,6 +1155,9 @@ export type Database = {
           city?: string | null
           country?: string | null
           created_at?: string
+          finish_activity_id?: string | null
+          finish_time_seconds?: number | null
+          finish_time_source?: string | null
           id?: string
           notes?: string | null
           race_date: string
@@ -1168,6 +1174,9 @@ export type Database = {
           city?: string | null
           country?: string | null
           created_at?: string
+          finish_activity_id?: string | null
+          finish_time_seconds?: number | null
+          finish_time_source?: string | null
           id?: string
           notes?: string | null
           race_date?: string

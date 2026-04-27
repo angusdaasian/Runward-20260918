@@ -1,4 +1,5 @@
 import { Sparkles } from "lucide-react";
+import { useActivities } from "@/hooks/use-activities";
 import type { CoachPreferences } from "@/hooks/use-ai-coach";
 
 interface Props {
@@ -8,6 +9,7 @@ interface Props {
 }
 
 const ContextBar = ({ prefs, insights, lang }: Props) => {
+  const { userRaces } = useActivities();
   const parts: string[] = [];
   if (prefs?.experience_level) parts.push(prefs.experience_level);
   if (prefs?.training_goal) {
@@ -24,6 +26,15 @@ const ContextBar = ({ prefs, insights, lang }: Props) => {
   }
   if (prefs?.preferred_units) {
     parts.push(prefs.preferred_units === "miles" ? "miles" : "km");
+  }
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const upcomingCount = (userRaces || []).filter((r) => r.race_date >= todayIso).length;
+  if (upcomingCount > 0) {
+    parts.push(
+      lang === "zh"
+        ? `${upcomingCount} 場即將賽事`
+        : `${upcomingCount} upcoming race${upcomingCount > 1 ? "s" : ""}`,
+    );
   }
   insights.slice(0, 2).forEach((i) => {
     if (i.insight_value) parts.push(i.insight_value);

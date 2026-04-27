@@ -1044,15 +1044,34 @@ const RaceTab = ({ lang }: Props) => {
   }
 };
 
+const fmtFinishTime = (totalSeconds: number) => {
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  const s = Math.round(totalSeconds % 60);
+  return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+};
+
+const parseHmsToSeconds = (h: string, m: string, s: string): number | null => {
+  const hh = parseInt(h || "0", 10);
+  const mm = parseInt(m || "0", 10);
+  const ss = parseInt(s || "0", 10);
+  if (Number.isNaN(hh) || Number.isNaN(mm) || Number.isNaN(ss)) return null;
+  if (mm >= 60 || ss >= 60 || hh < 0 || mm < 0 || ss < 0) return null;
+  const total = hh * 3600 + mm * 60 + ss;
+  return total > 0 ? total : null;
+};
+
 const MyRaceCard = ({
   race,
   lang,
   onRemove,
+  onSaveTime,
   dim = false,
 }: {
   race: UserRaceRow;
   lang: Lang;
   onRemove: () => void;
+  onSaveTime: (seconds: number | null) => void | Promise<void>;
   dim?: boolean;
 }) => {
   const raceDate = new Date(race.race_date + "T00:00:00");
@@ -1066,8 +1085,52 @@ const MyRaceCard = ({
   today.setHours(0, 0, 0, 0);
   const daysAway = Math.round((raceDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
   const catColor = CATEGORY_COLORS[race.category] || "bg-muted-foreground";
+
+  const isPastOrToday = daysAway <= 0;
+  const hasFinish = !!(race.finish_time_seconds && race.finish_time_seconds > 0);
+
+  const initial = hasFinish
+    ? {
+        h: Math.floor(race.finish_time_seconds! / 3600).toString(),
+        m: Math.floor((race.finish_time_seconds! % 3600) / 60).toString().padStart(2, "0"),
+        s: Math.round(race.finish_time_seconds! % 60).toString().padStart(2, "0"),
+      }
+    : { h: "", m: "", s: "" };
+
+  const [editing, setEditing] = useState(false);
+  const [hh, setHh] = useState(initial.h);
+  const [mm, setMm] = useState(initial.m);
+  const [ss, setSs] = useState(initial.s);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setHh(initial.h);
+    setMm(initial.m);
+    setSs(initial.s);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [race.finish_time_seconds]);
+
+  const handleSave = async () => {
+    const total = parseHmsToSeconds(hh, mm, ss);
+    if (total === null) {
+      toast({ title: lang === "zh" ? "請輸入有效時間" : "Enter a valid time", variant: "destructive" });
+      return;
+    }
+    setSaving(true);
+    await onSaveTime(total);
+    setSaving(false);
+    setEditing(false);
+  };
+
+  const handleClear = async () => {
+    setSaving(true);
+    await onSaveTime(null);
+    setSaving(false);
+    setEditing(false);
+  };
+
   return (
-    <div className={`bg-card border border-border rounded-xl overflow-hidden ${dim ? "opacity-60" : ""}`}>
+    <div className={`bg-card border border-border rounded-xl overflow-hidden ${dim ? "opacity-70" : ""}`}>
       <div className={`${catColor} px-3 py-1.5 flex items-center justify-between`}>
         <span className="text-[11px] font-bold text-white uppercase tracking-wide">{race.category}</span>
         <span className="text-[10px] font-medium text-white/90 uppercase">
@@ -1111,6 +1174,112 @@ const MyRaceCard = ({
         )}
         {race.notes && (
           <p className="text-[11px] text-muted-foreground line-clamp-2 pt-1">{race.notes}</p>
+        )}
+
+        {/* Finish time section — show on past/today races, or always allow logging */}
+        {(isPastOrToday || hasFinish) && (
+          <div className="pt-2 mt-1 border-t border-border/60">
+            {!editing ? (
+              <div className="flex items-center gap-2">
+                <Timer size={13} className="text-muted-foreground" />
+                {hasFinish ? (
+                  <>
+                    <span className="text-xs font-mono font-semibold text-foreground">
+                      {fmtFinishTime(race.finish_time_seconds!)}
+                    </span>
+                    {race.finish_time_source === "auto" && (
+                      <span className="text-[9px] uppercase tracking-wide font-semibold text-primary bg-primary/10 px-1.5 py-0.5 rounded">
+                        {lang === "zh" ? "自動" : "Auto"}
+                      </span>
+                    )}
+                    <button
+                      onClick={() => setEditing(true)}
+                      className="ml-auto inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-primary"
+                    >
+                      <Pencil size={11} />
+                      {lang === "zh" ? "編輯" : "Edit"}
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    onClick={() => setEditing(true)}
+                    className="text-[11px] font-medium text-primary hover:underline"
+                  >
+                    {lang === "zh" ? "+ 新增完成時間" : "+ Log finish time"}
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
+                  {lang === "zh" ? "完成時間 (時:分:秒)" : "Finish time (hh:mm:ss)"}
+                </p>
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    min={0}
+                    placeholder="hh"
+                    value={hh}
+                    onChange={(e) => setHh(e.target.value)}
+                    className="w-14 px-2 py-1.5 rounded-md border border-border bg-background text-foreground text-sm text-center font-mono"
+                  />
+                  <span className="text-muted-foreground font-bold">:</span>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    min={0}
+                    max={59}
+                    placeholder="mm"
+                    value={mm}
+                    onChange={(e) => setMm(e.target.value)}
+                    className="w-14 px-2 py-1.5 rounded-md border border-border bg-background text-foreground text-sm text-center font-mono"
+                  />
+                  <span className="text-muted-foreground font-bold">:</span>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    min={0}
+                    max={59}
+                    placeholder="ss"
+                    value={ss}
+                    onChange={(e) => setSs(e.target.value)}
+                    className="w-14 px-2 py-1.5 rounded-md border border-border bg-background text-foreground text-sm text-center font-mono"
+                  />
+                  <button
+                    onClick={handleSave}
+                    disabled={saving}
+                    className="ml-auto inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 disabled:opacity-50"
+                  >
+                    {saving ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
+                    {lang === "zh" ? "儲存" : "Save"}
+                  </button>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      setEditing(false);
+                      setHh(initial.h);
+                      setMm(initial.m);
+                      setSs(initial.s);
+                    }}
+                    className="text-[11px] text-muted-foreground hover:text-foreground"
+                  >
+                    {lang === "zh" ? "取消" : "Cancel"}
+                  </button>
+                  {hasFinish && (
+                    <button
+                      onClick={handleClear}
+                      disabled={saving}
+                      className="ml-auto text-[11px] text-destructive hover:underline"
+                    >
+                      {lang === "zh" ? "清除成績" : "Clear time"}
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
         )}
       </div>
     </div>

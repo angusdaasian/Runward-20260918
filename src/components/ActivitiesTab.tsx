@@ -621,7 +621,8 @@ const ActivitiesTab = ({ lang }: Props) => {
           lang={lang}
           activities={activities}
           plannedWorkouts={plannedWorkouts}
-          onSelectDate={({ date, activity, extraActivities, planned }) => {
+          userRaces={userRaces}
+          onSelectDate={({ date, activity, extraActivities, planned, races }) => {
             const d = new Date(date + "T00:00:00");
             const dateLabel = d.toLocaleDateString(lang === "zh" ? "zh-TW" : "en-US", {
               weekday: "short",
@@ -645,6 +646,7 @@ const ActivitiesTab = ({ lang }: Props) => {
                     pace: (planned as any).pace ?? null,
                   }
                 : null,
+              races: races || [],
             });
           }}
         />

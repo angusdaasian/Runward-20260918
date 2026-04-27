@@ -47,6 +47,19 @@ export interface PlannedWorkout {
   pace?: string | null;
 }
 
+export interface UserRace {
+  id: string;
+  race_name: string;
+  race_name_zh: string | null;
+  race_date: string;
+  city: string | null;
+  country: string | null;
+  category: string;
+  source: string;
+  website_url: string | null;
+  notes: string | null;
+}
+
 const appEnv = getAppEnvironment();
 
 async function fetchActivities(userId: string): Promise<StravaActivity[]> {
@@ -162,6 +175,26 @@ async function fetchPlannedWorkouts(userId: string): Promise<PlannedWorkout[]> {
   return workouts;
 }
 
+async function fetchUserRaces(userId: string): Promise<UserRace[]> {
+  const { data } = await supabase
+    .from("user_races")
+    .select("*")
+    .eq("user_id", userId)
+    .order("race_date", { ascending: true });
+  return ((data as any[]) || []).map((r) => ({
+    id: r.id,
+    race_name: r.race_name,
+    race_name_zh: r.race_name_zh,
+    race_date: r.race_date,
+    city: r.city,
+    country: r.country,
+    category: r.category,
+    source: r.source,
+    website_url: r.website_url,
+    notes: r.notes,
+  }));
+}
+
 export function useActivities() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -212,6 +245,13 @@ export function useActivities() {
     staleTime: 5 * 60 * 1000,
   });
 
+  const userRacesQuery = useQuery({
+    queryKey: ["user-races", user?.id],
+    queryFn: () => fetchUserRaces(user!.id),
+    enabled: !!user,
+    staleTime: 5 * 60 * 1000,
+  });
+
   // Merge Strava + Apple Health + Garmin activities
   const mergedActivities = useMemo(() => {
     const strava = activitiesQuery.data || [];
@@ -229,6 +269,7 @@ export function useActivities() {
     queryClient.invalidateQueries({ queryKey: ["user-profile", user?.id] });
     queryClient.invalidateQueries({ queryKey: ["planned-workouts", user?.id] });
     queryClient.invalidateQueries({ queryKey: ["fitness-connection", user?.id] });
+    queryClient.invalidateQueries({ queryKey: ["user-races", user?.id] });
   };
 
   return {
@@ -237,6 +278,7 @@ export function useActivities() {
     connected: connectionQuery.data?.any ?? false,
     fitnessAppConnected: connectionQuery.data?.fitnessApp ?? false,
     plannedWorkouts: workoutsQuery.data || [],
+    userRaces: userRacesQuery.data || [],
     loading: activitiesQuery.isLoading || appleHealthQuery.isLoading || garminQuery.isLoading || profileQuery.isLoading || connectionQuery.isLoading,
     invalidateAll,
   };

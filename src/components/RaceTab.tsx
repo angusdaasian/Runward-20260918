@@ -1,5 +1,5 @@
-import { useState, useEffect, useMemo } from "react";
-import { Search, X, MapPin, Calendar, Filter, ChevronDown, ChevronUp, Plus, Loader2 } from "lucide-react";
+import { useState, useEffect, useMemo, useCallback } from "react";
+import { Search, X, MapPin, Calendar, Filter, ChevronDown, ChevronUp, Plus, Loader2, BookmarkPlus, Trash2, Bookmark } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Lang } from "@/lib/i18n";
 import FadeIn from "@/components/ui/FadeIn";
@@ -9,6 +9,9 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useOnlineStatus } from "@/hooks/use-online-status";
 import { getCached, setCached, CacheKeys } from "@/lib/offlineCache";
 import { WifiOff } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "@/hooks/use-toast";
 
 interface Race {
   id: string;
@@ -203,8 +206,23 @@ const RaceTabSkeleton = () => (
   </div>
 );
 
+interface UserRaceRow {
+  id: string;
+  race_name: string;
+  race_name_zh: string | null;
+  race_date: string;
+  city: string | null;
+  country: string | null;
+  category: string;
+  source: string;
+  website_url: string | null;
+  notes: string | null;
+}
+
 const RaceTab = ({ lang }: Props) => {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const [activeTab, setActiveTab] = useState<"calendar" | "my">("calendar");
   const [races, setRaces] = useState<Race[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -219,6 +237,14 @@ const RaceTab = ({ lang }: Props) => {
   const [addForm, setAddForm] = useState({ name: "", race_date: "", place: "", category: "Full Marathon" });
   const [verifying, setVerifying] = useState(false);
   const [verifyResult, setVerifyResult] = useState<{ verified: boolean; reason: string } | null>(null);
+
+  // My Races state
+  const [myRaces, setMyRaces] = useState<UserRaceRow[]>([]);
+  const [myRacesLoading, setMyRacesLoading] = useState(true);
+  const [myAddOpen, setMyAddOpen] = useState(false);
+  const [myAddForm, setMyAddForm] = useState({ name: "", race_date: "", city: "", country: "", category: "Full Marathon" });
+  const [savingMy, setSavingMy] = useState(false);
+  const [savedKeys, setSavedKeys] = useState<Set<string>>(new Set());
 
   const [page, setPage] = useState(1);
   const perPage = 5;
@@ -277,6 +303,107 @@ const RaceTab = ({ lang }: Props) => {
     };
     fetchRaces();
   }, [online]);
+
+  // Fetch My Races
+  const loadMyRaces = useCallback(async () => {
+    if (!user) {
+      setMyRaces([]);
+      setMyRacesLoading(false);
+      setSavedKeys(new Set());
+      return;
+    }
+    setMyRacesLoading(true);
+    const { data } = await supabase
+      .from("user_races")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("race_date", { ascending: true });
+    const list = (data as any[] as UserRaceRow[]) || [];
+    setMyRaces(list);
+    const keys = new Set<string>();
+    for (const r of list) {
+      keys.add(`${_canon(r.race_name)}__${r.race_date}`);
+    }
+    setSavedKeys(keys);
+    setMyRacesLoading(false);
+  }, [user]);
+
+  useEffect(() => {
+    loadMyRaces();
+  }, [loadMyRaces]);
+
+  const importRace = async (g: GroupedRace) => {
+    if (!user) {
+      toast({ title: lang === "zh" ? "請先登入" : "Please sign in", variant: "destructive" });
+      return;
+    }
+    const key = `${_canon(g.name)}__${g.race_date}`;
+    if (savedKeys.has(key)) {
+      toast({ title: lang === "zh" ? "已加入我的賽事" : "Already in My Races" });
+      return;
+    }
+    const mainCat = g.categories.sort((a, b) => CATEGORY_PRIORITY.indexOf(a) - CATEGORY_PRIORITY.indexOf(b))[0] || g.categories[0] || "Road Race";
+    const { error } = await supabase.from("user_races").insert({
+      user_id: user.id,
+      race_name: g.name,
+      race_name_zh: g.name_zh,
+      race_date: g.race_date,
+      city: g.city,
+      country: g.country,
+      category: mainCat,
+      website_url: g.website_url,
+      source: "imported",
+    });
+    if (error) {
+      toast({ title: lang === "zh" ? "無法新增" : "Failed to add", description: error.message, variant: "destructive" });
+      return;
+    }
+    toast({ title: lang === "zh" ? "已加入我的賽事" : "Added to My Races" });
+    setSavedKeys((s) => new Set(s).add(key));
+    await loadMyRaces();
+    queryClient.invalidateQueries({ queryKey: ["user-races", user.id] });
+  };
+
+  const removeMyRace = async (id: string) => {
+    if (!user) return;
+    const { error } = await supabase.from("user_races").delete().eq("id", id).eq("user_id", user.id);
+    if (error) {
+      toast({ title: lang === "zh" ? "刪除失敗" : "Delete failed", variant: "destructive" });
+      return;
+    }
+    toast({ title: lang === "zh" ? "已刪除" : "Removed" });
+    await loadMyRaces();
+    queryClient.invalidateQueries({ queryKey: ["user-races", user.id] });
+  };
+
+  const addManualMyRace = async () => {
+    if (!user) return;
+    if (!myAddForm.name || !myAddForm.race_date) {
+      toast({ title: lang === "zh" ? "請填寫名稱及日期" : "Please fill name and date", variant: "destructive" });
+      return;
+    }
+    setSavingMy(true);
+    const { error } = await supabase.from("user_races").insert({
+      user_id: user.id,
+      race_name: myAddForm.name,
+      race_date: myAddForm.race_date,
+      city: myAddForm.city || null,
+      country: myAddForm.country || null,
+      category: myAddForm.category,
+      source: "manual",
+    });
+    setSavingMy(false);
+    if (error) {
+      toast({ title: lang === "zh" ? "新增失敗" : "Add failed", description: error.message, variant: "destructive" });
+      return;
+    }
+    toast({ title: lang === "zh" ? "已新增到我的賽事" : "Added to My Races" });
+    setMyAddOpen(false);
+    setMyAddForm({ name: "", race_date: "", city: "", country: "", category: "Full Marathon" });
+    await loadMyRaces();
+    queryClient.invalidateQueries({ queryKey: ["user-races", user.id] });
+  };
+
 
   const grouped = useMemo(() => {
     const map = new Map<string, GroupedRace>();
@@ -355,11 +482,30 @@ const RaceTab = ({ lang }: Props) => {
   return (
     <FadeIn className="px-5 pt-6 max-w-lg mx-auto pb-24">
       <h1 className="font-display text-2xl font-bold text-foreground mb-1">
-        {lang === "zh" ? "賽事日曆" : "Race Calendar"}
+        {lang === "zh" ? "賽事" : "Races"}
       </h1>
-      <p className="text-sm text-muted-foreground mb-1">
-        {lang === "zh" ? "探索即將舉行的跑步賽事" : "Discover upcoming running events"}
+      <p className="text-sm text-muted-foreground mb-3">
+        {lang === "zh" ? "探索與管理你的跑步賽事" : "Discover and manage your running events"}
       </p>
+
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "calendar" | "my")} className="mb-3">
+        <TabsList className="grid grid-cols-2 w-full">
+          <TabsTrigger value="calendar">{lang === "zh" ? "賽事日曆" : "Race Calendar"}</TabsTrigger>
+          <TabsTrigger value="my">
+            {lang === "zh" ? "我的賽事" : "My Races"}
+            {myRaces.length > 0 && (
+              <span className="ml-1.5 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-primary text-primary-foreground text-[10px] font-semibold">
+                {myRaces.length}
+              </span>
+            )}
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="my" className="mt-4">
+          {renderMyRaces()}
+        </TabsContent>
+
+        <TabsContent value="calendar" className="mt-4">
       {(!online || servedFromCache) && (
         <div className="flex items-center gap-1.5 mb-2 text-[11px] text-muted-foreground bg-muted/50 px-2 py-1 rounded-md w-fit">
           <WifiOff size={11} />
@@ -616,6 +762,8 @@ const RaceTab = ({ lang }: Props) => {
           const mainCat = sortedCats[0];
           const catColor = CATEGORY_COLORS[mainCat] || "bg-muted-foreground";
 
+          const savedKey = `${_canon(race.name)}__${race.race_date}`;
+          const isSaved = savedKeys.has(savedKey);
           return (
             <div
               key={`${race.name}_${race.race_date}_${idx}`}
@@ -650,6 +798,22 @@ const RaceTab = ({ lang }: Props) => {
                     </span>
                   ))}
                 </div>
+                {user && (
+                  <button
+                    onClick={() => importRace(race)}
+                    disabled={isSaved}
+                    className={`mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                      isSaved
+                        ? "bg-muted text-muted-foreground cursor-default"
+                        : "bg-primary/10 text-primary hover:bg-primary/20"
+                    }`}
+                  >
+                    {isSaved ? <Bookmark size={13} /> : <BookmarkPlus size={13} />}
+                    {isSaved
+                      ? lang === "zh" ? "已加入" : "Saved"
+                      : lang === "zh" ? "加入我的賽事" : "Add to My Races"}
+                  </button>
+                )}
               </div>
             </div>
           );
@@ -694,7 +858,242 @@ const RaceTab = ({ lang }: Props) => {
           </button>
         </div>
       )}
+        </TabsContent>
+      </Tabs>
     </FadeIn>
+  );
+
+  function renderMyRaces() {
+    if (!user) {
+      return (
+        <div className="text-center py-12 text-sm text-muted-foreground">
+          {lang === "zh" ? "請先登入以管理你的賽事" : "Please sign in to manage your races"}
+        </div>
+      );
+    }
+
+    if (myRacesLoading) {
+      return (
+        <div className="space-y-3">
+          <Skeleton className="h-24 w-full rounded-xl" />
+          <Skeleton className="h-24 w-full rounded-xl" />
+        </div>
+      );
+    }
+
+    const today = new Date().toISOString().split("T")[0];
+    const upcoming = myRaces.filter((r) => r.race_date >= today);
+    const past = myRaces.filter((r) => r.race_date < today);
+
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <p className="text-xs text-muted-foreground">
+            {lang === "zh"
+              ? `${upcoming.length} 場即將舉行 · ${past.length} 場已完成`
+              : `${upcoming.length} upcoming · ${past.length} past`}
+          </p>
+          <button
+            onClick={() => setMyAddOpen((v) => !v)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors"
+          >
+            <Plus size={13} />
+            {lang === "zh" ? "新增" : "Add"}
+          </button>
+        </div>
+
+        {myAddOpen && (
+          <div className="bg-card border border-border rounded-xl p-4 space-y-3">
+            <h3 className="font-semibold text-sm text-foreground">
+              {lang === "zh" ? "新增賽事到我的賽事" : "Add to My Races"}
+            </h3>
+            <input
+              type="text"
+              placeholder={lang === "zh" ? "賽事名稱 *" : "Race Name *"}
+              value={myAddForm.name}
+              onChange={(e) => setMyAddForm((f) => ({ ...f, name: e.target.value }))}
+              className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground text-sm"
+            />
+            <input
+              type="date"
+              value={myAddForm.race_date}
+              onChange={(e) => setMyAddForm((f) => ({ ...f, race_date: e.target.value }))}
+              className="w-full px-3 py-2 rounded-lg border border-border bg-card text-foreground text-sm appearance-none"
+            />
+            <div className="grid grid-cols-2 gap-2">
+              <input
+                type="text"
+                placeholder={lang === "zh" ? "城市" : "City"}
+                value={myAddForm.city}
+                onChange={(e) => setMyAddForm((f) => ({ ...f, city: e.target.value }))}
+                className="px-3 py-2 rounded-lg border border-border bg-card text-foreground text-sm"
+              />
+              <input
+                type="text"
+                placeholder={lang === "zh" ? "國家/地區" : "Country"}
+                value={myAddForm.country}
+                onChange={(e) => setMyAddForm((f) => ({ ...f, country: e.target.value }))}
+                className="px-3 py-2 rounded-lg border border-border bg-card text-foreground text-sm"
+              />
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {["5K", "10K", "Half Marathon", "Full Marathon", "Ultramarathon", "Road Race"].map((c) => (
+                <button
+                  key={c}
+                  onClick={() => setMyAddForm((f) => ({ ...f, category: c }))}
+                  className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                    myAddForm.category === c
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted text-muted-foreground"
+                  }`}
+                >
+                  {c}
+                </button>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={addManualMyRace}
+                disabled={savingMy || !myAddForm.name || !myAddForm.race_date}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
+              >
+                {savingMy && <Loader2 size={14} className="animate-spin" />}
+                {lang === "zh" ? "儲存" : "Save"}
+              </button>
+              <button
+                onClick={() => {
+                  setMyAddOpen(false);
+                  setMyAddForm({ name: "", race_date: "", city: "", country: "", category: "Full Marathon" });
+                }}
+                className="px-4 py-2 rounded-lg border border-border text-sm font-medium text-muted-foreground hover:bg-muted transition-colors"
+              >
+                {lang === "zh" ? "取消" : "Cancel"}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {myRaces.length === 0 && !myAddOpen && (
+          <div className="text-center py-12 space-y-3 bg-card border border-border rounded-xl">
+            <p className="text-sm text-muted-foreground">
+              {lang === "zh"
+                ? "尚未加入任何賽事。從賽事日曆匯入或手動新增。"
+                : "No races yet. Import from the Race Calendar or add one manually."}
+            </p>
+            <div className="flex justify-center gap-2">
+              <button
+                onClick={() => setActiveTab("calendar")}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-xs font-medium text-foreground hover:bg-muted transition-colors"
+              >
+                {lang === "zh" ? "瀏覽賽事日曆" : "Browse Race Calendar"}
+              </button>
+              <button
+                onClick={() => setMyAddOpen(true)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors"
+              >
+                <Plus size={13} />
+                {lang === "zh" ? "手動新增" : "Add Manually"}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {upcoming.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+              {lang === "zh" ? "即將舉行" : "Upcoming"}
+            </p>
+            {upcoming.map((r) => (
+              <MyRaceCard key={r.id} race={r} lang={lang} onRemove={() => removeMyRace(r.id)} />
+            ))}
+          </div>
+        )}
+
+        {past.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+              {lang === "zh" ? "已完成" : "Past"}
+            </p>
+            {past.map((r) => (
+              <MyRaceCard key={r.id} race={r} lang={lang} onRemove={() => removeMyRace(r.id)} dim />
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+};
+
+const MyRaceCard = ({
+  race,
+  lang,
+  onRemove,
+  dim = false,
+}: {
+  race: UserRaceRow;
+  lang: Lang;
+  onRemove: () => void;
+  dim?: boolean;
+}) => {
+  const raceDate = new Date(race.race_date + "T00:00:00");
+  const dateStr = raceDate.toLocaleDateString(lang === "zh" ? "zh-HK" : "en-US", {
+    weekday: "short",
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const daysAway = Math.round((raceDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+  const catColor = CATEGORY_COLORS[race.category] || "bg-muted-foreground";
+  return (
+    <div className={`bg-card border border-border rounded-xl overflow-hidden ${dim ? "opacity-60" : ""}`}>
+      <div className={`${catColor} px-3 py-1.5 flex items-center justify-between`}>
+        <span className="text-[11px] font-bold text-white uppercase tracking-wide">{race.category}</span>
+        <span className="text-[10px] font-medium text-white/90 uppercase">
+          {race.source === "manual"
+            ? lang === "zh" ? "手動" : "Manual"
+            : lang === "zh" ? "已匯入" : "Imported"}
+        </span>
+      </div>
+      <div className="p-3 space-y-1.5">
+        <div className="flex items-start justify-between gap-2">
+          <h3 className="font-semibold text-sm text-foreground flex-1">
+            {lang === "zh" && race.race_name_zh ? race.race_name_zh : race.race_name}
+          </h3>
+          <button
+            onClick={onRemove}
+            aria-label="Remove"
+            className="p-1 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+          >
+            <Trash2 size={14} />
+          </button>
+        </div>
+        <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+          <Calendar size={12} />
+          <span>{dateStr}</span>
+          {daysAway > 0 && (
+            <span className="ml-auto text-[10px] font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-full">
+              {lang === "zh" ? `還有 ${daysAway} 天` : `${daysAway} days to go`}
+            </span>
+          )}
+          {daysAway === 0 && (
+            <span className="ml-auto text-[10px] font-semibold text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full">
+              {lang === "zh" ? "今天" : "Today"}
+            </span>
+          )}
+        </div>
+        {(race.city || race.country) && (
+          <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+            <MapPin size={12} />
+            <span>{[race.city, race.country].filter(Boolean).join(", ")}</span>
+          </div>
+        )}
+        {race.notes && (
+          <p className="text-[11px] text-muted-foreground line-clamp-2 pt-1">{race.notes}</p>
+        )}
+      </div>
+    </div>
   );
 };
 

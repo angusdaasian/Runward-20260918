@@ -20,15 +20,25 @@ interface PlannedWorkout {
   pace?: string | null;
 }
 
+interface UserRaceLite {
+  id: string;
+  race_name: string;
+  race_name_zh?: string | null;
+  race_date: string;
+  category: string;
+}
+
 interface Props {
   lang: Lang;
   activities: StravaActivity[];
   plannedWorkouts: PlannedWorkout[];
+  userRaces?: UserRaceLite[];
   onSelectDate?: (info: {
     date: string;
     activity: StravaActivity | null;
     extraActivities: StravaActivity[];
     planned: PlannedWorkout | null;
+    races?: UserRaceLite[];
   }) => void;
 }
 
@@ -77,7 +87,7 @@ function formatDateKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-const ActivityCalendar = ({ lang, activities, plannedWorkouts, onSelectDate }: Props) => {
+const ActivityCalendar = ({ lang, activities, plannedWorkouts, userRaces = [], onSelectDate }: Props) => {
   const today = new Date();
   const [viewYear, setViewYear] = useState(today.getFullYear());
   const [viewMonth, setViewMonth] = useState(today.getMonth());
@@ -120,6 +130,16 @@ const ActivityCalendar = ({ lang, activities, plannedWorkouts, onSelectDate }: P
     }
     return map;
   }, [plannedWorkouts]);
+
+  // Build lookup: date string -> user races
+  const racesByDate = useMemo(() => {
+    const map: Record<string, UserRaceLite[]> = {};
+    for (const r of userRaces) {
+      if (!map[r.race_date]) map[r.race_date] = [];
+      map[r.race_date].push(r);
+    }
+    return map;
+  }, [userRaces]);
 
   // Monthly total km from Strava
   const monthlyTotalKm = useMemo(() => {
@@ -189,24 +209,31 @@ const ActivityCalendar = ({ lang, activities, plannedWorkouts, onSelectDate }: P
           const stravaKm = kmByDate[key];
           const planned = planByDate[key];
           const dayActs = actsByDate[key] || [];
+          const dayRaces = racesByDate[key] || [];
           const hasStrava = stravaKm !== undefined && stravaKm > 0;
-          const isTappable = hasStrava || !!planned;
+          const hasRace = dayRaces.length > 0;
+          const isTappable = hasStrava || !!planned || hasRace;
 
           const cellClass = `aspect-square rounded-lg flex flex-col items-center justify-center relative overflow-hidden text-[10px] ${
             isToday ? "ring-1 ring-primary" : ""
-          } ${hasStrava ? "bg-primary/10" : planned ? "bg-accent/50" : ""}`;
+          } ${hasRace ? "bg-amber-500/15 ring-1 ring-amber-500/40" : hasStrava ? "bg-primary/10" : planned ? "bg-accent/50" : ""}`;
 
           const inner = (
             <>
               <span className={`font-medium leading-none ${isToday ? "text-primary font-bold" : "text-foreground"}`}>
                 {day.getDate()}
               </span>
-              {hasStrava && (
+              {hasRace && (
+                <span className="text-[8px] font-bold leading-none mt-0.5 text-amber-600 dark:text-amber-400">
+                  🏁
+                </span>
+              )}
+              {hasStrava && !hasRace && (
                 <span className="text-[8px] font-bold text-primary leading-none mt-0.5">
                   {stravaKm.toFixed(1)}
                 </span>
               )}
-              {planned && !hasStrava && (
+              {planned && !hasStrava && !hasRace && (
                 <span
                   className="text-[8px] font-bold leading-none mt-0.5"
                   style={{ color: planned.color || "hsl(var(--muted-foreground))" }}
@@ -237,6 +264,7 @@ const ActivityCalendar = ({ lang, activities, plannedWorkouts, onSelectDate }: P
                     activity: primary,
                     extraActivities: extras,
                     planned: planned || null,
+                    races: dayRaces,
                   })
                 }
                 className={`${cellClass} cursor-pointer transition-transform active:scale-95 hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-primary/40`}
@@ -255,7 +283,7 @@ const ActivityCalendar = ({ lang, activities, plannedWorkouts, onSelectDate }: P
       </div>
 
       {/* Legend */}
-      <div className="flex items-center gap-4 mt-3 justify-center">
+      <div className="flex items-center gap-4 mt-3 justify-center flex-wrap">
         <div className="flex items-center gap-1">
           <div className="w-2.5 h-2.5 rounded-sm bg-primary/20" />
           <span className="text-[10px] text-muted-foreground">{lang === "zh" ? "已跑" : "Ran"}</span>
@@ -263,6 +291,10 @@ const ActivityCalendar = ({ lang, activities, plannedWorkouts, onSelectDate }: P
         <div className="flex items-center gap-1">
           <div className="w-2.5 h-2.5 rounded-sm bg-accent" />
           <span className="text-[10px] text-muted-foreground">{lang === "zh" ? "計劃" : "Planned"}</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <div className="w-2.5 h-2.5 rounded-sm bg-amber-500/30" />
+          <span className="text-[10px] text-muted-foreground">{lang === "zh" ? "賽事" : "Race"}</span>
         </div>
       </div>
     </div>

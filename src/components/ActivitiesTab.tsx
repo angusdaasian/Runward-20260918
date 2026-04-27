@@ -355,7 +355,7 @@ const SKELETON_MIN_MS = 400;
 const ActivitiesTab = ({ lang }: Props) => {
   const { user } = useAuth();
   const { isPremium } = usePremium();
-  const { activities, profile, connected, fitnessAppConnected, plannedWorkouts, loading, invalidateAll } = useActivities();
+  const { activities, profile, connected, fitnessAppConnected, plannedWorkouts, userRaces, loading, invalidateAll } = useActivities();
   const [selectedActivity, setSelectedActivity] = useState<StravaActivity | null>(null);
   const [showAllActivities, setShowAllActivities] = useState(false);
   const [dateSheet, setDateSheet] = useState<{
@@ -369,6 +369,7 @@ const ActivitiesTab = ({ lang }: Props) => {
       description?: string | null;
       pace?: string | null;
     } | null;
+    races?: { id: string; race_name: string; race_name_zh?: string | null; category: string }[];
   } | null>(null);
 
   // Mandatory skeleton on every mount
@@ -620,7 +621,8 @@ const ActivitiesTab = ({ lang }: Props) => {
           lang={lang}
           activities={activities}
           plannedWorkouts={plannedWorkouts}
-          onSelectDate={({ date, activity, extraActivities, planned }) => {
+          userRaces={userRaces}
+          onSelectDate={({ date, activity, extraActivities, planned, races }) => {
             const d = new Date(date + "T00:00:00");
             const dateLabel = d.toLocaleDateString(lang === "zh" ? "zh-TW" : "en-US", {
               weekday: "short",
@@ -644,6 +646,7 @@ const ActivitiesTab = ({ lang }: Props) => {
                     pace: (planned as any).pace ?? null,
                   }
                 : null,
+              races: races || [],
             });
           }}
         />
@@ -825,6 +828,27 @@ const ActivitiesTab = ({ lang }: Props) => {
                       {dateSheet.planned.description}
                     </p>
                   )}
+                </div>
+              )}
+
+              {dateSheet.races && dateSheet.races.length > 0 && (
+                <div className={`${dateSheet.activities.length > 0 || dateSheet.planned ? "mt-4 pt-4 border-t border-border" : "mt-4"}`}>
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-base">🏁</span>
+                    <span className="text-xs font-semibold text-amber-600 dark:text-amber-400 uppercase tracking-wide">
+                      {lang === "zh" ? "賽事日" : "Race Day"}
+                    </span>
+                  </div>
+                  <div className="space-y-2">
+                    {dateSheet.races.map((r) => (
+                      <div key={r.id} className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3">
+                        <p className="text-sm font-semibold text-foreground">
+                          {lang === "zh" && r.race_name_zh ? r.race_name_zh : r.race_name}
+                        </p>
+                        <p className="text-[11px] text-muted-foreground mt-0.5">{r.category}</p>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
             </>

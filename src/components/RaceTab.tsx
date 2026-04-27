@@ -406,6 +406,24 @@ const RaceTab = ({ lang }: Props) => {
     queryClient.invalidateQueries({ queryKey: ["user-races", user.id] });
   };
 
+  const updateFinishTime = async (id: string, seconds: number | null) => {
+    if (!user) return;
+    const { error } = await supabase
+      .from("user_races")
+      .update({
+        finish_time_seconds: seconds,
+        finish_time_source: seconds ? "manual" : null,
+      } as any)
+      .eq("id", id)
+      .eq("user_id", user.id);
+    if (error) {
+      toast({ title: lang === "zh" ? "更新失敗" : "Update failed", description: error.message, variant: "destructive" });
+      return;
+    }
+    toast({ title: seconds ? (lang === "zh" ? "已更新成績" : "Finish time updated") : (lang === "zh" ? "已清除成績" : "Finish time cleared") });
+    await loadMyRaces();
+    queryClient.invalidateQueries({ queryKey: ["user-races", user.id] });
+  };
 
   const grouped = useMemo(() => {
     const map = new Map<string, GroupedRace>();

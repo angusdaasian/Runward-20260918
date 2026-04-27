@@ -206,8 +206,23 @@ const RaceTabSkeleton = () => (
   </div>
 );
 
+interface UserRaceRow {
+  id: string;
+  race_name: string;
+  race_name_zh: string | null;
+  race_date: string;
+  city: string | null;
+  country: string | null;
+  category: string;
+  source: string;
+  website_url: string | null;
+  notes: string | null;
+}
+
 const RaceTab = ({ lang }: Props) => {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const [activeTab, setActiveTab] = useState<"calendar" | "my">("calendar");
   const [races, setRaces] = useState<Race[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -222,6 +237,14 @@ const RaceTab = ({ lang }: Props) => {
   const [addForm, setAddForm] = useState({ name: "", race_date: "", place: "", category: "Full Marathon" });
   const [verifying, setVerifying] = useState(false);
   const [verifyResult, setVerifyResult] = useState<{ verified: boolean; reason: string } | null>(null);
+
+  // My Races state
+  const [myRaces, setMyRaces] = useState<UserRaceRow[]>([]);
+  const [myRacesLoading, setMyRacesLoading] = useState(true);
+  const [myAddOpen, setMyAddOpen] = useState(false);
+  const [myAddForm, setMyAddForm] = useState({ name: "", race_date: "", city: "", country: "", category: "Full Marathon" });
+  const [savingMy, setSavingMy] = useState(false);
+  const [savedKeys, setSavedKeys] = useState<Set<string>>(new Set());
 
   const [page, setPage] = useState(1);
   const perPage = 5;

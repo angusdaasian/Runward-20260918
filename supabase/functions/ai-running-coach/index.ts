@@ -396,6 +396,11 @@ serve(async (req) => {
           .gte("start_date", new Date(Date.now() - 7 * 86400000).toISOString())
           .order("start_date", { ascending: false })
           .limit(10),
+        admin
+          .from("user_races")
+          .select("race_name, race_date, category, city, country, finish_time_seconds, notes")
+          .eq("user_id", user.id)
+          .order("race_date", { ascending: true }),
       ]);
 
     const prefs = prefsR.data;

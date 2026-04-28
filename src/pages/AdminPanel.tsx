@@ -15,6 +15,7 @@ import RaceManager from "@/components/admin/RaceManager";
 import PendingRaceManager from "@/components/admin/PendingRaceManager";
 import RewardCodeManager from "@/components/admin/RewardCodeManager";
 import NotificationManager from "@/components/admin/NotificationManager";
+import ValidicTestPanel from "@/components/admin/ValidicTestPanel";
 
 interface UserRow {
   user_id: string;
@@ -217,6 +218,7 @@ const AdminPanel = () => {
           </CardContent>
         </Card>
 
+        <ValidicTestPanel />
         <NotificationManager />
         <AnnouncementManager />
         <PromoBannerManager />

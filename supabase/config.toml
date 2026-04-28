@@ -8,6 +8,3 @@ verify_jwt = true
 
 [functions.garmin-daily-health-sync]
 verify_jwt = false
-
-[functions.validic-test]
-verify_jwt = false

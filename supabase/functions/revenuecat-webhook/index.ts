@@ -48,6 +48,9 @@ Deno.serve(async (req) => {
     const body = await req.json();
     const event = body?.event;
 
+    // Log full event payload for debugging
+    console.log("RC event payload:", JSON.stringify(event));
+
     if (!event) {
       return new Response(JSON.stringify({ error: "No event data" }), {
         status: 400,
@@ -57,17 +60,20 @@ Deno.serve(async (req) => {
 
     const eventType: string = event.type;
     const appUserId: string | undefined = event.app_user_id;
+    const originalAppUserId: string | undefined = event.original_app_user_id;
+    const aliases: string[] = Array.isArray(event.aliases) ? event.aliases : [];
     const productId: string | undefined = event.product_id;
     const purchasedAtMs: number | undefined = event.purchased_at_ms;
     const expirationAtMs: number | undefined = event.expiration_at_ms;
-    const isTrialPeriod: boolean = event.is_trial_period === true || event.is_trial_period === "true";
+    const periodType: string | undefined = event.period_type;
+    const isTrialPeriod: boolean =
+      event.is_trial_period === true ||
+      event.is_trial_period === "true" ||
+      periodType === "TRIAL" ||
+      periodType === "trial" ||
+      periodType === "INTRO";
     const entitlementIds: string[] = event.entitlement_ids || [];
-    // For PRODUCT_CHANGE, the new product info
     const newProductId: string | undefined = event.new_product_id;
-
-    console.log(
-      `RevenueCat webhook: type=${eventType}, app_user_id=${appUserId}, product=${productId}, entitlements=${JSON.stringify(entitlementIds)}`,
-    );
 
     if (!appUserId) {
       return new Response(JSON.stringify({ error: "No app_user_id" }), {
@@ -76,16 +82,53 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Skip anonymous RevenueCat IDs
-    if (appUserId.startsWith("$RCAnonymousID:")) {
-      console.log(`Skipping anonymous user: ${appUserId}`);
-      return new Response(JSON.stringify({ received: true, skipped: "anonymous_user" }), {
+    const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+
+    // Resolve canonical user_id from candidates (app_user_id, original, aliases)
+    const candidates = Array.from(
+      new Set(
+        [appUserId, originalAppUserId, ...aliases].filter(
+          (id): id is string => !!id && !id.startsWith("$RCAnonymousID:"),
+        ),
+      ),
+    );
+
+    let resolvedUserId: string | null = null;
+    for (const candidate of candidates) {
+      // UUID shape check
+      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(candidate)) continue;
+      const { data: prof } = await supabase
+        .from("profiles")
+        .select("user_id")
+        .eq("user_id", candidate)
+        .maybeSingle();
+      if (prof?.user_id) {
+        resolvedUserId = prof.user_id;
+        break;
+      }
+    }
+
+    console.log(
+      `RC webhook: type=${eventType}, app_user_id=${appUserId}, aliases=${JSON.stringify(aliases)}, resolved=${resolvedUserId}, product=${productId}, period=${periodType}, trial=${isTrialPeriod}`,
+    );
+
+    if (eventType === "TEST") {
+      console.log("RevenueCat test webhook received (no DB action)");
+      return new Response(JSON.stringify({ received: true, test: true, candidates, resolvedUserId }), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+    if (!resolvedUserId) {
+      console.warn(`No matching Supabase user for RC candidates: ${JSON.stringify(candidates)}`);
+      return new Response(JSON.stringify({ received: true, skipped: "no_matching_user", candidates }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const targetUserId = resolvedUserId;
 
     if (ACTIVE_EVENTS.includes(eventType)) {
       const activatedAt = purchasedAtMs ? new Date(purchasedAtMs).toISOString() : new Date().toISOString();

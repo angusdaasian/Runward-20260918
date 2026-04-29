@@ -51,7 +51,8 @@ Deno.serve(async (req) => {
 
     if (!rcResponse.ok) {
       if (rcResponse.status === 404) {
-        return new Response(JSON.stringify({ isPremium: false, synced: false }), {
+        // Unknown to RC — DO NOT delete local row (might be a webhook-granted promo)
+        return new Response(JSON.stringify({ isPremium: false, synced: false, reason: "not_in_rc" }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
@@ -63,39 +64,53 @@ Deno.serve(async (req) => {
     }
 
     const rcData = await rcResponse.json();
-    const entitlements = rcData?.subscriber?.entitlements || {};
+    const subscriber = rcData?.subscriber || {};
+    const entitlements = subscriber.entitlements || {};
+    const subscriptions = subscriber.subscriptions || {};
 
-    // Check for "premium" entitlement specifically
-    const premiumEntitlement = entitlements["premium"];
+    console.log(
+      `RC subscriber for ${userId}: entitlements=${JSON.stringify(Object.keys(entitlements))}, subscriptions=${JSON.stringify(
+        Object.entries(subscriptions).map(([k, v]: any) => ({
+          k,
+          period_type: v?.period_type,
+          expires_date: v?.expires_date,
+        })),
+      )}`,
+    );
+
+    const now = new Date();
     let isActive = false;
+    let isTrial = false;
     let expiresAt: string | null = null;
     let plan: string | null = null;
     let rcEntitlement = "premium";
 
-    if (premiumEntitlement && premiumEntitlement.expires_date) {
-      const expDate = new Date(premiumEntitlement.expires_date);
-      if (expDate > new Date()) {
+    // 1. Check "premium" entitlement
+    const premiumEntitlement = entitlements["premium"];
+    if (premiumEntitlement) {
+      if (premiumEntitlement.expires_date) {
+        const expDate = new Date(premiumEntitlement.expires_date);
+        if (expDate > now) {
+          isActive = true;
+          expiresAt = premiumEntitlement.expires_date;
+          plan = premiumEntitlement.product_identifier || "unknown";
+          rcEntitlement = "premium";
+        }
+      } else {
+        // Lifetime
         isActive = true;
-        expiresAt = premiumEntitlement.expires_date;
+        expiresAt = new Date(Date.now() + 100 * 365 * 24 * 60 * 60 * 1000).toISOString();
         plan = premiumEntitlement.product_identifier || "unknown";
         rcEntitlement = "premium";
       }
     }
 
-    // Also check if premium entitlement has no expiry (lifetime/one-time purchase)
-    if (!isActive && premiumEntitlement && !premiumEntitlement.expires_date) {
-      isActive = true;
-      expiresAt = new Date(Date.now() + 100 * 365 * 24 * 60 * 60 * 1000).toISOString();
-      plan = premiumEntitlement.product_identifier || "unknown";
-      rcEntitlement = "premium";
-    }
-
-    // Fallback: check all entitlements for any active one
+    // 2. Any other entitlement
     if (!isActive) {
       for (const [entName, entitlement] of Object.entries(entitlements) as any) {
         if (entitlement.expires_date) {
           const expDate = new Date(entitlement.expires_date);
-          if (expDate > new Date()) {
+          if (expDate > now) {
             isActive = true;
             expiresAt = entitlement.expires_date;
             plan = entitlement.product_identifier || "unknown";
@@ -103,13 +118,37 @@ Deno.serve(async (req) => {
             break;
           }
         } else {
-          // No expiry = lifetime
           isActive = true;
           expiresAt = new Date(Date.now() + 100 * 365 * 24 * 60 * 60 * 1000).toISOString();
           plan = entitlement.product_identifier || "unknown";
           rcEntitlement = entName;
           break;
         }
+      }
+    }
+
+    // 3. Fallback to subscriptions map (covers promo trials with no entitlement mapping)
+    if (!isActive) {
+      for (const [productId, sub] of Object.entries(subscriptions) as any) {
+        if (sub?.expires_date) {
+          const expDate = new Date(sub.expires_date);
+          if (expDate > now) {
+            isActive = true;
+            expiresAt = sub.expires_date;
+            plan = productId;
+            rcEntitlement = "premium";
+            const pt = String(sub.period_type || "").toLowerCase();
+            isTrial = pt === "trial" || pt === "intro";
+            console.log(`Subscriptions-map fallback matched: product=${productId}, period_type=${sub.period_type}`);
+            break;
+          }
+        }
+      }
+    } else {
+      // We matched via entitlement; mark trial if the linked subscription says so
+      if (plan && subscriptions[plan]) {
+        const pt = String(subscriptions[plan].period_type || "").toLowerCase();
+        isTrial = pt === "trial" || pt === "intro";
       }
     }
 
@@ -136,6 +175,7 @@ Deno.serve(async (req) => {
           plan,
           activated_at: new Date().toISOString(),
           expires_at: expiresAt,
+          is_trial: isTrial,
           rc_entitlement: rcEntitlement,
         },
         { onConflict: "user_id" },
@@ -145,15 +185,32 @@ Deno.serve(async (req) => {
         console.error("Upsert error:", upsertError);
       }
 
-      return new Response(JSON.stringify({ isPremium: true, plan, expiresAt, rcEntitlement, synced: true }), {
+      await serviceClient.from("profiles").update({ is_premium: true }).eq("user_id", userId);
+
+      return new Response(
+        JSON.stringify({ isPremium: true, plan, expiresAt, rcEntitlement, isTrial, synced: true }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    // Not active per RC. Only revoke if RC ACTUALLY shows everything expired.
+    // If entitlements + subscriptions are both empty, it's likely an unmapped promo —
+    // do NOT wipe the local row (the webhook is the source of truth for revocation).
+    const hasAnyData = Object.keys(entitlements).length > 0 || Object.keys(subscriptions).length > 0;
+
+    if (hasAnyData) {
+      // RC returned data but nothing is active → safe to revoke
+      await serviceClient.from("premium_subscriptions").delete().eq("user_id", userId);
+      await serviceClient.from("profiles").update({ is_premium: false }).eq("user_id", userId);
+      console.log(`Revoked premium for ${userId}: RC reports all expired`);
+      return new Response(JSON.stringify({ isPremium: false, synced: true, reason: "all_expired" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Not active — clean up stale DB record if exists
-    await serviceClient.from("premium_subscriptions").delete().eq("user_id", userId);
-
-    return new Response(JSON.stringify({ isPremium: false, synced: true }), {
+    // Empty payload — leave DB alone, fall back to whatever the webhook set
+    console.log(`Empty RC payload for ${userId} — preserving local DB state`);
+    return new Response(JSON.stringify({ isPremium: false, synced: false, reason: "empty_rc_payload" }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {

@@ -149,7 +149,7 @@ Deno.serve(async (req) => {
         .from("premium_subscriptions")
         .select("user_id")
         .eq("plan", effectiveProductId)
-        .neq("user_id", appUserId);
+        .neq("user_id", targetUserId);
 
       if (oldSubs && oldSubs.length > 0) {
         const oldUserIds = oldSubs.map((s: any) => s.user_id);
@@ -160,7 +160,7 @@ Deno.serve(async (req) => {
 
       const { error } = await supabase.from("premium_subscriptions").upsert(
         {
-          user_id: appUserId,
+          user_id: targetUserId,
           plan: effectiveProductId,
           activated_at: activatedAt,
           expires_at: expiresAt,
@@ -180,14 +180,14 @@ Deno.serve(async (req) => {
       }
 
       // Sync profiles.is_premium
-      await supabase.from("profiles").update({ is_premium: true }).eq("user_id", appUserId);
+      await supabase.from("profiles").update({ is_premium: true }).eq("user_id", targetUserId);
 
       console.log(
-        `Subscription activated: user=${appUserId}, plan=${effectiveProductId}, entitlement=${rcEntitlement}, trial=${isTrialPeriod}, event=${eventType}`,
+        `Subscription activated: user=${targetUserId}, plan=${effectiveProductId}, entitlement=${rcEntitlement}, trial=${isTrialPeriod}, event=${eventType}`,
       );
     } else if (INACTIVE_EVENTS.includes(eventType)) {
       // EXPIRATION and BILLING_ISSUE = access should be revoked
-      const { error } = await supabase.from("premium_subscriptions").delete().eq("user_id", appUserId);
+      const { error } = await supabase.from("premium_subscriptions").delete().eq("user_id", targetUserId);
 
       if (error) {
         console.error("Delete error:", error);
@@ -198,15 +198,11 @@ Deno.serve(async (req) => {
       }
 
       // Sync profiles.is_premium
-      await supabase.from("profiles").update({ is_premium: false }).eq("user_id", appUserId);
+      await supabase.from("profiles").update({ is_premium: false }).eq("user_id", targetUserId);
 
-      console.log(`Subscription removed: user=${appUserId}, event=${eventType}`);
+      console.log(`Subscription removed: user=${targetUserId}, event=${eventType}`);
     } else if (LOG_ONLY_EVENTS.includes(eventType)) {
-      // CANCELLATION: auto-renew off but access continues until expires_at
-      // We do NOT delete — the EXPIRATION event will handle actual revocation
-      console.log(`Logged event (no action): user=${appUserId}, event=${eventType}`);
-    } else if (eventType === "TEST") {
-      console.log("RevenueCat test webhook received");
+      console.log(`Logged event (no action): user=${targetUserId}, event=${eventType}`);
     } else {
       console.log(`Unhandled event type: ${eventType}`);
     }

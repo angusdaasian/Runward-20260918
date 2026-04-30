@@ -24,7 +24,12 @@ const RewardCodeManager = () => {
   const [loading, setLoading] = useState(true);
   const [newCodes, setNewCodes] = useState("");
   const [adding, setAdding] = useState(false);
-  const [resetMonth, setResetMonth] = useState("");
+  const [resetMonth, setResetMonth] = useState(() => {
+    // Default to previous month in HKT (UTC+8)
+    const nowHkt = new Date(Date.now() + 8 * 60 * 60 * 1000);
+    const prev = new Date(Date.UTC(nowHkt.getUTCFullYear(), nowHkt.getUTCMonth() - 1, 1));
+    return `${prev.getUTCFullYear()}-${String(prev.getUTCMonth() + 1).padStart(2, "0")}`;
+  });
   const [resetting, setResetting] = useState(false);
 
   const handleRunReset = async (dryRun: boolean) => {

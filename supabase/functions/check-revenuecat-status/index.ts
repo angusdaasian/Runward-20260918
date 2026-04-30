@@ -155,35 +155,9 @@ Deno.serve(async (req) => {
     const serviceClient = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
     if (isActive && expiresAt && plan) {
-      // Subscription-transfer cleanup:
-      // Only revoke OTHER users when:
-      //  (a) the current matched plan is a real RevenueCat product id
-      //      (e.g. com.despia.runward.monthly / .annual / .lifetime), AND
-      //  (b) the other user's stored plan is ALSO a RevenueCat product id.
-      // Promo plans (code_annual, promo_monthly_lcra, "monthly"/"yearly" admin grants, etc.)
-      // are issued per-user and must never be invalidated by an unrelated RC sign-in.
-      const isRcProductId = (p: string | null | undefined) =>
-        !!p && p.startsWith("com.despia.runward.");
-
-      if (isRcProductId(plan)) {
-        const { data: oldSubs } = await serviceClient
-          .from("premium_subscriptions")
-          .select("user_id, plan")
-          .eq("plan", plan)
-          .neq("user_id", userId);
-
-        const transferable = (oldSubs || []).filter((s: any) => isRcProductId(s.plan));
-        if (transferable.length > 0) {
-          const oldUserIds = transferable.map((s: any) => s.user_id);
-          await serviceClient.from("premium_subscriptions").delete().in("user_id", oldUserIds);
-          await serviceClient.from("profiles").update({ is_premium: false }).in("user_id", oldUserIds);
-          console.log(`Revoked premium from old users (RC transfer, plan=${plan}): ${oldUserIds.join(", ")}`);
-        }
-      } else {
-        console.log(`Skipping transfer cleanup: plan="${plan}" is not an RC product id`);
-      }
-
-
+      // SAFE behavior: only ever upsert the CURRENT user's row.
+      // Never touch other users — RevenueCat webhook is the source of truth
+      // for transfers and revocations, not this read-only check.
       const { error: upsertError } = await serviceClient.from("premium_subscriptions").upsert(
         {
           user_id: userId,
@@ -208,24 +182,39 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Not active per RC. Only revoke if RC ACTUALLY shows everything expired.
-    // If entitlements + subscriptions are both empty, it's likely an unmapped promo —
-    // do NOT wipe the local row (the webhook is the source of truth for revocation).
-    const hasAnyData = Object.keys(entitlements).length > 0 || Object.keys(subscriptions).length > 0;
+    // Not active per RC. We DO NOT revoke from this endpoint anymore.
+    // Reasons:
+    //  - Promo/code-issued subscriptions (LCRA, code_annual, admin grants) are
+    //    not visible in the RevenueCat subscriber payload, so an "all expired"
+    //    response from RC says nothing about their validity.
+    //  - The RevenueCat webhook is the authoritative source for revocations
+    //    (CANCELLATION / EXPIRATION events) and already updates the DB.
+    //  - Transient RC API hiccups have caused false "all_expired" reads.
+    // If the local DB still has a valid row, fall back to it; otherwise report not premium.
+    const { data: localSub } = await serviceClient
+      .from("premium_subscriptions")
+      .select("plan, expires_at, is_trial, rc_entitlement")
+      .eq("user_id", userId)
+      .maybeSingle();
 
-    if (hasAnyData) {
-      // RC returned data but nothing is active → safe to revoke
-      await serviceClient.from("premium_subscriptions").delete().eq("user_id", userId);
-      await serviceClient.from("profiles").update({ is_premium: false }).eq("user_id", userId);
-      console.log(`Revoked premium for ${userId}: RC reports all expired`);
-      return new Response(JSON.stringify({ isPremium: false, synced: true, reason: "all_expired" }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    if (localSub && new Date(localSub.expires_at) > now) {
+      console.log(`RC inactive for ${userId} but local DB has valid subscription; preserving it`);
+      return new Response(
+        JSON.stringify({
+          isPremium: true,
+          plan: localSub.plan,
+          expiresAt: localSub.expires_at,
+          rcEntitlement: localSub.rc_entitlement,
+          isTrial: localSub.is_trial,
+          synced: false,
+          reason: "rc_inactive_db_valid",
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
     }
 
-    // Empty payload — leave DB alone, fall back to whatever the webhook set
-    console.log(`Empty RC payload for ${userId} — preserving local DB state`);
-    return new Response(JSON.stringify({ isPremium: false, synced: false, reason: "empty_rc_payload" }), {
+    console.log(`No active subscription for ${userId} (RC inactive, no valid DB row)`);
+    return new Response(JSON.stringify({ isPremium: false, synced: false, reason: "no_active_subscription" }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {

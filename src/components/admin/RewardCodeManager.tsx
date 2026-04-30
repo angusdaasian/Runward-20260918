@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Gift, Upload, Trash2 } from "lucide-react";
+import { Gift, Upload, Trash2, RotateCcw } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
 interface RewardCode {

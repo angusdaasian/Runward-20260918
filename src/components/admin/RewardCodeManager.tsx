@@ -24,6 +24,36 @@ const RewardCodeManager = () => {
   const [loading, setLoading] = useState(true);
   const [newCodes, setNewCodes] = useState("");
   const [adding, setAdding] = useState(false);
+  const [resetMonth, setResetMonth] = useState("");
+  const [resetting, setResetting] = useState(false);
+
+  const handleRunReset = async (dryRun: boolean) => {
+    if (!confirm(dryRun
+      ? "Preview which winners would receive codes for this run?"
+      : "This will assign codes and RESET monthly XP to 0 for everyone. Continue?")) return;
+    setResetting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("admin-trigger-season-reset", {
+        body: {
+          ...(resetMonth ? { month_year: resetMonth } : {}),
+          dry_run: dryRun,
+        },
+      });
+      if (error) throw error;
+      const msg = data?.skipped
+        ? `Already processed (${data.codes_assigned} codes for ${data.month})`
+        : dryRun
+          ? `Dry run: ${data?.winners?.length ?? 0} winners would be processed`
+          : `Done: ${data?.codes_assigned ?? 0} codes assigned for ${data?.month}`;
+      toast({ title: "Season reset", description: msg });
+      console.log("[admin-trigger-season-reset] result:", data);
+      fetchCodes();
+    } catch (err) {
+      toast({ title: "Error", description: (err as Error).message, variant: "destructive" });
+    } finally {
+      setResetting(false);
+    }
+  };
 
   const fetchCodes = async () => {
     const { data } = await supabase

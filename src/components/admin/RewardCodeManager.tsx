@@ -133,6 +133,30 @@ const RewardCodeManager = () => {
           </Button>
         </div>
 
+        {/* Manual Season Reset */}
+        <div className="space-y-2 rounded-lg border border-border p-3 bg-muted/30">
+          <label className="text-sm font-medium text-foreground flex items-center gap-2">
+            <RotateCcw className="h-4 w-4" /> Run Season Reset
+          </label>
+          <p className="text-xs text-muted-foreground">
+            Auto-runs at 00:05 UTC on the 1st of every month. Use this to backfill a missed month or trigger early. Leave month blank to use the previous month.
+          </p>
+          <div className="flex gap-2 items-center">
+            <Input
+              placeholder="YYYY-MM (optional)"
+              value={resetMonth}
+              onChange={(e) => setResetMonth(e.target.value)}
+              className="max-w-[160px] font-mono text-xs"
+            />
+            <Button onClick={() => handleRunReset(true)} disabled={resetting} size="sm" variant="outline">
+              Dry run
+            </Button>
+            <Button onClick={() => handleRunReset(false)} disabled={resetting} size="sm" variant="destructive">
+              {resetting ? "Running..." : "Run reset"}
+            </Button>
+          </div>
+        </div>
+
         {/* Table */}
         {loading ? (
           <div className="flex justify-center py-4">

@@ -1,104 +1,72 @@
-# Plan — Write `README.md` for Runward
+## Problem
 
-Replace the current placeholder `README.md` with a comprehensive document covering what the app does, its tech stack, how to run it, and how the major integrations (Garmin, Strava, Apple Health, AI coach, posture analysis) fit together.
+The April leaderboard ended but no codes were sent and XP was not reset because:
 
-## Proposed structure
+1. **`reset-season` was never invoked.** Edge function logs are empty, `used_codes` table is empty, and 21 users still have non-zero `monthly_xp` (max 37,371). There is no scheduler wired up — the function only exists as an on-demand HTTP endpoint.
+2. **The function itself has bugs** that would have hurt even if it had run:
+   - It queries `reward_codes.is_assigned = false` but then **deletes** the code instead of marking it assigned, and never sets `is_assigned`. With service-role bypass the delete works, but the `is_assigned` field is dead weight.
+   - It uses `.single()` on the available-code lookup — if zero codes remain it throws (instead of `.maybeSingle()`), aborting the loop on the next iteration.
+   - It selects `reward_codes.*` then inserts into `used_codes` — needs to confirm column shape matches.
+   - It excludes the dev account (`angchenghk@gmail.com`) from the leaderboard RPC, but `reset-season` does **not** exclude them, so they could win a code.
+   - The `profiles` update uses `.gt("monthly_xp", -1)` as a "match all" hack — fine, but fragile.
+   - No idempotency — if cron fires twice in a month, codes get double-assigned.
 
-### 1. Header
-- Title: **Runward — Your Running Training Companion**
-- One-line tagline pulled from `index.html` meta description
-- Badges (optional): React 18, Vite, TypeScript, Supabase, Tailwind
+## Fix
 
-### 2. Overview
-Short paragraph describing Runward as a mobile-first running app that:
-- Tracks runs from Garmin / Strava / Apple Health / manual upload
-- Analyzes running posture via on-device TensorFlow.js pose detection
-- Generates personalized training programs via AI
-- Gamifies training with XP, ranks, leaderboards, daily check-ins, rewards
-- Provides race discovery, calculators (VDOT, pace equivalents), and an AI running coach
+### 1. Schedule the job (pg_cron + pg_net)
 
-### 3. Key Features
-Bullet list grouped by tab:
-- **Activities** — calendar, year heatmap, training load, monthly road quest, suggested next workout
-- **Analytics** — performance, posture results, Garmin daily health card (VO₂max, resting HR, sleep)
-- **Training** — AI-generated programs and free plans
-- **Races** — discovery, verification, pending race manager
-- **Rewards** — XP, ranks, leaderboards, daily check-in, claim codes
-- **Coach** — floating AI chat with context-aware running advice
-- **More** — settings, profile, connect apps, language toggle (EN / ZH), admin panel
+Add a cron job that calls the `reset-season` edge function at **00:05 UTC on the 1st of every month**:
 
-### 4. Tech Stack
-Pulled from `package.json` + project conventions:
-- **Frontend:** React 18, Vite 5, TypeScript 5, Tailwind CSS v3, shadcn/ui (Radix), TanStack Query, React Router, Framer Motion, Recharts, Leaflet
-- **Backend:** Lovable Cloud (Supabase) — Postgres, Auth, Storage, Edge Functions (Deno)
-- **AI:** Lovable AI Gateway (Vertex/Gemini), TensorFlow.js pose detection
-- **Native shell:** Despia / median-js-bridge for iOS/Android wrappers
-- **Integrations:** Garmin (via Railway Python service using `garminconnect`), Strava OAuth + webhooks, Apple Health (native bridge), RevenueCat (subscriptions)
-- **Tooling:** ESLint, Vitest, Playwright, Bun
+```sql
+select cron.schedule(
+  'reset-season-monthly',
+  '5 0 1 * *',
+  $$
+  select net.http_post(
+    url := 'https://kbghvclwhxnjeskdodeh.supabase.co/functions/v1/reset-season',
+    headers := jsonb_build_object(
+      'Content-Type','application/json',
+      'Authorization','Bearer <SERVICE_ROLE_KEY>'
+    ),
+    body := '{}'::jsonb
+  );
+  $$
+);
+```
 
-### 5. Project Structure
-Tree showing top-level layout: `src/pages`, `src/components`, `src/hooks`, `src/contexts`, `src/lib`, `src/integrations/supabase`, `supabase/functions`, `supabase/migrations`.
+Service role key will be stored in a Postgres setting (`vault` or `app.settings`) so it isn't pasted in plaintext in the migration. Set `verify_jwt = false` for `reset-season` in `supabase/config.toml` so cron can call it without a user JWT (it's already service-role internally), OR keep JWT on and pass the service role token — I'll go with `verify_jwt = false` + an internal `WEBHOOK_AUTH_KEY` header check inside the function to prevent public abuse.
 
-### 6. Getting Started
-- Prerequisites (Node 18+ or Bun, Supabase project / Lovable Cloud)
-- Install: `bun install`
-- Dev server: `bun run dev`
-- Build: `bun run build`
-- Tests: `bun run test`
-- Lint: `bun run lint`
+### 2. Harden `reset-season/index.ts`
 
-### 7. Environment & Secrets
-Note that secrets are managed via Lovable Cloud (no local `.env` editing required). List required secrets at a high level:
-- Supabase URL / anon key (auto-injected)
-- Garmin Railway endpoint URL + auth key
-- Strava client ID/secret
-- Lovable AI gateway key
-- RevenueCat webhook secret
-- Apple sign-in keys
-- Mapbox / weather API keys
+- Add `WEBHOOK_AUTH_KEY` header check (reuse existing secret).
+- Change available-code lookup to `.maybeSingle()` and bail cleanly when codes run out.
+- Exclude the dev account (`angchenghk@gmail.com`) from winners, matching `get_leaderboard`.
+- Add **idempotency**: skip if `used_codes` already has rows for the target `month_year`.
+- Use a single transaction-style flow: mark code assigned (or delete) only **after** `used_codes` insert succeeds.
+- Log each step (winner id, code assigned, errors) so future runs are debuggable.
+- Add CORS headers for manual invocation.
 
-### 8. Edge Functions (Supabase)
-Brief table grouping the ~30 functions by domain:
-- **Garmin:** `garmin-credential-login`, `garmin-credential-mfa`, `garmin-sync`, `garmin-manual-import`, `garmin-daily-health-sync`
-- **Strava:** `strava-auth`, `strava-callback`, `strava-sync`, `strava-webhook`, `strava-disconnect`, `strava-activity-streams`
-- **Apple:** `apple-auth-start`, `apple-auth-callback`, `apple-health-post-sync`
-- **AI:** `ai-running-coach`, `analyze-activity`, `analyze-posture`, `generate-program`, `generate-free-plans`, `generate-suggested-workout`
-- **Subscriptions:** `activate-subscription`, `check-revenuecat-status`, `revenuecat-webhook`
-- **Misc:** `get-weather`, `scrape-races`, `verify-race`, `apply-xp-decay`, `reset-season`, `send-notification`, `send-daily-morning-push`, `seed-promo-banner`
+### 3. Run the missed April reset manually
 
-### 9. Garmin Integration Architecture
-Short explanation of the Garmin auth flow:
-- Frontend collects credentials → `garmin-credential-login` → Railway `/garmin-login` (uses `garminconnect` Python lib)
-- MFA path via `garmin-credential-mfa` → Railway `/garmin-login-mfa`
-- Tokens encrypted (`_shared/garminCrypto.ts`) and stored in `garmin_connections`
-- Daily cron at 02:00 UTC (10:00 HKT) → `garmin-daily-health-sync` → upserts into `garmin_daily_health`
-- Activities synced via `garmin-sync`
+After deploy, invoke `reset-season` once via curl/edge-function tool to:
+- Assign codes to April's top 10 premium + top 3 free users.
+- Reset everyone's `monthly_xp` to 0 and rank to Bronze V.
 
-### 10. Internationalization
-EN / ZH supported via `src/lib/i18n.ts`, toggleable in More tab.
+I'll show you the result (codes assigned, winner list) before declaring done.
 
-### 11. Testing
-- Unit: Vitest (`src/test/`)
-- E2E: Playwright (`playwright.config.ts`)
+### 4. Add an admin "Run Season Reset Now" button (optional, recommended)
 
-### 12. Deployment
-- Web: Lovable hosting (`https://welcome-ward-start.lovable.app`) + custom domain (`angustest.site`)
-- Native: Despia builds for iOS / Android
-- Backend: Supabase edge functions auto-deployed via Lovable Cloud
-- Garmin auth microservice: Railway (separate repo)
+In `AdminPanel` / `RewardCodeManager`, add a button that invokes `reset-season` with the auth header, so you can trigger it manually if cron ever fails. Behind `has_role(uid,'admin')`.
 
-### 13. License & Credits
-- Built with [Lovable](https://lovable.dev)
-- Note that this is a private project (or pick a license — TBD)
+## Files to change
 
----
+- `supabase/functions/reset-season/index.ts` — harden + auth + idempotency
+- `supabase/config.toml` — `verify_jwt = false` for `reset-season`
+- New migration — schedule pg_cron job
+- `src/components/admin/RewardCodeManager.tsx` — add manual trigger button
+- One-time: invoke the function to process April
 
-## File to write
-- `README.md` (overwrite the current placeholder)
+## Notes
 
-## Open questions (will assume defaults unless you say otherwise)
-1. **License** — assume "private / proprietary" unless you want MIT/Apache.
-2. **Public-facing vs internal README** — I'll write it as an internal/developer README (assumes reader has repo access). If you'd rather have a marketing-style README, say so.
-3. **Include screenshots?** — I'll skip image embeds since none are in the repo at predictable paths; can add later.
-
-Once approved I'll write the full `README.md` in default mode.
+- 499 unassigned codes available, plenty for this month.
+- Cron runs in UTC; "month end" means rewards for month N are issued at 00:05 UTC on day 1 of month N+1, using `now()-1 month` to compute `month_year`. That matches the current code.

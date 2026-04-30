@@ -38,10 +38,12 @@ Deno.serve(async (req) => {
     let body: { month_year?: string; dry_run?: boolean } = {};
     try { body = await req.json(); } catch { /* no body */ }
 
-    const now = new Date();
-    const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    // Compute "previous month" in HKT (UTC+8) so the season boundary matches
+    // the cron schedule (00:00 HKT on the 1st of each month).
+    const nowHkt = new Date(Date.now() + 8 * 60 * 60 * 1000);
+    const lastMonthHkt = new Date(Date.UTC(nowHkt.getUTCFullYear(), nowHkt.getUTCMonth() - 1, 1));
     const monthYear = body.month_year ||
-      `${lastMonth.getFullYear()}-${String(lastMonth.getMonth() + 1).padStart(2, "0")}`;
+      `${lastMonthHkt.getUTCFullYear()}-${String(lastMonthHkt.getUTCMonth() + 1).padStart(2, "0")}`;
     const dryRun = !!body.dry_run;
 
     console.log(`[reset-season] start month=${monthYear} dryRun=${dryRun}`);

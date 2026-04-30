@@ -217,52 +217,14 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ isPremium: false, synced: false, reason: "no_active_subscription" }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
-
-
-      const { error: upsertError } = await serviceClient.from("premium_subscriptions").upsert(
-        {
-          user_id: userId,
-          plan,
-          activated_at: new Date().toISOString(),
-          expires_at: expiresAt,
-          is_trial: isTrial,
-          rc_entitlement: rcEntitlement,
-        },
-        { onConflict: "user_id" },
-      );
-
-      if (upsertError) {
-        console.error("Upsert error:", upsertError);
-      }
-
-      await serviceClient.from("profiles").update({ is_premium: true }).eq("user_id", userId);
-
-      return new Response(
-        JSON.stringify({ isPremium: true, plan, expiresAt, rcEntitlement, isTrial, synced: true }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
-    }
-
-    // Not active per RC. Only revoke if RC ACTUALLY shows everything expired.
-    // If entitlements + subscriptions are both empty, it's likely an unmapped promo —
-    // do NOT wipe the local row (the webhook is the source of truth for revocation).
-    const hasAnyData = Object.keys(entitlements).length > 0 || Object.keys(subscriptions).length > 0;
-
-    if (hasAnyData) {
-      // RC returned data but nothing is active → safe to revoke
-      await serviceClient.from("premium_subscriptions").delete().eq("user_id", userId);
-      await serviceClient.from("profiles").update({ is_premium: false }).eq("user_id", userId);
-      console.log(`Revoked premium for ${userId}: RC reports all expired`);
-      return new Response(JSON.stringify({ isPremium: false, synced: true, reason: "all_expired" }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // Empty payload — leave DB alone, fall back to whatever the webhook set
-    console.log(`Empty RC payload for ${userId} — preserving local DB state`);
-    return new Response(JSON.stringify({ isPremium: false, synced: false, reason: "empty_rc_payload" }), {
+  } catch (err) {
+    console.error("Error:", err);
+    return new Response(JSON.stringify({ error: "Internal server error" }), {
+      status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
+  }
+});
   } catch (err) {
     console.error("Error:", err);
     return new Response(JSON.stringify({ error: "Internal server error" }), {

@@ -1274,6 +1274,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      invoke_reset_season: { Args: { p_month_year?: string }; Returns: number }
     }
     Enums: {
       app_role: "admin" | "user"

@@ -214,8 +214,12 @@ const AdminPanel = () => {
       </div>
 
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Users</CardTitle>
+          <Button size="sm" variant="outline" onClick={handleRestoreRC} disabled={restoring}>
+            <Crown className="h-4 w-4 mr-2" />
+            {restoring ? "Restoring..." : "Restore RC Subscribers"}
+          </Button>
         </CardHeader>
         <CardContent>
           {loading ? (

@@ -1141,6 +1141,7 @@ export type Database = {
           finish_time_source: string | null
           id: string
           notes: string | null
+          priority: string
           race_date: string
           race_name: string
           race_name_zh: string | null
@@ -1160,6 +1161,7 @@ export type Database = {
           finish_time_source?: string | null
           id?: string
           notes?: string | null
+          priority?: string
           race_date: string
           race_name: string
           race_name_zh?: string | null
@@ -1179,6 +1181,7 @@ export type Database = {
           finish_time_source?: string | null
           id?: string
           notes?: string | null
+          priority?: string
           race_date?: string
           race_name?: string
           race_name_zh?: string | null

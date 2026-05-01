@@ -1084,12 +1084,14 @@ const MyRaceCard = ({
   lang,
   onRemove,
   onSaveTime,
+  onSetPriority,
   dim = false,
 }: {
   race: UserRaceRow;
   lang: Lang;
   onRemove: () => void;
   onSaveTime: (seconds: number | null) => void | Promise<void>;
+  onSetPriority: (priority: "A" | "B" | "C" | "none") => void | Promise<void>;
   dim?: boolean;
 }) => {
   const raceDate = new Date(race.race_date + "T00:00:00");

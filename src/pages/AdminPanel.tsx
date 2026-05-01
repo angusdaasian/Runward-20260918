@@ -31,6 +31,7 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
+import { toast } from "sonner";
 import AnnouncementManager from "@/components/admin/AnnouncementManager";
 import PromoBannerManager from "@/components/admin/PromoBannerManager";
 import FeedbackManager from "@/components/admin/FeedbackManager";
@@ -81,6 +82,36 @@ const AdminPanel = () => {
   const [users, setUsers] = useState<UserRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabKey>("users");
+  const [restoring, setRestoring] = useState(false);
+
+  const AFFECTED_USER_IDS = [
+    "0ed6a94b-1e42-479d-ad51-468c007310e8",
+    "21c70699-36a0-4243-a511-f9d3fb558529",
+    "3ea42539-f316-4e30-8a20-647cce23d9f1",
+    "54576cb1-3ef4-4fff-8859-a0e610283def",
+    "697e7d98-a790-40d5-b315-63eac7bf8181",
+    "7c94df5c-c24d-4bef-95b2-39afefe98055",
+    "b65fd88b-4e6a-4770-8afc-194143303e8a",
+    "fb7a336f-8c6d-47b5-bdfd-75a2a524f109",
+  ];
+
+  const handleRestoreRC = async () => {
+    if (restoring) return;
+    setRestoring(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("admin-restore-rc-subs", {
+        body: { userIds: AFFECTED_USER_IDS },
+      });
+      if (error) throw error;
+      const restored = (data as any)?.results?.filter((r: any) => r.ok)?.length ?? 0;
+      toast.success(`Restored ${restored}/${AFFECTED_USER_IDS.length} subscribers`);
+      fetchUsers();
+    } catch (e: any) {
+      toast.error(e?.message || "Failed to restore subscribers");
+    } finally {
+      setRestoring(false);
+    }
+  };
 
   useEffect(() => {
     if (!adminLoading && !authLoading && !isAdmin) {
@@ -183,8 +214,12 @@ const AdminPanel = () => {
       </div>
 
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Users</CardTitle>
+          <Button size="sm" variant="outline" onClick={handleRestoreRC} disabled={restoring}>
+            <Crown className="h-4 w-4 mr-2" />
+            {restoring ? "Restoring..." : "Restore RC Subscribers"}
+          </Button>
         </CardHeader>
         <CardContent>
           {loading ? (

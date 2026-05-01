@@ -219,6 +219,7 @@ interface UserRaceRow {
   notes: string | null;
   finish_time_seconds: number | null;
   finish_time_source: string | null;
+  priority: "A" | "B" | "C" | "none";
 }
 
 const RaceTab = ({ lang }: Props) => {

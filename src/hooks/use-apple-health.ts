@@ -240,7 +240,7 @@ function extractSampleTimestamp(sample: unknown): string | null {
 // Path constants
 const WORKOUT_NAME_PATHS = [["name"], ["workoutName"], ["summary", "name"]];
 const WORKOUT_ACTIVITY_TYPE_PATHS = [["workoutActivityType"], ["activityType"], ["sport_type"], ["type"]];
-const WORKOUT_START_DATE_PATHS = [["startDate"], ["start_date"], ["start"]];
+const WORKOUT_START_DATE_PATHS = [["startDate"], ["start_date"], ["start"], ["date"], ["timestamp"]];
 const WORKOUT_END_DATE_PATHS = [["endDate"], ["end_date"], ["end"], ["date"]];
 const WORKOUT_DISTANCE_PATHS = [["totalDistance"], ["total_distance"], ["distance"]];
 const WORKOUT_DURATION_PATHS = [["duration"], ["moving_time"], ["elapsed_time"]];

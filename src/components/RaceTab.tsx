@@ -1210,6 +1210,28 @@ const MyRaceCard = ({
           <p className="text-[11px] text-muted-foreground line-clamp-2 pt-1">{race.notes}</p>
         )}
 
+        {/* Priority selector */}
+        <div className="flex items-center gap-1.5 pt-1.5">
+          <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mr-1">
+            {lang === "zh" ? "目標" : "Goal"}
+          </span>
+          {(["A", "B", "C", "none"] as const).map((p) => {
+            const active = (race.priority || "none") === p;
+            return (
+              <button
+                key={p}
+                onClick={() => onSetPriority(p)}
+                className={`text-[10px] font-bold px-2 py-0.5 rounded border transition ${
+                  active ? PRIORITY_META[p].cls : "bg-transparent text-muted-foreground border-border hover:bg-muted"
+                }`}
+                aria-label={`Set priority ${p}`}
+              >
+                {p === "none" ? (lang === "zh" ? "無" : "None") : p}
+              </button>
+            );
+          })}
+        </div>
+
         {/* Finish time section — show on past/today races, or always allow logging */}
         {(isPastOrToday || hasFinish) && (
           <div className="pt-2 mt-1 border-t border-border/60">

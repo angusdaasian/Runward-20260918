@@ -426,6 +426,23 @@ const RaceTab = ({ lang }: Props) => {
     queryClient.invalidateQueries({ queryKey: ["user-races", user.id] });
   };
 
+  const updatePriority = async (id: string, priority: "A" | "B" | "C" | "none") => {
+    if (!user) return;
+    // Optimistic UI
+    setMyRaces((prev) => prev.map((r) => (r.id === id ? { ...r, priority } : r)));
+    const { error } = await supabase
+      .from("user_races")
+      .update({ priority } as any)
+      .eq("id", id)
+      .eq("user_id", user.id);
+    if (error) {
+      toast({ title: lang === "zh" ? "更新失敗" : "Update failed", description: error.message, variant: "destructive" });
+      await loadMyRaces();
+      return;
+    }
+    queryClient.invalidateQueries({ queryKey: ["user-races", user.id] });
+  };
+
   const grouped = useMemo(() => {
     const map = new Map<string, GroupedRace>();
     for (const r of races) {

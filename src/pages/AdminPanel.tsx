@@ -7,7 +7,30 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Crown, Users } from "lucide-react";
+import {
+  ArrowLeft,
+  Crown,
+  Users,
+  Bell,
+  Megaphone,
+  Image as ImageIcon,
+  Gift,
+  Flag,
+  ClipboardList,
+  MessageSquare,
+} from "lucide-react";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarProvider,
+  SidebarTrigger,
+} from "@/components/ui/sidebar";
 import AnnouncementManager from "@/components/admin/AnnouncementManager";
 import PromoBannerManager from "@/components/admin/PromoBannerManager";
 import FeedbackManager from "@/components/admin/FeedbackManager";
@@ -30,12 +53,34 @@ interface UserRow {
   rc_entitlement: string | null;
 }
 
+type TabKey =
+  | "users"
+  | "notifications"
+  | "announcements"
+  | "promo"
+  | "rewards"
+  | "races"
+  | "pending"
+  | "feedback";
+
+const TABS: { key: TabKey; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
+  { key: "users", label: "Users", icon: Users },
+  { key: "notifications", label: "Notifications", icon: Bell },
+  { key: "announcements", label: "Announcements", icon: Megaphone },
+  { key: "promo", label: "Promo Banners", icon: ImageIcon },
+  { key: "rewards", label: "Reward Codes", icon: Gift },
+  { key: "races", label: "Races", icon: Flag },
+  { key: "pending", label: "Pending Races", icon: ClipboardList },
+  { key: "feedback", label: "Feedback", icon: MessageSquare },
+];
+
 const AdminPanel = () => {
   const { isAdmin, loading: adminLoading } = useAdmin();
   const { loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [users, setUsers] = useState<UserRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<TabKey>("users");
 
   useEffect(() => {
     if (!adminLoading && !authLoading && !isAdmin) {
@@ -100,132 +145,184 @@ const AdminPanel = () => {
 
   if (!isAdmin) return null;
 
-  return (
-    <div className="min-h-screen bg-background p-4 md:p-8">
-      <div className="max-w-6xl mx-auto space-y-6">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate("/")}>
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <h1 className="text-2xl font-bold text-foreground">Admin Panel</h1>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                <Users className="h-4 w-4" /> Total Users
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-3xl font-bold text-foreground">{users.length}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                <Crown className="h-4 w-4" /> Premium Users
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-3xl font-bold text-foreground">
-                {users.filter((u) => isPremiumActive(u.premium_expires)).length}
-              </p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Free Users</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-3xl font-bold text-foreground">
-                {users.filter((u) => !isPremiumActive(u.premium_expires)).length}
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-
+  const renderUsersTab = () => (
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
-          <CardHeader>
-            <CardTitle>Users</CardTitle>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+              <Users className="h-4 w-4" /> Total Users
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            {loading ? (
-              <div className="flex justify-center py-8">
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Age</TableHead>
-                      <TableHead>Sex</TableHead>
-                      <TableHead>Runs/Week</TableHead>
-                      <TableHead>Joined</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Plan</TableHead>
-                      <TableHead>Method</TableHead>
-                      <TableHead>Subscribed</TableHead>
-                      <TableHead>Expires</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {users.map((u) => {
-                      const active = isPremiumActive(u.premium_expires);
-                      const method = u.is_trial
-                        ? "Trial"
-                        : u.rc_entitlement === "premium"
-                          ? "RevenueCat"
-                          : u.rc_entitlement
-                            ? u.rc_entitlement
-                            : u.premium_plan
-                              ? "Manual"
-                              : "—";
-                      return (
-                        <TableRow key={u.user_id}>
-                          <TableCell className="font-medium">{u.display_name || "—"}</TableCell>
-                          <TableCell>{u.age ?? "—"}</TableCell>
-                          <TableCell>{u.sex ?? "—"}</TableCell>
-                          <TableCell>{u.runs_per_week ?? "—"}</TableCell>
-                          <TableCell>{new Date(u.created_at).toLocaleDateString()}</TableCell>
-                          <TableCell>
-                            {active ? (
-                              <Badge className="bg-primary text-primary-foreground">Active</Badge>
-                            ) : u.premium_plan ? (
-                              <Badge variant="outline">Expired</Badge>
-                            ) : (
-                              <Badge variant="secondary">Free</Badge>
-                            )}
-                          </TableCell>
-                          <TableCell>{u.premium_plan ?? "—"}</TableCell>
-                          <TableCell>{method}</TableCell>
-                          <TableCell>
-                            {u.premium_activated ? new Date(u.premium_activated).toLocaleDateString() : "—"}
-                          </TableCell>
-                          <TableCell>
-                            {u.premium_expires ? new Date(u.premium_expires).toLocaleDateString() : "—"}
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
+            <p className="text-3xl font-bold text-foreground">{users.length}</p>
           </CardContent>
         </Card>
-
-        <NotificationManager />
-        <AnnouncementManager />
-        <PromoBannerManager />
-        <RewardCodeManager />
-        <RaceManager />
-        <PendingRaceManager />
-        <FeedbackManager />
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+              <Crown className="h-4 w-4" /> Premium Users
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-3xl font-bold text-foreground">
+              {users.filter((u) => isPremiumActive(u.premium_expires)).length}
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Free Users</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-3xl font-bold text-foreground">
+              {users.filter((u) => !isPremiumActive(u.premium_expires)).length}
+            </p>
+          </CardContent>
+        </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Users</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <div className="flex justify-center py-8">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Age</TableHead>
+                    <TableHead>Sex</TableHead>
+                    <TableHead>Runs/Week</TableHead>
+                    <TableHead>Joined</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Plan</TableHead>
+                    <TableHead>Method</TableHead>
+                    <TableHead>Subscribed</TableHead>
+                    <TableHead>Expires</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {users.map((u) => {
+                    const active = isPremiumActive(u.premium_expires);
+                    const method = u.is_trial
+                      ? "Trial"
+                      : u.rc_entitlement === "premium"
+                        ? "RevenueCat"
+                        : u.rc_entitlement
+                          ? u.rc_entitlement
+                          : u.premium_plan
+                            ? "Manual"
+                            : "—";
+                    return (
+                      <TableRow key={u.user_id}>
+                        <TableCell className="font-medium">{u.display_name || "—"}</TableCell>
+                        <TableCell>{u.age ?? "—"}</TableCell>
+                        <TableCell>{u.sex ?? "—"}</TableCell>
+                        <TableCell>{u.runs_per_week ?? "—"}</TableCell>
+                        <TableCell>{new Date(u.created_at).toLocaleDateString()}</TableCell>
+                        <TableCell>
+                          {active ? (
+                            <Badge className="bg-primary text-primary-foreground">Active</Badge>
+                          ) : u.premium_plan ? (
+                            <Badge variant="outline">Expired</Badge>
+                          ) : (
+                            <Badge variant="secondary">Free</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell>{u.premium_plan ?? "—"}</TableCell>
+                        <TableCell>{method}</TableCell>
+                        <TableCell>
+                          {u.premium_activated ? new Date(u.premium_activated).toLocaleDateString() : "—"}
+                        </TableCell>
+                        <TableCell>
+                          {u.premium_expires ? new Date(u.premium_expires).toLocaleDateString() : "—"}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
+  );
+
+  const renderTab = () => {
+    switch (activeTab) {
+      case "users":
+        return renderUsersTab();
+      case "notifications":
+        return <NotificationManager />;
+      case "announcements":
+        return <AnnouncementManager />;
+      case "promo":
+        return <PromoBannerManager />;
+      case "rewards":
+        return <RewardCodeManager />;
+      case "races":
+        return <RaceManager />;
+      case "pending":
+        return <PendingRaceManager />;
+      case "feedback":
+        return <FeedbackManager />;
+    }
+  };
+
+  const activeLabel = TABS.find((t) => t.key === activeTab)?.label ?? "Admin";
+
+  return (
+    <SidebarProvider>
+      <div className="min-h-screen flex w-full bg-background">
+        <Sidebar collapsible="offcanvas">
+          <SidebarContent>
+            <SidebarGroup>
+              <SidebarGroupLabel>Admin</SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  {TABS.map((tab) => (
+                    <SidebarMenuItem key={tab.key}>
+                      <SidebarMenuButton
+                        isActive={activeTab === tab.key}
+                        onClick={() => setActiveTab(tab.key)}
+                        className="flex items-center gap-2"
+                      >
+                        <tab.icon className="h-4 w-4" />
+                        <span>{tab.label}</span>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  ))}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          </SidebarContent>
+        </Sidebar>
+
+        <div className="flex-1 flex flex-col min-w-0">
+          <header className="h-12 flex items-center gap-2 border-b border-border px-3">
+            <SidebarTrigger />
+            <Button variant="ghost" size="icon" onClick={() => navigate("/")}>
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <h1 className="text-lg font-semibold text-foreground">
+              Admin Panel · <span className="text-muted-foreground">{activeLabel}</span>
+            </h1>
+          </header>
+
+          <main className="flex-1 p-4 md:p-8 overflow-x-hidden">
+            <div className="max-w-6xl mx-auto">{renderTab()}</div>
+          </main>
+        </div>
+      </div>
+    </SidebarProvider>
   );
 };
 

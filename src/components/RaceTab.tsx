@@ -1042,7 +1042,7 @@ const RaceTab = ({ lang }: Props) => {
               {lang === "zh" ? "即將舉行" : "Upcoming"}
             </p>
             {upcoming.map((r) => (
-              <MyRaceCard key={r.id} race={r} lang={lang} onRemove={() => removeMyRace(r.id)} onSaveTime={(secs) => updateFinishTime(r.id, secs)} />
+              <MyRaceCard key={r.id} race={r} lang={lang} onRemove={() => removeMyRace(r.id)} onSaveTime={(secs) => updateFinishTime(r.id, secs)} onSetPriority={(p) => updatePriority(r.id, p)} />
             ))}
           </div>
         )}
@@ -1053,7 +1053,7 @@ const RaceTab = ({ lang }: Props) => {
               {lang === "zh" ? "已完成" : "Past"}
             </p>
             {past.map((r) => (
-              <MyRaceCard key={r.id} race={r} lang={lang} onRemove={() => removeMyRace(r.id)} onSaveTime={(secs) => updateFinishTime(r.id, secs)} dim />
+              <MyRaceCard key={r.id} race={r} lang={lang} onRemove={() => removeMyRace(r.id)} onSaveTime={(secs) => updateFinishTime(r.id, secs)} onSetPriority={(p) => updatePriority(r.id, p)} dim />
             ))}
           </div>
         )}

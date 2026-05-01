@@ -398,7 +398,7 @@ serve(async (req) => {
           .limit(10),
         admin
           .from("user_races")
-          .select("race_name, race_date, category, city, country, finish_time_seconds, notes")
+          .select("race_name, race_date, category, city, country, finish_time_seconds, notes, priority")
           .eq("user_id", user.id)
           .order("race_date", { ascending: true }),
       ]);

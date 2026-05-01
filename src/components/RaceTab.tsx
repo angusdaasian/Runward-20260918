@@ -940,6 +940,26 @@ const RaceTab = ({ lang }: Props) => {
           </button>
         </div>
 
+        <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-1.5">
+          <p className="text-[11px] font-semibold text-foreground uppercase tracking-wide">
+            {lang === "zh" ? "賽事優先級" : "Race Priority"}
+          </p>
+          <ul className="space-y-1 text-xs text-muted-foreground">
+            <li className="flex items-start gap-2">
+              <span className="mt-0.5 inline-flex items-center justify-center w-5 h-5 rounded-full bg-red-500/15 text-red-500 text-[10px] font-bold shrink-0">A</span>
+              <span>{lang === "zh" ? "最重要的目標賽事 — AI 教練會圍繞它規劃高峰期。" : "Top priority goal race — AI coach will peak your training for this."}</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="mt-0.5 inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-500/15 text-amber-500 text-[10px] font-bold shrink-0">B</span>
+              <span>{lang === "zh" ? "次要目標 — 視為 A 賽前的熱身賽。" : "Secondary goal — treated as a tune-up race before your A-goal."}</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="mt-0.5 inline-flex items-center justify-center w-5 h-5 rounded-full bg-emerald-500/15 text-emerald-500 text-[10px] font-bold shrink-0">C</span>
+              <span>{lang === "zh" ? "低優先級 — 當作訓練跑,不需特別減量。" : "Low priority — run as a training session, no special taper."}</span>
+            </li>
+          </ul>
+        </div>
+
         {myAddOpen && (
           <div className="bg-card border border-border rounded-xl p-4 space-y-3">
             <h3 className="font-semibold text-sm text-foreground">

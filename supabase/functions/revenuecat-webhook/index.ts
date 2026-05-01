@@ -144,19 +144,12 @@ Deno.serve(async (req) => {
       // Determine entitlement — use first from entitlement_ids, default to "premium"
       const rcEntitlement = entitlementIds.length > 0 ? entitlementIds[0] : "premium";
 
-      // Revoke premium from any other user with the same plan (subscription transfer)
-      const { data: oldSubs } = await supabase
-        .from("premium_subscriptions")
-        .select("user_id")
-        .eq("plan", effectiveProductId)
-        .neq("user_id", targetUserId);
-
-      if (oldSubs && oldSubs.length > 0) {
-        const oldUserIds = oldSubs.map((s: any) => s.user_id);
-        await supabase.from("premium_subscriptions").delete().in("user_id", oldUserIds);
-        await supabase.from("profiles").update({ is_premium: false }).in("user_id", oldUserIds);
-        console.log(`Revoked premium from old users: ${oldUserIds.join(", ")}`);
-      }
+      // NOTE: We deliberately do NOT revoke other users who share the same plan
+      // (product_id). Many users can legitimately hold the same monthly/annual
+      // SKU at the same time. Real "transfers" come through the TRANSFER event
+      // (handled in LOG_ONLY_EVENTS / future TRANSFER logic) and are tied to
+      // original_transaction_id, NOT product_id. The previous logic here was
+      // wiping every existing subscriber to the same SKU on every new purchase.
 
       const { error } = await supabase.from("premium_subscriptions").upsert(
         {

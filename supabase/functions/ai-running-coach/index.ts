@@ -458,13 +458,28 @@ serve(async (req) => {
     const fmtRace = (r: any) => {
       const loc = [r.city, r.country].filter(Boolean).join(", ");
       const finish = fmtFinish(r.finish_time_seconds);
-      const parts = [`${r.race_date}: ${r.race_name} (${r.category})`];
+      const pr = r.priority && r.priority !== "none" ? `[${r.priority}-GOAL] ` : "";
+      const parts = [`${pr}${r.race_date}: ${r.race_name} (${r.category})`];
       if (loc) parts.push(`@ ${loc}`);
       if (finish) parts.push(`— finished ${finish}`);
       return `- ${parts.join(" ")}`;
     };
+    // Sort upcoming by priority (A > B > C > none) then date
+    const PRIO_RANK: Record<string, number> = { A: 0, B: 1, C: 2, none: 3 };
+    const upcomingSorted = [...upcomingRaces].sort((a, b) => {
+      const pa = PRIO_RANK[a.priority || "none"] ?? 3;
+      const pb = PRIO_RANK[b.priority || "none"] ?? 3;
+      if (pa !== pb) return pa - pb;
+      return a.race_date.localeCompare(b.race_date);
+    });
+    const aGoal = upcomingSorted.find((r) => r.priority === "A");
+    const priorityLine = aGoal
+      ? `\nPRIMARY (A-GOAL) RACE: ${aGoal.race_name} on ${aGoal.race_date} (${aGoal.category}). Build the training plan around peaking for this race. Treat B-goal races as tune-ups and C-goal races as training/fun runs (do not taper fully for them).`
+      : upcomingSorted.some((r) => r.priority === "B" || r.priority === "C")
+        ? `\nThe runner has B/C-goal races but no A-goal yet — ask which race is their main goal so you can plan the peak.`
+        : "";
     const racesBlock = racesData.length
-      ? `UPCOMING RACES (${upcomingRaces.length}):\n${upcomingRaces.length ? upcomingRaces.map(fmtRace).join("\n") : "(none)"}\n\nPAST RACES (most recent):\n${pastRaces.length ? pastRaces.map(fmtRace).join("\n") : "(none)"}`
+      ? `UPCOMING RACES (${upcomingSorted.length}, sorted by priority):\n${upcomingSorted.length ? upcomingSorted.map(fmtRace).join("\n") : "(none)"}\n\nPAST RACES (most recent):\n${pastRaces.length ? pastRaces.map(fmtRace).join("\n") : "(none)"}${priorityLine}`
       : "USER RACE SCHEDULE: (none yet — encourage them to add races to their schedule)";
 
     const systemPrompt = `You are an expert AI Running Coach for an athlete named ${profile?.display_name || "the runner"}.

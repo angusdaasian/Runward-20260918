@@ -1149,15 +1149,29 @@ const MyRaceCard = ({
     setEditing(false);
   };
 
+  const PRIORITY_META: Record<"A" | "B" | "C" | "none", { label: string; cls: string }> = {
+    A: { label: "A", cls: "bg-red-500 text-white border-red-500" },
+    B: { label: "B", cls: "bg-amber-500 text-white border-amber-500" },
+    C: { label: "C", cls: "bg-emerald-500 text-white border-emerald-500" },
+    none: { label: lang === "zh" ? "—" : "—", cls: "bg-muted text-muted-foreground border-border" },
+  };
+
   return (
     <div className={`bg-card border border-border rounded-xl overflow-hidden ${dim ? "opacity-70" : ""}`}>
       <div className={`${catColor} px-3 py-1.5 flex items-center justify-between`}>
         <span className="text-[11px] font-bold text-white uppercase tracking-wide">{race.category}</span>
-        <span className="text-[10px] font-medium text-white/90 uppercase">
-          {race.source === "manual"
-            ? lang === "zh" ? "手動" : "Manual"
-            : lang === "zh" ? "已匯入" : "Imported"}
-        </span>
+        <div className="flex items-center gap-2">
+          {race.priority && race.priority !== "none" && (
+            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${PRIORITY_META[race.priority].cls} border`}>
+              {race.priority}-{lang === "zh" ? "目標" : "Goal"}
+            </span>
+          )}
+          <span className="text-[10px] font-medium text-white/90 uppercase">
+            {race.source === "manual"
+              ? lang === "zh" ? "手動" : "Manual"
+              : lang === "zh" ? "已匯入" : "Imported"}
+          </span>
+        </div>
       </div>
       <div className="p-3 space-y-1.5">
         <div className="flex items-start justify-between gap-2">

@@ -41,6 +41,13 @@ interface RaceRow {
   source: string;
 }
 
+const SCRAPER_SOURCES = [
+  "flyareyou_japan",
+  "flyareyou_overseas",
+  "fitz_hk",
+  "world_athletics_china",
+  "taipei_marathon_tw",
+];
 const CATEGORY_ORDER = ["Full Marathon", "Half Marathon", "Ultramarathon", "10K", "5K", "3K", "1K", "Road Race"];
 const VALID_CATEGORIES = new Set(CATEGORY_ORDER);
 const TODAY = new Date().toISOString().split("T")[0];

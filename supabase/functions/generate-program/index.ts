@@ -84,7 +84,7 @@ IMPORTANT: Use a VARIETY of workout types throughout the plan. Do NOT only use E
 
 IMPORTANT: For each non-rest workout, calculate and include the appropriate pace per km based on the target finish time. Include specific paces for easy runs, tempo runs, intervals, long runs, etc.
 
-The program should start from today working backward from race date. Be progressive, practical, include taper in the last 1-2 weeks. Use km for distances.
+The program will start on ${startDate || "today"} (week 1, day 1 = Monday of that week's training cycle) and end on/around the race date ${raceDate}. Be progressive, practical, include taper in the last 1-2 weeks. Use km for distances.
 
 Return ONLY valid JSON, no markdown, no explanation.`;
 

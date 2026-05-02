@@ -193,6 +193,14 @@ interface Props {
 }
 
 const DAY_LABELS = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
+const WEEKDAY_FROM_DATE = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
+const labelForDay = (day: any, i: number): string => {
+  if (day?.date) {
+    const dt = new Date(day.date + "T00:00:00");
+    if (!isNaN(dt.getTime())) return WEEKDAY_FROM_DATE[dt.getDay()];
+  }
+  return DAY_LABELS[i] || (day?.day?.substring(0, 3).toUpperCase() ?? "");
+};
 
 const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
   const { isPremium } = usePremium();
@@ -816,7 +824,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                     return (
                       <div key={i} className="flex items-stretch gap-2">
                         <div className="w-10 flex-shrink-0 flex flex-col items-center pt-3">
-                          <span className="text-[10px] font-medium text-muted-foreground uppercase">{DAY_LABELS[i] || day.day?.substring(0, 3).toUpperCase()}</span>
+                          <span className="text-[10px] font-medium text-muted-foreground uppercase">{labelForDay(day, i)}</span>
                           <span className={`text-sm font-bold ${isToday ? "text-primary" : "text-foreground"}`}>{dayNum}</span>
                         </div>
                         {day.type === "Rest" ? (
@@ -965,7 +973,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                     {(currentWeek.days || []).map((day: any, i: number) => (
                       <div key={i} className="flex items-stretch gap-2">
                         <div className="w-10 flex-shrink-0 flex flex-col items-center pt-3">
-                          <span className="text-[10px] font-medium text-muted-foreground uppercase">{DAY_LABELS[i] || day.day?.substring(0, 3).toUpperCase()}</span>
+                          <span className="text-[10px] font-medium text-muted-foreground uppercase">{labelForDay(day, i)}</span>
                         </div>
                         {day.type === "Rest" ? (
                           <div className="flex-1 border-l-2 border-border pl-3 py-3 min-h-[48px] flex items-center">
@@ -1184,7 +1192,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                         return (
                           <div key={i} className="flex items-stretch gap-2">
                             <div className="w-10 flex-shrink-0 flex flex-col items-center pt-3">
-                              <span className="text-[10px] font-medium text-muted-foreground uppercase">{DAY_LABELS[i] || day.day?.substring(0, 3).toUpperCase()}</span>
+                              <span className="text-[10px] font-medium text-muted-foreground uppercase">{labelForDay(day, i)}</span>
                               <span className={`text-sm font-bold ${isToday ? "text-primary" : "text-foreground"}`}>{dayNum}</span>
                             </div>
                             {day.type === "Rest" ? (
@@ -1320,7 +1328,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                     return (
                       <div key={i} className="flex items-stretch gap-2">
                         <div className="w-10 flex-shrink-0 flex flex-col items-center pt-3">
-                          <span className="text-[10px] font-medium text-muted-foreground uppercase">{DAY_LABELS[i] || day.day?.substring(0, 3).toUpperCase()}</span>
+                          <span className="text-[10px] font-medium text-muted-foreground uppercase">{labelForDay(day, i)}</span>
                           <span className={`text-sm font-bold ${isToday ? "text-primary" : "text-foreground"}`}>{dayNum}</span>
                         </div>
                         {day.type === "Rest" ? (

@@ -44,7 +44,7 @@ serve(async (req) => {
   }
 
   try {
-    const { goal, distance, targetTime, raceDate, weeks, daysPerWeek, weeklyKm, lang } = await req.json();
+    const { goal, distance, targetTime, raceDate, startDate, weeks, daysPerWeek, weeklyKm, lang } = await req.json();
 
     const isZh = lang === "zh";
     const distanceFull =
@@ -64,8 +64,8 @@ Preferred weekly volume: approximately ${weeklyKm || 30} km per week (adjust pro
 
 ${langInstruction}
 
-Structure it as a JSON array of weeks. Each week has a "week" number, "startDate" (YYYY-MM-DD), and "days" array.
-Each day has: "day" (Mon/Tue/Wed/Thu/Fri/Sat/Sun), "date" (YYYY-MM-DD), "type" (one of: "Easy Run", "Tempo Run", "Interval", "Long Run", "Recovery", "Rest", "Cross Training", "Race Pace", "Progression Run"), "title" (short workout name), "description" (see format rules below), "distance_km" (number or null for rest), "pace" (target pace per km as string like "5:30/km" or null for rest), "color" (hex color for the workout type: #4CAF50 for Easy, #FF9800 for Tempo, #F44336 for Interval, #2196F3 for Long Run, #9C27B0 for Recovery, #607D8B for Rest, #00BCD4 for Cross Training, #E91E63 for Race Pace, #FF5722 for Progression).
+Structure it as a JSON array of weeks. Each week has a "week" number and "days" array (exactly 7 days per week, ordered Monday → Sunday). DO NOT include "date" or "startDate" fields — the system assigns calendar dates after generation. Just give 7 ordered day entries per week.
+Each day has: "day" (Mon/Tue/Wed/Thu/Fri/Sat/Sun, in order), "type" (one of: "Easy Run", "Tempo Run", "Interval", "Long Run", "Recovery", "Rest", "Cross Training", "Race Pace", "Progression Run"), "title" (short workout name), "description" (see format rules below), "distance_km" (number or null for rest), "pace" (target pace per km as string like "5:30/km" or null for rest), "color" (hex color for the workout type: #4CAF50 for Easy, #FF9800 for Tempo, #F44336 for Interval, #2196F3 for Long Run, #9C27B0 for Recovery, #607D8B for Rest, #00BCD4 for Cross Training, #E91E63 for Race Pace, #FF5722 for Progression).
 
 WORKOUT TYPE DESCRIPTIONS (include a brief note of the type purpose in description):
 - Easy Run: Comfortable conversational pace to build aerobic base.
@@ -84,7 +84,7 @@ IMPORTANT: Use a VARIETY of workout types throughout the plan. Do NOT only use E
 
 IMPORTANT: For each non-rest workout, calculate and include the appropriate pace per km based on the target finish time. Include specific paces for easy runs, tempo runs, intervals, long runs, etc.
 
-The program should start from today working backward from race date. Be progressive, practical, include taper in the last 1-2 weeks. Use km for distances.
+The program will start on ${startDate || "today"} (week 1, day 1 = Monday of that week's training cycle) and end on/around the race date ${raceDate}. Be progressive, practical, include taper in the last 1-2 weeks. Use km for distances.
 
 Return ONLY valid JSON, no markdown, no explanation.`;
 
@@ -171,6 +171,35 @@ Return ONLY valid JSON, no markdown, no explanation.`;
             }
           }
         }
+      }
+    }
+
+    // Post-process: assign deterministic dates from startDate so calendar and plan view always match.
+    // Week 1 starts on the user's chosen startDate; each week is exactly 7 days, days[0]..days[6].
+    const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+    const baseStr = (startDate && /^\d{4}-\d{2}-\d{2}$/.test(startDate))
+      ? startDate
+      : new Date().toISOString().slice(0, 10);
+    const base = new Date(baseStr + "T00:00:00Z");
+    if (Array.isArray(planData) && !isNaN(base.getTime())) {
+      for (let w = 0; w < planData.length; w++) {
+        const week = planData[w];
+        if (!week || !Array.isArray(week.days)) continue;
+        // Pad/truncate to 7 days defensively
+        while (week.days.length < 7) {
+          week.days.push({ day: DAY_LABELS[week.days.length], type: "Rest", title: "Rest", description: "", distance_km: null, pace: null, color: "#607D8B" });
+        }
+        if (week.days.length > 7) week.days.length = 7;
+        for (let d = 0; d < 7; d++) {
+          const dt = new Date(base.getTime() + ((w * 7 + d) * 86400000));
+          const yyyy = dt.getUTCFullYear();
+          const mm = String(dt.getUTCMonth() + 1).padStart(2, "0");
+          const dd = String(dt.getUTCDate()).padStart(2, "0");
+          week.days[d].date = `${yyyy}-${mm}-${dd}`;
+          week.days[d].day = DAY_LABELS[(dt.getUTCDay() + 6) % 7]; // 0=Sun → Sun, shift to Mon=0
+        }
+        week.startDate = week.days[0].date;
+        week.week = w + 1;
       }
     }
 

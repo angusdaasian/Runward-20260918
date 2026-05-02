@@ -738,7 +738,7 @@ async function crossSourceDedup(supabase: any): Promise<{ merged: number; total:
 
   if (mergedCount > 0 || compressed.length < raceMap.size) {
     console.log(`Cross-source dedup: ${raceMap.size} grouped → ${compressed.length} unique races`);
-    const { error: delErr } = await supabase.from("races").delete().not("id", "is", null);
+    const { error: delErr } = await supabase.from("races").delete().in("source", SCRAPER_SOURCES);
     if (delErr) throw new Error(`Cross-source dedup delete: ${delErr.message}`);
     const rows = expandRaces(compressed);
     for (let i = 0; i < rows.length; i += 50) {

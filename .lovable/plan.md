@@ -1,56 +1,46 @@
-## Confirmed bug — approved pending races get wiped on every scrape
+# Fix: AI plan dates don't match calendar dates
 
-When an admin clicks ✓ Approve in **Pending Race Confirmation**, the row is inserted into the public `races` table with `source: "user_submitted"` (`PendingRaceManager.tsx` line 38–45).
+## Root cause
 
-But the `scrape-races` edge function deletes from `races` indiscriminately in **three** places:
+When the AI generates a training program, the edge function asks Gemini to invent both the `day` label (Mon/Tue/...) and the `date` (YYYY-MM-DD) for every workout. Two problems result:
 
-1. Line 733 — cross-source dedup: `supabase.from("races").delete().not("id", "is", null)` — wipes everything.
-2. Line 843 — per-source filtered run: `delete().eq("source", sv)` — safe (only touches the scraper's own sources).
-3. Line 846 — full run: `delete().not("id", "is", null)` — wipes everything, including `user_submitted`.
+1. **The user's `startDate` is never sent to the AI.** The frontend (`TrainingTab.handleGenerate`) collects `startDate` from the date picker and posts it, but `supabase/functions/generate-program/index.ts` ignores it — the prompt only says "start from today working backward from race date." So Gemini picks its own start day.
+2. **The AI's `day` label and `date` field can disagree.** The weekly plan view in `TrainingTab` renders each workout under a positional label (`DAY_LABELS[i]` = Mon, Tue, ...), while the calendar (`ActivityCalendar` via `fetchPlannedWorkouts`) uses the real `day.date` value. If the AI says `{day:"Mon", date:"2026-05-05"}` but May 5 is actually a Tuesday, the user sees "Recovery Run on Monday" in the plan but "Recovery Run on Tuesday" on the calendar — exactly the bug reported.
 
-So whenever the full scraper runs (or the cross-source dedup triggers), every approved community race disappears.
+## Fix
 
-### Fix
+Stop trusting the AI for dates. Compute every `date` deterministically on the server from the user's chosen `startDate`, and force the `day` label to match.
 
-Exclude any non-scraper source from deletion in all three call sites. The scraper only owns these sources:
-`flyareyou_japan`, `flyareyou_overseas`, `fitz_hk`, `world_athletics_china`, `taipei_marathon_tw`.
+### 1. `supabase/functions/generate-program/index.ts`
 
-Anything else (`user_submitted` today, plus any future admin-added or imported source) must be preserved.
+- Accept `startDate` from the request body (already sent by frontend).
+- Keep asking the AI for `week`, `day`, `type`, `title`, `description`, `distance_km`, `pace`, `color` — but tell it dates will be assigned by the system, so it can omit/ignore `date`.
+- After parsing the AI JSON, walk every week and overwrite each `day.date` based on `startDate + (weekIndex * 7) + dayIndex`, and overwrite `day.day` with the matching `Mon..Sun` label. Also fix `week.startDate`.
+- This makes the schedule always start exactly on the user-picked date and guarantees `day.day` matches the weekday of `day.date`.
 
-Concrete edits in `supabase/functions/scrape-races/index.ts`:
+### 2. `src/components/TrainingTab.tsx` (weekly plan view)
 
-1. Define a constant near the top:
-   ```ts
-   const SCRAPER_SOURCES = [
-     "flyareyou_japan",
-     "flyareyou_overseas",
-     "fitz_hk",
-     "world_athletics_china",
-     "taipei_marathon_tw",
-   ];
-   ```
+In the three places that render `currentWeek.days.map((day, i) => ...)` (lines ~812, ~965, ~1180, ~1316), replace the positional label with the real weekday derived from `day.date` so the plan view and calendar can never visually disagree even on legacy plans:
 
-2. Line 733 (cross-source dedup delete) — change to:
-   ```ts
-   await supabase.from("races").delete().in("source", SCRAPER_SOURCES);
-   ```
-   And in the SELECT at line 700, also filter `.in("source", SCRAPER_SOURCES)` so user-submitted rows are never pulled into the dedup/re-insert pipeline (otherwise they'd get re-inserted with a scraper category mapping).
+```ts
+const dateObj = day.date ? new Date(day.date + "T00:00:00") : null;
+const weekdayLabel = dateObj
+  ? ["SUN","MON","TUE","WED","THU","FRI","SAT"][dateObj.getDay()]
+  : (DAY_LABELS[i] || day.day?.substring(0,3).toUpperCase());
+```
 
-3. Line 846 (full run delete) — change to:
-   ```ts
-   await supabase.from("races").delete().in("source", SCRAPER_SOURCES);
-   ```
+Use `weekdayLabel` instead of `DAY_LABELS[i] || day.day?.substring(0,3).toUpperCase()`.
 
-4. Line 843 stays as-is (already source-scoped).
+### 3. (Optional cleanup) `ProgramsTab.tsx`
 
-### Why not just add a DB-level guard?
+Same positional-label issue exists there. Apply the same `weekdayLabel` fix for consistency, even though `Index.tsx` currently mounts `TrainingTab`.
 
-We could add a trigger that blocks deletes where `source = 'user_submitted'`, but the scraper would then throw on every run. Source-scoping the delete is the right fix and keeps the door open for other manually-added sources later.
+## Result
 
-### Optional follow-up (not required)
+- New plans: dates always begin on the user's chosen start date and the weekday label always matches the actual date — calendar and plan view show the same workout on the same day.
+- Existing/legacy plans: the plan view now derives its weekday label from `date`, so it visually matches the calendar even if the stored `day` label was wrong.
 
-Approved pending races currently get inserted with a single `category` and no `name_zh` / `description`. If you want, I can also have the approve flow let admins pick multiple categories, but that's a separate request — say the word.
+## Out of scope
 
-### Summary
-
-Single edge-function file change. No migration, no schema change, no frontend change. After deploy, approved community races will survive every scrape run.
+- Not changing storage schema.
+- Not regenerating existing plans automatically; users can re-generate to get correctly-dated plans.

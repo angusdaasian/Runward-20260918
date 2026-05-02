@@ -707,7 +707,8 @@ async function crossSourceDedup(supabase: any): Promise<{ merged: number; total:
   const { data: allRows } = await supabase
     .from("races")
     .select("id, name, name_zh, race_date, city, country, category, website_url, description, source")
-    .gte("race_date", TODAY);
+    .gte("race_date", TODAY)
+    .in("source", SCRAPER_SOURCES);
 
   if (!allRows || allRows.length === 0) return { merged: 0, total: 0 };
 

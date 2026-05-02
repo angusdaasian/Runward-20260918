@@ -196,7 +196,7 @@ Return ONLY valid JSON, no markdown, no explanation.`;
           const mm = String(dt.getUTCMonth() + 1).padStart(2, "0");
           const dd = String(dt.getUTCDate()).padStart(2, "0");
           week.days[d].date = `${yyyy}-${mm}-${dd}`;
-          week.days[d].day = DAY_LABELS[d];
+          week.days[d].day = DAY_LABELS[(dt.getUTCDay() + 6) % 7]; // 0=Sun → Sun, shift to Mon=0
         }
         week.startDate = week.days[0].date;
         week.week = w + 1;

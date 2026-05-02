@@ -851,7 +851,7 @@ Deno.serve(async (req) => {
         await supabase.from("races").delete().eq("source", sv);
       }
     } else {
-      await supabase.from("races").delete().not("id", "is", null);
+      await supabase.from("races").delete().in("source", SCRAPER_SOURCES);
     }
 
     if (allRows.length > 0) {

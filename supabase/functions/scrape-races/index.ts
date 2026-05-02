@@ -41,6 +41,13 @@ interface RaceRow {
   source: string;
 }
 
+const SCRAPER_SOURCES = [
+  "flyareyou_japan",
+  "flyareyou_overseas",
+  "fitz_hk",
+  "world_athletics_china",
+  "taipei_marathon_tw",
+];
 const CATEGORY_ORDER = ["Full Marathon", "Half Marathon", "Ultramarathon", "10K", "5K", "3K", "1K", "Road Race"];
 const VALID_CATEGORIES = new Set(CATEGORY_ORDER);
 const TODAY = new Date().toISOString().split("T")[0];
@@ -700,7 +707,8 @@ async function crossSourceDedup(supabase: any): Promise<{ merged: number; total:
   const { data: allRows } = await supabase
     .from("races")
     .select("id, name, name_zh, race_date, city, country, category, website_url, description, source")
-    .gte("race_date", TODAY);
+    .gte("race_date", TODAY)
+    .in("source", SCRAPER_SOURCES);
 
   if (!allRows || allRows.length === 0) return { merged: 0, total: 0 };
 
@@ -730,7 +738,7 @@ async function crossSourceDedup(supabase: any): Promise<{ merged: number; total:
 
   if (mergedCount > 0 || compressed.length < raceMap.size) {
     console.log(`Cross-source dedup: ${raceMap.size} grouped → ${compressed.length} unique races`);
-    const { error: delErr } = await supabase.from("races").delete().not("id", "is", null);
+    const { error: delErr } = await supabase.from("races").delete().in("source", SCRAPER_SOURCES);
     if (delErr) throw new Error(`Cross-source dedup delete: ${delErr.message}`);
     const rows = expandRaces(compressed);
     for (let i = 0; i < rows.length; i += 50) {
@@ -843,7 +851,7 @@ Deno.serve(async (req) => {
         await supabase.from("races").delete().eq("source", sv);
       }
     } else {
-      await supabase.from("races").delete().not("id", "is", null);
+      await supabase.from("races").delete().in("source", SCRAPER_SOURCES);
     }
 
     if (allRows.length > 0) {

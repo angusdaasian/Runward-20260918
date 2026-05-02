@@ -1,72 +1,56 @@
-## Problem
+## Confirmed bug — approved pending races get wiped on every scrape
 
-The April leaderboard ended but no codes were sent and XP was not reset because:
+When an admin clicks ✓ Approve in **Pending Race Confirmation**, the row is inserted into the public `races` table with `source: "user_submitted"` (`PendingRaceManager.tsx` line 38–45).
 
-1. **`reset-season` was never invoked.** Edge function logs are empty, `used_codes` table is empty, and 21 users still have non-zero `monthly_xp` (max 37,371). There is no scheduler wired up — the function only exists as an on-demand HTTP endpoint.
-2. **The function itself has bugs** that would have hurt even if it had run:
-   - It queries `reward_codes.is_assigned = false` but then **deletes** the code instead of marking it assigned, and never sets `is_assigned`. With service-role bypass the delete works, but the `is_assigned` field is dead weight.
-   - It uses `.single()` on the available-code lookup — if zero codes remain it throws (instead of `.maybeSingle()`), aborting the loop on the next iteration.
-   - It selects `reward_codes.*` then inserts into `used_codes` — needs to confirm column shape matches.
-   - It excludes the dev account (`angchenghk@gmail.com`) from the leaderboard RPC, but `reset-season` does **not** exclude them, so they could win a code.
-   - The `profiles` update uses `.gt("monthly_xp", -1)` as a "match all" hack — fine, but fragile.
-   - No idempotency — if cron fires twice in a month, codes get double-assigned.
+But the `scrape-races` edge function deletes from `races` indiscriminately in **three** places:
 
-## Fix
+1. Line 733 — cross-source dedup: `supabase.from("races").delete().not("id", "is", null)` — wipes everything.
+2. Line 843 — per-source filtered run: `delete().eq("source", sv)` — safe (only touches the scraper's own sources).
+3. Line 846 — full run: `delete().not("id", "is", null)` — wipes everything, including `user_submitted`.
 
-### 1. Schedule the job (pg_cron + pg_net)
+So whenever the full scraper runs (or the cross-source dedup triggers), every approved community race disappears.
 
-Add a cron job that calls the `reset-season` edge function at **00:05 UTC on the 1st of every month**:
+### Fix
 
-```sql
-select cron.schedule(
-  'reset-season-monthly',
-  '5 0 1 * *',
-  $$
-  select net.http_post(
-    url := 'https://kbghvclwhxnjeskdodeh.supabase.co/functions/v1/reset-season',
-    headers := jsonb_build_object(
-      'Content-Type','application/json',
-      'Authorization','Bearer <SERVICE_ROLE_KEY>'
-    ),
-    body := '{}'::jsonb
-  );
-  $$
-);
-```
+Exclude any non-scraper source from deletion in all three call sites. The scraper only owns these sources:
+`flyareyou_japan`, `flyareyou_overseas`, `fitz_hk`, `world_athletics_china`, `taipei_marathon_tw`.
 
-Service role key will be stored in a Postgres setting (`vault` or `app.settings`) so it isn't pasted in plaintext in the migration. Set `verify_jwt = false` for `reset-season` in `supabase/config.toml` so cron can call it without a user JWT (it's already service-role internally), OR keep JWT on and pass the service role token — I'll go with `verify_jwt = false` + an internal `WEBHOOK_AUTH_KEY` header check inside the function to prevent public abuse.
+Anything else (`user_submitted` today, plus any future admin-added or imported source) must be preserved.
 
-### 2. Harden `reset-season/index.ts`
+Concrete edits in `supabase/functions/scrape-races/index.ts`:
 
-- Add `WEBHOOK_AUTH_KEY` header check (reuse existing secret).
-- Change available-code lookup to `.maybeSingle()` and bail cleanly when codes run out.
-- Exclude the dev account (`angchenghk@gmail.com`) from winners, matching `get_leaderboard`.
-- Add **idempotency**: skip if `used_codes` already has rows for the target `month_year`.
-- Use a single transaction-style flow: mark code assigned (or delete) only **after** `used_codes` insert succeeds.
-- Log each step (winner id, code assigned, errors) so future runs are debuggable.
-- Add CORS headers for manual invocation.
+1. Define a constant near the top:
+   ```ts
+   const SCRAPER_SOURCES = [
+     "flyareyou_japan",
+     "flyareyou_overseas",
+     "fitz_hk",
+     "world_athletics_china",
+     "taipei_marathon_tw",
+   ];
+   ```
 
-### 3. Run the missed April reset manually
+2. Line 733 (cross-source dedup delete) — change to:
+   ```ts
+   await supabase.from("races").delete().in("source", SCRAPER_SOURCES);
+   ```
+   And in the SELECT at line 700, also filter `.in("source", SCRAPER_SOURCES)` so user-submitted rows are never pulled into the dedup/re-insert pipeline (otherwise they'd get re-inserted with a scraper category mapping).
 
-After deploy, invoke `reset-season` once via curl/edge-function tool to:
-- Assign codes to April's top 10 premium + top 3 free users.
-- Reset everyone's `monthly_xp` to 0 and rank to Bronze V.
+3. Line 846 (full run delete) — change to:
+   ```ts
+   await supabase.from("races").delete().in("source", SCRAPER_SOURCES);
+   ```
 
-I'll show you the result (codes assigned, winner list) before declaring done.
+4. Line 843 stays as-is (already source-scoped).
 
-### 4. Add an admin "Run Season Reset Now" button (optional, recommended)
+### Why not just add a DB-level guard?
 
-In `AdminPanel` / `RewardCodeManager`, add a button that invokes `reset-season` with the auth header, so you can trigger it manually if cron ever fails. Behind `has_role(uid,'admin')`.
+We could add a trigger that blocks deletes where `source = 'user_submitted'`, but the scraper would then throw on every run. Source-scoping the delete is the right fix and keeps the door open for other manually-added sources later.
 
-## Files to change
+### Optional follow-up (not required)
 
-- `supabase/functions/reset-season/index.ts` — harden + auth + idempotency
-- `supabase/config.toml` — `verify_jwt = false` for `reset-season`
-- New migration — schedule pg_cron job
-- `src/components/admin/RewardCodeManager.tsx` — add manual trigger button
-- One-time: invoke the function to process April
+Approved pending races currently get inserted with a single `category` and no `name_zh` / `description`. If you want, I can also have the approve flow let admins pick multiple categories, but that's a separate request — say the word.
 
-## Notes
+### Summary
 
-- 499 unassigned codes available, plenty for this month.
-- Cron runs in UTC; "month end" means rewards for month N are issued at 00:05 UTC on day 1 of month N+1, using `now()-1 month` to compute `month_year`. That matches the current code.
+Single edge-function file change. No migration, no schema change, no frontend change. After deploy, approved community races will survive every scrape run.

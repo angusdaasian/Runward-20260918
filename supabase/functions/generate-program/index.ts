@@ -174,6 +174,35 @@ Return ONLY valid JSON, no markdown, no explanation.`;
       }
     }
 
+    // Post-process: assign deterministic dates from startDate so calendar and plan view always match.
+    // Week 1 starts on the user's chosen startDate; each week is exactly 7 days, days[0]..days[6].
+    const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+    const baseStr = (startDate && /^\d{4}-\d{2}-\d{2}$/.test(startDate))
+      ? startDate
+      : new Date().toISOString().slice(0, 10);
+    const base = new Date(baseStr + "T00:00:00Z");
+    if (Array.isArray(planData) && !isNaN(base.getTime())) {
+      for (let w = 0; w < planData.length; w++) {
+        const week = planData[w];
+        if (!week || !Array.isArray(week.days)) continue;
+        // Pad/truncate to 7 days defensively
+        while (week.days.length < 7) {
+          week.days.push({ day: DAY_LABELS[week.days.length], type: "Rest", title: "Rest", description: "", distance_km: null, pace: null, color: "#607D8B" });
+        }
+        if (week.days.length > 7) week.days.length = 7;
+        for (let d = 0; d < 7; d++) {
+          const dt = new Date(base.getTime() + ((w * 7 + d) * 86400000));
+          const yyyy = dt.getUTCFullYear();
+          const mm = String(dt.getUTCMonth() + 1).padStart(2, "0");
+          const dd = String(dt.getUTCDate()).padStart(2, "0");
+          week.days[d].date = `${yyyy}-${mm}-${dd}`;
+          week.days[d].day = DAY_LABELS[d];
+        }
+        week.startDate = week.days[0].date;
+        week.week = w + 1;
+      }
+    }
+
     return new Response(JSON.stringify({ plan: planData, raw: content }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

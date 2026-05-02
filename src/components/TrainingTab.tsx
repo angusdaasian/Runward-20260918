@@ -193,6 +193,14 @@ interface Props {
 }
 
 const DAY_LABELS = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
+const WEEKDAY_FROM_DATE = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
+const labelForDay = (day: any, i: number): string => {
+  if (day?.date) {
+    const dt = new Date(day.date + "T00:00:00");
+    if (!isNaN(dt.getTime())) return WEEKDAY_FROM_DATE[dt.getDay()];
+  }
+  return DAY_LABELS[i] || (day?.day?.substring(0, 3).toUpperCase() ?? "");
+};
 
 const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
   const { isPremium } = usePremium();

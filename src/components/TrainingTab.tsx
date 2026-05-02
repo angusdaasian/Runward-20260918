@@ -973,7 +973,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                     {(currentWeek.days || []).map((day: any, i: number) => (
                       <div key={i} className="flex items-stretch gap-2">
                         <div className="w-10 flex-shrink-0 flex flex-col items-center pt-3">
-                          <span className="text-[10px] font-medium text-muted-foreground uppercase">{DAY_LABELS[i] || day.day?.substring(0, 3).toUpperCase()}</span>
+                          <span className="text-[10px] font-medium text-muted-foreground uppercase">{labelForDay(day, i)}</span>
                         </div>
                         {day.type === "Rest" ? (
                           <div className="flex-1 border-l-2 border-border pl-3 py-3 min-h-[48px] flex items-center">

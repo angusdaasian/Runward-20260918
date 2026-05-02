@@ -1328,7 +1328,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                     return (
                       <div key={i} className="flex items-stretch gap-2">
                         <div className="w-10 flex-shrink-0 flex flex-col items-center pt-3">
-                          <span className="text-[10px] font-medium text-muted-foreground uppercase">{DAY_LABELS[i] || day.day?.substring(0, 3).toUpperCase()}</span>
+                          <span className="text-[10px] font-medium text-muted-foreground uppercase">{labelForDay(day, i)}</span>
                           <span className={`text-sm font-bold ${isToday ? "text-primary" : "text-foreground"}`}>{dayNum}</span>
                         </div>
                         {day.type === "Rest" ? (

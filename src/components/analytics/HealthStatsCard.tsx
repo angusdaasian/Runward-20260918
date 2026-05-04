@@ -1,11 +1,6 @@
-import { Activity, HeartPulse, Moon, Sparkles, RefreshCw, Footprints } from "lucide-react";
+import { Activity, HeartPulse, Moon, RefreshCw, Footprints } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Lang } from "@/lib/i18n";
-import {
-  useGarminDailyHealth,
-  useHasGarminConnection,
-  useRefreshGarminDailyHealth,
-} from "@/hooks/use-garmin-daily-health";
 import {
   useTerraConnections,
   useTerraDailyHealth,

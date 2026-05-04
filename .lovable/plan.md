@@ -1,31 +1,23 @@
-# Plan: Splits & route from Terra activities
+## Garmin/Terra deeplink return via pacecalculator.fun
 
-## 1. `supabase/functions/terra-webhook/index.ts`
+### Files
 
-- Add helpers:
-  - `encodePolyline(points)` — Google encoded polyline algorithm.
-  - `extractGpsPoints(a)` — pulls `position_data.position_samples[]` (and known fallbacks) into `[lat, lng][]`.
-  - `extractLaps(a)` — normalises `lap_data.laps[]` into `{ lap_index, start_time, end_time, duration_seconds, distance_meters, avg_hr, max_hr, avg_speed, max_speed, avg_cadence, calories, elevation_gain }` matching the lap shape Garmin activities already use.
-- In the historical re-fetch (auth handler) call Terra with `with_samples=true` for the `activity` endpoint only (keep `false` for `daily` and `sleep` to limit payload size).
-- In the activity handler upsert, also set:
-  - `laps` = `extractLaps(a)`
-  - `summary_polyline` = `encodePolyline(extractGpsPoints(a))` (null if empty)
-  - `has_gps` = points.length > 0
+**1. New: `src/pages/TerraReturn.tsx`**
+- Reads `?status=success|failure&provider=...`
+- On mount: `window.location.href = "despia://pacecalculator.fun/?tab=more&page=connect-apps&terra=<status>&provider=<p>"`
+- After 1.2s shows fallback card: "Open Runward app" button (re-fires deeplink) + "Continue in browser" link to `https://pacecalculator.fun/?tab=more&page=connect-apps&terra=<status>`
+- Minimal standalone UI using design tokens (bg-background, bg-card, text-primary, etc.)
 
-## 2. `src/hooks/use-activities.ts`
+**2. `src/App.tsx`**
+- Import `TerraReturn`
+- Register `<Route path="/terra-return" element={<TerraReturn />} />`
 
-- `fetchTerraActivities` already maps `summary_polyline` and `laps`; nothing else to change — the new columns will start populating once the webhook updates rows.
+**3. `src/components/ConnectApps.tsx` (handleTerraConnect, ~line 200)**
+- Replace dynamic `window.location.origin` redirect URLs with hardcoded:
+  - `https://pacecalculator.fun/terra-return?status=success&provider=<P>`
+  - `https://pacecalculator.fun/terra-return?status=failure&provider=<P>`
+- Existing in-app `?terra=success` handler (lines 175-191) remains unchanged — it fires once the deeplink reopens the app at `/?tab=more&page=connect-apps&terra=success`.
 
-## 3. One-time backfill
-
-- After deploy, trigger `garmin_backfill` again (re-auth or a manual fetch) so the existing 90 days of `terra_activities` rows get re-upserted with samples enabled. The webhook upsert is keyed on `(user_id, terra_activity_id)`, so existing rows update in place.
-
-## Technical notes
-
-- Terra v2 sample payloads can be large; we only request samples for `activity`, not `daily`/`sleep`.
-- Polyline encoding is done server-side so the client stays unchanged and the existing Strava/Garmin map components render Terra activities the same way.
-- Lap shape mirrors what `garmin_activities.laps` already stores so `ActivityDetail` renders splits without a code change.
-
-## Out of scope
-
-- No FIT-file parsing, no schema migration, no UI changes.
+### No changes
+- `terra-auth-init` edge function — already forwards whatever URLs the client sends
+- Existing toast + `loadTerraConns()` polling in ConnectApps

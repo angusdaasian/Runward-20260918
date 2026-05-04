@@ -177,6 +177,9 @@ const ConnectApps = ({ lang, onBack }: Props) => {
       const t = setInterval(() => { loadTerraConns(); if (++n >= 6) clearInterval(t); }, 2000);
       const url = new URL(window.location.href);
       url.searchParams.delete("terra");
+      url.searchParams.delete("user_id");
+      url.searchParams.delete("reference_id");
+      url.searchParams.delete("resource");
       window.history.replaceState({}, "", url.toString());
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -185,9 +188,18 @@ const ConnectApps = ({ lang, onBack }: Props) => {
   const handleTerraConnect = async (provider: TerraProvider) => {
     setTerraBusy(provider);
     try {
-      const origin = window.location.origin + window.location.pathname;
+      const successUrl = new URL(window.location.origin + window.location.pathname);
+      successUrl.searchParams.set("tab", "more");
+      successUrl.searchParams.set("page", "connect-apps");
+      successUrl.searchParams.set("terra", "success");
+
+      const failureUrl = new URL(window.location.origin + window.location.pathname);
+      failureUrl.searchParams.set("tab", "more");
+      failureUrl.searchParams.set("page", "connect-apps");
+      failureUrl.searchParams.set("terra", "failure");
+
       const { data, error } = await supabase.functions.invoke("terra-auth-init", {
-        body: { provider, success_url: `${origin}?terra=success`, failure_url: `${origin}?terra=failure` },
+        body: { provider, success_url: successUrl.toString(), failure_url: failureUrl.toString() },
       });
       if (error || !data?.auth_url) throw new Error(error?.message || "no auth url");
       window.location.href = data.auth_url;

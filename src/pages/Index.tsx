@@ -32,7 +32,7 @@ const Index = () => {
   const { isAdmin } = useAdmin();
   const { online } = useOnlineStatus();
   const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState<Tab>(() => {
     const tabParam = searchParams.get("tab");
     // Back-compat: redirect old `posture` deeplinks into `analytics`
@@ -57,6 +57,16 @@ const Index = () => {
     () => sessionStorage.getItem(ONBOARDING_SIGNUP_IN_PROGRESS_KEY) === "true"
   );
   const [checkingProfile, setCheckingProfile] = useState(false);
+
+  useEffect(() => {
+    const tabParam = searchParams.get("tab");
+    if (tabParam === "training" || tabParam === "analytics" || tabParam === "activities" || tabParam === "more" || tabParam === "community" || tabParam === "races") {
+      setActiveTab(tabParam);
+    } else if (tabParam === "posture") {
+      setActiveTab("analytics");
+    }
+    setShowConnectApps(searchParams.get("page") === "connect-apps");
+  }, [searchParams]);
 
   // Preload header profile as soon as user is known
   useEffect(() => {

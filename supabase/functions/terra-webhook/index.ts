@@ -13,10 +13,14 @@ const supa = createClient(
 async function verifySignature(secret: string, header: string | null, raw: string): Promise<boolean> {
   if (!header) return false;
   // header format: "t=<timestamp>,v1=<signature>"
-  const parts = Object.fromEntries(header.split(",").map((p) => p.split("=") as [string, string]));
+  const entries = header
+    .split(",")
+    .map((p) => p.trim().split("=") as [string, string])
+    .filter(([key, value]) => key && value);
+  const parts = Object.fromEntries(entries);
   const t = parts.t;
-  const v1 = parts.v1;
-  if (!t || !v1) return false;
+  const signatures = entries.filter(([key]) => key === "v1").map(([, value]) => value);
+  if (!t || signatures.length === 0) return false;
   const payload = `${t}.${raw}`;
   const key = await crypto.subtle.importKey(
     "raw",
@@ -27,7 +31,7 @@ async function verifySignature(secret: string, header: string | null, raw: strin
   );
   const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(payload));
   const hex = Array.from(new Uint8Array(sig)).map((b) => b.toString(16).padStart(2, "0")).join("");
-  return hex === v1;
+  return signatures.some((signature) => hex === signature);
 }
 
 function mapProvider(resource: string | undefined | null): string {

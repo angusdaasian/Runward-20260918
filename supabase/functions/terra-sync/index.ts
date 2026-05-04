@@ -309,8 +309,11 @@ Deno.serve(async (req) => {
         }
       } catch (e) { console.error("sleep fetch failed", c.provider, e); }
 
+      const sleepRows = Object.values(dailyByDate).filter((r: any) => r.sleep_seconds != null).length;
+      console.log(`[terra-sync] daily upsert ${c.provider}: total=${Object.values(dailyByDate).length} withSleep=${sleepRows}`);
       for (const row of Object.values(dailyByDate)) {
-        await admin.from("terra_daily_health").upsert(row, { onConflict: "user_id,provider,date" });
+        const { error: upErr } = await admin.from("terra_daily_health").upsert(row, { onConflict: "user_id,provider,date" });
+        if (upErr) console.error(`[terra-sync] upsert failed for ${(row as any).date}:`, upErr.message, JSON.stringify(row));
         dailyCount++;
       }
 

@@ -216,6 +216,9 @@ Deno.serve(async (req) => {
           const cal = a?.calories_data ?? {};
           const elev = a?.distance_data?.summary?.elevation ?? {};
           const aid = String(meta?.upload_type ?? "") + ":" + String(meta?.summary_id ?? meta?.id ?? meta?.start_time ?? crypto.randomUUID());
+          const gpsPoints = extractGpsPoints(a);
+          const polyline = gpsPoints.length > 1 ? encodePolyline(gpsPoints) : null;
+          const laps = extractLaps(a);
           await supa.from("terra_activities").upsert({
             user_id: appUserId,
             provider,
@@ -230,6 +233,9 @@ Deno.serve(async (req) => {
             max_hr: hr?.max_hr_bpm ? Math.round(hr.max_hr_bpm) : null,
             elevation_gain: elev?.gain_actual_meters ?? null,
             average_speed: a?.movement_data?.avg_speed_meters_per_second ?? null,
+            summary_polyline: polyline,
+            has_gps: gpsPoints.length > 0,
+            laps,
             raw_json: a,
           }, { onConflict: "user_id,terra_activity_id" });
         }

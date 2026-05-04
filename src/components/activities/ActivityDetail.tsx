@@ -103,10 +103,11 @@ const StatBox = ({ icon: Icon, label, value, unit, iconColor }: {
 const ActivityDetail = ({ activity, lang, onBack, isPremium, trainingScore }: Props) => {
   const isAppleHealth = activity.source === "Apple Health";
   const isGarmin = activity.source === "Garmin";
-  const isTerraGarmin = isGarmin || activity.source === "Terra";
+  const isTerraActivity = activity.source?.startsWith("Terra") ?? false;
+  const isTerraGarmin = isTerraActivity && activity.source === "Terra Garmin";
   const isCoros = activity.source === "COROS";
-  const needsRpe = isAppleHealth || isTerraGarmin || isCoros;
-  const dbTable = isAppleHealth ? "apple_health_activities" : isGarmin || isCoros ? "garmin_activities" : activity.source === "Terra" ? "terra_activities" : "strava_activities";
+  const needsRpe = isAppleHealth || isGarmin || isTerraActivity || isCoros;
+  const dbTable = isAppleHealth ? "apple_health_activities" : isGarmin || isCoros ? "garmin_activities" : isTerraActivity ? "terra_activities" : "strava_activities";
 
   const [streams, setStreams] = useState<any[]>([]);
   const [splits, setSplits] = useState<Split[] | null>(null);
@@ -330,7 +331,7 @@ const ActivityDetail = ({ activity, lang, onBack, isPremium, trainingScore }: Pr
       // Apple Health / Garmin/Terra: no Strava streams. Map laps to splits.
       if (needsRpe || !activity.strava_id || activity.strava_id <= 0) {
         setStreams([]);
-        if (isTerraGarmin && Array.isArray(activity.laps) && activity.laps.length > 0) {
+        if ((isGarmin || isTerraActivity) && Array.isArray(activity.laps) && activity.laps.length > 0) {
           const mapped: Split[] = activity.laps.map((lap: any, idx: number) => {
             const distance = Number(lap.distance ?? lap.distance_meters) || 0;
             const elapsed = Number(

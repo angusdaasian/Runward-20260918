@@ -178,9 +178,11 @@ Deno.serve(async (req) => {
     const devId = Deno.env.get("TERRA_DEV_ID")!;
     const apiKey = Deno.env.get("TERRA_API_KEY")!;
     const end = new Date();
+    end.setDate(end.getDate() + 1);
     const start = new Date(); start.setDate(start.getDate() - 30);
     // Terra date params: use YYYY-MM-DD only. Full ISO timestamps cause /v2/sleep
-    // (and others) to return 0 items.
+    // (and others) to return 0 items. Terra sleep end_date behaves like an
+    // exclusive upper bound, so ask through tomorrow to include today's wake-day.
     const startStr = start.toISOString().slice(0, 10);
     const endStr = end.toISOString().slice(0, 10);
 

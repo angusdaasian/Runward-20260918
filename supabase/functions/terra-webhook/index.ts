@@ -228,7 +228,8 @@ function lapElevationGain(lap: any, elevationSamples: ReturnType<typeof extractE
   const startMs = lap?.start_time ? new Date(lap.start_time).getTime() : NaN;
   const endMs = lap?.end_time ? new Date(lap.end_time).getTime() : NaN;
   if (Number.isFinite(startMs) && Number.isFinite(endMs)) {
-    return computeElevationGain(elevationSamples.filter((s) => s.timestampMs !== null && s.timestampMs >= startMs && s.timestampMs <= endMs));
+    const byTimestamp = computeElevationGain(elevationSamples.filter((s) => s.timestampMs !== null && s.timestampMs >= startMs && s.timestampMs <= endMs));
+    if (byTimestamp !== null) return byTimestamp;
   }
 
   const activityStartMs = activityStartTime ? new Date(activityStartTime).getTime() : NaN;

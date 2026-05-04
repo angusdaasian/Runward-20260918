@@ -71,7 +71,7 @@ export function useRefreshTerraDailyHealth(lang: Lang) {
       setRefreshing(true);
       try {
         const { data, error } = await supabase.functions.invoke("terra-sync", {
-          body: provider ? { provider } : {},
+          body: { healthOnly: true, ...(provider ? { provider } : {}) },
         });
         if (error || !data?.ok) {
           toast.error(

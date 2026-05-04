@@ -234,7 +234,8 @@ Deno.serve(async (req) => {
         }
       } catch (e) { console.error("activity fetch failed", c.provider, e); }
 
-      // daily
+      // daily (steps, resting hr, vo2max)
+      const dailyByDate: Record<string, any> = {};
       try {
         const r = await fetch(`https://api.tryterra.co/v2/daily?user_id=${c.terra_user_id}&start_date=${startStr}&end_date=${endStr}&to_webhook=false&with_samples=false`, { headers });
         const j = await r.json();
@@ -243,17 +244,44 @@ Deno.serve(async (req) => {
           const meta = d?.metadata ?? {};
           const date = (meta?.start_time ?? "").slice(0, 10);
           if (!date) continue;
-          await admin.from("terra_daily_health").upsert({
+          dailyByDate[date] = {
             user_id: c.user_id,
             provider: c.provider,
             date,
             resting_hr: d?.heart_rate_data?.summary?.resting_hr_bpm ?? null,
             steps: d?.distance_data?.steps ?? null,
             vo2max: d?.MET_data?.avg_level ?? null,
-          }, { onConflict: "user_id,provider,date" });
-          dailyCount++;
+          };
         }
       } catch (e) { console.error("daily fetch failed", c.provider, e); }
+
+      // sleep (sleep_seconds, sleep_score)
+      try {
+        const r = await fetch(`https://api.tryterra.co/v2/sleep?user_id=${c.terra_user_id}&start_date=${startStr}&end_date=${endStr}&to_webhook=false&with_samples=false`, { headers });
+        const j = await r.json();
+        const items = Array.isArray(j?.data) ? j.data : [];
+        for (const d of items) {
+          const meta = d?.metadata ?? {};
+          const date = (meta?.start_time ?? meta?.end_time ?? "").slice(0, 10);
+          if (!date) continue;
+          const asleepSec = toFiniteNumber(d?.sleep_durations_data?.asleep?.duration_asleep_state_seconds)
+            ?? toFiniteNumber(d?.sleep_durations_data?.sleep_efficiency)
+            ?? toFiniteNumber(d?.sleep_durations_data?.other?.duration_in_bed_seconds);
+          const score = toFiniteNumber(d?.scores?.sleep) ?? toFiniteNumber(d?.scores?.overall);
+          const existing = dailyByDate[date] ?? {
+            user_id: c.user_id, provider: c.provider, date,
+            resting_hr: null, steps: null, vo2max: null,
+          };
+          existing.sleep_seconds = asleepSec ? Math.round(asleepSec) : null;
+          existing.sleep_score = score ? Math.round(score) : null;
+          dailyByDate[date] = existing;
+        }
+      } catch (e) { console.error("sleep fetch failed", c.provider, e); }
+
+      for (const row of Object.values(dailyByDate)) {
+        await admin.from("terra_daily_health").upsert(row, { onConflict: "user_id,provider,date" });
+        dailyCount++;
+      }
 
       await admin.from("terra_connections").update({ last_synced_at: new Date().toISOString() }).eq("id", c.id);
     }

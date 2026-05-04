@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.reset-season]
 verify_jwt = false
+
+[functions.terra-webhook]
+verify_jwt = false

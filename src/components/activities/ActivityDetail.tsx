@@ -201,7 +201,7 @@ const ActivityDetail = ({ activity, lang, onBack, isPremium, trainingScore }: Pr
         ...(userComment.trim() ? { userComment: userComment.trim() } : {}),
         ...(opts?.forceRefresh ? { forceRefresh: true } : {}),
       };
-      if (isGarmin && activity.laps && Array.isArray(activity.laps) && activity.laps.length > 0) {
+      if ((isGarmin || isTerraActivity) && activity.laps && Array.isArray(activity.laps) && activity.laps.length > 0) {
         bodyPayload.garminLaps = activity.laps;
       }
       const { data, error } = await supabase.functions.invoke("analyze-activity", { body: bodyPayload });

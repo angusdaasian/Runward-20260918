@@ -156,20 +156,28 @@ async function deleteMatchingGarminDuplicate(admin: any, userId: string, startTi
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   try {
+    const body = await req.json().catch(() => ({}));
+    const internalKey = req.headers.get("x-webhook-key");
+    const expectedInternalKey = Deno.env.get("WEBHOOK_AUTH_KEY");
+    const isInternal = !!internalKey && !!expectedInternalKey && internalKey === expectedInternalKey;
     const auth = req.headers.get("Authorization") ?? "";
-    const userClient = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_ANON_KEY")!,
-      { global: { headers: { Authorization: auth } } },
-    );
-    const { data: { user } } = await userClient.auth.getUser();
-    if (!user) return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    let userId = typeof body.user_id === "string" ? body.user_id : null;
+    if (!isInternal) {
+      const userClient = createClient(
+        Deno.env.get("SUPABASE_URL")!,
+        Deno.env.get("SUPABASE_ANON_KEY")!,
+        { global: { headers: { Authorization: auth } } },
+      );
+      const { data: { user } } = await userClient.auth.getUser();
+      if (!user) return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      userId = user.id;
+    }
+    if (!userId) return new Response(JSON.stringify({ error: "missing user_id" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
     const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-    const body = await req.json().catch(() => ({}));
     const providerFilter: string | undefined = body.provider ? String(body.provider).toUpperCase() : undefined;
 
-    const q = admin.from("terra_connections").select("*").eq("user_id", user.id).eq("active", true);
+    const q = admin.from("terra_connections").select("*").eq("user_id", userId).eq("active", true);
     const { data: conns } = providerFilter ? await q.eq("provider", providerFilter) : await q;
     if (!conns || conns.length === 0) {
       return new Response(JSON.stringify({ ok: true, synced: 0, message: "no active connections" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });

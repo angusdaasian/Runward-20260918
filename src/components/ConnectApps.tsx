@@ -148,9 +148,9 @@ const ConnectApps = ({ lang, onBack }: Props) => {
 
   type TerraProvider = "GARMIN" | "POLAR" | "SUUNTO" | "COROS";
   const TERRA_PROVIDERS: { id: TerraProvider; label: string; icon: string }[] = [
+    { id: "GARMIN", label: "Garmin", icon: garminIcon },
     { id: "COROS", label: "COROS", icon: corosIcon },
     { id: "POLAR", label: "Polar", icon: polarIcon },
-    { id: "GARMIN", label: "Garmin", icon: garminIcon },
     { id: "SUUNTO", label: "Suunto", icon: suuntoIcon },
   ];
   const [terraConns, setTerraConns] = useState<Record<string, { id: string; last_synced_at: string | null }>>({});

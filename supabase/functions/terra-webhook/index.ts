@@ -291,6 +291,42 @@ function extractDurationSeconds(a: any, distanceMeters?: number | null): number 
   return null;
 }
 
+function extractSleepDate(s: any): string {
+  const meta = s?.metadata ?? {};
+  return (meta?.end_time ?? meta?.start_time ?? "").slice(0, 10);
+}
+
+function extractSleepSeconds(s: any): number | null {
+  const sd = s?.sleep_durations_data ?? {};
+  const asleep = sd?.asleep ?? {};
+  const awake = sd?.awake ?? {};
+  const other = sd?.other ?? {};
+  const directAsleep = toFiniteNumber(asleep?.duration_asleep_state_seconds);
+  const deep = toFiniteNumber(asleep?.duration_deep_sleep_state_seconds);
+  const light = toFiniteNumber(asleep?.duration_light_sleep_state_seconds);
+  const rem = toFiniteNumber(asleep?.duration_REM_sleep_state_seconds);
+  const sumStages = deep != null || light != null || rem != null ? (deep ?? 0) + (light ?? 0) + (rem ?? 0) : null;
+  const inBedSec = toFiniteNumber(other?.duration_in_bed_seconds);
+  const awakeSec = toFiniteNumber(awake?.duration_awake_state_seconds);
+  const fromInBed = inBedSec != null ? inBedSec - (awakeSec ?? 0) : null;
+  const meta = s?.metadata ?? {};
+  const st = meta?.start_time ? Date.parse(meta.start_time) : NaN;
+  const et = meta?.end_time ? Date.parse(meta.end_time) : NaN;
+  const fromWindow = Number.isFinite(st) && Number.isFinite(et) && et > st
+    ? Math.round((et - st) / 1000) - (awakeSec ?? 0)
+    : null;
+  const total = directAsleep ?? sumStages ?? fromInBed ?? fromWindow;
+  return total != null && total > 0 ? Math.round(total) : null;
+}
+
+function extractSleepScore(s: any): number | null {
+  const score = toFiniteNumber(s?.scores?.sleep)
+    ?? toFiniteNumber(s?.scores?.overall)
+    ?? toFiniteNumber(s?.scores?.sleep_score)
+    ?? toFiniteNumber(s?.sleep_score);
+  return score != null ? Math.round(score) : null;
+}
+
 async function deleteMatchingGarminDuplicate(userId: string, startTime: string | null, distanceMeters: number | null) {
   if (!startTime || !distanceMeters || distanceMeters <= 0) return;
   const start = new Date(startTime);

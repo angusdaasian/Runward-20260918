@@ -929,6 +929,30 @@ export type Database = {
         }
         Relationships: []
       }
+      social_rewards_claimed: {
+        Row: {
+          claimed_at: string
+          id: string
+          reward_key: string
+          user_id: string
+          xp_awarded: number
+        }
+        Insert: {
+          claimed_at?: string
+          id?: string
+          reward_key: string
+          user_id: string
+          xp_awarded?: number
+        }
+        Update: {
+          claimed_at?: string
+          id?: string
+          reward_key?: string
+          user_id?: string
+          xp_awarded?: number
+        }
+        Relationships: []
+      }
       strava_activities: {
         Row: {
           average_heartrate: number | null

@@ -493,6 +493,7 @@ const ActivitiesTab = ({ lang }: Props) => {
         onBack={() => {
           setSelectedActivity(null);
         }}
+        onDeleted={invalidateAll}
         isPremium={isPremium}
         trainingScore={profile?.training_score ?? undefined}
       />

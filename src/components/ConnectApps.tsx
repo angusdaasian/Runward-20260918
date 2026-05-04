@@ -412,7 +412,7 @@ const ConnectApps = ({ lang, onBack }: Props) => {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center overflow-hidden">
-                        <img src={p.icon} alt={p.label} className="w-7 h-7 object-contain" />
+                        <img src={p.icon} alt={p.label} className="w-full h-full object-cover" />
                       </div>
                       <div>
                         <span className="font-medium text-foreground block">{p.label}</span>

@@ -219,8 +219,7 @@ Deno.serve(async (req) => {
         if (provider === "GARMIN") {
           const days = 7;
           const since = new Date(Date.now() - days * 86400_000);
-          const sinceISO = since.toISOString();
-          const sinceDate = sinceISO.slice(0, 10);
+          const sinceDate = since.toISOString().slice(0, 10);
           const endDate = new Date().toISOString().slice(0, 10);
           const startDate = sinceDate;
 

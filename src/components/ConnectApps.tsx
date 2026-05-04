@@ -191,6 +191,10 @@ const ConnectApps = ({ lang, onBack }: Props) => {
   }, []);
 
   const handleTerraConnect = async (provider: TerraProvider) => {
+    if (hasTerraConn) {
+      toast.error(lang === "zh" ? "請先中斷現有裝置連結" : "Please disconnect the current device first");
+      return;
+    }
     setTerraBusy(provider);
     try {
       const successUrl = new URL(window.location.origin + window.location.pathname);

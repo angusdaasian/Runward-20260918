@@ -134,24 +134,15 @@ const HealthStatsCard = ({ lang }: Props) => {
           label={lang === "zh" ? "睡眠時間" : "Sleep"}
           value={fmtSleep(latest?.sleep_seconds ?? null)}
         />
-        {active === "GARMIN" && hasGarminRailway ? (
-          <Stat
-            icon={<Sparkles size={14} className="text-amber-400" />}
-            label={lang === "zh" ? "睡眠分數" : "Sleep Score"}
-            value={latest?.sleep_score != null ? String(latest.sleep_score) : "—"}
-            valueClass={sleepScoreClass(latest?.sleep_score ?? null)}
-          />
-        ) : (
-          <Stat
-            icon={<Footprints size={14} className="text-emerald-500" />}
-            label={lang === "zh" ? "步數" : "Steps"}
-            value={
-              latest && (latest as any).steps != null
-                ? Number((latest as any).steps).toLocaleString()
-                : "—"
-            }
-          />
-        )}
+        <Stat
+          icon={<Footprints size={14} className="text-emerald-500" />}
+          label={lang === "zh" ? "步數" : "Steps"}
+          value={
+            latest && (latest as any).steps != null
+              ? Number((latest as any).steps).toLocaleString()
+              : "—"
+          }
+        />
       </div>
     </Card>
   );

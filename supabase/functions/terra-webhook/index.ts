@@ -236,7 +236,7 @@ Deno.serve(async (req) => {
             summary_polyline: polyline,
             has_gps: gpsPoints.length > 0,
             laps,
-            raw_json: a,
+            raw_json: null,
           }, { onConflict: "user_id,terra_activity_id" });
         }
       } else if (type === "daily" && appUserId) {

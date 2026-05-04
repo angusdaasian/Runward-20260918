@@ -441,6 +441,8 @@ Deno.serve(async (req) => {
           }, { onConflict: "user_id,terra_activity_id" });
           await deleteMatchingGarminDuplicate(appUserId, meta?.start_time ?? null, distanceMeters);
         }
+        // Recalculate XP & leaderboard rank from terra_activities
+        await recalcUserXp(appUserId);
       } else if (type === "daily" && appUserId) {
         const items = Array.isArray(payload?.data) ? payload.data : [payload?.data].filter(Boolean);
         for (const d of items) {

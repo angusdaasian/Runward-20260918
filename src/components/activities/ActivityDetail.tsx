@@ -104,7 +104,6 @@ const ActivityDetail = ({ activity, lang, onBack, isPremium, trainingScore }: Pr
   const isAppleHealth = activity.source === "Apple Health";
   const isGarmin = activity.source === "Garmin";
   const isTerraActivity = activity.source?.startsWith("Terra") ?? false;
-  const isTerraGarmin = isTerraActivity && activity.source === "Terra Garmin";
   const isCoros = activity.source === "COROS";
   const needsRpe = isAppleHealth || isGarmin || isTerraActivity || isCoros;
   const dbTable = isAppleHealth ? "apple_health_activities" : isGarmin || isCoros ? "garmin_activities" : isTerraActivity ? "terra_activities" : "strava_activities";

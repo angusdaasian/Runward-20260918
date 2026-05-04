@@ -275,18 +275,20 @@ Deno.serve(async (req) => {
           const asleep = sd?.asleep ?? {};
           const other = sd?.other ?? {};
           const awake = sd?.awake ?? {};
-          const asleepSec =
-            toFiniteNumber(asleep?.duration_asleep_state_seconds)
-            ?? toFiniteNumber(asleep?.duration_deep_sleep_state_seconds) != null
-              ? (toFiniteNumber(asleep?.duration_deep_sleep_state_seconds) ?? 0)
-                + (toFiniteNumber(asleep?.duration_light_sleep_state_seconds) ?? 0)
-                + (toFiniteNumber(asleep?.duration_REM_sleep_state_seconds) ?? 0)
+          const directAsleep = toFiniteNumber(asleep?.duration_asleep_state_seconds);
+          const deep = toFiniteNumber(asleep?.duration_deep_sleep_state_seconds);
+          const light = toFiniteNumber(asleep?.duration_light_sleep_state_seconds);
+          const rem = toFiniteNumber(asleep?.duration_REM_sleep_state_seconds);
+          const sumStages =
+            deep != null || light != null || rem != null
+              ? (deep ?? 0) + (light ?? 0) + (rem ?? 0)
               : null;
           const inBedSec = toFiniteNumber(other?.duration_in_bed_seconds);
-          const totalSec = asleepSec
-            ?? (inBedSec != null && toFiniteNumber(awake?.duration_awake_state_seconds) != null
-              ? inBedSec - (toFiniteNumber(awake?.duration_awake_state_seconds) ?? 0)
-              : inBedSec);
+          const awakeSec = toFiniteNumber(awake?.duration_awake_state_seconds);
+          const fromInBed = inBedSec != null
+            ? inBedSec - (awakeSec ?? 0)
+            : null;
+          const totalSec = directAsleep ?? sumStages ?? fromInBed;
           const score = toFiniteNumber(d?.scores?.sleep) ?? toFiniteNumber(d?.scores?.overall);
           const existing = dailyByDate[date] ?? {
             user_id: c.user_id, provider: c.provider, date,

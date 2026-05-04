@@ -354,6 +354,15 @@ async function deleteMatchingGarminDuplicate(userId: string, startTime: string |
 
 async function pushActivityUploadedNotification(appUserId: string) {
   try {
+    const { data: profile } = await supa
+      .from("profiles")
+      .select("activity_notifications")
+      .eq("user_id", appUserId)
+      .single();
+    if (!profile?.activity_notifications) {
+      console.log(`[terra-webhook] notifications disabled for ${appUserId}, skipping`);
+      return;
+    }
     const onesignalAppId = Deno.env.get("ONESIGNAL_APP_ID");
     const onesignalApiKey = Deno.env.get("ONESIGNAL_REST_API_KEY");
     if (!onesignalAppId || !onesignalApiKey) return;

@@ -311,13 +311,18 @@ export function useActivities() {
     staleTime: 5 * 60 * 1000,
   });
 
-  // Merge Strava + Apple Health + Garmin + Terra activities (dedup by terra_activity_id when overlap)
+  // Merge Strava + Apple Health + Garmin + Terra activities (prefer Terra over duplicate Garmin imports)
   const mergedActivities = useMemo(() => {
     const strava = activitiesQuery.data || [];
     const ah = appleHealthQuery.data || [];
     const gm = garminQuery.data || [];
     const tr = terraQuery.data || [];
-    const all = [...strava, ...ah, ...gm, ...tr];
+    const filteredGarmin = gm.filter((g) => !tr.some((t) => {
+      const timeDiff = Math.abs(new Date(g.start_date).getTime() - new Date(t.start_date).getTime());
+      const distanceDiff = Math.abs((g.distance || 0) - (t.distance || 0));
+      return timeDiff < 5 * 60 * 1000 && distanceDiff < 100;
+    }));
+    const all = [...strava, ...ah, ...filteredGarmin, ...tr];
     all.sort((a, b) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime());
     return all;
   }, [activitiesQuery.data, appleHealthQuery.data, garminQuery.data, terraQuery.data]);

@@ -318,54 +318,50 @@ const ConnectApps = ({ lang, onBack }: Props) => {
           </div>
         </div>
 
-        {/* Garmin Connect */}
-        <div className={`bg-card border border-border rounded-xl p-4 ${hasFitnessApp && !garminConnected ? "opacity-50" : ""}`}>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center text-lg">
-                ⌚
-              </div>
-              <div>
-                <span className="font-medium text-foreground block">Garmin Connect</span>
-                <span className="text-xs text-muted-foreground">
-                  {lang === "zh"
-                    ? "同步跑步數據、心率、海拔及訓練負荷"
-                    : "Sync runs, HR, elevation & training load"}
-                </span>
+        {/* Terra device connections (Garmin / Polar / COROS / Suunto) */}
+        {TERRA_PROVIDERS.map((p) => {
+          const conn = terraConns[p.id];
+          const busy = terraBusy === p.id;
+          const disabledByOther = hasTerraConn && !conn;
+          return (
+            <div key={p.id} className={`bg-card border border-border rounded-xl p-4 ${disabledByOther ? "opacity-50" : ""}`}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center overflow-hidden">
+                    <img src={p.icon} alt={p.label} className="w-full h-full object-cover" />
+                  </div>
+                  <div>
+                    <span className="font-medium text-foreground block">{p.label}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {conn?.last_synced_at
+                        ? `${lang === "zh" ? "上次同步: " : "Last synced: "}${new Date(conn.last_synced_at).toLocaleString()}`
+                        : (lang === "zh"
+                            ? "同步跑步活動數據、配速、心率、海拔及訓練負荷"
+                            : "Sync running activity data, pace, heart rate, elevation & training load")}
+                    </span>
+                  </div>
+                </div>
+                {conn ? (
+                  <div className="flex items-center gap-2">
+                    {busy && <RefreshCw size={14} className="animate-spin text-muted-foreground" />}
+                    <Check size={16} className="text-green-500" />
+                    <button onClick={() => handleTerraDisconnect(p.id)} disabled={busy} className="text-xs text-destructive hover:underline disabled:opacity-50">
+                      {lang === "zh" ? "中斷" : "Disconnect"}
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => handleTerraConnect(p.id)}
+                    disabled={busy || disabledByOther}
+                    className={`text-xs font-medium px-3 py-1 rounded-full ${disabledByOther ? "bg-muted text-muted-foreground cursor-not-allowed" : "text-primary-foreground bg-primary"} disabled:opacity-50`}
+                  >
+                    {busy ? (lang === "zh" ? "..." : "...") : (lang === "zh" ? "連結" : "Connect")}
+                  </button>
+                )}
               </div>
             </div>
-            {garminConnected ? (
-              <div className="flex items-center gap-2">
-                {garmin.syncing && <RefreshCw size={14} className="animate-spin text-muted-foreground" />}
-                <button onClick={handleSyncGarmin} disabled={garmin.syncing} className="text-xs text-primary hover:underline disabled:opacity-50 disabled:cursor-not-allowed disabled:no-underline">
-                  {garmin.syncing
-                    ? (lang === "zh" ? "同步中..." : "Syncing...")
-                    : (lang === "zh" ? "同步" : "Sync")}
-                </button>
-                <Check size={16} className="text-green-500" />
-                <button onClick={handleDisconnectGarmin} className="text-xs text-destructive hover:underline">
-                  {lang === "zh" ? "中斷" : "Disconnect"}
-                </button>
-              </div>
-            ) : (
-              <button
-                onClick={handleConnectGarmin}
-                disabled={hasFitnessApp}
-                className={`text-xs font-medium px-3 py-1 rounded-full ${hasFitnessApp ? "bg-muted text-muted-foreground cursor-not-allowed" : "text-primary-foreground bg-primary"}`}
-              >
-                {lang === "zh" ? "連結" : "Connect"}
-              </button>
-            )}
-          </div>
-
-          {!garminConnected && (
-            <p className="mt-3 pt-3 border-t border-border text-[11px] text-muted-foreground leading-relaxed">
-              {lang === "zh"
-                ? "使用你的 Garmin Connect 電郵及密碼登入。我們會將憑證直接傳送至我們的 Garmin 認證服務以取得權杖,密碼不會儲存。如已啟用兩步驟驗證,我們會提示你輸入驗證碼。"
-                : "Sign in with your Garmin Connect email and password. We send your credentials directly to our Garmin authentication service to fetch tokens — your password is never stored. If you have 2-step verification enabled, we'll prompt you for the code."}
-            </p>
-          )}
-        </div>
+          );
+        })}
 
         {/* Strava — temporarily disabled */}
         <div className="bg-card border border-border rounded-xl p-4 opacity-50">

@@ -137,15 +137,54 @@ async function fetchGarminActivities(userId: string): Promise<StravaActivity[]> 
   });
 }
 
+async function fetchTerraActivities(userId: string): Promise<StravaActivity[]> {
+  const { data } = await supabase
+    .from("terra_activities")
+    .select("*")
+    .eq("user_id", userId)
+    .order("start_time", { ascending: false });
+  return ((data as any[]) || []).map((a) => {
+    const provider = (a.provider || "").toString();
+    const sourceLabel = provider
+      ? provider.charAt(0).toUpperCase() + provider.slice(1).toLowerCase()
+      : "Terra";
+    return {
+      id: a.id,
+      strava_id: 0,
+      name: a.activity_name || `${sourceLabel} Activity`,
+      sport_type: a.activity_type || "Run",
+      distance: a.distance_meters || 0,
+      moving_time: a.duration_seconds || 0,
+      elapsed_time: a.duration_seconds || 0,
+      total_elevation_gain: a.elevation_gain || 0,
+      start_date: a.start_time,
+      average_speed: (a.average_speed && a.average_speed > 0)
+        ? a.average_speed
+        : (a.distance_meters && a.duration_seconds && a.duration_seconds > 0)
+          ? a.distance_meters / a.duration_seconds
+          : 0,
+      max_speed: 0,
+      average_heartrate: a.average_hr || null,
+      max_heartrate: a.max_hr || null,
+      summary_polyline: a.summary_polyline ?? null,
+      source: sourceLabel,
+      calories: a.calories ?? null,
+      laps: a.laps || [],
+      garmin_training_load: a.training_load ?? null,
+    } as StravaActivity;
+  });
+}
+
 async function fetchConnection(userId: string) {
-  const [stravaRes, ahRes, garminRes] = await Promise.all([
+  const [stravaRes, ahRes, garminRes, terraRes] = await Promise.all([
     supabase.from("strava_connections").select("id").eq("user_id", userId).maybeSingle(),
     supabase.from("apple_health_connections").select("id").eq("user_id", userId).maybeSingle(),
     supabase.from("garmin_connections").select("id").eq("user_id", userId).maybeSingle(),
+    supabase.from("terra_connections").select("id").eq("user_id", userId).eq("active", true).limit(1).maybeSingle(),
   ]);
   return {
-    any: !!(stravaRes.data || ahRes.data || garminRes.data),
-    fitnessApp: !!(stravaRes.data || garminRes.data),
+    any: !!(stravaRes.data || ahRes.data || garminRes.data || terraRes.data),
+    fitnessApp: !!(stravaRes.data || garminRes.data || terraRes.data),
   };
 }
 

@@ -406,8 +406,9 @@ const ConnectApps = ({ lang, onBack }: Props) => {
             {TERRA_PROVIDERS.map((p) => {
               const conn = terraConns[p.id];
               const busy = terraBusy === p.id;
+              const disabledByOther = hasTerraConn && !conn;
               return (
-                <div key={p.id} className="bg-card border border-border rounded-xl p-4">
+                <div key={p.id} className={`bg-card border border-border rounded-xl p-4 ${disabledByOther ? "opacity-50" : ""}`}>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center overflow-hidden">
@@ -427,9 +428,6 @@ const ConnectApps = ({ lang, onBack }: Props) => {
                     {conn ? (
                       <div className="flex items-center gap-2">
                         {busy && <RefreshCw size={14} className="animate-spin text-muted-foreground" />}
-                        <button onClick={() => handleTerraSync(p.id)} disabled={busy} className="text-xs text-primary hover:underline disabled:opacity-50">
-                          {lang === "zh" ? "同步" : "Sync"}
-                        </button>
                         <Check size={16} className="text-green-500" />
                         <button onClick={() => handleTerraDisconnect(p.id)} disabled={busy} className="text-xs text-destructive hover:underline disabled:opacity-50">
                           {lang === "zh" ? "中斷" : "Disconnect"}
@@ -438,8 +436,8 @@ const ConnectApps = ({ lang, onBack }: Props) => {
                     ) : (
                       <button
                         onClick={() => handleTerraConnect(p.id)}
-                        disabled={busy}
-                        className="text-xs font-medium px-3 py-1 rounded-full text-primary-foreground bg-primary disabled:opacity-50"
+                        disabled={busy || disabledByOther}
+                        className={`text-xs font-medium px-3 py-1 rounded-full ${disabledByOther ? "bg-muted text-muted-foreground cursor-not-allowed" : "text-primary-foreground bg-primary"} disabled:opacity-50`}
                       >
                         {busy ? (lang === "zh" ? "..." : "...") : (lang === "zh" ? "連結" : "Connect")}
                       </button>

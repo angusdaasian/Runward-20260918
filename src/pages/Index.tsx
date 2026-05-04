@@ -32,7 +32,7 @@ const Index = () => {
   const { isAdmin } = useAdmin();
   const { online } = useOnlineStatus();
   const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState<Tab>(() => {
     const tabParam = searchParams.get("tab");
     // Back-compat: redirect old `posture` deeplinks into `analytics`

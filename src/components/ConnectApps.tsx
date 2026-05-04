@@ -168,6 +168,8 @@ const ConnectApps = ({ lang, onBack }: Props) => {
     setTerraConns(map);
   }, [user]);
 
+  const hasTerraConn = Object.keys(terraConns).length > 0;
+
   useEffect(() => { loadTerraConns(); }, [loadTerraConns]);
 
   useEffect(() => {

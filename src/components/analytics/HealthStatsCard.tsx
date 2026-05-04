@@ -1,11 +1,6 @@
-import { Activity, HeartPulse, Moon, Sparkles, RefreshCw, Footprints } from "lucide-react";
+import { Activity, HeartPulse, Moon, RefreshCw, Footprints } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Lang } from "@/lib/i18n";
-import {
-  useGarminDailyHealth,
-  useHasGarminConnection,
-  useRefreshGarminDailyHealth,
-} from "@/hooks/use-garmin-daily-health";
 import {
   useTerraConnections,
   useTerraDailyHealth,
@@ -50,20 +45,14 @@ function fmtDate(iso: string, lang: Lang): string {
 }
 
 const HealthStatsCard = ({ lang }: Props) => {
-  const { data: hasGarminRailway } = useHasGarminConnection();
-  const { data: garminHistory } = useGarminDailyHealth();
-  const { refresh: refreshGarmin, refreshing: refreshingGarmin } =
-    useRefreshGarminDailyHealth(lang);
-
   const { data: terraConns } = useTerraConnections();
   const { data: terraHistory } = useTerraDailyHealth();
-  const { refresh: refreshTerra, refreshing: refreshingTerra } =
+  const { refresh: refreshTerra, refreshing } =
     useRefreshTerraDailyHealth(lang);
 
-  // Build the list of available providers.
+  // Build the list of available providers from Terra only.
   const providers = useMemo<ProviderKey[]>(() => {
     const set = new Set<ProviderKey>();
-    if (hasGarminRailway) set.add("GARMIN");
     for (const c of terraConns ?? []) {
       const p = c.provider?.toUpperCase();
       if (p === "GARMIN" || p === "COROS" || p === "SUUNTO" || p === "POLAR") {
@@ -71,7 +60,7 @@ const HealthStatsCard = ({ lang }: Props) => {
       }
     }
     return Array.from(set);
-  }, [hasGarminRailway, terraConns]);
+  }, [terraConns]);
 
   const [selected, setSelected] = useState<ProviderKey | null>(null);
   const active: ProviderKey | null = selected ?? providers[0] ?? null;
@@ -79,33 +68,11 @@ const HealthStatsCard = ({ lang }: Props) => {
   if (providers.length === 0) return null;
   if (!active) return null;
 
-  // Compose latest stats for the active provider.
-  let latest: {
-    date: string;
-    fetched_at: string;
-    vo2max: number | null;
-    resting_hr: number | null;
-    sleep_seconds: number | null;
-    sleep_score: number | null;
-    steps?: number | null;
-  } | null = null;
-
-  if (active === "GARMIN" && hasGarminRailway && (garminHistory?.length ?? 0) > 0) {
-    latest = garminHistory![0];
-  } else {
-    const row = (terraHistory ?? []).find((r) => r.provider?.toUpperCase() === active);
-    if (row) latest = row;
-  }
-
-  const refreshing = refreshingGarmin || refreshingTerra;
+  const latest =
+    (terraHistory ?? []).find((r) => r.provider?.toUpperCase() === active) ?? null;
 
   const handleRefresh = () => {
-    if (active === "GARMIN" && hasGarminRailway) {
-      // Garmin Railway path provides the richest stats — use it.
-      refreshGarmin();
-    } else {
-      refreshTerra(active);
-    }
+    refreshTerra(active);
   };
 
   return (
@@ -167,24 +134,15 @@ const HealthStatsCard = ({ lang }: Props) => {
           label={lang === "zh" ? "睡眠時間" : "Sleep"}
           value={fmtSleep(latest?.sleep_seconds ?? null)}
         />
-        {active === "GARMIN" && hasGarminRailway ? (
-          <Stat
-            icon={<Sparkles size={14} className="text-amber-400" />}
-            label={lang === "zh" ? "睡眠分數" : "Sleep Score"}
-            value={latest?.sleep_score != null ? String(latest.sleep_score) : "—"}
-            valueClass={sleepScoreClass(latest?.sleep_score ?? null)}
-          />
-        ) : (
-          <Stat
-            icon={<Footprints size={14} className="text-emerald-500" />}
-            label={lang === "zh" ? "步數" : "Steps"}
-            value={
-              latest && (latest as any).steps != null
-                ? Number((latest as any).steps).toLocaleString()
-                : "—"
-            }
-          />
-        )}
+        <Stat
+          icon={<Footprints size={14} className="text-emerald-500" />}
+          label={lang === "zh" ? "步數" : "Steps"}
+          value={
+            latest && (latest as any).steps != null
+              ? Number((latest as any).steps).toLocaleString()
+              : "—"
+          }
+        />
       </div>
     </Card>
   );

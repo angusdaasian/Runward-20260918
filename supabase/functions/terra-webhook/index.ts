@@ -280,7 +280,7 @@ Deno.serve(async (req) => {
     terra_user_id: terraUserId,
     reference_id: referenceId,
     signature_valid: signatureValid,
-    payload,
+    payload: { type, user: payload?.user, count: Array.isArray(payload?.data) ? payload.data.length : (payload?.data ? 1 : 0) },
     processing_error: processingError,
   });
 

@@ -214,8 +214,8 @@ Deno.serve(async (req) => {
           processingError = `connection upsert: ${upsertErr.message}`;
         }
 
-        // Garmin-only: wipe the recent Railway Garmin window and trigger
-        // Terra historical re-fetch (data streams back via this same webhook).
+        // Garmin-only: trigger Terra historical re-fetch. Matching Railway Garmin
+        // duplicates are deleted per Terra activity as each payload arrives.
         if (provider === "GARMIN") {
           const days = 7;
           const since = new Date(Date.now() - days * 86400_000);
@@ -223,16 +223,6 @@ Deno.serve(async (req) => {
           const sinceDate = sinceISO.slice(0, 10);
           const endDate = new Date().toISOString().slice(0, 10);
           const startDate = sinceDate;
-
-          // Wipe Railway Garmin window (don't await failures — keep webhook fast)
-          (async () => {
-            try {
-              await supa.from("garmin_activities").delete().eq("user_id", appUserId).gte("start_time", sinceISO);
-              await supa.from("garmin_daily_health").delete().eq("user_id", appUserId).gte("date", sinceDate);
-            } catch (e) {
-              console.error("garmin wipe failed", e);
-            }
-          })();
 
           // Fire historical re-fetch (to_webhook=true → Terra streams payloads back)
           const devId = Deno.env.get("TERRA_DEV_ID") ?? "";

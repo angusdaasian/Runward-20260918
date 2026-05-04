@@ -137,6 +137,44 @@ async function fetchGarminActivities(userId: string): Promise<StravaActivity[]> 
   });
 }
 
+// Terra activity_type numeric codes -> readable sport
+// Reference: https://docs.tryterra.co/reference/activity-types
+const TERRA_ACTIVITY_TYPE_MAP: Record<string, string> = {
+  "8": "Run",
+  "0": "Run",
+  "16": "Run",
+  "37": "Run",
+  "44": "Run",
+  "59": "Run",
+  "63": "Run",
+  "64": "Run",
+  "8.0": "Run",
+  "20": "Ride",
+  "30": "Ride",
+  "32": "Swim",
+  "1": "Walk",
+  "10": "Hike",
+};
+
+function mapTerraSportType(rawType: any): string {
+  if (rawType === null || rawType === undefined || rawType === "") return "Run";
+  const key = String(rawType);
+  if (TERRA_ACTIVITY_TYPE_MAP[key]) return TERRA_ACTIVITY_TYPE_MAP[key];
+  // If it's already a non-numeric string (e.g. "Running"), pass through
+  if (!/^-?\d+(\.\d+)?$/.test(key)) return key;
+  return "Run";
+}
+
+function mapTerraProviderLabel(provider: string): string {
+  const p = (provider || "").toUpperCase();
+  if (p === "GARMIN") return "Garmin";
+  if (p === "COROS") return "COROS";
+  if (p === "POLAR") return "Polar";
+  if (p === "SUUNTO") return "Suunto";
+  if (!provider) return "Garmin";
+  return provider.charAt(0).toUpperCase() + provider.slice(1).toLowerCase();
+}
+
 async function fetchTerraActivities(userId: string): Promise<StravaActivity[]> {
   const { data } = await supabase
     .from("terra_activities")
@@ -144,11 +182,8 @@ async function fetchTerraActivities(userId: string): Promise<StravaActivity[]> {
     .eq("user_id", userId)
     .order("start_time", { ascending: false });
   return ((data as any[]) || []).map((a) => {
-    const provider = (a.provider || "").toString();
-    const providerLabel = provider
-      ? provider.charAt(0).toUpperCase() + provider.slice(1).toLowerCase()
-      : "Terra";
-    const sourceLabel = provider ? `Terra ${providerLabel}` : "Terra";
+    const sourceLabel = mapTerraProviderLabel(a.provider);
+    const sportType = mapTerraSportType(a.activity_type);
     const durationSeconds = a.duration_seconds && a.duration_seconds > 0
       ? a.duration_seconds
       : a.distance_meters && a.average_speed && a.average_speed > 0
@@ -158,7 +193,7 @@ async function fetchTerraActivities(userId: string): Promise<StravaActivity[]> {
       id: a.id,
       strava_id: 0,
       name: a.activity_name || `${sourceLabel} Activity`,
-      sport_type: a.activity_type || "Run",
+      sport_type: sportType,
       distance: a.distance_meters || 0,
       moving_time: durationSeconds,
       elapsed_time: durationSeconds,

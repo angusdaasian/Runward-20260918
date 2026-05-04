@@ -179,8 +179,10 @@ Deno.serve(async (req) => {
     const apiKey = Deno.env.get("TERRA_API_KEY")!;
     const end = new Date();
     const start = new Date(); start.setDate(start.getDate() - 30);
-    const startStr = start.toISOString();
-    const endStr = end.toISOString();
+    // Terra date params: use YYYY-MM-DD only. Full ISO timestamps cause /v2/sleep
+    // (and others) to return 0 items.
+    const startStr = start.toISOString().slice(0, 10);
+    const endStr = end.toISOString().slice(0, 10);
 
     let activityCount = 0;
     let dailyCount = 0;

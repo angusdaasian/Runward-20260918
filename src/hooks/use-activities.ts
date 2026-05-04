@@ -73,7 +73,7 @@ async function fetchActivities(userId: string): Promise<StravaActivity[]> {
     .eq("user_id", userId)
     .eq("environment", appEnv)
     .order("start_date", { ascending: false });
-  return ((data as any[]) || []).map((a) => ({ ...a, source: "strava" }));
+  return ((data as any[]) || []).map((a) => ({ ...a, source: "strava", provenance: "strava" as const }));
 }
 
 async function fetchAppleHealthActivities(userId: string): Promise<StravaActivity[]> {

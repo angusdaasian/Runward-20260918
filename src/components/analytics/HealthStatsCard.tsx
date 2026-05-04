@@ -70,12 +70,6 @@ const HealthStatsCard = ({ lang }: Props) => {
 
   const latest =
     (terraHistory ?? []).find((r) => r.provider?.toUpperCase() === active) ?? null;
-  const latestSleep =
-    (terraHistory ?? []).find(
-      (r) =>
-        r.provider?.toUpperCase() === active &&
-        (r.sleep_seconds != null || r.sleep_score != null),
-    ) ?? null;
 
   const handleRefresh = () => {
     refreshTerra(active);
@@ -138,13 +132,13 @@ const HealthStatsCard = ({ lang }: Props) => {
         <Stat
           icon={<Moon size={14} className="text-indigo-400" />}
           label={lang === "zh" ? "睡眠時間" : "Sleep"}
-          value={fmtSleep(latestSleep?.sleep_seconds ?? null)}
+          value={fmtSleep(latest?.sleep_seconds ?? null)}
         />
         <Stat
           icon={<Sparkles size={14} className="text-emerald-500" />}
           label={lang === "zh" ? "睡眠分數" : "Sleep Score"}
-          value={latestSleep?.sleep_score != null ? String(latestSleep.sleep_score) : "—"}
-          valueClass={sleepScoreClass(latestSleep?.sleep_score ?? null)}
+          value={latest?.sleep_score != null ? String(latest.sleep_score) : "—"}
+          valueClass={sleepScoreClass(latest?.sleep_score ?? null)}
         />
       </div>
     </Card>

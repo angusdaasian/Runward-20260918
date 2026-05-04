@@ -142,9 +142,84 @@ const ConnectApps = ({ lang, onBack }: Props) => {
     await garmin.syncActivities();
   };
 
-  const comingSoonApps = [
-    { name: "COROS", icon: "⌚" },
+  // Terra (Beta) state
+  type TerraProvider = "GARMIN" | "POLAR" | "SUUNTO" | "COROS";
+  const TERRA_PROVIDERS: { id: TerraProvider; label: string; icon: string }[] = [
+    { id: "GARMIN", label: "Garmin", icon: "⌚" },
+    { id: "POLAR", label: "Polar", icon: "🟥" },
+    { id: "SUUNTO", label: "Suunto", icon: "🧭" },
+    { id: "COROS", label: "COROS", icon: "🟠" },
   ];
+  const [terraConns, setTerraConns] = useState<Record<string, { id: string; last_synced_at: string | null }>>({});
+  const [terraBusy, setTerraBusy] = useState<string | null>(null);
+
+  const loadTerraConns = useCallback(async () => {
+    if (!user) return;
+    const { data } = await (supabase as any)
+      .from("terra_connections")
+      .select("id, provider, last_synced_at, active")
+      .eq("user_id", user.id)
+      .eq("active", true);
+    const map: Record<string, { id: string; last_synced_at: string | null }> = {};
+    (data ?? []).forEach((r: any) => { map[r.provider] = { id: r.id, last_synced_at: r.last_synced_at }; });
+    setTerraConns(map);
+  }, [user]);
+
+  useEffect(() => { loadTerraConns(); }, [loadTerraConns]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("terra")) {
+      const status = params.get("terra");
+      if (status === "success") toast.success(lang === "zh" ? "Terra 連接成功" : "Terra connected");
+      else toast.error(lang === "zh" ? "Terra 連接失敗" : "Terra connection failed");
+      let n = 0;
+      const t = setInterval(() => { loadTerraConns(); if (++n >= 6) clearInterval(t); }, 2000);
+      const url = new URL(window.location.href);
+      url.searchParams.delete("terra");
+      window.history.replaceState({}, "", url.toString());
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleTerraConnect = async (provider: TerraProvider) => {
+    setTerraBusy(provider);
+    try {
+      const origin = window.location.origin + window.location.pathname;
+      const { data, error } = await supabase.functions.invoke("terra-auth-init", {
+        body: { provider, success_url: `${origin}?terra=success`, failure_url: `${origin}?terra=failure` },
+      });
+      if (error || !data?.auth_url) throw new Error(error?.message || "no auth url");
+      window.location.href = data.auth_url;
+    } catch (e: any) {
+      toast.error((lang === "zh" ? "Terra 啟動失敗: " : "Terra init failed: ") + (e?.message ?? ""));
+      setTerraBusy(null);
+    }
+  };
+
+  const handleTerraSync = async (provider: TerraProvider) => {
+    setTerraBusy(provider);
+    try {
+      const { data, error } = await supabase.functions.invoke("terra-sync", { body: { provider } });
+      if (error) throw error;
+      toast.success(lang === "zh" ? `已同步 ${data?.activities ?? 0} 個活動` : `Synced ${data?.activities ?? 0} activities`);
+      await loadTerraConns();
+    } catch (e: any) {
+      toast.error((lang === "zh" ? "同步失敗: " : "Sync failed: ") + (e?.message ?? ""));
+    } finally { setTerraBusy(null); }
+  };
+
+  const handleTerraDisconnect = async (provider: TerraProvider) => {
+    setTerraBusy(provider);
+    try {
+      const { error } = await supabase.functions.invoke("terra-disconnect", { body: { provider } });
+      if (error) throw error;
+      toast.success(lang === "zh" ? "已中斷連結" : "Disconnected");
+      await loadTerraConns();
+    } catch (e: any) {
+      toast.error((lang === "zh" ? "中斷失敗: " : "Disconnect failed: ") + (e?.message ?? ""));
+    } finally { setTerraBusy(null); }
+  };
 
   return (
     <div className="px-5 pt-6 max-w-lg mx-auto pb-24">
@@ -293,27 +368,66 @@ const ConnectApps = ({ lang, onBack }: Props) => {
           </div>
         </div>
 
-        {/* Coming Soon Apps */}
-        {comingSoonApps.map((app) => (
-          <div key={app.name} className="bg-card border border-border rounded-xl p-4 opacity-50">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center text-lg">
-                  {app.icon}
-                </div>
-                <div>
-                  <span className="font-medium text-foreground block">{app.name}</span>
-                  <span className="text-xs text-muted-foreground">
-                    {t("stravaConnectDesc", lang)}
-                  </span>
-                </div>
-              </div>
-              <span className="text-xs text-muted-foreground bg-muted px-3 py-1 rounded-full">
-                {t("comingSoon", lang)}
-              </span>
-            </div>
+        {/* Terra Beta section */}
+        <div className="pt-4 mt-2 border-t border-border">
+          <div className="flex items-center gap-2 mb-1">
+            <h2 className="font-display text-base font-bold text-foreground">
+              {lang === "zh" ? "Beta — 新連接 (Terra)" : "Beta — new connections (Terra)"}
+            </h2>
+            <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-600">BETA</span>
           </div>
-        ))}
+          <p className="text-xs text-muted-foreground mb-3">
+            {lang === "zh"
+              ? "測試新的通用連接,不會影響你現有的 Garmin 同步。"
+              : "Test the new universal connection. Won't affect your existing Garmin sync."}
+          </p>
+
+          <div className="space-y-3">
+            {TERRA_PROVIDERS.map((p) => {
+              const conn = terraConns[p.id];
+              const busy = terraBusy === p.id;
+              return (
+                <div key={p.id} className="bg-card border border-border rounded-xl p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center text-lg">{p.icon}</div>
+                      <div>
+                        <span className="font-medium text-foreground block">
+                          {p.label} <span className="text-[10px] text-muted-foreground">(Beta — Terra)</span>
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {conn?.last_synced_at
+                            ? `${lang === "zh" ? "上次同步: " : "Last synced: "}${new Date(conn.last_synced_at).toLocaleString()}`
+                            : (lang === "zh" ? "經 Terra 連接" : "Connect via Terra")}
+                        </span>
+                      </div>
+                    </div>
+                    {conn ? (
+                      <div className="flex items-center gap-2">
+                        {busy && <RefreshCw size={14} className="animate-spin text-muted-foreground" />}
+                        <button onClick={() => handleTerraSync(p.id)} disabled={busy} className="text-xs text-primary hover:underline disabled:opacity-50">
+                          {lang === "zh" ? "同步" : "Sync"}
+                        </button>
+                        <Check size={16} className="text-green-500" />
+                        <button onClick={() => handleTerraDisconnect(p.id)} disabled={busy} className="text-xs text-destructive hover:underline disabled:opacity-50">
+                          {lang === "zh" ? "中斷" : "Disconnect"}
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => handleTerraConnect(p.id)}
+                        disabled={busy}
+                        className="text-xs font-medium px-3 py-1 rounded-full text-primary-foreground bg-primary disabled:opacity-50"
+                      >
+                        {busy ? (lang === "zh" ? "..." : "...") : (lang === "zh" ? "連結" : "Connect")}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
       </div>
 
       <GarminCredentialDialog

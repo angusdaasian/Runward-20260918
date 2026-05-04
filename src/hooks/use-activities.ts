@@ -35,6 +35,7 @@ export interface StravaActivity {
   laps?: any[] | null;
   map_screenshot_url?: string | null;
   garmin_training_load?: number | null;
+  provenance?: "strava" | "apple_health" | "garmin" | "terra";
 }
 
 export interface PlannedWorkout {

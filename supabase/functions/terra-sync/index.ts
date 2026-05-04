@@ -102,7 +102,7 @@ Deno.serve(async (req) => {
       const headers = { "dev-id": devId, "x-api-key": apiKey };
       // activity
       try {
-        const r = await fetch(`https://api.tryterra.co/v2/activity?user_id=${c.terra_user_id}&start_date=${startStr}&end_date=${endStr}&to_webhook=false&with_samples=false`, { headers });
+        const r = await fetch(`https://api.tryterra.co/v2/activity?user_id=${c.terra_user_id}&start_date=${startStr}&end_date=${endStr}&to_webhook=false&with_samples=true`, { headers });
         const j = await r.json();
         const items = Array.isArray(j?.data) ? j.data : [];
         for (const a of items) {
@@ -110,7 +110,17 @@ Deno.serve(async (req) => {
           const dist = a?.distance_data?.summary ?? {};
           const hr = a?.heart_rate_data?.summary ?? {};
           const cal = a?.calories_data ?? {};
-          const aid = String(meta?.summary_id ?? meta?.id ?? meta?.start_time ?? crypto.randomUUID());
+          const aid = String(meta?.upload_type ?? "") + ":" + String(meta?.summary_id ?? meta?.id ?? meta?.start_time ?? crypto.randomUUID());
+          const polyline = extractPolyline(a);
+          const laps = extractLaps(a);
+          const { data: existing } = await admin
+            .from("terra_activities")
+            .select("summary_polyline, laps, has_gps")
+            .eq("user_id", c.user_id)
+            .eq("terra_activity_id", aid)
+            .maybeSingle();
+          const finalPolyline = polyline ?? existing?.summary_polyline ?? null;
+          const finalLaps = laps.length > 0 ? laps : (Array.isArray(existing?.laps) && existing!.laps.length > 0 ? existing!.laps : []);
           await admin.from("terra_activities").upsert({
             user_id: c.user_id,
             provider: c.provider,
@@ -124,7 +134,11 @@ Deno.serve(async (req) => {
             average_hr: hr?.avg_hr_bpm ? Math.round(hr.avg_hr_bpm) : null,
             max_hr: hr?.max_hr_bpm ? Math.round(hr.max_hr_bpm) : null,
             elevation_gain: dist?.elevation?.gain_actual_meters ?? null,
-            raw_json: a,
+            average_speed: a?.movement_data?.avg_speed_meters_per_second ?? null,
+            summary_polyline: finalPolyline,
+            has_gps: !!finalPolyline || !!existing?.has_gps,
+            laps: finalLaps,
+            raw_json: null,
           }, { onConflict: "user_id,terra_activity_id" });
           activityCount++;
         }

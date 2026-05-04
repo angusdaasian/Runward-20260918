@@ -254,7 +254,13 @@ Deno.serve(async (req) => {
             activity_name: meta?.name ?? null,
             activity_type: meta?.type ?? meta?.activity_type ?? null,
             start_time: meta?.start_time ?? null,
-            duration_seconds: meta?.active_duration_seconds ? Math.round(meta.active_duration_seconds) : null,
+            duration_seconds: (() => {
+              const d = a?.active_durations_data?.activity_seconds
+                ?? meta?.active_duration_seconds
+                ?? a?.distance_data?.summary?.duration_seconds
+                ?? (meta?.end_time && meta?.start_time ? (new Date(meta.end_time).getTime() - new Date(meta.start_time).getTime())/1000 : null);
+              return d ? Math.round(d) : null;
+            })(),
             distance_meters: dist?.distance_meters ?? null,
             calories: cal?.total_burned_calories ? Math.round(cal.total_burned_calories) : null,
             average_hr: hr?.avg_hr_bpm ? Math.round(hr.avg_hr_bpm) : null,

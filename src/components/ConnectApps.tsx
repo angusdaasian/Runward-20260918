@@ -404,15 +404,17 @@ const ConnectApps = ({ lang, onBack }: Props) => {
                 <div key={p.id} className="bg-card border border-border rounded-xl p-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center text-lg">{p.icon}</div>
+                      <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center overflow-hidden">
+                        <img src={p.icon} alt={p.label} className="w-7 h-7 object-contain" />
+                      </div>
                       <div>
-                        <span className="font-medium text-foreground block">
-                          {p.label} <span className="text-[10px] text-muted-foreground">(Beta — Terra)</span>
-                        </span>
+                        <span className="font-medium text-foreground block">{p.label}</span>
                         <span className="text-xs text-muted-foreground">
                           {conn?.last_synced_at
                             ? `${lang === "zh" ? "上次同步: " : "Last synced: "}${new Date(conn.last_synced_at).toLocaleString()}`
-                            : (lang === "zh" ? "經 Terra 連接" : "Connect via Terra")}
+                            : (lang === "zh"
+                                ? "同步跑步活動數據、配速、心率、海拔及訓練負荷"
+                                : "Sync running activity data, pace, heart rate, elevation & training load")}
                         </span>
                       </div>
                     </div>

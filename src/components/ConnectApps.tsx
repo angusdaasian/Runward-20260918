@@ -385,65 +385,6 @@ const ConnectApps = ({ lang, onBack }: Props) => {
           </div>
         </div>
 
-        {/* Additional device connections */}
-        <div className="pt-4 mt-2 border-t border-border">
-          <div className="flex items-center gap-2 mb-1">
-            <h2 className="font-display text-base font-bold text-foreground">
-              {lang === "zh" ? "其他裝置" : "Other devices"}
-            </h2>
-          </div>
-          <p className="text-xs text-muted-foreground mb-3">
-            {lang === "zh"
-              ? "連結你的裝置以自動同步訓練數據。"
-              : "Connect your device to automatically sync training data."}
-          </p>
-
-          <div className="space-y-3">
-            {TERRA_PROVIDERS.map((p) => {
-              const conn = terraConns[p.id];
-              const busy = terraBusy === p.id;
-              const disabledByOther = hasTerraConn && !conn;
-              return (
-                <div key={p.id} className={`bg-card border border-border rounded-xl p-4 ${disabledByOther ? "opacity-50" : ""}`}>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center overflow-hidden">
-                        <img src={p.icon} alt={p.label} className="w-full h-full object-cover" />
-                      </div>
-                      <div>
-                        <span className="font-medium text-foreground block">{p.label}</span>
-                        <span className="text-xs text-muted-foreground">
-                          {conn?.last_synced_at
-                            ? `${lang === "zh" ? "上次同步: " : "Last synced: "}${new Date(conn.last_synced_at).toLocaleString()}`
-                            : (lang === "zh"
-                                ? "同步跑步活動數據、配速、心率、海拔及訓練負荷"
-                                : "Sync running activity data, pace, heart rate, elevation & training load")}
-                        </span>
-                      </div>
-                    </div>
-                    {conn ? (
-                      <div className="flex items-center gap-2">
-                        {busy && <RefreshCw size={14} className="animate-spin text-muted-foreground" />}
-                        <Check size={16} className="text-green-500" />
-                        <button onClick={() => handleTerraDisconnect(p.id)} disabled={busy} className="text-xs text-destructive hover:underline disabled:opacity-50">
-                          {lang === "zh" ? "中斷" : "Disconnect"}
-                        </button>
-                      </div>
-                    ) : (
-                      <button
-                        onClick={() => handleTerraConnect(p.id)}
-                        disabled={busy || disabledByOther}
-                        className={`text-xs font-medium px-3 py-1 rounded-full ${disabledByOther ? "bg-muted text-muted-foreground cursor-not-allowed" : "text-primary-foreground bg-primary"} disabled:opacity-50`}
-                      >
-                        {busy ? (lang === "zh" ? "..." : "...") : (lang === "zh" ? "連結" : "Connect")}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
       </div>
 
       <GarminCredentialDialog

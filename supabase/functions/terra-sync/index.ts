@@ -255,25 +255,52 @@ Deno.serve(async (req) => {
         }
       } catch (e) { console.error("daily fetch failed", c.provider, e); }
 
-      // sleep (sleep_seconds, sleep_score)
+      // sleep (sleep_seconds, sleep_score) — Terra returns one record per sleep session.
+      // We aggregate per night (using end_time date as the "wake day") and pick the longest.
       try {
         const r = await fetch(`https://api.tryterra.co/v2/sleep?user_id=${c.terra_user_id}&start_date=${startStr}&end_date=${endStr}&to_webhook=false&with_samples=false`, { headers });
         const j = await r.json();
         const items = Array.isArray(j?.data) ? j.data : [];
+        console.log(`[terra-sync] sleep ${c.provider} items=${items.length}`);
+        if (items.length > 0) {
+          console.log(`[terra-sync] sleep sample keys ${c.provider}:`, JSON.stringify(Object.keys(items[0] ?? {})));
+          console.log(`[terra-sync] sleep durations sample ${c.provider}:`, JSON.stringify(items[0]?.sleep_durations_data ?? null).slice(0, 800));
+        }
         for (const d of items) {
           const meta = d?.metadata ?? {};
-          const date = (meta?.start_time ?? meta?.end_time ?? "").slice(0, 10);
+          // Use end_time so a sleep that ends in the morning is attributed to that day.
+          const date = (meta?.end_time ?? meta?.start_time ?? "").slice(0, 10);
           if (!date) continue;
-          const asleepSec = toFiniteNumber(d?.sleep_durations_data?.asleep?.duration_asleep_state_seconds)
-            ?? toFiniteNumber(d?.sleep_durations_data?.sleep_efficiency)
-            ?? toFiniteNumber(d?.sleep_durations_data?.other?.duration_in_bed_seconds);
+          const sd = d?.sleep_durations_data ?? {};
+          const asleep = sd?.asleep ?? {};
+          const other = sd?.other ?? {};
+          const awake = sd?.awake ?? {};
+          const asleepSec =
+            toFiniteNumber(asleep?.duration_asleep_state_seconds)
+            ?? toFiniteNumber(asleep?.duration_deep_sleep_state_seconds) != null
+              ? (toFiniteNumber(asleep?.duration_deep_sleep_state_seconds) ?? 0)
+                + (toFiniteNumber(asleep?.duration_light_sleep_state_seconds) ?? 0)
+                + (toFiniteNumber(asleep?.duration_REM_sleep_state_seconds) ?? 0)
+              : null;
+          const inBedSec = toFiniteNumber(other?.duration_in_bed_seconds);
+          const totalSec = asleepSec
+            ?? (inBedSec != null && toFiniteNumber(awake?.duration_awake_state_seconds) != null
+              ? inBedSec - (toFiniteNumber(awake?.duration_awake_state_seconds) ?? 0)
+              : inBedSec);
           const score = toFiniteNumber(d?.scores?.sleep) ?? toFiniteNumber(d?.scores?.overall);
           const existing = dailyByDate[date] ?? {
             user_id: c.user_id, provider: c.provider, date,
             resting_hr: null, steps: null, vo2max: null,
+            sleep_seconds: null, sleep_score: null,
           };
-          existing.sleep_seconds = asleepSec ? Math.round(asleepSec) : null;
-          existing.sleep_score = score ? Math.round(score) : null;
+          const newSec = totalSec ? Math.round(totalSec) : null;
+          // Keep the longest sleep session for the day.
+          if (newSec != null && (existing.sleep_seconds == null || newSec > existing.sleep_seconds)) {
+            existing.sleep_seconds = newSec;
+            if (score != null) existing.sleep_score = Math.round(score);
+          } else if (existing.sleep_score == null && score != null) {
+            existing.sleep_score = Math.round(score);
+          }
           dailyByDate[date] = existing;
         }
       } catch (e) { console.error("sleep fetch failed", c.provider, e); }

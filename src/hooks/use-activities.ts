@@ -135,9 +135,7 @@ async function fetchGarminActivities(userId: string): Promise<StravaActivity[]> 
       weather: a.weather ?? null,
       map_screenshot_url: a.raw_json?.map_screenshot_url ?? null,
       garmin_training_load: a.training_load ?? null,
-    };
-  });
-}
+      provenance: "garmin" as const,
 
 // Terra activity_type numeric codes -> readable sport
 // Reference: https://docs.tryterra.co/reference/activity-types

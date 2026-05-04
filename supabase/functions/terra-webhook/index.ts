@@ -234,8 +234,19 @@ Deno.serve(async (req) => {
           const elev = a?.distance_data?.summary?.elevation ?? {};
           const aid = String(meta?.upload_type ?? "") + ":" + String(meta?.summary_id ?? meta?.id ?? meta?.start_time ?? crypto.randomUUID());
           const polyline = extractPolyline(a);
-          const hasGps = !!polyline;
           const laps = extractLaps(a);
+          // Read existing row so we don't overwrite good polyline/laps with empty
+          const { data: existing } = await supa
+            .from("terra_activities")
+            .select("summary_polyline, laps, has_gps")
+            .eq("user_id", appUserId)
+            .eq("terra_activity_id", aid)
+            .maybeSingle();
+          const finalPolyline = polyline ?? existing?.summary_polyline ?? null;
+          const finalLaps = (laps && laps.length > 0)
+            ? laps
+            : (Array.isArray(existing?.laps) && existing!.laps.length > 0 ? existing!.laps : []);
+          const finalHasGps = !!finalPolyline || !!existing?.has_gps;
           await supa.from("terra_activities").upsert({
             user_id: appUserId,
             provider,
@@ -250,9 +261,9 @@ Deno.serve(async (req) => {
             max_hr: hr?.max_hr_bpm ? Math.round(hr.max_hr_bpm) : null,
             elevation_gain: elev?.gain_actual_meters ?? null,
             average_speed: a?.movement_data?.avg_speed_meters_per_second ?? null,
-            summary_polyline: polyline,
-            has_gps: hasGps,
-            laps,
+            summary_polyline: finalPolyline,
+            has_gps: finalHasGps,
+            laps: finalLaps,
             raw_json: null,
           }, { onConflict: "user_id,terra_activity_id" });
         }

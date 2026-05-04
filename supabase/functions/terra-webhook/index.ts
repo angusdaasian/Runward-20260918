@@ -542,7 +542,9 @@ Deno.serve(async (req) => {
             date,
             resting_hr: d?.heart_rate_data?.summary?.resting_hr_bpm ?? null,
             steps: d?.distance_data?.steps ?? null,
-            vo2max: d?.MET_data?.avg_level ?? null,
+            vo2max:
+              toFiniteNumber(d?.oxygen_data?.vo2max_ml_per_min_per_kg) ??
+              toFiniteNumber(d?.oxygen_data?.day_avg_vo2max_ml_per_min_per_kg),
             sleep_seconds: existing?.sleep_seconds ?? null,
             sleep_score: existing?.sleep_score ?? null,
           }, { onConflict: "user_id,provider,date" });

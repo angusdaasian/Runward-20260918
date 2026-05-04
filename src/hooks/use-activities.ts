@@ -149,20 +149,25 @@ async function fetchTerraActivities(userId: string): Promise<StravaActivity[]> {
       ? provider.charAt(0).toUpperCase() + provider.slice(1).toLowerCase()
       : "Terra";
     const sourceLabel = provider ? `Terra ${providerLabel}` : "Terra";
+    const durationSeconds = a.duration_seconds && a.duration_seconds > 0
+      ? a.duration_seconds
+      : a.distance_meters && a.average_speed && a.average_speed > 0
+        ? Math.round(a.distance_meters / a.average_speed)
+        : 0;
     return {
       id: a.id,
       strava_id: 0,
       name: a.activity_name || `${sourceLabel} Activity`,
       sport_type: a.activity_type || "Run",
       distance: a.distance_meters || 0,
-      moving_time: a.duration_seconds || 0,
-      elapsed_time: a.duration_seconds || 0,
+      moving_time: durationSeconds,
+      elapsed_time: durationSeconds,
       total_elevation_gain: a.elevation_gain || 0,
       start_date: a.start_time,
       average_speed: (a.average_speed && a.average_speed > 0)
         ? a.average_speed
-        : (a.distance_meters && a.duration_seconds && a.duration_seconds > 0)
-          ? a.distance_meters / a.duration_seconds
+        : (a.distance_meters && durationSeconds > 0)
+          ? a.distance_meters / durationSeconds
           : 0,
       max_speed: 0,
       average_heartrate: a.average_hr || null,

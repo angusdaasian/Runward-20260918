@@ -197,15 +197,14 @@ const ConnectApps = ({ lang, onBack }: Props) => {
     }
     setTerraBusy(provider);
     try {
-      const successUrl = new URL(window.location.origin + window.location.pathname);
-      successUrl.searchParams.set("tab", "more");
-      successUrl.searchParams.set("page", "connect-apps");
-      successUrl.searchParams.set("terra", "success");
+      // Always return to production domain so the deeplink bridge can reopen the native app.
+      const successUrl = new URL("https://pacecalculator.fun/terra-return");
+      successUrl.searchParams.set("status", "success");
+      successUrl.searchParams.set("provider", provider);
 
-      const failureUrl = new URL(window.location.origin + window.location.pathname);
-      failureUrl.searchParams.set("tab", "more");
-      failureUrl.searchParams.set("page", "connect-apps");
-      failureUrl.searchParams.set("terra", "failure");
+      const failureUrl = new URL("https://pacecalculator.fun/terra-return");
+      failureUrl.searchParams.set("status", "failure");
+      failureUrl.searchParams.set("provider", provider);
 
       const { data, error } = await supabase.functions.invoke("terra-auth-init", {
         body: { provider, success_url: successUrl.toString(), failure_url: failureUrl.toString() },

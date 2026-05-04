@@ -16,6 +16,7 @@ import Support from "./pages/Support.tsx";
 import Privacy from "./pages/Privacy.tsx";
 import Landing from "./pages/Landing.tsx";
 import ManualUploadGuide from "./pages/ManualUploadGuide.tsx";
+import TerraReturn from "./pages/TerraReturn.tsx";
 
 const queryClient = new QueryClient();
 const native = isNativeApp();
@@ -66,6 +67,7 @@ const App = () => (
               <Route path="/support" element={<Support />} />
               <Route path="/privacy" element={<Privacy />} />
               <Route path="/manual-upload-guide" element={<ManualUploadGuide />} />
+              <Route path="/terra-return" element={<TerraReturn />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>

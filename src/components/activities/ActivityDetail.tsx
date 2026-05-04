@@ -41,6 +41,7 @@ interface StravaActivity {
   calories?: number | null;
   laps?: any[] | null;
   map_screenshot_url?: string | null;
+  provenance?: "strava" | "apple_health" | "garmin" | "terra";
 }
 
 interface Split {
@@ -57,6 +58,7 @@ interface Props {
   activity: StravaActivity;
   lang: Lang;
   onBack: () => void;
+  onDeleted?: () => void;
   isPremium?: boolean;
   trainingScore?: number;
 }
@@ -100,13 +102,13 @@ const StatBox = ({ icon: Icon, label, value, unit, iconColor }: {
   </div>
 );
 
-const ActivityDetail = ({ activity, lang, onBack, isPremium, trainingScore }: Props) => {
+const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, trainingScore }: Props) => {
   const isAppleHealth = activity.source === "Apple Health";
-  const isGarmin = activity.source === "Garmin";
-  const isTerraActivity = activity.source?.startsWith("Terra") ?? false;
-  const isCoros = activity.source === "COROS";
+  const isTerraActivity = activity.provenance === "terra" || (activity.source?.startsWith("Terra") ?? false);
+  const isGarmin = activity.provenance === "garmin" && activity.source === "Garmin";
+  const isCoros = activity.provenance === "garmin" && activity.source === "COROS";
   const needsRpe = isAppleHealth || isGarmin || isTerraActivity || isCoros;
-  const dbTable = isAppleHealth ? "apple_health_activities" : isGarmin || isCoros ? "garmin_activities" : isTerraActivity ? "terra_activities" : "strava_activities";
+  const dbTable = isTerraActivity ? "terra_activities" : isAppleHealth ? "apple_health_activities" : isGarmin || isCoros ? "garmin_activities" : "strava_activities";
 
   const [streams, setStreams] = useState<any[]>([]);
   const [splits, setSplits] = useState<Split[] | null>(null);
@@ -139,7 +141,10 @@ const ActivityDetail = ({ activity, lang, onBack, isPremium, trainingScore }: Pr
   const handleRename = async () => {
     if (!nameInput.trim() || nameInput === activityName) { setEditingName(false); return; }
     setSavingName(true);
-    const { error } = await supabase.from(dbTable).update({ name: nameInput.trim() } as any).eq('id', activity.id);
+    const updatePayload = (isTerraActivity || isGarmin || isCoros)
+      ? { activity_name: nameInput.trim() }
+      : { name: nameInput.trim() };
+    const { error } = await supabase.from(dbTable).update(updatePayload as any).eq('id', activity.id);
     if (error) {
       toast.error(lang === "zh" ? "重命名失敗" : "Failed to rename");
     } else {
@@ -152,12 +157,13 @@ const ActivityDetail = ({ activity, lang, onBack, isPremium, trainingScore }: Pr
 
   const handleDelete = async () => {
     setDeleting(true);
-    const { error } = await supabase.from(dbTable).delete().eq('id', activity.id);
-    if (error) {
+    const { data, error } = await supabase.from(dbTable).delete().eq('id', activity.id).select('id');
+    if (error || !data || data.length === 0) {
       toast.error(lang === "zh" ? "刪除失敗" : "Failed to delete activity");
       setDeleting(false);
     } else {
       toast.success(lang === "zh" ? "活動已刪除" : "Activity deleted");
+      onDeleted?.();
       onBack();
     }
   };

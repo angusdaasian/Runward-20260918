@@ -197,6 +197,48 @@ function extractPolyline(a: any): string | null {
   return pts.length > 1 ? encodePolyline(pts) : null;
 }
 
+function extractElevationSamples(a: any): Array<{ timestampMs: number | null; timerSeconds: number | null; elevMeters: number }> {
+  const samples = a?.distance_data?.detailed?.elevation_samples ?? a?.distance_data?.elevation_samples ?? [];
+  if (!Array.isArray(samples)) return [];
+  return samples
+    .map((s: any) => {
+      const timestampMs = s?.timestamp ? new Date(s.timestamp).getTime() : NaN;
+      const elevMeters = toFiniteNumber(s?.elev_meters ?? s?.elevation_meters ?? s?.altitude_meters);
+      return {
+        timestampMs: Number.isFinite(timestampMs) ? timestampMs : null,
+        timerSeconds: toFiniteNumber(s?.timer_duration_seconds),
+        elevMeters: elevMeters ?? NaN,
+      };
+    })
+    .filter((s: any) => Number.isFinite(s.elevMeters));
+}
+
+function computeElevationGain(samples: Array<{ elevMeters: number }>): number | null {
+  if (samples.length < 2) return null;
+  let gain = 0;
+  for (let i = 1; i < samples.length; i++) {
+    const diff = samples[i].elevMeters - samples[i - 1].elevMeters;
+    if (diff > 0) gain += diff;
+  }
+  return Math.round(gain * 10) / 10;
+}
+
+function lapElevationGain(lap: any, elevationSamples: ReturnType<typeof extractElevationSamples>, activityStartTime?: string | null): number | null {
+  if (elevationSamples.length < 2) return null;
+  const startMs = lap?.start_time ? new Date(lap.start_time).getTime() : NaN;
+  const endMs = lap?.end_time ? new Date(lap.end_time).getTime() : NaN;
+  if (Number.isFinite(startMs) && Number.isFinite(endMs)) {
+    const byTimestamp = computeElevationGain(elevationSamples.filter((s) => s.timestampMs !== null && s.timestampMs >= startMs && s.timestampMs <= endMs));
+    if (byTimestamp !== null) return byTimestamp;
+  }
+
+  const activityStartMs = activityStartTime ? new Date(activityStartTime).getTime() : NaN;
+  if (!Number.isFinite(activityStartMs) || !Number.isFinite(startMs) || !Number.isFinite(endMs)) return null;
+  const startSeconds = (startMs - activityStartMs) / 1000;
+  const endSeconds = (endMs - activityStartMs) / 1000;
+  return computeElevationGain(elevationSamples.filter((s) => s.timerSeconds !== null && s.timerSeconds >= startSeconds && s.timerSeconds <= endSeconds));
+}
+
 function extractLaps(a: any): any[] {
   const rawLaps =
     a?.lap_data?.laps ??
@@ -204,6 +246,8 @@ function extractLaps(a: any): any[] {
     a?.laps ??
     [];
   if (!Array.isArray(rawLaps)) return [];
+  const elevationSamples = extractElevationSamples(a);
+  const activityStartTime = a?.metadata?.start_time ?? null;
   return rawLaps.map((l: any, idx: number) => ({
     lap_index: l?.lap_index ?? idx + 1,
     start_time: l?.start_time ?? null,
@@ -216,7 +260,7 @@ function extractLaps(a: any): any[] {
     max_speed: l?.max_speed_meters_per_second ?? null,
     avg_cadence: l?.avg_cadence_rpm ?? l?.avg_cadence ?? null,
     calories: l?.total_calories ?? l?.calories ?? null,
-    elevation_gain: l?.total_ascent_meters ?? l?.elevation_gain_meters ?? null,
+    elevation_gain: l?.total_ascent_meters ?? l?.elevation_gain_meters ?? lapElevationGain(l, elevationSamples, activityStartTime),
   }));
 }
 

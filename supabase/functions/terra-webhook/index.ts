@@ -88,6 +88,15 @@ async function recalcUserXp(userId: string) {
       if (xp > 0) totalMonthlyXp += xp;
     }
 
+    // Add social-reward bonuses claimed this month so we don't wipe them.
+    const { data: socialRewards } = await supa
+      .from("social_rewards_claimed")
+      .select("xp_awarded")
+      .eq("user_id", userId)
+      .gte("claimed_at", monthStart)
+      .lt("claimed_at", monthEnd);
+    for (const r of socialRewards || []) totalMonthlyXp += (r.xp_awarded || 0);
+
     const { data: profile } = await supa
       .from("profiles")
       .select("monthly_xp, lifetime_xp")

@@ -10,6 +10,107 @@ const supa = createClient(
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
 );
 
+// ── XP / rank computation (mirrors garmin-sync) ──
+function percentVO2(minutes: number): number {
+  return 0.8 + 0.1894393 * Math.exp(-0.012778 * minutes) + 0.2989558 * Math.exp(-0.1932605 * minutes);
+}
+function vo2Cost(velocity: number): number {
+  return -4.6 + 0.182258 * velocity + 0.000104 * velocity * velocity;
+}
+function calculateVdot(distanceMeters: number, timeSeconds: number): number {
+  const minutes = timeSeconds / 60;
+  if (minutes <= 0) return 0;
+  const velocity = distanceMeters / minutes;
+  return vo2Cost(velocity) / percentVO2(minutes);
+}
+const RANK_TIERS = ["Bronze", "Silver", "Gold", "Diamond"];
+const DIVISIONS = ["V", "IV", "III", "II", "I"];
+const XP_PER_DIVISION = 2000;
+function computeRankFromXP(monthlyXp: number) {
+  const divisionIndex = Math.min(Math.floor(monthlyXp / XP_PER_DIVISION), RANK_TIERS.length * DIVISIONS.length - 1);
+  const tierIndex = Math.min(Math.floor(divisionIndex / DIVISIONS.length), RANK_TIERS.length - 1);
+  const divIndex = divisionIndex % DIVISIONS.length;
+  return { tier: RANK_TIERS[tierIndex], division: DIVISIONS[divIndex] };
+}
+const RUNNING_TYPES = new Set([
+  "Run", "TrailRun", "VirtualRun", "Treadmill", "Workout",
+  "running", "trail_running", "treadmill_running", "RUNNING", "TRAIL_RUNNING",
+]);
+function isRunning(t: unknown): boolean {
+  if (typeof t !== "string") return false;
+  return RUNNING_TYPES.has(t) || t.toLowerCase().includes("run");
+}
+
+async function recalcUserXp(userId: string) {
+  try {
+    // Compute training_score from VDOT of recent terra running activities
+    const { data: recent } = await supa
+      .from("terra_activities")
+      .select("distance_meters, duration_seconds, activity_type, start_time")
+      .eq("user_id", userId)
+      .order("start_time", { ascending: false })
+      .limit(50);
+
+    const vdots: number[] = [];
+    for (const act of recent || []) {
+      if (
+        isRunning(act.activity_type) &&
+        (act.distance_meters || 0) >= 400 &&
+        (act.duration_seconds || 0) >= 60
+      ) {
+        const v = calculateVdot(act.distance_meters || 0, act.duration_seconds || 0);
+        if (v >= 5 && v <= 100 && isFinite(v)) vdots.push(v);
+      }
+      if (vdots.length >= 20) break;
+    }
+    const trainingScore = vdots.length > 0
+      ? Math.round(vdots.reduce((a, b) => a + b, 0) / vdots.length)
+      : 0;
+
+    await supa.from("profiles").update({ training_score: trainingScore }).eq("user_id", userId);
+
+    // Sum monthly XP from terra_activities for current month
+    const now = new Date();
+    const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString();
+    const monthEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1)).toISOString();
+    const { data: monthActs } = await supa
+      .from("terra_activities")
+      .select("distance_meters, duration_seconds")
+      .eq("user_id", userId)
+      .gte("start_time", monthStart)
+      .lt("start_time", monthEnd);
+
+    let totalMonthlyXp = 0;
+    for (const act of monthActs || []) {
+      const km = (act.distance_meters || 0) / 1000;
+      const minutes = (act.duration_seconds || 0) / 60;
+      const xp = Math.round(km * 20) + Math.round(minutes * 10) + Math.round(trainingScore * 5);
+      if (xp > 0) totalMonthlyXp += xp;
+    }
+
+    const { data: profile } = await supa
+      .from("profiles")
+      .select("monthly_xp, lifetime_xp")
+      .eq("user_id", userId)
+      .single();
+    if (!profile) return;
+
+    const oldMonthlyXp = profile.monthly_xp || 0;
+    const xpDelta = totalMonthlyXp - oldMonthlyXp;
+    const newLifetimeXp = Math.max(0, (profile.lifetime_xp || 0) + xpDelta);
+    const rank = computeRankFromXP(totalMonthlyXp);
+
+    await supa.from("profiles").update({
+      monthly_xp: totalMonthlyXp,
+      lifetime_xp: newLifetimeXp,
+      rank_tier: rank.tier,
+      division: rank.division,
+    }).eq("user_id", userId);
+  } catch (e) {
+    console.error("terra-webhook recalcUserXp failed", e);
+  }
+}
+
 async function verifySignature(secret: string, header: string | null, raw: string): Promise<boolean> {
   if (!header) return false;
   // header format: "t=<timestamp>,v1=<signature>"

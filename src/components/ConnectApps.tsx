@@ -142,9 +142,84 @@ const ConnectApps = ({ lang, onBack }: Props) => {
     await garmin.syncActivities();
   };
 
-  const comingSoonApps = [
-    { name: "COROS", icon: "⌚" },
+  // Terra (Beta) state
+  type TerraProvider = "GARMIN" | "POLAR" | "SUUNTO" | "COROS";
+  const TERRA_PROVIDERS: { id: TerraProvider; label: string; icon: string }[] = [
+    { id: "GARMIN", label: "Garmin", icon: "⌚" },
+    { id: "POLAR", label: "Polar", icon: "🟥" },
+    { id: "SUUNTO", label: "Suunto", icon: "🧭" },
+    { id: "COROS", label: "COROS", icon: "🟠" },
   ];
+  const [terraConns, setTerraConns] = useState<Record<string, { id: string; last_synced_at: string | null }>>({});
+  const [terraBusy, setTerraBusy] = useState<string | null>(null);
+
+  const loadTerraConns = useCallback(async () => {
+    if (!user) return;
+    const { data } = await (supabase as any)
+      .from("terra_connections")
+      .select("id, provider, last_synced_at, active")
+      .eq("user_id", user.id)
+      .eq("active", true);
+    const map: Record<string, { id: string; last_synced_at: string | null }> = {};
+    (data ?? []).forEach((r: any) => { map[r.provider] = { id: r.id, last_synced_at: r.last_synced_at }; });
+    setTerraConns(map);
+  }, [user]);
+
+  useEffect(() => { loadTerraConns(); }, [loadTerraConns]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("terra")) {
+      const status = params.get("terra");
+      if (status === "success") toast.success(lang === "zh" ? "Terra 連接成功" : "Terra connected");
+      else toast.error(lang === "zh" ? "Terra 連接失敗" : "Terra connection failed");
+      let n = 0;
+      const t = setInterval(() => { loadTerraConns(); if (++n >= 6) clearInterval(t); }, 2000);
+      const url = new URL(window.location.href);
+      url.searchParams.delete("terra");
+      window.history.replaceState({}, "", url.toString());
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleTerraConnect = async (provider: TerraProvider) => {
+    setTerraBusy(provider);
+    try {
+      const origin = window.location.origin + window.location.pathname;
+      const { data, error } = await supabase.functions.invoke("terra-auth-init", {
+        body: { provider, success_url: `${origin}?terra=success`, failure_url: `${origin}?terra=failure` },
+      });
+      if (error || !data?.auth_url) throw new Error(error?.message || "no auth url");
+      window.location.href = data.auth_url;
+    } catch (e: any) {
+      toast.error((lang === "zh" ? "Terra 啟動失敗: " : "Terra init failed: ") + (e?.message ?? ""));
+      setTerraBusy(null);
+    }
+  };
+
+  const handleTerraSync = async (provider: TerraProvider) => {
+    setTerraBusy(provider);
+    try {
+      const { data, error } = await supabase.functions.invoke("terra-sync", { body: { provider } });
+      if (error) throw error;
+      toast.success(lang === "zh" ? `已同步 ${data?.activities ?? 0} 個活動` : `Synced ${data?.activities ?? 0} activities`);
+      await loadTerraConns();
+    } catch (e: any) {
+      toast.error((lang === "zh" ? "同步失敗: " : "Sync failed: ") + (e?.message ?? ""));
+    } finally { setTerraBusy(null); }
+  };
+
+  const handleTerraDisconnect = async (provider: TerraProvider) => {
+    setTerraBusy(provider);
+    try {
+      const { error } = await supabase.functions.invoke("terra-disconnect", { body: { provider } });
+      if (error) throw error;
+      toast.success(lang === "zh" ? "已中斷連結" : "Disconnected");
+      await loadTerraConns();
+    } catch (e: any) {
+      toast.error((lang === "zh" ? "中斷失敗: " : "Disconnect failed: ") + (e?.message ?? ""));
+    } finally { setTerraBusy(null); }
+  };
 
   return (
     <div className="px-5 pt-6 max-w-lg mx-auto pb-24">

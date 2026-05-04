@@ -251,7 +251,7 @@ Deno.serve(async (req) => {
             elevation_gain: elev?.gain_actual_meters ?? null,
             average_speed: a?.movement_data?.avg_speed_meters_per_second ?? null,
             summary_polyline: polyline,
-            has_gps: gpsPoints.length > 0,
+            has_gps: hasGps,
             laps,
             raw_json: null,
           }, { onConflict: "user_id,terra_activity_id" });

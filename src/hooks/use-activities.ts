@@ -88,6 +88,7 @@ async function fetchAppleHealthActivities(userId: string): Promise<StravaActivit
     summary_polyline: null,
     source: a.source || "Apple Health",
     calories: a.calories ?? null,
+    provenance: "apple_health" as const,
   }));
 }
 

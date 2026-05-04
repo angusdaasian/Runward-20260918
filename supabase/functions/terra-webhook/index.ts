@@ -182,7 +182,7 @@ Deno.serve(async (req) => {
           (async () => {
             const results = await Promise.allSettled(
               endpoints.map((ep) => {
-                const withSamples = ep === "activity" ? "true" : "false";
+                const withSamples = "false";
                 return fetch(
                   `https://api.tryterra.co/v2/${ep}?user_id=${terraUserId}&start_date=${startDate}&end_date=${endDate}&to_webhook=true&with_samples=${withSamples}`,
                   { headers },
@@ -236,7 +236,7 @@ Deno.serve(async (req) => {
             summary_polyline: polyline,
             has_gps: gpsPoints.length > 0,
             laps,
-            raw_json: a,
+            raw_json: null,
           }, { onConflict: "user_id,terra_activity_id" });
         }
       } else if (type === "daily" && appUserId) {
@@ -280,7 +280,7 @@ Deno.serve(async (req) => {
     terra_user_id: terraUserId,
     reference_id: referenceId,
     signature_valid: signatureValid,
-    payload,
+    payload: { type, user: payload?.user, count: Array.isArray(payload?.data) ? payload.data.length : (payload?.data ? 1 : 0) },
     processing_error: processingError,
   });
 

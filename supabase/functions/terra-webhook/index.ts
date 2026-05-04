@@ -157,7 +157,7 @@ Deno.serve(async (req) => {
         // Garmin-only: wipe last 90 days from Railway garmin tables and trigger
         // Terra historical re-fetch (data streams back via this same webhook).
         if (provider === "GARMIN") {
-          const days = 90;
+          const days = 7;
           const since = new Date(Date.now() - days * 86400_000);
           const sinceISO = since.toISOString();
           const sinceDate = sinceISO.slice(0, 10);

@@ -137,15 +137,54 @@ async function fetchGarminActivities(userId: string): Promise<StravaActivity[]> 
   });
 }
 
+async function fetchTerraActivities(userId: string): Promise<StravaActivity[]> {
+  const { data } = await supabase
+    .from("terra_activities")
+    .select("*")
+    .eq("user_id", userId)
+    .order("start_time", { ascending: false });
+  return ((data as any[]) || []).map((a) => {
+    const provider = (a.provider || "").toString();
+    const sourceLabel = provider
+      ? provider.charAt(0).toUpperCase() + provider.slice(1).toLowerCase()
+      : "Terra";
+    return {
+      id: a.id,
+      strava_id: 0,
+      name: a.activity_name || `${sourceLabel} Activity`,
+      sport_type: a.activity_type || "Run",
+      distance: a.distance_meters || 0,
+      moving_time: a.duration_seconds || 0,
+      elapsed_time: a.duration_seconds || 0,
+      total_elevation_gain: a.elevation_gain || 0,
+      start_date: a.start_time,
+      average_speed: (a.average_speed && a.average_speed > 0)
+        ? a.average_speed
+        : (a.distance_meters && a.duration_seconds && a.duration_seconds > 0)
+          ? a.distance_meters / a.duration_seconds
+          : 0,
+      max_speed: 0,
+      average_heartrate: a.average_hr || null,
+      max_heartrate: a.max_hr || null,
+      summary_polyline: a.summary_polyline ?? null,
+      source: sourceLabel,
+      calories: a.calories ?? null,
+      laps: a.laps || [],
+      garmin_training_load: a.training_load ?? null,
+    } as StravaActivity;
+  });
+}
+
 async function fetchConnection(userId: string) {
-  const [stravaRes, ahRes, garminRes] = await Promise.all([
+  const [stravaRes, ahRes, garminRes, terraRes] = await Promise.all([
     supabase.from("strava_connections").select("id").eq("user_id", userId).maybeSingle(),
     supabase.from("apple_health_connections").select("id").eq("user_id", userId).maybeSingle(),
     supabase.from("garmin_connections").select("id").eq("user_id", userId).maybeSingle(),
+    supabase.from("terra_connections").select("id").eq("user_id", userId).eq("active", true).limit(1).maybeSingle(),
   ]);
   return {
-    any: !!(stravaRes.data || ahRes.data || garminRes.data),
-    fitnessApp: !!(stravaRes.data || garminRes.data),
+    any: !!(stravaRes.data || ahRes.data || garminRes.data || terraRes.data),
+    fitnessApp: !!(stravaRes.data || garminRes.data || terraRes.data),
   };
 }
 
@@ -229,6 +268,14 @@ export function useActivities() {
     gcTime: 10 * 60 * 1000,
   });
 
+  const terraQuery = useQuery({
+    queryKey: ["terra-activities", user?.id],
+    queryFn: () => fetchTerraActivities(user!.id),
+    enabled: !!user,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+  });
+
   const profileQuery = useQuery({
     queryKey: ["user-profile", user?.id],
     queryFn: () => fetchProfile(user!.id),
@@ -258,15 +305,16 @@ export function useActivities() {
     staleTime: 5 * 60 * 1000,
   });
 
-  // Merge Strava + Apple Health + Garmin activities
+  // Merge Strava + Apple Health + Garmin + Terra activities (dedup by terra_activity_id when overlap)
   const mergedActivities = useMemo(() => {
     const strava = activitiesQuery.data || [];
     const ah = appleHealthQuery.data || [];
     const gm = garminQuery.data || [];
-    const all = [...strava, ...ah, ...gm];
+    const tr = terraQuery.data || [];
+    const all = [...strava, ...ah, ...gm, ...tr];
     all.sort((a, b) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime());
     return all;
-  }, [activitiesQuery.data, appleHealthQuery.data, garminQuery.data]);
+  }, [activitiesQuery.data, appleHealthQuery.data, garminQuery.data, terraQuery.data]);
 
   // Auto-link races to activities: when an activity exists on a race day and
   // the race has no finish time yet, fill it from the activity's elapsed_time.
@@ -321,6 +369,7 @@ export function useActivities() {
     queryClient.invalidateQueries({ queryKey: ["strava-activities", user?.id] });
     queryClient.invalidateQueries({ queryKey: ["apple-health-activities", user?.id] });
     queryClient.invalidateQueries({ queryKey: ["garmin-activities", user?.id] });
+    queryClient.invalidateQueries({ queryKey: ["terra-activities", user?.id] });
     queryClient.invalidateQueries({ queryKey: ["user-profile", user?.id] });
     queryClient.invalidateQueries({ queryKey: ["planned-workouts", user?.id] });
     queryClient.invalidateQueries({ queryKey: ["fitness-connection", user?.id] });
@@ -334,7 +383,7 @@ export function useActivities() {
     fitnessAppConnected: connectionQuery.data?.fitnessApp ?? false,
     plannedWorkouts: workoutsQuery.data || [],
     userRaces: userRacesQuery.data || [],
-    loading: activitiesQuery.isLoading || appleHealthQuery.isLoading || garminQuery.isLoading || profileQuery.isLoading || connectionQuery.isLoading,
+    loading: activitiesQuery.isLoading || appleHealthQuery.isLoading || garminQuery.isLoading || terraQuery.isLoading || profileQuery.isLoading || connectionQuery.isLoading,
     invalidateAll,
   };
 }

@@ -6,7 +6,6 @@ import {
   useTerraDailyHealth,
   useRefreshTerraDailyHealth,
 } from "@/hooks/use-terra-daily-health";
-import { useGarminDailyHealth } from "@/hooks/use-garmin-daily-health";
 import { useMemo, useState } from "react";
 
 interface Props {
@@ -48,7 +47,6 @@ function fmtDate(iso: string, lang: Lang): string {
 const HealthStatsCard = ({ lang }: Props) => {
   const { data: terraConns } = useTerraConnections();
   const { data: terraHistory } = useTerraDailyHealth();
-  const { data: garminHistory } = useGarminDailyHealth();
   const { refresh: refreshTerra, refreshing } =
     useRefreshTerraDailyHealth(lang);
 
@@ -72,11 +70,6 @@ const HealthStatsCard = ({ lang }: Props) => {
 
   const latest =
     (terraHistory ?? []).find((r) => r.provider?.toUpperCase() === active) ?? null;
-  const sameDateGarmin = active === "GARMIN" && latest
-    ? (garminHistory ?? []).find((r) => r.date === latest.date) ?? null
-    : null;
-  const sleepSeconds = latest?.sleep_seconds ?? sameDateGarmin?.sleep_seconds ?? null;
-  const sleepScore = latest?.sleep_score ?? sameDateGarmin?.sleep_score ?? null;
 
   const handleRefresh = () => {
     refreshTerra(active);
@@ -139,13 +132,13 @@ const HealthStatsCard = ({ lang }: Props) => {
         <Stat
           icon={<Moon size={14} className="text-indigo-400" />}
           label={lang === "zh" ? "睡眠時間" : "Sleep"}
-          value={fmtSleep(sleepSeconds)}
+          value={fmtSleep(latest?.sleep_seconds ?? null)}
         />
         <Stat
           icon={<Sparkles size={14} className="text-emerald-500" />}
           label={lang === "zh" ? "睡眠分數" : "Sleep Score"}
-          value={sleepScore != null ? String(sleepScore) : "—"}
-          valueClass={sleepScoreClass(sleepScore)}
+          value={latest?.sleep_score != null ? String(latest.sleep_score) : "—"}
+          valueClass={sleepScoreClass(latest?.sleep_score ?? null)}
         />
       </div>
     </Card>

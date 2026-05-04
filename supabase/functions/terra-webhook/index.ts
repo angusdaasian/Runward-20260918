@@ -233,8 +233,8 @@ Deno.serve(async (req) => {
           const cal = a?.calories_data ?? {};
           const elev = a?.distance_data?.summary?.elevation ?? {};
           const aid = String(meta?.upload_type ?? "") + ":" + String(meta?.summary_id ?? meta?.id ?? meta?.start_time ?? crypto.randomUUID());
-          const gpsPoints = extractGpsPoints(a);
-          const polyline = gpsPoints.length > 1 ? encodePolyline(gpsPoints) : null;
+          const polyline = extractPolyline(a);
+          const hasGps = !!polyline;
           const laps = extractLaps(a);
           await supa.from("terra_activities").upsert({
             user_id: appUserId,

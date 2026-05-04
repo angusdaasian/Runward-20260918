@@ -759,8 +759,17 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
               const avgSplitPace = speedToPace(activity.average_speed);
               const splitPace = speedToPace(split.average_speed);
               const isFaster = splitPace < avgSplitPace;
-              const distKm = (split.distance || 0) / 1000;
-              const distLabel = distKm >= 1 ? `${distKm.toFixed(2)}km` : `${Math.round(split.distance || 0)}m`;
+              const distMeters = split.distance || 0;
+              // Garmin/Coros autolap distances aren't always exactly 1000m
+              // (e.g. 999m or 1010m). Snap anything within 50m of a full km
+              // to that km so display is consistent across laps.
+              const nearestKm = Math.round(distMeters / 1000);
+              const isFullKmLap = nearestKm >= 1 && Math.abs(distMeters - nearestKm * 1000) <= 50;
+              const distLabel = isFullKmLap
+                ? `${nearestKm}.00km`
+                : distMeters >= 1000
+                  ? `${(distMeters / 1000).toFixed(2)}km`
+                  : `${Math.round(distMeters)}m`;
               return (
                 <div key={idx} className="grid grid-cols-5 text-xs py-1.5 border-b border-border/50 last:border-0">
                   <span className="font-medium text-foreground">{split.split}</span>

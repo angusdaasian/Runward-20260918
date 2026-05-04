@@ -267,6 +267,37 @@ Deno.serve(async (req) => {
         }
       } catch (e) { console.error("daily fetch failed", c.provider, e); }
 
+      // body (vo2max) — Garmin exposes VO2max via /v2/body measurements_data
+      try {
+        const r = await fetch(`https://api.tryterra.co/v2/body?user_id=${c.terra_user_id}&start_date=${startStr}&end_date=${endStr}&to_webhook=false&with_samples=false`, { headers });
+        const j = await r.json();
+        const items = Array.isArray(j?.data) ? j.data : [];
+        console.log(`[terra-sync] body ${c.provider} items=${items.length}`);
+        for (const d of items) {
+          const meta = d?.metadata ?? {};
+          const date = (meta?.start_time ?? meta?.end_time ?? "").slice(0, 10);
+          if (!date) continue;
+          const measurements = Array.isArray(d?.measurements_data?.measurements) ? d.measurements_data.measurements : [];
+          let vo2: number | null = null;
+          for (const m of measurements) {
+            const v = toFiniteNumber(m?.VO2max_ml_per_min_per_kg ?? m?.vo2max_ml_per_min_per_kg);
+            if (v != null) vo2 = v;
+          }
+          if (vo2 == null) {
+            vo2 = toFiniteNumber(d?.oxygen_data?.vo2max_ml_per_min_per_kg)
+              ?? toFiniteNumber(d?.oxygen_data?.day_avg_vo2max_ml_per_min_per_kg);
+          }
+          if (vo2 == null) continue;
+          const existing = dailyByDate[date] ?? {
+            user_id: c.user_id, provider: c.provider, date,
+            resting_hr: null, steps: null, vo2max: null,
+            sleep_seconds: null, sleep_score: null,
+          };
+          if (existing.vo2max == null) existing.vo2max = vo2;
+          dailyByDate[date] = existing;
+        }
+      } catch (e) { console.error("body fetch failed", c.provider, e); }
+
       // sleep (sleep_seconds, sleep_score) — Terra returns one record per sleep session.
       // We aggregate per night (using end_time date as the "wake day") and pick the longest.
       try {

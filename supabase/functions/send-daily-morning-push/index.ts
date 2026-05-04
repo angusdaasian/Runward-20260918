@@ -95,29 +95,42 @@ Deno.serve(async (req) => {
     const now = new Date();
     const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString();
 
-    // 3. Fetch month activities for all users in one query each (3 sources)
-    const userIds = profiles.map((p: any) => p.user_id);
-
-    const [stravaRes, appleRes, garminRes] = await Promise.all([
-      supabase.from("strava_activities")
-        .select("user_id, distance, start_date")
-        .in("user_id", userIds).gte("start_date", monthStart),
-      supabase.from("apple_health_activities")
-        .select("user_id, distance, start_date")
-        .in("user_id", userIds).gte("start_date", monthStart),
-      supabase.from("garmin_activities")
-        .select("user_id, distance_meters, start_time")
-        .in("user_id", userIds).gte("start_time", monthStart),
-    ]);
-
+    // 3. Fetch month activities for all users in pages (avoid huge .in() URL
+    //    and the default 1000-row PostgREST limit).
+    const optedInSet = new Set(profiles.map((p: any) => p.user_id));
     const kmByUser = new Map<string, number>();
     const add = (uid: string, meters: number) => {
       if (!meters || meters <= 0) return;
+      if (!optedInSet.has(uid)) return;
       kmByUser.set(uid, (kmByUser.get(uid) ?? 0) + meters / 1000);
     };
-    (stravaRes.data ?? []).forEach((a: any) => add(a.user_id, Number(a.distance) || 0));
-    (appleRes.data ?? []).forEach((a: any) => add(a.user_id, Number(a.distance) || 0));
-    (garminRes.data ?? []).forEach((a: any) => add(a.user_id, Number(a.distance_meters) || 0));
+
+    const PAGE = 1000;
+    async function pageFetch(table: string, distanceCol: string, dateCol: string) {
+      let from = 0;
+      while (true) {
+        const { data, error } = await supabase
+          .from(table)
+          .select(`user_id, ${distanceCol}, ${dateCol}`)
+          .gte(dateCol, monthStart)
+          .range(from, from + PAGE - 1);
+        if (error) {
+          console.error(`[daily-push] ${table} fetch err`, error);
+          return;
+        }
+        const rows = data ?? [];
+        for (const r of rows as any[]) add(r.user_id, Number(r[distanceCol]) || 0);
+        if (rows.length < PAGE) return;
+        from += PAGE;
+        if (from > 50_000) return; // safety
+      }
+    }
+
+    await Promise.all([
+      pageFetch("strava_activities", "distance", "start_date"),
+      pageFetch("apple_health_activities", "distance", "start_date"),
+      pageFetch("garmin_activities", "distance_meters", "start_time"),
+    ]);
 
     // 4. Detect each user's preferred language from auth metadata (fallback en)
     // Bulk fetch via admin API in pages

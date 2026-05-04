@@ -119,6 +119,49 @@ function extractLaps(a: any): any[] {
   }));
 }
 
+function toFiniteNumber(value: unknown): number | null {
+  const n = typeof value === "number" ? value : typeof value === "string" ? Number(value) : NaN;
+  return Number.isFinite(n) ? n : null;
+}
+
+function secondsBetween(start?: string | null, end?: string | null): number | null {
+  if (!start || !end) return null;
+  const seconds = (new Date(end).getTime() - new Date(start).getTime()) / 1000;
+  return Number.isFinite(seconds) && seconds > 0 ? seconds : null;
+}
+
+function extractDurationSeconds(a: any, distanceMeters?: number | null): number | null {
+  const meta = a?.metadata ?? {};
+  const duration = toFiniteNumber(a?.active_durations_data?.activity_seconds)
+    ?? toFiniteNumber(a?.active_durations_data?.duration_activity_seconds)
+    ?? toFiniteNumber(a?.active_durations_data?.active_seconds)
+    ?? toFiniteNumber(meta?.active_duration_seconds)
+    ?? secondsBetween(meta?.start_time, meta?.end_time);
+  if (duration && duration > 0) return Math.round(duration);
+
+  const speed = toFiniteNumber(a?.movement_data?.avg_speed_meters_per_second);
+  if (distanceMeters && distanceMeters > 0 && speed && speed > 0) {
+    return Math.round(distanceMeters / speed);
+  }
+  return null;
+}
+
+async function deleteMatchingGarminDuplicate(userId: string, startTime: string | null, distanceMeters: number | null) {
+  if (!startTime || !distanceMeters || distanceMeters <= 0) return;
+  const start = new Date(startTime);
+  if (!Number.isFinite(start.getTime())) return;
+  const from = new Date(start.getTime() - 5 * 60 * 1000).toISOString();
+  const to = new Date(start.getTime() + 5 * 60 * 1000).toISOString();
+  await supa
+    .from("garmin_activities")
+    .delete()
+    .eq("user_id", userId)
+    .gte("start_time", from)
+    .lte("start_time", to)
+    .gte("distance_meters", Math.max(0, distanceMeters - 100))
+    .lte("distance_meters", distanceMeters + 100);
+}
+
 async function findUserId(terraUserId: string | null, referenceId: string | null): Promise<string | null> {
   if (referenceId) return referenceId;
   if (!terraUserId) return null;
@@ -171,25 +214,14 @@ Deno.serve(async (req) => {
           processingError = `connection upsert: ${upsertErr.message}`;
         }
 
-        // Garmin-only: wipe the recent Railway Garmin window and trigger
-        // Terra historical re-fetch (data streams back via this same webhook).
+        // Garmin-only: trigger Terra historical re-fetch. Matching Railway Garmin
+        // duplicates are deleted per Terra activity as each payload arrives.
         if (provider === "GARMIN") {
           const days = 7;
           const since = new Date(Date.now() - days * 86400_000);
-          const sinceISO = since.toISOString();
-          const sinceDate = sinceISO.slice(0, 10);
+          const sinceDate = since.toISOString().slice(0, 10);
           const endDate = new Date().toISOString().slice(0, 10);
           const startDate = sinceDate;
-
-          // Wipe Railway Garmin window (don't await failures — keep webhook fast)
-          (async () => {
-            try {
-              await supa.from("garmin_activities").delete().eq("user_id", appUserId).gte("start_time", sinceISO);
-              await supa.from("garmin_daily_health").delete().eq("user_id", appUserId).gte("date", sinceDate);
-            } catch (e) {
-              console.error("garmin wipe failed", e);
-            }
-          })();
 
           // Fire historical re-fetch (to_webhook=true → Terra streams payloads back)
           const devId = Deno.env.get("TERRA_DEV_ID") ?? "";
@@ -232,6 +264,8 @@ Deno.serve(async (req) => {
           const hr = a?.heart_rate_data?.summary ?? {};
           const cal = a?.calories_data ?? {};
           const elev = a?.distance_data?.summary?.elevation ?? {};
+          const distanceMeters = toFiniteNumber(dist?.distance_meters);
+          const durationSeconds = extractDurationSeconds(a, distanceMeters);
           const aid = String(meta?.upload_type ?? "") + ":" + String(meta?.summary_id ?? meta?.id ?? meta?.start_time ?? crypto.randomUUID());
           const polyline = extractPolyline(a);
           const laps = extractLaps(a);
@@ -254,14 +288,8 @@ Deno.serve(async (req) => {
             activity_name: meta?.name ?? null,
             activity_type: meta?.type ?? meta?.activity_type ?? null,
             start_time: meta?.start_time ?? null,
-            duration_seconds: (() => {
-              const d = a?.active_durations_data?.activity_seconds
-                ?? meta?.active_duration_seconds
-                ?? a?.distance_data?.summary?.duration_seconds
-                ?? (meta?.end_time && meta?.start_time ? (new Date(meta.end_time).getTime() - new Date(meta.start_time).getTime())/1000 : null);
-              return d ? Math.round(d) : null;
-            })(),
-            distance_meters: dist?.distance_meters ?? null,
+            duration_seconds: durationSeconds,
+            distance_meters: distanceMeters,
             calories: cal?.total_burned_calories ? Math.round(cal.total_burned_calories) : null,
             average_hr: hr?.avg_hr_bpm ? Math.round(hr.avg_hr_bpm) : null,
             max_hr: hr?.max_hr_bpm ? Math.round(hr.max_hr_bpm) : null,
@@ -272,6 +300,7 @@ Deno.serve(async (req) => {
             laps: finalLaps,
             raw_json: null,
           }, { onConflict: "user_id,terra_activity_id" });
+          await deleteMatchingGarminDuplicate(appUserId, meta?.start_time ?? null, distanceMeters);
         }
       } else if (type === "daily" && appUserId) {
         const items = Array.isArray(payload?.data) ? payload.data : [payload?.data].filter(Boolean);

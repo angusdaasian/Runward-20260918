@@ -149,20 +149,25 @@ async function fetchTerraActivities(userId: string): Promise<StravaActivity[]> {
       ? provider.charAt(0).toUpperCase() + provider.slice(1).toLowerCase()
       : "Terra";
     const sourceLabel = provider ? `Terra ${providerLabel}` : "Terra";
+    const durationSeconds = a.duration_seconds && a.duration_seconds > 0
+      ? a.duration_seconds
+      : a.distance_meters && a.average_speed && a.average_speed > 0
+        ? Math.round(a.distance_meters / a.average_speed)
+        : 0;
     return {
       id: a.id,
       strava_id: 0,
       name: a.activity_name || `${sourceLabel} Activity`,
       sport_type: a.activity_type || "Run",
       distance: a.distance_meters || 0,
-      moving_time: a.duration_seconds || 0,
-      elapsed_time: a.duration_seconds || 0,
+      moving_time: durationSeconds,
+      elapsed_time: durationSeconds,
       total_elevation_gain: a.elevation_gain || 0,
       start_date: a.start_time,
       average_speed: (a.average_speed && a.average_speed > 0)
         ? a.average_speed
-        : (a.distance_meters && a.duration_seconds && a.duration_seconds > 0)
-          ? a.distance_meters / a.duration_seconds
+        : (a.distance_meters && durationSeconds > 0)
+          ? a.distance_meters / durationSeconds
           : 0,
       max_speed: 0,
       average_heartrate: a.average_hr || null,
@@ -306,13 +311,18 @@ export function useActivities() {
     staleTime: 5 * 60 * 1000,
   });
 
-  // Merge Strava + Apple Health + Garmin + Terra activities (dedup by terra_activity_id when overlap)
+  // Merge Strava + Apple Health + Garmin + Terra activities (prefer Terra over duplicate Garmin imports)
   const mergedActivities = useMemo(() => {
     const strava = activitiesQuery.data || [];
     const ah = appleHealthQuery.data || [];
     const gm = garminQuery.data || [];
     const tr = terraQuery.data || [];
-    const all = [...strava, ...ah, ...gm, ...tr];
+    const filteredGarmin = gm.filter((g) => !tr.some((t) => {
+      const timeDiff = Math.abs(new Date(g.start_date).getTime() - new Date(t.start_date).getTime());
+      const distanceDiff = Math.abs((g.distance || 0) - (t.distance || 0));
+      return timeDiff < 5 * 60 * 1000 && distanceDiff < 100;
+    }));
+    const all = [...strava, ...ah, ...filteredGarmin, ...tr];
     all.sort((a, b) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime());
     return all;
   }, [activitiesQuery.data, appleHealthQuery.data, garminQuery.data, terraQuery.data]);

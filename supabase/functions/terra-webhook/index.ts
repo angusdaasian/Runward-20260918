@@ -119,6 +119,49 @@ function extractLaps(a: any): any[] {
   }));
 }
 
+function toFiniteNumber(value: unknown): number | null {
+  const n = typeof value === "number" ? value : typeof value === "string" ? Number(value) : NaN;
+  return Number.isFinite(n) ? n : null;
+}
+
+function secondsBetween(start?: string | null, end?: string | null): number | null {
+  if (!start || !end) return null;
+  const seconds = (new Date(end).getTime() - new Date(start).getTime()) / 1000;
+  return Number.isFinite(seconds) && seconds > 0 ? seconds : null;
+}
+
+function extractDurationSeconds(a: any, distanceMeters?: number | null): number | null {
+  const meta = a?.metadata ?? {};
+  const duration = toFiniteNumber(a?.active_durations_data?.activity_seconds)
+    ?? toFiniteNumber(a?.active_durations_data?.duration_activity_seconds)
+    ?? toFiniteNumber(a?.active_durations_data?.active_seconds)
+    ?? toFiniteNumber(meta?.active_duration_seconds)
+    ?? secondsBetween(meta?.start_time, meta?.end_time);
+  if (duration && duration > 0) return Math.round(duration);
+
+  const speed = toFiniteNumber(a?.movement_data?.avg_speed_meters_per_second);
+  if (distanceMeters && distanceMeters > 0 && speed && speed > 0) {
+    return Math.round(distanceMeters / speed);
+  }
+  return null;
+}
+
+async function deleteMatchingGarminDuplicate(userId: string, startTime: string | null, distanceMeters: number | null) {
+  if (!startTime || !distanceMeters || distanceMeters <= 0) return;
+  const start = new Date(startTime);
+  if (!Number.isFinite(start.getTime())) return;
+  const from = new Date(start.getTime() - 5 * 60 * 1000).toISOString();
+  const to = new Date(start.getTime() + 5 * 60 * 1000).toISOString();
+  await supa
+    .from("garmin_activities")
+    .delete()
+    .eq("user_id", userId)
+    .gte("start_time", from)
+    .lte("start_time", to)
+    .gte("distance_meters", Math.max(0, distanceMeters - 100))
+    .lte("distance_meters", distanceMeters + 100);
+}
+
 async function findUserId(terraUserId: string | null, referenceId: string | null): Promise<string | null> {
   if (referenceId) return referenceId;
   if (!terraUserId) return null;

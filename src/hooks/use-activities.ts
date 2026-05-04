@@ -145,9 +145,10 @@ async function fetchTerraActivities(userId: string): Promise<StravaActivity[]> {
     .order("start_time", { ascending: false });
   return ((data as any[]) || []).map((a) => {
     const provider = (a.provider || "").toString();
-    const sourceLabel = provider
+    const providerLabel = provider
       ? provider.charAt(0).toUpperCase() + provider.slice(1).toLowerCase()
       : "Terra";
+    const sourceLabel = provider ? `Terra ${providerLabel}` : "Terra";
     return {
       id: a.id,
       strava_id: 0,

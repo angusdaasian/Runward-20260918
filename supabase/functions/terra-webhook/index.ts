@@ -75,6 +75,57 @@ Deno.serve(async (req) => {
           active: true,
           last_webhook_at: new Date().toISOString(),
         }, { onConflict: "user_id,provider" });
+
+        // Garmin-only: wipe last 90 days from Railway garmin tables and trigger
+        // Terra historical re-fetch (data streams back via this same webhook).
+        if (provider === "GARMIN") {
+          const days = 90;
+          const since = new Date(Date.now() - days * 86400_000);
+          const sinceISO = since.toISOString();
+          const sinceDate = sinceISO.slice(0, 10);
+          const endDate = new Date().toISOString().slice(0, 10);
+          const startDate = sinceDate;
+
+          // Wipe Railway Garmin window (don't await failures — keep webhook fast)
+          (async () => {
+            try {
+              await supa.from("garmin_activities").delete().eq("user_id", appUserId).gte("start_time", sinceISO);
+              await supa.from("garmin_daily_health").delete().eq("user_id", appUserId).gte("date", sinceDate);
+            } catch (e) {
+              console.error("garmin wipe failed", e);
+            }
+          })();
+
+          // Fire historical re-fetch (to_webhook=true → Terra streams payloads back)
+          const devId = Deno.env.get("TERRA_DEV_ID") ?? "";
+          const apiKey = Deno.env.get("TERRA_API_KEY") ?? "";
+          const headers = { "dev-id": devId, "x-api-key": apiKey };
+          const endpoints = ["activity", "daily", "sleep"] as const;
+          (async () => {
+            const results = await Promise.allSettled(
+              endpoints.map((ep) =>
+                fetch(
+                  `https://api.tryterra.co/v2/${ep}?user_id=${terraUserId}&start_date=${startDate}&end_date=${endDate}&to_webhook=true&with_samples=false`,
+                  { headers },
+                ).then((r) => ({ ep, status: r.status })),
+              ),
+            );
+            const summary = results.map((r, i) =>
+              r.status === "fulfilled" ? r.value : { ep: endpoints[i], error: String((r as any).reason) }
+            );
+            try {
+              await supa.from("terra_webhook_events").insert({
+                type: "garmin_backfill",
+                terra_user_id: terraUserId,
+                reference_id: referenceId,
+                signature_valid: true,
+                payload: { window_days: days, start_date: startDate, end_date: endDate, results: summary } as any,
+              });
+            } catch (e) {
+              console.error("garmin_backfill log insert failed", e);
+            }
+          })();
+        }
       } else if ((type === "deauth" || type === "access_revoked") && terraUserId) {
         await supa.from("terra_connections").update({ active: false, last_webhook_at: new Date().toISOString() }).eq("terra_user_id", terraUserId);
       } else if ((type === "activity" || type === "processed_activity") && appUserId) {

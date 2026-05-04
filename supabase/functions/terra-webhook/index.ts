@@ -69,14 +69,31 @@ function extractGpsPoints(a: any): Array<[number, number]> {
   const pts: Array<[number, number]> = [];
   if (Array.isArray(samples)) {
     for (const s of samples) {
-      const lat = s?.coords?.latitude ?? s?.latitude ?? s?.lat;
-      const lng = s?.coords?.longitude ?? s?.longitude ?? s?.lng ?? s?.lon;
+      // Terra v2: coords_lat_lng_deg = [lat, lng]
+      const ll = s?.coords_lat_lng_deg;
+      let lat: number | undefined;
+      let lng: number | undefined;
+      if (Array.isArray(ll) && ll.length >= 2) {
+        lat = ll[0];
+        lng = ll[1];
+      } else {
+        lat = s?.coords?.latitude ?? s?.latitude ?? s?.lat;
+        lng = s?.coords?.longitude ?? s?.longitude ?? s?.lng ?? s?.lon;
+      }
       if (typeof lat === "number" && typeof lng === "number" && !isNaN(lat) && !isNaN(lng)) {
         pts.push([lat, lng]);
       }
     }
   }
   return pts;
+}
+
+function extractPolyline(a: any): string | null {
+  // Prefer Terra's pre-encoded polyline (no samples needed)
+  const pre = a?.polyline_map_data?.summary_polyline;
+  if (typeof pre === "string" && pre.length > 0) return pre;
+  const pts = extractGpsPoints(a);
+  return pts.length > 1 ? encodePolyline(pts) : null;
 }
 
 function extractLaps(a: any): any[] {
@@ -96,7 +113,7 @@ function extractLaps(a: any): any[] {
     max_hr: l?.max_hr_bpm ?? null,
     avg_speed: l?.avg_speed_meters_per_second ?? l?.average_speed_meters_per_second ?? null,
     max_speed: l?.max_speed_meters_per_second ?? null,
-    avg_cadence: l?.avg_cadence ?? null,
+    avg_cadence: l?.avg_cadence_rpm ?? l?.avg_cadence ?? null,
     calories: l?.total_calories ?? l?.calories ?? null,
     elevation_gain: l?.total_ascent_meters ?? l?.elevation_gain_meters ?? null,
   }));

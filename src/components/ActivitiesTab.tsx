@@ -420,6 +420,11 @@ const ActivitiesTab = ({ lang }: Props) => {
         { event: "*", schema: "public", table: "garmin_activities", filter: `user_id=eq.${user.id}` },
         () => invalidateAll(),
       )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "terra_activities", filter: `user_id=eq.${user.id}` },
+        () => invalidateAll(),
+      )
       .subscribe();
     return () => {
       supabase.removeChannel(channel);

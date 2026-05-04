@@ -668,12 +668,14 @@ export function useAppleHealth(lang: Lang) {
       try {
         // If a fitness app (Strava/Garmin) is currently connected, skip saving
         // AH activities entirely — the connected app owns activities live.
-        const [stravaConn, garminConn] = await Promise.all([
+        const [stravaConn, garminConn, terraGarminConn] = await Promise.all([
           supabase.from("strava_connections").select("id").eq("user_id", user.id).maybeSingle(),
           supabase.from("garmin_connections").select("id").eq("user_id", user.id).maybeSingle(),
+          supabase.from("terra_connections").select("id")
+            .eq("user_id", user.id).eq("provider", "GARMIN").eq("active", true).maybeSingle(),
         ]);
-        if (stravaConn.data || garminConn.data) {
-          console.log("[AppleHealth] Fitness app connected, skipping activity save (fitness app takes priority)");
+        if (stravaConn.data || garminConn.data || terraGarminConn.data) {
+          console.log("[AppleHealth] Fitness app connected (Strava/Garmin/Terra-Garmin), skipping activity save");
           return 0;
         }
 

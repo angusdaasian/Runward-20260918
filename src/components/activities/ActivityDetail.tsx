@@ -103,9 +103,10 @@ const StatBox = ({ icon: Icon, label, value, unit, iconColor }: {
 const ActivityDetail = ({ activity, lang, onBack, isPremium, trainingScore }: Props) => {
   const isAppleHealth = activity.source === "Apple Health";
   const isGarmin = activity.source === "Garmin";
+  const isTerraActivity = activity.source?.startsWith("Terra") ?? false;
   const isCoros = activity.source === "COROS";
-  const needsRpe = isAppleHealth || isGarmin || isCoros;
-  const dbTable = isAppleHealth ? "apple_health_activities" : (isGarmin || isCoros) ? "garmin_activities" : "strava_activities";
+  const needsRpe = isAppleHealth || isGarmin || isTerraActivity || isCoros;
+  const dbTable = isAppleHealth ? "apple_health_activities" : isGarmin || isCoros ? "garmin_activities" : isTerraActivity ? "terra_activities" : "strava_activities";
 
   const [streams, setStreams] = useState<any[]>([]);
   const [splits, setSplits] = useState<Split[] | null>(null);
@@ -199,7 +200,7 @@ const ActivityDetail = ({ activity, lang, onBack, isPremium, trainingScore }: Pr
         ...(userComment.trim() ? { userComment: userComment.trim() } : {}),
         ...(opts?.forceRefresh ? { forceRefresh: true } : {}),
       };
-      if (isGarmin && activity.laps && Array.isArray(activity.laps) && activity.laps.length > 0) {
+      if ((isGarmin || isTerraActivity) && activity.laps && Array.isArray(activity.laps) && activity.laps.length > 0) {
         bodyPayload.garminLaps = activity.laps;
       }
       const { data, error } = await supabase.functions.invoke("analyze-activity", { body: bodyPayload });
@@ -326,10 +327,10 @@ const ActivityDetail = ({ activity, lang, onBack, isPremium, trainingScore }: Pr
   useEffect(() => {
     const fetchStreams = async () => {
       setLoading(true);
-      // Apple Health / Garmin: no Strava streams. Map Garmin laps to splits.
+      // Apple Health / Garmin/Terra: no Strava streams. Map laps to splits.
       if (needsRpe || !activity.strava_id || activity.strava_id <= 0) {
         setStreams([]);
-        if (isGarmin && Array.isArray(activity.laps) && activity.laps.length > 0) {
+        if ((isGarmin || isTerraActivity) && Array.isArray(activity.laps) && activity.laps.length > 0) {
           const mapped: Split[] = activity.laps.map((lap: any, idx: number) => {
             const distance = Number(lap.distance ?? lap.distance_meters) || 0;
             const elapsed = Number(
@@ -381,6 +382,8 @@ const ActivityDetail = ({ activity, lang, onBack, isPremium, trainingScore }: Pr
             }
           } catch {}
         }
+        setLoading(false);
+        return;
       }
 
       // Check for cached analysis (all sources). Only auto-load — do NOT auto-run a new analysis.

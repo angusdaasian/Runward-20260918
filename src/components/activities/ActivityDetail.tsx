@@ -58,6 +58,7 @@ interface Props {
   activity: StravaActivity;
   lang: Lang;
   onBack: () => void;
+  onDeleted?: () => void;
   isPremium?: boolean;
   trainingScore?: number;
 }
@@ -101,7 +102,7 @@ const StatBox = ({ icon: Icon, label, value, unit, iconColor }: {
   </div>
 );
 
-const ActivityDetail = ({ activity, lang, onBack, isPremium, trainingScore }: Props) => {
+const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, trainingScore }: Props) => {
   const isAppleHealth = activity.source === "Apple Health";
   const isTerraActivity = activity.provenance === "terra" || (activity.source?.startsWith("Terra") ?? false);
   const isGarmin = activity.provenance === "garmin" && activity.source === "Garmin";
@@ -162,6 +163,7 @@ const ActivityDetail = ({ activity, lang, onBack, isPremium, trainingScore }: Pr
       setDeleting(false);
     } else {
       toast.success(lang === "zh" ? "活動已刪除" : "Activity deleted");
+      onDeleted?.();
       onBack();
     }
   };

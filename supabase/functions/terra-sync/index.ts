@@ -168,6 +168,7 @@ Deno.serve(async (req) => {
     const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
     const body = await req.json().catch(() => ({}));
     const providerFilter: string | undefined = body.provider ? String(body.provider).toUpperCase() : undefined;
+    const healthOnly = body.healthOnly === true;
 
     const q = admin.from("terra_connections").select("*").eq("user_id", user.id).eq("active", true);
     const { data: conns } = providerFilter ? await q.eq("provider", providerFilter) : await q;
@@ -191,7 +192,8 @@ Deno.serve(async (req) => {
 
     for (const c of conns) {
       const headers = { "dev-id": devId, "x-api-key": apiKey };
-      // activity
+      // activity (skipped when caller only wants health stats)
+      if (!healthOnly) {
       try {
         const r = await fetch(`https://api.tryterra.co/v2/activity?user_id=${c.terra_user_id}&start_date=${startStr}&end_date=${endStr}&to_webhook=false&with_samples=true`, { headers });
         const j = await r.json();
@@ -237,6 +239,7 @@ Deno.serve(async (req) => {
           activityCount++;
         }
       } catch (e) { console.error("activity fetch failed", c.provider, e); }
+      }
 
       // daily (steps, resting hr, vo2max)
       const dailyByDate: Record<string, any> = {};

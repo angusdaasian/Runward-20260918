@@ -140,29 +140,30 @@ async function fetchGarminActivities(userId: string): Promise<StravaActivity[]> 
 // Terra activity_type numeric codes -> readable sport
 // Reference: https://docs.tryterra.co/reference/activity-types
 const TERRA_ACTIVITY_TYPE_MAP: Record<string, string> = {
-  "8": "Run",
-  "0": "Run",
-  "16": "Run",
-  "37": "Run",
-  "44": "Run",
-  "59": "Run",
-  "63": "Run",
-  "64": "Run",
-  "8.0": "Run",
-  "20": "Ride",
-  "30": "Ride",
-  "32": "Swim",
-  "1": "Walk",
-  "10": "Hike",
+  "8": "Running",
+  "0": "Running",
+  "16": "Running",
+  "37": "Running",
+  "44": "Running",
+  "59": "Running",
+  "63": "Running",
+  "64": "Running",
+  "8.0": "Running",
+  "20": "Cycling",
+  "30": "Cycling",
+  "32": "Swimming",
+  "1": "Walking",
+  "10": "Hiking",
 };
 
 function mapTerraSportType(rawType: any): string {
-  if (rawType === null || rawType === undefined || rawType === "") return "Run";
-  const key = String(rawType);
+  if (rawType === null || rawType === undefined || rawType === "") return "Running";
+  const key = String(rawType).trim();
   if (TERRA_ACTIVITY_TYPE_MAP[key]) return TERRA_ACTIVITY_TYPE_MAP[key];
-  // If it's already a non-numeric string (e.g. "Running"), pass through
-  if (!/^-?\d+(\.\d+)?$/.test(key)) return key;
-  return "Run";
+  // Numeric but unmapped → default to Running
+  if (/^-?\d+(\.\d+)?$/.test(key)) return "Running";
+  // Pass through readable strings (e.g. "Run", "Running")
+  return key;
 }
 
 function mapTerraProviderLabel(provider: string): string {

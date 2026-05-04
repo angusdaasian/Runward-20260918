@@ -1,0 +1,3 @@
+INSERT INTO public.terra_connections (user_id, terra_user_id, provider, reference_id, scopes, active, last_webhook_at)
+VALUES ('c7a7d1ca-c7bf-4288-bb9d-794006a04087','cb420a20-e140-4d13-9ed9-d28eb8be8a53','GARMIN','c7a7d1ca-c7bf-4288-bb9d-794006a04087', ARRAY['ACTIVITY_EXPORT','HISTORICAL_DATA_EXPORT','HEALTH_EXPORT','WORKOUT_IMPORT','MCT_EXPORT'], true, now())
+ON CONFLICT (user_id, provider) DO UPDATE SET terra_user_id=EXCLUDED.terra_user_id, active=true, scopes=EXCLUDED.scopes, last_webhook_at=now();

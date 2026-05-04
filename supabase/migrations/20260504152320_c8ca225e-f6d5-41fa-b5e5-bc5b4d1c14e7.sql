@@ -1,0 +1,1 @@
+UPDATE public.terra_daily_health SET vo2max = NULL WHERE vo2max IS NOT NULL AND vo2max < 10;

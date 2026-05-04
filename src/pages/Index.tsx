@@ -58,6 +58,16 @@ const Index = () => {
   );
   const [checkingProfile, setCheckingProfile] = useState(false);
 
+  useEffect(() => {
+    const tabParam = searchParams.get("tab");
+    if (tabParam === "training" || tabParam === "analytics" || tabParam === "activities" || tabParam === "more" || tabParam === "community" || tabParam === "races") {
+      setActiveTab(tabParam);
+    } else if (tabParam === "posture") {
+      setActiveTab("analytics");
+    }
+    setShowConnectApps(searchParams.get("page") === "connect-apps");
+  }, [searchParams]);
+
   // Preload header profile as soon as user is known
   useEffect(() => {
     if (user) preloadHeaderProfile(user.id);

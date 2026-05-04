@@ -1,46 +1,65 @@
-# Fix: AI plan dates don't match calendar dates
+## Goal
+Add Terra API integration **inside the existing "Link to Fitness App" tab** (`ConnectApps.tsx`) as new connect options for Garmin / Polar / Suunto / Coros via Terra. The current Railway garminconnect flow stays fully intact for now — Terra entries are presented as separate items labeled "(Beta — Terra)" so you can test them while real users continue using the existing Garmin connection. Migration to replace Garmin/Coros happens later.
 
-## Root cause
+## Isolation guarantees
+- **No changes** to: `garmin-credential-login`, `garmin-credential-mfa`, `garmin-sync`, `garmin-daily-health-sync`, `_shared/garminRailway.ts`, the daily 10am cron, or any reads/writes of `garmin_connections` / `garmin_activities` / `garmin_daily_health`.
+- Terra runs entirely on **new tables** and **new edge functions**.
+- The existing "Garmin Connect" card in the Fitness App tab is untouched. Terra appears as additional cards beneath it.
 
-When the AI generates a training program, the edge function asks Gemini to invent both the `day` label (Mon/Tue/...) and the `date` (YYYY-MM-DD) for every workout. Two problems result:
+## Secrets to add (via add_secret)
+- `TERRA_DEV_ID` = `runward-testing-SFwUKff5Pw`
+- `TERRA_API_KEY` = (your `x-api-key`)
+- `TERRA_SIGNING_SECRET` = from Terra dashboard (HMAC verification)
 
-1. **The user's `startDate` is never sent to the AI.** The frontend (`TrainingTab.handleGenerate`) collects `startDate` from the date picker and posts it, but `supabase/functions/generate-program/index.ts` ignores it — the prompt only says "start from today working backward from race date." So Gemini picks its own start day.
-2. **The AI's `day` label and `date` field can disagree.** The weekly plan view in `TrainingTab` renders each workout under a positional label (`DAY_LABELS[i]` = Mon, Tue, ...), while the calendar (`ActivityCalendar` via `fetchPlannedWorkouts`) uses the real `day.date` value. If the AI says `{day:"Mon", date:"2026-05-05"}` but May 5 is actually a Tuesday, the user sees "Recovery Run on Monday" in the plan but "Recovery Run on Tuesday" on the calendar — exactly the bug reported.
+## New tables (migration)
+1. `terra_connections` — `id, user_id, terra_user_id text, provider text, reference_id text, scopes text[], active bool default true, last_webhook_at, last_synced_at, created_at, updated_at`; unique `(user_id, provider)`; RLS user-owns + service-role full
+2. `terra_activities` — provider-agnostic activity rows mirroring `garmin_activities` shape + `provider`, `terra_activity_id`; unique `(user_id, terra_activity_id)`; RLS user-reads + service-role full
+3. `terra_daily_health` — `(user_id, provider, date)` unique with vo2max, resting_hr, sleep, steps; RLS user-reads + service-role full
+4. `terra_webhook_events` — debug log of every Terra webhook payload (`type, terra_user_id, reference_id, signature_valid, payload jsonb, processing_error, received_at`); RLS admins-read + service-role full
 
-## Fix
+## New edge functions
+1. **`terra-auth-init`** (JWT) — body `{ provider }` → POST Terra `/v2/auth/authenticateUser?resource=<PROVIDER>` with `dev-id`, `x-api-key`, body `{ language: "en", reference_id: user.id }` → returns `{ auth_url }`
+2. **`terra-webhook`** (public, HMAC verify) — handles `auth`, `activity`/`processed_activity`, `daily`, `sleep`, `deauth`, `access_revoked`. Always logs payload to `terra_webhook_events`, then upserts into the right table.
+3. **`terra-sync`** (JWT) — for caller's active terra_connections, pulls last 30 days from `/v2/activity` and `/v2/daily`, upserts.
+4. **`terra-disconnect`** (JWT) — calls Terra deauthenticate, marks `active=false`.
 
-Stop trusting the AI for dates. Compute every `date` deterministically on the server from the user's chosen `startDate`, and force the `day` label to match.
+## UI changes inside the Fitness App tab (ConnectApps.tsx)
+- Keep the existing **Garmin Connect** card (Railway) exactly as-is.
+- Add a new section header: **"Beta — new connections (Terra)"** with a short note: *"Test the new universal connection. Won't affect your existing Garmin sync."*
+- Add 4 new cards using the same visual style as the existing cards:
+  - **Garmin (Beta — Terra)**
+  - **Polar (Beta — Terra)**
+  - **Suunto (Beta — Terra)**
+  - **Coros (Beta — Terra)**
+- Each "Connect" button calls `terra-auth-init({ provider })` and opens `auth_url` in a new tab.
+- For each, if a row exists in `terra_connections` for that provider with `active=true`, show:
+  - Last synced timestamp
+  - **Sync now** button → `terra-sync`
+  - **Disconnect** button → `terra-disconnect`
+- These Terra cards are **not gated** by the existing `hasFitnessApp` mutual-exclusion check — Terra is parallel to Railway, so connecting Garmin via Terra does not block or unblock the existing Garmin/Strava buttons.
+- Remove the "COROS — coming soon" placeholder card since Coros is now bookable via Terra Beta.
 
-### 1. `supabase/functions/generate-program/index.ts`
+## Webhook + redirect URLs to register in Terra dashboard
+- Webhook: `https://kbghvclwhxnjeskdodeh.supabase.co/functions/v1/terra-webhook`
+- Success redirect: `https://welcome-ward-start.lovable.app/?terra=success`
+- Failure redirect: `https://welcome-ward-start.lovable.app/?terra=failure`
 
-- Accept `startDate` from the request body (already sent by frontend).
-- Keep asking the AI for `week`, `day`, `type`, `title`, `description`, `distance_km`, `pace`, `color` — but tell it dates will be assigned by the system, so it can omit/ignore `date`.
-- After parsing the AI JSON, walk every week and overwrite each `day.date` based on `startDate + (weekIndex * 7) + dayIndex`, and overwrite `day.day` with the matching `Mon..Sun` label. Also fix `week.startDate`.
-- This makes the schedule always start exactly on the user-picked date and guarantees `day.day` matches the weekday of `day.date`.
+I'll print the exact values after deployment.
 
-### 2. `src/components/TrainingTab.tsx` (weekly plan view)
+## Data flow during testing
+- You connect via the new Beta cards → Terra webhook fires → rows land in `terra_*` tables.
+- Reads in the existing app (analytics, calendar, XP, training score) keep using `garmin_*` / `apple_health_*` / `strava_*` tables — **unchanged**, so other users see no difference.
+- You can verify Terra is working by reviewing `terra_activities`, `terra_daily_health`, and `terra_webhook_events` directly (or via a quick admin debug view if you want one — happy to add).
 
-In the three places that render `currentWeek.days.map((day, i) => ...)` (lines ~812, ~965, ~1180, ~1316), replace the positional label with the real weekday derived from `day.date` so the plan view and calendar can never visually disagree even on legacy plans:
+## Rollout order
+1. Add the 3 Terra secrets
+2. Run migration (4 new tables + RLS)
+3. Deploy 4 edge functions
+4. Update `ConnectApps.tsx` with the Beta section
+5. You paste webhook + redirect URLs into Terra dashboard
+6. You test Garmin / Polar / Suunto / Coros end-to-end
+7. Later, separate task: switch the main app reads over to `terra_*` and retire Railway
 
-```ts
-const dateObj = day.date ? new Date(day.date + "T00:00:00") : null;
-const weekdayLabel = dateObj
-  ? ["SUN","MON","TUE","WED","THU","FRI","SAT"][dateObj.getDay()]
-  : (DAY_LABELS[i] || day.day?.substring(0,3).toUpperCase());
-```
-
-Use `weekdayLabel` instead of `DAY_LABELS[i] || day.day?.substring(0,3).toUpperCase()`.
-
-### 3. (Optional cleanup) `ProgramsTab.tsx`
-
-Same positional-label issue exists there. Apply the same `weekdayLabel` fix for consistency, even though `Index.tsx` currently mounts `TrainingTab`.
-
-## Result
-
-- New plans: dates always begin on the user's chosen start date and the weekday label always matches the actual date — calendar and plan view show the same workout on the same day.
-- Existing/legacy plans: the plan view now derives its weekday label from `date`, so it visually matches the calendar even if the stored `day` label was wrong.
-
-## Out of scope
-
-- Not changing storage schema.
-- Not regenerating existing plans automatically; users can re-generate to get correctly-dated plans.
+## Open questions
+1. Should the Terra Beta section be visible to **everyone** in production, or only to **admins** (you) for now? (Recommend admin-only until validated.)
+2. Want a quick read-only "Terra debug" panel inside the Beta section showing latest activities + webhook events for the current user, so you can verify without opening Supabase? (Recommend yes.)

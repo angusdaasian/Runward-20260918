@@ -182,7 +182,7 @@ Deno.serve(async (req) => {
           (async () => {
             const results = await Promise.allSettled(
               endpoints.map((ep) => {
-                const withSamples = ep === "activity" ? "true" : "false";
+                const withSamples = "false";
                 return fetch(
                   `https://api.tryterra.co/v2/${ep}?user_id=${terraUserId}&start_date=${startDate}&end_date=${endDate}&to_webhook=true&with_samples=${withSamples}`,
                   { headers },

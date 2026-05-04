@@ -38,6 +38,70 @@ function mapProvider(resource: string | undefined | null): string {
   return (resource ?? "").toUpperCase();
 }
 
+function encodePolyline(points: Array<[number, number]>): string {
+  let lastLat = 0, lastLng = 0, result = "";
+  const encode = (v: number) => {
+    v = v < 0 ? ~(v << 1) : v << 1;
+    let s = "";
+    while (v >= 0x20) {
+      s += String.fromCharCode((0x20 | (v & 0x1f)) + 63);
+      v >>= 5;
+    }
+    s += String.fromCharCode(v + 63);
+    return s;
+  };
+  for (const [lat, lng] of points) {
+    const iLat = Math.round(lat * 1e5);
+    const iLng = Math.round(lng * 1e5);
+    result += encode(iLat - lastLat) + encode(iLng - lastLng);
+    lastLat = iLat;
+    lastLng = iLng;
+  }
+  return result;
+}
+
+function extractGpsPoints(a: any): Array<[number, number]> {
+  const samples =
+    a?.position_data?.position_samples ??
+    a?.position_data?.coords_samples ??
+    a?.gps_data?.samples ??
+    [];
+  const pts: Array<[number, number]> = [];
+  if (Array.isArray(samples)) {
+    for (const s of samples) {
+      const lat = s?.coords?.latitude ?? s?.latitude ?? s?.lat;
+      const lng = s?.coords?.longitude ?? s?.longitude ?? s?.lng ?? s?.lon;
+      if (typeof lat === "number" && typeof lng === "number" && !isNaN(lat) && !isNaN(lng)) {
+        pts.push([lat, lng]);
+      }
+    }
+  }
+  return pts;
+}
+
+function extractLaps(a: any): any[] {
+  const rawLaps =
+    a?.lap_data?.laps ??
+    a?.laps_data?.laps ??
+    a?.laps ??
+    [];
+  if (!Array.isArray(rawLaps)) return [];
+  return rawLaps.map((l: any, idx: number) => ({
+    lap_index: l?.lap_index ?? idx + 1,
+    start_time: l?.start_time ?? null,
+    end_time: l?.end_time ?? null,
+    duration_seconds: l?.total_timer_time_seconds ?? l?.duration_seconds ?? l?.active_duration_seconds ?? null,
+    distance_meters: l?.total_distance_meters ?? l?.distance_meters ?? null,
+    avg_hr: l?.avg_hr_bpm ?? l?.average_hr_bpm ?? null,
+    max_hr: l?.max_hr_bpm ?? null,
+    avg_speed: l?.avg_speed_meters_per_second ?? l?.average_speed_meters_per_second ?? null,
+    max_speed: l?.max_speed_meters_per_second ?? null,
+    avg_cadence: l?.avg_cadence ?? null,
+    calories: l?.total_calories ?? l?.calories ?? null,
+    elevation_gain: l?.total_ascent_meters ?? l?.elevation_gain_meters ?? null,
+  }));
+}
+
 async function findUserId(terraUserId: string | null, referenceId: string | null): Promise<string | null> {
   if (referenceId) return referenceId;
   if (!terraUserId) return null;
@@ -117,12 +181,13 @@ Deno.serve(async (req) => {
           const endpoints = ["activity", "daily", "sleep"] as const;
           (async () => {
             const results = await Promise.allSettled(
-              endpoints.map((ep) =>
-                fetch(
-                  `https://api.tryterra.co/v2/${ep}?user_id=${terraUserId}&start_date=${startDate}&end_date=${endDate}&to_webhook=true&with_samples=false`,
+              endpoints.map((ep) => {
+                const withSamples = ep === "activity" ? "true" : "false";
+                return fetch(
+                  `https://api.tryterra.co/v2/${ep}?user_id=${terraUserId}&start_date=${startDate}&end_date=${endDate}&to_webhook=true&with_samples=${withSamples}`,
                   { headers },
-                ).then((r) => ({ ep, status: r.status })),
-              ),
+                ).then((r) => ({ ep, status: r.status }));
+              }),
             );
             const summary = results.map((r, i) =>
               r.status === "fulfilled" ? r.value : { ep: endpoints[i], error: String((r as any).reason) }
@@ -151,6 +216,9 @@ Deno.serve(async (req) => {
           const cal = a?.calories_data ?? {};
           const elev = a?.distance_data?.summary?.elevation ?? {};
           const aid = String(meta?.upload_type ?? "") + ":" + String(meta?.summary_id ?? meta?.id ?? meta?.start_time ?? crypto.randomUUID());
+          const gpsPoints = extractGpsPoints(a);
+          const polyline = gpsPoints.length > 1 ? encodePolyline(gpsPoints) : null;
+          const laps = extractLaps(a);
           await supa.from("terra_activities").upsert({
             user_id: appUserId,
             provider,
@@ -165,6 +233,9 @@ Deno.serve(async (req) => {
             max_hr: hr?.max_hr_bpm ? Math.round(hr.max_hr_bpm) : null,
             elevation_gain: elev?.gain_actual_meters ?? null,
             average_speed: a?.movement_data?.avg_speed_meters_per_second ?? null,
+            summary_polyline: polyline,
+            has_gps: gpsPoints.length > 0,
+            laps,
             raw_json: a,
           }, { onConflict: "user_id,terra_activity_id" });
         }

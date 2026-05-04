@@ -1,22 +1,31 @@
-## Change
-Broaden the Apple Health save guard in `src/hooks/use-apple-health.ts` (`saveWorkoutsToDb`, ~line 671) so it short-circuits when **any** active Terra connection exists — not just Garmin.
+# Plan: Splits & route from Terra activities
 
-Replace the current Terra-Garmin-only check with an active-any-provider check:
+## 1. `supabase/functions/terra-webhook/index.ts`
 
-```ts
-const [stravaConn, garminConn, terraConn] = await Promise.all([
-  supabase.from("strava_connections").select("id").eq("user_id", user.id).maybeSingle(),
-  supabase.from("garmin_connections").select("id").eq("user_id", user.id).maybeSingle(),
-  supabase.from("terra_connections").select("id")
-    .eq("user_id", user.id).eq("active", true).limit(1).maybeSingle(),
-]);
-if (stravaConn.data || garminConn.data || terraConn.data) {
-  console.log("[AppleHealth] Fitness app connected (Strava/Garmin/Terra), skipping activity save");
-  return 0;
-}
-```
+- Add helpers:
+  - `encodePolyline(points)` — Google encoded polyline algorithm.
+  - `extractGpsPoints(a)` — pulls `position_data.position_samples[]` (and known fallbacks) into `[lat, lng][]`.
+  - `extractLaps(a)` — normalises `lap_data.laps[]` into `{ lap_index, start_time, end_time, duration_seconds, distance_meters, avg_hr, max_hr, avg_speed, max_speed, avg_cadence, calories, elevation_gain }` matching the lap shape Garmin activities already use.
+- In the historical re-fetch (auth handler) call Terra with `with_samples=true` for the `activity` endpoint only (keep `false` for `daily` and `sleep` to limit payload size).
+- In the activity handler upsert, also set:
+  - `laps` = `extractLaps(a)`
+  - `summary_polyline` = `encodePolyline(extractGpsPoints(a))` (null if empty)
+  - `has_gps` = points.length > 0
 
-No other changes. Webhook backfill logic stays Garmin-only (as previously approved).
+## 2. `src/hooks/use-activities.ts`
 
-### Files touched
-- `src/hooks/use-apple-health.ts`
+- `fetchTerraActivities` already maps `summary_polyline` and `laps`; nothing else to change — the new columns will start populating once the webhook updates rows.
+
+## 3. One-time backfill
+
+- After deploy, trigger `garmin_backfill` again (re-auth or a manual fetch) so the existing 90 days of `terra_activities` rows get re-upserted with samples enabled. The webhook upsert is keyed on `(user_id, terra_activity_id)`, so existing rows update in place.
+
+## Technical notes
+
+- Terra v2 sample payloads can be large; we only request samples for `activity`, not `daily`/`sleep`.
+- Polyline encoding is done server-side so the client stays unchanged and the existing Strava/Garmin map components render Terra activities the same way.
+- Lap shape mirrors what `garmin_activities.laps` already stores so `ActivityDetail` renders splits without a code change.
+
+## Out of scope
+
+- No FIT-file parsing, no schema migration, no UI changes.

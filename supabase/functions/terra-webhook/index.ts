@@ -529,6 +529,13 @@ Deno.serve(async (req) => {
           const meta = d?.metadata ?? {};
           const date = (meta?.start_time ?? "").slice(0, 10) || (meta?.end_time ?? "").slice(0, 10);
           if (!date) continue;
+          const { data: existing } = await supa
+            .from("terra_daily_health")
+            .select("sleep_seconds, sleep_score")
+            .eq("user_id", appUserId)
+            .eq("provider", provider)
+            .eq("date", date)
+            .maybeSingle();
           await supa.from("terra_daily_health").upsert({
             user_id: appUserId,
             provider,
@@ -536,20 +543,23 @@ Deno.serve(async (req) => {
             resting_hr: d?.heart_rate_data?.summary?.resting_hr_bpm ?? null,
             steps: d?.distance_data?.steps ?? null,
             vo2max: d?.MET_data?.avg_level ?? null,
+            sleep_seconds: existing?.sleep_seconds ?? null,
+            sleep_score: existing?.sleep_score ?? null,
           }, { onConflict: "user_id,provider,date" });
         }
       } else if (type === "sleep" && appUserId) {
         const items = Array.isArray(payload?.data) ? payload.data : [payload?.data].filter(Boolean);
         for (const s of items) {
-          const meta = s?.metadata ?? {};
-          const date = (meta?.start_time ?? "").slice(0, 10);
+          const date = extractSleepDate(s);
           if (!date) continue;
+          const sleepSeconds = extractSleepSeconds(s);
+          const sleepScore = extractSleepScore(s);
           await supa.from("terra_daily_health").upsert({
             user_id: appUserId,
             provider,
             date,
-            sleep_seconds: s?.sleep_durations_data?.asleep?.duration_asleep_state_seconds ?? null,
-            sleep_score: s?.sleep_durations_data?.sleep_efficiency ?? null,
+            sleep_seconds: sleepSeconds,
+            sleep_score: sleepScore,
           }, { onConflict: "user_id,provider,date" });
         }
       }

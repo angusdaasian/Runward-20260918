@@ -35,6 +35,7 @@ export interface StravaActivity {
   laps?: any[] | null;
   map_screenshot_url?: string | null;
   garmin_training_load?: number | null;
+  provenance?: "strava" | "apple_health" | "garmin" | "terra";
 }
 
 export interface PlannedWorkout {
@@ -72,7 +73,7 @@ async function fetchActivities(userId: string): Promise<StravaActivity[]> {
     .eq("user_id", userId)
     .eq("environment", appEnv)
     .order("start_date", { ascending: false });
-  return ((data as any[]) || []).map((a) => ({ ...a, source: "strava" }));
+  return ((data as any[]) || []).map((a) => ({ ...a, source: "strava", provenance: "strava" as const }));
 }
 
 async function fetchAppleHealthActivities(userId: string): Promise<StravaActivity[]> {
@@ -87,6 +88,7 @@ async function fetchAppleHealthActivities(userId: string): Promise<StravaActivit
     summary_polyline: null,
     source: a.source || "Apple Health",
     calories: a.calories ?? null,
+    provenance: "apple_health" as const,
   }));
 }
 
@@ -133,6 +135,7 @@ async function fetchGarminActivities(userId: string): Promise<StravaActivity[]> 
       weather: a.weather ?? null,
       map_screenshot_url: a.raw_json?.map_screenshot_url ?? null,
       garmin_training_load: a.training_load ?? null,
+      provenance: "garmin" as const,
     };
   });
 }
@@ -213,6 +216,7 @@ async function fetchTerraActivities(userId: string): Promise<StravaActivity[]> {
       calories: a.calories ?? null,
       laps: a.laps || [],
       garmin_training_load: a.training_load ?? null,
+      provenance: "terra" as const,
     } as StravaActivity;
   });
 }

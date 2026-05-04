@@ -8,6 +8,10 @@ import { useAppleHealth } from "@/hooks/use-apple-health";
 import { useGarmin } from "@/hooks/use-garmin";
 import { getAppEnvironment } from "@/lib/environment";
 import GarminCredentialDialog from "@/components/GarminCredentialDialog";
+import corosIcon from "@/assets/brands/coros.png";
+import polarIcon from "@/assets/brands/polar.png";
+import garminIcon from "@/assets/brands/garmin.png";
+import suuntoIcon from "@/assets/brands/suunto.png";
 
 interface Props {
   lang: Lang;
@@ -142,13 +146,12 @@ const ConnectApps = ({ lang, onBack }: Props) => {
     await garmin.syncActivities();
   };
 
-  // Terra (Beta) state
   type TerraProvider = "GARMIN" | "POLAR" | "SUUNTO" | "COROS";
   const TERRA_PROVIDERS: { id: TerraProvider; label: string; icon: string }[] = [
-    { id: "GARMIN", label: "Garmin", icon: "⌚" },
-    { id: "POLAR", label: "Polar", icon: "🟥" },
-    { id: "SUUNTO", label: "Suunto", icon: "🧭" },
-    { id: "COROS", label: "COROS", icon: "🟠" },
+    { id: "COROS", label: "COROS", icon: corosIcon },
+    { id: "POLAR", label: "Polar", icon: polarIcon },
+    { id: "GARMIN", label: "Garmin", icon: garminIcon },
+    { id: "SUUNTO", label: "Suunto", icon: suuntoIcon },
   ];
   const [terraConns, setTerraConns] = useState<Record<string, { id: string; last_synced_at: string | null }>>({});
   const [terraBusy, setTerraBusy] = useState<string | null>(null);
@@ -380,18 +383,17 @@ const ConnectApps = ({ lang, onBack }: Props) => {
           </div>
         </div>
 
-        {/* Terra Beta section */}
+        {/* Additional device connections */}
         <div className="pt-4 mt-2 border-t border-border">
           <div className="flex items-center gap-2 mb-1">
             <h2 className="font-display text-base font-bold text-foreground">
-              {lang === "zh" ? "Beta — 新連接 (Terra)" : "Beta — new connections (Terra)"}
+              {lang === "zh" ? "其他裝置" : "Other devices"}
             </h2>
-            <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-600">BETA</span>
           </div>
           <p className="text-xs text-muted-foreground mb-3">
             {lang === "zh"
-              ? "測試新的通用連接,不會影響你現有的 Garmin 同步。"
-              : "Test the new universal connection. Won't affect your existing Garmin sync."}
+              ? "連結你的裝置以自動同步訓練數據。"
+              : "Connect your device to automatically sync training data."}
           </p>
 
           <div className="space-y-3">

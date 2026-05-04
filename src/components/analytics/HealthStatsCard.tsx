@@ -1,4 +1,4 @@
-import { Activity, HeartPulse, Moon, RefreshCw, Gauge } from "lucide-react";
+import { Activity, HeartPulse, Moon, RefreshCw, Footprints } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Lang } from "@/lib/i18n";
 import {
@@ -135,10 +135,13 @@ const HealthStatsCard = ({ lang }: Props) => {
           value={fmtSleep(latest?.sleep_seconds ?? null)}
         />
         <Stat
-          icon={<Gauge size={14} className="text-emerald-500" />}
-          label={lang === "zh" ? "睡眠評分" : "Sleep Score"}
-          value={latest?.sleep_score != null ? String(latest.sleep_score) : "—"}
-          valueClass={sleepScoreClass(latest?.sleep_score ?? null)}
+          icon={<Footprints size={14} className="text-emerald-500" />}
+          label={lang === "zh" ? "步數" : "Steps"}
+          value={
+            latest && (latest as any).steps != null
+              ? Number((latest as any).steps).toLocaleString()
+              : "—"
+          }
         />
       </div>
     </Card>

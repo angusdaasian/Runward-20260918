@@ -70,15 +70,25 @@ Deno.serve(async (req) => {
       const appUserId = await findUserId(terraUserId, referenceId);
 
       if (type === "auth" && appUserId && terraUserId) {
-        await supa.from("terra_connections").upsert({
+        const rawScopes = user?.scopes;
+        const scopesArr = Array.isArray(rawScopes)
+          ? rawScopes
+          : typeof rawScopes === "string" && rawScopes.length > 0
+            ? rawScopes.split(",").map((s: string) => s.trim()).filter(Boolean)
+            : null;
+        const { error: upsertErr } = await supa.from("terra_connections").upsert({
           user_id: appUserId,
           terra_user_id: terraUserId,
           provider,
           reference_id: referenceId,
-          scopes: user?.scopes ?? null,
+          scopes: scopesArr,
           active: true,
           last_webhook_at: new Date().toISOString(),
         }, { onConflict: "user_id,provider" });
+        if (upsertErr) {
+          console.error("terra_connections upsert failed", upsertErr);
+          processingError = `connection upsert: ${upsertErr.message}`;
+        }
 
         // Garmin-only: wipe last 90 days from Railway garmin tables and trigger
         // Terra historical re-fetch (data streams back via this same webhook).

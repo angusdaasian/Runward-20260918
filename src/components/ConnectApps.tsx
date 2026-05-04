@@ -8,6 +8,10 @@ import { useAppleHealth } from "@/hooks/use-apple-health";
 import { useGarmin } from "@/hooks/use-garmin";
 import { getAppEnvironment } from "@/lib/environment";
 import GarminCredentialDialog from "@/components/GarminCredentialDialog";
+import corosIcon from "@/assets/brands/coros.png";
+import polarIcon from "@/assets/brands/polar.png";
+import garminIcon from "@/assets/brands/garmin.png";
+import suuntoIcon from "@/assets/brands/suunto.png";
 
 interface Props {
   lang: Lang;
@@ -142,13 +146,12 @@ const ConnectApps = ({ lang, onBack }: Props) => {
     await garmin.syncActivities();
   };
 
-  // Terra (Beta) state
   type TerraProvider = "GARMIN" | "POLAR" | "SUUNTO" | "COROS";
   const TERRA_PROVIDERS: { id: TerraProvider; label: string; icon: string }[] = [
-    { id: "GARMIN", label: "Garmin", icon: "⌚" },
-    { id: "POLAR", label: "Polar", icon: "🟥" },
-    { id: "SUUNTO", label: "Suunto", icon: "🧭" },
-    { id: "COROS", label: "COROS", icon: "🟠" },
+    { id: "COROS", label: "COROS", icon: corosIcon },
+    { id: "POLAR", label: "Polar", icon: polarIcon },
+    { id: "GARMIN", label: "Garmin", icon: garminIcon },
+    { id: "SUUNTO", label: "Suunto", icon: suuntoIcon },
   ];
   const [terraConns, setTerraConns] = useState<Record<string, { id: string; last_synced_at: string | null }>>({});
   const [terraBusy, setTerraBusy] = useState<string | null>(null);

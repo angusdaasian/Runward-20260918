@@ -290,8 +290,19 @@ Deno.serve(async (req) => {
           const fromInBed = inBedSec != null
             ? inBedSec - (awakeSec ?? 0)
             : null;
-          const totalSec = directAsleep ?? sumStages ?? fromInBed;
-          const score = toFiniteNumber(d?.scores?.sleep) ?? toFiniteNumber(d?.scores?.overall);
+          // Final fallback: end_time - start_time (raw session window) minus awake time.
+          let fromWindow: number | null = null;
+          const st = meta?.start_time ? Date.parse(meta.start_time) : NaN;
+          const et = meta?.end_time ? Date.parse(meta.end_time) : NaN;
+          if (Number.isFinite(st) && Number.isFinite(et) && et > st) {
+            fromWindow = Math.round((et - st) / 1000) - (awakeSec ?? 0);
+          }
+          const totalSec = directAsleep ?? sumStages ?? fromInBed ?? fromWindow;
+          const score =
+            toFiniteNumber(d?.scores?.sleep) ??
+            toFiniteNumber(d?.scores?.overall) ??
+            toFiniteNumber(d?.scores?.sleep_score) ??
+            toFiniteNumber(d?.sleep_score);
           const existing = dailyByDate[date] ?? {
             user_id: c.user_id, provider: c.provider, date,
             resting_hr: null, steps: null, vo2max: null,

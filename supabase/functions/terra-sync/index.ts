@@ -248,13 +248,18 @@ Deno.serve(async (req) => {
           const meta = d?.metadata ?? {};
           const date = (meta?.start_time ?? "").slice(0, 10);
           if (!date) continue;
+          // VO2max lives in oxygen_data per Terra spec (ml/kg/min).
+          // Prefer the day's stored value, then the day-avg over samples.
+          const vo2 =
+            toFiniteNumber(d?.oxygen_data?.vo2max_ml_per_min_per_kg) ??
+            toFiniteNumber(d?.oxygen_data?.day_avg_vo2max_ml_per_min_per_kg);
           dailyByDate[date] = {
             user_id: c.user_id,
             provider: c.provider,
             date,
             resting_hr: d?.heart_rate_data?.summary?.resting_hr_bpm ?? null,
             steps: d?.distance_data?.steps ?? null,
-            vo2max: d?.MET_data?.avg_level ?? null,
+            vo2max: vo2,
           };
         }
       } catch (e) { console.error("daily fetch failed", c.provider, e); }

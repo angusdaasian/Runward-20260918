@@ -181,12 +181,13 @@ Deno.serve(async (req) => {
           const endpoints = ["activity", "daily", "sleep"] as const;
           (async () => {
             const results = await Promise.allSettled(
-              endpoints.map((ep) =>
-                fetch(
-                  `https://api.tryterra.co/v2/${ep}?user_id=${terraUserId}&start_date=${startDate}&end_date=${endDate}&to_webhook=true&with_samples=false`,
+              endpoints.map((ep) => {
+                const withSamples = ep === "activity" ? "true" : "false";
+                return fetch(
+                  `https://api.tryterra.co/v2/${ep}?user_id=${terraUserId}&start_date=${startDate}&end_date=${endDate}&to_webhook=true&with_samples=${withSamples}`,
                   { headers },
-                ).then((r) => ({ ep, status: r.status })),
-              ),
+                ).then((r) => ({ ep, status: r.status }));
+              }),
             );
             const summary = results.map((r, i) =>
               r.status === "fulfilled" ? r.value : { ep: endpoints[i], error: String((r as any).reason) }

@@ -45,20 +45,14 @@ function fmtDate(iso: string, lang: Lang): string {
 }
 
 const HealthStatsCard = ({ lang }: Props) => {
-  const { data: hasGarminRailway } = useHasGarminConnection();
-  const { data: garminHistory } = useGarminDailyHealth();
-  const { refresh: refreshGarmin, refreshing: refreshingGarmin } =
-    useRefreshGarminDailyHealth(lang);
-
   const { data: terraConns } = useTerraConnections();
   const { data: terraHistory } = useTerraDailyHealth();
-  const { refresh: refreshTerra, refreshing: refreshingTerra } =
+  const { refresh: refreshTerra, refreshing } =
     useRefreshTerraDailyHealth(lang);
 
-  // Build the list of available providers.
+  // Build the list of available providers from Terra only.
   const providers = useMemo<ProviderKey[]>(() => {
     const set = new Set<ProviderKey>();
-    if (hasGarminRailway) set.add("GARMIN");
     for (const c of terraConns ?? []) {
       const p = c.provider?.toUpperCase();
       if (p === "GARMIN" || p === "COROS" || p === "SUUNTO" || p === "POLAR") {
@@ -66,7 +60,7 @@ const HealthStatsCard = ({ lang }: Props) => {
       }
     }
     return Array.from(set);
-  }, [hasGarminRailway, terraConns]);
+  }, [terraConns]);
 
   const [selected, setSelected] = useState<ProviderKey | null>(null);
   const active: ProviderKey | null = selected ?? providers[0] ?? null;
@@ -74,33 +68,11 @@ const HealthStatsCard = ({ lang }: Props) => {
   if (providers.length === 0) return null;
   if (!active) return null;
 
-  // Compose latest stats for the active provider.
-  let latest: {
-    date: string;
-    fetched_at: string;
-    vo2max: number | null;
-    resting_hr: number | null;
-    sleep_seconds: number | null;
-    sleep_score: number | null;
-    steps?: number | null;
-  } | null = null;
-
-  if (active === "GARMIN" && hasGarminRailway && (garminHistory?.length ?? 0) > 0) {
-    latest = garminHistory![0];
-  } else {
-    const row = (terraHistory ?? []).find((r) => r.provider?.toUpperCase() === active);
-    if (row) latest = row;
-  }
-
-  const refreshing = refreshingGarmin || refreshingTerra;
+  const latest =
+    (terraHistory ?? []).find((r) => r.provider?.toUpperCase() === active) ?? null;
 
   const handleRefresh = () => {
-    if (active === "GARMIN" && hasGarminRailway) {
-      // Garmin Railway path provides the richest stats — use it.
-      refreshGarmin();
-    } else {
-      refreshTerra(active);
-    }
+    refreshTerra(active);
   };
 
   return (

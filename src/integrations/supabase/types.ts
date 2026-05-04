@@ -1052,6 +1052,201 @@ export type Database = {
         }
         Relationships: []
       }
+      terra_activities: {
+        Row: {
+          activity_name: string | null
+          activity_type: string | null
+          aerobic_te: number | null
+          anaerobic_te: number | null
+          average_hr: number | null
+          average_speed: number | null
+          avg_cadence: number | null
+          calories: number | null
+          created_at: string
+          distance_meters: number | null
+          duration_seconds: number | null
+          elevation_gain: number | null
+          has_gps: boolean | null
+          id: string
+          laps: Json | null
+          max_hr: number | null
+          provider: string
+          raw_json: Json | null
+          start_time: string | null
+          summary_polyline: string | null
+          terra_activity_id: string
+          training_load: number | null
+          user_id: string
+          vo2max: number | null
+        }
+        Insert: {
+          activity_name?: string | null
+          activity_type?: string | null
+          aerobic_te?: number | null
+          anaerobic_te?: number | null
+          average_hr?: number | null
+          average_speed?: number | null
+          avg_cadence?: number | null
+          calories?: number | null
+          created_at?: string
+          distance_meters?: number | null
+          duration_seconds?: number | null
+          elevation_gain?: number | null
+          has_gps?: boolean | null
+          id?: string
+          laps?: Json | null
+          max_hr?: number | null
+          provider: string
+          raw_json?: Json | null
+          start_time?: string | null
+          summary_polyline?: string | null
+          terra_activity_id: string
+          training_load?: number | null
+          user_id: string
+          vo2max?: number | null
+        }
+        Update: {
+          activity_name?: string | null
+          activity_type?: string | null
+          aerobic_te?: number | null
+          anaerobic_te?: number | null
+          average_hr?: number | null
+          average_speed?: number | null
+          avg_cadence?: number | null
+          calories?: number | null
+          created_at?: string
+          distance_meters?: number | null
+          duration_seconds?: number | null
+          elevation_gain?: number | null
+          has_gps?: boolean | null
+          id?: string
+          laps?: Json | null
+          max_hr?: number | null
+          provider?: string
+          raw_json?: Json | null
+          start_time?: string | null
+          summary_polyline?: string | null
+          terra_activity_id?: string
+          training_load?: number | null
+          user_id?: string
+          vo2max?: number | null
+        }
+        Relationships: []
+      }
+      terra_connections: {
+        Row: {
+          active: boolean
+          created_at: string
+          id: string
+          last_synced_at: string | null
+          last_webhook_at: string | null
+          provider: string
+          reference_id: string | null
+          scopes: string[] | null
+          terra_user_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          last_synced_at?: string | null
+          last_webhook_at?: string | null
+          provider: string
+          reference_id?: string | null
+          scopes?: string[] | null
+          terra_user_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          last_synced_at?: string | null
+          last_webhook_at?: string | null
+          provider?: string
+          reference_id?: string | null
+          scopes?: string[] | null
+          terra_user_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      terra_daily_health: {
+        Row: {
+          date: string
+          fetched_at: string
+          id: string
+          provider: string
+          resting_hr: number | null
+          sleep_score: number | null
+          sleep_seconds: number | null
+          steps: number | null
+          user_id: string
+          vo2max: number | null
+        }
+        Insert: {
+          date: string
+          fetched_at?: string
+          id?: string
+          provider: string
+          resting_hr?: number | null
+          sleep_score?: number | null
+          sleep_seconds?: number | null
+          steps?: number | null
+          user_id: string
+          vo2max?: number | null
+        }
+        Update: {
+          date?: string
+          fetched_at?: string
+          id?: string
+          provider?: string
+          resting_hr?: number | null
+          sleep_score?: number | null
+          sleep_seconds?: number | null
+          steps?: number | null
+          user_id?: string
+          vo2max?: number | null
+        }
+        Relationships: []
+      }
+      terra_webhook_events: {
+        Row: {
+          id: string
+          payload: Json | null
+          processing_error: string | null
+          received_at: string
+          reference_id: string | null
+          signature_valid: boolean | null
+          terra_user_id: string | null
+          type: string | null
+        }
+        Insert: {
+          id?: string
+          payload?: Json | null
+          processing_error?: string | null
+          received_at?: string
+          reference_id?: string | null
+          signature_valid?: boolean | null
+          terra_user_id?: string | null
+          type?: string | null
+        }
+        Update: {
+          id?: string
+          payload?: Json | null
+          processing_error?: string | null
+          received_at?: string
+          reference_id?: string | null
+          signature_valid?: boolean | null
+          terra_user_id?: string | null
+          type?: string | null
+        }
+        Relationships: []
+      }
       training_plans: {
         Row: {
           created_at: string

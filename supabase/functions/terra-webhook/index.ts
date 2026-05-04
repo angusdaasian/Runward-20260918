@@ -171,7 +171,7 @@ Deno.serve(async (req) => {
           processingError = `connection upsert: ${upsertErr.message}`;
         }
 
-        // Garmin-only: wipe last 90 days from Railway garmin tables and trigger
+        // Garmin-only: wipe the recent Railway Garmin window and trigger
         // Terra historical re-fetch (data streams back via this same webhook).
         if (provider === "GARMIN") {
           const days = 7;
@@ -199,7 +199,7 @@ Deno.serve(async (req) => {
           (async () => {
             const results = await Promise.allSettled(
               endpoints.map((ep) => {
-                const withSamples = "false";
+                const withSamples = ep === "activity" ? "true" : "false";
                 return fetch(
                   `https://api.tryterra.co/v2/${ep}?user_id=${terraUserId}&start_date=${startDate}&end_date=${endDate}&to_webhook=true&with_samples=${withSamples}`,
                   { headers },

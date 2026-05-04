@@ -495,6 +495,7 @@ Deno.serve(async (req) => {
         await supa.from("terra_connections").update({ active: false, last_webhook_at: new Date().toISOString() }).eq("terra_user_id", terraUserId);
       } else if ((type === "activity" || type === "processed_activity") && appUserId) {
         const acts = Array.isArray(payload?.data) ? payload.data : [payload?.data].filter(Boolean);
+        let newActivityCount = 0;
         for (const a of acts) {
           const meta = a?.metadata ?? {};
           const dist = a?.distance_data?.summary ?? {};
@@ -513,6 +514,7 @@ Deno.serve(async (req) => {
             .eq("user_id", appUserId)
             .eq("terra_activity_id", aid)
             .maybeSingle();
+          const isNew = !existing;
           const finalPolyline = polyline ?? existing?.summary_polyline ?? null;
           const finalLaps = (laps && laps.length > 0)
             ? laps
@@ -538,9 +540,13 @@ Deno.serve(async (req) => {
             raw_json: null,
           }, { onConflict: "user_id,terra_activity_id" });
           await deleteMatchingGarminDuplicate(appUserId, meta?.start_time ?? null, distanceMeters);
+          if (isNew && (distanceMeters ?? 0) > 0) newActivityCount++;
         }
         // Recalculate XP & leaderboard rank from terra_activities
         await recalcUserXp(appUserId);
+        if (newActivityCount > 0) {
+          await pushActivityUploadedNotification(appUserId);
+        }
       } else if (type === "daily" && appUserId) {
         const items = Array.isArray(payload?.data) ? payload.data : [payload?.data].filter(Boolean);
         for (const d of items) {

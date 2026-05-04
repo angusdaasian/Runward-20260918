@@ -267,19 +267,6 @@ Deno.serve(async (req) => {
         if (items.length > 0) {
           console.log(`[terra-sync] sleep sample keys ${c.provider}:`, JSON.stringify(Object.keys(items[0] ?? {})));
           console.log(`[terra-sync] sleep durations sample ${c.provider}:`, JSON.stringify(items[0]?.sleep_durations_data ?? null).slice(0, 800));
-          const recentSleep = items
-            .map((d: any) => ({
-              start: d?.metadata?.start_time ?? null,
-              end: d?.metadata?.end_time ?? null,
-              date: (d?.metadata?.end_time ?? d?.metadata?.start_time ?? "").slice(0, 10),
-              asleep: d?.sleep_durations_data?.asleep?.duration_asleep_state_seconds ?? null,
-              scoreSleep: d?.scores?.sleep ?? null,
-              scoreOverall: d?.scores?.overall ?? null,
-            }))
-            .filter((d: any) => d.date >= "2026-05-02")
-            .sort((a: any, b: any) => String(b.end ?? "").localeCompare(String(a.end ?? "")))
-            .slice(0, 8);
-          console.log(`[terra-sync] recent sleep raw ${c.provider} user=${String(c.user_id).slice(0, 8)}:`, JSON.stringify(recentSleep));
         }
         for (const d of items) {
           const meta = d?.metadata ?? {};

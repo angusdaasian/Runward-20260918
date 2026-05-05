@@ -456,7 +456,7 @@ async function processWebhook(
           const devId = Deno.env.get("TERRA_DEV_ID") ?? "";
           const apiKey = Deno.env.get("TERRA_API_KEY") ?? "";
           const headers = { "dev-id": devId, "x-api-key": apiKey };
-          const endpoints = ["activity", "daily", "sleep"] as const;
+          const endpoints = ["activity"] as const;
           (async () => {
             const results = await Promise.allSettled(
               endpoints.map((ep) => {

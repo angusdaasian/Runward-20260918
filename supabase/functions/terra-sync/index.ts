@@ -308,7 +308,7 @@ Deno.serve(async (req) => {
           const r = await fetch(url, { headers });
           const j = await r.json();
           const fetched = Array.isArray(j?.data) ? j.data : [];
-          const picked = pickLatestActivity(fetched, singleActivityId);
+          const picked = pickLatestActivity(fetched, singleActivityId, body.latestDate === true ? startStr : undefined);
           items = picked ? [picked] : [];
           console.log(`[terra-sync] latest/single activity ${c.provider} fetched=${fetched.length} picked=${items.length} status=${r.status} type=${j?.type}`);
         } else {

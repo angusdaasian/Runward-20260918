@@ -212,8 +212,21 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const providerFilter: string | undefined = body.provider ? String(body.provider).toUpperCase() : undefined;
     const healthOnly = body.healthOnly === true;
+    const dayOnly = body.dayOnly === true;
+    const targetUserId: string | undefined = typeof body.targetUserId === "string" ? body.targetUserId : undefined;
 
-    const q = admin.from("terra_connections").select("*").eq("user_id", user.id).eq("active", true);
+    // Admin override: allow targeting another user (used to backfill specific accounts).
+    let connUserId = user.id;
+    if (targetUserId && targetUserId !== user.id) {
+      const { data: roleRow } = await admin
+        .from("user_roles").select("role").eq("user_id", user.id).eq("role", "admin").maybeSingle();
+      if (!roleRow) {
+        return new Response(JSON.stringify({ error: "forbidden" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      connUserId = targetUserId;
+    }
+
+    const q = admin.from("terra_connections").select("*").eq("user_id", connUserId).eq("active", true);
     const { data: conns } = providerFilter ? await q.eq("provider", providerFilter) : await q;
     if (!conns || conns.length === 0) {
       return new Response(JSON.stringify({ ok: true, synced: 0, message: "no active connections" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -223,10 +236,12 @@ Deno.serve(async (req) => {
     const apiKey = Deno.env.get("TERRA_API_KEY")!;
     const end = new Date();
     end.setDate(end.getDate() + 1);
-    const start = new Date(); start.setDate(start.getDate() - 30);
-    // Terra date params: use YYYY-MM-DD only. Full ISO timestamps cause /v2/sleep
-    // (and others) to return 0 items. Terra sleep end_date behaves like an
-    // exclusive upper bound, so ask through tomorrow to include today's wake-day.
+    const start = new Date();
+    if (dayOnly) {
+      // Today only — Terra still treats end_date as exclusive, so ask through tomorrow.
+    } else {
+      start.setDate(start.getDate() - 30);
+    }
     const startStr = start.toISOString().slice(0, 10);
     const endStr = end.toISOString().slice(0, 10);
 

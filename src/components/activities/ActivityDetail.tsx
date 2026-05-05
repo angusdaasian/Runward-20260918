@@ -462,11 +462,11 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
       const data: any[] = [];
       for (let i = 0; i < hrSamples.length; i += step) {
         const s = hrSamples[i];
-    const sampleTime = Number(s?.t);
-    const sampleBpm = Number(s?.bpm);
-    if (!Number.isFinite(sampleTime) || !Number.isFinite(sampleBpm) || sampleBpm <= 0) continue;
-    const km = totalDist > 0 ? (totalDist * (sampleTime / lastT)) / 1000 : sampleTime / 60;
-        data.push({ distance_km: km.toFixed(2), heartrate: s.bpm, time: s.t });
+        const sampleTime = Number(s?.t);
+        const sampleBpm = Number(s?.bpm);
+        if (!Number.isFinite(sampleTime) || !Number.isFinite(sampleBpm) || sampleBpm <= 0) continue;
+        const km = totalDist > 0 ? (totalDist * (sampleTime / lastT)) / 1000 : sampleTime / 60;
+        data.push({ distance_km: km.toFixed(2), heartrate: sampleBpm, time: sampleTime });
       }
       return data;
     }

@@ -322,6 +322,7 @@ Deno.serve(async (req) => {
     const dayOnly = body.dayOnly === true;
     const forceWebhook = body.forceWebhook === true;
     const latestWithSamples = body.latestWithSamples === true;
+    const historicalActivity = body.historicalActivity === true;
     const targetUserId: string | undefined = typeof body.targetUserId === "string" ? body.targetUserId : undefined;
 
     // Admin override: allow targeting another user (used to backfill specific accounts).
@@ -365,6 +366,11 @@ Deno.serve(async (req) => {
       const headers = { "dev-id": devId, "x-api-key": apiKey };
       // activity (skipped when caller only wants health stats)
       if (!healthOnly) {
+      if (historicalActivity) {
+        try {
+          await applyHistoricalActivityWebhook(admin, c, headers, startStr, endStr);
+        } catch (e) { console.error("historical activity request failed", c.provider, e); }
+      }
       try {
         // When forceWebhook=true, ask Terra to RE-DELIVER the activity (with samples)
         // via the webhook destination — bypasses Terra's range-endpoint dedupe.
@@ -386,6 +392,18 @@ Deno.serve(async (req) => {
         for (const a of items) {
           await upsertTerraActivity(admin, c, a);
           activityCount++;
+        }
+        if (latestWithSamples && items.length === 0) {
+          const { data: withSamples } = await admin
+            .from("terra_activities")
+            .select("id")
+            .eq("user_id", c.user_id)
+            .eq("provider", c.provider)
+            .gte("start_time", `${startStr}T00:00:00Z`)
+            .lt("start_time", `${endStr}T00:00:00Z`)
+            .not("hr_samples", "is", null)
+            .limit(1);
+          if ((withSamples?.length ?? 0) > 0) activityCount++;
         }
       } catch (e) { console.error("activity fetch failed", c.provider, e); }
 

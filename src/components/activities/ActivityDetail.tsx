@@ -342,12 +342,15 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
             const elapsed = Number(
               lap.elapsed_time ?? lap.moving_time ?? lap.duration_seconds,
             ) || 0;
-            let avgSpeed = Number(lap.avg_speed ?? lap.average_speed) || 0;
+            // Use real distance / elapsed for true split pace (matches the watch).
+            // Terra's avg_speed is a moving average and disagrees with what Garmin Connect shows.
+            let avgSpeed = (distance > 0 && elapsed > 0)
+              ? distance / elapsed
+              : Number(lap.avg_speed ?? lap.average_speed) || 0;
             if (!avgSpeed && lap.average_pace_seconds_per_km) {
               const pace = Number(lap.average_pace_seconds_per_km);
               if (pace > 0) avgSpeed = 1000 / pace;
             }
-            if (!avgSpeed && elapsed > 0) avgSpeed = distance / elapsed;
             return {
               distance,
               elapsed_time: elapsed,

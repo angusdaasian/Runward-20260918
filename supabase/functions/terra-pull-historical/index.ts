@@ -166,6 +166,7 @@ Deno.serve(async (req) => {
       hr_final: hrSamples.length,
       per_activity_status: perActivityStatus,
       per_activity_type: perActivityType,
+      per_attempts: perAttempts,
     });
 
     if (hrSamples.length > 0) {

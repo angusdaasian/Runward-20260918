@@ -452,6 +452,21 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
   }, [activity.strava_id, isPremium, needsRpe]);
 
   const chartData = useMemo(() => {
+    // Highest fidelity: per-second HR samples from Terra (when available).
+    const hrSamples = Array.isArray(activity.hr_samples) ? activity.hr_samples : null;
+    if (hrSamples && hrSamples.length > 10) {
+      const totalDist = activity.distance || 0;
+      const lastT = hrSamples[hrSamples.length - 1].t || 1;
+      // Downsample to ~250 points for smooth rendering.
+      const step = Math.max(1, Math.floor(hrSamples.length / 250));
+      const data: any[] = [];
+      for (let i = 0; i < hrSamples.length; i += step) {
+        const s = hrSamples[i];
+        const km = totalDist > 0 ? (totalDist * (s.t / lastT)) / 1000 : s.t / 60;
+        data.push({ distance_km: km.toFixed(2), heartrate: s.bpm, time: s.t });
+      }
+      return data;
+    }
     // Fallback: when no Strava streams (Terra / Garmin / Apple Health), build a
     // per-lap chart from splits so HR + Pace charts still render.
     if ((!streams || streams.length === 0) && splits && splits.length > 0) {

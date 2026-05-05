@@ -494,11 +494,7 @@ const ActivitiesTab = ({ lang }: Props) => {
             },
             body: JSON.stringify({
               latestOnly: true,
-              latestDate: true,
               provider: "GARMIN",
-              startDate: "2026-05-05",
-              endDate: "2026-05-06",
-              dayOnly: true,
             }),
           });
         }

@@ -273,8 +273,17 @@ Deno.serve(async (req) => {
         console.log(`[terra-sync] activity fetch ${c.provider} url=${url}`);
         const r = await fetch(url, { headers });
         const j = await r.json();
-        const items = Array.isArray(j?.data) ? j.data : [];
-        console.log(`[terra-sync] activity ${c.provider} items=${items.length} status=${r.status} topKeys=${JSON.stringify(Object.keys(j ?? {}))}`);
+        let items = Array.isArray(j?.data) ? j.data : [];
+        console.log(`[terra-sync] activity ${c.provider} items=${items.length} status=${r.status} type=${j?.type} message=${JSON.stringify(j?.message)?.slice(0,300)}`);
+        // Terra returns a job reference (no inline data) when with_samples=true triggers async delivery.
+        // Fall back to a non-samples request to at least capture activity rows; HR samples will arrive via webhook.
+        if (items.length === 0 && j?.type && j?.type !== "activity") {
+          const url2 = `https://api.tryterra.co/v2/activity?user_id=${c.terra_user_id}&start_date=${startStr}&end_date=${endStr}&to_webhook=false&with_samples=false`;
+          const r2 = await fetch(url2, { headers });
+          const j2 = await r2.json();
+          items = Array.isArray(j2?.data) ? j2.data : [];
+          console.log(`[terra-sync] activity ${c.provider} fallback items=${items.length} type=${j2?.type}`);
+        }
         for (const a of items) {
           const meta = a?.metadata ?? {};
           const dist = a?.distance_data?.summary ?? {};

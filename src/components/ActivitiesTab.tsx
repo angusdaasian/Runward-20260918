@@ -492,8 +492,8 @@ const ActivitiesTab = ({ lang }: Props) => {
               Authorization: `Bearer ${accessToken}`,
               apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
             },
-            // TEMP: only resync May 5, 2026 to test HR sample backfill via webhook
-            body: JSON.stringify({ startDate: "2026-05-05", endDate: "2026-05-06" }),
+            // TEMP: resync single Terra activity (4.69km track on 5-5) for HR samples
+            body: JSON.stringify({ activityId: "1:22772394276", provider: "GARMIN" }),
           });
         }
       } catch (e) {

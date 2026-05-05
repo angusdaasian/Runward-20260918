@@ -138,21 +138,37 @@ function extractDurationSeconds(a: any, distanceMeters?: number | null): number 
 }
 
 function extractHrSamples(a: any): Array<{ t: number; bpm: number }> {
-  const sources = [
-    a?.heart_rate_data?.detailed?.hr_samples,
-    a?.heart_rate_data?.detailed?.hr_samples_data,
-    a?.heart_rate_data?.samples,
+  const hrd = a?.heart_rate_data ?? {};
+  const sources: any[] = [
+    hrd?.detailed?.hr_samples,
+    hrd?.detailed?.hr_samples_data,
+    hrd?.detailed?.heart_rate_samples,
+    hrd?.samples,
+    hrd?.hr_samples,
+    a?.hr_data?.samples,
+    a?.heart_rate_samples,
   ];
   const samples = sources.find((s) => Array.isArray(s) && s.length > 0);
-  if (!samples) return [];
+  if (!samples) {
+    try {
+      console.log("[terra-sync] no hr samples; heart_rate_data keys =", JSON.stringify(Object.keys(hrd ?? {})));
+      if (hrd?.detailed) console.log("[terra-sync] detailed keys =", JSON.stringify(Object.keys(hrd.detailed)));
+      console.log("[terra-sync] activity top-level keys =", JSON.stringify(Object.keys(a ?? {})));
+    } catch {}
+    return [];
+  }
+  console.log(`[terra-sync] hr samples found: ${samples.length}, first =`, JSON.stringify(samples[0]).slice(0, 300));
   const startMs = a?.metadata?.start_time ? new Date(a.metadata.start_time).getTime() : NaN;
   const bySecond = new Map<number, number>();
   for (const s of samples as any[]) {
-    const bpm = toFiniteNumber(s?.bpm ?? s?.heart_rate_bpm ?? s?.heart_rate);
+    const bpm = toFiniteNumber(s?.bpm ?? s?.heart_rate_bpm ?? s?.heart_rate ?? s?.value);
     if (bpm == null || bpm <= 0) continue;
-    let t: number | null = toFiniteNumber(s?.timer_duration_seconds);
+    let t: number | null = toFiniteNumber(s?.timer_duration_seconds ?? s?.timer_seconds ?? s?.elapsed_seconds);
     if (t == null && s?.timestamp && Number.isFinite(startMs)) {
       t = (new Date(s.timestamp).getTime() - startMs) / 1000;
+    }
+    if (t == null && s?.start_time && Number.isFinite(startMs)) {
+      t = (new Date(s.start_time).getTime() - startMs) / 1000;
     }
     if (t == null || !Number.isFinite(t) || t < 0) continue;
     bySecond.set(Math.floor(t), Math.round(bpm));

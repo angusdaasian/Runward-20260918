@@ -295,14 +295,18 @@ Deno.serve(async (req) => {
       try {
         let items: any[] = [];
         const singleActivityId: string | undefined = typeof body.activityId === "string" ? body.activityId : undefined;
-        if (singleActivityId) {
-          // Single-activity fetch by Terra activity id (returns inline samples).
-          const url = `https://api.tryterra.co/v2/activity/${encodeURIComponent(singleActivityId)}?user_id=${c.terra_user_id}&to_webhook=false&with_samples=true`;
-          console.log(`[terra-sync] single activity fetch ${c.provider} url=${url}`);
+        const latestOnly = body.latestOnly === true || body.fetchLatest === true;
+        if (singleActivityId || latestOnly) {
+          // Fetch the recent window WITH samples inline, then pick the requested/latest activity.
+          // Terra's /v2/activity/{id} is unreliable for Garmin IDs like 1:227..., while this endpoint returns samples.
+          const url = `https://api.tryterra.co/v2/activity?user_id=${c.terra_user_id}&start_date=${startStr}&end_date=${endStr}&to_webhook=false&with_samples=true`;
+          console.log(`[terra-sync] latest/single activity fetch ${c.provider} url=${url}`);
           const r = await fetch(url, { headers });
           const j = await r.json();
-          items = Array.isArray(j?.data) ? j.data : (j?.data ? [j.data] : []);
-          console.log(`[terra-sync] single activity ${c.provider} items=${items.length} status=${r.status} type=${j?.type}`);
+          const fetched = Array.isArray(j?.data) ? j.data : [];
+          const picked = pickLatestActivity(fetched, singleActivityId);
+          items = picked ? [picked] : [];
+          console.log(`[terra-sync] latest/single activity ${c.provider} fetched=${fetched.length} picked=${items.length} status=${r.status} type=${j?.type}`);
         } else {
           // Inline fetch (no samples) for immediate metadata upsert.
           const url = `https://api.tryterra.co/v2/activity?user_id=${c.terra_user_id}&start_date=${startStr}&end_date=${endStr}&to_webhook=false&with_samples=false`;

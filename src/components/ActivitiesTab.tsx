@@ -471,6 +471,7 @@ const ActivitiesTab = ({ lang }: Props) => {
     if (!user || resyncing) return;
     setResyncing(true);
     try {
+      let terraResult: any = null;
       // Apple Health (native)
       try {
         await supabase.from("apple_health_activities").delete().eq("user_id", user.id);
@@ -485,7 +486,7 @@ const ActivitiesTab = ({ lang }: Props) => {
         const { data: sessionData } = await supabase.auth.getSession();
         const accessToken = sessionData?.session?.access_token;
         if (accessToken) {
-          await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/terra-sync`, {
+          const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/terra-sync`, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -500,13 +501,19 @@ const ActivitiesTab = ({ lang }: Props) => {
               latestWithSamples: true,
             }),
           });
+          terraResult = await response.json().catch(() => null);
+          if (!response.ok) throw new Error(terraResult?.error ?? `Terra sync failed (${response.status})`);
         }
       } catch (e) {
         console.warn("Terra resync failed:", e);
       }
 
       invalidateAll();
-      toast.success(lang === "zh" ? "已重新同步活動" : "Activities resynced successfully");
+      if (terraResult?.activities === 0) {
+        toast.error(lang === "zh" ? "Terra 尚未返回 HR samples" : "Terra returned no HR samples yet");
+      } else {
+        toast.success(lang === "zh" ? "已重新同步活動" : "Activities resynced successfully");
+      }
     } catch (err) {
       console.error("Resync error:", err);
       toast.error(lang === "zh" ? "重新同步失敗" : "Resync failed");

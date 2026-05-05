@@ -781,8 +781,8 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
             <span className="text-right">HR</span>
           </div>
           {(() => {
-            // Heuristic: rest = much slower than run laps (<60% of activity avg) OR very short distance
             const activityAvgSpeed = activity.average_speed || 0;
+            let runNum = 0;
             return splits.map((split, idx) => {
               const distMeters = split.distance || 0;
               const isRest =

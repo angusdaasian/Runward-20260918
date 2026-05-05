@@ -531,7 +531,9 @@ async function processWebhook(
             average_hr: hr?.avg_hr_bpm ? Math.round(hr.avg_hr_bpm) : null,
             max_hr: hr?.max_hr_bpm ? Math.round(hr.max_hr_bpm) : null,
             elevation_gain: elev?.gain_actual_meters ?? null,
-            average_speed: a?.movement_data?.avg_speed_meters_per_second ?? null,
+            average_speed: (distanceMeters && durationSeconds && durationSeconds > 0)
+              ? distanceMeters / durationSeconds
+              : (a?.movement_data?.avg_speed_meters_per_second ?? null),
             summary_polyline: finalPolyline,
             has_gps: finalHasGps,
             laps: finalLaps,

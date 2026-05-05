@@ -342,12 +342,15 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
             const elapsed = Number(
               lap.elapsed_time ?? lap.moving_time ?? lap.duration_seconds,
             ) || 0;
-            let avgSpeed = Number(lap.avg_speed ?? lap.average_speed) || 0;
+            // Use real distance / elapsed for true split pace (matches the watch).
+            // Terra's avg_speed is a moving average and disagrees with what Garmin Connect shows.
+            let avgSpeed = (distance > 0 && elapsed > 0)
+              ? distance / elapsed
+              : Number(lap.avg_speed ?? lap.average_speed) || 0;
             if (!avgSpeed && lap.average_pace_seconds_per_km) {
               const pace = Number(lap.average_pace_seconds_per_km);
               if (pace > 0) avgSpeed = 1000 / pace;
             }
-            if (!avgSpeed && elapsed > 0) avgSpeed = distance / elapsed;
             return {
               distance,
               elapsed_time: elapsed,
@@ -747,9 +750,10 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
             {lang === "zh" ? "分段配速" : "Splits"}
           </h3>
           <div className="space-y-1">
-            <div className="grid grid-cols-5 text-[10px] text-muted-foreground font-medium pb-1 border-b border-border">
+            <div className="grid grid-cols-6 text-[10px] text-muted-foreground font-medium pb-1 border-b border-border">
               <span>#</span>
               <span className="text-center">{lang === "zh" ? "距離" : "Dist"}</span>
+              <span className="text-center">{lang === "zh" ? "時間" : "Time"}</span>
               <span className="text-center">{lang === "zh" ? "配速" : "Pace"}</span>
               <span className="text-center">{lang === "zh" ? "爬升" : "Elev"}</span>
               <span className="text-center">HR</span>
@@ -760,20 +764,14 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
               const splitPace = speedToPace(split.average_speed);
               const isFaster = splitPace < avgSplitPace;
               const distMeters = split.distance || 0;
-              // Garmin/Coros autolap distances aren't always exactly 1000m
-              // (e.g. 999m or 1010m). Snap anything within 50m of a full km
-              // to that km so display is consistent across laps.
-              const nearestKm = Math.round(distMeters / 1000);
-              const isFullKmLap = nearestKm >= 1 && Math.abs(distMeters - nearestKm * 1000) <= 50;
-              const distLabel = isFullKmLap
-                ? `${nearestKm}.00km`
-                : distMeters >= 1000
-                  ? `${(distMeters / 1000).toFixed(2)}km`
-                  : `${Math.round(distMeters)}m`;
+              const distLabel = distMeters >= 1000
+                ? `${(distMeters / 1000).toFixed(2)}km`
+                : `${Math.round(distMeters)}m`;
               return (
-                <div key={idx} className="grid grid-cols-5 text-xs py-1.5 border-b border-border/50 last:border-0">
+                <div key={idx} className="grid grid-cols-6 text-xs py-1.5 border-b border-border/50 last:border-0">
                   <span className="font-medium text-foreground">{split.split}</span>
                   <span className="text-center text-muted-foreground">{distLabel}</span>
+                  <span className="text-center text-muted-foreground">{formatDuration(split.elapsed_time)}</span>
                   <span className={`text-center font-semibold ${isFaster ? "text-green-500" : "text-foreground"}`}>{pace}</span>
                   <span className="text-center text-muted-foreground">{split.elevation_difference > 0 ? "+" : ""}{Math.round(split.elevation_difference)}m</span>
                   <span className="text-center text-muted-foreground">{split.average_heartrate ? Math.round(split.average_heartrate) : "--"}</span>

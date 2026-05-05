@@ -1,41 +1,45 @@
-# Rate the App reward
+## Goal
+Fix Terra split pace/HR accuracy and add **lap time** to the splits table.
 
-Add a one-time "Rate the App" card in the Rewards tab that opens the App Store / Play Store review page and grants XP. Mirrors the existing `InstagramFollow` pattern (trust-based, gated by `social_rewards_claimed` unique key — claimable once per user).
+## Changes
 
-## What gets built
+### 1. Splits table — add "Time" column + fix pace (`src/components/activities/ActivityDetail.tsx` ~lines 743–785)
 
-### 1. New component: `src/components/rewards/RateAppReward.tsx`
-- Same props as `InstagramFollow`: `lang`, `userId`, `currentXp`, `onXpGain`.
-- Constants:
-  - `REWARD_KEY = "rate_app"`
-  - `REWARD_XP = 5000` (one-time)
-  - iOS URL: `https://apps.apple.com/us/app/runward/id6761060757?action=write-review`
-  - Android URL: `https://play.google.com/store/apps/details?id=com.runward.app&showAllReviews=true` (placeholder package name — TODO comment, user to confirm)
-- Platform detection via `src/lib/nativeDetection.ts` (`Capacitor.getPlatform()`):
-  - iOS native → open iOS review URL
-  - Android native → open Play Store URL
-  - Web → default to iOS App Store link (since that's confirmed)
-- On click:
-  1. `window.open(url, "_blank", "noopener,noreferrer")` inside the user gesture.
-  2. Insert into `social_rewards_claimed` with `reward_key="rate_app"`, `xp_awarded=5000`.
-  3. On 23505 unique-violation → mark claimed silently.
-  4. On success → bump `profiles.monthly_xp` + `lifetime_xp`, fire gold-themed confetti, toast, call `onXpGain(newMonthly)`.
-- Visual: gold/amber gradient (`from-amber-400 via-yellow-500 to-orange-500`) with `Star` icon from lucide. Claimed state = muted card with check, identical to IG card.
-- Bilingual strings inline (en/zh).
+Update the header to 6 columns and add a time cell using `split.elapsed_time`:
 
-### 2. Wire into `src/components/RewardsTab.tsx`
-- Import `RateAppReward` and render it directly below `<InstagramFollow ... />` in the `rewards` TabsContent, passing the same `lang`/`userId`/`currentXp`/`onXpGain`.
+```tsx
+<div className="grid grid-cols-6 text-[10px] ...">
+  <span>#</span>
+  <span className="text-center">Dist</span>
+  <span className="text-center">Time</span>
+  <span className="text-center">Pace</span>
+  <span className="text-center">Elev</span>
+  <span className="text-center">HR</span>
+</div>
+```
 
-### 3. Update `src/components/rewards/XpExplainer.tsx`
-- Add a line: "Rate the app — +5000 XP (one-time)" / 為應用程式評分 — +5000 XP（一次性）.
+Each row shows `formatDuration(split.elapsed_time)` (e.g. `3:45`, `13:55`).
+Also remove the "snap to 1.00km" logic so 806m / 240m render as the real distance.
 
-## Technical notes
+### 2. Splits pace — use real distance/time (`src/components/activities/ActivityDetail.tsx` ~lines 339–362)
 
-- **No DB changes.** `social_rewards_claimed` already enforces `(user_id, reward_key)` uniqueness — same flow as Instagram, just a new key.
-- **No review verification.** Apple and Google forbid gating rewards on actually leaving a review, so the reward is granted on tap-through. Standard pattern.
-- **Play Store package name** is a placeholder — needs confirmation before Android launch. iOS URL is confirmed.
+For Garmin / Terra laps, prefer `distance ÷ elapsed` over Terra's `avg_speed` (which is a moving average and disagrees with what the watch shows):
+
+```ts
+let avgSpeed = (distance > 0 && elapsed > 0)
+  ? distance / elapsed
+  : Number(lap.avg_speed ?? lap.average_speed) || 0;
+```
+
+### 3. Activity-level pace (`supabase/functions/terra-webhook/index.ts` ~line 534)
+
+Compute `average_speed` from real `distanceMeters / durationSeconds` when both exist; fall back to Terra's `movement_data.avg_speed_meters_per_second`. This makes the header pace match the watch.
+
+### 4. HR — pass through raw lap HR
+Lap-level HR already kept as raw decimal in `laps` JSON; UI rounds for display. Activity-level int rounding stays (DB column is `integer`, watches display rounded BPM).
 
 ## Files touched
-- `src/components/rewards/RateAppReward.tsx` (new)
-- `src/components/RewardsTab.tsx` (add one line)
-- `src/components/rewards/XpExplainer.tsx` (add one entry)
+- `src/components/activities/ActivityDetail.tsx`
+- `supabase/functions/terra-webhook/index.ts`
+
+No DB migration. No new secrets.

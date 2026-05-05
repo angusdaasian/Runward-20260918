@@ -143,10 +143,14 @@ function extractHrSamples(a: any): Array<{ t: number; bpm: number }> {
     hrd?.detailed?.hr_samples,
     hrd?.detailed?.hr_samples_data,
     hrd?.detailed?.heart_rate_samples,
+    hrd?.detailed?.samples,
     hrd?.samples,
     hrd?.hr_samples,
+    hrd?.heart_rate_samples,
     a?.hr_data?.samples,
     a?.heart_rate_samples,
+    a?.samples?.heart_rate,
+    a?.samples?.heart_rate_samples,
   ];
   const samples = sources.find((s) => Array.isArray(s) && s.length > 0);
   if (!samples) {
@@ -161,9 +165,9 @@ function extractHrSamples(a: any): Array<{ t: number; bpm: number }> {
   const startMs = a?.metadata?.start_time ? new Date(a.metadata.start_time).getTime() : NaN;
   const bySecond = new Map<number, number>();
   for (const s of samples as any[]) {
-    const bpm = toFiniteNumber(s?.bpm ?? s?.heart_rate_bpm ?? s?.heart_rate ?? s?.value);
+    const bpm = toFiniteNumber(s?.bpm ?? s?.heart_rate_bpm ?? s?.heart_rate ?? s?.hr_bpm ?? s?.hr ?? s?.beats_per_minute ?? s?.heart_rate_value_bpm ?? s?.value);
     if (bpm == null || bpm <= 0) continue;
-    let t: number | null = toFiniteNumber(s?.timer_duration_seconds ?? s?.timer_seconds ?? s?.elapsed_seconds);
+    let t: number | null = toFiniteNumber(s?.timer_duration_seconds ?? s?.timer_seconds ?? s?.elapsed_seconds ?? s?.offset_seconds ?? s?.duration_seconds ?? s?.sample_time_offset_in_seconds);
     if (t == null && s?.timestamp && Number.isFinite(startMs)) {
       t = (new Date(s.timestamp).getTime() - startMs) / 1000;
     }

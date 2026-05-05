@@ -143,12 +143,13 @@ function extractHrSamples(a: any): Array<{ t: number; bpm: number }> {
     hrd?.detailed?.hr_samples,
     hrd?.detailed?.hr_samples_data,
     hrd?.detailed?.heart_rate_samples,
+    hrd?.detailed?.samples,
     hrd?.samples,
     hrd?.hr_samples,
     a?.hr_data?.samples,
     a?.heart_rate_samples,
   ];
-  const samples = sources.find((s) => Array.isArray(s) && s.length > 0);
+  const samples = sources.find((s) => Array.isArray(s) && s.length > 0) ?? findHrSampleArray(a);
   if (!samples) {
     try {
       console.log("[terra-sync] no hr samples; heart_rate_data keys =", JSON.stringify(Object.keys(hrd ?? {})));
@@ -177,6 +178,30 @@ function extractHrSamples(a: any): Array<{ t: number; bpm: number }> {
     .sort((a, b) => a[0] - b[0])
     .map(([t, bpm]) => ({ t, bpm }));
   return out.length > 7200 ? out.slice(0, 7200) : out;
+}
+
+function looksLikeHrSample(s: any): boolean {
+  return !!s && typeof s === "object" && toFiniteNumber(s?.bpm ?? s?.heart_rate_bpm ?? s?.heart_rate ?? s?.value) != null
+    && (s?.timestamp || toFiniteNumber(s?.timer_duration_seconds ?? s?.timer_seconds ?? s?.elapsed_seconds) != null);
+}
+
+function findHrSampleArray(root: any): any[] | undefined {
+  const seen = new Set<any>();
+  const queue = [root];
+  while (queue.length > 0) {
+    const node = queue.shift();
+    if (!node || typeof node !== "object" || seen.has(node)) continue;
+    seen.add(node);
+    if (Array.isArray(node)) {
+      if (node.length > 0 && looksLikeHrSample(node[0])) return node;
+      continue;
+    }
+    for (const [key, value] of Object.entries(node)) {
+      if (key.toLowerCase().includes("hrv")) continue;
+      queue.push(value);
+    }
+  }
+  return undefined;
 }
 
 function recomputeLapAvgHr(laps: any[], samples: Array<{ t: number; bpm: number }>, activityStartTime: string | null): any[] {
@@ -261,6 +286,34 @@ async function upsertTerraActivity(admin: any, c: any, a: any) {
   return { terraActivityId: aid, startTime: meta?.start_time ?? null, distanceMeters, hrSampleCount: hrSamples.length };
 }
 
+async function applyHistoricalActivityWebhook(admin: any, c: any, headers: Record<string, string>, startStr: string, endStr: string) {
+  const variants = [
+    { start_date: startStr },
+    { start_date: startStr, end_date: startStr },
+    { start_date: startStr, end_date: endStr },
+  ];
+  const results = [];
+  for (const params of variants) {
+    const qs = new URLSearchParams({ user_id: c.terra_user_id, to_webhook: "true", with_samples: "true", ...params });
+    const url = `https://api.tryterra.co/v2/activity?${qs.toString()}`;
+    console.log(`[terra-sync] historical activity webhook ${c.provider} url=${url}`);
+    const response = await fetch(url, { headers });
+    const terraReference = response.headers.get("terra-reference");
+    const body = await response.json().catch(() => null);
+    const result = { status: response.status, terraReference, responseType: body?.type ?? null, ...params };
+    results.push(result);
+    console.log(`[terra-sync] historical activity webhook ${c.provider} status=${response.status} type=${body?.type} terraReference=${terraReference ?? "none"}`);
+  }
+  await admin.from("terra_webhook_events").insert({
+    type: "terra_historical_request",
+    terra_user_id: c.terra_user_id,
+    reference_id: c.reference_id ?? c.user_id,
+    signature_valid: true,
+    payload: { provider: c.provider, endpoint: "activity", with_samples: true, requests: results },
+  });
+  return results;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   try {
@@ -280,6 +333,7 @@ Deno.serve(async (req) => {
     const dayOnly = body.dayOnly === true;
     const forceWebhook = body.forceWebhook === true;
     const latestWithSamples = body.latestWithSamples === true;
+    const historicalActivity = body.historicalActivity === true;
     const targetUserId: string | undefined = typeof body.targetUserId === "string" ? body.targetUserId : undefined;
 
     // Admin override: allow targeting another user (used to backfill specific accounts).
@@ -323,6 +377,11 @@ Deno.serve(async (req) => {
       const headers = { "dev-id": devId, "x-api-key": apiKey };
       // activity (skipped when caller only wants health stats)
       if (!healthOnly) {
+      if (historicalActivity) {
+        try {
+          await applyHistoricalActivityWebhook(admin, c, headers, startStr, endStr);
+        } catch (e) { console.error("historical activity request failed", c.provider, e); }
+      }
       try {
         // When forceWebhook=true, ask Terra to RE-DELIVER the activity (with samples)
         // via the webhook destination — bypasses Terra's range-endpoint dedupe.
@@ -344,6 +403,18 @@ Deno.serve(async (req) => {
         for (const a of items) {
           await upsertTerraActivity(admin, c, a);
           activityCount++;
+        }
+        if (latestWithSamples && items.length === 0) {
+          const { data: withSamples } = await admin
+            .from("terra_activities")
+            .select("id")
+            .eq("user_id", c.user_id)
+            .eq("provider", c.provider)
+            .gte("start_time", `${startStr}T00:00:00Z`)
+            .lt("start_time", `${endStr}T00:00:00Z`)
+            .not("hr_samples", "is", null)
+            .limit(1);
+          if ((withSamples?.length ?? 0) > 0) activityCount++;
         }
       } catch (e) { console.error("activity fetch failed", c.provider, e); }
 

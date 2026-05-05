@@ -1,3 +1,4 @@
+// ConnectApps: handles Terra OAuth flow and connection state for wearables.
 import { ArrowLeft, Check, RefreshCw, Info, AlertTriangle } from "lucide-react";
 import { Lang, t } from "@/lib/i18n";
 import { useAuth } from "@/contexts/AuthContext";

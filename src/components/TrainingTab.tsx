@@ -12,8 +12,9 @@ import { useOnlineStatus, isOnline } from "@/hooks/use-online-status";
 import { getCached, setCached, CacheKeys } from "@/lib/offlineCache";
 import {
   Loader2, Lock, ChevronLeft, ChevronRight, Plus, Calendar, Target, Trophy,
-  Repeat, Route, Check, HelpCircle, X, WifiOff
+  Repeat, Route, Check, HelpCircle, X, WifiOff, Sparkles
 } from "lucide-react";
+import WeeklyReviewModal from "@/components/training/WeeklyReviewModal";
 const CalculatorTab = lazy(() => import("@/components/CalculatorTab"));
 import freePlan5k from "@/assets/free-plan-5k.jpg";
 import freePlan10k from "@/assets/free-plan-10k.jpg";
@@ -265,6 +266,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
   const [currentWeekIdx, setCurrentWeekIdx] = useState(0);
   const [existingPlan, setExistingPlan] = useState<any>(null);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [showWeeklyReview, setShowWeeklyReview] = useState(false);
 
   // Add/Edit workout
   const [addingDayIdx, setAddingDayIdx] = useState<number | null>(null);
@@ -1227,7 +1229,16 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                       ))}
                     </div>
 
-                    <Button variant="outline" className="w-full mt-6 text-destructive border-destructive/30 hover:bg-destructive/10" onClick={() => setShowCancelConfirm(true)}>
+                    <Button
+                      variant="outline"
+                      className="w-full mt-6 border-primary/30 text-primary hover:bg-primary/10"
+                      onClick={() => setShowWeeklyReview(true)}
+                    >
+                      <Sparkles size={14} className="mr-2" />
+                      {lang === "zh" ? "週訓練回顧" : "Weekly Review"}
+                    </Button>
+
+                    <Button variant="outline" className="w-full mt-2 text-destructive border-destructive/30 hover:bg-destructive/10" onClick={() => setShowCancelConfirm(true)}>
                       {lang === "zh" ? "取消計劃" : "Cancel Plan"}
                     </Button>
                   </>
@@ -1612,6 +1623,14 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
           })()}
         </DialogContent>
       </Dialog>
+
+      <WeeklyReviewModal
+        open={showWeeklyReview}
+        onClose={() => setShowWeeklyReview(false)}
+        lang={lang}
+        planId={existingPlan?.id ?? null}
+        currentWeekIdx={currentWeekIdx}
+      />
     </div>
   );
 };

@@ -6,13 +6,23 @@ export default function TerraReturn() {
   const provider = (params.get("provider") ?? "").toUpperCase();
   const ok = status === "success";
 
-  const deeplink = `despia://pacecalculator.fun/?tab=more&page=connect-apps&terra=${ok ? "success" : "failure"}${provider ? `&provider=${provider}` : ""}`;
-  const webFallback = `https://pacecalculator.fun/?tab=more&page=connect-apps&terra=${ok ? "success" : "failure"}`;
+  const returnParams = new URLSearchParams({
+    tab: "more",
+    page: "connect-apps",
+    terra: ok ? "success" : "failure",
+    native: "true",
+  });
+  if (provider) returnParams.set("provider", provider);
+
+  const appReturnUrl = `https://pacecalculator.fun/?${returnParams.toString()}`;
+  const webFallbackParams = new URLSearchParams(returnParams);
+  webFallbackParams.delete("native");
+  const webFallback = `https://pacecalculator.fun/?${webFallbackParams.toString()}`;
 
   const [showFallback, setShowFallback] = useState(false);
 
   useEffect(() => {
-    window.location.href = deeplink;
+    window.location.replace(appReturnUrl);
     const t = setTimeout(() => setShowFallback(true), 1200);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -31,7 +41,7 @@ export default function TerraReturn() {
             : "Something went wrong. Tap below to return to the app and try again."}
         </p>
         <a
-          href={deeplink}
+          href={appReturnUrl}
           className="block w-full rounded-lg bg-primary px-4 py-3 font-medium text-primary-foreground"
         >
           Open Runward app

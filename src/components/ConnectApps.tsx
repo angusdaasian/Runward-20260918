@@ -173,6 +173,24 @@ const ConnectApps = ({ lang, onBack }: Props) => {
 
   useEffect(() => { loadTerraConns(); }, [loadTerraConns]);
 
+  // When user returns from external OAuth browser, clear any stuck "busy" state
+  // and refresh connections so the button flips from spinner to ✓.
+  useEffect(() => {
+    const onFocus = () => {
+      setTerraBusy(null);
+      loadTerraConns();
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") onFocus();
+    };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [loadTerraConns]);
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get("terra")) {

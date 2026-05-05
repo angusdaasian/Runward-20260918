@@ -586,15 +586,56 @@ async function processWebhook(
     processingError = String(e);
     console.error("terra-webhook processing error", e);
   }
+  return processingError;
+}
 
-  await supa.from("terra_webhook_events").insert({
-    type,
-    terra_user_id: terraUserId,
-    reference_id: referenceId,
-    signature_valid: signatureValid,
-    payload: { type, user: payload?.user, count: Array.isArray(payload?.data) ? payload.data.length : (payload?.data ? 1 : 0) },
-    processing_error: processingError,
-  });
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  const raw = await req.text();
+  const sigHeader = req.headers.get("terra-signature");
+  const secret = Deno.env.get("TERRA_SIGNING_SECRET") ?? "";
+  let signatureValid = false;
+  try { signatureValid = secret ? await verifySignature(secret, sigHeader, raw) : false; } catch { signatureValid = false; }
 
+  let payload: any = {};
+  try { payload = JSON.parse(raw); } catch { payload = { _parse_error: true, raw }; }
+
+  const type: string = payload?.type ?? "unknown";
+  const user = payload?.user ?? {};
+  const terraUserId: string | null = user?.user_id ?? null;
+  const referenceId: string | null = user?.reference_id ?? null;
+  const provider: string = mapProvider(user?.provider ?? payload?.resource);
+
+  // 1. Log receipt synchronously so we always have a record.
+  const { data: eventRow, error: eventInsertErr } = await supa
+    .from("terra_webhook_events")
+    .insert({
+      type,
+      terra_user_id: terraUserId,
+      reference_id: referenceId,
+      signature_valid: signatureValid,
+      payload: { type, user: payload?.user, count: Array.isArray(payload?.data) ? payload.data.length : (payload?.data ? 1 : 0) },
+      processing_error: null,
+    })
+    .select("id")
+    .single();
+  if (eventInsertErr) console.error("terra_webhook_events insert failed", eventInsertErr);
+
+  // 2. Process in background so we ack Terra within their ~10s timeout.
+  const work = (async () => {
+    const err = await processWebhook(payload, signatureValid, secret, type, terraUserId, referenceId, provider);
+    if (err && eventRow?.id) {
+      await supa.from("terra_webhook_events").update({ processing_error: err }).eq("id", eventRow.id);
+    }
+  })();
+  // @ts-ignore EdgeRuntime is provided by Supabase edge runtime
+  if (typeof EdgeRuntime !== "undefined" && (EdgeRuntime as any).waitUntil) {
+    // @ts-ignore
+    EdgeRuntime.waitUntil(work);
+  } else {
+    work.catch((e) => console.error("terra-webhook background error", e));
+  }
+
+  // 3. Ack immediately
   return new Response(JSON.stringify({ ok: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 });

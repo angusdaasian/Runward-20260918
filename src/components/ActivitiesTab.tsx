@@ -492,15 +492,8 @@ const ActivitiesTab = ({ lang }: Props) => {
               Authorization: `Bearer ${accessToken}`,
               apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
             },
-            body: JSON.stringify({
-              latestOnly: true,
-              targetDate: "2026-05-05",
-              startDate: "2026-05-04",
-              endDate: "2026-05-07",
-              dayOnly: true,
-              provider: "GARMIN",
-              timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-            }),
+            // TEMP: only resync May 5, 2026 to test HR sample backfill via webhook
+            body: JSON.stringify({ startDate: "2026-05-05", endDate: "2026-05-06" }),
           });
         }
       } catch (e) {

@@ -451,6 +451,20 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
   }, [activity.strava_id, isPremium, needsRpe]);
 
   const chartData = useMemo(() => {
+    // Fallback: when no Strava streams (Terra / Garmin / Apple Health), build a
+    // per-lap chart from splits so HR + Pace charts still render.
+    if ((!streams || streams.length === 0) && splits && splits.length > 0) {
+      const data: any[] = [];
+      let cum = 0;
+      for (const s of splits) {
+        cum += (s.distance || 0);
+        const point: any = { distance_km: (cum / 1000).toFixed(2) };
+        if (s.average_heartrate) point.heartrate = s.average_heartrate;
+        if (s.average_speed > 0) point.pace = speedToPace(s.average_speed);
+        data.push(point);
+      }
+      return data;
+    }
     if (!streams || streams.length === 0) return [];
     const timeStream = streams.find((s: any) => s.type === 'time');
     const distStream = streams.find((s: any) => s.type === 'distance');
@@ -469,7 +483,7 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
       data.push(point);
     }
     return data;
-  }, [streams]);
+  }, [streams, splits]);
 
   const hasHeartrate = chartData.some(d => d.heartrate);
   const hasAltitude = chartData.some(d => d.altitude !== undefined);
@@ -743,42 +757,69 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
         </div>
       ) : null}
 
-      {/* Splits Table */}
+      {/* Intervals Table — Garmin-style */}
       {splits && splits.length > 0 && (
-        <div className="bg-card border border-border rounded-xl p-4 mt-4">
-          <h3 className="font-display font-bold text-foreground text-sm mb-3">
-            {lang === "zh" ? "分段配速" : "Splits"}
-          </h3>
-          <div className="space-y-1">
-            <div className="grid grid-cols-6 text-[10px] text-muted-foreground font-medium pb-1 border-b border-border">
-              <span>#</span>
-              <span className="text-center">{lang === "zh" ? "距離" : "Dist"}</span>
-              <span className="text-center">{lang === "zh" ? "時間" : "Time"}</span>
-              <span className="text-center">{lang === "zh" ? "配速" : "Pace"}</span>
-              <span className="text-center">{lang === "zh" ? "爬升" : "Elev"}</span>
-              <span className="text-center">HR</span>
-            </div>
-            {splits.map((split, idx) => {
-              const pace = formatPace(split.average_speed);
-              const avgSplitPace = speedToPace(activity.average_speed);
-              const splitPace = speedToPace(split.average_speed);
-              const isFaster = splitPace < avgSplitPace;
+        <div className="bg-card border border-border rounded-xl overflow-hidden mt-4">
+          <div className="px-4 pt-4 pb-2">
+            <h3 className="font-display font-bold text-foreground text-sm">
+              {lang === "zh" ? "分段" : "Intervals"}
+            </h3>
+          </div>
+          {/* Header row */}
+          <div className="grid grid-cols-[36px_1fr_1fr_1fr_1fr_56px] items-end gap-2 px-4 py-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground border-b border-border">
+            <span>Int</span>
+            <span>{lang === "zh" ? "類型" : "Type"}</span>
+            <span className="text-right">{lang === "zh" ? "時間" : "Time"}</span>
+            <span className="text-right">
+              {lang === "zh" ? "距離" : "Dist"}
+              <span className="block text-[9px] font-normal normal-case text-muted-foreground/70">m</span>
+            </span>
+            <span className="text-right">
+              {lang === "zh" ? "平均配速" : "Avg Pace"}
+              <span className="block text-[9px] font-normal normal-case text-muted-foreground/70">min/km</span>
+            </span>
+            <span className="text-right">HR</span>
+          </div>
+          {(() => {
+            const activityAvgSpeed = activity.average_speed || 0;
+            let runNum = 0;
+            return splits.map((split, idx) => {
               const distMeters = split.distance || 0;
-              const distLabel = distMeters >= 1000
-                ? `${(distMeters / 1000).toFixed(2)}km`
-                : `${Math.round(distMeters)}m`;
+              const isRest =
+                (activityAvgSpeed > 0 && split.average_speed > 0 && split.average_speed < activityAvgSpeed * 0.55) ||
+                (distMeters > 0 && distMeters < 200);
+              const pace = formatPace(split.average_speed);
+              const hr = split.average_heartrate ? Math.round(split.average_heartrate) : null;
+              if (!isRest) runNum++;
               return (
-                <div key={idx} className="grid grid-cols-6 text-xs py-1.5 border-b border-border/50 last:border-0">
-                  <span className="font-medium text-foreground">{split.split}</span>
-                  <span className="text-center text-muted-foreground">{distLabel}</span>
-                  <span className="text-center text-muted-foreground">{formatDuration(split.elapsed_time)}</span>
-                  <span className={`text-center font-semibold ${isFaster ? "text-green-500" : "text-foreground"}`}>{pace}</span>
-                  <span className="text-center text-muted-foreground">{split.elevation_difference > 0 ? "+" : ""}{Math.round(split.elevation_difference)}m</span>
-                  <span className="text-center text-muted-foreground">{split.average_heartrate ? Math.round(split.average_heartrate) : "--"}</span>
+                <div
+                  key={idx}
+                  className={`grid grid-cols-[36px_1fr_1fr_1fr_1fr_56px] items-center gap-2 px-4 py-3 text-xs border-b border-border/40 last:border-0 ${
+                    isRest ? "bg-muted/30" : "bg-transparent"
+                  }`}
+                >
+                  <span className={`font-semibold tabular-nums ${isRest ? "text-muted-foreground" : "text-foreground"}`}>
+                    {isRest ? "" : runNum}
+                  </span>
+                  <span className={`${isRest ? "text-muted-foreground font-normal" : "text-foreground font-semibold"}`}>
+                    {isRest ? (lang === "zh" ? "休息" : "Rest") : (lang === "zh" ? "跑步" : "Run")}
+                  </span>
+                  <span className={`text-right tabular-nums ${isRest ? "text-muted-foreground" : "text-foreground font-semibold"}`}>
+                    {formatDuration(split.elapsed_time)}
+                  </span>
+                  <span className={`text-right tabular-nums ${isRest ? "text-muted-foreground" : "text-foreground font-semibold"}`}>
+                    {Math.round(distMeters)}
+                  </span>
+                  <span className={`text-right tabular-nums ${isRest ? "text-muted-foreground" : "text-foreground font-semibold"}`}>
+                    {pace}
+                  </span>
+                  <span className={`text-right tabular-nums ${isRest ? "text-muted-foreground" : "text-foreground"}`}>
+                    {hr ?? "--"}
+                  </span>
                 </div>
               );
-            })}
-          </div>
+            });
+          })()}
         </div>
       )}
 

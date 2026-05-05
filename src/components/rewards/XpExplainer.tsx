@@ -1,4 +1,4 @@
-import { Info, Zap, Flame, Trophy, ArrowDown, Activity } from "lucide-react";
+import { Info, Zap, Flame, Trophy, ArrowDown, Activity, Star, Instagram } from "lucide-react";
 import { Lang } from "@/lib/i18n";
 
 interface Props {
@@ -28,6 +28,16 @@ const XpExplainer = ({ lang }: Props) => {
       icon: <ArrowDown size={14} className="text-destructive" />,
       label: isZh ? "每日 XP 衰減（不活躍）" : "Daily XP Decay (inactive)",
       value: "-2%",
+    },
+    {
+      icon: <Instagram size={14} className="text-pink-500" />,
+      label: isZh ? "關注 Instagram（一次性）" : "Follow on Instagram (one-time)",
+      value: "+3,000 XP",
+    },
+    {
+      icon: <Star size={14} className="text-amber-500 fill-amber-500" />,
+      label: isZh ? "為應用程式評分（一次性）" : "Rate the app (one-time)",
+      value: "+5,000 XP",
     },
     {
       icon: <Trophy size={14} className="text-amber-500" />,

@@ -1623,6 +1623,14 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
           })()}
         </DialogContent>
       </Dialog>
+
+      <WeeklyReviewModal
+        open={showWeeklyReview}
+        onClose={() => setShowWeeklyReview(false)}
+        lang={lang}
+        planId={existingPlan?.id ?? null}
+        currentWeekIdx={currentWeekIdx}
+      />
     </div>
   );
 };

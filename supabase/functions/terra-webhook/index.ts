@@ -342,12 +342,13 @@ function extractHrSamples(a: any): Array<{ t: number; bpm: number }> {
     hrd?.detailed?.hr_samples,
     hrd?.detailed?.hr_samples_data,
     hrd?.detailed?.heart_rate_samples,
+    hrd?.detailed?.samples,
     hrd?.samples,
     hrd?.hr_samples,
     a?.hr_data?.samples,
     a?.heart_rate_samples,
   ];
-  const samples = sources.find((s) => Array.isArray(s) && s.length > 0);
+  const samples = sources.find((s) => Array.isArray(s) && s.length > 0) ?? findHrSampleArray(a);
   if (!samples) return [];
   const startMs = a?.metadata?.start_time ? new Date(a.metadata.start_time).getTime() : NaN;
   const bySecond = new Map<number, number>();
@@ -366,6 +367,30 @@ function extractHrSamples(a: any): Array<{ t: number; bpm: number }> {
   }
   const out = Array.from(bySecond.entries()).sort((a, b) => a[0] - b[0]).map(([t, bpm]) => ({ t, bpm }));
   return out.length > 7200 ? out.slice(0, 7200) : out;
+}
+
+function looksLikeHrSample(s: any): boolean {
+  return !!s && typeof s === "object" && toFiniteNumber(s?.bpm ?? s?.heart_rate_bpm ?? s?.heart_rate ?? s?.value) != null
+    && (s?.timestamp || toFiniteNumber(s?.timer_duration_seconds ?? s?.timer_seconds ?? s?.elapsed_seconds) != null);
+}
+
+function findHrSampleArray(root: any): any[] | undefined {
+  const seen = new Set<any>();
+  const queue = [root];
+  while (queue.length > 0) {
+    const node = queue.shift();
+    if (!node || typeof node !== "object" || seen.has(node)) continue;
+    seen.add(node);
+    if (Array.isArray(node)) {
+      if (node.length > 0 && looksLikeHrSample(node[0])) return node;
+      continue;
+    }
+    for (const [key, value] of Object.entries(node)) {
+      if (key.toLowerCase().includes("hrv")) continue;
+      queue.push(value);
+    }
+  }
+  return undefined;
 }
 
 function recomputeLapAvgHr(laps: any[], samples: Array<{ t: number; bpm: number }>, activityStartTime: string | null): any[] {

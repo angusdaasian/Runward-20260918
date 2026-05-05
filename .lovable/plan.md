@@ -1,27 +1,34 @@
-## Fix 1 — `terra-webhook` `auth` crash (the blocker)
+## Goal
 
-**File:** `supabase/functions/terra-webhook/index.ts`
+Only mark splits as "Rest" when the activity is an **interval workout**. For easy runs, long runs, progressive runs, etc., every split is labeled "Run" — no rest rows.
 
-- Add `user: any` parameter to `processWebhook` signature.
-- Pass `payload?.user ?? {}` from the `Deno.serve` call site (line ~640).
-- Defensive: inside the `auth` branch, `const rawScopes = user?.scopes` already null-safe — no other change needed.
+## Detection logic (in `ActivityDetail.tsx`, intervals table)
 
-This restores the `terra_connections` upsert + 7-day activity backfill that currently throws `ReferenceError: user is not defined` on every Terra connect, which is why connecting Garmin/Coros/Polar/Suunto silently fails today.
+Compute once per activity from the splits array, before rendering rows:
 
-## Fix 3 — `terra-auth-init` redirect URLs
+- `speeds` = lap `average_speed` values (>0)
+- `hrs` = lap `average_heartrate` values (>0)
+- `paceRatio = max(speeds) / min(speeds)` — how much faster the fastest lap is vs the slowest
+- `hrSpread = max(hrs) - min(hrs)`
 
-**File:** `supabase/functions/terra-auth-init/index.ts`
+`isIntervalWorkout = paceRatio >= 1.6 OR (paceRatio >= 1.4 AND hrSpread >= 25 bpm)`
 
-Currently passes `body.success_url` / `body.failure_url` straight to Terra, even if empty — Terra then has nowhere to redirect after the user authorizes, so they're stuck on Terra's success screen and never returned to the app.
+Rationale:
+- Easy run: pace stays within ~10% (ratio ~1.1) — not interval
+- Long run: maybe ~1.2 ratio — not interval
+- Progressive run: ~1.3 ratio, smooth HR drift — not interval
+- Interval session: work laps 4:00/km, recovery 7:00/km → ratio ~1.75, HR swings 40+ bpm — interval
 
-- Validate inputs; if `success_url` / `failure_url` are missing or empty strings, fall back to a sensible default that always works:
-  - success: `https://pacecalculator.fun/terra-return?status=success`
-  - failure: `https://pacecalculator.fun/terra-return?status=failure`
-- Use `https://www.pacecalculator.fun` only if the request `Origin` header indicates www; otherwise the apex domain. Simpler: default to apex.
-- Keep client-supplied URLs when present (so native deep links / preview URLs still work).
+## Per-row classification
 
-## Recovery for already-broken users
+Only when `isIntervalWorkout === true`, mark a split as Rest if:
+- `average_speed < activity.average_speed * 0.7`, OR
+- `distance < 200 m` (very short recovery jog lap)
 
-After deploy, run a one-shot to reconstruct `terra_connections` for the recent failed `auth` events from `terra_webhook_events.payload.user` (those rows have `processing_error: ReferenceError...` and contain the full `user` blob with `provider`, `reference_id`, `terra_user_id`). This avoids forcing the affected users to disconnect/reconnect again.
+Otherwise every row is "Run", numbered sequentially 1, 2, 3, ... and styled with the normal (non-muted) row look.
 
-No DB migration. No new secrets. No client changes.
+## Files
+
+- `src/components/activities/ActivityDetail.tsx` — replace the IIFE inside the Intervals table (lines ~783–822) with the workout-type detection + gated rest classification described above.
+
+No schema, no edge function, no other components affected.

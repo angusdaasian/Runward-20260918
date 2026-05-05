@@ -13,8 +13,5 @@ verify_jwt = false
 [functions.terra-webhook]
 verify_jwt = false
 
-[functions.terra-pull-historical]
-verify_jwt = false
-
 [functions.weekly-plan-review]
 verify_jwt = false

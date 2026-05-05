@@ -198,17 +198,15 @@ const ConnectApps = ({ lang, onBack }: Props) => {
     }
     setTerraBusy(provider);
     try {
-      const returnQuery = new URLSearchParams({
-        tab: "more",
-        page: "connect-apps",
-        provider,
-        native: "true",
-      });
-      const successUrl = new URL(`runward://oauth/?${returnQuery.toString()}&terra=success`);
+      const successUrl = new URL("https://pacecalculator.fun/terra-return");
       successUrl.searchParams.set("status", "success");
+      successUrl.searchParams.set("provider", provider);
+      successUrl.searchParams.set("native", "true");
 
-      const failureUrl = new URL(`runward://oauth/?${returnQuery.toString()}&terra=failure`);
+      const failureUrl = new URL("https://pacecalculator.fun/terra-return");
       failureUrl.searchParams.set("status", "failure");
+      failureUrl.searchParams.set("provider", provider);
+      failureUrl.searchParams.set("native", "true");
 
       const { data, error } = await supabase.functions.invoke("terra-auth-init", {
         body: { provider, success_url: successUrl.toString(), failure_url: failureUrl.toString() },

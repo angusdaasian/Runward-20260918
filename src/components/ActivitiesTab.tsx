@@ -498,6 +498,7 @@ const ActivitiesTab = ({ lang }: Props) => {
               targetUserId: "c7a7d1ca-c7bf-4288-bb9d-794006a04087",
               startDate: "2026-05-05",
               endDate: "2026-05-06",
+              historicalActivity: true,
               latestWithSamples: true,
             }),
           });

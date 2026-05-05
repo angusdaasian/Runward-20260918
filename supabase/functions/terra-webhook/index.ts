@@ -480,6 +480,56 @@ async function findUserId(terraUserId: string | null, referenceId: string | null
   return data?.user_id ?? null;
 }
 
+function nextDate(date: string): string {
+  const d = new Date(`${date}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + 1);
+  return d.toISOString().slice(0, 10);
+}
+
+async function requestActivityHrSamplesWebhook(terraUserId: string, referenceId: string | null, provider: string, summaryId: string, startTime: string | null) {
+  const startDate = (startTime ?? "").slice(0, 10);
+  if (!startDate) return;
+
+  const { data: recent } = await supa
+    .from("terra_webhook_events")
+    .select("received_at, payload")
+    .eq("terra_user_id", terraUserId)
+    .eq("type", "terra_hr_samples_retry")
+    .order("received_at", { ascending: false })
+    .limit(20);
+  const alreadyRequested = (recent ?? []).some((row: any) =>
+    row?.payload?.summary_id === summaryId &&
+    Date.now() - new Date(row.received_at).getTime() < 2 * 60 * 1000
+  );
+  if (alreadyRequested) return;
+
+  const endDate = nextDate(startDate);
+  const url = `https://api.tryterra.co/v2/activity?user_id=${terraUserId}&start_date=${startDate}&end_date=${endDate}&to_webhook=true&with_samples=true`;
+  const response = await fetch(url, {
+    headers: {
+      "dev-id": Deno.env.get("TERRA_DEV_ID") ?? "",
+      "x-api-key": Deno.env.get("TERRA_API_KEY") ?? "",
+    },
+  });
+  await supa.from("terra_webhook_events").insert({
+    type: "terra_hr_samples_retry",
+    terra_user_id: terraUserId,
+    reference_id: referenceId,
+    signature_valid: true,
+    payload: {
+      provider,
+      summary_id: summaryId,
+      start_date: startDate,
+      end_date: endDate,
+      to_webhook: true,
+      with_samples: true,
+      status: response.status,
+      terra_reference: response.headers.get("terra-reference"),
+    },
+  });
+  console.log(`[terra-webhook] requested HR samples webhook summary=${summaryId} status=${response.status}`);
+}
+
 async function processWebhook(
   payload: any,
   signatureValid: boolean,

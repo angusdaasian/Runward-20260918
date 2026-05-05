@@ -336,6 +336,55 @@ function extractSleepScore(s: any): number | null {
   return score != null ? Math.round(score) : null;
 }
 
+function extractHrSamples(a: any): Array<{ t: number; bpm: number }> {
+  const hrd = a?.heart_rate_data ?? {};
+  const sources: any[] = [
+    hrd?.detailed?.hr_samples,
+    hrd?.detailed?.hr_samples_data,
+    hrd?.detailed?.heart_rate_samples,
+    hrd?.samples,
+    hrd?.hr_samples,
+    a?.hr_data?.samples,
+    a?.heart_rate_samples,
+  ];
+  const samples = sources.find((s) => Array.isArray(s) && s.length > 0);
+  if (!samples) return [];
+  const startMs = a?.metadata?.start_time ? new Date(a.metadata.start_time).getTime() : NaN;
+  const bySecond = new Map<number, number>();
+  for (const s of samples as any[]) {
+    const bpm = toFiniteNumber(s?.bpm ?? s?.heart_rate_bpm ?? s?.heart_rate ?? s?.value);
+    if (bpm == null || bpm <= 0) continue;
+    let t: number | null = toFiniteNumber(s?.timer_duration_seconds ?? s?.timer_seconds ?? s?.elapsed_seconds);
+    if (t == null && s?.timestamp && Number.isFinite(startMs)) {
+      t = (new Date(s.timestamp).getTime() - startMs) / 1000;
+    }
+    if (t == null && s?.start_time && Number.isFinite(startMs)) {
+      t = (new Date(s.start_time).getTime() - startMs) / 1000;
+    }
+    if (t == null || !Number.isFinite(t) || t < 0) continue;
+    bySecond.set(Math.floor(t), Math.round(bpm));
+  }
+  const out = Array.from(bySecond.entries()).sort((a, b) => a[0] - b[0]).map(([t, bpm]) => ({ t, bpm }));
+  return out.length > 7200 ? out.slice(0, 7200) : out;
+}
+
+function recomputeLapAvgHr(laps: any[], samples: Array<{ t: number; bpm: number }>, activityStartTime: string | null): any[] {
+  if (!samples.length || !laps.length) return laps;
+  const startMs = activityStartTime ? new Date(activityStartTime).getTime() : NaN;
+  if (!Number.isFinite(startMs)) return laps;
+  return laps.map((lap) => {
+    const lapStartMs = lap?.start_time ? new Date(lap.start_time).getTime() : NaN;
+    const dur = toFiniteNumber(lap?.duration_seconds);
+    if (!Number.isFinite(lapStartMs) || dur == null) return lap;
+    const startSec = (lapStartMs - startMs) / 1000;
+    const endSec = startSec + dur;
+    const inWindow = samples.filter((s) => s.t >= startSec && s.t <= endSec);
+    if (inWindow.length < 5) return lap;
+    const avg = Math.round(inWindow.reduce((sum, s) => sum + s.bpm, 0) / inWindow.length);
+    return { ...lap, avg_hr: avg };
+  });
+}
+
 async function deleteMatchingGarminDuplicate(userId: string, startTime: string | null, distanceMeters: number | null) {
   if (!startTime || !distanceMeters || distanceMeters <= 0) return;
   const start = new Date(startTime);

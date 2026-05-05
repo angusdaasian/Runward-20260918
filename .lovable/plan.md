@@ -1,34 +1,70 @@
 ## Goal
 
-Only mark splits as "Rest" when the activity is an **interval workout**. For easy runs, long runs, progressive runs, etc., every split is labeled "Run" — no rest rows.
+Add per-second HR time-series capture from Terra activity payloads, plot a true HR-over-time chart in ActivityDetail, and validate by syncing **only today's activities** for user `6hhxbmqfd7` (uuid lookup at runtime via `terra_connections`).
 
-## Detection logic (in `ActivityDetail.tsx`, intervals table)
+## 1. Schema migration
 
-Compute once per activity from the splits array, before rendering rows:
+Add to `terra_activities`:
 
-- `speeds` = lap `average_speed` values (>0)
-- `hrs` = lap `average_heartrate` values (>0)
-- `paceRatio = max(speeds) / min(speeds)` — how much faster the fastest lap is vs the slowest
-- `hrSpread = max(hrs) - min(hrs)`
+- `hr_samples jsonb` — compact array `[{ t: <int seconds from start>, bpm: <int> }, ...]`, downsampled to ≤1 Hz. Nullable, default `null`.
 
-`isIntervalWorkout = paceRatio >= 1.6 OR (paceRatio >= 1.4 AND hrSpread >= 25 bpm)`
+## 2. terra-sync edge function changes
 
-Rationale:
-- Easy run: pace stays within ~10% (ratio ~1.1) — not interval
-- Long run: maybe ~1.2 ratio — not interval
-- Progressive run: ~1.3 ratio, smooth HR drift — not interval
-- Interval session: work laps 4:00/km, recovery 7:00/km → ratio ~1.75, HR swings 40+ bpm — interval
+`supabase/functions/terra-sync/index.ts`:
 
-## Per-row classification
+- Helper `extractHrSamples(a)`:
+  - Source order: `a.heart_rate_data.detailed.hr_samples` → `a.heart_rate_data.detailed.hr_samples_data` → `a.heart_rate_data.samples`.
+  - Per sample: prefer `timer_duration_seconds`, else `(timestamp - metadata.start_time) / 1000`. Read bpm from `bpm` or `heart_rate_bpm` or `heart_rate`.
+  - Drop non-finite bpm or `t < 0`. Downsample to 1 Hz (last write wins per integer second). Cap 7200 entries.
+- Helper `recomputeLapAvgHr(laps, samples)`:
+  - For each lap, average bpm of samples with `t` in `[lapStartSec, lapEndSec]`.
+  - Replace lap `avg_hr` only when ≥5 samples fall in window.
+- Activity loop:
+  - Compute `hrSamples`. If non-empty + laps present, recompute lap `avg_hr`.
+  - Add `hr_samples` to upsert; preserve existing on re-sync (extend the `existing` select).
 
-Only when `isIntervalWorkout === true`, mark a split as Rest if:
-- `average_speed < activity.average_speed * 0.7`, OR
-- `distance < 200 m` (very short recovery jog lap)
+### Scoping for this test
 
-Otherwise every row is "Run", numbered sequentially 1, 2, 3, ... and styled with the normal (non-muted) row look.
+Add two **optional body params** to terra-sync (admin-only, gated via `has_role(auth.uid(), 'admin')`):
 
-## Files
+- `targetUserId: string` — when set, use that user_id for the connections query instead of `auth.uid()`.
+- `dayOnly: boolean` — when true, set `startStr = endStr = today (UTC YYYY-MM-DD)` to fetch only today's activities (skip daily/sleep/body branches in this mode to keep the call cheap).
 
-- `src/components/activities/ActivityDetail.tsx` — replace the IIFE inside the Intervals table (lines ~783–822) with the workout-type detection + gated rest classification described above.
+Then invoke once:
+```
+supabase.functions.invoke('terra-sync', { body: { targetUserId: '<uuid of 6hhxbmqfd7>', dayOnly: true } })
+```
 
-No schema, no edge function, no other components affected.
+Both params remain useful as admin tools after the test.
+
+## 3. Frontend chart
+
+`src/components/activities/ActivityDetail.tsx`:
+
+- Read `hr_samples` from the activity row.
+- When length > 10, render a recharts `LineChart` above the per-lap HR section:
+  - X: elapsed `mm:ss`. Y: bpm, domain `[min-10, max+10]` clamped to `[40, 220]`.
+  - Single smooth line, no dots.
+  - `ReferenceLine` at each cumulative lap boundary from `laps[i].duration_seconds`.
+- Keep existing per-lap HR display.
+
+## 4. Validation
+
+1. Run migration.
+2. Deploy terra-sync.
+3. Look up uuid for `6hhxbmqfd7` via `terra_connections`, invoke with `{ targetUserId, dayOnly: true }`.
+4. Inspect today's activity row in `terra_activities`: `hr_samples` populated, lap avgs updated.
+5. Open ActivityDetail, confirm chart matches Garmin shape.
+
+## Files touched
+
+- new migration: `terra_activities.hr_samples jsonb`
+- `supabase/functions/terra-sync/index.ts`
+- `src/components/activities/ActivityDetail.tsx`
+- `src/integrations/supabase/types.ts` (auto-regenerated)
+
+## Out of scope
+
+- `garmin_activities` mirror — follow-up.
+- Backfill beyond today / past 30 days — Terra API limit anyway.
+- Rolling out broadly — only after this user validates.

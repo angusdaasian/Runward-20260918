@@ -1,45 +1,27 @@
-## Goal
-Fix Terra split pace/HR accuracy and add **lap time** to the splits table.
+## Fix 1 — `terra-webhook` `auth` crash (the blocker)
 
-## Changes
+**File:** `supabase/functions/terra-webhook/index.ts`
 
-### 1. Splits table — add "Time" column + fix pace (`src/components/activities/ActivityDetail.tsx` ~lines 743–785)
+- Add `user: any` parameter to `processWebhook` signature.
+- Pass `payload?.user ?? {}` from the `Deno.serve` call site (line ~640).
+- Defensive: inside the `auth` branch, `const rawScopes = user?.scopes` already null-safe — no other change needed.
 
-Update the header to 6 columns and add a time cell using `split.elapsed_time`:
+This restores the `terra_connections` upsert + 7-day activity backfill that currently throws `ReferenceError: user is not defined` on every Terra connect, which is why connecting Garmin/Coros/Polar/Suunto silently fails today.
 
-```tsx
-<div className="grid grid-cols-6 text-[10px] ...">
-  <span>#</span>
-  <span className="text-center">Dist</span>
-  <span className="text-center">Time</span>
-  <span className="text-center">Pace</span>
-  <span className="text-center">Elev</span>
-  <span className="text-center">HR</span>
-</div>
-```
+## Fix 3 — `terra-auth-init` redirect URLs
 
-Each row shows `formatDuration(split.elapsed_time)` (e.g. `3:45`, `13:55`).
-Also remove the "snap to 1.00km" logic so 806m / 240m render as the real distance.
+**File:** `supabase/functions/terra-auth-init/index.ts`
 
-### 2. Splits pace — use real distance/time (`src/components/activities/ActivityDetail.tsx` ~lines 339–362)
+Currently passes `body.success_url` / `body.failure_url` straight to Terra, even if empty — Terra then has nowhere to redirect after the user authorizes, so they're stuck on Terra's success screen and never returned to the app.
 
-For Garmin / Terra laps, prefer `distance ÷ elapsed` over Terra's `avg_speed` (which is a moving average and disagrees with what the watch shows):
+- Validate inputs; if `success_url` / `failure_url` are missing or empty strings, fall back to a sensible default that always works:
+  - success: `https://pacecalculator.fun/terra-return?status=success`
+  - failure: `https://pacecalculator.fun/terra-return?status=failure`
+- Use `https://www.pacecalculator.fun` only if the request `Origin` header indicates www; otherwise the apex domain. Simpler: default to apex.
+- Keep client-supplied URLs when present (so native deep links / preview URLs still work).
 
-```ts
-let avgSpeed = (distance > 0 && elapsed > 0)
-  ? distance / elapsed
-  : Number(lap.avg_speed ?? lap.average_speed) || 0;
-```
+## Recovery for already-broken users
 
-### 3. Activity-level pace (`supabase/functions/terra-webhook/index.ts` ~line 534)
+After deploy, run a one-shot to reconstruct `terra_connections` for the recent failed `auth` events from `terra_webhook_events.payload.user` (those rows have `processing_error: ReferenceError...` and contain the full `user` blob with `provider`, `reference_id`, `terra_user_id`). This avoids forcing the affected users to disconnect/reconnect again.
 
-Compute `average_speed` from real `distanceMeters / durationSeconds` when both exist; fall back to Terra's `movement_data.avg_speed_meters_per_second`. This makes the header pace match the watch.
-
-### 4. HR — pass through raw lap HR
-Lap-level HR already kept as raw decimal in `laps` JSON; UI rounds for display. Activity-level int rounding stays (DB column is `integer`, watches display rounded BPM).
-
-## Files touched
-- `src/components/activities/ActivityDetail.tsx`
-- `supabase/functions/terra-webhook/index.ts`
-
-No DB migration. No new secrets.
+No DB migration. No new secrets. No client changes.

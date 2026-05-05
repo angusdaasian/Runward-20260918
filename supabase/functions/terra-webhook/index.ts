@@ -414,6 +414,7 @@ async function processWebhook(
   terraUserId: string | null,
   referenceId: string | null,
   provider: string,
+  user: any,
 ): Promise<string | null> {
   let processingError: string | null = null;
   try {

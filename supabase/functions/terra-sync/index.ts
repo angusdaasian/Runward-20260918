@@ -279,6 +279,7 @@ Deno.serve(async (req) => {
     const healthOnly = body.healthOnly === true;
     const dayOnly = body.dayOnly === true;
     const forceWebhook = body.forceWebhook === true;
+    const latestWithSamples = body.latestWithSamples === true;
     const targetUserId: string | undefined = typeof body.targetUserId === "string" ? body.targetUserId : undefined;
 
     // Admin override: allow targeting another user (used to backfill specific accounts).
@@ -330,54 +331,18 @@ Deno.serve(async (req) => {
         console.log(`[terra-sync] activity fetch ${c.provider} url=${url}`);
         const r = await fetch(url, { headers });
         const j = await r.json();
-        const items: any[] = forceWebhook ? [] : (Array.isArray(j?.data) ? j.data : []);
+        let items: any[] = forceWebhook ? [] : (Array.isArray(j?.data) ? j.data : []);
+        if (latestWithSamples) {
+          items = items
+            .map((item) => ({ item, hrSampleCount: extractHrSamples(item).length }))
+            .filter(({ hrSampleCount }) => hrSampleCount > 0)
+            .sort((a, b) => Date.parse(b.item?.metadata?.start_time ?? "") - Date.parse(a.item?.metadata?.start_time ?? ""))
+            .slice(0, 1)
+            .map(({ item }) => item);
+        }
         console.log(`[terra-sync] activity ${c.provider} items=${items.length} status=${r.status} type=${j?.type} forceWebhook=${forceWebhook}`);
         for (const a of items) {
-          const meta = a?.metadata ?? {};
-          const dist = a?.distance_data?.summary ?? {};
-          const hr = a?.heart_rate_data?.summary ?? {};
-          const cal = a?.calories_data ?? {};
-          const distanceMeters = toFiniteNumber(dist?.distance_meters);
-          const durationSeconds = extractDurationSeconds(a, distanceMeters);
-          const aid = String(meta?.upload_type ?? "") + ":" + String(meta?.summary_id ?? meta?.id ?? meta?.start_time ?? crypto.randomUUID());
-          const polyline = extractPolyline(a);
-          const rawLaps = extractLaps(a);
-          const hrSamples = extractHrSamples(a);
-          const laps = hrSamples.length > 0 && rawLaps.length > 0
-            ? recomputeLapAvgHr(rawLaps, hrSamples, meta?.start_time ?? null)
-            : rawLaps;
-          const { data: existing } = await admin
-            .from("terra_activities")
-            .select("summary_polyline, laps, has_gps, hr_samples")
-            .eq("user_id", c.user_id)
-            .eq("terra_activity_id", aid)
-            .maybeSingle();
-          const finalPolyline = polyline ?? existing?.summary_polyline ?? null;
-          const finalLaps = laps.length > 0 ? laps : (Array.isArray(existing?.laps) && existing!.laps.length > 0 ? existing!.laps : []);
-          const finalHrSamples = hrSamples.length > 0
-            ? hrSamples
-            : (Array.isArray(existing?.hr_samples) ? existing!.hr_samples : null);
-          await admin.from("terra_activities").upsert({
-            user_id: c.user_id,
-            provider: c.provider,
-            terra_activity_id: aid,
-            activity_name: meta?.name ?? null,
-            activity_type: meta?.type ?? null,
-            start_time: meta?.start_time ?? null,
-            duration_seconds: durationSeconds,
-            distance_meters: distanceMeters,
-            calories: cal?.total_burned_calories ? Math.round(cal.total_burned_calories) : null,
-            average_hr: hr?.avg_hr_bpm ? Math.round(hr.avg_hr_bpm) : null,
-            max_hr: hr?.max_hr_bpm ? Math.round(hr.max_hr_bpm) : null,
-            elevation_gain: dist?.elevation?.gain_actual_meters ?? null,
-            average_speed: a?.movement_data?.avg_speed_meters_per_second ?? null,
-            summary_polyline: finalPolyline,
-            has_gps: !!finalPolyline || !!existing?.has_gps,
-            laps: finalLaps,
-            hr_samples: finalHrSamples,
-            raw_json: null,
-          }, { onConflict: "user_id,terra_activity_id" });
-          await deleteMatchingGarminDuplicate(admin, c.user_id, meta?.start_time ?? null, distanceMeters);
+          await upsertTerraActivity(admin, c, a);
           activityCount++;
         }
       } catch (e) { console.error("activity fetch failed", c.provider, e); }

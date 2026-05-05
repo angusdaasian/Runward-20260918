@@ -790,6 +790,7 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
                 (distMeters > 0 && distMeters < 200);
               const pace = formatPace(split.average_speed);
               const hr = split.average_heartrate ? Math.round(split.average_heartrate) : null;
+              if (!isRest) runNum++;
               return (
                 <div
                   key={idx}

@@ -132,14 +132,31 @@ Deno.serve(async (req) => {
     let perActivityStatus: number | null = null;
     let perActivityType: string | null = null;
 
+    const perAttempts: any[] = [];
     if (hrSamples.length === 0 && summaryId) {
-      const perUrl = `https://api.tryterra.co/v2/activity/${encodeURIComponent(summaryId)}?user_id=${conn.terra_user_id}&to_webhook=false&with_samples=true`;
-      const r2 = await fetch(perUrl, { headers });
-      perActivityStatus = r2.status;
-      const j2 = await r2.json();
-      perActivityType = j2?.type ?? null;
-      const item = Array.isArray(j2?.data) ? j2.data[0] : j2?.data;
-      if (item) hrSamples = extractHrSamples(item);
+      const candidates = [
+        // Date-windowed range pulls — bypass dedupe of the open-ended range
+        `https://api.tryterra.co/v2/activity?user_id=${conn.terra_user_id}&start_date=${(meta?.start_time ?? startDate).slice(0,10)}&end_date=${endDate}&to_webhook=false&with_samples=true`,
+        // Per-activity REST shapes
+        `https://api.tryterra.co/v2/activity/${encodeURIComponent(summaryId)}?user_id=${conn.terra_user_id}&to_webhook=false&with_samples=true`,
+        `https://api.tryterra.co/v2/activity/${encodeURIComponent(`1:${summaryId}`)}?user_id=${conn.terra_user_id}&to_webhook=false&with_samples=true`,
+      ];
+      for (const perUrl of candidates) {
+        const r2 = await fetch(perUrl, { headers });
+        perActivityStatus = r2.status;
+        const j2 = await r2.json().catch(() => ({}));
+        perActivityType = j2?.type ?? null;
+        const arr = Array.isArray(j2?.data) ? j2.data : (j2?.data ? [j2.data] : []);
+        let best: any[] = [];
+        for (const it of arr) {
+          const sid = String(it?.metadata?.summary_id ?? "");
+          if (sid && sid !== summaryId) continue;
+          const s = extractHrSamples(it);
+          if (s.length > best.length) best = s;
+        }
+        perAttempts.push({ url: perUrl, status: r2.status, type: j2?.type, items: arr.length, hr: best.length });
+        if (best.length > 0) { hrSamples = best; break; }
+      }
     }
 
     summary.push({

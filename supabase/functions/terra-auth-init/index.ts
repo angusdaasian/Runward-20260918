@@ -28,6 +28,11 @@ Deno.serve(async (req) => {
     const devId = Deno.env.get("TERRA_DEV_ID")!;
     const apiKey = Deno.env.get("TERRA_API_KEY")!;
 
+    const DEFAULT_SUCCESS = "https://pacecalculator.fun/terra-return?status=success";
+    const DEFAULT_FAILURE = "https://pacecalculator.fun/terra-return?status=failure";
+    const successUrl = (typeof body.success_url === "string" && body.success_url.trim()) ? body.success_url.trim() : DEFAULT_SUCCESS;
+    const failureUrl = (typeof body.failure_url === "string" && body.failure_url.trim()) ? body.failure_url.trim() : DEFAULT_FAILURE;
+
     const tres = await fetch(`https://api.tryterra.co/v2/auth/authenticateUser?resource=${provider}`, {
       method: "POST",
       headers: {
@@ -38,8 +43,8 @@ Deno.serve(async (req) => {
       body: JSON.stringify({
         language: "en",
         reference_id: user.id,
-        auth_success_redirect_url: `${body.success_url ?? ""}`,
-        auth_failure_redirect_url: `${body.failure_url ?? ""}`,
+        auth_success_redirect_url: successUrl,
+        auth_failure_redirect_url: failureUrl,
       }),
     });
     const tjson = await tres.json();

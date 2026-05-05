@@ -61,13 +61,38 @@ function extractHrSamples(a: any): Array<{ t: number; bpm: number }> {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
+  // Auth: accept either x-admin-key=WEBHOOK_AUTH_KEY OR a logged-in admin user.
   const adminKey = req.headers.get("x-admin-key");
-  if (adminKey !== Deno.env.get("WEBHOOK_AUTH_KEY")) {
+  let authorized = adminKey === Deno.env.get("WEBHOOK_AUTH_KEY");
+
+  if (!authorized) {
+    const auth = req.headers.get("Authorization") ?? "";
+    if (auth.startsWith("Bearer ")) {
+      const userClient = createClient(
+        Deno.env.get("SUPABASE_URL")!,
+        Deno.env.get("SUPABASE_ANON_KEY")!,
+        { global: { headers: { Authorization: auth } } },
+      );
+      const { data: { user } } = await userClient.auth.getUser();
+      if (user) {
+        const adminCheck = createClient(
+          Deno.env.get("SUPABASE_URL")!,
+          Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+        );
+        const { data: roleRow } = await adminCheck
+          .from("user_roles").select("role").eq("user_id", user.id).eq("role", "admin").maybeSingle();
+        if (roleRow) authorized = true;
+      }
+    }
+  }
+
+  if (!authorized) {
     return new Response(JSON.stringify({ error: "forbidden" }), {
       status: 403,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
+
 
   const body = await req.json().catch(() => ({}));
   const userId: string = body.userId ?? "c7a7d1ca-c7bf-4288-bb9d-794006a04087";

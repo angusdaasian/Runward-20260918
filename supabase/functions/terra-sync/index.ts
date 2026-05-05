@@ -258,8 +258,12 @@ Deno.serve(async (req) => {
     } else {
       start.setDate(start.getDate() - 30);
     }
-    const startStr = start.toISOString().slice(0, 10);
-    const endStr = end.toISOString().slice(0, 10);
+    let startStr = start.toISOString().slice(0, 10);
+    let endStr = end.toISOString().slice(0, 10);
+    // Optional explicit date window override (testing / single-activity backfill).
+    if (typeof body.startDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(body.startDate)) startStr = body.startDate;
+    if (typeof body.endDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(body.endDate)) endStr = body.endDate;
+    console.log(`[terra-sync] window ${startStr} -> ${endStr} dayOnly=${dayOnly}`);
 
     let activityCount = 0;
     let dailyCount = 0;

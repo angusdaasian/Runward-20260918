@@ -28,8 +28,9 @@ Deno.serve(async (req) => {
     const devId = Deno.env.get("TERRA_DEV_ID")!;
     const apiKey = Deno.env.get("TERRA_API_KEY")!;
 
-    const DEFAULT_SUCCESS = "https://pacecalculator.fun/terra-return?status=success&native=true";
-    const DEFAULT_FAILURE = "https://pacecalculator.fun/terra-return?status=failure&native=true";
+    const origin = req.headers.get("origin") || "https://angustest.site";
+    const DEFAULT_SUCCESS = `${origin}/terra-return?status=success&native=true`;
+    const DEFAULT_FAILURE = `${origin}/terra-return?status=failure&native=true`;
     const successUrl = (typeof body.success_url === "string" && body.success_url.trim()) ? body.success_url.trim() : DEFAULT_SUCCESS;
     const failureUrl = (typeof body.failure_url === "string" && body.failure_url.trim()) ? body.failure_url.trim() : DEFAULT_FAILURE;
 

@@ -286,6 +286,23 @@ async function upsertTerraActivity(admin: any, c: any, a: any) {
   return { terraActivityId: aid, startTime: meta?.start_time ?? null, distanceMeters, hrSampleCount: hrSamples.length };
 }
 
+async function applyHistoricalActivityWebhook(admin: any, c: any, headers: Record<string, string>, startStr: string, endStr: string) {
+  const url = `https://api.tryterra.co/v2/activity?user_id=${c.terra_user_id}&start_date=${startStr}&end_date=${endStr}&to_webhook=true&with_samples=true`;
+  console.log(`[terra-sync] historical activity webhook ${c.provider} url=${url}`);
+  const response = await fetch(url, { headers });
+  const terraReference = response.headers.get("terra-reference");
+  const body = await response.json().catch(() => null);
+  console.log(`[terra-sync] historical activity webhook ${c.provider} status=${response.status} type=${body?.type} terraReference=${terraReference ?? "none"}`);
+  await admin.from("terra_webhook_events").insert({
+    type: "terra_historical_request",
+    terra_user_id: c.terra_user_id,
+    reference_id: c.reference_id ?? c.user_id,
+    signature_valid: true,
+    payload: { provider: c.provider, endpoint: "activity", start_date: startStr, end_date: endStr, with_samples: true, terra_reference: terraReference, status: response.status, response_type: body?.type ?? null },
+  });
+  return { status: response.status, terraReference, responseType: body?.type ?? null };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   try {

@@ -492,7 +492,8 @@ const ActivitiesTab = ({ lang }: Props) => {
               Authorization: `Bearer ${accessToken}`,
               apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
             },
-            body: JSON.stringify({}),
+            // TEMP: only resync Apr 9, 2026 to test HR sample backfill via webhook
+            body: JSON.stringify({ startDate: "2026-04-09", endDate: "2026-04-10" }),
           });
         }
       } catch (e) {

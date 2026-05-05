@@ -265,15 +265,22 @@ Deno.serve(async (req) => {
           const durationSeconds = extractDurationSeconds(a, distanceMeters);
           const aid = String(meta?.upload_type ?? "") + ":" + String(meta?.summary_id ?? meta?.id ?? meta?.start_time ?? crypto.randomUUID());
           const polyline = extractPolyline(a);
-          const laps = extractLaps(a);
+          const rawLaps = extractLaps(a);
+          const hrSamples = extractHrSamples(a);
+          const laps = hrSamples.length > 0 && rawLaps.length > 0
+            ? recomputeLapAvgHr(rawLaps, hrSamples, meta?.start_time ?? null)
+            : rawLaps;
           const { data: existing } = await admin
             .from("terra_activities")
-            .select("summary_polyline, laps, has_gps")
+            .select("summary_polyline, laps, has_gps, hr_samples")
             .eq("user_id", c.user_id)
             .eq("terra_activity_id", aid)
             .maybeSingle();
           const finalPolyline = polyline ?? existing?.summary_polyline ?? null;
           const finalLaps = laps.length > 0 ? laps : (Array.isArray(existing?.laps) && existing!.laps.length > 0 ? existing!.laps : []);
+          const finalHrSamples = hrSamples.length > 0
+            ? hrSamples
+            : (Array.isArray(existing?.hr_samples) ? existing!.hr_samples : null);
           await admin.from("terra_activities").upsert({
             user_id: c.user_id,
             provider: c.provider,
@@ -291,12 +298,19 @@ Deno.serve(async (req) => {
             summary_polyline: finalPolyline,
             has_gps: !!finalPolyline || !!existing?.has_gps,
             laps: finalLaps,
+            hr_samples: finalHrSamples,
             raw_json: null,
           }, { onConflict: "user_id,terra_activity_id" });
           await deleteMatchingGarminDuplicate(admin, c.user_id, meta?.start_time ?? null, distanceMeters);
           activityCount++;
         }
       } catch (e) { console.error("activity fetch failed", c.provider, e); }
+      }
+
+      if (dayOnly) {
+        // Skip health endpoints when only validating activity capture for today.
+        await admin.from("terra_connections").update({ last_synced_at: new Date().toISOString() }).eq("id", c.id);
+        continue;
       }
 
       // daily (steps, resting hr, vo2max)

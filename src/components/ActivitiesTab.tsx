@@ -492,7 +492,14 @@ const ActivitiesTab = ({ lang }: Props) => {
               Authorization: `Bearer ${accessToken}`,
               apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
             },
-            body: JSON.stringify({ latestOnly: true, provider: "GARMIN" }),
+            body: JSON.stringify({
+              latestOnly: true,
+              latestDate: true,
+              provider: "GARMIN",
+              startDate: "2026-05-05",
+              endDate: "2026-05-06",
+              dayOnly: true,
+            }),
           });
         }
       } catch (e) {

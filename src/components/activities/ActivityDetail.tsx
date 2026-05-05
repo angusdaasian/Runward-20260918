@@ -451,6 +451,20 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
   }, [activity.strava_id, isPremium, needsRpe]);
 
   const chartData = useMemo(() => {
+    // Fallback: when no Strava streams (Terra / Garmin / Apple Health), build a
+    // per-lap chart from splits so HR + Pace charts still render.
+    if ((!streams || streams.length === 0) && splits && splits.length > 0) {
+      const data: any[] = [];
+      let cum = 0;
+      for (const s of splits) {
+        cum += (s.distance || 0);
+        const point: any = { distance_km: (cum / 1000).toFixed(2) };
+        if (s.average_heartrate) point.heartrate = s.average_heartrate;
+        if (s.average_speed > 0) point.pace = speedToPace(s.average_speed);
+        data.push(point);
+      }
+      return data;
+    }
     if (!streams || streams.length === 0) return [];
     const timeStream = streams.find((s: any) => s.type === 'time');
     const distStream = streams.find((s: any) => s.type === 'distance');

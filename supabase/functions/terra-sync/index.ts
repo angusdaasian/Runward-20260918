@@ -221,7 +221,27 @@ function sameTerraActivityId(left: string, right: string): boolean {
   return left === right || left.split(":").pop() === right.split(":").pop();
 }
 
-function pickLatestActivity(items: any[], requestedId?: string, targetDate?: string): any | null {
+function localDateForActivity(a: any, timeZone?: string): string {
+  const startTime = a?.metadata?.start_time;
+  if (!startTime) return "";
+  if (timeZone) {
+    try {
+      const parts = new Intl.DateTimeFormat("en-CA", {
+        timeZone,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).formatToParts(new Date(startTime));
+      const year = parts.find((p) => p.type === "year")?.value;
+      const month = parts.find((p) => p.type === "month")?.value;
+      const day = parts.find((p) => p.type === "day")?.value;
+      if (year && month && day) return `${year}-${month}-${day}`;
+    } catch {}
+  }
+  return String(startTime).slice(0, 10);
+}
+
+function pickLatestActivity(items: any[], requestedId?: string, targetDate?: string, timeZone?: string): any | null {
   const candidates = requestedId
     ? items.filter((a) => {
       const meta = a?.metadata ?? {};
@@ -230,7 +250,7 @@ function pickLatestActivity(items: any[], requestedId?: string, targetDate?: str
     })
     : items;
   const dateCandidates = targetDate
-    ? candidates.filter((a) => String(a?.metadata?.start_time ?? "").slice(0, 10) === targetDate)
+    ? candidates.filter((a) => localDateForActivity(a, timeZone) === targetDate)
     : candidates;
   if (targetDate && dateCandidates.length === 0) return null;
   return [...dateCandidates].sort((a, b) => Date.parse(b?.metadata?.start_time ?? "") - Date.parse(a?.metadata?.start_time ?? ""))[0] ?? null;

@@ -471,9 +471,34 @@ const ActivitiesTab = ({ lang }: Props) => {
     if (!user || resyncing) return;
     setResyncing(true);
     try {
-      await supabase.from("apple_health_activities").delete().eq("user_id", user.id);
-      const { workouts } = await appleHealth.readHealthData(1, 60);
-      await appleHealth.saveWorkoutsToDb(workouts);
+      // Apple Health (native)
+      try {
+        await supabase.from("apple_health_activities").delete().eq("user_id", user.id);
+        const { workouts } = await appleHealth.readHealthData(1, 60);
+        await appleHealth.saveWorkoutsToDb(workouts);
+      } catch (e) {
+        console.warn("Apple Health resync skipped/failed:", e);
+      }
+
+      // Terra (Garmin/Coros/Polar/Suunto via Terra) — pulls activities + hr_samples
+      try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        const accessToken = sessionData?.session?.access_token;
+        if (accessToken) {
+          await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/terra-sync`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${accessToken}`,
+              apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+            },
+            body: JSON.stringify({}),
+          });
+        }
+      } catch (e) {
+        console.warn("Terra resync failed:", e);
+      }
+
       invalidateAll();
       toast.success(lang === "zh" ? "已重新同步活動" : "Activities resynced successfully");
     } catch (err) {

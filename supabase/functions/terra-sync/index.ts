@@ -345,6 +345,7 @@ Deno.serve(async (req) => {
           const finalHrSamples = hrSamples.length > 0
             ? hrSamples
             : (Array.isArray(existing?.hr_samples) ? existing!.hr_samples : null);
+          console.log(`[terra-sync] activity upsert ${aid} start=${meta?.start_time ?? "null"} distance=${distanceMeters ?? "null"} hr_samples=${hrSamples.length} final_hr_samples=${Array.isArray(finalHrSamples) ? finalHrSamples.length : 0}`);
           await admin.from("terra_activities").upsert({
             user_id: c.user_id,
             provider: c.provider,

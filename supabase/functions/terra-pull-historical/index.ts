@@ -101,7 +101,25 @@ Deno.serve(async (req) => {
   const rangeUrl = `https://api.tryterra.co/v2/activity?user_id=${conn.terra_user_id}&start_date=${startDate}&end_date=${endDate}&to_webhook=false&with_samples=true`;
   const r1 = await fetch(rangeUrl, { headers });
   const j1 = await r1.json();
-  const items: any[] = Array.isArray(j1?.data) ? j1.data : [];
+  let items: any[] = Array.isArray(j1?.data) ? j1.data : [];
+
+  // Step 2: if range returned nothing, fall back to existing rows in DB for this window
+  let usedFallback = false;
+  if (items.length === 0) {
+    usedFallback = true;
+    const { data: existingRows } = await admin
+      .from("terra_activities")
+      .select("terra_activity_id, start_time")
+      .eq("user_id", userId)
+      .eq("provider", provider)
+      .gte("start_time", `${startDate}T00:00:00Z`)
+      .lt("start_time", `${endDate}T00:00:00Z`);
+    items = (existingRows ?? []).map((row: any) => {
+      const aid = String(row.terra_activity_id || "");
+      const summaryId = aid.includes(":") ? aid.split(":").slice(1).join(":") : aid;
+      return { metadata: { summary_id: summaryId, start_time: row.start_time } };
+    });
+  }
 
   const summary: any[] = [];
   const updates: any[] = [];
@@ -109,16 +127,17 @@ Deno.serve(async (req) => {
   for (const a of items) {
     const meta = a?.metadata ?? {};
     const summaryId = String(meta?.summary_id ?? "");
-    const hrFromRange = extractHrSamples(a);
+    const hrFromRange = usedFallback ? [] : extractHrSamples(a);
     let hrSamples = hrFromRange;
     let perActivityStatus: number | null = null;
+    let perActivityType: string | null = null;
 
-    // Step 2: if range returned no samples, fall back to per-activity endpoint
     if (hrSamples.length === 0 && summaryId) {
-      const perUrl = `https://api.tryterra.co/v2/activity/${encodeURIComponent(summaryId)}?user_id=${conn.terra_user_id}&with_samples=true`;
+      const perUrl = `https://api.tryterra.co/v2/activity/${encodeURIComponent(summaryId)}?user_id=${conn.terra_user_id}&to_webhook=false&with_samples=true`;
       const r2 = await fetch(perUrl, { headers });
       perActivityStatus = r2.status;
       const j2 = await r2.json();
+      perActivityType = j2?.type ?? null;
       const item = Array.isArray(j2?.data) ? j2.data[0] : j2?.data;
       if (item) hrSamples = extractHrSamples(item);
     }
@@ -129,6 +148,7 @@ Deno.serve(async (req) => {
       hr_from_range: hrFromRange.length,
       hr_final: hrSamples.length,
       per_activity_status: perActivityStatus,
+      per_activity_type: perActivityType,
     });
 
     if (hrSamples.length > 0) {
@@ -152,6 +172,7 @@ Deno.serve(async (req) => {
       range_status: r1.status,
       range_type: j1?.type,
       range_message: j1?.message,
+      used_fallback: usedFallback,
       items: items.length,
       summary,
       updates,

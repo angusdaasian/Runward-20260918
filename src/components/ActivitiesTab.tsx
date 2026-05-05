@@ -492,8 +492,7 @@ const ActivitiesTab = ({ lang }: Props) => {
               Authorization: `Bearer ${accessToken}`,
               apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
             },
-            // TEMP: resync single Terra activity (4.69km track on 5-5) for HR samples
-            body: JSON.stringify({ activityId: "1:22772394276", provider: "GARMIN" }),
+            body: JSON.stringify({ latestOnly: true, provider: "GARMIN" }),
           });
         }
       } catch (e) {

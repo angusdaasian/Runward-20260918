@@ -242,7 +242,9 @@ Deno.serve(async (req) => {
       { global: { headers: { Authorization: auth } } },
     );
     const { data: { user } } = await userClient.auth.getUser();
-    if (!user) return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    const webhookKey = Deno.env.get("WEBHOOK_AUTH_KEY");
+    const isWebhookAuthorized = !!webhookKey && req.headers.get("x-webhook-key") === webhookKey;
+    if (!user && !isWebhookAuthorized) return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
     const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
     const body = await req.json().catch(() => ({}));
@@ -252,8 +254,9 @@ Deno.serve(async (req) => {
     const targetUserId: string | undefined = typeof body.targetUserId === "string" ? body.targetUserId : undefined;
 
     // Admin override: allow targeting another user (used to backfill specific accounts).
-    let connUserId = user.id;
-    if (targetUserId && targetUserId !== user.id) {
+    let connUserId = user?.id ?? targetUserId;
+    if (!connUserId) return new Response(JSON.stringify({ error: "targetUserId required" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    if (targetUserId && user && targetUserId !== user.id) {
       const { data: roleRow } = await admin
         .from("user_roles").select("role").eq("user_id", user.id).eq("role", "admin").maybeSingle();
       if (!roleRow) {

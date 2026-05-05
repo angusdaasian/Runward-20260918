@@ -130,6 +130,7 @@ Deno.serve(async (req) => {
       pageFetch("strava_activities", "distance", "start_date"),
       pageFetch("apple_health_activities", "distance", "start_date"),
       pageFetch("garmin_activities", "distance_meters", "start_time"),
+      pageFetch("terra_activities", "distance_meters", "start_time"),
     ]);
 
     // 4. Detect each user's preferred language from auth metadata (fallback en)

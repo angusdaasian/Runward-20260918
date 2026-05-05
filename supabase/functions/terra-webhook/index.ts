@@ -406,23 +406,15 @@ async function findUserId(terraUserId: string | null, referenceId: string | null
   return data?.user_id ?? null;
 }
 
-Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
-  const raw = await req.text();
-  const sigHeader = req.headers.get("terra-signature");
-  const secret = Deno.env.get("TERRA_SIGNING_SECRET") ?? "";
-  let signatureValid = false;
-  try { signatureValid = secret ? await verifySignature(secret, sigHeader, raw) : false; } catch { signatureValid = false; }
-
-  let payload: any = {};
-  try { payload = JSON.parse(raw); } catch { payload = { _parse_error: true, raw }; }
-
-  const type: string = payload?.type ?? "unknown";
-  const user = payload?.user ?? {};
-  const terraUserId: string | null = user?.user_id ?? null;
-  const referenceId: string | null = user?.reference_id ?? null;
-  const provider: string = mapProvider(user?.provider ?? payload?.resource);
-
+async function processWebhook(
+  payload: any,
+  signatureValid: boolean,
+  secret: string,
+  type: string,
+  terraUserId: string | null,
+  referenceId: string | null,
+  provider: string,
+): Promise<string | null> {
   let processingError: string | null = null;
   try {
     if (!signatureValid && secret) {

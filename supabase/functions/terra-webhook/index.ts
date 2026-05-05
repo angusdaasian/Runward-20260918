@@ -638,7 +638,7 @@ Deno.serve(async (req) => {
 
   // 2. Process in background so we ack Terra within their ~10s timeout.
   const work = (async () => {
-    const err = await processWebhook(payload, signatureValid, secret, type, terraUserId, referenceId, provider);
+    const err = await processWebhook(payload, signatureValid, secret, type, terraUserId, referenceId, provider, payload?.user ?? {});
     if (err && eventRow?.id) {
       await supa.from("terra_webhook_events").update({ processing_error: err }).eq("id", eventRow.id);
     }

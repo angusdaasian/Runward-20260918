@@ -359,7 +359,7 @@ serve(async (req) => {
     const sessionId = new_session || !requestedSessionId ? crypto.randomUUID() : requestedSessionId;
 
     // Load context in parallel
-    const [prefsR, historyR, insightsR, garminR, stravaR, appleR, racesR] =
+    const [prefsR, historyR, insightsR, garminR, stravaR, appleR, terraR, racesR] =
       await Promise.all([
         admin.from("ai_coach_preferences").select("*").eq("user_id", user.id).maybeSingle(),
         admin
@@ -397,6 +397,13 @@ serve(async (req) => {
           .order("start_date", { ascending: false })
           .limit(10),
         admin
+          .from("terra_activities")
+          .select("start_time, distance_meters, duration_seconds, average_hr, activity_type, provider")
+          .eq("user_id", user.id)
+          .gte("start_time", new Date(Date.now() - 7 * 86400000).toISOString())
+          .order("start_time", { ascending: false })
+          .limit(10),
+        admin
           .from("user_races")
           .select("race_name, race_date, category, city, country, finish_time_seconds, notes, priority")
           .eq("user_id", user.id)
@@ -416,6 +423,14 @@ serve(async (req) => {
       })),
       ...(stravaR.data || []),
       ...(appleR.data || []),
+      ...(terraR.data || []).map((a: any) => ({
+        ...a,
+        start_date: a.start_time,
+        distance: a.distance_meters,
+        moving_time: a.duration_seconds,
+        average_heartrate: a.average_hr,
+        sport_type: a.activity_type,
+      })),
     ].sort(
       (a: any, b: any) =>
         new Date(b.start_date).getTime() - new Date(a.start_date).getTime(),

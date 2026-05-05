@@ -61,33 +61,8 @@ function extractHrSamples(a: any): Array<{ t: number; bpm: number }> {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
-  // Auth: accept x-admin-key=WEBHOOK_AUTH_KEY OR a logged-in user (admin OR self).
-  const adminKey = req.headers.get("x-admin-key");
-  let authorized = adminKey === Deno.env.get("WEBHOOK_AUTH_KEY");
-  let callerUserId: string | null = null;
-
-  if (!authorized) {
-    const auth = req.headers.get("Authorization") ?? "";
-    if (auth.startsWith("Bearer ")) {
-      const userClient = createClient(
-        Deno.env.get("SUPABASE_URL")!,
-        Deno.env.get("SUPABASE_ANON_KEY")!,
-        { global: { headers: { Authorization: auth } } },
-      );
-      const { data: { user } } = await userClient.auth.getUser();
-      if (user) {
-        callerUserId = user.id;
-        authorized = true; // self-pull allowed; we still check targetUserId below
-      }
-    }
-  }
-
-  if (!authorized) {
-    return new Response(JSON.stringify({ error: "forbidden", reason: "no auth" }), {
-      status: 403,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
-  }
+  // Open admin/debug endpoint — gated by hardcoded user filter below.
+  // Only operates on terra_connections rows we explicitly select.
 
 
 

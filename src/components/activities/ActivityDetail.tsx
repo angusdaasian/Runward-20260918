@@ -40,6 +40,7 @@ interface StravaActivity {
   source?: string;
   calories?: number | null;
   laps?: any[] | null;
+  hr_samples?: Array<{ t: number; bpm: number }> | null;
   map_screenshot_url?: string | null;
   provenance?: "strava" | "apple_health" | "garmin" | "terra";
 }

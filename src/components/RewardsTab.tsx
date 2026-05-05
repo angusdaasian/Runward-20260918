@@ -9,6 +9,7 @@ import HeroSection from "@/components/rewards/HeroSection";
 import DailyCheckIn from "@/components/rewards/DailyCheckIn";
 import ClaimRewards from "@/components/rewards/ClaimRewards";
 import InstagramFollow from "@/components/rewards/InstagramFollow";
+import RateAppReward from "@/components/rewards/RateAppReward";
 import LeaderboardTabs from "@/components/rewards/LeaderboardTabs";
 import RankUpOverlay from "@/components/rewards/RankUpOverlay";
 import XpExplainer from "@/components/rewards/XpExplainer";
@@ -119,6 +120,14 @@ const RewardsTab = ({ lang }: Props) => {
             )}
             {user && (
               <InstagramFollow
+                lang={lang}
+                userId={user.id}
+                currentXp={profile?.monthly_xp ?? 0}
+                onXpGain={handleXpGain}
+              />
+            )}
+            {user && (
+              <RateAppReward
                 lang={lang}
                 userId={user.id}
                 currentXp={profile?.monthly_xp ?? 0}

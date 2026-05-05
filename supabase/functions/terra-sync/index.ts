@@ -229,6 +229,7 @@ Deno.serve(async (req) => {
     const providerFilter: string | undefined = body.provider ? String(body.provider).toUpperCase() : undefined;
     const healthOnly = body.healthOnly === true;
     const dayOnly = body.dayOnly === true;
+    const forceWebhook = body.forceWebhook === true;
     const targetUserId: string | undefined = typeof body.targetUserId === "string" ? body.targetUserId : undefined;
 
     // Admin override: allow targeting another user (used to backfill specific accounts).
@@ -273,14 +274,15 @@ Deno.serve(async (req) => {
       // activity (skipped when caller only wants health stats)
       if (!healthOnly) {
       try {
-        // Inline fetch WITH samples → extract hr_samples immediately (avoids Terra
-        // webhook deduplication when an activity has already been delivered before).
-        const url = `https://api.tryterra.co/v2/activity?user_id=${c.terra_user_id}&start_date=${startStr}&end_date=${endStr}&to_webhook=false&with_samples=true`;
+        // When forceWebhook=true, ask Terra to RE-DELIVER the activity (with samples)
+        // via the webhook destination — bypasses Terra's range-endpoint dedupe.
+        const toWebhookFlag = forceWebhook ? "true" : "false";
+        const url = `https://api.tryterra.co/v2/activity?user_id=${c.terra_user_id}&start_date=${startStr}&end_date=${endStr}&to_webhook=${toWebhookFlag}&with_samples=true`;
         console.log(`[terra-sync] activity fetch ${c.provider} url=${url}`);
         const r = await fetch(url, { headers });
         const j = await r.json();
-        const items: any[] = Array.isArray(j?.data) ? j.data : [];
-        console.log(`[terra-sync] activity ${c.provider} items=${items.length} status=${r.status} type=${j?.type}`);
+        const items: any[] = forceWebhook ? [] : (Array.isArray(j?.data) ? j.data : []);
+        console.log(`[terra-sync] activity ${c.provider} items=${items.length} status=${r.status} type=${j?.type} forceWebhook=${forceWebhook}`);
         for (const a of items) {
           const meta = a?.metadata ?? {};
           const dist = a?.distance_data?.summary ?? {};

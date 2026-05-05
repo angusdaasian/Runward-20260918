@@ -330,6 +330,39 @@ Deno.serve(async (req) => {
           activityCount++;
         }
       } catch (e) { console.error("activity fetch failed", c.provider, e); }
+
+      // Backfill hr_samples for existing rows missing samples in window via the
+      // per-activity endpoint (range endpoint dedupes after first delivery).
+      try {
+        const { data: missing } = await admin
+          .from("terra_activities")
+          .select("id, terra_activity_id, laps")
+          .eq("user_id", c.user_id)
+          .eq("provider", c.provider)
+          .gte("start_time", `${startStr}T00:00:00Z`)
+          .lt("start_time", `${endStr}T00:00:00Z`)
+          .is("hr_samples", null);
+        console.log(`[terra-sync] backfill ${c.provider} candidates=${missing?.length ?? 0}`);
+        for (const row of missing ?? []) {
+          const aid = String(row.terra_activity_id || "");
+          const summaryId = aid.includes(":") ? aid.split(":").slice(1).join(":") : aid;
+          if (!summaryId) continue;
+          const url = `https://api.tryterra.co/v2/activity/${encodeURIComponent(summaryId)}?user_id=${c.terra_user_id}&with_samples=true`;
+          const rr = await fetch(url, { headers });
+          const jj = await rr.json();
+          const item = Array.isArray(jj?.data) ? jj.data[0] : jj?.data;
+          if (!item) { console.log(`[terra-sync] backfill ${summaryId} no data status=${rr.status}`); continue; }
+          const meta = item?.metadata ?? {};
+          const hrSamples = extractHrSamples(item);
+          const rawLaps = extractLaps(item);
+          const laps = hrSamples.length > 0 && rawLaps.length > 0
+            ? recomputeLapAvgHr(rawLaps, hrSamples, meta?.start_time ?? null)
+            : (rawLaps.length > 0 ? rawLaps : (Array.isArray(row.laps) ? row.laps : []));
+          console.log(`[terra-sync] backfill ${summaryId} hr=${hrSamples.length} laps=${laps.length} status=${rr.status}`);
+          if (hrSamples.length === 0) continue;
+          await admin.from("terra_activities").update({ hr_samples: hrSamples, laps }).eq("id", row.id);
+        }
+      } catch (e) { console.error("backfill failed", c.provider, e); }
       }
 
       if (dayOnly) {

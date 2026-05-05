@@ -197,14 +197,16 @@ const ConnectApps = ({ lang, onBack }: Props) => {
     }
     setTerraBusy(provider);
     try {
-      // Always return to production domain so the deeplink bridge can reopen the native app.
+      // Always return to production domain; universal/app links reopen the native app from Terra.
       const successUrl = new URL("https://pacecalculator.fun/terra-return");
       successUrl.searchParams.set("status", "success");
       successUrl.searchParams.set("provider", provider);
+      successUrl.searchParams.set("native", "true");
 
       const failureUrl = new URL("https://pacecalculator.fun/terra-return");
       failureUrl.searchParams.set("status", "failure");
       failureUrl.searchParams.set("provider", provider);
+      failureUrl.searchParams.set("native", "true");
 
       const { data, error } = await supabase.functions.invoke("terra-auth-init", {
         body: { provider, success_url: successUrl.toString(), failure_url: failureUrl.toString() },

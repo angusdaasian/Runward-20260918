@@ -567,6 +567,12 @@ async function processWebhook(
             vo2max:
               toFiniteNumber(d?.oxygen_data?.vo2max_ml_per_min_per_kg) ??
               toFiniteNumber(d?.oxygen_data?.day_avg_vo2max_ml_per_min_per_kg),
+            hrv:
+              toFiniteNumber(d?.heart_rate_data?.summary?.avg_hrv_rmssd) ??
+              toFiniteNumber(d?.heart_rate_data?.summary?.hrv_rmssd) ??
+              toFiniteNumber(d?.heart_rate_data?.summary?.avg_hrv_sdnn) ??
+              toFiniteNumber(d?.heart_rate_data?.summary?.avg_hrv) ??
+              null,
             sleep_seconds: existing?.sleep_seconds ?? null,
             sleep_score: existing?.sleep_score ?? null,
           }, { onConflict: "user_id,provider,date" });

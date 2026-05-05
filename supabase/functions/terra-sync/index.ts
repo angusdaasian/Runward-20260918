@@ -273,6 +273,8 @@ Deno.serve(async (req) => {
     const providerFilter: string | undefined = body.provider ? String(body.provider).toUpperCase() : undefined;
     const healthOnly = body.healthOnly === true;
     const dayOnly = body.dayOnly === true;
+    const targetDate: string | undefined = typeof body.targetDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(body.targetDate) ? body.targetDate : undefined;
+    const timeZone: string | undefined = typeof body.timeZone === "string" && body.timeZone.length <= 80 ? body.timeZone : undefined;
     const targetUserId: string | undefined = typeof body.targetUserId === "string" ? body.targetUserId : undefined;
 
     // Admin override: allow targeting another user (used to backfill specific accounts).
@@ -307,7 +309,16 @@ Deno.serve(async (req) => {
     // Optional explicit date window override (testing / single-activity backfill).
     if (typeof body.startDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(body.startDate)) startStr = body.startDate;
     if (typeof body.endDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(body.endDate)) endStr = body.endDate;
-    console.log(`[terra-sync] window ${startStr} -> ${endStr} dayOnly=${dayOnly}`);
+    if (targetDate) {
+      const target = new Date(`${targetDate}T00:00:00.000Z`);
+      const targetStart = new Date(target);
+      targetStart.setUTCDate(targetStart.getUTCDate() - 1);
+      const targetEnd = new Date(target);
+      targetEnd.setUTCDate(targetEnd.getUTCDate() + 2);
+      startStr = targetStart.toISOString().slice(0, 10);
+      endStr = targetEnd.toISOString().slice(0, 10);
+    }
+    console.log(`[terra-sync] window ${startStr} -> ${endStr} dayOnly=${dayOnly} targetDate=${targetDate ?? "none"} timeZone=${timeZone ?? "none"}`);
 
     let activityCount = 0;
     let dailyCount = 0;
@@ -328,9 +339,9 @@ Deno.serve(async (req) => {
           const r = await fetch(url, { headers });
           const j = await r.json();
           const fetched = Array.isArray(j?.data) ? j.data : [];
-          const picked = pickLatestActivity(fetched, singleActivityId, body.latestDate === true ? startStr : undefined);
+          const picked = pickLatestActivity(fetched, singleActivityId, targetDate, timeZone);
           items = picked ? [picked] : [];
-          console.log(`[terra-sync] latest/single activity ${c.provider} fetched=${fetched.length} picked=${items.length} status=${r.status} type=${j?.type}`);
+          console.log(`[terra-sync] latest/single activity ${c.provider} fetched=${fetched.length} picked=${items.length} status=${r.status} type=${j?.type} targetDate=${targetDate ?? "none"}`);
         } else {
           // Inline fetch (no samples) for immediate metadata upsert.
           const url = `https://api.tryterra.co/v2/activity?user_id=${c.terra_user_id}&start_date=${startStr}&end_date=${endStr}&to_webhook=false&with_samples=false`;

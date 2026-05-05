@@ -1430,6 +1430,66 @@ export type Database = {
         }
         Relationships: []
       }
+      weekly_plan_reviews: {
+        Row: {
+          completion_pct: number
+          created_at: string
+          distance_score: number
+          hr_score: number
+          id: string
+          insights_en: string | null
+          insights_zh: string | null
+          overall_score: number
+          pace_score: number
+          plan_id: string
+          recovery_score: number
+          stats: Json
+          updated_at: string
+          user_id: string
+          week_end: string
+          week_index: number
+          week_start: string
+        }
+        Insert: {
+          completion_pct?: number
+          created_at?: string
+          distance_score?: number
+          hr_score?: number
+          id?: string
+          insights_en?: string | null
+          insights_zh?: string | null
+          overall_score?: number
+          pace_score?: number
+          plan_id: string
+          recovery_score?: number
+          stats?: Json
+          updated_at?: string
+          user_id: string
+          week_end: string
+          week_index: number
+          week_start: string
+        }
+        Update: {
+          completion_pct?: number
+          created_at?: string
+          distance_score?: number
+          hr_score?: number
+          id?: string
+          insights_en?: string | null
+          insights_zh?: string | null
+          overall_score?: number
+          pace_score?: number
+          plan_id?: string
+          recovery_score?: number
+          stats?: Json
+          updated_at?: string
+          user_id?: string
+          week_end?: string
+          week_index?: number
+          week_start?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       leaderboard_view: {

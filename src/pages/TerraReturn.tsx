@@ -14,7 +14,7 @@ export default function TerraReturn() {
   });
   if (provider) returnParams.set("provider", provider);
 
-  const appReturnUrl = `https://pacecalculator.fun/?${returnParams.toString()}`;
+  const appDeepLink = `despia://oauth/?${returnParams.toString()}`;
   const webFallbackParams = new URLSearchParams(returnParams);
   webFallbackParams.delete("native");
   const webFallback = `https://pacecalculator.fun/?${webFallbackParams.toString()}`;
@@ -22,7 +22,7 @@ export default function TerraReturn() {
   const [showFallback, setShowFallback] = useState(false);
 
   useEffect(() => {
-    window.location.replace(appReturnUrl);
+    window.location.href = appDeepLink;
     const t = setTimeout(() => setShowFallback(true), 1200);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -41,7 +41,7 @@ export default function TerraReturn() {
             : "Something went wrong. Tap below to return to the app and try again."}
         </p>
         <a
-          href={appReturnUrl}
+          href={appDeepLink}
           className="block w-full rounded-lg bg-primary px-4 py-3 font-medium text-primary-foreground"
         >
           Open Runward app

@@ -266,6 +266,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
   const [currentWeekIdx, setCurrentWeekIdx] = useState(0);
   const [existingPlan, setExistingPlan] = useState<any>(null);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [showWeeklyReview, setShowWeeklyReview] = useState(false);
 
   // Add/Edit workout
   const [addingDayIdx, setAddingDayIdx] = useState<number | null>(null);

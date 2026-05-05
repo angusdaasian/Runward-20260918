@@ -1091,6 +1091,7 @@ export type Database = {
           duration_seconds: number | null
           elevation_gain: number | null
           has_gps: boolean | null
+          hr_samples: Json | null
           id: string
           laps: Json | null
           max_hr: number | null
@@ -1117,6 +1118,7 @@ export type Database = {
           duration_seconds?: number | null
           elevation_gain?: number | null
           has_gps?: boolean | null
+          hr_samples?: Json | null
           id?: string
           laps?: Json | null
           max_hr?: number | null
@@ -1143,6 +1145,7 @@ export type Database = {
           duration_seconds?: number | null
           elevation_gain?: number | null
           has_gps?: boolean | null
+          hr_samples?: Json | null
           id?: string
           laps?: Json | null
           max_hr?: number | null

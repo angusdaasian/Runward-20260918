@@ -1637,8 +1637,8 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
         open={showWeeklyReview}
         onClose={() => setShowWeeklyReview(false)}
         lang={lang}
-        planId={existingPlan?.id ?? null}
-        currentWeekIdx={currentWeekIdx}
+        planId={section === "custom" ? (customExistingPlan?.id ?? null) : (existingPlan?.id ?? null)}
+        currentWeekIdx={section === "custom" ? customWeekIdx : currentWeekIdx}
       />
     </div>
   );

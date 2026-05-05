@@ -12,8 +12,9 @@ import { useOnlineStatus, isOnline } from "@/hooks/use-online-status";
 import { getCached, setCached, CacheKeys } from "@/lib/offlineCache";
 import {
   Loader2, Lock, ChevronLeft, ChevronRight, Plus, Calendar, Target, Trophy,
-  Repeat, Route, Check, HelpCircle, X, WifiOff
+  Repeat, Route, Check, HelpCircle, X, WifiOff, Sparkles
 } from "lucide-react";
+import WeeklyReviewModal from "@/components/training/WeeklyReviewModal";
 const CalculatorTab = lazy(() => import("@/components/CalculatorTab"));
 import freePlan5k from "@/assets/free-plan-5k.jpg";
 import freePlan10k from "@/assets/free-plan-10k.jpg";

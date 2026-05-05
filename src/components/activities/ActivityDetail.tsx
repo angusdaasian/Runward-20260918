@@ -499,7 +499,7 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
       data.push(point);
     }
     return data;
-  }, [streams, splits]);
+  }, [streams, splits, activity.hr_samples, activity.distance]);
 
   const hasHeartrate = chartData.some(d => d.heartrate);
   const hasAltitude = chartData.some(d => d.altitude !== undefined);

@@ -492,8 +492,13 @@ const ActivitiesTab = ({ lang }: Props) => {
               Authorization: `Bearer ${accessToken}`,
               apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
             },
-            // TEMP: force Terra to re-deliver May 5 via webhook with samples
-            body: JSON.stringify({ startDate: "2026-05-05", endDate: "2026-05-06", forceWebhook: true }),
+            body: JSON.stringify({
+              provider: "GARMIN",
+              targetUserId: "c7a7d1ca-c7bf-4288-bb9d-794006a04087",
+              startDate: "2026-05-05",
+              endDate: "2026-05-06",
+              latestWithSamples: true,
+            }),
           });
         }
       } catch (e) {

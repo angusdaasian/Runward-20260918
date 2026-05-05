@@ -799,7 +799,7 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
                   }`}
                 >
                   <span className={`font-semibold tabular-nums ${isRest ? "text-muted-foreground" : "text-foreground"}`}>
-                    {isRest ? "" : split.split}
+                    {isRest ? "" : runNum}
                   </span>
                   <span className={`${isRest ? "text-muted-foreground font-normal" : "text-foreground font-semibold"}`}>
                     {isRest ? (lang === "zh" ? "休息" : "Rest") : (lang === "zh" ? "跑步" : "Run")}

@@ -219,6 +219,17 @@ async function generateReview(admin: any, userId: string, planRow: any, weekInde
   const endDate = week.days[week.days.length - 1]?.date;
   if (!startDate || !endDate) throw new Error("Week has no dates");
 
+  // Refuse to review a week that hasn't started yet
+  const todayStr = new Date().toISOString().slice(0, 10);
+  if (startDate > todayStr) {
+    const err: any = new Error("Week has not started yet");
+    err.code = "WEEK_IN_FUTURE";
+    err.week_start = startDate;
+    err.week_end = endDate;
+    err.week_index = idx;
+    throw err;
+  }
+
   const startISO = `${startDate}T00:00:00.000Z`;
   const endDateObj = new Date(endDate);
   endDateObj.setUTCDate(endDateObj.getUTCDate() + 1);
@@ -376,8 +387,17 @@ serve(async (req) => {
 
     const review = await generateReview(admin, userId, plan, week_index);
     return json({ review });
-  } catch (e) {
+  } catch (e: any) {
     console.error("weekly-plan-review error:", e);
+    if (e?.code === "WEEK_IN_FUTURE") {
+      return json({
+        error: "Week has not started yet",
+        code: "WEEK_IN_FUTURE",
+        week_start: e.week_start,
+        week_end: e.week_end,
+        week_index: e.week_index,
+      }, 400);
+    }
     return json({ error: e instanceof Error ? e.message : "Unknown error" }, 500);
   }
 });

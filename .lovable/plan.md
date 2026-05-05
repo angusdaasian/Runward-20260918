@@ -1,54 +1,41 @@
-# Terra On-Auth Sync: Activities + Today's Daily Stats
+# Rate the App reward
 
-## Current vs Desired
+Add a one-time "Rate the App" card in the Rewards tab that opens the App Store / Play Store review page and grants XP. Mirrors the existing `InstagramFollow` pattern (trust-based, gated by `social_rewards_claimed` unique key — claimable once per user).
 
-**Now**
-- On `auth` webhook, only `GARMIN` triggers a 7-day historical re-fetch (already trimmed to `activity` only).
-- Coros / Suunto / Polar / others get nothing on auth — user has to wait for Terra's live webhooks.
-- `terra_daily_health` has no HRV column.
+## What gets built
 
-**Goal**
-- On `auth` for **every** Terra provider (Garmin, Coros, Suunto, Polar, …):
-  1. Fetch past **7 days of activities** only (no historical daily/sleep backfill).
-  2. Fetch **today's** `daily` + `sleep` snapshot once and append sleep duration, sleep score, HRV, VO2max to `terra_daily_health`.
+### 1. New component: `src/components/rewards/RateAppReward.tsx`
+- Same props as `InstagramFollow`: `lang`, `userId`, `currentXp`, `onXpGain`.
+- Constants:
+  - `REWARD_KEY = "rate_app"`
+  - `REWARD_XP = 5000` (one-time)
+  - iOS URL: `https://apps.apple.com/us/app/runward/id6761060757?action=write-review`
+  - Android URL: `https://play.google.com/store/apps/details?id=com.runward.app&showAllReviews=true` (placeholder package name — TODO comment, user to confirm)
+- Platform detection via `src/lib/nativeDetection.ts` (`Capacitor.getPlatform()`):
+  - iOS native → open iOS review URL
+  - Android native → open Play Store URL
+  - Web → default to iOS App Store link (since that's confirmed)
+- On click:
+  1. `window.open(url, "_blank", "noopener,noreferrer")` inside the user gesture.
+  2. Insert into `social_rewards_claimed` with `reward_key="rate_app"`, `xp_awarded=5000`.
+  3. On 23505 unique-violation → mark claimed silently.
+  4. On success → bump `profiles.monthly_xp` + `lifetime_xp`, fire gold-themed confetti, toast, call `onXpGain(newMonthly)`.
+- Visual: gold/amber gradient (`from-amber-400 via-yellow-500 to-orange-500`) with `Star` icon from lucide. Claimed state = muted card with check, identical to IG card.
+- Bilingual strings inline (en/zh).
 
-## Changes
+### 2. Wire into `src/components/RewardsTab.tsx`
+- Import `RateAppReward` and render it directly below `<InstagramFollow ... />` in the `rewards` TabsContent, passing the same `lang`/`userId`/`currentXp`/`onXpGain`.
 
-### 1. DB migration — add HRV column
-```sql
-alter table public.terra_daily_health
-  add column if not exists hrv numeric;
-```
+### 3. Update `src/components/rewards/XpExplainer.tsx`
+- Add a line: "Rate the app — +5000 XP (one-time)" / 為應用程式評分 — +5000 XP（一次性）.
 
-### 2. `supabase/functions/terra-webhook/index.ts`
+## Technical notes
 
-**Remove the `if (provider === "GARMIN")` guard** around the historical re-fetch block so it runs for all providers.
+- **No DB changes.** `social_rewards_claimed` already enforces `(user_id, reward_key)` uniqueness — same flow as Instagram, just a new key.
+- **No review verification.** Apple and Google forbid gating rewards on actually leaving a review, so the reward is granted on tap-through. Standard pattern.
+- **Play Store package name** is a placeholder — needs confirmation before Android launch. iOS URL is confirmed.
 
-**Inside that block, two separate Terra calls (in background via the existing IIFE):**
-- `GET /v2/activity?start_date=<today-7>&end_date=<today>&to_webhook=true&with_samples=true`
-- `GET /v2/daily?start_date=<today>&end_date=<today>&to_webhook=true&with_samples=false`
-- `GET /v2/sleep?start_date=<today>&end_date=<today>&to_webhook=true&with_samples=false`
-
-The activity range stays at 7 days. Daily/sleep are constrained to **today only** (single day) so the webhook payloads stay small and don't 504.
-
-Log the combined result row as `type: "terra_backfill"` with `provider` in the payload (replacing today's `garmin_backfill`).
-
-**Update the `daily` handler** to also persist HRV when present:
-```ts
-hrv: toFiniteNumber(d?.heart_rate_data?.summary?.avg_hrv_rmssd)
-   ?? toFiniteNumber(d?.heart_rate_data?.summary?.hrv_rmssd)
-   ?? toFiniteNumber(d?.heart_rate_data?.summary?.avg_hrv)
-   ?? null,
-```
-Add it to the upsert payload alongside the existing `vo2max`, `resting_hr`, `steps`.
-
-The existing `sleep` handler already populates `sleep_seconds` + `sleep_score` — no change needed there beyond the new today-only backfill triggering it.
-
-### 3. `src/hooks/use-terra-daily-health.ts`
-Add `hrv` to the select list and `TerraDailyHealthRow` interface so the column is exposed to UI consumers (no UI rendering changes in this task — just plumbing so it's available).
-
-## What this fixes / doesn't change
-- Coros/Suunto/Polar users now get their last week of runs immediately on connect (same as Garmin).
-- No historical daily/sleep pulls → no more 504s from Garmin connect.
-- Today's daily snapshot still gets fetched once on auth, then live webhooks keep it fresh.
-- `recalcUserXp`, polyline merging, Garmin-Railway dedupe — all untouched.
+## Files touched
+- `src/components/rewards/RateAppReward.tsx` (new)
+- `src/components/RewardsTab.tsx` (add one line)
+- `src/components/rewards/XpExplainer.tsx` (add one entry)

@@ -216,6 +216,22 @@ async function deleteMatchingGarminDuplicate(admin: any, userId: string, startTi
     .lte("distance_meters", distanceMeters + 100);
 }
 
+function sameTerraActivityId(left: string, right: string): boolean {
+  if (!left || !right) return false;
+  return left === right || left.split(":").pop() === right.split(":").pop();
+}
+
+function pickLatestActivity(items: any[], requestedId?: string): any | null {
+  const candidates = requestedId
+    ? items.filter((a) => {
+      const meta = a?.metadata ?? {};
+      const aid = String(meta?.upload_type ?? "") + ":" + String(meta?.summary_id ?? meta?.id ?? "");
+      return sameTerraActivityId(aid, requestedId) || sameTerraActivityId(String(meta?.summary_id ?? meta?.id ?? ""), requestedId);
+    })
+    : items;
+  return [...candidates].sort((a, b) => Date.parse(b?.metadata?.start_time ?? "") - Date.parse(a?.metadata?.start_time ?? ""))[0] ?? null;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   try {

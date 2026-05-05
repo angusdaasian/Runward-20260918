@@ -554,11 +554,15 @@ async function processWebhook(
           const durationSeconds = extractDurationSeconds(a, distanceMeters);
           const aid = String(meta?.upload_type ?? "") + ":" + String(meta?.summary_id ?? meta?.id ?? meta?.start_time ?? crypto.randomUUID());
           const polyline = extractPolyline(a);
-          const laps = extractLaps(a);
-          // Read existing row so we don't overwrite good polyline/laps with empty
+          const rawLaps = extractLaps(a);
+          const hrSamples = extractHrSamples(a);
+          const laps = hrSamples.length > 0 && rawLaps.length > 0
+            ? recomputeLapAvgHr(rawLaps, hrSamples, meta?.start_time ?? null)
+            : rawLaps;
+          // Read existing row so we don't overwrite good polyline/laps/hr_samples with empty
           const { data: existing } = await supa
             .from("terra_activities")
-            .select("summary_polyline, laps, has_gps")
+            .select("summary_polyline, laps, has_gps, hr_samples")
             .eq("user_id", appUserId)
             .eq("terra_activity_id", aid)
             .maybeSingle();
@@ -568,6 +572,10 @@ async function processWebhook(
             ? laps
             : (Array.isArray(existing?.laps) && existing!.laps.length > 0 ? existing!.laps : []);
           const finalHasGps = !!finalPolyline || !!existing?.has_gps;
+          const finalHrSamples = hrSamples.length > 0
+            ? hrSamples
+            : (Array.isArray(existing?.hr_samples) ? existing!.hr_samples : null);
+          console.log(`[terra-webhook] activity upsert ${aid} hr_samples=${hrSamples.length} laps=${rawLaps.length}`);
           await supa.from("terra_activities").upsert({
             user_id: appUserId,
             provider,
@@ -587,6 +595,7 @@ async function processWebhook(
             summary_polyline: finalPolyline,
             has_gps: finalHasGps,
             laps: finalLaps,
+            hr_samples: finalHrSamples,
             raw_json: null,
           }, { onConflict: "user_id,terra_activity_id" });
           await deleteMatchingGarminDuplicate(appUserId, meta?.start_time ?? null, distanceMeters);

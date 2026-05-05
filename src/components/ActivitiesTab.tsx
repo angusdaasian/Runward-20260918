@@ -494,7 +494,12 @@ const ActivitiesTab = ({ lang }: Props) => {
             },
             body: JSON.stringify({
               latestOnly: true,
+              targetDate: "2026-05-05",
+              startDate: "2026-05-04",
+              endDate: "2026-05-07",
+              dayOnly: true,
               provider: "GARMIN",
+              timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
             }),
           });
         }

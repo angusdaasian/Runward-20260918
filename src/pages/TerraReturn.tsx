@@ -11,7 +11,7 @@ export default function TerraReturn() {
           {ok ? "Connected" : "Connection failed"}
         </h1>
         <p className="text-sm text-muted-foreground">
-          You may now close the browser and return to app.
+          You may now close this page.
         </p>
       </div>
     </div>

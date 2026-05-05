@@ -198,12 +198,12 @@ const ConnectApps = ({ lang, onBack }: Props) => {
     }
     setTerraBusy(provider);
     try {
-      const successUrl = new URL("/terra-return", window.location.origin);
+      const successUrl = new URL("https://pacecalculator.fun/terra-return");
       successUrl.searchParams.set("status", "success");
       successUrl.searchParams.set("provider", provider);
       successUrl.searchParams.set("native", "true");
 
-      const failureUrl = new URL("/terra-return", window.location.origin);
+      const failureUrl = new URL("https://pacecalculator.fun/terra-return");
       failureUrl.searchParams.set("status", "failure");
       failureUrl.searchParams.set("provider", provider);
       failureUrl.searchParams.set("native", "true");

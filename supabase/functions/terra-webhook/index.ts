@@ -674,6 +674,9 @@ async function processWebhook(
             raw_json: null,
           }, { onConflict: "user_id,terra_activity_id" });
           await deleteMatchingGarminDuplicate(appUserId, meta?.start_time ?? null, distanceMeters);
+          if (hrSamples.length === 0 && terraUserId && (meta?.summary_id ?? meta?.id)) {
+            await requestActivityHrSamplesWebhook(terraUserId, referenceId, provider, String(meta.summary_id ?? meta.id), meta?.start_time ?? null);
+          }
           if (isNew && (distanceMeters ?? 0) > 0) newActivityCount++;
         }
         // Recalculate XP & leaderboard rank from terra_activities

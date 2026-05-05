@@ -107,6 +107,14 @@ const WeeklyReviewModal = ({ open, onClose, lang, planId, currentWeekIdx, onUpgr
         body: { plan_id: planId, week_index: weekIndex ?? currentWeekIdx },
       });
       if (error) throw error;
+      if ((data as any)?.code === "WEEK_IN_FUTURE") {
+        toast.info(
+          lang === "zh"
+            ? `此週（${(data as any).week_start} 起）尚未開始,無法生成回顧。`
+            : `This week (starting ${(data as any).week_start}) hasn't started yet.`,
+        );
+        return;
+      }
       if ((data as any)?.review) {
         await load();
         toast.success(lang === "zh" ? "回顧已生成" : "Review generated");

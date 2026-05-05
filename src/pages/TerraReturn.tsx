@@ -19,7 +19,6 @@ export default function TerraReturn() {
     `despia://oauth/?${returnParams.toString()}`,
     `runward://?${returnParams.toString()}`,
   ];
-  const appDeepLink = nativeDeepLinks[0];
   const webFallbackParams = new URLSearchParams(returnParams);
   webFallbackParams.delete("native");
   const webFallback = `https://pacecalculator.fun/?${webFallbackParams.toString()}`;

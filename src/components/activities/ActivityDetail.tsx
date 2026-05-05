@@ -796,9 +796,10 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
             let runNum = 0;
             return splits.map((split, idx) => {
               const distMeters = split.distance || 0;
-              const isRest =
-                (activityAvgSpeed > 0 && split.average_speed > 0 && split.average_speed < activityAvgSpeed * 0.55) ||
-                (distMeters > 0 && distMeters < 200);
+              const isRest = isIntervalWorkout && (
+                (activityAvgSpeed > 0 && split.average_speed > 0 && split.average_speed < activityAvgSpeed * 0.7) ||
+                (distMeters > 0 && distMeters < 200)
+              );
               const pace = formatPace(split.average_speed);
               const hr = split.average_heartrate ? Math.round(split.average_heartrate) : null;
               if (!isRest) runNum++;

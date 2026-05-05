@@ -193,7 +193,10 @@ Deno.serve(async (req) => {
   return new Response(
     JSON.stringify({
       ok: true,
-      range_status: r1.status,
+      diag_no_samples_items: diagItems,
+      diag_status: rd.status,
+      diag_message: jd?.message ?? null,
+      diag_type: jd?.type ?? null,
       range_type: j1?.type,
       range_message: j1?.message,
       used_fallback: usedFallback,

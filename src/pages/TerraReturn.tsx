@@ -14,15 +14,28 @@ export default function TerraReturn() {
   });
   if (provider) returnParams.set("provider", provider);
 
-  const appDeepLink = `despia://oauth/?${returnParams.toString()}`;
+  const nativeDeepLinks = [
+    `runward://oauth/?${returnParams.toString()}`,
+    `despia://oauth/?${returnParams.toString()}`,
+    `runward://?${returnParams.toString()}`,
+  ];
+  const appDeepLink = nativeDeepLinks[0];
   const webFallbackParams = new URLSearchParams(returnParams);
   webFallbackParams.delete("native");
   const webFallback = `https://pacecalculator.fun/?${webFallbackParams.toString()}`;
 
   const [showFallback, setShowFallback] = useState(false);
 
+  const openRunward = () => {
+    nativeDeepLinks.forEach((link, index) => {
+      window.setTimeout(() => {
+        window.location.href = link;
+      }, index * 450);
+    });
+  };
+
   useEffect(() => {
-    window.location.href = appDeepLink;
+    openRunward();
     const t = setTimeout(() => setShowFallback(true), 1200);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -40,12 +53,13 @@ export default function TerraReturn() {
             ? "Tap below to return to the Runward app and finish syncing."
             : "Something went wrong. Tap below to return to the app and try again."}
         </p>
-        <a
-          href={appDeepLink}
+        <button
+          type="button"
+          onClick={openRunward}
           className="block w-full rounded-lg bg-primary px-4 py-3 font-medium text-primary-foreground"
         >
           Open Runward app
-        </a>
+        </button>
         {showFallback && (
           <a
             href={webFallback}

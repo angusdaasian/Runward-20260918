@@ -237,6 +237,7 @@ async function fetchTerraActivities(userId: string): Promise<StravaActivity[]> {
       source: sourceLabel,
       calories: a.calories ?? null,
       laps: a.laps || [],
+      hr_samples: a.hr_samples || null,
       garmin_training_load: a.training_load ?? null,
       provenance: "terra" as const,
     } as StravaActivity;

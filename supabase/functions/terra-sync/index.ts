@@ -212,6 +212,55 @@ async function deleteMatchingGarminDuplicate(admin: any, userId: string, startTi
     .lte("distance_meters", distanceMeters + 100);
 }
 
+async function upsertTerraActivity(admin: any, c: any, a: any) {
+  const meta = a?.metadata ?? {};
+  const dist = a?.distance_data?.summary ?? {};
+  const hr = a?.heart_rate_data?.summary ?? {};
+  const cal = a?.calories_data ?? {};
+  const distanceMeters = toFiniteNumber(dist?.distance_meters);
+  const durationSeconds = extractDurationSeconds(a, distanceMeters);
+  const aid = String(meta?.upload_type ?? "") + ":" + String(meta?.summary_id ?? meta?.id ?? meta?.start_time ?? crypto.randomUUID());
+  const polyline = extractPolyline(a);
+  const rawLaps = extractLaps(a);
+  const hrSamples = extractHrSamples(a);
+  const laps = hrSamples.length > 0 && rawLaps.length > 0
+    ? recomputeLapAvgHr(rawLaps, hrSamples, meta?.start_time ?? null)
+    : rawLaps;
+  const { data: existing } = await admin
+    .from("terra_activities")
+    .select("summary_polyline, laps, has_gps, hr_samples")
+    .eq("user_id", c.user_id)
+    .eq("terra_activity_id", aid)
+    .maybeSingle();
+  const finalPolyline = polyline ?? existing?.summary_polyline ?? null;
+  const finalLaps = laps.length > 0 ? laps : (Array.isArray(existing?.laps) && existing!.laps.length > 0 ? existing!.laps : []);
+  const finalHrSamples = hrSamples.length > 0
+    ? hrSamples
+    : (Array.isArray(existing?.hr_samples) ? existing!.hr_samples : null);
+  await admin.from("terra_activities").upsert({
+    user_id: c.user_id,
+    provider: c.provider,
+    terra_activity_id: aid,
+    activity_name: meta?.name ?? null,
+    activity_type: meta?.type ?? null,
+    start_time: meta?.start_time ?? null,
+    duration_seconds: durationSeconds,
+    distance_meters: distanceMeters,
+    calories: cal?.total_burned_calories ? Math.round(cal.total_burned_calories) : null,
+    average_hr: hr?.avg_hr_bpm ? Math.round(hr.avg_hr_bpm) : null,
+    max_hr: hr?.max_hr_bpm ? Math.round(hr.max_hr_bpm) : null,
+    elevation_gain: dist?.elevation?.gain_actual_meters ?? null,
+    average_speed: a?.movement_data?.avg_speed_meters_per_second ?? null,
+    summary_polyline: finalPolyline,
+    has_gps: !!finalPolyline || !!existing?.has_gps,
+    laps: finalLaps,
+    hr_samples: finalHrSamples,
+    raw_json: null,
+  }, { onConflict: "user_id,terra_activity_id" });
+  await deleteMatchingGarminDuplicate(admin, c.user_id, meta?.start_time ?? null, distanceMeters);
+  return { terraActivityId: aid, startTime: meta?.start_time ?? null, distanceMeters, hrSampleCount: hrSamples.length };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   try {

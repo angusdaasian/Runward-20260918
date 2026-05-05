@@ -103,6 +103,12 @@ Deno.serve(async (req) => {
   const j1 = await r1.json();
   let items: any[] = Array.isArray(j1?.data) ? j1.data : [];
 
+  // Diagnostic: same range without with_samples
+  const diagUrl = `https://api.tryterra.co/v2/activity?user_id=${conn.terra_user_id}&start_date=${startDate}&end_date=${endDate}&to_webhook=false&with_samples=false`;
+  const rd = await fetch(diagUrl, { headers });
+  const jd = await rd.json().catch(() => ({}));
+  const diagItems = Array.isArray(jd?.data) ? jd.data.length : 0;
+
   // Step 2: if range returned nothing, fall back to existing rows in DB for this window
   let usedFallback = false;
   if (items.length === 0) {

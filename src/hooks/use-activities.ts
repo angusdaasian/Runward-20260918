@@ -33,6 +33,7 @@ export interface StravaActivity {
   calories?: number | null;
   weather?: ActivityWeather | null;
   laps?: any[] | null;
+  hr_samples?: Array<{ t: number; bpm: number }> | null;
   map_screenshot_url?: string | null;
   garmin_training_load?: number | null;
   provenance?: "strava" | "apple_health" | "garmin" | "terra";

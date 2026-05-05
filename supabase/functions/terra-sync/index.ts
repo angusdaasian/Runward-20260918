@@ -143,10 +143,14 @@ function extractHrSamples(a: any): Array<{ t: number; bpm: number }> {
     hrd?.detailed?.hr_samples,
     hrd?.detailed?.hr_samples_data,
     hrd?.detailed?.heart_rate_samples,
+    hrd?.detailed?.samples,
     hrd?.samples,
     hrd?.hr_samples,
+    hrd?.heart_rate_samples,
     a?.hr_data?.samples,
     a?.heart_rate_samples,
+    a?.samples?.heart_rate,
+    a?.samples?.heart_rate_samples,
   ];
   const samples = sources.find((s) => Array.isArray(s) && s.length > 0);
   if (!samples) {
@@ -161,9 +165,9 @@ function extractHrSamples(a: any): Array<{ t: number; bpm: number }> {
   const startMs = a?.metadata?.start_time ? new Date(a.metadata.start_time).getTime() : NaN;
   const bySecond = new Map<number, number>();
   for (const s of samples as any[]) {
-    const bpm = toFiniteNumber(s?.bpm ?? s?.heart_rate_bpm ?? s?.heart_rate ?? s?.value);
+    const bpm = toFiniteNumber(s?.bpm ?? s?.heart_rate_bpm ?? s?.heart_rate ?? s?.hr_bpm ?? s?.hr ?? s?.beats_per_minute ?? s?.heart_rate_value_bpm ?? s?.value);
     if (bpm == null || bpm <= 0) continue;
-    let t: number | null = toFiniteNumber(s?.timer_duration_seconds ?? s?.timer_seconds ?? s?.elapsed_seconds);
+    let t: number | null = toFiniteNumber(s?.timer_duration_seconds ?? s?.timer_seconds ?? s?.elapsed_seconds ?? s?.offset_seconds ?? s?.duration_seconds ?? s?.sample_time_offset_in_seconds);
     if (t == null && s?.timestamp && Number.isFinite(startMs)) {
       t = (new Date(s.timestamp).getTime() - startMs) / 1000;
     }
@@ -212,6 +216,22 @@ async function deleteMatchingGarminDuplicate(admin: any, userId: string, startTi
     .lte("distance_meters", distanceMeters + 100);
 }
 
+function sameTerraActivityId(left: string, right: string): boolean {
+  if (!left || !right) return false;
+  return left === right || left.split(":").pop() === right.split(":").pop();
+}
+
+function pickLatestActivity(items: any[], requestedId?: string): any | null {
+  const candidates = requestedId
+    ? items.filter((a) => {
+      const meta = a?.metadata ?? {};
+      const aid = String(meta?.upload_type ?? "") + ":" + String(meta?.summary_id ?? meta?.id ?? "");
+      return sameTerraActivityId(aid, requestedId) || sameTerraActivityId(String(meta?.summary_id ?? meta?.id ?? ""), requestedId);
+    })
+    : items;
+  return [...candidates].sort((a, b) => Date.parse(b?.metadata?.start_time ?? "") - Date.parse(a?.metadata?.start_time ?? ""))[0] ?? null;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   try {
@@ -222,7 +242,9 @@ Deno.serve(async (req) => {
       { global: { headers: { Authorization: auth } } },
     );
     const { data: { user } } = await userClient.auth.getUser();
-    if (!user) return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    const webhookKey = Deno.env.get("WEBHOOK_AUTH_KEY");
+    const isWebhookAuthorized = !!webhookKey && req.headers.get("x-webhook-key") === webhookKey;
+    if (!user && !isWebhookAuthorized) return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
     const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
     const body = await req.json().catch(() => ({}));
@@ -232,8 +254,9 @@ Deno.serve(async (req) => {
     const targetUserId: string | undefined = typeof body.targetUserId === "string" ? body.targetUserId : undefined;
 
     // Admin override: allow targeting another user (used to backfill specific accounts).
-    let connUserId = user.id;
-    if (targetUserId && targetUserId !== user.id) {
+    let connUserId = user?.id ?? targetUserId;
+    if (!connUserId) return new Response(JSON.stringify({ error: "targetUserId required" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    if (targetUserId && user && targetUserId !== user.id) {
       const { data: roleRow } = await admin
         .from("user_roles").select("role").eq("user_id", user.id).eq("role", "admin").maybeSingle();
       if (!roleRow) {
@@ -275,14 +298,18 @@ Deno.serve(async (req) => {
       try {
         let items: any[] = [];
         const singleActivityId: string | undefined = typeof body.activityId === "string" ? body.activityId : undefined;
-        if (singleActivityId) {
-          // Single-activity fetch by Terra activity id (returns inline samples).
-          const url = `https://api.tryterra.co/v2/activity/${encodeURIComponent(singleActivityId)}?user_id=${c.terra_user_id}&to_webhook=false&with_samples=true`;
-          console.log(`[terra-sync] single activity fetch ${c.provider} url=${url}`);
+        const latestOnly = body.latestOnly === true || body.fetchLatest === true;
+        if (singleActivityId || latestOnly) {
+          // Fetch the recent window WITH samples inline, then pick the requested/latest activity.
+          // Terra's /v2/activity/{id} is unreliable for Garmin IDs like 1:227..., while this endpoint returns samples.
+          const url = `https://api.tryterra.co/v2/activity?user_id=${c.terra_user_id}&start_date=${startStr}&end_date=${endStr}&to_webhook=false&with_samples=true`;
+          console.log(`[terra-sync] latest/single activity fetch ${c.provider} url=${url}`);
           const r = await fetch(url, { headers });
           const j = await r.json();
-          items = Array.isArray(j?.data) ? j.data : (j?.data ? [j.data] : []);
-          console.log(`[terra-sync] single activity ${c.provider} items=${items.length} status=${r.status} type=${j?.type}`);
+          const fetched = Array.isArray(j?.data) ? j.data : [];
+          const picked = pickLatestActivity(fetched, singleActivityId);
+          items = picked ? [picked] : [];
+          console.log(`[terra-sync] latest/single activity ${c.provider} fetched=${fetched.length} picked=${items.length} status=${r.status} type=${j?.type}`);
         } else {
           // Inline fetch (no samples) for immediate metadata upsert.
           const url = `https://api.tryterra.co/v2/activity?user_id=${c.terra_user_id}&start_date=${startStr}&end_date=${endStr}&to_webhook=false&with_samples=false`;
@@ -321,6 +348,7 @@ Deno.serve(async (req) => {
           const finalHrSamples = hrSamples.length > 0
             ? hrSamples
             : (Array.isArray(existing?.hr_samples) ? existing!.hr_samples : null);
+          console.log(`[terra-sync] activity upsert ${aid} start=${meta?.start_time ?? "null"} distance=${distanceMeters ?? "null"} hr_samples=${hrSamples.length} final_hr_samples=${Array.isArray(finalHrSamples) ? finalHrSamples.length : 0}`);
           await admin.from("terra_activities").upsert({
             user_id: c.user_id,
             provider: c.provider,

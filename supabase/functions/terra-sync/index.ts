@@ -229,6 +229,7 @@ Deno.serve(async (req) => {
     const providerFilter: string | undefined = body.provider ? String(body.provider).toUpperCase() : undefined;
     const healthOnly = body.healthOnly === true;
     const dayOnly = body.dayOnly === true;
+    const forceWebhook = body.forceWebhook === true;
     const targetUserId: string | undefined = typeof body.targetUserId === "string" ? body.targetUserId : undefined;
 
     // Admin override: allow targeting another user (used to backfill specific accounts).

@@ -269,9 +269,12 @@ Deno.serve(async (req) => {
       // activity (skipped when caller only wants health stats)
       if (!healthOnly) {
       try {
-        const r = await fetch(`https://api.tryterra.co/v2/activity?user_id=${c.terra_user_id}&start_date=${startStr}&end_date=${endStr}&to_webhook=false&with_samples=true`, { headers });
+        const url = `https://api.tryterra.co/v2/activity?user_id=${c.terra_user_id}&start_date=${startStr}&end_date=${endStr}&to_webhook=false&with_samples=true`;
+        console.log(`[terra-sync] activity fetch ${c.provider} url=${url}`);
+        const r = await fetch(url, { headers });
         const j = await r.json();
         const items = Array.isArray(j?.data) ? j.data : [];
+        console.log(`[terra-sync] activity ${c.provider} items=${items.length} status=${r.status} topKeys=${JSON.stringify(Object.keys(j ?? {}))}`);
         for (const a of items) {
           const meta = a?.metadata ?? {};
           const dist = a?.distance_data?.summary ?? {};

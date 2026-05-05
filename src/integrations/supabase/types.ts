@@ -1203,6 +1203,7 @@ export type Database = {
         Row: {
           date: string
           fetched_at: string
+          hrv: number | null
           id: string
           provider: string
           resting_hr: number | null
@@ -1215,6 +1216,7 @@ export type Database = {
         Insert: {
           date: string
           fetched_at?: string
+          hrv?: number | null
           id?: string
           provider: string
           resting_hr?: number | null
@@ -1227,6 +1229,7 @@ export type Database = {
         Update: {
           date?: string
           fetched_at?: string
+          hrv?: number | null
           id?: string
           provider?: string
           resting_hr?: number | null

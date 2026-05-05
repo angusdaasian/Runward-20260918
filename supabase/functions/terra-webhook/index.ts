@@ -443,43 +443,49 @@ async function processWebhook(
           processingError = `connection upsert: ${upsertErr.message}`;
         }
 
-        // Garmin-only: trigger Terra historical re-fetch. Matching Railway Garmin
-        // duplicates are deleted per Terra activity as each payload arrives.
-        if (provider === "GARMIN") {
-          const days = 7;
-          const since = new Date(Date.now() - days * 86400_000);
-          const sinceDate = since.toISOString().slice(0, 10);
-          const endDate = new Date().toISOString().slice(0, 10);
-          const startDate = sinceDate;
+        // All Terra providers: on auth, fetch past 7 days of activities
+        // + today's daily/sleep snapshot. Skip historical daily/sleep
+        // backfill — those payloads are huge and cause 504s.
+        // Garmin Railway duplicates are deleted per Terra activity as
+        // each payload arrives.
+        {
+          const today = new Date().toISOString().slice(0, 10);
+          const since = new Date(Date.now() - 7 * 86400_000).toISOString().slice(0, 10);
 
-          // Fire historical re-fetch (to_webhook=true → Terra streams payloads back)
           const devId = Deno.env.get("TERRA_DEV_ID") ?? "";
           const apiKey = Deno.env.get("TERRA_API_KEY") ?? "";
           const headers = { "dev-id": devId, "x-api-key": apiKey };
-          const endpoints = ["activity"] as const;
+          const calls: Array<{ ep: string; url: string }> = [
+            {
+              ep: "activity",
+              url: `https://api.tryterra.co/v2/activity?user_id=${terraUserId}&start_date=${since}&end_date=${today}&to_webhook=true&with_samples=true`,
+            },
+            {
+              ep: "daily",
+              url: `https://api.tryterra.co/v2/daily?user_id=${terraUserId}&start_date=${today}&end_date=${today}&to_webhook=true&with_samples=false`,
+            },
+            {
+              ep: "sleep",
+              url: `https://api.tryterra.co/v2/sleep?user_id=${terraUserId}&start_date=${today}&end_date=${today}&to_webhook=true&with_samples=false`,
+            },
+          ];
           (async () => {
             const results = await Promise.allSettled(
-              endpoints.map((ep) => {
-                const withSamples = ep === "activity" ? "true" : "false";
-                return fetch(
-                  `https://api.tryterra.co/v2/${ep}?user_id=${terraUserId}&start_date=${startDate}&end_date=${endDate}&to_webhook=true&with_samples=${withSamples}`,
-                  { headers },
-                ).then((r) => ({ ep, status: r.status }));
-              }),
+              calls.map((c) => fetch(c.url, { headers }).then((r) => ({ ep: c.ep, status: r.status }))),
             );
             const summary = results.map((r, i) =>
-              r.status === "fulfilled" ? r.value : { ep: endpoints[i], error: String((r as any).reason) }
+              r.status === "fulfilled" ? r.value : { ep: calls[i].ep, error: String((r as any).reason) }
             );
             try {
               await supa.from("terra_webhook_events").insert({
-                type: "garmin_backfill",
+                type: "terra_backfill",
                 terra_user_id: terraUserId,
                 reference_id: referenceId,
                 signature_valid: true,
-                payload: { window_days: days, start_date: startDate, end_date: endDate, results: summary } as any,
+                payload: { provider, activity_window_days: 7, daily_date: today, results: summary } as any,
               });
             } catch (e) {
-              console.error("garmin_backfill log insert failed", e);
+              console.error("terra_backfill log insert failed", e);
             }
           })();
         }
@@ -561,6 +567,12 @@ async function processWebhook(
             vo2max:
               toFiniteNumber(d?.oxygen_data?.vo2max_ml_per_min_per_kg) ??
               toFiniteNumber(d?.oxygen_data?.day_avg_vo2max_ml_per_min_per_kg),
+            hrv:
+              toFiniteNumber(d?.heart_rate_data?.summary?.avg_hrv_rmssd) ??
+              toFiniteNumber(d?.heart_rate_data?.summary?.hrv_rmssd) ??
+              toFiniteNumber(d?.heart_rate_data?.summary?.avg_hrv_sdnn) ??
+              toFiniteNumber(d?.heart_rate_data?.summary?.avg_hrv) ??
+              null,
             sleep_seconds: existing?.sleep_seconds ?? null,
             sleep_score: existing?.sleep_score ?? null,
           }, { onConflict: "user_id,provider,date" });

@@ -1,0 +1,1 @@
+alter table public.terra_daily_health add column if not exists hrv numeric;

@@ -137,6 +137,49 @@ function extractDurationSeconds(a: any, distanceMeters?: number | null): number 
   return null;
 }
 
+function extractHrSamples(a: any): Array<{ t: number; bpm: number }> {
+  const sources = [
+    a?.heart_rate_data?.detailed?.hr_samples,
+    a?.heart_rate_data?.detailed?.hr_samples_data,
+    a?.heart_rate_data?.samples,
+  ];
+  const samples = sources.find((s) => Array.isArray(s) && s.length > 0);
+  if (!samples) return [];
+  const startMs = a?.metadata?.start_time ? new Date(a.metadata.start_time).getTime() : NaN;
+  const bySecond = new Map<number, number>();
+  for (const s of samples as any[]) {
+    const bpm = toFiniteNumber(s?.bpm ?? s?.heart_rate_bpm ?? s?.heart_rate);
+    if (bpm == null || bpm <= 0) continue;
+    let t: number | null = toFiniteNumber(s?.timer_duration_seconds);
+    if (t == null && s?.timestamp && Number.isFinite(startMs)) {
+      t = (new Date(s.timestamp).getTime() - startMs) / 1000;
+    }
+    if (t == null || !Number.isFinite(t) || t < 0) continue;
+    bySecond.set(Math.floor(t), Math.round(bpm));
+  }
+  const out = Array.from(bySecond.entries())
+    .sort((a, b) => a[0] - b[0])
+    .map(([t, bpm]) => ({ t, bpm }));
+  return out.length > 7200 ? out.slice(0, 7200) : out;
+}
+
+function recomputeLapAvgHr(laps: any[], samples: Array<{ t: number; bpm: number }>, activityStartTime: string | null): any[] {
+  if (!samples.length || !laps.length) return laps;
+  const startMs = activityStartTime ? new Date(activityStartTime).getTime() : NaN;
+  if (!Number.isFinite(startMs)) return laps;
+  return laps.map((lap) => {
+    const lapStartMs = lap?.start_time ? new Date(lap.start_time).getTime() : NaN;
+    const dur = toFiniteNumber(lap?.duration_seconds);
+    if (!Number.isFinite(lapStartMs) || dur == null) return lap;
+    const startSec = (lapStartMs - startMs) / 1000;
+    const endSec = startSec + dur;
+    const inWindow = samples.filter((s) => s.t >= startSec && s.t <= endSec);
+    if (inWindow.length < 5) return lap;
+    const avg = Math.round(inWindow.reduce((sum, s) => sum + s.bpm, 0) / inWindow.length);
+    return { ...lap, avg_hr: avg };
+  });
+}
+
 async function deleteMatchingGarminDuplicate(admin: any, userId: string, startTime: string | null, distanceMeters: number | null) {
   if (!startTime || !distanceMeters || distanceMeters <= 0) return;
   const start = new Date(startTime);
@@ -169,8 +212,21 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const providerFilter: string | undefined = body.provider ? String(body.provider).toUpperCase() : undefined;
     const healthOnly = body.healthOnly === true;
+    const dayOnly = body.dayOnly === true;
+    const targetUserId: string | undefined = typeof body.targetUserId === "string" ? body.targetUserId : undefined;
 
-    const q = admin.from("terra_connections").select("*").eq("user_id", user.id).eq("active", true);
+    // Admin override: allow targeting another user (used to backfill specific accounts).
+    let connUserId = user.id;
+    if (targetUserId && targetUserId !== user.id) {
+      const { data: roleRow } = await admin
+        .from("user_roles").select("role").eq("user_id", user.id).eq("role", "admin").maybeSingle();
+      if (!roleRow) {
+        return new Response(JSON.stringify({ error: "forbidden" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      connUserId = targetUserId;
+    }
+
+    const q = admin.from("terra_connections").select("*").eq("user_id", connUserId).eq("active", true);
     const { data: conns } = providerFilter ? await q.eq("provider", providerFilter) : await q;
     if (!conns || conns.length === 0) {
       return new Response(JSON.stringify({ ok: true, synced: 0, message: "no active connections" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -180,10 +236,12 @@ Deno.serve(async (req) => {
     const apiKey = Deno.env.get("TERRA_API_KEY")!;
     const end = new Date();
     end.setDate(end.getDate() + 1);
-    const start = new Date(); start.setDate(start.getDate() - 30);
-    // Terra date params: use YYYY-MM-DD only. Full ISO timestamps cause /v2/sleep
-    // (and others) to return 0 items. Terra sleep end_date behaves like an
-    // exclusive upper bound, so ask through tomorrow to include today's wake-day.
+    const start = new Date();
+    if (dayOnly) {
+      // Today only — Terra still treats end_date as exclusive, so ask through tomorrow.
+    } else {
+      start.setDate(start.getDate() - 30);
+    }
     const startStr = start.toISOString().slice(0, 10);
     const endStr = end.toISOString().slice(0, 10);
 
@@ -207,15 +265,22 @@ Deno.serve(async (req) => {
           const durationSeconds = extractDurationSeconds(a, distanceMeters);
           const aid = String(meta?.upload_type ?? "") + ":" + String(meta?.summary_id ?? meta?.id ?? meta?.start_time ?? crypto.randomUUID());
           const polyline = extractPolyline(a);
-          const laps = extractLaps(a);
+          const rawLaps = extractLaps(a);
+          const hrSamples = extractHrSamples(a);
+          const laps = hrSamples.length > 0 && rawLaps.length > 0
+            ? recomputeLapAvgHr(rawLaps, hrSamples, meta?.start_time ?? null)
+            : rawLaps;
           const { data: existing } = await admin
             .from("terra_activities")
-            .select("summary_polyline, laps, has_gps")
+            .select("summary_polyline, laps, has_gps, hr_samples")
             .eq("user_id", c.user_id)
             .eq("terra_activity_id", aid)
             .maybeSingle();
           const finalPolyline = polyline ?? existing?.summary_polyline ?? null;
           const finalLaps = laps.length > 0 ? laps : (Array.isArray(existing?.laps) && existing!.laps.length > 0 ? existing!.laps : []);
+          const finalHrSamples = hrSamples.length > 0
+            ? hrSamples
+            : (Array.isArray(existing?.hr_samples) ? existing!.hr_samples : null);
           await admin.from("terra_activities").upsert({
             user_id: c.user_id,
             provider: c.provider,
@@ -233,12 +298,19 @@ Deno.serve(async (req) => {
             summary_polyline: finalPolyline,
             has_gps: !!finalPolyline || !!existing?.has_gps,
             laps: finalLaps,
+            hr_samples: finalHrSamples,
             raw_json: null,
           }, { onConflict: "user_id,terra_activity_id" });
           await deleteMatchingGarminDuplicate(admin, c.user_id, meta?.start_time ?? null, distanceMeters);
           activityCount++;
         }
       } catch (e) { console.error("activity fetch failed", c.provider, e); }
+      }
+
+      if (dayOnly) {
+        // Skip health endpoints when only validating activity capture for today.
+        await admin.from("terra_connections").update({ last_synced_at: new Date().toISOString() }).eq("id", c.id);
+        continue;
       }
 
       // daily (steps, resting hr, vo2max)

@@ -387,8 +387,17 @@ serve(async (req) => {
 
     const review = await generateReview(admin, userId, plan, week_index);
     return json({ review });
-  } catch (e) {
+  } catch (e: any) {
     console.error("weekly-plan-review error:", e);
+    if (e?.code === "WEEK_IN_FUTURE") {
+      return json({
+        error: "Week has not started yet",
+        code: "WEEK_IN_FUTURE",
+        week_start: e.week_start,
+        week_end: e.week_end,
+        week_index: e.week_index,
+      }, 400);
+    }
     return json({ error: e instanceof Error ? e.message : "Unknown error" }, 500);
   }
 });

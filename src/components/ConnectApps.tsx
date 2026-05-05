@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { useAppleHealth } from "@/hooks/use-apple-health";
 import { useGarmin } from "@/hooks/use-garmin";
 import { getAppEnvironment } from "@/lib/environment";
+import despia from "despia-native";
 import GarminCredentialDialog from "@/components/GarminCredentialDialog";
 import corosIcon from "@/assets/brands/coros.png";
 import polarIcon from "@/assets/brands/polar.png";
@@ -197,22 +198,31 @@ const ConnectApps = ({ lang, onBack }: Props) => {
     }
     setTerraBusy(provider);
     try {
-      // Always return to production domain; universal/app links reopen the native app from Terra.
-      const successUrl = new URL("https://pacecalculator.fun/terra-return");
+      const returnQuery = new URLSearchParams({
+        tab: "more",
+        page: "connect-apps",
+        provider,
+        native: "true",
+      });
+      const successUrl = new URL(`runward://oauth/?${returnQuery.toString()}&terra=success`);
       successUrl.searchParams.set("status", "success");
-      successUrl.searchParams.set("provider", provider);
-      successUrl.searchParams.set("native", "true");
 
-      const failureUrl = new URL("https://pacecalculator.fun/terra-return");
+      const failureUrl = new URL(`runward://oauth/?${returnQuery.toString()}&terra=failure`);
       failureUrl.searchParams.set("status", "failure");
-      failureUrl.searchParams.set("provider", provider);
-      failureUrl.searchParams.set("native", "true");
 
       const { data, error } = await supabase.functions.invoke("terra-auth-init", {
         body: { provider, success_url: successUrl.toString(), failure_url: failureUrl.toString() },
       });
       if (error || !data?.auth_url) throw new Error(error?.message || "no auth url");
-      window.location.href = data.auth_url;
+      const isNativeRuntime =
+        navigator.userAgent.toLowerCase().includes("despia") ||
+        typeof (window as any).despia !== "undefined" ||
+        typeof (window as any).median !== "undefined";
+      if (isNativeRuntime) {
+        despia(`oauth://?url=${encodeURIComponent(data.auth_url)}`);
+      } else {
+        window.location.href = data.auth_url;
+      }
     } catch (e: any) {
       toast.error((lang === "zh" ? "Terra 啟動失敗: " : "Terra init failed: ") + (e?.message ?? ""));
       setTerraBusy(null);

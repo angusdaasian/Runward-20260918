@@ -852,11 +852,19 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
             <span className="text-right">HR</span>
           </div>
           {(() => {
-            // Detect interval workout from lap data using RELATIVE pace spread.
-            // Rest = laps significantly slower than the fastest lap (NOT based on
-            // absolute distance — interval work laps can themselves be short).
-            const speeds = splits.map(s => s.average_speed).filter(v => v > 0);
-            const hrs = splits.map(s => s.average_heartrate ?? 0).filter(v => v > 0);
+            // Filter out GPS-noise laps (tiny distance/duration that produce
+            // unrealistic paces, e.g. 6m @ 2:44/km from a Garmin auto-lap glitch).
+            const NOISE_DIST_M = 50;
+            const NOISE_TIME_S = 10;
+            const visibleSplits = splits.filter((s) => {
+              const d = s.distance || 0;
+              const t = s.elapsed_time || 0;
+              return !(d < NOISE_DIST_M && t < NOISE_TIME_S);
+            });
+            // Detect interval workout from lap data using RELATIVE pace spread,
+            // ignoring noise laps when computing fastest/slowest.
+            const speeds = visibleSplits.map(s => s.average_speed).filter(v => v > 0);
+            const hrs = visibleSplits.map(s => s.average_heartrate ?? 0).filter(v => v > 0);
             const fastestSpeed = speeds.length ? Math.max(...speeds) : 0;
             const slowestSpeed = speeds.length ? Math.min(...speeds) : 0;
             let isIntervalWorkout = false;
@@ -866,7 +874,7 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
               isIntervalWorkout = paceRatio >= 1.4 || (paceRatio >= 1.25 && hrSpread >= 20);
             }
             let runNum = 0;
-            return splits.map((split, idx) => {
+            return visibleSplits.map((split, idx) => {
               const distMeters = split.distance || 0;
               // Rest if this lap's speed is <70% of the fastest lap's speed
               // (i.e. >~43% slower in pace terms).

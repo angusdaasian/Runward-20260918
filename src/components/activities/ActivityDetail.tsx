@@ -906,7 +906,7 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
       )}
 
       {/* Intervals Table — Garmin-style */}
-      {splits && splits.length > 0 && (
+      {isRunningActivity && splits && splits.length > 0 && (
         <div className="bg-card border border-border rounded-xl overflow-hidden mt-4">
           <div className="px-4 pt-4 pb-2">
             <h3 className="font-display font-bold text-foreground text-sm">

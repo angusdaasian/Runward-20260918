@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-import { getTerraCreds, type TerraEnv } from "../_shared/terraEnv.ts";
+import { getTerraCreds, type TerraEnv } from "./terraEnv.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -810,5 +810,3 @@ export async function handleTerraWebhook(req: Request, env: TerraEnv = "prod"): 
 
   return new Response(JSON.stringify({ ok: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 }
-
-Deno.serve((req) => handleTerraWebhook(req, "prod"));

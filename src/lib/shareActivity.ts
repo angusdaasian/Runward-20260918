@@ -49,6 +49,19 @@ export interface ShareSplitsInput {
   lang: Lang;
 }
 
+export interface ShareChartPoint {
+  distance_km: number; // x-axis
+  pace?: number;       // min/km (decimal)
+  heartrate?: number;  // bpm
+}
+
+export interface ShareChartsInput {
+  name: string;
+  startDate: string;
+  data: ShareChartPoint[];
+  lang: Lang;
+}
+
 // ---------------- formatting helpers ----------------
 
 function fmtDistance(meters: number): string {

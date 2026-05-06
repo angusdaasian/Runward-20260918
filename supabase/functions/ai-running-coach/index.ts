@@ -448,7 +448,28 @@ serve(async (req) => {
           .limit(15),
         admin
           .from("garmin_activities")
-          .select("start_time, distance_meters, duration_seconds, average_hr, activity_type")
+          .select("start_time, distance_meters, duration_seconds, average_hr, activity_type, laps")
+          .eq("user_id", user.id)
+          .gte("start_time", new Date(Date.now() - 7 * 86400000).toISOString())
+          .order("start_time", { ascending: false })
+          .limit(10),
+        admin
+          .from("strava_activities")
+          .select("start_date, distance, moving_time, average_heartrate, sport_type")
+          .eq("user_id", user.id)
+          .gte("start_date", new Date(Date.now() - 7 * 86400000).toISOString())
+          .order("start_date", { ascending: false })
+          .limit(10),
+        admin
+          .from("apple_health_activities")
+          .select("start_date, distance, moving_time, average_heartrate, sport_type")
+          .eq("user_id", user.id)
+          .gte("start_date", new Date(Date.now() - 7 * 86400000).toISOString())
+          .order("start_date", { ascending: false })
+          .limit(10),
+        admin
+          .from("terra_activities")
+          .select("start_time, distance_meters, duration_seconds, average_hr, activity_type, provider, laps")
           .eq("user_id", user.id)
           .gte("start_time", new Date(Date.now() - 7 * 86400000).toISOString())
           .order("start_time", { ascending: false })

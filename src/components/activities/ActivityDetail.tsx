@@ -625,6 +625,10 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
               <DropdownMenuItem
                 disabled={!splits || splits.length === 0}
                 onClick={() => {
+                  if (!isPremium) {
+                    toast.error(lang === "zh" ? "升級 Premium 以解鎖" : "Upgrade to Premium to unlock");
+                    return;
+                  }
                   if (!splits || splits.length === 0) return;
                   shareSplits({
                     name: activityName,
@@ -639,11 +643,18 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
                   });
                 }}
               >
-                {lang === "zh" ? "分享分段" : "Share splits"}
+                <span className="flex items-center gap-2 w-full">
+                  {lang === "zh" ? "分享分段" : "Share splits"}
+                  {!isPremium && <Lock size={12} className="ml-auto text-muted-foreground" />}
+                </span>
               </DropdownMenuItem>
               <DropdownMenuItem
                 disabled={!chartData || chartData.length < 2}
                 onClick={() => {
+                  if (!isPremium) {
+                    toast.error(lang === "zh" ? "升級 Premium 以解鎖" : "Upgrade to Premium to unlock");
+                    return;
+                  }
                   if (!chartData || chartData.length < 2) return;
                   shareCharts({
                     name: activityName,
@@ -657,7 +668,10 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
                   });
                 }}
               >
-                {lang === "zh" ? "分享圖表" : "Share charts"}
+                <span className="flex items-center gap-2 w-full">
+                  {lang === "zh" ? "分享圖表" : "Share charts"}
+                  {!isPremium && <Lock size={12} className="ml-auto text-muted-foreground" />}
+                </span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

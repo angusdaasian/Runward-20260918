@@ -154,7 +154,7 @@ serve(async (req) => {
         try { garminEmail = await decryptString(conn.garmin_email_encrypted); }
         catch (e) { console.error("Failed to decrypt email:", e); }
       }
-      if (!garminEmail) garminEmail = conn.access_token;
+      
 
       if (conn.oauth1_token_encrypted) {
         try { oauth1Token = await decryptString(conn.oauth1_token_encrypted); }

@@ -15,7 +15,7 @@ import AppleCallback from "./pages/AppleCallback.tsx";
 import Support from "./pages/Support.tsx";
 import Privacy from "./pages/Privacy.tsx";
 import Landing from "./pages/Landing.tsx";
-import ManualUploadGuide from "./pages/ManualUploadGuide.tsx";
+
 import TerraReturn from "./pages/TerraReturn.tsx";
 
 const queryClient = new QueryClient();

@@ -66,7 +66,7 @@ const App = () => (
               <Route path="/admin" element={<AdminPanel />} />
               <Route path="/support" element={<Support />} />
               <Route path="/privacy" element={<Privacy />} />
-              <Route path="/manual-upload-guide" element={<ManualUploadGuide />} />
+              
               <Route path="/terra-return" element={<TerraReturn />} />
               <Route path="*" element={<NotFound />} />
             </Routes>

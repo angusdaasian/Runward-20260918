@@ -675,7 +675,7 @@ async function processWebhook(
           const distanceMeters = toFiniteNumber(dist?.distance_meters);
           const durationSeconds = extractDurationSeconds(a, distanceMeters);
           const rawType = meta?.type ?? meta?.activity_type ?? null;
-          if (!isRunningActivityType(rawType)) {
+          if (!isRunning(rawType)) {
             console.log(`[terra-webhook] skipping non-running activity type=${rawType}`);
             continue;
           }

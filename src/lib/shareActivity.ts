@@ -934,13 +934,49 @@ function drawChart(
     return plotY + ratio * plotH;
   };
 
-  // Grid + Y labels (4 ticks)
-  ctx.strokeStyle = "rgba(255,255,255,0.08)";
-  ctx.lineWidth = 1;
-  ctx.fillStyle = "rgba(255,255,255,0.5)";
-  ctx.font = `500 16px ${FONT_TEXT}`;
+  // ---------- Smoothing & downsampling ----------
+  // 1) LTTB downsample to ~120 points to remove noise
+  // 2) Build monotone-cubic spline path for buttery curves
+  const downsample = (pts: { x: number; y: number }[], threshold: number) => {
+    if (pts.length <= threshold) return pts;
+    const sampled: typeof pts = [];
+    const bucketSize = (pts.length - 2) / (threshold - 2);
+    let a = 0;
+    sampled.push(pts[0]);
+    for (let i = 0; i < threshold - 2; i++) {
+      const rangeStart = Math.floor((i + 1) * bucketSize) + 1;
+      const rangeEnd = Math.min(Math.floor((i + 2) * bucketSize) + 1, pts.length);
+      let avgX = 0, avgY = 0;
+      const avgRangeLength = rangeEnd - rangeStart;
+      for (let j = rangeStart; j < rangeEnd; j++) { avgX += pts[j].x; avgY += pts[j].y; }
+      avgX /= avgRangeLength; avgY /= avgRangeLength;
+      const ra = Math.floor(i * bucketSize) + 1;
+      const rb = Math.floor((i + 1) * bucketSize) + 1;
+      let maxArea = -1, nextA = ra;
+      for (let j = ra; j < rb; j++) {
+        const area = Math.abs(
+          (pts[a].x - avgX) * (pts[j].y - pts[a].y) -
+          (pts[a].x - pts[j].x) * (avgY - pts[a].y),
+        );
+        if (area > maxArea) { maxArea = area; nextA = j; }
+      }
+      sampled.push(pts[nextA]);
+      a = nextA;
+    }
+    sampled.push(pts[pts.length - 1]);
+    return sampled;
+  };
+  const smooth = downsample(points, 120);
+
+  // Dotted grid + Y labels (4 ticks)
+  ctx.fillStyle = "rgba(255,255,255,0.45)";
+  ctx.font = `500 15px ${FONT_TEXT}`;
   ctx.textAlign = "right";
   ctx.textBaseline = "middle";
+  ctx.save();
+  ctx.setLineDash([2, 6]);
+  ctx.strokeStyle = "rgba(255,255,255,0.10)";
+  ctx.lineWidth = 1;
   for (let i = 0; i <= 4; i++) {
     const yVal = yMin + ((yMax - yMin) * i) / 4;
     const py = sy(yVal);
@@ -948,43 +984,97 @@ function drawChart(
     ctx.moveTo(plotX, py);
     ctx.lineTo(plotX + plotW, py);
     ctx.stroke();
-    ctx.fillText(opts.yFmt(yVal), plotX - 12, py);
+    ctx.fillText(opts.yFmt(yVal), plotX - 14, py);
   }
+  ctx.restore();
 
-  // X labels (start, mid, end)
+  // X labels
   ctx.textAlign = "center";
   ctx.textBaseline = "top";
-  ctx.fillStyle = "rgba(255,255,255,0.5)";
+  ctx.fillStyle = "rgba(255,255,255,0.45)";
+  ctx.font = `500 15px ${FONT_TEXT}`;
   for (const t of [0, 0.5, 1]) {
     const xVal = xMin + (xMax - xMin) * t;
     ctx.fillText(opts.xFmt(xVal), sx(xVal), plotY + plotH + 14);
   }
 
-  // Area fill under curve
-  ctx.beginPath();
-  ctx.moveTo(sx(points[0].x), plotY + plotH);
-  for (const p of points) ctx.lineTo(sx(p.x), sy(p.y));
-  ctx.lineTo(sx(points[points.length - 1].x), plotY + plotH);
-  ctx.closePath();
+  // ---------- Monotone-cubic spline path ----------
+  const screenPts = smooth.map((p) => ({ x: sx(p.x), y: sy(p.y) }));
+  const buildSplinePath = (close: boolean) => {
+    const n = screenPts.length;
+    const dxs: number[] = [], slopes: number[] = [];
+    for (let i = 0; i < n - 1; i++) {
+      const dx = screenPts[i + 1].x - screenPts[i].x;
+      dxs.push(dx);
+      slopes.push((screenPts[i + 1].y - screenPts[i].y) / (dx || 1));
+    }
+    const tangents: number[] = new Array(n);
+    tangents[0] = slopes[0];
+    tangents[n - 1] = slopes[n - 2];
+    for (let i = 1; i < n - 1; i++) {
+      if (slopes[i - 1] * slopes[i] <= 0) tangents[i] = 0;
+      else {
+        const w1 = 2 * dxs[i] + dxs[i - 1];
+        const w2 = dxs[i] + 2 * dxs[i - 1];
+        tangents[i] = (w1 + w2) / (w1 / slopes[i - 1] + w2 / slopes[i]);
+      }
+    }
+    ctx.beginPath();
+    if (close) ctx.moveTo(screenPts[0].x, plotY + plotH);
+    ctx.moveTo(screenPts[0].x, screenPts[0].y);
+    for (let i = 0; i < n - 1; i++) {
+      const dx = dxs[i] / 3;
+      const cp1x = screenPts[i].x + dx;
+      const cp1y = screenPts[i].y + tangents[i] * dx;
+      const cp2x = screenPts[i + 1].x - dx;
+      const cp2y = screenPts[i + 1].y - tangents[i + 1] * dx;
+      ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, screenPts[i + 1].x, screenPts[i + 1].y);
+    }
+    if (close) {
+      ctx.lineTo(screenPts[n - 1].x, plotY + plotH);
+      ctx.lineTo(screenPts[0].x, plotY + plotH);
+      ctx.closePath();
+    }
+  };
+
+  // Area fill (gradient)
+  buildSplinePath(true);
   const grad = ctx.createLinearGradient(0, plotY, 0, plotY + plotH);
   grad.addColorStop(0, opts.fillColor);
   grad.addColorStop(1, "rgba(0,0,0,0)");
   ctx.fillStyle = grad;
   ctx.fill();
 
-  // Line
-  ctx.beginPath();
+  // Soft glow under the line
+  ctx.save();
+  ctx.shadowColor = opts.color;
+  ctx.shadowBlur = 18;
+  buildSplinePath(false);
   ctx.strokeStyle = opts.color;
-  ctx.lineWidth = 4;
+  ctx.lineWidth = 4.5;
   ctx.lineJoin = "round";
   ctx.lineCap = "round";
-  for (let i = 0; i < points.length; i++) {
-    const px = sx(points[i].x);
-    const py = sy(points[i].y);
-    if (i === 0) ctx.moveTo(px, py);
-    else ctx.lineTo(px, py);
-  }
   ctx.stroke();
+  ctx.restore();
+
+  // Crisp top stroke (no glow) for definition
+  buildSplinePath(false);
+  ctx.strokeStyle = opts.color;
+  ctx.lineWidth = 3;
+  ctx.lineJoin = "round";
+  ctx.lineCap = "round";
+  ctx.stroke();
+
+  // End point dot
+  const last = screenPts[screenPts.length - 1];
+  ctx.beginPath();
+  ctx.fillStyle = "#FFFFFF";
+  ctx.arc(last.x, last.y, 6, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.fillStyle = opts.color;
+  ctx.arc(last.x, last.y, 3.5, 0, Math.PI * 2);
+  ctx.fill();
 }
 
 function drawInstagramFooter(

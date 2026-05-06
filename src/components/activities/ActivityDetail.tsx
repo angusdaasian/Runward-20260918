@@ -852,25 +852,28 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
             <span className="text-right">HR</span>
           </div>
           {(() => {
-            const activityAvgSpeed = activity.average_speed || 0;
-            // Detect interval workout from lap data: intervals show a large
-            // pace spread (work vs recovery) and HR swings. Easy/long/progressive
-            // runs stay within a narrow band.
+            // Detect interval workout from lap data using RELATIVE pace spread.
+            // Rest = laps significantly slower than the fastest lap (NOT based on
+            // absolute distance — interval work laps can themselves be short).
             const speeds = splits.map(s => s.average_speed).filter(v => v > 0);
             const hrs = splits.map(s => s.average_heartrate ?? 0).filter(v => v > 0);
+            const fastestSpeed = speeds.length ? Math.max(...speeds) : 0;
+            const slowestSpeed = speeds.length ? Math.min(...speeds) : 0;
             let isIntervalWorkout = false;
-            if (speeds.length >= 3) {
-              const paceRatio = Math.max(...speeds) / Math.min(...speeds);
+            if (speeds.length >= 3 && slowestSpeed > 0) {
+              const paceRatio = fastestSpeed / slowestSpeed;
               const hrSpread = hrs.length >= 3 ? Math.max(...hrs) - Math.min(...hrs) : 0;
-              isIntervalWorkout = paceRatio >= 1.6 || (paceRatio >= 1.4 && hrSpread >= 25);
+              isIntervalWorkout = paceRatio >= 1.4 || (paceRatio >= 1.25 && hrSpread >= 20);
             }
             let runNum = 0;
             return splits.map((split, idx) => {
               const distMeters = split.distance || 0;
-              const isRest = isIntervalWorkout && (
-                (activityAvgSpeed > 0 && split.average_speed > 0 && split.average_speed < activityAvgSpeed * 0.7) ||
-                (distMeters > 0 && distMeters < 200)
-              );
+              // Rest if this lap's speed is <70% of the fastest lap's speed
+              // (i.e. >~43% slower in pace terms).
+              const isRest = isIntervalWorkout
+                && fastestSpeed > 0
+                && split.average_speed > 0
+                && split.average_speed < fastestSpeed * 0.7;
               const pace = formatPace(split.average_speed);
               const hr = split.average_heartrate ? Math.round(split.average_heartrate) : null;
               if (!isRest) runNum++;

@@ -575,6 +575,47 @@ ${plannedWorkout ? `- ${plannedWorkout}` : ""}`;
         if (restDurations.length) statsText += `\n  Recovery duration: avg ${Math.round(avg(restDurations))}s, distance avg ${Math.round(avg(restDistances))}m`;
         if (restHrs.length) statsText += `\n  Recovery avg HR: ${Math.round(avg(restHrs))} bpm`;
 
+        // Group consecutive WORK laps into "sets" separated by REST laps.
+        // This reveals non-uniform structures like a ladder (e.g. 2000→1600→1200→800→400)
+        // or mixed sets where reps inside a set may not be uniform.
+        type SetGroup = { setNumber: number; workLaps: typeof lapsWithType; totalDistance: number; totalDuration: number; restAfter?: { distance: number; duration: number } };
+        const sets: SetGroup[] = [];
+        let currentWork: typeof lapsWithType = [];
+        let setIdx = 0;
+        const flushSet = (restAfter?: { distance: number; duration: number }) => {
+          if (currentWork.length === 0) return;
+          setIdx++;
+          sets.push({
+            setNumber: setIdx,
+            workLaps: currentWork,
+            totalDistance: currentWork.reduce((s, l) => s + l.distance, 0),
+            totalDuration: currentWork.reduce((s, l) => s + l.elapsed, 0),
+            restAfter,
+          });
+          currentWork = [];
+        };
+        for (const lap of lapsWithType) {
+          if (lap.isRest) {
+            flushSet({ distance: lap.distance, duration: lap.elapsed });
+          } else {
+            currentWork.push(lap);
+          }
+        }
+        flushSet();
+
+        statsText += `\n\n  Set structure (consecutive WORK laps grouped, separated by REST):`;
+        for (const set of sets) {
+          const repBreakdown = set.workLaps.map((l) => `${Math.round(l.distance)}m`).join(" + ");
+          const avgPaceSet = set.workLaps.filter((l) => Number.isFinite(l.paceSecPerKm))
+            .reduce((s, l, _, arr) => s + l.paceSecPerKm / arr.length, 0);
+          statsText += `\n    SET ${set.setNumber}: ${set.workLaps.length} work lap(s) = ${Math.round(set.totalDistance)}m total in ${Math.round(set.totalDuration)}s (${repBreakdown}) @ ~${fmtLapPace(avgPaceSet)}`;
+          if (set.restAfter) {
+            statsText += `  → then REST ${Math.round(set.restAfter.distance)}m / ${Math.round(set.restAfter.duration)}s`;
+          }
+        }
+        const totalWorkDistAllSets = sets.reduce((s, x) => s + x.totalDistance, 0);
+        statsText += `\n  Total work distance across all sets: ${Math.round(totalWorkDistAllSets)}m in ${sets.length} set(s).`;
+
         statsText += `\n\n  Lap-by-lap (in order):`;
         for (const lap of lapsWithType) {
           const tag = lap.isRest ? "🟦 REST " : "🟥 WORK ";
@@ -582,7 +623,7 @@ ${plannedWorkout ? `- ${plannedWorkout}` : ""}`;
           if (lap.avgHr) statsText += ` | HR ${Math.round(lap.avgHr)}${lap.maxHr ? `/${Math.round(lap.maxHr)}` : ""} bpm`;
         }
         statsText += `\n\n  → DEEP ANALYSIS REQUIRED:`;
-        statsText += `\n    1. Identify the exact interval structure from the work-rep distance/duration pattern (e.g., "10×400m w/ ~90s recovery", "6×1km w/ 2min jog", "Yasso 800s", fartlek, hill repeats, ladder).`;
+        statsText += `\n    1. Use the SET STRUCTURE above (total work distance per set, separated by rest) to identify the workout — it may be a uniform set (e.g. "10×400m"), a ladder/pyramid (e.g. "2000m→1600m→1200m→800m→400m"), mixed sets, or fartlek. Do NOT assume every rep is the same distance — read the per-set totals.`;
         statsText += `\n    2. Comment on PACING CONSISTENCY across reps — are they even, fading, or progressive? Quote specific lap paces.`;
         statsText += `\n    3. Comment on HR DRIFT across reps — does HR climb on later reps at same pace (sign of fatigue/cardiac drift)?`;
         statsText += `\n    4. Assess work:rest RATIO and what energy system this targets (VO2max ~3-5min hard / equal rest, threshold ~1km cruise w/ short rest, anaerobic 200-400m w/ full recovery, etc.).`;

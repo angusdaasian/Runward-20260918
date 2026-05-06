@@ -31,6 +31,16 @@ export function isCardio(sportType?: string): boolean {
   return cardioSportTypes.has(sportType);
 }
 
+const runningTypes = new Set([
+  "Run", "TrailRun", "VirtualRun", "Treadmill",
+  "running", "trail_running", "treadmill_running",
+]);
+
+export function isRunning(sportType?: string): boolean {
+  if (!sportType) return false;
+  return runningTypes.has(sportType);
+}
+
 /**
  * Banister TRIMP approximation using HRR (heart rate reserve).
  * y = 0.75 * e^(1.8 * HRR)  (gender-averaged)

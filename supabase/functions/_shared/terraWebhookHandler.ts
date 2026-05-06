@@ -394,6 +394,30 @@ function findHrSampleArray(root: any): any[] | undefined {
   return undefined;
 }
 
+function extractDistanceSamples(a: any): Array<{ t: number; d: number }> {
+  const sources: any[] = [
+    a?.distance_data?.detailed?.distance_samples,
+    a?.distance_data?.distance_samples,
+    a?.distance_data?.detailed?.samples,
+  ];
+  const samples = sources.find((s) => Array.isArray(s) && s.length > 0);
+  if (!samples) return [];
+  const startMs = a?.metadata?.start_time ? new Date(a.metadata.start_time).getTime() : NaN;
+  const bySecond = new Map<number, number>();
+  for (const s of samples as any[]) {
+    const d = toFiniteNumber(s?.distance_meters ?? s?.distance);
+    if (d == null || d < 0) continue;
+    let t: number | null = toFiniteNumber(s?.timer_duration_seconds ?? s?.timer_seconds ?? s?.elapsed_seconds);
+    if (t == null && s?.timestamp && Number.isFinite(startMs)) {
+      t = (new Date(s.timestamp).getTime() - startMs) / 1000;
+    }
+    if (t == null || !Number.isFinite(t) || t < 0) continue;
+    bySecond.set(Math.floor(t), Math.round(d * 100) / 100);
+  }
+  const out = Array.from(bySecond.entries()).sort((a, b) => a[0] - b[0]).map(([t, d]) => ({ t, d }));
+  return out.length > 7200 ? out.slice(0, 7200) : out;
+}
+
 function recomputeLapAvgHr(laps: any[], samples: Array<{ t: number; bpm: number }>, activityStartTime: string | null): any[] {
   if (!samples.length || !laps.length) return laps;
   const startMs = activityStartTime ? new Date(activityStartTime).getTime() : NaN;

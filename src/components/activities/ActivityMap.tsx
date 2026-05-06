@@ -59,17 +59,44 @@ const ActivityMap = ({ polyline }: Props) => {
 
     mapInstanceRef.current = map;
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19,
+    // Cleaner cartography — Carto's "Voyager" basemap is softer/less busy
+    // than default OSM. Falls back gracefully if the host blocks it.
+    L.tileLayer(
+      'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+      { maxZoom: 19, subdomains: 'abcd' },
+    ).addTo(map);
+
+    // White "casing" beneath the route gives a clean halo against the map.
+    L.polyline(coords, {
+      color: '#FFFFFF',
+      weight: 7,
+      opacity: 0.95,
+      lineJoin: 'round',
+      lineCap: 'round',
     }).addTo(map);
 
+    // Main route — bold, rounded, vivid.
     const line = L.polyline(coords, {
       color: '#FC4C02',
-      weight: 3,
-      opacity: 0.9,
+      weight: 4,
+      opacity: 1,
+      lineJoin: 'round',
+      lineCap: 'round',
     }).addTo(map);
 
-    map.fitBounds(line.getBounds(), { padding: [10, 10] });
+    // Start (green) and end (orange) dots
+    const dot = (latlng: [number, number], fill: string) =>
+      L.circleMarker(latlng, {
+        radius: 5,
+        weight: 2,
+        color: '#FFFFFF',
+        fillColor: fill,
+        fillOpacity: 1,
+      }).addTo(map);
+    dot(coords[0], '#10B981');
+    dot(coords[coords.length - 1], '#FC4C02');
+
+    map.fitBounds(line.getBounds(), { padding: [14, 14] });
 
     return () => {
       if (mapInstanceRef.current) {

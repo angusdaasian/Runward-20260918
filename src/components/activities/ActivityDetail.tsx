@@ -894,6 +894,17 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
         </div>
       ) : null}
 
+      {/* Non-running notice */}
+      {!isRunningActivity && (
+        <div className="bg-card border border-border rounded-xl p-4 mt-4">
+          <p className="text-sm text-muted-foreground text-center">
+            {lang === "zh"
+              ? "非跑步活動不提供分段、AI 訓練分析或配速圖表。"
+              : "Non-running activities don't have splits, AI analysis or pace charts."}
+          </p>
+        </div>
+      )}
+
       {/* Intervals Table — Garmin-style */}
       {splits && splits.length > 0 && (
         <div className="bg-card border border-border rounded-xl overflow-hidden mt-4">

@@ -765,11 +765,11 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                   <XAxis dataKey="distance_km" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} tickFormatter={(v) => `${Math.round(v)}`}
                     label={{ value: "km", position: "insideBottomRight", offset: -5, fontSize: 10, fill: "hsl(var(--muted-foreground))" }} />
-                  <YAxis reversed tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} tickFormatter={(v) => formatPaceFromMinutes(v)} domain={['auto', 'auto']}
-                    label={{ value: "/km", angle: -90, position: "insideLeft", fontSize: 10, fill: "hsl(var(--muted-foreground))" }} />
+                  <YAxis reversed tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} tickFormatter={(v) => formatPaceFromMinutes(v)} domain={['auto', 'auto']} width={52}
+                    label={{ value: "min/km", angle: -90, position: "insideLeft", fontSize: 10, fill: "hsl(var(--muted-foreground))" }} />
                   <Tooltip contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }}
-                    formatter={(value: number) => [formatPaceFromMinutes(value), lang === "zh" ? "配速" : "Pace"]} labelFormatter={(v) => `${v} km`} />
-                  <Line type="monotone" dataKey="pace" stroke="hsl(var(--primary))" strokeWidth={2} dot={false} />
+                    formatter={(value: number) => [`${formatPaceFromMinutes(value)} min/km`, lang === "zh" ? "配速" : "Pace"]} labelFormatter={(v) => `${v} km`} />
+                  <Line type="monotone" dataKey="pace" stroke="hsl(var(--primary))" strokeWidth={2} dot={false} connectNulls />
                 </LineChart>
               ) : activeChart === "heartrate" ? (
                 <AreaChart data={chartData}>

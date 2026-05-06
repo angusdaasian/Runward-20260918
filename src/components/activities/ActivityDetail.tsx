@@ -641,6 +641,24 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
               >
                 {lang === "zh" ? "分享分段" : "Share splits"}
               </DropdownMenuItem>
+              <DropdownMenuItem
+                disabled={!chartData || chartData.length < 2}
+                onClick={() => {
+                  if (!chartData || chartData.length < 2) return;
+                  shareCharts({
+                    name: activityName,
+                    startDate: activity.start_date,
+                    data: chartData.map((d: any) => ({
+                      distance_km: Number(d.distance_km),
+                      pace: typeof d.pace === "number" ? d.pace : undefined,
+                      heartrate: typeof d.heartrate === "number" ? d.heartrate : undefined,
+                    })),
+                    lang,
+                  });
+                }}
+              >
+                {lang === "zh" ? "分享圖表" : "Share charts"}
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         <AlertDialog>

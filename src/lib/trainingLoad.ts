@@ -271,9 +271,10 @@ export function buildTrendComparison(
   const immediatePrevStart = new Date(currentWindowStart);
   immediatePrevStart.setDate(immediatePrevStart.getDate() - 4 * 7);
 
-  // Pre-parse activity dates once
+  // Pre-parse activity dates once — running activities only
   const parsed: { date: Date; act: any }[] = [];
   for (const act of activities as any[]) {
+    if (!isRunning(act?.sport_type)) continue;
     const date = new Date(act.start_date);
     if (!isNaN(date.getTime())) parsed.push({ date, act });
   }

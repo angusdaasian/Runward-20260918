@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { getTerraCreds, pickEnvFromRequest } from "../_shared/terraEnv.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -353,8 +354,8 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ ok: true, synced: 0, message: "no active connections" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    const devId = Deno.env.get("TERRA_DEV_ID")!;
-    const apiKey = Deno.env.get("TERRA_API_KEY")!;
+    const { devId, apiKey, env } = getTerraCreds(pickEnvFromRequest(req));
+    console.log(`[terra-sync] env=${env}`);
     const end = new Date();
     end.setDate(end.getDate() + 1);
     const start = new Date();

@@ -192,6 +192,7 @@ serve(async (req) => {
     const {
       activity, splits, lang, translate, activityDbId, rpe, checkCacheOnly, garminLaps,
       raceId, raceName, userComment, forceRefresh,
+      hrSamples, distanceSamples,
     } = body;
     const isZh = lang === "zh";
 

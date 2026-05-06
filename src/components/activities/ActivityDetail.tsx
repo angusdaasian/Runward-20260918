@@ -1176,6 +1176,7 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
           </div>
         )}
       </div>
+      )}
 
       {/* Suggested Next Workout */}
       {isPremium && aiNextWorkout && !aiLoading && (

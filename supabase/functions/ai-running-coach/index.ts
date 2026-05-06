@@ -94,6 +94,76 @@ function pace(distMeters: number, secs: number): string {
   return `${m}:${s.toString().padStart(2, "0")}/km`;
 }
 
+function fmtPaceSec(paceSecPerKm: number): string {
+  if (!Number.isFinite(paceSecPerKm)) return "—";
+  const m = Math.floor(paceSecPerKm / 60);
+  const s = Math.round(paceSecPerKm % 60);
+  return `${m}:${s.toString().padStart(2, "0")}/km`;
+}
+
+// Detect interval/fartlek structure from raw lap arrays (Garmin/Terra format).
+// Returns a compact summary string or null when there isn't a clear interval pattern.
+function summarizeLaps(rawLaps: any[] | null | undefined): string | null {
+  if (!Array.isArray(rawLaps) || rawLaps.length < 3) return null;
+  const norm = rawLaps
+    .map((lap: any, idx: number) => {
+      const distance = Number(lap.distance ?? lap.distance_meters ?? lap.total_distance_meters ?? 0) || 0;
+      const elapsed = Number(
+        lap.elapsed_time ?? lap.duration_seconds ?? lap.moving_time ?? lap.total_timer_time_seconds ?? 0,
+      ) || 0;
+      let speed = Number(lap.avg_speed ?? lap.average_speed ?? lap.avg_speed_meters_per_second ?? 0) || 0;
+      if (!speed && distance > 0 && elapsed > 0) speed = distance / elapsed;
+      const paceSecPerKm = speed > 0 ? 1000 / speed : Infinity;
+      const avgHr = Number(lap.avg_hr ?? lap.average_hr ?? lap.avg_hr_bpm ?? 0) || null;
+      return { number: idx + 1, distance, elapsed, paceSecPerKm, avgHr };
+    })
+    // Drop GPS-noise laps (tiny dist+duration → unrealistic pace)
+    .filter((l) => !(l.distance < 50 && l.elapsed < 10));
+  if (norm.length < 3) return null;
+  const validPaces = norm.filter((l) => Number.isFinite(l.paceSecPerKm)).map((l) => l.paceSecPerKm);
+  if (validPaces.length < 3) return null;
+  const fastest = Math.min(...validPaces);
+  const slowest = Math.max(...validPaces);
+  // Need clear pace contrast for interval pattern.
+  if (slowest < fastest * 1.4) return null;
+  const tagged = norm.map((l) => ({
+    ...l,
+    isRest: Number.isFinite(l.paceSecPerKm) ? l.paceSecPerKm > fastest * 1.4 : (l.distance === 0),
+  }));
+  const work = tagged.filter((l) => !l.isRest);
+  const rest = tagged.filter((l) => l.isRest);
+  if (work.length < 2 || rest.length < 1) return null;
+
+  // Group consecutive work laps into sets separated by rest laps.
+  const sets: { dist: number; reps: number[] }[] = [];
+  let cur: number[] = [];
+  let curDist = 0;
+  const flush = () => {
+    if (cur.length) sets.push({ dist: curDist, reps: cur });
+    cur = [];
+    curDist = 0;
+  };
+  for (const l of tagged) {
+    if (l.isRest) flush();
+    else { cur.push(Math.round(l.distance)); curDist += l.distance; }
+  }
+  flush();
+
+  const avg = (a: number[]) => a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0;
+  const workPaces = work.filter((l) => Number.isFinite(l.paceSecPerKm)).map((l) => l.paceSecPerKm);
+  const restPaces = rest.filter((l) => Number.isFinite(l.paceSecPerKm)).map((l) => l.paceSecPerKm);
+  const setStr = sets
+    .map((s, i) => `set${i + 1}=${Math.round(s.dist)}m(${s.reps.join("+")})`)
+    .join(", ");
+  const workHr = work.map((l) => l.avgHr).filter((x): x is number => !!x);
+  const restHr = rest.map((l) => l.avgHr).filter((x): x is number => !!x);
+  let s = ` [INTERVAL: ${work.length} work / ${rest.length} rest laps; work pace ${fmtPaceSec(avg(workPaces))} (fastest ${fmtPaceSec(fastest)}), rest pace ${fmtPaceSec(avg(restPaces))}`;
+  if (workHr.length) s += `; work HR ${Math.round(avg(workHr))}`;
+  if (restHr.length) s += `, rest HR ${Math.round(avg(restHr))}`;
+  s += `; sets: ${setStr}]`;
+  return s;
+}
+
 function buildActivitySummary(rows: any[], units: string): string {
   if (!rows.length) return "No recent runs in last 7 days.";
   const conv = units === "miles" ? 0.000621371 : 0.001;
@@ -106,7 +176,8 @@ function buildActivitySummary(rows: any[], units: string): string {
       const dist = (distRaw * conv).toFixed(2);
       const dur = a.duration_seconds ?? a.moving_time ?? 0;
       const min = Math.round(dur / 60);
-      return `- ${date}: ${dist}${unit}, ${min}min, ${pace(distRaw, dur)}, HR avg ${a.average_hr ?? a.average_heartrate ?? "—"}`;
+      const intervalTag = summarizeLaps(a.laps) || "";
+      return `- ${date}: ${dist}${unit}, ${min}min, ${pace(distRaw, dur)}, HR avg ${a.average_hr ?? a.average_heartrate ?? "—"}${intervalTag}`;
     })
     .join("\n");
 }
@@ -377,7 +448,7 @@ serve(async (req) => {
           .limit(15),
         admin
           .from("garmin_activities")
-          .select("start_time, distance_meters, duration_seconds, average_hr, activity_type")
+          .select("start_time, distance_meters, duration_seconds, average_hr, activity_type, laps")
           .eq("user_id", user.id)
           .gte("start_time", new Date(Date.now() - 7 * 86400000).toISOString())
           .order("start_time", { ascending: false })
@@ -398,7 +469,7 @@ serve(async (req) => {
           .limit(10),
         admin
           .from("terra_activities")
-          .select("start_time, distance_meters, duration_seconds, average_hr, activity_type, provider")
+          .select("start_time, distance_meters, duration_seconds, average_hr, activity_type, provider, laps")
           .eq("user_id", user.id)
           .gte("start_time", new Date(Date.now() - 7 * 86400000).toISOString())
           .order("start_time", { ascending: false })
@@ -509,6 +580,8 @@ ${insightsBlock}
 RECENT 7-DAY ACTIVITY:
 ${buildActivitySummary(allActs, units)}
 
+NOTE on activity lines: a trailing "[INTERVAL: …]" tag means the run was an interval/fartlek workout — NOT an easy run. The tag shows work vs rest lap counts, paces, HR, and the per-set structure (e.g. "set1=2000m(2000), set2=1600m(1600)"). When the user asks about that run, treat it as the structured workout shown — never call it an easy/tempo run.
+
 ${racesBlock}
 
 COACHING STYLE:
@@ -537,7 +610,9 @@ If the user has no preferences set yet, ask ONE friendly onboarding question per
       systemPrompt,
       messages,
       temperature: 0.7,
-      maxOutputTokens: 1024,
+      // Gemini counts thinking tokens against maxOutputTokens, so scale the
+      // budget with the thinking level — otherwise high thinking returns blank.
+      maxOutputTokens: 1500 + THINKING_BUDGETS[thinkingLevel],
       thinkingBudget: THINKING_BUDGETS[thinkingLevel],
     });
 

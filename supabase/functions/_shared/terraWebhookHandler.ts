@@ -674,6 +674,11 @@ async function processWebhook(
           const elev = a?.distance_data?.summary?.elevation ?? {};
           const distanceMeters = toFiniteNumber(dist?.distance_meters);
           const durationSeconds = extractDurationSeconds(a, distanceMeters);
+          const rawType = meta?.type ?? meta?.activity_type ?? null;
+          if (!isRunningActivityType(rawType)) {
+            console.log(`[terra-webhook] skipping non-running activity type=${rawType}`);
+            continue;
+          }
           const aid = String(meta?.upload_type ?? "") + ":" + String(meta?.summary_id ?? meta?.id ?? meta?.start_time ?? crypto.randomUUID());
           const polyline = extractPolyline(a);
           const rawLaps = extractLaps(a);

@@ -37,9 +37,18 @@ const RUNNING_TYPES = new Set([
   "Run", "TrailRun", "VirtualRun", "Treadmill", "Workout",
   "running", "trail_running", "treadmill_running", "RUNNING", "TRAIL_RUNNING",
 ]);
+// Terra numeric activity_type codes that map to running.
+// See https://docs.tryterra.co/reference/activity-types
+const RUNNING_NUMERIC_CODES = new Set([0, 8, 16, 37, 44, 59, 63, 64]);
 function isRunning(t: unknown): boolean {
+  if (typeof t === "number") return RUNNING_NUMERIC_CODES.has(t);
   if (typeof t !== "string") return false;
-  return RUNNING_TYPES.has(t) || t.toLowerCase().includes("run");
+  if (RUNNING_TYPES.has(t)) return true;
+  if (t.toLowerCase().includes("run")) return true;
+  if (/^-?\d+(\.\d+)?$/.test(t.trim())) {
+    return RUNNING_NUMERIC_CODES.has(Math.trunc(Number(t)));
+  }
+  return false;
 }
 
 async function recalcUserXp(userId: string) {
@@ -674,6 +683,11 @@ async function processWebhook(
           const elev = a?.distance_data?.summary?.elevation ?? {};
           const distanceMeters = toFiniteNumber(dist?.distance_meters);
           const durationSeconds = extractDurationSeconds(a, distanceMeters);
+          const rawType = meta?.type ?? meta?.activity_type ?? null;
+          if (!isRunning(rawType)) {
+            console.log(`[terra-webhook] skipping non-running activity type=${rawType}`);
+            continue;
+          }
           const aid = String(meta?.upload_type ?? "") + ":" + String(meta?.summary_id ?? meta?.id ?? meta?.start_time ?? crypto.randomUUID());
           const polyline = extractPolyline(a);
           const rawLaps = extractLaps(a);

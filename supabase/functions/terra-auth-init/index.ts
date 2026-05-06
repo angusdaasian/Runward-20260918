@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { getTerraCreds, pickEnvFromRequest } from "../_shared/terraEnv.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -25,11 +26,13 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "invalid provider" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    const devId = Deno.env.get("TERRA_DEV_ID")!;
-    const apiKey = Deno.env.get("TERRA_API_KEY")!;
+    const env = pickEnvFromRequest(req, [body.success_url, body.failure_url]);
+    const { devId, apiKey } = getTerraCreds(env);
+    console.log(`[terra-auth-init] env=${env} provider=${provider}`);
 
-    const DEFAULT_SUCCESS = "https://pacecalculator.fun/terra-return?status=success&native=true";
-    const DEFAULT_FAILURE = "https://pacecalculator.fun/terra-return?status=failure&native=true";
+    const baseHost = env === "test" ? "https://angustest.site" : "https://pacecalculator.fun";
+    const DEFAULT_SUCCESS = `${baseHost}/terra-return?status=success&native=true`;
+    const DEFAULT_FAILURE = `${baseHost}/terra-return?status=failure&native=true`;
     const successUrl = (typeof body.success_url === "string" && body.success_url.trim()) ? body.success_url.trim() : DEFAULT_SUCCESS;
     const failureUrl = (typeof body.failure_url === "string" && body.failure_url.trim()) ? body.failure_url.trim() : DEFAULT_FAILURE;
 

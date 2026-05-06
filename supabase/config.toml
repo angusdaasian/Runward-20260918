@@ -13,5 +13,8 @@ verify_jwt = false
 [functions.terra-webhook]
 verify_jwt = false
 
+[functions.terra-webhook-test]
+verify_jwt = false
+
 [functions.weekly-plan-review]
 verify_jwt = false

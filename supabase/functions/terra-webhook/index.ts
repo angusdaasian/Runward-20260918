@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { getTerraCreds, type TerraEnv } from "../_shared/terraEnv.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -486,9 +487,15 @@ function nextDate(date: string): string {
   return d.toISOString().slice(0, 10);
 }
 
-async function requestActivityHrSamplesWebhook(terraUserId: string, referenceId: string | null, provider: string, summaryId: string, startTime: string | null) {
-  const startDate = (startTime ?? "").slice(0, 10);
-  if (!startDate) return;
+async function requestActivityHrSamplesWebhook(terraUserId: string, referenceId: string | null, provider: string, summaryId: string, startTime: string | null, env: TerraEnv = "prod", explicitStartDate?: string) {
+  // Prefer explicit start date, then derive from startTime, else fall back to today UTC
+  let startDate = explicitStartDate || (startTime ?? "").slice(0, 10);
+  if (!startDate) {
+    startDate = new Date().toISOString().slice(0, 10);
+    // Widen window: yesterday -> tomorrow for empty-payload pings
+    const y = new Date(); y.setUTCDate(y.getUTCDate() - 1);
+    startDate = y.toISOString().slice(0, 10);
+  }
 
   const { data: recent } = await supa
     .from("terra_webhook_events")
@@ -503,12 +510,14 @@ async function requestActivityHrSamplesWebhook(terraUserId: string, referenceId:
   );
   if (alreadyRequested) return;
 
-  const endDate = nextDate(startDate);
+  // Empty-payload retry: widen end date by 2 days; otherwise just next day
+  const endDate = explicitStartDate ? nextDate(nextDate(startDate)) : nextDate(startDate);
+  const creds = getTerraCreds(env);
   const url = `https://api.tryterra.co/v2/activity?user_id=${terraUserId}&start_date=${startDate}&end_date=${endDate}&to_webhook=true&with_samples=true`;
   const response = await fetch(url, {
     headers: {
-      "dev-id": Deno.env.get("TERRA_DEV_ID") ?? "",
-      "x-api-key": Deno.env.get("TERRA_API_KEY") ?? "",
+      "dev-id": creds.devId,
+      "x-api-key": creds.apiKey,
     },
   });
   await supa.from("terra_webhook_events").insert({
@@ -523,11 +532,12 @@ async function requestActivityHrSamplesWebhook(terraUserId: string, referenceId:
       end_date: endDate,
       to_webhook: true,
       with_samples: true,
+      env,
       status: response.status,
       terra_reference: response.headers.get("terra-reference"),
     },
   });
-  console.log(`[terra-webhook] requested HR samples webhook summary=${summaryId} status=${response.status}`);
+  console.log(`[terra-webhook] requested HR samples webhook env=${env} summary=${summaryId} status=${response.status}`);
 }
 
 async function processWebhook(
@@ -539,6 +549,7 @@ async function processWebhook(
   referenceId: string | null,
   provider: string,
   user: any,
+  env: TerraEnv = "prod",
 ): Promise<string | null> {
   let processingError: string | null = null;
   try {
@@ -577,8 +588,9 @@ async function processWebhook(
           const today = new Date().toISOString().slice(0, 10);
           const since = new Date(Date.now() - 7 * 86400_000).toISOString().slice(0, 10);
 
-          const devId = Deno.env.get("TERRA_DEV_ID") ?? "";
-          const apiKey = Deno.env.get("TERRA_API_KEY") ?? "";
+          const creds = getTerraCreds(env);
+          const devId = creds.devId;
+          const apiKey = creds.apiKey;
           const headers = { "dev-id": devId, "x-api-key": apiKey };
           const calls: Array<{ ep: string; url: string }> = [
             {
@@ -618,6 +630,17 @@ async function processWebhook(
         await supa.from("terra_connections").update({ active: false, last_webhook_at: new Date().toISOString() }).eq("terra_user_id", terraUserId);
       } else if ((type === "activity" || type === "processed_activity") && appUserId) {
         const acts = Array.isArray(payload?.data) ? payload.data : [payload?.data].filter(Boolean);
+        // Empty-payload ping: Garmin/Terra notify us that activities exist
+        // without sending the actual data. Re-request with samples=true.
+        if (acts.length === 0 && terraUserId) {
+          const today = new Date().toISOString().slice(0, 10);
+          const yesterday = new Date(Date.now() - 86400_000).toISOString().slice(0, 10);
+          await requestActivityHrSamplesWebhook(
+            terraUserId, referenceId, provider,
+            `empty:${terraUserId}:${today}`,
+            null, env, yesterday,
+          );
+        }
         let newActivityCount = 0;
         for (const a of acts) {
           const meta = a?.metadata ?? {};
@@ -675,7 +698,7 @@ async function processWebhook(
           }, { onConflict: "user_id,terra_activity_id" });
           await deleteMatchingGarminDuplicate(appUserId, meta?.start_time ?? null, distanceMeters);
           if (hrSamples.length === 0 && terraUserId && (meta?.summary_id ?? meta?.id)) {
-            await requestActivityHrSamplesWebhook(terraUserId, referenceId, provider, String(meta.summary_id ?? meta.id), meta?.start_time ?? null);
+            await requestActivityHrSamplesWebhook(terraUserId, referenceId, provider, String(meta.summary_id ?? meta.id), meta?.start_time ?? null, env);
           }
           if (isNew && (distanceMeters ?? 0) > 0) newActivityCount++;
         }
@@ -740,11 +763,11 @@ async function processWebhook(
   return processingError;
 }
 
-Deno.serve(async (req) => {
+export async function handleTerraWebhook(req: Request, env: TerraEnv = "prod"): Promise<Response> {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   const raw = await req.text();
   const sigHeader = req.headers.get("terra-signature");
-  const secret = Deno.env.get("TERRA_SIGNING_SECRET") ?? "";
+  const secret = getTerraCreds(env).signingSecret;
   let signatureValid = false;
   try { signatureValid = secret ? await verifySignature(secret, sigHeader, raw) : false; } catch { signatureValid = false; }
 
@@ -757,7 +780,6 @@ Deno.serve(async (req) => {
   const referenceId: string | null = user?.reference_id ?? null;
   const provider: string = mapProvider(user?.provider ?? payload?.resource);
 
-  // 1. Log receipt synchronously so we always have a record.
   const { data: eventRow, error: eventInsertErr } = await supa
     .from("terra_webhook_events")
     .insert({
@@ -765,16 +787,15 @@ Deno.serve(async (req) => {
       terra_user_id: terraUserId,
       reference_id: referenceId,
       signature_valid: signatureValid,
-      payload: { type, user: payload?.user, count: Array.isArray(payload?.data) ? payload.data.length : (payload?.data ? 1 : 0) },
+      payload: { type, user: payload?.user, env, count: Array.isArray(payload?.data) ? payload.data.length : (payload?.data ? 1 : 0) },
       processing_error: null,
     })
     .select("id")
     .single();
   if (eventInsertErr) console.error("terra_webhook_events insert failed", eventInsertErr);
 
-  // 2. Process in background so we ack Terra within their ~10s timeout.
   const work = (async () => {
-    const err = await processWebhook(payload, signatureValid, secret, type, terraUserId, referenceId, provider, payload?.user ?? {});
+    const err = await processWebhook(payload, signatureValid, secret, type, terraUserId, referenceId, provider, payload?.user ?? {}, env);
     if (err && eventRow?.id) {
       await supa.from("terra_webhook_events").update({ processing_error: err }).eq("id", eventRow.id);
     }
@@ -787,6 +808,7 @@ Deno.serve(async (req) => {
     work.catch((e) => console.error("terra-webhook background error", e));
   }
 
-  // 3. Ack immediately
   return new Response(JSON.stringify({ ok: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
-});
+}
+
+Deno.serve((req) => handleTerraWebhook(req, "prod"));

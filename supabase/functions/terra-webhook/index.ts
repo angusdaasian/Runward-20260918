@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { getTerraCreds, type TerraEnv } from "../_shared/terraEnv.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -486,9 +487,15 @@ function nextDate(date: string): string {
   return d.toISOString().slice(0, 10);
 }
 
-async function requestActivityHrSamplesWebhook(terraUserId: string, referenceId: string | null, provider: string, summaryId: string, startTime: string | null) {
-  const startDate = (startTime ?? "").slice(0, 10);
-  if (!startDate) return;
+async function requestActivityHrSamplesWebhook(terraUserId: string, referenceId: string | null, provider: string, summaryId: string, startTime: string | null, env: TerraEnv = "prod", explicitStartDate?: string) {
+  // Prefer explicit start date, then derive from startTime, else fall back to today UTC
+  let startDate = explicitStartDate || (startTime ?? "").slice(0, 10);
+  if (!startDate) {
+    startDate = new Date().toISOString().slice(0, 10);
+    // Widen window: yesterday -> tomorrow for empty-payload pings
+    const y = new Date(); y.setUTCDate(y.getUTCDate() - 1);
+    startDate = y.toISOString().slice(0, 10);
+  }
 
   const { data: recent } = await supa
     .from("terra_webhook_events")
@@ -503,12 +510,14 @@ async function requestActivityHrSamplesWebhook(terraUserId: string, referenceId:
   );
   if (alreadyRequested) return;
 
-  const endDate = nextDate(startDate);
+  // Empty-payload retry: widen end date by 2 days; otherwise just next day
+  const endDate = explicitStartDate ? nextDate(nextDate(startDate)) : nextDate(startDate);
+  const creds = getTerraCreds(env);
   const url = `https://api.tryterra.co/v2/activity?user_id=${terraUserId}&start_date=${startDate}&end_date=${endDate}&to_webhook=true&with_samples=true`;
   const response = await fetch(url, {
     headers: {
-      "dev-id": Deno.env.get("TERRA_DEV_ID") ?? "",
-      "x-api-key": Deno.env.get("TERRA_API_KEY") ?? "",
+      "dev-id": creds.devId,
+      "x-api-key": creds.apiKey,
     },
   });
   await supa.from("terra_webhook_events").insert({
@@ -523,11 +532,12 @@ async function requestActivityHrSamplesWebhook(terraUserId: string, referenceId:
       end_date: endDate,
       to_webhook: true,
       with_samples: true,
+      env,
       status: response.status,
       terra_reference: response.headers.get("terra-reference"),
     },
   });
-  console.log(`[terra-webhook] requested HR samples webhook summary=${summaryId} status=${response.status}`);
+  console.log(`[terra-webhook] requested HR samples webhook env=${env} summary=${summaryId} status=${response.status}`);
 }
 
 async function processWebhook(

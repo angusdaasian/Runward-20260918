@@ -141,22 +141,43 @@ async function fetchGarminActivities(userId: string): Promise<StravaActivity[]> 
 }
 
 // Terra activity_type numeric codes -> readable sport
-// Reference: https://docs.tryterra.co/reference/activity-types
+// Reference: https://docs.tryterra.co/reference/health-and-fitness-api/data-models
+// Verified against terra_activities table on 2026-05-06.
 const TERRA_ACTIVITY_TYPE_MAP: Record<string, string> = {
-  "8": "Run",
+  // Running family
+  "8": "Run",        // outdoor running (incl. trail/track variants)
   "0": "Run",
-  "16": "Run",
+  "16": "Ride",      // road cycling — was incorrectly Run
   "37": "Run",
   "44": "Run",
+  "58": "Treadmill", // indoor / treadmill running
   "59": "Run",
   "63": "Run",
   "64": "Run",
   "8.0": "Run",
+  // Cycling
+  "1": "Ride",       // outdoor cycling
+  "18": "Ride",      // indoor cycling
   "20": "Ride",
   "30": "Ride",
+  // Swimming
   "32": "Swim",
-  "1": "Walk",
-  "10": "Hike",
+  "83": "Swim",      // pool swim
+  // Walking / hiking
+  "7": "Walk",
+  "10": "Other",     // observed: badminton (not Hike)
+  "130": "Hike",     // mountain hike
+  // Strength / other (explicitly non-cardio for analytics)
+  "80": "Strength",
+  "78": "Other",     // stair climber
+  "122": "Other",    // mindfulness / breathing
+  "123": "Cardio",   // generic cardio (not running)
+  "35": "Other",
+  "49": "Other",
+  "84": "Other",
+  "87": "Other",
+  "100": "Other",
+  "108": "Other",
 };
 
 // Normalize common readable variants to the canonical sport types
@@ -180,11 +201,11 @@ const TERRA_LABEL_NORMALISE: Record<string, string> = {
 };
 
 function mapTerraSportType(rawType: any): string {
-  if (rawType === null || rawType === undefined || rawType === "") return "Run";
+  if (rawType === null || rawType === undefined || rawType === "") return "Other";
   const key = String(rawType).trim();
   if (TERRA_ACTIVITY_TYPE_MAP[key]) return TERRA_ACTIVITY_TYPE_MAP[key];
-  // Numeric but unmapped → default to Run
-  if (/^-?\d+(\.\d+)?$/.test(key)) return "Run";
+  // Numeric but unmapped → Other (do NOT default to Run, that contaminates analytics)
+  if (/^-?\d+(\.\d+)?$/.test(key)) return "Other";
   const normalised = TERRA_LABEL_NORMALISE[key.toLowerCase()];
   if (normalised) return normalised;
   // Pass through readable strings already in canonical form

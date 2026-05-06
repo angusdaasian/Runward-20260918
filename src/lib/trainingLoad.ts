@@ -31,6 +31,16 @@ export function isCardio(sportType?: string): boolean {
   return cardioSportTypes.has(sportType);
 }
 
+const runningTypes = new Set([
+  "Run", "TrailRun", "VirtualRun", "Treadmill",
+  "running", "trail_running", "treadmill_running",
+]);
+
+export function isRunning(sportType?: string): boolean {
+  if (!sportType) return false;
+  return runningTypes.has(sportType);
+}
+
 /**
  * Banister TRIMP approximation using HRR (heart rate reserve).
  * y = 0.75 * e^(1.8 * HRR)  (gender-averaged)
@@ -261,9 +271,10 @@ export function buildTrendComparison(
   const immediatePrevStart = new Date(currentWindowStart);
   immediatePrevStart.setDate(immediatePrevStart.getDate() - 4 * 7);
 
-  // Pre-parse activity dates once
+  // Pre-parse activity dates once — running activities only
   const parsed: { date: Date; act: any }[] = [];
   for (const act of activities as any[]) {
+    if (!isRunning(act?.sport_type)) continue;
     const date = new Date(act.start_date);
     if (!isNaN(date.getTime())) parsed.push({ date, act });
   }

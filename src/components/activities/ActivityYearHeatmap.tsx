@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { LayoutGrid, BarChart3 } from "lucide-react";
 import { Lang } from "@/lib/i18n";
-import type { LoadActivity } from "@/lib/trainingLoad";
+import { isRunning, type LoadActivity } from "@/lib/trainingLoad";
 
 interface Props {
   lang: Lang;
@@ -71,7 +71,8 @@ const ActivityYearHeatmap = ({ lang, activities }: Props) => {
       if (d.getFullYear() !== year) continue;
       const key = fmtDate(d);
       const minutes = (act.moving_time ?? 0) / 60;
-      const distKm = (act.distance ?? 0) / 1000;
+      const runOnly = isRunning(act.sport_type);
+      const distKm = runOnly ? (act.distance ?? 0) / 1000 : 0;
       const cell = dayMap.get(key) ?? {
         date: key,
         dow: mondayDow(d),

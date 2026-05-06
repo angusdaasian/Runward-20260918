@@ -26,7 +26,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import ActivityMap from "./ActivityMap";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from "recharts";
-import { loadForActivity } from "@/lib/trainingLoad";
+import { loadForActivity, isRunning } from "@/lib/trainingLoad";
 
 interface StravaActivity {
   id: string;
@@ -117,6 +117,7 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
   const isCoros = activity.provenance === "garmin" && activity.source === "COROS";
   const needsRpe = isAppleHealth || isGarmin || isTerraActivity || isCoros;
   const dbTable = isTerraActivity ? "terra_activities" : isAppleHealth ? "apple_health_activities" : isGarmin || isCoros ? "garmin_activities" : "strava_activities";
+  const isRunningActivity = isRunning(activity.sport_type);
 
   const [streams, setStreams] = useState<any[]>([]);
   const [splits, setSplits] = useState<Split[] | null>(null);
@@ -568,11 +569,11 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
 
   const chartTabs = useMemo(() => {
     const tabs: { key: "pace" | "heartrate" | "altitude"; label: string }[] = [];
-    if (hasPace) tabs.push({ key: "pace", label: lang === "zh" ? "配速" : "Pace" });
+    if (isRunningActivity && hasPace) tabs.push({ key: "pace", label: lang === "zh" ? "配速" : "Pace" });
     if (hasHeartrate) tabs.push({ key: "heartrate", label: lang === "zh" ? "心率" : "Heart Rate" });
-    if (hasAltitude) tabs.push({ key: "altitude", label: lang === "zh" ? "海拔" : "Altitude" });
+    if (isRunningActivity && hasAltitude) tabs.push({ key: "altitude", label: lang === "zh" ? "海拔" : "Altitude" });
     return tabs;
-  }, [hasPace, hasHeartrate, hasAltitude, lang]);
+  }, [hasPace, hasHeartrate, hasAltitude, lang, isRunningActivity]);
 
   useEffect(() => {
     if (chartTabs.length > 0 && !chartTabs.find(t => t.key === activeChart)) {
@@ -893,8 +894,19 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
         </div>
       ) : null}
 
+      {/* Non-running notice */}
+      {!isRunningActivity && (
+        <div className="bg-card border border-border rounded-xl p-4 mt-4">
+          <p className="text-sm text-muted-foreground text-center">
+            {lang === "zh"
+              ? "非跑步活動不提供分段、AI 訓練分析或配速圖表。"
+              : "Non-running activities don't have splits, AI analysis or pace charts."}
+          </p>
+        </div>
+      )}
+
       {/* Intervals Table — Garmin-style */}
-      {splits && splits.length > 0 && (
+      {isRunningActivity && splits && splits.length > 0 && (
         <div className="bg-card border border-border rounded-xl overflow-hidden mt-4">
           <div className="px-4 pt-4 pb-2">
             <h3 className="font-display font-bold text-foreground text-sm">
@@ -982,8 +994,8 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
         </div>
       )}
 
-      {/* Race tag + Runner comment (Premium only) */}
-      {isPremium && (
+      {/* Race tag + Runner comment (Premium only, running activities only) */}
+      {isRunningActivity && isPremium && (
         <div className="bg-card border border-border rounded-xl p-4 mt-4">
           <div className="flex items-center gap-2 mb-3">
             <Trophy size={16} className="text-primary" />
@@ -1067,7 +1079,8 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
         </div>
       )}
 
-      {/* AI Workout Analysis Section */}
+      {/* AI Workout Analysis Section (running activities only) */}
+      {isRunningActivity && (
       <div className="bg-card border border-border rounded-xl p-4 mt-4">
         <div className="flex items-center gap-2 mb-3">
           <Sparkles size={16} className="text-primary" />
@@ -1163,9 +1176,10 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
           </div>
         )}
       </div>
+      )}
 
       {/* Suggested Next Workout */}
-      {isPremium && aiNextWorkout && !aiLoading && (
+      {isRunningActivity && isPremium && aiNextWorkout && !aiLoading && (
         <div className="bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/30 rounded-xl p-4 mt-4">
           <div className="flex items-center gap-2 mb-3">
             <Footprints size={16} className="text-primary" />

@@ -475,27 +475,6 @@ serve(async (req) => {
           .order("start_time", { ascending: false })
           .limit(10),
         admin
-          .from("strava_activities")
-          .select("start_date, distance, moving_time, average_heartrate, sport_type")
-          .eq("user_id", user.id)
-          .gte("start_date", new Date(Date.now() - 7 * 86400000).toISOString())
-          .order("start_date", { ascending: false })
-          .limit(10),
-        admin
-          .from("apple_health_activities")
-          .select("start_date, distance, moving_time, average_heartrate, sport_type")
-          .eq("user_id", user.id)
-          .gte("start_date", new Date(Date.now() - 7 * 86400000).toISOString())
-          .order("start_date", { ascending: false })
-          .limit(10),
-        admin
-          .from("terra_activities")
-          .select("start_time, distance_meters, duration_seconds, average_hr, activity_type, provider")
-          .eq("user_id", user.id)
-          .gte("start_time", new Date(Date.now() - 7 * 86400000).toISOString())
-          .order("start_time", { ascending: false })
-          .limit(10),
-        admin
           .from("user_races")
           .select("race_name, race_date, category, city, country, finish_time_seconds, notes, priority")
           .eq("user_id", user.id)

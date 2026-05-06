@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { ArrowLeft, Clock, MapPin, Zap, Heart, TrendingUp, Mountain, Timer, Footprints, Trash2, Pencil, Sparkles, Lock, Gauge, AlertTriangle, Flame, Trophy, MessageSquare, RefreshCw, Share2 } from "lucide-react";
-import { shareActivity, shareSplits } from "@/lib/shareActivity";
+import { shareActivity, shareSplits, shareCharts } from "@/lib/shareActivity";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -640,6 +640,24 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
                 }}
               >
                 {lang === "zh" ? "分享分段" : "Share splits"}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                disabled={!chartData || chartData.length < 2}
+                onClick={() => {
+                  if (!chartData || chartData.length < 2) return;
+                  shareCharts({
+                    name: activityName,
+                    startDate: activity.start_date,
+                    data: chartData.map((d: any) => ({
+                      distance_km: Number(d.distance_km),
+                      pace: typeof d.pace === "number" ? d.pace : undefined,
+                      heartrate: typeof d.heartrate === "number" ? d.heartrate : undefined,
+                    })),
+                    lang,
+                  });
+                }}
+              >
+                {lang === "zh" ? "分享圖表" : "Share charts"}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

@@ -49,6 +49,19 @@ export interface ShareSplitsInput {
   lang: Lang;
 }
 
+export interface ShareChartPoint {
+  distance_km: number; // x-axis
+  pace?: number;       // min/km (decimal)
+  heartrate?: number;  // bpm
+}
+
+export interface ShareChartsInput {
+  name: string;
+  startDate: string;
+  data: ShareChartPoint[];
+  lang: Lang;
+}
+
 // ---------------- formatting helpers ----------------
 
 function fmtDistance(meters: number): string {
@@ -838,6 +851,310 @@ export async function shareSplits(input: ShareSplitsInput): Promise<void> {
     blob = await renderSplitsCard(input);
   } catch (err) {
     console.error("[ShareSplits] Render failed:", err);
+    toast.dismiss(loadingId);
+    toast.error(isZh ? "無法生成圖片" : "Failed to create image");
+    return;
+  }
+  toast.dismiss(loadingId);
+  await distributeBlob(blob, input.lang);
+}
+
+// ====================================================================
+// CHARTS SHARE CARD (Pace + HR)
+// ====================================================================
+
+function fmtPaceMin(min: number): string {
+  if (!isFinite(min) || min <= 0) return "--";
+  const m = Math.floor(min);
+  const s = Math.round((min - m) * 60);
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
+
+interface ChartRect { x: number; y: number; w: number; h: number; }
+
+function drawChart(
+  ctx: CanvasRenderingContext2D,
+  rect: ChartRect,
+  points: { x: number; y: number }[],
+  opts: {
+    title: string;
+    unit: string;
+    color: string;
+    fillColor: string;
+    invertY?: boolean; // pace: lower number = faster = visually higher
+    yFmt: (v: number) => string;
+    xFmt: (v: number) => string;
+    isZh: boolean;
+  },
+) {
+  const { x, y, w, h } = rect;
+
+  // Card background
+  ctx.fillStyle = "rgba(255,255,255,0.04)";
+  roundedRect(ctx, x, y, w, h, 20);
+  ctx.fill();
+
+  // Title
+  ctx.fillStyle = "#FFFFFF";
+  ctx.textAlign = "left";
+  ctx.textBaseline = "top";
+  ctx.font = `700 30px ${FONT_DISPLAY}`;
+  ctx.fillText(opts.title, x + 28, y + 22);
+  ctx.fillStyle = "rgba(255,255,255,0.55)";
+  ctx.font = `500 18px ${FONT_TEXT}`;
+  ctx.fillText(opts.unit, x + 28, y + 60);
+
+  // Plot area
+  const padL = 90, padR = 36, padT = 100, padB = 56;
+  const plotX = x + padL;
+  const plotY = y + padT;
+  const plotW = w - padL - padR;
+  const plotH = h - padT - padB;
+
+  if (points.length < 2) {
+    ctx.fillStyle = "rgba(255,255,255,0.45)";
+    ctx.font = `500 22px ${FONT_TEXT}`;
+    ctx.textAlign = "center";
+    ctx.fillText(opts.isZh ? "沒有資料" : "No data", x + w / 2, y + h / 2);
+    return;
+  }
+
+  const xs = points.map((p) => p.x);
+  const ys = points.map((p) => p.y);
+  const xMin = Math.min(...xs), xMax = Math.max(...xs);
+  let yMin = Math.min(...ys), yMax = Math.max(...ys);
+  if (yMin === yMax) { yMin -= 1; yMax += 1; }
+  const pad = (yMax - yMin) * 0.1;
+  yMin -= pad; yMax += pad;
+
+  const sx = (v: number) => plotX + ((v - xMin) / (xMax - xMin)) * plotW;
+  const sy = (v: number) => {
+    const t = (v - yMin) / (yMax - yMin);
+    const ratio = opts.invertY ? t : 1 - t;
+    return plotY + ratio * plotH;
+  };
+
+  // Grid + Y labels (4 ticks)
+  ctx.strokeStyle = "rgba(255,255,255,0.08)";
+  ctx.lineWidth = 1;
+  ctx.fillStyle = "rgba(255,255,255,0.5)";
+  ctx.font = `500 16px ${FONT_TEXT}`;
+  ctx.textAlign = "right";
+  ctx.textBaseline = "middle";
+  for (let i = 0; i <= 4; i++) {
+    const yVal = yMin + ((yMax - yMin) * i) / 4;
+    const py = sy(yVal);
+    ctx.beginPath();
+    ctx.moveTo(plotX, py);
+    ctx.lineTo(plotX + plotW, py);
+    ctx.stroke();
+    ctx.fillText(opts.yFmt(yVal), plotX - 12, py);
+  }
+
+  // X labels (start, mid, end)
+  ctx.textAlign = "center";
+  ctx.textBaseline = "top";
+  ctx.fillStyle = "rgba(255,255,255,0.5)";
+  for (const t of [0, 0.5, 1]) {
+    const xVal = xMin + (xMax - xMin) * t;
+    ctx.fillText(opts.xFmt(xVal), sx(xVal), plotY + plotH + 14);
+  }
+
+  // Area fill under curve
+  ctx.beginPath();
+  ctx.moveTo(sx(points[0].x), plotY + plotH);
+  for (const p of points) ctx.lineTo(sx(p.x), sy(p.y));
+  ctx.lineTo(sx(points[points.length - 1].x), plotY + plotH);
+  ctx.closePath();
+  const grad = ctx.createLinearGradient(0, plotY, 0, plotY + plotH);
+  grad.addColorStop(0, opts.fillColor);
+  grad.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  // Line
+  ctx.beginPath();
+  ctx.strokeStyle = opts.color;
+  ctx.lineWidth = 4;
+  ctx.lineJoin = "round";
+  ctx.lineCap = "round";
+  for (let i = 0; i < points.length; i++) {
+    const px = sx(points[i].x);
+    const py = sy(points[i].y);
+    if (i === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  }
+  ctx.stroke();
+}
+
+function drawInstagramFooter(
+  ctx: CanvasRenderingContext2D,
+  W: number,
+  H: number,
+  padX: number,
+  isZh: boolean,
+  iconImg: HTMLImageElement | null,
+) {
+  const footerH = 140;
+  const footerY = H - footerH + 20;
+  ctx.strokeStyle = "rgba(255,255,255,0.08)";
+  ctx.beginPath();
+  ctx.moveTo(padX, footerY);
+  ctx.lineTo(W - padX, footerY);
+  ctx.stroke();
+
+  if (iconImg) {
+    ctx.save();
+    roundedRect(ctx, padX, footerY + 30, 56, 56, 14);
+    ctx.clip();
+    ctx.drawImage(iconImg, padX, footerY + 30, 56, 56);
+    ctx.restore();
+  }
+  ctx.fillStyle = "#FFFFFF";
+  ctx.textAlign = "left";
+  ctx.textBaseline = "top";
+  ctx.font = `800 30px ${FONT_DISPLAY}`;
+  ctx.fillText(APP_NAME, padX + 76, footerY + 32);
+  ctx.fillStyle = "rgba(255,255,255,0.55)";
+  ctx.font = `500 20px ${FONT_TEXT}`;
+  ctx.fillText(isZh ? "用 AI 訓練得更聰明" : "Train smarter with AI", padX + 76, footerY + 66);
+
+  // Instagram glyph + handle (right)
+  const handle = "@runward.app";
+  ctx.textAlign = "right";
+  ctx.textBaseline = "middle";
+  ctx.fillStyle = "#FFFFFF";
+  ctx.font = `600 22px ${FONT_TEXT}`;
+  const handleY = footerY + 58;
+  const handleW = ctx.measureText(handle).width;
+  ctx.fillText(handle, W - padX, handleY);
+  const igSize = 36;
+  const igX = W - padX - handleW - 16 - igSize;
+  const igY = handleY - igSize / 2;
+  ctx.save();
+  ctx.strokeStyle = "#FFFFFF";
+  ctx.fillStyle = "#FFFFFF";
+  ctx.lineWidth = 2.5;
+  roundedRect(ctx, igX, igY, igSize, igSize, 9);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(igX + igSize / 2, igY + igSize / 2, igSize * 0.26, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(igX + igSize - 8, igY + 8, 2.2, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+  ctx.textAlign = "left";
+  ctx.textBaseline = "top";
+}
+
+async function renderChartsCard(input: ShareChartsInput): Promise<Blob> {
+  const isZh = input.lang === "zh";
+  const W = 1080;
+  const headerH = 240;
+  const chartH = 520;
+  const chartGap = 32;
+  const footerH = 140;
+  const padX = 60;
+  const H = headerH + chartH * 2 + chartGap + footerH + 40;
+
+  const canvas = document.createElement("canvas");
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext("2d")!;
+
+  // Background
+  ctx.fillStyle = "#0B0F1A";
+  ctx.fillRect(0, 0, W, H);
+  const g = ctx.createLinearGradient(0, 0, 0, headerH);
+  g.addColorStop(0, "rgba(252, 76, 2, 0.20)");
+  g.addColorStop(1, "rgba(252, 76, 2, 0)");
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W, headerH);
+
+  // Header
+  let iconImg: HTMLImageElement | null = null;
+  try {
+    iconImg = await loadImage(appIcon);
+    ctx.save();
+    roundedRect(ctx, padX, 60, 80, 80, 18);
+    ctx.clip();
+    ctx.drawImage(iconImg, padX, 60, 80, 80);
+    ctx.restore();
+  } catch { /* ignore */ }
+
+  ctx.fillStyle = "#FFFFFF";
+  ctx.textBaseline = "top";
+  ctx.font = `700 42px ${FONT_DISPLAY}`;
+  ctx.fillText(APP_NAME, padX + 100, 70);
+  ctx.fillStyle = "rgba(255,255,255,0.65)";
+  ctx.font = `500 24px ${FONT_TEXT}`;
+  ctx.fillText(fmtDate(input.startDate, input.lang), padX + 100, 120);
+
+  ctx.fillStyle = "#FFFFFF";
+  ctx.font = `800 52px ${FONT_DISPLAY}`;
+  wrapText(ctx, input.name, padX, 170, W - padX * 2, 56, 1);
+
+  // Build series
+  const pacePts = input.data
+    .filter((d) => typeof d.pace === "number" && d.pace! > 0)
+    .map((d) => ({ x: Number(d.distance_km), y: d.pace as number }));
+  const hrPts = input.data
+    .filter((d) => typeof d.heartrate === "number" && d.heartrate! > 0)
+    .map((d) => ({ x: Number(d.distance_km), y: d.heartrate as number }));
+
+  const xFmt = (v: number) => `${v.toFixed(1)} km`;
+
+  drawChart(
+    ctx,
+    { x: padX, y: headerH, w: W - padX * 2, h: chartH },
+    pacePts,
+    {
+      title: isZh ? "配速" : "Pace",
+      unit: isZh ? "分鐘 / 公里" : "min / km",
+      color: "#FC4C02",
+      fillColor: "rgba(252,76,2,0.35)",
+      invertY: true, // faster pace at top
+      yFmt: fmtPaceMin,
+      xFmt,
+      isZh,
+    },
+  );
+
+  drawChart(
+    ctx,
+    { x: padX, y: headerH + chartH + chartGap, w: W - padX * 2, h: chartH },
+    hrPts,
+    {
+      title: isZh ? "心率" : "Heart Rate",
+      unit: "bpm",
+      color: "#EF4444",
+      fillColor: "rgba(239,68,68,0.35)",
+      yFmt: (v) => String(Math.round(v)),
+      xFmt,
+      isZh,
+    },
+  );
+
+  drawInstagramFooter(ctx, W, H, padX, isZh, iconImg);
+
+  return await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob(
+      (b) => (b ? resolve(b) : reject(new Error("Canvas toBlob failed"))),
+      "image/png",
+      0.95,
+    );
+  });
+}
+
+export async function shareCharts(input: ShareChartsInput): Promise<void> {
+  const isZh = input.lang === "zh";
+  const loadingId = toast.loading(isZh ? "正在生成圖表..." : "Generating charts image...");
+  let blob: Blob;
+  try {
+    blob = await renderChartsCard(input);
+  } catch (err) {
+    console.error("[ShareCharts] Render failed:", err);
     toast.dismiss(loadingId);
     toast.error(isZh ? "無法生成圖片" : "Failed to create image");
     return;

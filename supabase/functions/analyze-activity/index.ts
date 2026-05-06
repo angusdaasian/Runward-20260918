@@ -513,7 +513,7 @@ ${plannedWorkout ? `- ${plannedWorkout}` : ""}`;
     // --- Lap analysis (interval-aware) — normalises field names across Garmin / Terra / Strava ---
     const garminLapsArr = asArray<any>(garminLaps);
     if (garminLapsArr.length > 0) {
-      const norm = garminLapsArr.map((lap: any, idx: number) => {
+      const normAll = garminLapsArr.map((lap: any, idx: number) => {
         const distance = Number(lap.distance ?? lap.distance_meters ?? lap.total_distance_meters ?? 0) || 0;
         const elapsed = Number(
           lap.elapsed_time ?? lap.duration_seconds ?? lap.moving_time ?? lap.total_timer_time_seconds ?? 0,
@@ -523,12 +523,14 @@ ${plannedWorkout ? `- ${plannedWorkout}` : ""}`;
         const paceSecPerKm = speed > 0 ? 1000 / speed : Infinity;
         const number = lap.split_number ?? lap.lap_index ?? idx + 1;
         const avgHr = Number(lap.avg_hr ?? lap.average_hr ?? lap.avg_hr_bpm ?? 0) || null;
-        return { number, distance, elapsed, speed, paceSecPerKm, avgHr };
+        const maxHr = Number(lap.max_hr ?? lap.max_heartrate ?? 0) || null;
+        return { number, distance, elapsed, speed, paceSecPerKm, avgHr, maxHr };
       });
 
+      // Filter GPS-noise laps (tiny dist & duration cause unrealistic paces e.g. 6m @ 2:44)
+      const norm = normAll.filter((l) => !(l.distance < 50 && l.elapsed < 10));
+
       // Detect rest vs work using RELATIVE pace among laps (not absolute thresholds).
-      // Fastest lap pace = work reference. A lap is "rest" if its pace is >40% slower than fastest,
-      // or distance is very short AND much slower than fastest.
       const validForPace = norm.filter((l) => Number.isFinite(l.paceSecPerKm));
       const fastestPace = validForPace.length
         ? Math.min(...validForPace.map((l) => l.paceSecPerKm))
@@ -536,7 +538,6 @@ ${plannedWorkout ? `- ${plannedWorkout}` : ""}`;
       const lapsWithType = norm.map((l) => {
         let isRest = false;
         if (Number.isFinite(l.paceSecPerKm) && Number.isFinite(fastestPace)) {
-          // >40% slower than fastest lap → rest/recovery
           if (l.paceSecPerKm > fastestPace * 1.4) isRest = true;
         } else if (l.speed === 0 || l.distance === 0) {
           isRest = true;
@@ -555,16 +556,37 @@ ${plannedWorkout ? `- ${plannedWorkout}` : ""}`;
           : "--";
 
       if (hasIntervalPattern) {
-        statsText += `\n\n⚡ INTERVAL WORKOUT DETECTED (lap pace alternates):`;
-        statsText += `\n  Work laps: ${workLaps.length} | Rest/recovery laps: ${restLaps.length}`;
-        statsText += `\n  Fastest lap pace: ${fmtLapPace(fastestPace)} (used as work reference)`;
-        statsText += `\n\n  All laps in order (pace pattern matters — alternating fast/slow = intervals):`;
+        // Aggregate work-lap stats
+        const workDistances = workLaps.map((l) => Math.round(l.distance));
+        const workDurations = workLaps.map((l) => Math.round(l.elapsed));
+        const workPaces = workLaps.filter((l) => Number.isFinite(l.paceSecPerKm)).map((l) => l.paceSecPerKm);
+        const restDurations = restLaps.map((l) => Math.round(l.elapsed));
+        const restDistances = restLaps.map((l) => Math.round(l.distance));
+        const avg = (a: number[]) => a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0;
+        const workHrs = workLaps.map((l) => l.avgHr).filter((x): x is number => !!x);
+        const restHrs = restLaps.map((l) => l.avgHr).filter((x): x is number => !!x);
+
+        statsText += `\n\n⚡ INTERVAL WORKOUT DETECTED — clean lap data (GPS-noise laps removed):`;
+        statsText += `\n  Work reps: ${workLaps.length}  |  Recovery reps: ${restLaps.length}`;
+        statsText += `\n  Work rep distance: avg ${Math.round(avg(workDistances))}m (range ${Math.min(...workDistances)}–${Math.max(...workDistances)}m)`;
+        statsText += `\n  Work rep duration: avg ${Math.round(avg(workDurations))}s`;
+        if (workPaces.length) statsText += `\n  Work pace: avg ${fmtLapPace(avg(workPaces))} (fastest ${fmtLapPace(Math.min(...workPaces))})`;
+        if (workHrs.length) statsText += `\n  Work avg HR: ${Math.round(avg(workHrs))} bpm`;
+        if (restDurations.length) statsText += `\n  Recovery duration: avg ${Math.round(avg(restDurations))}s, distance avg ${Math.round(avg(restDistances))}m`;
+        if (restHrs.length) statsText += `\n  Recovery avg HR: ${Math.round(avg(restHrs))} bpm`;
+
+        statsText += `\n\n  Lap-by-lap (in order):`;
         for (const lap of lapsWithType) {
-          const tag = lap.isRest ? "🟦 REST  " : "🟥 WORK  ";
-          statsText += `\n    ${tag}Lap ${lap.number}: ${Math.round(lap.distance)}m in ${Math.round(lap.elapsed)}s (pace: ${fmtLapPace(lap.paceSecPerKm)})`;
-          if (lap.avgHr) statsText += ` | HR: ${Math.round(lap.avgHr)} bpm`;
+          const tag = lap.isRest ? "🟦 REST " : "🟥 WORK ";
+          statsText += `\n    ${tag}Lap ${lap.number}: ${Math.round(lap.distance)}m / ${Math.round(lap.elapsed)}s @ ${fmtLapPace(lap.paceSecPerKm)}`;
+          if (lap.avgHr) statsText += ` | HR ${Math.round(lap.avgHr)}${lap.maxHr ? `/${Math.round(lap.maxHr)}` : ""} bpm`;
         }
-        statsText += `\n\n  → Use this work/rest pattern to identify the interval structure (e.g., 4×400m w/ 200m jog, 6×1min hard / 1min easy, fartlek). Do NOT call this an easy/long run.`;
+        statsText += `\n\n  → DEEP ANALYSIS REQUIRED:`;
+        statsText += `\n    1. Identify the exact interval structure from the work-rep distance/duration pattern (e.g., "10×400m w/ ~90s recovery", "6×1km w/ 2min jog", "Yasso 800s", fartlek, hill repeats, ladder).`;
+        statsText += `\n    2. Comment on PACING CONSISTENCY across reps — are they even, fading, or progressive? Quote specific lap paces.`;
+        statsText += `\n    3. Comment on HR DRIFT across reps — does HR climb on later reps at same pace (sign of fatigue/cardiac drift)?`;
+        statsText += `\n    4. Assess work:rest RATIO and what energy system this targets (VO2max ~3-5min hard / equal rest, threshold ~1km cruise w/ short rest, anaerobic 200-400m w/ full recovery, etc.).`;
+        statsText += `\n    5. Do NOT call this an easy/long/tempo run.`;
       } else {
         statsText += "\n\nLaps:";
         for (const lap of lapsWithType) {

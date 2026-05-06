@@ -26,7 +26,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import ActivityMap from "./ActivityMap";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from "recharts";
-import { loadForActivity } from "@/lib/trainingLoad";
+import { loadForActivity, isRunning } from "@/lib/trainingLoad";
 
 interface StravaActivity {
   id: string;

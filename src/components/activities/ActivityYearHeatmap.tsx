@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { LayoutGrid, BarChart3 } from "lucide-react";
 import { Lang } from "@/lib/i18n";
-import type { LoadActivity } from "@/lib/trainingLoad";
+import { isRunning, type LoadActivity } from "@/lib/trainingLoad";
 
 interface Props {
   lang: Lang;

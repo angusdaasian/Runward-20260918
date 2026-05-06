@@ -486,7 +486,6 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
         if (v.heartrate) point.heartrate = v.heartrate;
         // Pace from distance window
         if (distSamples && v.distM != null) {
-          // Find sample ~WINDOW seconds earlier
           let j = i;
           while (j > 0 && t - ordered[j][0] < WINDOW) j--;
           const prev = distAt(j);
@@ -495,15 +494,28 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
             const dd = v.distM - prev;
             if (dd > 0) {
               const speed = dd / dt; // m/s
-              point.pace = speedToPace(speed);
+              const pace = speedToPace(speed);
+              // Drop unrealistic paces (slower than 15 min/km or faster than 2:30 min/km)
+              if (pace >= 2.5 && pace <= 15) point.pace = pace;
             }
           }
         }
         data.push(point);
       }
+      // Second-pass IQR clipping on pace to remove residual outliers
+      const paces = data.map((d) => d.pace).filter((p): p is number => typeof p === "number").sort((a, b) => a - b);
+      if (paces.length > 8) {
+        const q = (frac: number) => paces[Math.floor(paces.length * frac)];
+        const q1 = q(0.1), q3 = q(0.9);
+        const iqr = q3 - q1;
+        const lo = q1 - 1.5 * iqr;
+        const hi = q3 + 1.5 * iqr;
+        for (const d of data) {
+          if (typeof d.pace === "number" && (d.pace < lo || d.pace > hi)) delete d.pace;
+        }
+      }
       return data;
     }
-    // Fallback: when no Strava streams (Terra / Garmin / Apple Health), build a
     // per-lap chart from splits so HR + Pace charts still render.
     if ((!streams || streams.length === 0) && splits && splits.length > 0) {
       const data: any[] = [];

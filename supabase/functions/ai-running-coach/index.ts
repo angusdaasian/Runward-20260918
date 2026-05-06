@@ -608,7 +608,9 @@ If the user has no preferences set yet, ask ONE friendly onboarding question per
       systemPrompt,
       messages,
       temperature: 0.7,
-      maxOutputTokens: 1024,
+      // Gemini counts thinking tokens against maxOutputTokens, so scale the
+      // budget with the thinking level — otherwise high thinking returns blank.
+      maxOutputTokens: 1500 + THINKING_BUDGETS[thinkingLevel],
       thinkingBudget: THINKING_BUDGETS[thinkingLevel],
     });
 

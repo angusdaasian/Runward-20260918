@@ -630,6 +630,17 @@ async function processWebhook(
         await supa.from("terra_connections").update({ active: false, last_webhook_at: new Date().toISOString() }).eq("terra_user_id", terraUserId);
       } else if ((type === "activity" || type === "processed_activity") && appUserId) {
         const acts = Array.isArray(payload?.data) ? payload.data : [payload?.data].filter(Boolean);
+        // Empty-payload ping: Garmin/Terra notify us that activities exist
+        // without sending the actual data. Re-request with samples=true.
+        if (acts.length === 0 && terraUserId) {
+          const today = new Date().toISOString().slice(0, 10);
+          const yesterday = new Date(Date.now() - 86400_000).toISOString().slice(0, 10);
+          await requestActivityHrSamplesWebhook(
+            terraUserId, referenceId, provider,
+            `empty:${terraUserId}:${today}`,
+            null, env, yesterday,
+          );
+        }
         let newActivityCount = 0;
         for (const a of acts) {
           const meta = a?.metadata ?? {};
@@ -687,7 +698,7 @@ async function processWebhook(
           }, { onConflict: "user_id,terra_activity_id" });
           await deleteMatchingGarminDuplicate(appUserId, meta?.start_time ?? null, distanceMeters);
           if (hrSamples.length === 0 && terraUserId && (meta?.summary_id ?? meta?.id)) {
-            await requestActivityHrSamplesWebhook(terraUserId, referenceId, provider, String(meta.summary_id ?? meta.id), meta?.start_time ?? null);
+            await requestActivityHrSamplesWebhook(terraUserId, referenceId, provider, String(meta.summary_id ?? meta.id), meta?.start_time ?? null, env);
           }
           if (isNew && (distanceMeters ?? 0) > 0) newActivityCount++;
         }

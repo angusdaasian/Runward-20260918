@@ -625,28 +625,28 @@ async function renderSplitsCard(input: ShareSplitsInput): Promise<Blob> {
   ctx.fillStyle = "rgba(255,255,255,0.04)";
   ctx.fillRect(0, tableY, W, tableHeaderH);
 
-  // Column layout: [#] [Type] [Time] [Dist (m)] [Pace] [HR]
-  const colXs = [
-    padX,                  // #
-    padX + 80,             // Type
-    W - padX - 540,        // Time
-    W - padX - 380,        // Dist
-    W - padX - 220,        // Pace
-    W - padX - 60,         // HR (right-aligned)
-  ];
+  // Column layout — right-aligned numeric columns with generous spacing
+  // so HR is never clipped or overlapped.
+  // # | Type | ... Time | Dist | Pace | HR (each numeric col 170px apart)
+  const HR_RIGHT = W - padX;            // 1020
+  const PACE_RIGHT = HR_RIGHT - 170;    // 850
+  const DIST_RIGHT = PACE_RIGHT - 170;  // 680
+  const TIME_RIGHT = DIST_RIGHT - 170;  // 510
+  const NUM_LEFT = padX;                // 60
+  const TYPE_LEFT = padX + 80;          // 140
 
   ctx.fillStyle = "rgba(255,255,255,0.55)";
   ctx.font = `700 22px ${FONT_TEXT}`;
   ctx.textBaseline = "middle";
   const headerMid = tableY + tableHeaderH / 2;
   ctx.textAlign = "left";
-  ctx.fillText("#", colXs[0], headerMid);
-  ctx.fillText(isZh ? "類型" : "TYPE", colXs[1], headerMid);
+  ctx.fillText("#", NUM_LEFT, headerMid);
+  ctx.fillText(isZh ? "類型" : "TYPE", TYPE_LEFT, headerMid);
   ctx.textAlign = "right";
-  ctx.fillText(isZh ? "時間" : "TIME", colXs[2] + 140, headerMid);
-  ctx.fillText(isZh ? "距離 (m)" : "DIST (m)", colXs[3] + 140, headerMid);
-  ctx.fillText(isZh ? "配速" : "PACE", colXs[4] + 140, headerMid);
-  ctx.fillText("HR", colXs[5], headerMid);
+  ctx.fillText(isZh ? "時間" : "TIME", TIME_RIGHT, headerMid);
+  ctx.fillText(isZh ? "距離(m)" : "DIST(m)", DIST_RIGHT, headerMid);
+  ctx.fillText(isZh ? "配速" : "PACE", PACE_RIGHT, headerMid);
+  ctx.fillText("HR", HR_RIGHT, headerMid);
 
   // ---------- Rows ----------
   let runNum = 0;
@@ -656,13 +656,11 @@ async function renderSplitsCard(input: ShareSplitsInput): Promise<Blob> {
       isInterval && fastestSpeed > 0 && s.average_speed > 0 && s.average_speed < fastestSpeed * 0.7;
     if (!isRest) runNum++;
 
-    // Row background (alternate for legibility)
     if (isRest) {
       ctx.fillStyle = "rgba(255,255,255,0.03)";
       ctx.fillRect(0, y, W, rowH);
     }
 
-    // Bottom border
     ctx.strokeStyle = "rgba(255,255,255,0.06)";
     ctx.lineWidth = 1;
     ctx.beginPath();
@@ -674,32 +672,29 @@ async function renderSplitsCard(input: ShareSplitsInput): Promise<Blob> {
     const baseColor = isRest ? "rgba(255,255,255,0.45)" : "#FFFFFF";
     const accentWeight = isRest ? "500" : "700";
 
-    // # (orange dot for runs)
     if (!isRest) {
       ctx.fillStyle = "#FC4C02";
       ctx.beginPath();
-      ctx.arc(colXs[0] + 14, mid, 6, 0, Math.PI * 2);
+      ctx.arc(NUM_LEFT + 14, mid, 6, 0, Math.PI * 2);
       ctx.fill();
     }
     ctx.fillStyle = baseColor;
     ctx.font = `700 26px ${FONT_TEXT}`;
     ctx.textAlign = "left";
-    ctx.fillText(isRest ? "" : String(runNum), colXs[0] + 28, mid);
+    ctx.fillText(isRest ? "" : String(runNum), NUM_LEFT + 28, mid);
 
-    // Type
     ctx.font = `${accentWeight} 26px ${FONT_TEXT}`;
     ctx.fillStyle = baseColor;
     ctx.fillText(
       isRest ? (isZh ? "休息" : "Rest") : (isZh ? "跑步" : "Run"),
-      colXs[1],
+      TYPE_LEFT,
       mid,
     );
 
-    // Time / Dist / Pace / HR (right-aligned, tabular)
     ctx.textAlign = "right";
     ctx.font = `${accentWeight} 26px ${FONT_TEXT}`;
-    ctx.fillText(fmtTimeShort(s.elapsed_time, false).replace(/\s/g, ""), colXs[2] + 140, mid);
-    ctx.fillText(String(Math.round(s.distance || 0)), colXs[3] + 140, mid);
+    ctx.fillText(fmtTimeShort(s.elapsed_time, false).replace(/\s/g, ""), TIME_RIGHT, mid);
+    ctx.fillText(String(Math.round(s.distance || 0)), DIST_RIGHT, mid);
     ctx.fillText(
       s.average_speed > 0
         ? (() => {
@@ -709,10 +704,10 @@ async function renderSplitsCard(input: ShareSplitsInput): Promise<Blob> {
             return `${m}:${String(sec).padStart(2, "0")}`;
           })()
         : "--",
-      colXs[4] + 140,
+      PACE_RIGHT,
       mid,
     );
-    ctx.fillText(s.average_heartrate ? String(Math.round(s.average_heartrate)) : "--", colXs[5], mid);
+    ctx.fillText(s.average_heartrate ? String(Math.round(s.average_heartrate)) : "--", HR_RIGHT, mid);
   });
 
   // ---------- Footer ----------

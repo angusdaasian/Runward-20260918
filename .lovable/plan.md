@@ -1,70 +1,89 @@
 ## Goal
 
-Add per-second HR time-series capture from Terra activity payloads, plot a true HR-over-time chart in ActivityDetail, and validate by syncing **only today's activities** for user `6hhxbmqfd7` (uuid lookup at runtime via `terra_connections`).
+1. Add a test environment for Terra so we can validate the HR-samples retry on `angustest.site` without touching the production Garmin webhook flow on `pacecalculator.fun`.
+2. Implement the empty-payload retry fix from the previous plan inside the test path first.
 
-## 1. Schema migration
+## New secrets to add
 
-Add to `terra_activities`:
+- `TERRA_DEV_ID_TEST`
+- `TERRA_API_KEY_TEST`
+- `TERRA_SIGNING_SECRET_TEST`
 
-- `hr_samples jsonb` — compact array `[{ t: <int seconds from start>, bpm: <int> }, ...]`, downsampled to ≤1 Hz. Nullable, default `null`.
+(Existing `TERRA_DEV_ID`, `TERRA_API_KEY`, `TERRA_SIGNING_SECRET` stay as production.)
 
-## 2. terra-sync edge function changes
+## Environment selection
 
-`supabase/functions/terra-sync/index.ts`:
+A single edge function deployment serves both sites, so we route by environment per call:
 
-- Helper `extractHrSamples(a)`:
-  - Source order: `a.heart_rate_data.detailed.hr_samples` → `a.heart_rate_data.detailed.hr_samples_data` → `a.heart_rate_data.samples`.
-  - Per sample: prefer `timer_duration_seconds`, else `(timestamp - metadata.start_time) / 1000`. Read bpm from `bpm` or `heart_rate_bpm` or `heart_rate`.
-  - Drop non-finite bpm or `t < 0`. Downsample to 1 Hz (last write wins per integer second). Cap 7200 entries.
-- Helper `recomputeLapAvgHr(laps, samples)`:
-  - For each lap, average bpm of samples with `t` in `[lapStartSec, lapEndSec]`.
-  - Replace lap `avg_hr` only when ≥5 samples fall in window.
-- Activity loop:
-  - Compute `hrSamples`. If non-empty + laps present, recompute lap `avg_hr`.
-  - Add `hr_samples` to upsert; preserve existing on re-sync (extend the `existing` select).
+- **terra-auth-init / terra-sync / terra-disconnect**: read the caller origin from `req.headers.get("origin")` (and `success_url` host as fallback). If host is `angustest.site` / `www.angustest.site` / `id-preview--*.lovable.app`, use the `_TEST` credentials; otherwise production. Default success/failure URLs in `terra-auth-init` switch to `https://angustest.site/terra-return?...` for test.
+- **terra-webhook**: deploy a second function `terra-webhook-test` (thin wrapper that imports the same logic but forces `env = "test"`). Register *that* URL in the Terra **test** dashboard; production webhook stays untouched. The shared handler picks signing secret + API key based on the `env` flag.
 
-### Scoping for this test
-
-Add two **optional body params** to terra-sync (admin-only, gated via `has_role(auth.uid(), 'admin')`):
-
-- `targetUserId: string` — when set, use that user_id for the connections query instead of `auth.uid()`.
-- `dayOnly: boolean` — when true, set `startStr = endStr = today (UTC YYYY-MM-DD)` to fetch only today's activities (skip daily/sleep/body branches in this mode to keep the call cheap).
-
-Then invoke once:
-```
-supabase.functions.invoke('terra-sync', { body: { targetUserId: '<uuid of 6hhxbmqfd7>', dayOnly: true } })
+```text
+angustest.site ─┐                          ┌─ terra-webhook-test  → TEST creds
+                ├─ terra-auth-init ────────┤
+pacecalculator ─┘   (chooses creds by host)└─ terra-webhook       → PROD creds
 ```
 
-Both params remain useful as admin tools after the test.
+## Code changes
 
-## 3. Frontend chart
+### `supabase/functions/_shared/terraEnv.ts` (new)
+- Export `getTerraCreds(env: "prod" | "test")` returning `{ devId, apiKey, signingSecret }`.
+- Export `pickEnvFromRequest(req, extraHostHints?)` that returns `"test"` when host matches the test allowlist.
 
-`src/components/activities/ActivityDetail.tsx`:
+### `supabase/functions/terra-auth-init/index.ts`
+- Replace direct `Deno.env.get("TERRA_*")` with `getTerraCreds(pickEnvFromRequest(req, [success_url]))`.
+- Default success/failure URLs become test-aware.
 
-- Read `hr_samples` from the activity row.
-- When length > 10, render a recharts `LineChart` above the per-lap HR section:
-  - X: elapsed `mm:ss`. Y: bpm, domain `[min-10, max+10]` clamped to `[40, 220]`.
-  - Single smooth line, no dots.
-  - `ReferenceLine` at each cumulative lap boundary from `laps[i].duration_seconds`.
-- Keep existing per-lap HR display.
+### `supabase/functions/terra-sync/index.ts`
+- Same credential lookup. The env is determined per request; existing logic (including the historical-activity webhook calls already added) is unchanged otherwise.
 
-## 4. Validation
+### `supabase/functions/terra-disconnect/index.ts`
+- Same credential lookup.
 
-1. Run migration.
-2. Deploy terra-sync.
-3. Look up uuid for `6hhxbmqfd7` via `terra_connections`, invoke with `{ targetUserId, dayOnly: true }`.
-4. Inspect today's activity row in `terra_activities`: `hr_samples` populated, lap avgs updated.
-5. Open ActivityDetail, confirm chart matches Garmin shape.
+### `supabase/functions/terra-webhook/index.ts` (refactor)
+- Extract the existing handler body into an exported `handleTerraWebhook(req, env)` function.
+- Default export keeps wiring for production (`env = "prod"`).
+- Inside the handler, replace the three hard-coded `Deno.env.get("TERRA_*")` reads (lines 510/511, 580/581, 746/747) with `getTerraCreds(env)`.
+- **Apply the empty-payload retry fix here**:
+  - In the `activity` branch, before `for (const a of acts)`: if `acts.length === 0` and `terraUserId` is present, call a new `requestActivityHrSamplesWebhookForDay(terraUserId, todayUtc, env)` that hits `/v2/activity?to_webhook=true&with_samples=true&start_date=YYYY-MM-DD&end_date=YYYY-MM-DD` for `today-1` → `today+1`.
+  - Add a `startDate`-fallback path inside `requestActivityHrSamplesWebhook` for cases where `startTime` is null.
+  - Dedupe key for the empty case: `empty:{terraUserId}:{todayUtc}` (2-min window, same as existing).
+
+### `supabase/functions/terra-webhook-test/index.ts` (new)
+- Three-line file:
+  ```ts
+  import { handleTerraWebhook } from "../terra-webhook/index.ts";
+  Deno.serve((req) => handleTerraWebhook(req, "test"));
+  ```
+- Deployed alongside `terra-webhook`; gets its own public URL.
+
+### Frontend (`src/components/ConnectApps.tsx`)
+- No code change required for env selection — the request `Origin` is set automatically by the browser, so the auth-init function infers test vs prod from the host the user is on.
+
+## Setup steps for the user (in Terra dashboard)
+
+1. In the **test** Terra project: set the webhook URL to the new `terra-webhook-test` function URL (Lovable will print it after deploy).
+2. Keep the production Terra project pointed at the existing `terra-webhook` URL.
+3. Connect Garmin from `angustest.site` so a `terra_connections` row is created using test credentials.
+
+## Validation after deploy
+
+1. From `angustest.site`, connect Garmin → confirm OAuth completes.
+2. Trigger a Garmin push (or click Resync).
+3. Query `terra_webhook_events where type='terra_hr_samples_retry' order by received_at desc limit 5` — expect rows with HTTP 200.
+4. Within ~30 s, the follow-up activity webhook arrives with `payload.data` populated.
+5. Confirm `terra_activities.hr_samples` for May 5/6 becomes non-empty.
+6. Once verified on test, no production code change is needed — the same handler is already running on prod with prod creds; we only enabled the empty-payload retry path, which is benign for prod.
 
 ## Files touched
 
-- new migration: `terra_activities.hr_samples jsonb`
-- `supabase/functions/terra-sync/index.ts`
-- `src/components/activities/ActivityDetail.tsx`
-- `src/integrations/supabase/types.ts` (auto-regenerated)
+- new: `supabase/functions/_shared/terraEnv.ts`
+- new: `supabase/functions/terra-webhook-test/index.ts`
+- edited: `supabase/functions/terra-auth-init/index.ts`
+- edited: `supabase/functions/terra-sync/index.ts`
+- edited: `supabase/functions/terra-disconnect/index.ts`
+- edited: `supabase/functions/terra-webhook/index.ts`
 
-## Out of scope
+## Secrets I will request after you approve
 
-- `garmin_activities` mirror — follow-up.
-- Backfill beyond today / past 30 days — Terra API limit anyway.
-- Rolling out broadly — only after this user validates.
+`TERRA_DEV_ID_TEST`, `TERRA_API_KEY_TEST`, `TERRA_SIGNING_SECRET_TEST`.

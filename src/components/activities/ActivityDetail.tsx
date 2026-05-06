@@ -1079,7 +1079,8 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
         </div>
       )}
 
-      {/* AI Workout Analysis Section */}
+      {/* AI Workout Analysis Section (running activities only) */}
+      {isRunningActivity && (
       <div className="bg-card border border-border rounded-xl p-4 mt-4">
         <div className="flex items-center gap-2 mb-3">
           <Sparkles size={16} className="text-primary" />

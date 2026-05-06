@@ -24,7 +24,7 @@ import ActivityMap from "@/components/activities/ActivityMap";
 import ActivityCalendar from "@/components/activities/ActivityCalendar";
 import MonthlyRoadQuest from "@/components/activities/MonthlyRoadQuest";
 import ActivityDetail from "@/components/activities/ActivityDetail";
-import ManualImportTabs from "@/components/activities/ManualImportTabs";
+
 import SuggestedNextWorkout from "@/components/activities/SuggestedNextWorkout";
 import { calculateRunningScore } from "@/lib/vdot";
 import { loadForActivity } from "@/lib/trainingLoad";

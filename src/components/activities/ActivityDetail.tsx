@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { ArrowLeft, Clock, MapPin, Zap, Heart, TrendingUp, Mountain, Timer, Footprints, Trash2, Pencil, Sparkles, Lock, Gauge, AlertTriangle, Flame, Trophy, MessageSquare, RefreshCw, Share2 } from "lucide-react";
-import { shareActivity, shareSplits } from "@/lib/shareActivity";
+import { shareActivity, shareSplits, shareCharts } from "@/lib/shareActivity";
 import {
   DropdownMenu,
   DropdownMenuContent,

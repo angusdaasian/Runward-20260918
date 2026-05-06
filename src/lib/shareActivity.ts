@@ -738,11 +738,39 @@ async function renderSplitsCard(input: ShareSplitsInput): Promise<Blob> {
   ctx.font = `500 20px ${FONT_TEXT}`;
   ctx.fillText(isZh ? "用 AI 訓練得更聰明" : "Train smarter with AI", padX + 76, footerY + 66);
 
+  // Instagram handle (right side): IG glyph + @runward.app
+  const handle = "@runward.app";
   ctx.textAlign = "right";
-  ctx.fillStyle = "rgba(255,255,255,0.75)";
+  ctx.textBaseline = "middle";
+  ctx.fillStyle = "#FFFFFF";
   ctx.font = `600 22px ${FONT_TEXT}`;
-  ctx.fillText(APP_URL.replace("https://", ""), W - padX, footerY + 50);
+  const handleY = footerY + 58;
+  const handleW = ctx.measureText(handle).width;
+  ctx.fillText(handle, W - padX, handleY);
+
+  // Draw IG glyph just left of the handle
+  const igSize = 36;
+  const igX = W - padX - handleW - 16 - igSize;
+  const igY = handleY - igSize / 2;
+  ctx.save();
+  ctx.strokeStyle = "#FFFFFF";
+  ctx.fillStyle = "#FFFFFF";
+  ctx.lineWidth = 2.5;
+  // Rounded square
+  roundedRect(ctx, igX, igY, igSize, igSize, 9);
+  ctx.stroke();
+  // Lens circle
+  ctx.beginPath();
+  ctx.arc(igX + igSize / 2, igY + igSize / 2, igSize * 0.26, 0, Math.PI * 2);
+  ctx.stroke();
+  // Top-right dot
+  ctx.beginPath();
+  ctx.arc(igX + igSize - 8, igY + 8, 2.2, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
   ctx.textAlign = "left";
+  ctx.textBaseline = "top";
 
   return await new Promise<Blob>((resolve, reject) => {
     canvas.toBlob(

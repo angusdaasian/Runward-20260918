@@ -41,6 +41,7 @@ interface StravaActivity {
   calories?: number | null;
   laps?: any[] | null;
   hr_samples?: Array<{ t: number; bpm: number }> | null;
+  distance_samples?: Array<{ t: number; d: number }> | null;
   map_screenshot_url?: string | null;
   provenance?: "strava" | "apple_health" | "garmin" | "terra";
 }

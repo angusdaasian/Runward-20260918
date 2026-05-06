@@ -549,6 +549,7 @@ async function processWebhook(
   referenceId: string | null,
   provider: string,
   user: any,
+  env: TerraEnv = "prod",
 ): Promise<string | null> {
   let processingError: string | null = null;
   try {
@@ -587,8 +588,9 @@ async function processWebhook(
           const today = new Date().toISOString().slice(0, 10);
           const since = new Date(Date.now() - 7 * 86400_000).toISOString().slice(0, 10);
 
-          const devId = Deno.env.get("TERRA_DEV_ID") ?? "";
-          const apiKey = Deno.env.get("TERRA_API_KEY") ?? "";
+          const creds = getTerraCreds(env);
+          const devId = creds.devId;
+          const apiKey = creds.apiKey;
           const headers = { "dev-id": devId, "x-api-key": apiKey };
           const calls: Array<{ ep: string; url: string }> = [
             {

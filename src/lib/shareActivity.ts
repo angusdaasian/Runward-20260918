@@ -35,6 +35,20 @@ export interface ShareActivityInput {
   lang: Lang;
 }
 
+export interface ShareSplit {
+  distance: number; // meters
+  elapsed_time: number; // seconds
+  average_speed: number; // m/s
+  average_heartrate?: number | null;
+}
+
+export interface ShareSplitsInput {
+  name: string;
+  startDate: string;
+  splits: ShareSplit[];
+  lang: Lang;
+}
+
 // ---------------- formatting helpers ----------------
 
 function fmtDistance(meters: number): string {

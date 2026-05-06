@@ -1179,7 +1179,7 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
       )}
 
       {/* Suggested Next Workout */}
-      {isPremium && aiNextWorkout && !aiLoading && (
+      {isRunningActivity && isPremium && aiNextWorkout && !aiLoading && (
         <div className="bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/30 rounded-xl p-4 mt-4">
           <div className="flex items-center gap-2 mb-3">
             <Footprints size={16} className="text-primary" />

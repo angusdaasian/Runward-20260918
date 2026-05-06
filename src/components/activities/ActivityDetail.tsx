@@ -1,6 +1,12 @@
 import { useState, useEffect, useMemo } from "react";
 import { ArrowLeft, Clock, MapPin, Zap, Heart, TrendingUp, Mountain, Timer, Footprints, Trash2, Pencil, Sparkles, Lock, Gauge, AlertTriangle, Flame, Trophy, MessageSquare, RefreshCw, Share2 } from "lucide-react";
-import { shareActivity } from "@/lib/shareActivity";
+import { shareActivity, shareSplits } from "@/lib/shareActivity";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Lang } from "@/lib/i18n";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -592,24 +598,51 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
           {lang === "zh" ? "返回" : "Back"}
         </button>
         <div className="flex items-center gap-1">
-          <button
-            onClick={() =>
-              shareActivity({
-                name: activityName,
-                distanceMeters: activity.distance,
-                movingTimeSeconds: activity.moving_time,
-                averageSpeed: activity.average_speed,
-                startDate: activity.start_date,
-                analysis: aiAnalysis,
-                nextWorkout: aiNextWorkout,
-                lang,
-              })
-            }
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-primary hover:bg-primary/10 transition-colors"
-          >
-            <Share2 size={14} />
-            {lang === "zh" ? "分享" : "Share"}
-          </button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-primary hover:bg-primary/10 transition-colors">
+                <Share2 size={14} />
+                {lang === "zh" ? "分享" : "Share"}
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-52">
+              <DropdownMenuItem
+                onClick={() =>
+                  shareActivity({
+                    name: activityName,
+                    distanceMeters: activity.distance,
+                    movingTimeSeconds: activity.moving_time,
+                    averageSpeed: activity.average_speed,
+                    startDate: activity.start_date,
+                    analysis: aiAnalysis,
+                    nextWorkout: aiNextWorkout,
+                    lang,
+                  })
+                }
+              >
+                {lang === "zh" ? "分享活動卡片" : "Share activity card"}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                disabled={!splits || splits.length === 0}
+                onClick={() => {
+                  if (!splits || splits.length === 0) return;
+                  shareSplits({
+                    name: activityName,
+                    startDate: activity.start_date,
+                    splits: splits.map((s) => ({
+                      distance: s.distance,
+                      elapsed_time: s.elapsed_time,
+                      average_speed: s.average_speed,
+                      average_heartrate: s.average_heartrate ?? null,
+                    })),
+                    lang,
+                  });
+                }}
+              >
+                {lang === "zh" ? "分享分段" : "Share splits"}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         <AlertDialog>
           <AlertDialogTrigger asChild>
             <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-destructive hover:bg-destructive/10 transition-colors">

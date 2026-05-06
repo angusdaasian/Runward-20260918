@@ -35,6 +35,20 @@ export interface ShareActivityInput {
   lang: Lang;
 }
 
+export interface ShareSplit {
+  distance: number; // meters
+  elapsed_time: number; // seconds
+  average_speed: number; // m/s
+  average_heartrate?: number | null;
+}
+
+export interface ShareSplitsInput {
+  name: string;
+  startDate: string;
+  splits: ShareSplit[];
+  lang: Lang;
+}
+
 // ---------------- formatting helpers ----------------
 
 function fmtDistance(meters: number): string {
@@ -532,4 +546,279 @@ export async function shareActivity(input: ShareActivityInput): Promise<void> {
   } catch {
     toast.error(isZh ? "無法分享" : "Unable to share");
   }
+}
+
+// ====================================================================
+// SPLITS SHARE CARD
+// ====================================================================
+
+async function renderSplitsCard(input: ShareSplitsInput): Promise<Blob> {
+  const isZh = input.lang === "zh";
+
+  // Filter GPS-noise laps + detect intervals (mirrors ActivityDetail logic)
+  const NOISE_DIST_M = 50;
+  const NOISE_TIME_S = 10;
+  const visible = input.splits.filter(
+    (s) => !((s.distance || 0) < NOISE_DIST_M && (s.elapsed_time || 0) < NOISE_TIME_S),
+  );
+
+  const speeds = visible.map((s) => s.average_speed).filter((v) => v > 0);
+  const hrs = visible.map((s) => s.average_heartrate ?? 0).filter((v) => v > 0);
+  const fastestSpeed = speeds.length ? Math.max(...speeds) : 0;
+  const slowestSpeed = speeds.length ? Math.min(...speeds) : 0;
+  let isInterval = false;
+  if (speeds.length >= 3 && slowestSpeed > 0) {
+    const ratio = fastestSpeed / slowestSpeed;
+    const hrSpread = hrs.length >= 3 ? Math.max(...hrs) - Math.min(...hrs) : 0;
+    isInterval = ratio >= 1.4 || (ratio >= 1.25 && hrSpread >= 20);
+  }
+
+  const W = 1080;
+  const headerH = 240;
+  const rowH = 72;
+  const tableHeaderH = 70;
+  const footerH = 140;
+  const padX = 60;
+  const tablePadTop = 30;
+  const H = headerH + tableHeaderH + visible.length * rowH + tablePadTop + footerH + 40;
+
+  const canvas = document.createElement("canvas");
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext("2d")!;
+
+  // Background — clean, no photo
+  ctx.fillStyle = "#0B0F1A";
+  ctx.fillRect(0, 0, W, H);
+  // Subtle gradient accent at top
+  const g = ctx.createLinearGradient(0, 0, 0, headerH);
+  g.addColorStop(0, "rgba(252, 76, 2, 0.20)");
+  g.addColorStop(1, "rgba(252, 76, 2, 0)");
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W, headerH);
+
+  // ---------- Header (logo + brand + title) ----------
+  try {
+    const icon = await loadImage(appIcon);
+    ctx.save();
+    roundedRect(ctx, padX, 60, 80, 80, 18);
+    ctx.clip();
+    ctx.drawImage(icon, padX, 60, 80, 80);
+    ctx.restore();
+  } catch { /* ignore */ }
+
+  ctx.fillStyle = "#FFFFFF";
+  ctx.textBaseline = "top";
+  ctx.font = `700 42px ${FONT_DISPLAY}`;
+  ctx.fillText(APP_NAME, padX + 100, 70);
+  ctx.fillStyle = "rgba(255,255,255,0.65)";
+  ctx.font = `500 24px ${FONT_TEXT}`;
+  ctx.fillText(fmtDate(input.startDate, input.lang), padX + 100, 120);
+
+  // Title
+  ctx.fillStyle = "#FFFFFF";
+  ctx.font = `800 52px ${FONT_DISPLAY}`;
+  wrapText(ctx, input.name, padX, 170, W - padX * 2, 56, 1);
+
+  // ---------- Table header ----------
+  const tableY = headerH;
+  ctx.fillStyle = "rgba(255,255,255,0.04)";
+  ctx.fillRect(0, tableY, W, tableHeaderH);
+
+  // Column layout: [#] [Type] [Time] [Dist (m)] [Pace] [HR]
+  const colXs = [
+    padX,                  // #
+    padX + 80,             // Type
+    W - padX - 540,        // Time
+    W - padX - 380,        // Dist
+    W - padX - 220,        // Pace
+    W - padX - 60,         // HR (right-aligned)
+  ];
+
+  ctx.fillStyle = "rgba(255,255,255,0.55)";
+  ctx.font = `700 22px ${FONT_TEXT}`;
+  ctx.textBaseline = "middle";
+  const headerMid = tableY + tableHeaderH / 2;
+  ctx.textAlign = "left";
+  ctx.fillText("#", colXs[0], headerMid);
+  ctx.fillText(isZh ? "類型" : "TYPE", colXs[1], headerMid);
+  ctx.textAlign = "right";
+  ctx.fillText(isZh ? "時間" : "TIME", colXs[2] + 140, headerMid);
+  ctx.fillText(isZh ? "距離 (m)" : "DIST (m)", colXs[3] + 140, headerMid);
+  ctx.fillText(isZh ? "配速" : "PACE", colXs[4] + 140, headerMid);
+  ctx.fillText("HR", colXs[5], headerMid);
+
+  // ---------- Rows ----------
+  let runNum = 0;
+  visible.forEach((s, idx) => {
+    const y = tableY + tableHeaderH + tablePadTop + idx * rowH;
+    const isRest =
+      isInterval && fastestSpeed > 0 && s.average_speed > 0 && s.average_speed < fastestSpeed * 0.7;
+    if (!isRest) runNum++;
+
+    // Row background (alternate for legibility)
+    if (isRest) {
+      ctx.fillStyle = "rgba(255,255,255,0.03)";
+      ctx.fillRect(0, y, W, rowH);
+    }
+
+    // Bottom border
+    ctx.strokeStyle = "rgba(255,255,255,0.06)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(padX, y + rowH);
+    ctx.lineTo(W - padX, y + rowH);
+    ctx.stroke();
+
+    const mid = y + rowH / 2;
+    const baseColor = isRest ? "rgba(255,255,255,0.45)" : "#FFFFFF";
+    const accentWeight = isRest ? "500" : "700";
+
+    // # (orange dot for runs)
+    if (!isRest) {
+      ctx.fillStyle = "#FC4C02";
+      ctx.beginPath();
+      ctx.arc(colXs[0] + 14, mid, 6, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.fillStyle = baseColor;
+    ctx.font = `700 26px ${FONT_TEXT}`;
+    ctx.textAlign = "left";
+    ctx.fillText(isRest ? "" : String(runNum), colXs[0] + 28, mid);
+
+    // Type
+    ctx.font = `${accentWeight} 26px ${FONT_TEXT}`;
+    ctx.fillStyle = baseColor;
+    ctx.fillText(
+      isRest ? (isZh ? "休息" : "Rest") : (isZh ? "跑步" : "Run"),
+      colXs[1],
+      mid,
+    );
+
+    // Time / Dist / Pace / HR (right-aligned, tabular)
+    ctx.textAlign = "right";
+    ctx.font = `${accentWeight} 26px ${FONT_TEXT}`;
+    ctx.fillText(fmtTimeShort(s.elapsed_time, false).replace(/\s/g, ""), colXs[2] + 140, mid);
+    ctx.fillText(String(Math.round(s.distance || 0)), colXs[3] + 140, mid);
+    ctx.fillText(
+      s.average_speed > 0
+        ? (() => {
+            const p = 1000 / s.average_speed;
+            const m = Math.floor(p / 60);
+            const sec = Math.floor(p % 60);
+            return `${m}:${String(sec).padStart(2, "0")}`;
+          })()
+        : "--",
+      colXs[4] + 140,
+      mid,
+    );
+    ctx.fillText(s.average_heartrate ? String(Math.round(s.average_heartrate)) : "--", colXs[5], mid);
+  });
+
+  // ---------- Footer ----------
+  ctx.textAlign = "left";
+  ctx.textBaseline = "top";
+  const footerY = H - footerH + 20;
+
+  // Divider
+  ctx.strokeStyle = "rgba(255,255,255,0.08)";
+  ctx.beginPath();
+  ctx.moveTo(padX, footerY);
+  ctx.lineTo(W - padX, footerY);
+  ctx.stroke();
+
+  try {
+    const icon = await loadImage(appIcon);
+    ctx.save();
+    roundedRect(ctx, padX, footerY + 30, 56, 56, 14);
+    ctx.clip();
+    ctx.drawImage(icon, padX, footerY + 30, 56, 56);
+    ctx.restore();
+  } catch { /* ignore */ }
+
+  ctx.fillStyle = "#FFFFFF";
+  ctx.font = `800 30px ${FONT_DISPLAY}`;
+  ctx.fillText(APP_NAME, padX + 76, footerY + 32);
+  ctx.fillStyle = "rgba(255,255,255,0.55)";
+  ctx.font = `500 20px ${FONT_TEXT}`;
+  ctx.fillText(isZh ? "用 AI 訓練得更聰明" : "Train smarter with AI", padX + 76, footerY + 66);
+
+  ctx.textAlign = "right";
+  ctx.fillStyle = "rgba(255,255,255,0.75)";
+  ctx.font = `600 22px ${FONT_TEXT}`;
+  ctx.fillText(APP_URL.replace("https://", ""), W - padX, footerY + 50);
+  ctx.textAlign = "left";
+
+  return await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob(
+      (b) => (b ? resolve(b) : reject(new Error("Canvas toBlob failed"))),
+      "image/png",
+      0.95,
+    );
+  });
+}
+
+async function distributeBlob(blob: Blob, lang: Lang) {
+  const isZh = lang === "zh";
+  if (hasNativeBridge()) {
+    try {
+      const dataUrl = await blobToDataUrl(blob);
+      despia(`savethisimage://?url=${dataUrl}`);
+      toast.success(isZh ? "已儲存到相簿" : "Saved to camera roll");
+      return;
+    } catch (err) {
+      console.warn("[Share] Despia save failed, falling back:", err);
+    }
+  }
+  const file = new File([blob], `runward-${Date.now()}.png`, { type: "image/png" });
+  const navAny = navigator as any;
+  if (
+    typeof navigator !== "undefined" &&
+    typeof navigator.share === "function" &&
+    typeof navAny.canShare === "function" &&
+    navAny.canShare({ files: [file] })
+  ) {
+    try {
+      await navigator.share({
+        files: [file],
+        title: APP_NAME,
+        text: isZh
+          ? `由 ${APP_NAME} 追蹤 · ${APP_URL}`
+          : `Tracked with ${APP_NAME} · ${APP_URL}`,
+      });
+      return;
+    } catch (err: any) {
+      if (err?.name === "AbortError") return;
+      console.warn("[Share] navigator.share failed, falling back:", err);
+    }
+  }
+  try {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `runward-${Date.now()}.png`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    toast.success(isZh ? "圖片已下載" : "Image downloaded");
+  } catch {
+    toast.error(isZh ? "無法分享" : "Unable to share");
+  }
+}
+
+export async function shareSplits(input: ShareSplitsInput): Promise<void> {
+  const isZh = input.lang === "zh";
+  const loadingId = toast.loading(isZh ? "正在生成分段圖片..." : "Generating splits image...");
+  let blob: Blob;
+  try {
+    blob = await renderSplitsCard(input);
+  } catch (err) {
+    console.error("[ShareSplits] Render failed:", err);
+    toast.dismiss(loadingId);
+    toast.error(isZh ? "無法生成圖片" : "Failed to create image");
+    return;
+  }
+  toast.dismiss(loadingId);
+  await distributeBlob(blob, input.lang);
 }

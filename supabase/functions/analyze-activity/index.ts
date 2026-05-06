@@ -569,6 +569,73 @@ ${plannedWorkout ? `- ${plannedWorkout}` : ""}`;
       }
     }
 
+    // --- Per-second sample analysis (Terra): detect interval pattern from HR + pace volatility ---
+    try {
+      const hrArr: Array<{ t: number; bpm: number }> = Array.isArray(hrSamples) ? hrSamples : [];
+      const dArr: Array<{ t: number; d: number }> = Array.isArray(distanceSamples) ? distanceSamples : [];
+      if (hrArr.length > 30 || dArr.length > 30) {
+        const tMap = new Map<number, { bpm?: number; d?: number }>();
+        for (const s of hrArr) tMap.set(s.t, { ...(tMap.get(s.t) || {}), bpm: s.bpm });
+        for (const s of dArr) tMap.set(s.t, { ...(tMap.get(s.t) || {}), d: s.d });
+        const ordered = Array.from(tMap.entries()).sort((a, b) => a[0] - b[0]);
+        const WINDOW = 30;
+        const series: Array<{ t: number; bpm?: number; paceSecPerKm?: number }> = [];
+        for (let i = 0; i < ordered.length; i++) {
+          const [t, v] = ordered[i];
+          const item: any = { t, bpm: v.bpm };
+          if (v.d != null) {
+            let j = i;
+            while (j > 0 && t - ordered[j][0] < WINDOW) j--;
+            const prev = ordered[j][1].d;
+            const dt = t - ordered[j][0];
+            if (prev != null && dt >= 5) {
+              const dd = v.d - prev;
+              if (dd > 0) item.paceSecPerKm = (dt / dd) * 1000;
+            }
+          }
+          series.push(item);
+        }
+        const hrVals = series.map((s) => s.bpm).filter((x): x is number => typeof x === "number");
+        const paceVals = series.map((s) => s.paceSecPerKm).filter((x): x is number => typeof x === "number" && x > 120 && x < 900);
+        const stddev = (arr: number[]) => {
+          if (arr.length < 2) return 0;
+          const m = arr.reduce((a, b) => a + b, 0) / arr.length;
+          return Math.sqrt(arr.reduce((s, x) => s + (x - m) ** 2, 0) / arr.length);
+        };
+        const hrStd = stddev(hrVals);
+        const hrMean = hrVals.length ? hrVals.reduce((a, b) => a + b, 0) / hrVals.length : 0;
+        const paceStd = stddev(paceVals);
+        const paceMean = paceVals.length ? paceVals.reduce((a, b) => a + b, 0) / paceVals.length : 0;
+        let fastCount = 0, slowCount = 0, transitions = 0;
+        if (paceVals.length > 10) {
+          const sorted = [...paceVals].sort((a, b) => a - b);
+          const median = sorted[Math.floor(sorted.length / 2)];
+          let prevState: "fast" | "slow" | null = null;
+          for (const s of series) {
+            if (s.paceSecPerKm == null) continue;
+            const state: "fast" | "slow" = s.paceSecPerKm < median * 0.92 ? "fast" : s.paceSecPerKm > median * 1.08 ? "slow" : (prevState ?? "slow");
+            if (state === "fast") fastCount++; else if (state === "slow") slowCount++;
+            if (prevState && state !== prevState) transitions++;
+            prevState = state;
+          }
+        }
+        const looksIntervals = transitions >= 4 && (paceStd / Math.max(paceMean, 1)) > 0.12 && (hrStd / Math.max(hrMean, 1)) > 0.06;
+        const fmtPace = (s: number) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, "0")} /km`;
+        statsText += `\n\n📈 Per-second sample analysis (${series.length}s):`;
+        statsText += `\n  HR mean=${Math.round(hrMean)} bpm, stdev=${hrStd.toFixed(1)}`;
+        if (paceVals.length) statsText += `\n  Pace mean=${fmtPace(paceMean)}, stdev=${paceStd.toFixed(1)}s`;
+        statsText += `\n  Pace state transitions (fast↔slow): ${transitions}`;
+        statsText += `\n  Time fast: ${fastCount}s | slow: ${slowCount}s`;
+        if (looksIntervals) {
+          statsText += `\n  ⚡ HR + pace charts oscillate sharply — this STRONGLY suggests an INTERVAL workout. Look at the splits/laps above to identify the specific interval structure (e.g., 8×400m, 5×1km, 4×800m, fartlek), recovery type (jog/walk/standing), and report this in your analysis.`;
+        } else {
+          statsText += `\n  Pace + HR are relatively steady — likely a continuous-effort run (easy / tempo / long), NOT intervals.`;
+        }
+      }
+    } catch (e) {
+      console.error("sample analysis failed", e);
+    }
+
     // --- Race + weather + comment context ---
     let raceContext = "";
     if (resolvedRaceName) {

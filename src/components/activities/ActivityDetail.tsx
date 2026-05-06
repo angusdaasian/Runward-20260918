@@ -117,6 +117,7 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
   const isCoros = activity.provenance === "garmin" && activity.source === "COROS";
   const needsRpe = isAppleHealth || isGarmin || isTerraActivity || isCoros;
   const dbTable = isTerraActivity ? "terra_activities" : isAppleHealth ? "apple_health_activities" : isGarmin || isCoros ? "garmin_activities" : "strava_activities";
+  const isRunningActivity = isRunning(activity.sport_type);
 
   const [streams, setStreams] = useState<any[]>([]);
   const [splits, setSplits] = useState<Split[] | null>(null);

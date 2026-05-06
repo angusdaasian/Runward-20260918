@@ -510,50 +510,66 @@ ${plannedWorkout ? `- ${plannedWorkout}` : ""}`;
       if (activity.max_heartrate) statsText += `\n- Max HR: ${Math.round(activity.max_heartrate)} bpm`;
     }
 
-    // --- Garmin laps (interval-aware) ---
+    // --- Lap analysis (interval-aware) — normalises field names across Garmin / Terra / Strava ---
     const garminLapsArr = asArray<any>(garminLaps);
     if (garminLapsArr.length > 0) {
-      const lapsWithType = garminLapsArr.map((lap: any) => {
-        const dist = lap.distance || 0;
-        const speed = lap.avg_speed || 0;
-        const isRest = dist < 200 && speed < 2;
-        return { ...lap, isRest };
+      const norm = garminLapsArr.map((lap: any, idx: number) => {
+        const distance = Number(lap.distance ?? lap.distance_meters ?? lap.total_distance_meters ?? 0) || 0;
+        const elapsed = Number(
+          lap.elapsed_time ?? lap.duration_seconds ?? lap.moving_time ?? lap.total_timer_time_seconds ?? 0,
+        ) || 0;
+        let speed = Number(lap.avg_speed ?? lap.average_speed ?? lap.avg_speed_meters_per_second ?? 0) || 0;
+        if (!speed && distance > 0 && elapsed > 0) speed = distance / elapsed;
+        const paceSecPerKm = speed > 0 ? 1000 / speed : Infinity;
+        const number = lap.split_number ?? lap.lap_index ?? idx + 1;
+        const avgHr = Number(lap.avg_hr ?? lap.average_hr ?? lap.avg_hr_bpm ?? 0) || null;
+        return { number, distance, elapsed, speed, paceSecPerKm, avgHr };
       });
-      const workLaps = lapsWithType.filter((l: any) => !l.isRest && l.distance > 0);
-      const restLaps = lapsWithType.filter((l: any) => l.isRest && l.distance >= 0);
-      const hasIntervalPattern = workLaps.length >= 2 && restLaps.length >= 1;
+
+      // Detect rest vs work using RELATIVE pace among laps (not absolute thresholds).
+      // Fastest lap pace = work reference. A lap is "rest" if its pace is >40% slower than fastest,
+      // or distance is very short AND much slower than fastest.
+      const validForPace = norm.filter((l) => Number.isFinite(l.paceSecPerKm));
+      const fastestPace = validForPace.length
+        ? Math.min(...validForPace.map((l) => l.paceSecPerKm))
+        : Infinity;
+      const lapsWithType = norm.map((l) => {
+        let isRest = false;
+        if (Number.isFinite(l.paceSecPerKm) && Number.isFinite(fastestPace)) {
+          // >40% slower than fastest lap → rest/recovery
+          if (l.paceSecPerKm > fastestPace * 1.4) isRest = true;
+        } else if (l.speed === 0 || l.distance === 0) {
+          isRest = true;
+        }
+        return { ...l, isRest };
+      });
+      const workLaps = lapsWithType.filter((l) => !l.isRest);
+      const restLaps = lapsWithType.filter((l) => l.isRest);
+      const hasIntervalPattern = workLaps.length >= 2 && restLaps.length >= 1
+        && Number.isFinite(fastestPace)
+        && Math.max(...validForPace.map((l) => l.paceSecPerKm)) > fastestPace * 1.4;
+
+      const fmtLapPace = (paceSecPerKm: number) =>
+        Number.isFinite(paceSecPerKm)
+          ? `${Math.floor(paceSecPerKm / 60)}:${String(Math.floor(paceSecPerKm % 60)).padStart(2, "0")} /km`
+          : "--";
 
       if (hasIntervalPattern) {
-        statsText += `\n\n⚡ INTERVAL WORKOUT DETECTED (Garmin laps):`;
-        statsText += `\n  Work: ${workLaps.length} | Rest: ${restLaps.length}`;
-        statsText += `\n\n  Work intervals:`;
-        for (const lap of workLaps) {
-          const distM = Math.round(lap.distance || 0);
-          const elapsed = Math.round(lap.elapsed_time || 0);
-          const paceStr = lap.avg_speed > 0
-            ? `${Math.floor(1000 / lap.avg_speed / 60)}:${String(Math.floor((1000 / lap.avg_speed) % 60)).padStart(2, "0")} /km`
-            : "--";
-          statsText += `\n    Lap ${lap.split_number}: ${distM}m in ${elapsed}s (pace: ${paceStr})`;
-          if (lap.avg_hr) statsText += ` | HR: ${Math.round(lap.avg_hr)} bpm`;
+        statsText += `\n\n⚡ INTERVAL WORKOUT DETECTED (lap pace alternates):`;
+        statsText += `\n  Work laps: ${workLaps.length} | Rest/recovery laps: ${restLaps.length}`;
+        statsText += `\n  Fastest lap pace: ${fmtLapPace(fastestPace)} (used as work reference)`;
+        statsText += `\n\n  All laps in order (pace pattern matters — alternating fast/slow = intervals):`;
+        for (const lap of lapsWithType) {
+          const tag = lap.isRest ? "🟦 REST  " : "🟥 WORK  ";
+          statsText += `\n    ${tag}Lap ${lap.number}: ${Math.round(lap.distance)}m in ${Math.round(lap.elapsed)}s (pace: ${fmtLapPace(lap.paceSecPerKm)})`;
+          if (lap.avgHr) statsText += ` | HR: ${Math.round(lap.avgHr)} bpm`;
         }
-        if (restLaps.length > 0) {
-          statsText += `\n\n  Recovery intervals:`;
-          for (const lap of restLaps) {
-            const distM = Math.round(lap.distance || 0);
-            const elapsed = Math.round(lap.elapsed_time || 0);
-            statsText += `\n    Lap ${lap.split_number}: ${distM}m in ${elapsed}s`;
-          }
-        }
+        statsText += `\n\n  → Use this work/rest pattern to identify the interval structure (e.g., 4×400m w/ 200m jog, 6×1min hard / 1min easy, fartlek). Do NOT call this an easy/long run.`;
       } else {
-        statsText += "\n\nGarmin Laps:";
-        for (const lap of garminLapsArr) {
-          const distM = Math.round(lap.distance || 0);
-          const elapsed = Math.round(lap.elapsed_time || 0);
-          const paceStr = lap.avg_speed > 0
-            ? `${Math.floor(1000 / lap.avg_speed / 60)}:${String(Math.floor((1000 / lap.avg_speed) % 60)).padStart(2, "0")} /km`
-            : "--";
-          statsText += `\n  Lap ${lap.split_number}: ${distM}m in ${elapsed}s (pace: ${paceStr})`;
-          if (lap.avg_hr) statsText += ` | HR: ${Math.round(lap.avg_hr)} bpm`;
+        statsText += "\n\nLaps:";
+        for (const lap of lapsWithType) {
+          statsText += `\n  Lap ${lap.number}: ${Math.round(lap.distance)}m in ${Math.round(lap.elapsed)}s (pace: ${fmtLapPace(lap.paceSecPerKm)})`;
+          if (lap.avgHr) statsText += ` | HR: ${Math.round(lap.avgHr)} bpm`;
         }
       }
     } else if (splits && splits.length > 0) {

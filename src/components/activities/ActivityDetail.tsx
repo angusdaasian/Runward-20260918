@@ -211,6 +211,13 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
       if ((isGarmin || isTerraActivity) && activity.laps && Array.isArray(activity.laps) && activity.laps.length > 0) {
         bodyPayload.garminLaps = activity.laps;
       }
+      // Send per-second HR + distance samples (Terra) so the AI can detect interval patterns
+      if (Array.isArray(activity.hr_samples) && activity.hr_samples.length > 10) {
+        bodyPayload.hrSamples = activity.hr_samples;
+      }
+      if (Array.isArray(activity.distance_samples) && activity.distance_samples.length > 10) {
+        bodyPayload.distanceSamples = activity.distance_samples;
+      }
       const { data, error } = await supabase.functions.invoke("analyze-activity", { body: bodyPayload });
       if (error) {
         const errMsg = typeof error === "object" && error?.message ? error.message : String(error);

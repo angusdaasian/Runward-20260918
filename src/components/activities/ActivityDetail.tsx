@@ -994,8 +994,8 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
         </div>
       )}
 
-      {/* Race tag + Runner comment (Premium only) */}
-      {isPremium && (
+      {/* Race tag + Runner comment (Premium only, running activities only) */}
+      {isRunningActivity && isPremium && (
         <div className="bg-card border border-border rounded-xl p-4 mt-4">
           <div className="flex items-center gap-2 mb-3">
             <Trophy size={16} className="text-primary" />

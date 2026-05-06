@@ -41,6 +41,7 @@ interface StravaActivity {
   calories?: number | null;
   laps?: any[] | null;
   hr_samples?: Array<{ t: number; bpm: number }> | null;
+  distance_samples?: Array<{ t: number; d: number }> | null;
   map_screenshot_url?: string | null;
   provenance?: "strava" | "apple_health" | "garmin" | "terra";
 }
@@ -452,18 +453,53 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
   }, [activity.strava_id, isPremium, needsRpe]);
 
   const chartData = useMemo(() => {
-    // Highest fidelity: per-second HR samples from Terra (when available).
+    // Highest fidelity: per-second HR + distance samples from Terra (when available).
     const hrSamples = Array.isArray(activity.hr_samples) ? activity.hr_samples : null;
-    if (hrSamples && hrSamples.length > 10) {
+    const distSamples = Array.isArray(activity.distance_samples) ? activity.distance_samples : null;
+    if ((hrSamples && hrSamples.length > 10) || (distSamples && distSamples.length > 10)) {
       const totalDist = activity.distance || 0;
-      const lastT = hrSamples[hrSamples.length - 1].t || 1;
-      // Downsample to ~250 points for smooth rendering.
-      const step = Math.max(1, Math.floor(hrSamples.length / 250));
+      // Build a unified per-second view keyed by t.
+      const tMap = new Map<number, { heartrate?: number; distM?: number }>();
+      if (hrSamples) {
+        for (const s of hrSamples) {
+          tMap.set(s.t, { ...(tMap.get(s.t) || {}), heartrate: s.bpm });
+        }
+      }
+      if (distSamples) {
+        for (const s of distSamples) {
+          tMap.set(s.t, { ...(tMap.get(s.t) || {}), distM: s.d });
+        }
+      }
+      const ordered = Array.from(tMap.entries()).sort((a, b) => a[0] - b[0]);
+      // Compute pace via 30s rolling distance delta (min/km), so spikes are smoothed.
+      const WINDOW = 30;
+      const distAt = (idx: number) => ordered[idx][1].distM;
       const data: any[] = [];
-      for (let i = 0; i < hrSamples.length; i += step) {
-        const s = hrSamples[i];
-        const km = totalDist > 0 ? (totalDist * (s.t / lastT)) / 1000 : s.t / 60;
-        data.push({ distance_km: km.toFixed(2), heartrate: s.bpm, time: s.t });
+      const lastT = ordered[ordered.length - 1][0] || 1;
+      const step = Math.max(1, Math.floor(ordered.length / 250));
+      for (let i = 0; i < ordered.length; i += step) {
+        const [t, v] = ordered[i];
+        const km = v.distM != null
+          ? v.distM / 1000
+          : (totalDist > 0 ? (totalDist * (t / lastT)) / 1000 : t / 60);
+        const point: any = { distance_km: km.toFixed(2), time: t };
+        if (v.heartrate) point.heartrate = v.heartrate;
+        // Pace from distance window
+        if (distSamples && v.distM != null) {
+          // Find sample ~WINDOW seconds earlier
+          let j = i;
+          while (j > 0 && t - ordered[j][0] < WINDOW) j--;
+          const prev = distAt(j);
+          const dt = t - ordered[j][0];
+          if (prev != null && dt >= 5) {
+            const dd = v.distM - prev;
+            if (dd > 0) {
+              const speed = dd / dt; // m/s
+              point.pace = speedToPace(speed);
+            }
+          }
+        }
+        data.push(point);
       }
       return data;
     }
@@ -499,7 +535,7 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
       data.push(point);
     }
     return data;
-  }, [streams, splits, activity.hr_samples, activity.distance]);
+  }, [streams, splits, activity.hr_samples, activity.distance_samples, activity.distance]);
 
   const hasHeartrate = chartData.some(d => d.heartrate);
   const hasAltitude = chartData.some(d => d.altitude !== undefined);

@@ -394,6 +394,30 @@ function findHrSampleArray(root: any): any[] | undefined {
   return undefined;
 }
 
+function extractDistanceSamples(a: any): Array<{ t: number; d: number }> {
+  const sources: any[] = [
+    a?.distance_data?.detailed?.distance_samples,
+    a?.distance_data?.distance_samples,
+    a?.distance_data?.detailed?.samples,
+  ];
+  const samples = sources.find((s) => Array.isArray(s) && s.length > 0);
+  if (!samples) return [];
+  const startMs = a?.metadata?.start_time ? new Date(a.metadata.start_time).getTime() : NaN;
+  const bySecond = new Map<number, number>();
+  for (const s of samples as any[]) {
+    const d = toFiniteNumber(s?.distance_meters ?? s?.distance);
+    if (d == null || d < 0) continue;
+    let t: number | null = toFiniteNumber(s?.timer_duration_seconds ?? s?.timer_seconds ?? s?.elapsed_seconds);
+    if (t == null && s?.timestamp && Number.isFinite(startMs)) {
+      t = (new Date(s.timestamp).getTime() - startMs) / 1000;
+    }
+    if (t == null || !Number.isFinite(t) || t < 0) continue;
+    bySecond.set(Math.floor(t), Math.round(d * 100) / 100);
+  }
+  const out = Array.from(bySecond.entries()).sort((a, b) => a[0] - b[0]).map(([t, d]) => ({ t, d }));
+  return out.length > 7200 ? out.slice(0, 7200) : out;
+}
+
 function recomputeLapAvgHr(laps: any[], samples: Array<{ t: number; bpm: number }>, activityStartTime: string | null): any[] {
   if (!samples.length || !laps.length) return laps;
   const startMs = activityStartTime ? new Date(activityStartTime).getTime() : NaN;
@@ -654,13 +678,14 @@ async function processWebhook(
           const polyline = extractPolyline(a);
           const rawLaps = extractLaps(a);
           const hrSamples = extractHrSamples(a);
+          const distanceSamples = extractDistanceSamples(a);
           const laps = hrSamples.length > 0 && rawLaps.length > 0
             ? recomputeLapAvgHr(rawLaps, hrSamples, meta?.start_time ?? null)
             : rawLaps;
           // Read existing row so we don't overwrite good polyline/laps/hr_samples with empty
           const { data: existing } = await supa
             .from("terra_activities")
-            .select("summary_polyline, laps, has_gps, hr_samples")
+            .select("summary_polyline, laps, has_gps, hr_samples, distance_samples")
             .eq("user_id", appUserId)
             .eq("terra_activity_id", aid)
             .maybeSingle();
@@ -673,7 +698,10 @@ async function processWebhook(
           const finalHrSamples = hrSamples.length > 0
             ? hrSamples
             : (Array.isArray(existing?.hr_samples) ? existing!.hr_samples : null);
-          console.log(`[terra-webhook] activity upsert ${aid} hr_samples=${hrSamples.length} laps=${rawLaps.length}`);
+          const finalDistanceSamples = distanceSamples.length > 0
+            ? distanceSamples
+            : (Array.isArray((existing as any)?.distance_samples) ? (existing as any).distance_samples : null);
+          console.log(`[terra-webhook] activity upsert ${aid} hr_samples=${hrSamples.length} dist_samples=${distanceSamples.length} laps=${rawLaps.length}`);
           await supa.from("terra_activities").upsert({
             user_id: appUserId,
             provider,
@@ -694,6 +722,7 @@ async function processWebhook(
             has_gps: finalHasGps,
             laps: finalLaps,
             hr_samples: finalHrSamples,
+            distance_samples: finalDistanceSamples,
             raw_json: null,
           }, { onConflict: "user_id,terra_activity_id" });
           await deleteMatchingGarminDuplicate(appUserId, meta?.start_time ?? null, distanceMeters);

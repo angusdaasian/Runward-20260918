@@ -1088,6 +1088,7 @@ export type Database = {
           calories: number | null
           created_at: string
           distance_meters: number | null
+          distance_samples: Json | null
           duration_seconds: number | null
           elevation_gain: number | null
           has_gps: boolean | null
@@ -1115,6 +1116,7 @@ export type Database = {
           calories?: number | null
           created_at?: string
           distance_meters?: number | null
+          distance_samples?: Json | null
           duration_seconds?: number | null
           elevation_gain?: number | null
           has_gps?: boolean | null
@@ -1142,6 +1144,7 @@ export type Database = {
           calories?: number | null
           created_at?: string
           distance_meters?: number | null
+          distance_samples?: Json | null
           duration_seconds?: number | null
           elevation_gain?: number | null
           has_gps?: boolean | null

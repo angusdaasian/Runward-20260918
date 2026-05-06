@@ -608,11 +608,6 @@ const ActivitiesTab = ({ lang }: Props) => {
       {/* Today Stats from Apple HealthKit */}
       <TodayStats lang={lang} healthStats={ahConnected ? appleHealth.healthStats : null} />
 
-      {/* Manual Garmin / COROS imports — only when no fitness app is connected */}
-      {!fitnessAppConnected && (
-        <ManualImportTabs lang={lang} onImported={invalidateAll} />
-      )}
-
       {/* Recent Activity */}
       <div className="mb-4">
         <div className="flex items-center justify-between mb-3">

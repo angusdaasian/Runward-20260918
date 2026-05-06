@@ -569,11 +569,11 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
 
   const chartTabs = useMemo(() => {
     const tabs: { key: "pace" | "heartrate" | "altitude"; label: string }[] = [];
-    if (hasPace) tabs.push({ key: "pace", label: lang === "zh" ? "配速" : "Pace" });
+    if (isRunningActivity && hasPace) tabs.push({ key: "pace", label: lang === "zh" ? "配速" : "Pace" });
     if (hasHeartrate) tabs.push({ key: "heartrate", label: lang === "zh" ? "心率" : "Heart Rate" });
-    if (hasAltitude) tabs.push({ key: "altitude", label: lang === "zh" ? "海拔" : "Altitude" });
+    if (isRunningActivity && hasAltitude) tabs.push({ key: "altitude", label: lang === "zh" ? "海拔" : "Altitude" });
     return tabs;
-  }, [hasPace, hasHeartrate, hasAltitude, lang]);
+  }, [hasPace, hasHeartrate, hasAltitude, lang, isRunningActivity]);
 
   useEffect(() => {
     if (chartTabs.length > 0 && !chartTabs.find(t => t.key === activeChart)) {

@@ -580,6 +580,8 @@ ${insightsBlock}
 RECENT 7-DAY ACTIVITY:
 ${buildActivitySummary(allActs, units)}
 
+NOTE on activity lines: a trailing "[INTERVAL: …]" tag means the run was an interval/fartlek workout — NOT an easy run. The tag shows work vs rest lap counts, paces, HR, and the per-set structure (e.g. "set1=2000m(2000), set2=1600m(1600)"). When the user asks about that run, treat it as the structured workout shown — never call it an easy/tempo run.
+
 ${racesBlock}
 
 COACHING STYLE:

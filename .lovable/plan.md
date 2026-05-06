@@ -1,89 +1,54 @@
 ## Goal
+Treat non-running activities (bike, walk, hike, swim, strength, indoor cycle, etc.) as "non-analyzable" for distance-based analytics and activity detail charts/AI.
 
-1. Add a test environment for Terra so we can validate the HR-samples retry on `angustest.site` without touching the production Garmin webhook flow on `pacecalculator.fun`.
-2. Implement the empty-payload retry fix from the previous plan inside the test path first.
+## Terra activity type mapping (verified from DB)
+Sampled 311 type=`8` ("XX 跑步" / "Running") — clearly **Run**.
+Other type numbers found, with example names:
 
-## New secrets to add
+| type | example names | sport |
+|------|----|----|
+| 8 | "Kowloon Running", "新界 越野跑" | Run / TrailRun |
+| 58 | "跑步機", "Indoor Run", "室內跑" | **Run (treadmill)** — currently missing from map |
+| 1 | "桃園區 騎乘", "New Territories Cycling" | Ride |
+| 16 | "內湖區 公路車", "花蓮市 公路車" | Ride (road) |
+| 18 | "室內自行車" | Ride (indoor) — missing from map |
+| 7 | "九龍 步行", "Walking" | Walk |
+| 130 | "信義鄉 登山" | Hike |
+| 83 | "Pool Swim", "泳池游泳" | Swim |
+| 80 | "肌力訓練", "Strength" | Strength (non-cardio) |
+| 123 | "有氧運動", "Cardio" | Cardio (generic, not run) |
+| 122 | "放鬆與專注" | Meditation/relax |
+| 10 | "羽毛球" | Badminton |
+| 78 | "樓梯機" | Stair climber |
+| 35, 49, 84, 87, 100, 108 | misc | other |
 
-- `TERRA_DEV_ID_TEST`
-- `TERRA_API_KEY_TEST`
-- `TERRA_SIGNING_SECRET_TEST`
+I'll report these in chat after implementation so you can spot-check. Source: `terra_activities` table, grouped by `activity_type` + `activity_name`.
 
-(Existing `TERRA_DEV_ID`, `TERRA_API_KEY`, `TERRA_SIGNING_SECRET` stay as production.)
+## Changes
 
-## Environment selection
+### 1. `src/lib/trainingLoad.ts`
+- Add `isRunning(sport_type)` helper recognizing: `Run`, `TrailRun`, `VirtualRun`, `Treadmill`, `running`, `trail_running`, `treadmill_running`.
+- `buildTrendComparison`: only include activities where `isRunning(sport_type)` (currently includes all cardio).
+- (Training load EWMA stays cardio-based — only distance/trends are running-only as requested.)
 
-A single edge function deployment serves both sites, so we route by environment per call:
+### 2. `src/components/activities/ActivityYearHeatmap.tsx`
+- When tallying `distanceKm` (cell + monthly + yearly totals), only count running activities. Counts (`count`) and minutes can stay all-activity, OR also restrict — I'll restrict distance only since you said "total distance into the analytics chart".
 
-- **terra-auth-init / terra-sync / terra-disconnect**: read the caller origin from `req.headers.get("origin")` (and `success_url` host as fallback). If host is `angustest.site` / `www.angustest.site` / `id-preview--*.lovable.app`, use the `_TEST` credentials; otherwise production. Default success/failure URLs in `terra-auth-init` switch to `https://angustest.site/terra-return?...` for test.
-- **terra-webhook**: deploy a second function `terra-webhook-test` (thin wrapper that imports the same logic but forces `env = "test"`). Register *that* URL in the Terra **test** dashboard; production webhook stays untouched. The shared handler picks signing secret + API key based on the `env` flag.
+### 3. `src/hooks/use-activities.ts` — Terra mapping
+- Add `"58": "Treadmill"` and `"18": "Ride"` to `TERRA_ACTIVITY_TYPE_MAP` so treadmill runs are correctly classified as Run and indoor bikes as Ride (not defaulting to Run).
+- Change unmapped-numeric fallback from `"Run"` to `"Other"` so types like 80 (strength), 123 (cardio), 122, 130, 10, 78 don't get miscounted as runs. Add explicit mappings for known ones: `80: "Strength"`, `83: "Swim"`, `130: "Hike"`, `123: "Cardio"`, `122: "Other"`, `10: "Other"`, `78: "Other"`.
 
-```text
-angustest.site ─┐                          ┌─ terra-webhook-test  → TEST creds
-                ├─ terra-auth-init ────────┤
-pacecalculator ─┘   (chooses creds by host)└─ terra-webhook       → PROD creds
-```
+### 4. `src/components/activities/ActivityDetail.tsx`
+- Compute `const isRunning = ...` from `activity.sport_type`.
+- If **not** running:
+  - Hide the Intervals/Splits table (lines ~897–983) and the "Share splits" button.
+  - Hide the AI Workout Analysis card and the Race-tag/Comment card (and "Share charts" button if it triggers AI).
+  - Keep the heart-rate chart. Restrict the chart tab list to `heartrate` only (drop pace + altitude tabs) since pace is not meaningful and altitude pairs with running.
+  - Add a notice box under the HR chart: "Non-running activities don't have detailed analysis." (zh: "非跑步活動不提供分析。")
 
-## Code changes
+## Out of scope
+- Training load chart (CTL/ATL/TSB) keeps using all cardio as today — your request was about distance + trends only.
+- Activity list/feed still shows all activities.
 
-### `supabase/functions/_shared/terraEnv.ts` (new)
-- Export `getTerraCreds(env: "prod" | "test")` returning `{ devId, apiKey, signingSecret }`.
-- Export `pickEnvFromRequest(req, extraHostHints?)` that returns `"test"` when host matches the test allowlist.
-
-### `supabase/functions/terra-auth-init/index.ts`
-- Replace direct `Deno.env.get("TERRA_*")` with `getTerraCreds(pickEnvFromRequest(req, [success_url]))`.
-- Default success/failure URLs become test-aware.
-
-### `supabase/functions/terra-sync/index.ts`
-- Same credential lookup. The env is determined per request; existing logic (including the historical-activity webhook calls already added) is unchanged otherwise.
-
-### `supabase/functions/terra-disconnect/index.ts`
-- Same credential lookup.
-
-### `supabase/functions/terra-webhook/index.ts` (refactor)
-- Extract the existing handler body into an exported `handleTerraWebhook(req, env)` function.
-- Default export keeps wiring for production (`env = "prod"`).
-- Inside the handler, replace the three hard-coded `Deno.env.get("TERRA_*")` reads (lines 510/511, 580/581, 746/747) with `getTerraCreds(env)`.
-- **Apply the empty-payload retry fix here**:
-  - In the `activity` branch, before `for (const a of acts)`: if `acts.length === 0` and `terraUserId` is present, call a new `requestActivityHrSamplesWebhookForDay(terraUserId, todayUtc, env)` that hits `/v2/activity?to_webhook=true&with_samples=true&start_date=YYYY-MM-DD&end_date=YYYY-MM-DD` for `today-1` → `today+1`.
-  - Add a `startDate`-fallback path inside `requestActivityHrSamplesWebhook` for cases where `startTime` is null.
-  - Dedupe key for the empty case: `empty:{terraUserId}:{todayUtc}` (2-min window, same as existing).
-
-### `supabase/functions/terra-webhook-test/index.ts` (new)
-- Three-line file:
-  ```ts
-  import { handleTerraWebhook } from "../terra-webhook/index.ts";
-  Deno.serve((req) => handleTerraWebhook(req, "test"));
-  ```
-- Deployed alongside `terra-webhook`; gets its own public URL.
-
-### Frontend (`src/components/ConnectApps.tsx`)
-- No code change required for env selection — the request `Origin` is set automatically by the browser, so the auth-init function infers test vs prod from the host the user is on.
-
-## Setup steps for the user (in Terra dashboard)
-
-1. In the **test** Terra project: set the webhook URL to the new `terra-webhook-test` function URL (Lovable will print it after deploy).
-2. Keep the production Terra project pointed at the existing `terra-webhook` URL.
-3. Connect Garmin from `angustest.site` so a `terra_connections` row is created using test credentials.
-
-## Validation after deploy
-
-1. From `angustest.site`, connect Garmin → confirm OAuth completes.
-2. Trigger a Garmin push (or click Resync).
-3. Query `terra_webhook_events where type='terra_hr_samples_retry' order by received_at desc limit 5` — expect rows with HTTP 200.
-4. Within ~30 s, the follow-up activity webhook arrives with `payload.data` populated.
-5. Confirm `terra_activities.hr_samples` for May 5/6 becomes non-empty.
-6. Once verified on test, no production code change is needed — the same handler is already running on prod with prod creds; we only enabled the empty-payload retry path, which is benign for prod.
-
-## Files touched
-
-- new: `supabase/functions/_shared/terraEnv.ts`
-- new: `supabase/functions/terra-webhook-test/index.ts`
-- edited: `supabase/functions/terra-auth-init/index.ts`
-- edited: `supabase/functions/terra-sync/index.ts`
-- edited: `supabase/functions/terra-disconnect/index.ts`
-- edited: `supabase/functions/terra-webhook/index.ts`
-
-## Secrets I will request after you approve
-
-`TERRA_DEV_ID_TEST`, `TERRA_API_KEY_TEST`, `TERRA_SIGNING_SECRET_TEST`.
+## Verification after implementation
+I'll print the full Terra-type mapping I used so you can confirm nothing is misclassified.

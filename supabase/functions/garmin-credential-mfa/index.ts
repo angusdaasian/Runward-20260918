@@ -115,7 +115,7 @@ serve(async (req) => {
         oauth1_token_encrypted: oauth1Encrypted,
         oauth2_token_encrypted: oauth2Encrypted,
         needs_reauth: false,
-        access_token: email,
+        
       }, { onConflict: "user_id" });
 
     if (upsertError) {

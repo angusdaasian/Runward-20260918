@@ -463,9 +463,7 @@ export type Database = {
       }
       garmin_connections: {
         Row: {
-          access_token: string | null
           created_at: string | null
-          expires_at: string | null
           full_resync_done: boolean
           garmin_display_name: string | null
           garmin_email_encrypted: string | null
@@ -474,16 +472,11 @@ export type Database = {
           needs_reauth: boolean
           oauth1_token_encrypted: string | null
           oauth2_token_encrypted: string | null
-          refresh_token: string | null
-          refresh_token_expires_at: string | null
-          token_type: string | null
           updated_at: string | null
           user_id: string
         }
         Insert: {
-          access_token?: string | null
           created_at?: string | null
-          expires_at?: string | null
           full_resync_done?: boolean
           garmin_display_name?: string | null
           garmin_email_encrypted?: string | null
@@ -492,16 +485,11 @@ export type Database = {
           needs_reauth?: boolean
           oauth1_token_encrypted?: string | null
           oauth2_token_encrypted?: string | null
-          refresh_token?: string | null
-          refresh_token_expires_at?: string | null
-          token_type?: string | null
           updated_at?: string | null
           user_id: string
         }
         Update: {
-          access_token?: string | null
           created_at?: string | null
-          expires_at?: string | null
           full_resync_done?: boolean
           garmin_display_name?: string | null
           garmin_email_encrypted?: string | null
@@ -510,9 +498,6 @@ export type Database = {
           needs_reauth?: boolean
           oauth1_token_encrypted?: string | null
           oauth2_token_encrypted?: string | null
-          refresh_token?: string | null
-          refresh_token_expires_at?: string | null
-          token_type?: string | null
           updated_at?: string | null
           user_id?: string
         }
@@ -896,36 +881,6 @@ export type Database = {
           month_year?: string | null
           type?: string
           user_id?: string | null
-        }
-        Relationships: []
-      }
-      sahha_connections: {
-        Row: {
-          connected_at: string
-          external_id: string
-          id: string
-          last_synced_at: string | null
-          profile_token: string | null
-          refresh_token: string | null
-          user_id: string
-        }
-        Insert: {
-          connected_at?: string
-          external_id: string
-          id?: string
-          last_synced_at?: string | null
-          profile_token?: string | null
-          refresh_token?: string | null
-          user_id: string
-        }
-        Update: {
-          connected_at?: string
-          external_id?: string
-          id?: string
-          last_synced_at?: string | null
-          profile_token?: string | null
-          refresh_token?: string | null
-          user_id?: string
         }
         Relationships: []
       }

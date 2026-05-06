@@ -108,7 +108,7 @@ serve(async (req) => {
     if (action === "sync") {
       const { data: conn } = await supabase
         .from("garmin_connections")
-        .select("garmin_email_encrypted, access_token, oauth1_token_encrypted, oauth2_token_encrypted, full_resync_done")
+        .select("garmin_email_encrypted, oauth1_token_encrypted, oauth2_token_encrypted, full_resync_done")
         .eq("user_id", user.id)
         .maybeSingle();
 
@@ -154,7 +154,7 @@ serve(async (req) => {
         try { garminEmail = await decryptString(conn.garmin_email_encrypted); }
         catch (e) { console.error("Failed to decrypt email:", e); }
       }
-      if (!garminEmail) garminEmail = conn.access_token;
+      
 
       if (conn.oauth1_token_encrypted) {
         try { oauth1Token = await decryptString(conn.oauth1_token_encrypted); }

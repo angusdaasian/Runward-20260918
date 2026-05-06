@@ -24,7 +24,7 @@ import ActivityMap from "@/components/activities/ActivityMap";
 import ActivityCalendar from "@/components/activities/ActivityCalendar";
 import MonthlyRoadQuest from "@/components/activities/MonthlyRoadQuest";
 import ActivityDetail from "@/components/activities/ActivityDetail";
-import ManualImportTabs from "@/components/activities/ManualImportTabs";
+
 import SuggestedNextWorkout from "@/components/activities/SuggestedNextWorkout";
 import { calculateRunningScore } from "@/lib/vdot";
 import { loadForActivity } from "@/lib/trainingLoad";
@@ -607,11 +607,6 @@ const ActivitiesTab = ({ lang }: Props) => {
     <FadeIn className="px-5 pt-6 max-w-lg mx-auto">
       {/* Today Stats from Apple HealthKit */}
       <TodayStats lang={lang} healthStats={ahConnected ? appleHealth.healthStats : null} />
-
-      {/* Manual Garmin / COROS imports — only when no fitness app is connected */}
-      {!fitnessAppConnected && (
-        <ManualImportTabs lang={lang} onImported={invalidateAll} />
-      )}
 
       {/* Recent Activity */}
       <div className="mb-4">

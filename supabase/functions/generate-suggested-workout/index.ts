@@ -63,6 +63,9 @@ async function callVertexAI(opts: { apiKey: string; model?: string; messages: Ar
   }
   const body: any = { contents };
   if (systemParts.length) body.systemInstruction = { parts: systemParts };
+  if (model.startsWith("gemini-3")) {
+    body.generationConfig = { ...(body.generationConfig || {}), thinkingConfig: { thinkingLevel: "medium" } };
+  }
   const vRes = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
   if (!vRes.ok) return new Response(await vRes.text(), { status: vRes.status });
   const vData = await vRes.json();
@@ -341,7 +344,7 @@ Format:
 
     const aiResp = await callVertexAI({
       apiKey: VERTEX_API_KEY,
-      model: "google/gemini-2.5-pro",
+      model: "google/gemini-3-flash-preview",
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: context },

@@ -1069,10 +1069,14 @@ function drawChart(
 ) {
   const { x, y, w, h } = rect;
 
-  // Card background
-  ctx.fillStyle = "rgba(255,255,255,0.04)";
-  roundedRect(ctx, x, y, w, h, 20);
+  // Card background — light, matches activity share card
+  ctx.fillStyle = "#FFFFFF";
+  roundedRect(ctx, x, y, w, h, 24);
   ctx.fill();
+  ctx.strokeStyle = "rgba(15,23,42,0.08)";
+  ctx.lineWidth = 1.5;
+  roundedRect(ctx, x + 0.5, y + 0.5, w - 1, h - 1, 24);
+  ctx.stroke();
 
   // Title
   ctx.fillStyle = "#FFFFFF";

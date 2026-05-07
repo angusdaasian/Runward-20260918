@@ -418,6 +418,23 @@ function extractDistanceSamples(a: any): Array<{ t: number; d: number }> {
   return out.length > 7200 ? out.slice(0, 7200) : out;
 }
 
+function extractElevationSamplesForChart(a: any): Array<{ t: number; e: number }> {
+  const raw = extractElevationSamples(a);
+  if (!raw.length) return [];
+  const startMs = a?.metadata?.start_time ? new Date(a.metadata.start_time).getTime() : NaN;
+  const bySecond = new Map<number, number>();
+  for (const s of raw) {
+    let t: number | null = s.timerSeconds;
+    if (t == null && s.timestampMs != null && Number.isFinite(startMs)) {
+      t = (s.timestampMs - startMs) / 1000;
+    }
+    if (t == null || !Number.isFinite(t) || t < 0) continue;
+    bySecond.set(Math.floor(t), Math.round(s.elevMeters * 10) / 10);
+  }
+  const out = Array.from(bySecond.entries()).sort((a, b) => a[0] - b[0]).map(([t, e]) => ({ t, e }));
+  return out.length > 7200 ? out.slice(0, 7200) : out;
+}
+
 function recomputeLapAvgHr(laps: any[], samples: Array<{ t: number; bpm: number }>, activityStartTime: string | null): any[] {
   if (!samples.length || !laps.length) return laps;
   const startMs = activityStartTime ? new Date(activityStartTime).getTime() : NaN;

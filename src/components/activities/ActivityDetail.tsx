@@ -982,26 +982,26 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
               return (
                 <div
                   key={idx}
-                  className={`grid grid-cols-[36px_1fr_1fr_1fr_1fr_56px] items-center gap-2 px-4 py-3 text-xs border-b border-border/40 last:border-0 ${
-                    isRest ? "bg-muted/30" : "bg-transparent"
+                  className={`grid grid-cols-[36px_1fr_1fr_1fr_1fr_56px] items-center gap-2 px-5 py-3 text-xs border-b border-slate-100 last:border-0 ${
+                    isRest ? "bg-slate-50" : "bg-white"
                   }`}
                 >
-                  <span className={`font-semibold tabular-nums ${isRest ? "text-muted-foreground" : "text-foreground"}`}>
+                  <span className={`font-semibold tabular-nums ${isRest ? "text-slate-400" : "text-slate-900"}`}>
                     {isRest ? "" : runNum}
                   </span>
-                  <span className={`${isRest ? "text-muted-foreground font-normal" : "text-foreground font-semibold"}`}>
+                  <span className={`${isRest ? "text-slate-400 font-normal" : "text-slate-900 font-semibold"}`}>
                     {isRest ? (lang === "zh" ? "休息" : "Rest") : (lang === "zh" ? "跑步" : "Run")}
                   </span>
-                  <span className={`text-right tabular-nums ${isRest ? "text-muted-foreground" : "text-foreground font-semibold"}`}>
+                  <span className={`text-right tabular-nums ${isRest ? "text-slate-400" : "text-slate-900 font-semibold"}`}>
                     {formatDuration(split.elapsed_time)}
                   </span>
-                  <span className={`text-right tabular-nums ${isRest ? "text-muted-foreground" : "text-foreground font-semibold"}`}>
+                  <span className={`text-right tabular-nums ${isRest ? "text-slate-400" : "text-slate-900 font-semibold"}`}>
                     {Math.round(distMeters)}
                   </span>
-                  <span className={`text-right tabular-nums ${isRest ? "text-muted-foreground" : "text-foreground font-semibold"}`}>
+                  <span className={`text-right tabular-nums ${isRest ? "text-slate-400" : "text-slate-900 font-semibold"}`}>
                     {pace}
                   </span>
-                  <span className={`text-right tabular-nums ${isRest ? "text-muted-foreground" : "text-foreground"}`}>
+                  <span className={`text-right tabular-nums ${isRest ? "text-slate-400" : "text-slate-900"}`}>
                     {hr ?? "--"}
                   </span>
                 </div>

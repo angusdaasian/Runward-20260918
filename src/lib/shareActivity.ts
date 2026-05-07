@@ -387,6 +387,10 @@ async function drawMapWithTiles(
 
   const worldOriginX = tlW.x * TILE;
   const worldOriginY = tlW.y * TILE;
+  const prevSmooth = ctx.imageSmoothingEnabled;
+  const prevQuality = ctx.imageSmoothingQuality;
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
   for (const t of tiles) {
     if (!t.img) continue;
     const tilePxX = t.tx * TILE;
@@ -396,6 +400,8 @@ async function drawMapWithTiles(
     const ds = TILE * scale;
     ctx.drawImage(t.img, dx, dy, ds, ds);
   }
+  ctx.imageSmoothingEnabled = prevSmooth;
+  ctx.imageSmoothingQuality = prevQuality;
 
   const project = (lat: number, lng: number): [number, number] => {
     const wp = lonLatToWorld(lat, lng, zoom);

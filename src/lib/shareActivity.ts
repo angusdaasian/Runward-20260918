@@ -646,10 +646,7 @@ async function renderShareCard(input: ShareActivityInput): Promise<Blob> {
   ctx.textBaseline = "top";
   ctx.font = `700 22px ${FONT_DISPLAY}`;
   ctx.fillText(APP_NAME, cardX + 44, footerY);
-  ctx.fillStyle = "#64748B";
-  ctx.textAlign = "right";
-  ctx.font = `500 20px ${FONT_TEXT}`;
-  ctx.fillText(APP_URL.replace("https://", ""), cardX + cardW - 44, footerY + 1);
+  drawIgHandle(ctx, cardX + cardW - 44, footerY + 12, "#0F172A");
   ctx.textAlign = "left";
 
   return await new Promise<Blob>((resolve, reject) => {

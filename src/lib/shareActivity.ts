@@ -1079,14 +1079,17 @@ function drawChart(
   ctx.stroke();
 
   // Title
-  ctx.fillStyle = "#FFFFFF";
+  ctx.fillStyle = "#0F172A";
   ctx.textAlign = "left";
   ctx.textBaseline = "top";
-  ctx.font = `700 30px ${FONT_DISPLAY}`;
+  ctx.font = `800 30px ${FONT_DISPLAY}`;
   ctx.fillText(opts.title, x + 28, y + 22);
-  ctx.fillStyle = "rgba(255,255,255,0.55)";
-  ctx.font = `500 18px ${FONT_TEXT}`;
-  ctx.fillText(opts.unit, x + 28, y + 60);
+  ctx.fillStyle = "#94A3B8";
+  ctx.font = `600 16px ${FONT_TEXT}`;
+  ctx.fillText(opts.unit.toUpperCase(), x + 28, y + 60);
+  // Accent underline under title
+  ctx.fillStyle = opts.color;
+  ctx.fillRect(x + 28, y + 56, 36, 3);
 
   // Plot area
   const padL = 90, padR = 36, padT = 100, padB = 56;

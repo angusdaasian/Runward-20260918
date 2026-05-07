@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { Maximize2 } from "lucide-react";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Maximize2, X } from "lucide-react";
 
 // Decode Google polyline encoding
 function decodePolyline(encoded: string): [number, number][] {
@@ -108,16 +108,29 @@ const ActivityMap = ({ polyline }: Props) => {
     };
   }, [polyline]);
 
-  // Fullscreen map (mounted only when dialog opens)
+  // Fullscreen map (mounted only when overlay opens)
   useEffect(() => {
     if (!open || !fullRef.current || !polyline) return;
 
     const coords = decodePolyline(polyline);
     if (coords.length === 0) return;
 
-    // Wait for the dialog enter animation to complete so the container has size
-    const timer = setTimeout(() => {
-      if (!fullRef.current) return;
+    let frame = 0;
+
+    const mountMap = () => {
+      const container = fullRef.current;
+      if (!container) return;
+
+      if (container.clientWidth === 0 || container.clientHeight === 0) {
+        frame = requestAnimationFrame(mountMap);
+        return;
+      }
+
+      if (fullMapRef.current) {
+        fullMapRef.current.remove();
+        fullMapRef.current = null;
+      }
+
       const map = L.map(fullRef.current, {
         zoomControl: true,
         attributionControl: true,
@@ -128,13 +141,13 @@ const ActivityMap = ({ polyline }: Props) => {
       });
       fullMapRef.current = map;
       renderRoute(map, coords, [30, 30]);
-      // Force Leaflet to recompute size now that the dialog is fully open
       requestAnimationFrame(() => map.invalidateSize());
-      setTimeout(() => map.invalidateSize(), 250);
-    }, 250);
+    };
+
+    frame = requestAnimationFrame(mountMap);
 
     return () => {
-      clearTimeout(timer);
+      cancelAnimationFrame(frame);
       if (fullMapRef.current) {
         fullMapRef.current.remove();
         fullMapRef.current = null;
@@ -160,15 +173,24 @@ const ActivityMap = ({ polyline }: Props) => {
         </div>
       </button>
 
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-[95vw] w-[95vw] sm:max-w-4xl p-0 overflow-hidden">
+      {open && createPortal(
+        <div className="fixed inset-0 z-50 bg-background">
           <div
             ref={fullRef}
-            className="w-full h-[80vh] rounded-lg overflow-hidden"
+            className="h-[100dvh] w-screen"
             style={{ zIndex: 0 }}
           />
-        </DialogContent>
-      </Dialog>
+          <button
+            type="button"
+            onClick={() => setOpen(false)}
+            aria-label="Close expanded map"
+            className="absolute right-4 top-4 z-[1000] rounded-full border border-border bg-background/90 p-2 shadow-lg backdrop-blur-sm"
+          >
+            <X className="h-5 w-5 text-foreground" />
+          </button>
+        </div>,
+        document.body,
+      )}
     </>
   );
 };

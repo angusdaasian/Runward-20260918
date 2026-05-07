@@ -838,14 +838,16 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
           </span>
         </div>
       ) : chartData.length > 0 && chartTabs.length > 0 ? (
-        <div className="bg-card border border-border rounded-xl p-4">
-          <div className="flex gap-1 mb-4">
+        <div className="bg-white rounded-2xl p-5 shadow-[0_4px_20px_-8px_rgba(15,23,42,0.15)] ring-1 ring-slate-200/70">
+          <div className="flex gap-1.5 mb-4">
             {chartTabs.map(tab => (
               <button
                 key={tab.key}
                 onClick={() => setActiveChart(tab.key)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                  activeChart === tab.key ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-accent"
+                className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition-colors ${
+                  activeChart === tab.key
+                    ? "bg-slate-900 text-white"
+                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                 }`}
               >
                 {tab.label}
@@ -856,46 +858,46 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
             <ResponsiveContainer width="100%" height="100%">
               {activeChart === "pace" ? (
                 <LineChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="distance_km" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} tickFormatter={(v) => `${Math.round(v)}`}
-                    label={{ value: "km", position: "insideBottomRight", offset: -5, fontSize: 10, fill: "hsl(var(--muted-foreground))" }} />
-                  <YAxis reversed tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} tickFormatter={(v) => formatPaceFromMinutes(v)} domain={['auto', 'auto']} width={52}
-                    label={{ value: "min/km", angle: -90, position: "insideLeft", fontSize: 10, fill: "hsl(var(--muted-foreground))" }} />
-                  <Tooltip contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }}
+                  <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
+                  <XAxis dataKey="distance_km" tick={{ fontSize: 10, fill: "#64748B" }} tickFormatter={(v) => `${Math.round(v)}`}
+                    label={{ value: "km", position: "insideBottomRight", offset: -5, fontSize: 10, fill: "#64748B" }} />
+                  <YAxis reversed tick={{ fontSize: 10, fill: "#64748B" }} tickFormatter={(v) => formatPaceFromMinutes(v)} domain={['auto', 'auto']} width={52}
+                    label={{ value: "min/km", angle: -90, position: "insideLeft", fontSize: 10, fill: "#64748B" }} />
+                  <Tooltip contentStyle={{ backgroundColor: "#FFFFFF", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 12, color: "#0F172A" }}
                     formatter={(value: number) => [`${formatPaceFromMinutes(value)} min/km`, lang === "zh" ? "配速" : "Pace"]} labelFormatter={(v) => `${v} km`} />
-                  <Line type="monotone" dataKey="pace" stroke="hsl(var(--primary))" strokeWidth={2} dot={false} connectNulls />
+                  <Line type="monotone" dataKey="pace" stroke="#FC4C02" strokeWidth={2.5} dot={false} connectNulls />
                 </LineChart>
               ) : activeChart === "heartrate" ? (
                 <AreaChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="distance_km" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} tickFormatter={(v) => `${Math.round(v)}`} />
-                  <YAxis tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} domain={['auto', 'auto']}
-                    label={{ value: "bpm", angle: -90, position: "insideLeft", fontSize: 10, fill: "hsl(var(--muted-foreground))" }} />
-                  <Tooltip contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }}
+                  <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
+                  <XAxis dataKey="distance_km" tick={{ fontSize: 10, fill: "#64748B" }} tickFormatter={(v) => `${Math.round(v)}`} />
+                  <YAxis tick={{ fontSize: 10, fill: "#64748B" }} domain={['auto', 'auto']}
+                    label={{ value: "bpm", angle: -90, position: "insideLeft", fontSize: 10, fill: "#64748B" }} />
+                  <Tooltip contentStyle={{ backgroundColor: "#FFFFFF", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 12, color: "#0F172A" }}
                     formatter={(value: number) => [Math.round(value), "bpm"]} labelFormatter={(v) => `${v} km`} />
                   <defs>
                     <linearGradient id="hrGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="hsl(var(--destructive))" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="hsl(var(--destructive))" stopOpacity={0} />
+                      <stop offset="5%" stopColor="#EF4444" stopOpacity={0.35} />
+                      <stop offset="95%" stopColor="#EF4444" stopOpacity={0} />
                     </linearGradient>
                   </defs>
-                  <Area type="monotone" dataKey="heartrate" stroke="hsl(var(--destructive))" fill="url(#hrGradient)" strokeWidth={2} dot={false} />
+                  <Area type="monotone" dataKey="heartrate" stroke="#EF4444" fill="url(#hrGradient)" strokeWidth={2.5} dot={false} />
                 </AreaChart>
               ) : (
                 <AreaChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="distance_km" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} tickFormatter={(v) => `${Math.round(v)}`} />
-                  <YAxis tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} domain={['auto', 'auto']}
-                    label={{ value: "m", angle: -90, position: "insideLeft", fontSize: 10, fill: "hsl(var(--muted-foreground))" }} />
-                  <Tooltip contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }}
+                  <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
+                  <XAxis dataKey="distance_km" tick={{ fontSize: 10, fill: "#64748B" }} tickFormatter={(v) => `${Math.round(v)}`} />
+                  <YAxis tick={{ fontSize: 10, fill: "#64748B" }} domain={['auto', 'auto']}
+                    label={{ value: "m", angle: -90, position: "insideLeft", fontSize: 10, fill: "#64748B" }} />
+                  <Tooltip contentStyle={{ backgroundColor: "#FFFFFF", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 12, color: "#0F172A" }}
                     formatter={(value: number) => [`${Math.round(value)}m`, lang === "zh" ? "海拔" : "Altitude"]} labelFormatter={(v) => `${v} km`} />
                   <defs>
                     <linearGradient id="altGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                      <stop offset="5%" stopColor="#0EA5E9" stopOpacity={0.35} />
+                      <stop offset="95%" stopColor="#0EA5E9" stopOpacity={0} />
                     </linearGradient>
                   </defs>
-                  <Area type="monotone" dataKey="altitude" stroke="hsl(var(--primary))" fill="url(#altGradient)" strokeWidth={2} dot={false} />
+                  <Area type="monotone" dataKey="altitude" stroke="#0EA5E9" fill="url(#altGradient)" strokeWidth={2.5} dot={false} />
                 </AreaChart>
               )}
             </ResponsiveContainer>
@@ -916,24 +918,24 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
 
       {/* Intervals Table — Garmin-style */}
       {isRunningActivity && splits && splits.length > 0 && (
-        <div className="bg-card border border-border rounded-xl overflow-hidden mt-4">
-          <div className="px-4 pt-4 pb-2">
-            <h3 className="font-display font-bold text-foreground text-sm">
+        <div className="bg-white rounded-2xl overflow-hidden mt-4 shadow-[0_4px_20px_-8px_rgba(15,23,42,0.15)] ring-1 ring-slate-200/70">
+          <div className="px-5 pt-4 pb-3">
+            <h3 className="font-display font-bold text-slate-900 text-sm">
               {lang === "zh" ? "分段" : "Intervals"}
             </h3>
           </div>
           {/* Header row */}
-          <div className="grid grid-cols-[36px_1fr_1fr_1fr_1fr_56px] items-end gap-2 px-4 py-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground border-b border-border">
+          <div className="grid grid-cols-[36px_1fr_1fr_1fr_1fr_56px] items-end gap-2 px-5 py-2 text-[10px] font-semibold uppercase tracking-wide text-slate-500 border-b border-slate-200">
             <span>Int</span>
             <span>{lang === "zh" ? "類型" : "Type"}</span>
             <span className="text-right">{lang === "zh" ? "時間" : "Time"}</span>
             <span className="text-right">
               {lang === "zh" ? "距離" : "Dist"}
-              <span className="block text-[9px] font-normal normal-case text-muted-foreground/70">m</span>
+              <span className="block text-[9px] font-normal normal-case text-slate-400">m</span>
             </span>
             <span className="text-right">
               {lang === "zh" ? "平均配速" : "Avg Pace"}
-              <span className="block text-[9px] font-normal normal-case text-muted-foreground/70">min/km</span>
+              <span className="block text-[9px] font-normal normal-case text-slate-400">min/km</span>
             </span>
             <span className="text-right">HR</span>
           </div>
@@ -980,26 +982,26 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
               return (
                 <div
                   key={idx}
-                  className={`grid grid-cols-[36px_1fr_1fr_1fr_1fr_56px] items-center gap-2 px-4 py-3 text-xs border-b border-border/40 last:border-0 ${
-                    isRest ? "bg-muted/30" : "bg-transparent"
+                  className={`grid grid-cols-[36px_1fr_1fr_1fr_1fr_56px] items-center gap-2 px-5 py-3 text-xs border-b border-slate-100 last:border-0 ${
+                    isRest ? "bg-slate-50" : "bg-white"
                   }`}
                 >
-                  <span className={`font-semibold tabular-nums ${isRest ? "text-muted-foreground" : "text-foreground"}`}>
+                  <span className={`font-semibold tabular-nums ${isRest ? "text-slate-400" : "text-slate-900"}`}>
                     {isRest ? "" : runNum}
                   </span>
-                  <span className={`${isRest ? "text-muted-foreground font-normal" : "text-foreground font-semibold"}`}>
+                  <span className={`${isRest ? "text-slate-400 font-normal" : "text-slate-900 font-semibold"}`}>
                     {isRest ? (lang === "zh" ? "休息" : "Rest") : (lang === "zh" ? "跑步" : "Run")}
                   </span>
-                  <span className={`text-right tabular-nums ${isRest ? "text-muted-foreground" : "text-foreground font-semibold"}`}>
+                  <span className={`text-right tabular-nums ${isRest ? "text-slate-400" : "text-slate-900 font-semibold"}`}>
                     {formatDuration(split.elapsed_time)}
                   </span>
-                  <span className={`text-right tabular-nums ${isRest ? "text-muted-foreground" : "text-foreground font-semibold"}`}>
+                  <span className={`text-right tabular-nums ${isRest ? "text-slate-400" : "text-slate-900 font-semibold"}`}>
                     {Math.round(distMeters)}
                   </span>
-                  <span className={`text-right tabular-nums ${isRest ? "text-muted-foreground" : "text-foreground font-semibold"}`}>
+                  <span className={`text-right tabular-nums ${isRest ? "text-slate-400" : "text-slate-900 font-semibold"}`}>
                     {pace}
                   </span>
-                  <span className={`text-right tabular-nums ${isRest ? "text-muted-foreground" : "text-foreground"}`}>
+                  <span className={`text-right tabular-nums ${isRest ? "text-slate-400" : "text-slate-900"}`}>
                     {hr ?? "--"}
                   </span>
                 </div>
@@ -1008,13 +1010,13 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
             return (
               <>
                 {rows}
-                <div className="grid grid-cols-[36px_1fr_1fr_1fr_1fr_56px] items-center gap-2 px-4 py-3 text-xs bg-muted/40 border-t border-border">
-                  <span className="font-bold text-foreground">Σ</span>
-                  <span className="font-bold text-foreground">{lang === "zh" ? "總計" : "Total"}</span>
-                  <span className="text-right tabular-nums font-bold text-foreground">{formatDuration(totalTime)}</span>
-                  <span className="text-right tabular-nums font-bold text-foreground">{Math.round(totalDist)}</span>
-                  <span className="text-right tabular-nums font-bold text-foreground">{formatPace(avgSpeedTotal)}</span>
-                  <span className="text-right tabular-nums font-bold text-foreground">{avgHrTotal ?? "--"}</span>
+                <div className="grid grid-cols-[36px_1fr_1fr_1fr_1fr_56px] items-center gap-2 px-5 py-3.5 text-xs bg-slate-100 border-t border-slate-200">
+                  <span className="font-bold text-slate-900">Σ</span>
+                  <span className="font-bold text-slate-900">{lang === "zh" ? "總計" : "Total"}</span>
+                  <span className="text-right tabular-nums font-bold text-slate-900">{formatDuration(totalTime)}</span>
+                  <span className="text-right tabular-nums font-bold text-slate-900">{Math.round(totalDist)}</span>
+                  <span className="text-right tabular-nums font-bold text-slate-900">{formatPace(avgSpeedTotal)}</span>
+                  <span className="text-right tabular-nums font-bold text-slate-900">{avgHrTotal ?? "--"}</span>
                 </div>
               </>
             );

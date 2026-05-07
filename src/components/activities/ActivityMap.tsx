@@ -1,6 +1,8 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { Maximize2 } from "lucide-react";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 
 // Decode Google polyline encoding
 function decodePolyline(encoded: string): [number, number][] {
@@ -28,27 +30,66 @@ function decodePolyline(encoded: string): [number, number][] {
   return points;
 }
 
+function renderRoute(map: L.Map, coords: [number, number][], padding: [number, number]) {
+  L.tileLayer(
+    'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+    { maxZoom: 19, subdomains: 'abcd' },
+  ).addTo(map);
+
+  L.polyline(coords, {
+    color: '#FFFFFF',
+    weight: 7,
+    opacity: 0.95,
+    lineJoin: 'round',
+    lineCap: 'round',
+  }).addTo(map);
+
+  const line = L.polyline(coords, {
+    color: '#FC4C02',
+    weight: 4,
+    opacity: 1,
+    lineJoin: 'round',
+    lineCap: 'round',
+  }).addTo(map);
+
+  const dot = (latlng: [number, number], fill: string) =>
+    L.circleMarker(latlng, {
+      radius: 5,
+      weight: 2,
+      color: '#FFFFFF',
+      fillColor: fill,
+      fillOpacity: 1,
+    }).addTo(map);
+  dot(coords[0], '#10B981');
+  dot(coords[coords.length - 1], '#FC4C02');
+
+  map.fitBounds(line.getBounds(), { padding });
+}
+
 interface Props {
   polyline: string;
 }
 
 const ActivityMap = ({ polyline }: Props) => {
-  const mapRef = useRef<HTMLDivElement>(null);
-  const mapInstanceRef = useRef<L.Map | null>(null);
+  const previewRef = useRef<HTMLDivElement>(null);
+  const previewMapRef = useRef<L.Map | null>(null);
+  const fullRef = useRef<HTMLDivElement>(null);
+  const fullMapRef = useRef<L.Map | null>(null);
+  const [open, setOpen] = useState(false);
 
+  // Preview map
   useEffect(() => {
-    if (!mapRef.current || !polyline) return;
+    if (!previewRef.current || !polyline) return;
 
-    // Clean up previous instance
-    if (mapInstanceRef.current) {
-      mapInstanceRef.current.remove();
-      mapInstanceRef.current = null;
+    if (previewMapRef.current) {
+      previewMapRef.current.remove();
+      previewMapRef.current = null;
     }
 
     const coords = decodePolyline(polyline);
     if (coords.length === 0) return;
 
-    const map = L.map(mapRef.current, {
+    const map = L.map(previewRef.current, {
       zoomControl: false,
       attributionControl: false,
       dragging: false,
@@ -56,62 +97,76 @@ const ActivityMap = ({ polyline }: Props) => {
       doubleClickZoom: false,
       touchZoom: false,
     });
-
-    mapInstanceRef.current = map;
-
-    // Cleaner cartography — Carto's "Voyager" basemap is softer/less busy
-    // than default OSM. Falls back gracefully if the host blocks it.
-    L.tileLayer(
-      'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-      { maxZoom: 19, subdomains: 'abcd' },
-    ).addTo(map);
-
-    // White "casing" beneath the route gives a clean halo against the map.
-    L.polyline(coords, {
-      color: '#FFFFFF',
-      weight: 7,
-      opacity: 0.95,
-      lineJoin: 'round',
-      lineCap: 'round',
-    }).addTo(map);
-
-    // Main route — bold, rounded, vivid.
-    const line = L.polyline(coords, {
-      color: '#FC4C02',
-      weight: 4,
-      opacity: 1,
-      lineJoin: 'round',
-      lineCap: 'round',
-    }).addTo(map);
-
-    // Start (green) and end (orange) dots
-    const dot = (latlng: [number, number], fill: string) =>
-      L.circleMarker(latlng, {
-        radius: 5,
-        weight: 2,
-        color: '#FFFFFF',
-        fillColor: fill,
-        fillOpacity: 1,
-      }).addTo(map);
-    dot(coords[0], '#10B981');
-    dot(coords[coords.length - 1], '#FC4C02');
-
-    map.fitBounds(line.getBounds(), { padding: [14, 14] });
+    previewMapRef.current = map;
+    renderRoute(map, coords, [14, 14]);
 
     return () => {
-      if (mapInstanceRef.current) {
-        mapInstanceRef.current.remove();
-        mapInstanceRef.current = null;
+      if (previewMapRef.current) {
+        previewMapRef.current.remove();
+        previewMapRef.current = null;
       }
     };
   }, [polyline]);
 
+  // Fullscreen map (mounted only when dialog opens)
+  useEffect(() => {
+    if (!open || !fullRef.current || !polyline) return;
+
+    const coords = decodePolyline(polyline);
+    if (coords.length === 0) return;
+
+    // Small delay so the dialog has finished sizing
+    const timer = setTimeout(() => {
+      if (!fullRef.current) return;
+      const map = L.map(fullRef.current, {
+        zoomControl: true,
+        attributionControl: true,
+        dragging: true,
+        scrollWheelZoom: true,
+        doubleClickZoom: true,
+        touchZoom: true,
+      });
+      fullMapRef.current = map;
+      renderRoute(map, coords, [30, 30]);
+    }, 50);
+
+    return () => {
+      clearTimeout(timer);
+      if (fullMapRef.current) {
+        fullMapRef.current.remove();
+        fullMapRef.current = null;
+      }
+    };
+  }, [open, polyline]);
+
   return (
-    <div
-      ref={mapRef}
-      className="w-full h-32 rounded-lg overflow-hidden mt-2"
-      style={{ zIndex: 0 }}
-    />
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        aria-label="Expand map"
+        className="relative w-full mt-2 group cursor-pointer"
+      >
+        <div
+          ref={previewRef}
+          className="w-full h-32 rounded-lg overflow-hidden"
+          style={{ zIndex: 0 }}
+        />
+        <div className="absolute top-2 right-2 bg-background/90 backdrop-blur-sm rounded-md p-1.5 shadow-md opacity-80 group-hover:opacity-100 transition-opacity">
+          <Maximize2 className="w-3.5 h-3.5 text-foreground" />
+        </div>
+      </button>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-[95vw] w-[95vw] sm:max-w-4xl p-0 overflow-hidden">
+          <div
+            ref={fullRef}
+            className="w-full h-[80vh] rounded-lg overflow-hidden"
+            style={{ zIndex: 0 }}
+          />
+        </DialogContent>
+      </Dialog>
+    </>
   );
 };
 

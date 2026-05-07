@@ -505,6 +505,7 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
           : (totalDist > 0 ? (totalDist * (t / lastT)) / 1000 : t / 60);
         const point: any = { distance_km: km.toFixed(2), time: t };
         if (v.heartrate) point.heartrate = v.heartrate;
+        if (v.altitude != null) point.altitude = v.altitude;
         // Pace from distance window
         if (distSamples && v.distM != null) {
           let j = i;

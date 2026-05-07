@@ -343,7 +343,7 @@ async function drawMapWithTiles(
     if (ln < minLng) minLng = ln;
     if (ln > maxLng) maxLng = ln;
   }
-  const TILE = 512; // @2x retina tiles
+  const TILE = 256; // tile world units; @2x retina images source for sharpness
   const pad = 32;
   const aw = w - pad * 2;
   const ah = h - pad * 2;

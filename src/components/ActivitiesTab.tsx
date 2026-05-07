@@ -27,7 +27,7 @@ import ActivityDetail from "@/components/activities/ActivityDetail";
 
 import SuggestedNextWorkout from "@/components/activities/SuggestedNextWorkout";
 import { calculateRunningScore } from "@/lib/vdot";
-import { loadForActivity } from "@/lib/trainingLoad";
+import { loadForActivity, isRunning } from "@/lib/trainingLoad";
 import { useActivities, type StravaActivity } from "@/hooks/use-activities";
 import FadeIn from "@/components/ui/FadeIn";
 import { ActivityListSkeleton } from "@/components/ui/PageSkeleton";
@@ -73,7 +73,7 @@ function formatSleep(minutes: number): string {
   return `${m}m`;
 }
 
-const runningSportTypes = new Set(["Run", "TrailRun", "VirtualRun", "Treadmill", "running", "trail_running", "treadmill_running"]);
+
 
 const sportTypeIcon: Record<string, string> = {
   Run: "🏃",
@@ -437,7 +437,7 @@ const ActivitiesTab = ({ lang }: Props) => {
     const validScores: number[] = [];
     const profileAge = (profile as any)?.age ?? null;
     for (const act of activities) {
-      if (runningSportTypes.has(act.sport_type)) {
+      if (isRunning(act.sport_type)) {
         const s = getActivityScore(act.distance, act.moving_time);
         scores[act.id] = s;
         if (s !== null) validScores.push(s);

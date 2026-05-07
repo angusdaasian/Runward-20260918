@@ -918,24 +918,24 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
 
       {/* Intervals Table — Garmin-style */}
       {isRunningActivity && splits && splits.length > 0 && (
-        <div className="bg-card border border-border rounded-xl overflow-hidden mt-4">
-          <div className="px-4 pt-4 pb-2">
-            <h3 className="font-display font-bold text-foreground text-sm">
+        <div className="bg-white rounded-2xl overflow-hidden mt-4 shadow-[0_4px_20px_-8px_rgba(15,23,42,0.15)] ring-1 ring-slate-200/70">
+          <div className="px-5 pt-4 pb-3">
+            <h3 className="font-display font-bold text-slate-900 text-sm">
               {lang === "zh" ? "分段" : "Intervals"}
             </h3>
           </div>
           {/* Header row */}
-          <div className="grid grid-cols-[36px_1fr_1fr_1fr_1fr_56px] items-end gap-2 px-4 py-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground border-b border-border">
+          <div className="grid grid-cols-[36px_1fr_1fr_1fr_1fr_56px] items-end gap-2 px-5 py-2 text-[10px] font-semibold uppercase tracking-wide text-slate-500 border-b border-slate-200">
             <span>Int</span>
             <span>{lang === "zh" ? "類型" : "Type"}</span>
             <span className="text-right">{lang === "zh" ? "時間" : "Time"}</span>
             <span className="text-right">
               {lang === "zh" ? "距離" : "Dist"}
-              <span className="block text-[9px] font-normal normal-case text-muted-foreground/70">m</span>
+              <span className="block text-[9px] font-normal normal-case text-slate-400">m</span>
             </span>
             <span className="text-right">
               {lang === "zh" ? "平均配速" : "Avg Pace"}
-              <span className="block text-[9px] font-normal normal-case text-muted-foreground/70">min/km</span>
+              <span className="block text-[9px] font-normal normal-case text-slate-400">min/km</span>
             </span>
             <span className="text-right">HR</span>
           </div>

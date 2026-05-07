@@ -838,14 +838,16 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
           </span>
         </div>
       ) : chartData.length > 0 && chartTabs.length > 0 ? (
-        <div className="bg-card border border-border rounded-xl p-4">
-          <div className="flex gap-1 mb-4">
+        <div className="bg-white rounded-2xl p-5 shadow-[0_4px_20px_-8px_rgba(15,23,42,0.15)] ring-1 ring-slate-200/70">
+          <div className="flex gap-1.5 mb-4">
             {chartTabs.map(tab => (
               <button
                 key={tab.key}
                 onClick={() => setActiveChart(tab.key)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                  activeChart === tab.key ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-accent"
+                className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition-colors ${
+                  activeChart === tab.key
+                    ? "bg-slate-900 text-white"
+                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                 }`}
               >
                 {tab.label}
@@ -856,46 +858,46 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
             <ResponsiveContainer width="100%" height="100%">
               {activeChart === "pace" ? (
                 <LineChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="distance_km" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} tickFormatter={(v) => `${Math.round(v)}`}
-                    label={{ value: "km", position: "insideBottomRight", offset: -5, fontSize: 10, fill: "hsl(var(--muted-foreground))" }} />
-                  <YAxis reversed tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} tickFormatter={(v) => formatPaceFromMinutes(v)} domain={['auto', 'auto']} width={52}
-                    label={{ value: "min/km", angle: -90, position: "insideLeft", fontSize: 10, fill: "hsl(var(--muted-foreground))" }} />
-                  <Tooltip contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }}
+                  <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
+                  <XAxis dataKey="distance_km" tick={{ fontSize: 10, fill: "#64748B" }} tickFormatter={(v) => `${Math.round(v)}`}
+                    label={{ value: "km", position: "insideBottomRight", offset: -5, fontSize: 10, fill: "#64748B" }} />
+                  <YAxis reversed tick={{ fontSize: 10, fill: "#64748B" }} tickFormatter={(v) => formatPaceFromMinutes(v)} domain={['auto', 'auto']} width={52}
+                    label={{ value: "min/km", angle: -90, position: "insideLeft", fontSize: 10, fill: "#64748B" }} />
+                  <Tooltip contentStyle={{ backgroundColor: "#FFFFFF", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 12, color: "#0F172A" }}
                     formatter={(value: number) => [`${formatPaceFromMinutes(value)} min/km`, lang === "zh" ? "配速" : "Pace"]} labelFormatter={(v) => `${v} km`} />
-                  <Line type="monotone" dataKey="pace" stroke="hsl(var(--primary))" strokeWidth={2} dot={false} connectNulls />
+                  <Line type="monotone" dataKey="pace" stroke="#FC4C02" strokeWidth={2.5} dot={false} connectNulls />
                 </LineChart>
               ) : activeChart === "heartrate" ? (
                 <AreaChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="distance_km" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} tickFormatter={(v) => `${Math.round(v)}`} />
-                  <YAxis tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} domain={['auto', 'auto']}
-                    label={{ value: "bpm", angle: -90, position: "insideLeft", fontSize: 10, fill: "hsl(var(--muted-foreground))" }} />
-                  <Tooltip contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }}
+                  <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
+                  <XAxis dataKey="distance_km" tick={{ fontSize: 10, fill: "#64748B" }} tickFormatter={(v) => `${Math.round(v)}`} />
+                  <YAxis tick={{ fontSize: 10, fill: "#64748B" }} domain={['auto', 'auto']}
+                    label={{ value: "bpm", angle: -90, position: "insideLeft", fontSize: 10, fill: "#64748B" }} />
+                  <Tooltip contentStyle={{ backgroundColor: "#FFFFFF", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 12, color: "#0F172A" }}
                     formatter={(value: number) => [Math.round(value), "bpm"]} labelFormatter={(v) => `${v} km`} />
                   <defs>
                     <linearGradient id="hrGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="hsl(var(--destructive))" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="hsl(var(--destructive))" stopOpacity={0} />
+                      <stop offset="5%" stopColor="#EF4444" stopOpacity={0.35} />
+                      <stop offset="95%" stopColor="#EF4444" stopOpacity={0} />
                     </linearGradient>
                   </defs>
-                  <Area type="monotone" dataKey="heartrate" stroke="hsl(var(--destructive))" fill="url(#hrGradient)" strokeWidth={2} dot={false} />
+                  <Area type="monotone" dataKey="heartrate" stroke="#EF4444" fill="url(#hrGradient)" strokeWidth={2.5} dot={false} />
                 </AreaChart>
               ) : (
                 <AreaChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="distance_km" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} tickFormatter={(v) => `${Math.round(v)}`} />
-                  <YAxis tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} domain={['auto', 'auto']}
-                    label={{ value: "m", angle: -90, position: "insideLeft", fontSize: 10, fill: "hsl(var(--muted-foreground))" }} />
-                  <Tooltip contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }}
+                  <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
+                  <XAxis dataKey="distance_km" tick={{ fontSize: 10, fill: "#64748B" }} tickFormatter={(v) => `${Math.round(v)}`} />
+                  <YAxis tick={{ fontSize: 10, fill: "#64748B" }} domain={['auto', 'auto']}
+                    label={{ value: "m", angle: -90, position: "insideLeft", fontSize: 10, fill: "#64748B" }} />
+                  <Tooltip contentStyle={{ backgroundColor: "#FFFFFF", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 12, color: "#0F172A" }}
                     formatter={(value: number) => [`${Math.round(value)}m`, lang === "zh" ? "海拔" : "Altitude"]} labelFormatter={(v) => `${v} km`} />
                   <defs>
                     <linearGradient id="altGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                      <stop offset="5%" stopColor="#0EA5E9" stopOpacity={0.35} />
+                      <stop offset="95%" stopColor="#0EA5E9" stopOpacity={0} />
                     </linearGradient>
                   </defs>
-                  <Area type="monotone" dataKey="altitude" stroke="hsl(var(--primary))" fill="url(#altGradient)" strokeWidth={2} dot={false} />
+                  <Area type="monotone" dataKey="altitude" stroke="#0EA5E9" fill="url(#altGradient)" strokeWidth={2.5} dot={false} />
                 </AreaChart>
               )}
             </ResponsiveContainer>

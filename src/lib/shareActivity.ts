@@ -1156,13 +1156,13 @@ function drawChart(
   const smooth = downsample(points, 120);
 
   // Dotted grid + Y labels (4 ticks)
-  ctx.fillStyle = "rgba(255,255,255,0.45)";
-  ctx.font = `500 15px ${FONT_TEXT}`;
+  ctx.fillStyle = "#94A3B8";
+  ctx.font = `600 14px ${FONT_TEXT}`;
   ctx.textAlign = "right";
   ctx.textBaseline = "middle";
   ctx.save();
   ctx.setLineDash([2, 6]);
-  ctx.strokeStyle = "rgba(255,255,255,0.10)";
+  ctx.strokeStyle = "rgba(15,23,42,0.10)";
   ctx.lineWidth = 1;
   for (let i = 0; i <= 4; i++) {
     const yVal = yMin + ((yMax - yMin) * i) / 4;

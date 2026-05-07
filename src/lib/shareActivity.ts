@@ -1099,7 +1099,7 @@ function drawChart(
   const plotH = h - padT - padB;
 
   if (points.length < 2) {
-    ctx.fillStyle = "rgba(255,255,255,0.45)";
+    ctx.fillStyle = "#94A3B8";
     ctx.font = `500 22px ${FONT_TEXT}`;
     ctx.textAlign = "center";
     ctx.fillText(opts.isZh ? "沒有資料" : "No data", x + w / 2, y + h / 2);

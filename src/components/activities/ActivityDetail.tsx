@@ -960,7 +960,13 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
               isIntervalWorkout = paceRatio >= 1.4 || (paceRatio >= 1.25 && hrSpread >= 20);
             }
             let runNum = 0;
-            return visibleSplits.map((split, idx) => {
+            const totalDist = visibleSplits.reduce((a, s) => a + (s.distance || 0), 0);
+            const totalTime = visibleSplits.reduce((a, s) => a + (s.elapsed_time || 0), 0);
+            const avgSpeedTotal = totalTime > 0 ? totalDist / totalTime : 0;
+            const hrWeighted = visibleSplits.reduce((a, s) => a + ((s.average_heartrate || 0) * (s.elapsed_time || 0)), 0);
+            const hrTimeSum = visibleSplits.reduce((a, s) => a + (s.average_heartrate ? (s.elapsed_time || 0) : 0), 0);
+            const avgHrTotal = hrTimeSum > 0 ? Math.round(hrWeighted / hrTimeSum) : null;
+            const rows = visibleSplits.map((split, idx) => {
               const distMeters = split.distance || 0;
               // Rest if this lap's speed is <70% of the fastest lap's speed
               // (i.e. >~43% slower in pace terms).

@@ -235,9 +235,97 @@ const FONT_TEXT =
 const FONT_HAND =
   "'Bradley Hand', 'Noteworthy', 'Marker Felt', 'Comic Sans MS', 'PingFang TC', cursive";
 
+// Decode Google encoded polyline → [lat, lng] pairs
+function decodePolyline(encoded: string): [number, number][] {
+  const points: [number, number][] = [];
+  let index = 0, lat = 0, lng = 0;
+  while (index < encoded.length) {
+    let shift = 0, result = 0, byte: number;
+    do {
+      byte = encoded.charCodeAt(index++) - 63;
+      result |= (byte & 0x1f) << shift;
+      shift += 5;
+    } while (byte >= 0x20);
+    lat += result & 1 ? ~(result >> 1) : result >> 1;
+    shift = 0; result = 0;
+    do {
+      byte = encoded.charCodeAt(index++) - 63;
+      result |= (byte & 0x1f) << shift;
+      shift += 5;
+    } while (byte >= 0x20);
+    lng += result & 1 ? ~(result >> 1) : result >> 1;
+    points.push([lat / 1e5, lng / 1e5]);
+  }
+  return points;
+}
+
+function drawRouteOnCanvas(
+  ctx: CanvasRenderingContext2D,
+  coords: [number, number][],
+  x: number, y: number, w: number, h: number,
+) {
+  if (coords.length < 2) return;
+  let minLat = Infinity, maxLat = -Infinity, minLng = Infinity, maxLng = -Infinity;
+  for (const [la, ln] of coords) {
+    if (la < minLat) minLat = la;
+    if (la > maxLat) maxLat = la;
+    if (ln < minLng) minLng = ln;
+    if (ln > maxLng) maxLng = ln;
+  }
+  // Mercator-ish: lng cos(lat) correction
+  const midLat = (minLat + maxLat) / 2;
+  const cos = Math.cos((midLat * Math.PI) / 180);
+  const dx = (maxLng - minLng) * cos || 1e-6;
+  const dy = (maxLat - minLat) || 1e-6;
+  const pad = 24;
+  const aw = w - pad * 2;
+  const ah = h - pad * 2;
+  const scale = Math.min(aw / dx, ah / dy);
+  const drawW = dx * scale;
+  const drawH = dy * scale;
+  const offX = x + pad + (aw - drawW) / 2;
+  const offY = y + pad + (ah - drawH) / 2;
+  const project = (lat: number, lng: number): [number, number] => [
+    offX + (lng - minLng) * cos * scale,
+    offY + (maxLat - lat) * scale,
+  ];
+
+  // White outline
+  ctx.beginPath();
+  for (let i = 0; i < coords.length; i++) {
+    const [px, py] = project(coords[i][0], coords[i][1]);
+    if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+  }
+  ctx.lineJoin = "round";
+  ctx.lineCap = "round";
+  ctx.strokeStyle = "rgba(255,255,255,0.95)";
+  ctx.lineWidth = 16;
+  ctx.stroke();
+
+  // Accent line
+  ctx.strokeStyle = "#FC4C02";
+  ctx.lineWidth = 9;
+  ctx.stroke();
+
+  // Start / end dots
+  const drawDot = (lat: number, lng: number, fill: string) => {
+    const [px, py] = project(lat, lng);
+    ctx.beginPath();
+    ctx.arc(px, py, 14, 0, Math.PI * 2);
+    ctx.fillStyle = "#FFFFFF";
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(px, py, 9, 0, Math.PI * 2);
+    ctx.fillStyle = fill;
+    ctx.fill();
+  };
+  drawDot(coords[0][0], coords[0][1], "#22C55E");
+  drawDot(coords[coords.length - 1][0], coords[coords.length - 1][1], "#EF4444");
+}
+
 async function renderShareCard(input: ShareActivityInput): Promise<Blob> {
   const W = 1080;
-  const H = 1920;
+  const H = 1350; // 4:5 — clean, no excess whitespace
   const isZh = input.lang === "zh";
 
   const canvas = document.createElement("canvas");
@@ -245,226 +333,192 @@ async function renderShareCard(input: ShareActivityInput): Promise<Blob> {
   canvas.height = H;
   const ctx = canvas.getContext("2d")!;
 
-  // Base background
-  ctx.fillStyle = "#0B0F1A";
+  // Soft warm gradient background (transparent feel — light, no photo)
+  const bg = ctx.createLinearGradient(0, 0, 0, H);
+  bg.addColorStop(0, "#FFFFFF");
+  bg.addColorStop(1, "#F4F1EC");
+  ctx.fillStyle = bg;
   ctx.fillRect(0, 0, W, H);
 
-  // ---------- Hero photo (top ~58%) ----------
-  const heroH = 1120;
-  const heroSrc = pickHero(input.startDate + input.name);
-  let hero: HTMLImageElement | null = null;
-  try {
-    hero = await loadImage(heroSrc);
-    drawCover(ctx, hero, 0, 0, W, heroH);
-  } catch {
-    // Fallback gradient
-    const g = ctx.createLinearGradient(0, 0, W, heroH);
-    g.addColorStop(0, "#FC4C02");
-    g.addColorStop(1, "#0B0F1A");
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, W, heroH);
-  }
+  // Outer card
+  const M = 48; // page margin
+  const cardX = M;
+  const cardY = M;
+  const cardW = W - M * 2;
+  const cardH = H - M * 2;
+  const cardR = 40;
 
-  // Dark vignette over photo for legibility
-  const vignette = ctx.createLinearGradient(0, 0, 0, heroH);
-  vignette.addColorStop(0, "rgba(0,0,0,0.55)");
-  vignette.addColorStop(0.45, "rgba(0,0,0,0.15)");
-  vignette.addColorStop(1, "rgba(0,0,0,0.85)");
-  ctx.fillStyle = vignette;
-  ctx.fillRect(0, 0, W, heroH);
-
-  // ---------- Header (logo + brand) ----------
-  try {
-    const icon = await loadImage(appIcon);
-    // Rounded mask for icon
-    ctx.save();
-    roundedRect(ctx, 70, 70, 80, 80, 18);
-    ctx.clip();
-    ctx.drawImage(icon, 70, 70, 80, 80);
-    ctx.restore();
-  } catch {
-    // ignore
-  }
-  ctx.fillStyle = "#FFFFFF";
-  ctx.textBaseline = "top";
-  ctx.font = `700 42px ${FONT_DISPLAY}`;
-  ctx.fillText(APP_NAME, 170, 80);
-  ctx.fillStyle = "rgba(255,255,255,0.7)";
-  ctx.font = `500 24px ${FONT_TEXT}`;
-  ctx.fillText(isZh ? "AI 跑步教練" : "AI Running Coach", 170, 130);
-
-  // Date pill (top-right)
-  const dateText = fmtDate(input.startDate, input.lang);
-  ctx.font = `600 24px ${FONT_TEXT}`;
-  const dateW = ctx.measureText(dateText).width;
-  const pillW = dateW + 48;
-  const pillX = W - 70 - pillW;
-  ctx.fillStyle = "rgba(255,255,255,0.18)";
-  roundedRect(ctx, pillX, 80, pillW, 56, 28);
-  ctx.fill();
-  ctx.fillStyle = "#FFFFFF";
-  ctx.fillText(dateText, pillX + 24, 96);
-
-  // ---------- Activity title (over photo, lower-left) ----------
-  ctx.fillStyle = "#FFFFFF";
-  ctx.font = `800 72px ${FONT_DISPLAY}`;
-  ctx.textBaseline = "alphabetic";
-  // Add subtle shadow for legibility
-  ctx.shadowColor = "rgba(0,0,0,0.5)";
-  ctx.shadowBlur = 24;
-  ctx.shadowOffsetY = 4;
-  // Manual wrap, max 2 lines
-  const titleY = heroH - 280;
-  ctx.textBaseline = "top";
-  wrapText(ctx, input.name, 70, titleY, W - 140, 80, 2);
-  ctx.shadowColor = "transparent";
-  ctx.shadowBlur = 0;
-  ctx.shadowOffsetY = 0;
-
-  // ---------- Stat row (Distance / Pace / Time) over photo ----------
-  const stats = [
-    {
-      label: isZh ? "距離" : "Distance",
-      value: `${fmtDistance(input.distanceMeters)} ${isZh ? "公里" : "km"}`,
-    },
-    { label: isZh ? "配速" : "Pace", value: fmtPace(input.averageSpeed, isZh) },
-    { label: isZh ? "時間" : "Time", value: fmtTimeShort(input.movingTimeSeconds, isZh) },
-  ];
-
-  const statsY = heroH - 140;
-  const colW = (W - 140) / stats.length;
-
-  ctx.shadowColor = "rgba(0,0,0,0.5)";
-  ctx.shadowBlur = 18;
-  stats.forEach((s, i) => {
-    const cx = 70 + colW * i;
-    ctx.textBaseline = "top";
-    ctx.fillStyle = "rgba(255,255,255,0.85)";
-    ctx.font = `600 28px ${FONT_TEXT}`;
-    ctx.fillText(s.label, cx, statsY);
-
-    ctx.fillStyle = "#FFFFFF";
-    ctx.font = `800 56px ${FONT_DISPLAY}`;
-    ctx.fillText(s.value, cx, statsY + 44);
-  });
-  ctx.shadowColor = "transparent";
-  ctx.shadowBlur = 0;
-
-  // ---------- Notepad card (AI analysis) ----------
-  const padX = 60;
-  const padY = heroH + 40;
-  const padW = W - 120;
-  const padH = H - padY - 200;
-  const padR = 28;
-
-  // Paper shadow
   ctx.save();
-  ctx.shadowColor = "rgba(0,0,0,0.45)";
-  ctx.shadowBlur = 30;
-  ctx.shadowOffsetY = 10;
-  ctx.fillStyle = "#FAF7EE";
-  roundedRect(ctx, padX, padY, padW, padH, padR);
+  ctx.shadowColor = "rgba(15, 23, 42, 0.10)";
+  ctx.shadowBlur = 40;
+  ctx.shadowOffsetY = 12;
+  ctx.fillStyle = "#FFFFFF";
+  roundedRect(ctx, cardX, cardY, cardW, cardH, cardR);
   ctx.fill();
   ctx.restore();
 
-  // Tape strip (top-left)
-  ctx.save();
-  ctx.translate(padX + 80, padY - 18);
-  ctx.rotate(-0.08);
-  ctx.fillStyle = "rgba(252, 76, 2, 0.55)";
-  ctx.fillRect(-60, -16, 200, 36);
-  ctx.restore();
-
-  // Red margin line + ruled lines (notepad feel)
-  ctx.strokeStyle = "rgba(220, 38, 38, 0.45)";
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(padX + 90, padY + 30);
-  ctx.lineTo(padX + 90, padY + padH - 30);
+  // Subtle border
+  ctx.strokeStyle = "rgba(15,23,42,0.06)";
+  ctx.lineWidth = 1.5;
+  roundedRect(ctx, cardX + 0.5, cardY + 0.5, cardW - 1, cardH - 1, cardR);
   ctx.stroke();
 
-  ctx.strokeStyle = "rgba(30, 41, 59, 0.10)";
-  ctx.lineWidth = 1.5;
-  const lineGap = 50;
-  const linesStart = padY + 150;
-  for (let ly = linesStart; ly < padY + padH - 40; ly += lineGap) {
+  // ---------- Header (logo + brand + date) ----------
+  const headerY = cardY + 44;
+  try {
+    const icon = await loadImage(appIcon);
+    ctx.save();
+    roundedRect(ctx, cardX + 44, headerY, 56, 56, 14);
+    ctx.clip();
+    ctx.drawImage(icon, cardX + 44, headerY, 56, 56);
+    ctx.restore();
+  } catch { /* ignore */ }
+
+  ctx.fillStyle = "#0F172A";
+  ctx.textBaseline = "top";
+  ctx.font = `700 28px ${FONT_DISPLAY}`;
+  ctx.fillText(APP_NAME, cardX + 116, headerY + 4);
+  ctx.fillStyle = "#64748B";
+  ctx.font = `500 18px ${FONT_TEXT}`;
+  ctx.fillText(isZh ? "AI 跑步教練" : "AI Running Coach", cardX + 116, headerY + 34);
+
+  // Date right-aligned
+  ctx.textAlign = "right";
+  ctx.fillStyle = "#64748B";
+  ctx.font = `600 20px ${FONT_TEXT}`;
+  ctx.fillText(fmtDate(input.startDate, input.lang), cardX + cardW - 44, headerY + 18);
+  ctx.textAlign = "left";
+
+  // ---------- Activity title ----------
+  const titleY = headerY + 100;
+  ctx.fillStyle = "#0F172A";
+  ctx.font = `800 56px ${FONT_DISPLAY}`;
+  const titleEnd = wrapText(ctx, input.name, cardX + 44, titleY, cardW - 88, 64, 2);
+
+  // Accent underline
+  ctx.fillStyle = "#FC4C02";
+  ctx.fillRect(cardX + 44, titleEnd + 8, 64, 5);
+
+  // ---------- Map area ----------
+  const mapY = titleEnd + 44;
+  const mapH = 560;
+  const mapX = cardX + 44;
+  const mapW = cardW - 88;
+  const mapR = 28;
+
+  // Map background card
+  ctx.save();
+  roundedRect(ctx, mapX, mapY, mapW, mapH, mapR);
+  ctx.clip();
+  // Subtle paper texture / gradient inside the map card
+  const mg = ctx.createLinearGradient(mapX, mapY, mapX, mapY + mapH);
+  mg.addColorStop(0, "#0F172A");
+  mg.addColorStop(1, "#1E293B");
+  ctx.fillStyle = mg;
+  ctx.fillRect(mapX, mapY, mapW, mapH);
+
+  // Faint grid
+  ctx.strokeStyle = "rgba(255,255,255,0.05)";
+  ctx.lineWidth = 1;
+  const grid = 60;
+  for (let gx = mapX; gx < mapX + mapW; gx += grid) {
     ctx.beginPath();
-    ctx.moveTo(padX + 110, ly);
-    ctx.lineTo(padX + padW - 50, ly);
+    ctx.moveTo(gx, mapY);
+    ctx.lineTo(gx, mapY + mapH);
+    ctx.stroke();
+  }
+  for (let gy = mapY; gy < mapY + mapH; gy += grid) {
+    ctx.beginPath();
+    ctx.moveTo(mapX, gy);
+    ctx.lineTo(mapX + mapW, gy);
     ctx.stroke();
   }
 
-  // Notepad header
+  // Route polyline
+  if (input.summaryPolyline) {
+    try {
+      const coords = decodePolyline(input.summaryPolyline);
+      if (coords.length >= 2) {
+        drawRouteOnCanvas(ctx, coords, mapX, mapY, mapW, mapH);
+      } else {
+        ctx.fillStyle = "rgba(255,255,255,0.5)";
+        ctx.font = `500 24px ${FONT_TEXT}`;
+        ctx.textAlign = "center";
+        ctx.fillText(isZh ? "無 GPS 軌跡" : "No GPS route", mapX + mapW / 2, mapY + mapH / 2 - 12);
+        ctx.textAlign = "left";
+      }
+    } catch {
+      // ignore
+    }
+  } else {
+    ctx.fillStyle = "rgba(255,255,255,0.5)";
+    ctx.font = `500 24px ${FONT_TEXT}`;
+    ctx.textAlign = "center";
+    ctx.fillText(isZh ? "無 GPS 軌跡" : "No GPS route", mapX + mapW / 2, mapY + mapH / 2 - 12);
+    ctx.textAlign = "left";
+  }
+  ctx.restore();
+
+  // ---------- Stats grid (Distance / Pace / Time + optional row) ----------
+  const statsY = mapY + mapH + 40;
+  const stats: { label: string; value: string }[] = [
+    { label: isZh ? "距離" : "Distance", value: `${fmtDistance(input.distanceMeters)} ${isZh ? "公里" : "km"}` },
+    { label: isZh ? "配速" : "Pace", value: fmtPace(input.averageSpeed, isZh) },
+    { label: isZh ? "時間" : "Time", value: fmtTimeShort(input.movingTimeSeconds, isZh) },
+  ];
+  // Add HR/elevation if present (replace pace row's siblings on a 2nd row)
+  const extras: { label: string; value: string }[] = [];
+  if (input.averageHeartrate && input.averageHeartrate > 0) {
+    extras.push({ label: isZh ? "平均心率" : "Avg HR", value: `${Math.round(input.averageHeartrate)} bpm` });
+  }
+  if (input.elevationGainMeters && input.elevationGainMeters > 0) {
+    extras.push({ label: isZh ? "爬升" : "Elevation", value: `${Math.round(input.elevationGainMeters)} m` });
+  }
+
+  const colW = (cardW - 88) / 3;
+  stats.forEach((s, i) => {
+    const cx = cardX + 44 + colW * i;
+    ctx.textBaseline = "top";
+    ctx.fillStyle = "#94A3B8";
+    ctx.font = `600 18px ${FONT_TEXT}`;
+    ctx.fillText(s.label.toUpperCase(), cx, statsY);
+    ctx.fillStyle = "#0F172A";
+    ctx.font = `800 44px ${FONT_DISPLAY}`;
+    ctx.fillText(s.value, cx, statsY + 30);
+  });
+
+  if (extras.length > 0) {
+    const extraY = statsY + 110;
+    const extraCol = (cardW - 88) / Math.max(extras.length, 2);
+    extras.forEach((s, i) => {
+      const cx = cardX + 44 + extraCol * i;
+      ctx.fillStyle = "#94A3B8";
+      ctx.font = `600 16px ${FONT_TEXT}`;
+      ctx.fillText(s.label.toUpperCase(), cx, extraY);
+      ctx.fillStyle = "#0F172A";
+      ctx.font = `700 32px ${FONT_DISPLAY}`;
+      ctx.fillText(s.value, cx, extraY + 26);
+    });
+  }
+
+  // ---------- Footer (brand URL) ----------
+  const footerY = cardY + cardH - 70;
+  // Divider
+  ctx.strokeStyle = "rgba(15,23,42,0.08)";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(cardX + 44, footerY - 16);
+  ctx.lineTo(cardX + cardW - 44, footerY - 16);
+  ctx.stroke();
+
   ctx.fillStyle = "#0F172A";
   ctx.textBaseline = "top";
-  ctx.font = `700 40px ${FONT_DISPLAY}`;
-  ctx.fillText(isZh ? "教練筆記" : "Coach's Notes", padX + 110, padY + 50);
-
-  // Underline accent
-  ctx.fillStyle = "#FC4C02";
-  ctx.fillRect(padX + 110, padY + 100, 80, 5);
-
-  // Body content
-  const bodyX = padX + 110;
-  let bodyY = linesStart - 38; // sit text on the ruled lines
-  const bodyMaxY = padY + padH - 60;
-  const bodyMaxW = padW - 160;
-  const bodyLineH = lineGap;
-
-  ctx.fillStyle = "#1E293B";
-  ctx.font = `400 30px ${FONT_HAND}`;
-
-  const sections: string[] = [];
-  if (input.analysis) {
-    sections.push(stripMarkdown(input.analysis));
-  }
-  if (input.nextWorkout) {
-    sections.push(
-      (isZh ? "下一步: " : "Next up: ") + stripMarkdown(input.nextWorkout),
-    );
-  }
-  if (sections.length === 0) {
-    sections.push(
-      isZh ? "繼續加油！每一步都算數。" : "Keep it up! Every step counts.",
-    );
-  }
-
-  for (const section of sections) {
-    const remaining = bodyMaxY - bodyY;
-    if (remaining < bodyLineH) break;
-    const maxLines = Math.floor(remaining / bodyLineH);
-    bodyY = wrapText(ctx, section, bodyX, bodyY, bodyMaxW, bodyLineH, maxLines);
-    bodyY += bodyLineH * 0.4; // small gap between sections
-  }
-
-  // ---------- Footer ----------
-  const footerY = H - 130;
-
-  // Brand row
-  try {
-    const icon = await loadImage(appIcon);
-    ctx.save();
-    roundedRect(ctx, 70, footerY, 64, 64, 14);
-    ctx.clip();
-    ctx.drawImage(icon, 70, footerY, 64, 64);
-    ctx.restore();
-  } catch {
-    // ignore
-  }
-
-  ctx.fillStyle = "#FFFFFF";
-  ctx.textBaseline = "top";
-  ctx.font = `800 36px ${FONT_DISPLAY}`;
-  ctx.fillText(APP_NAME, 150, footerY + 4);
-  ctx.fillStyle = "rgba(255,255,255,0.65)";
-  ctx.font = `500 22px ${FONT_TEXT}`;
-  ctx.fillText(isZh ? "用 AI 訓練得更聰明" : "Train smarter with AI", 150, footerY + 44);
-
-  // URL right-aligned
+  ctx.font = `700 22px ${FONT_DISPLAY}`;
+  ctx.fillText(APP_NAME, cardX + 44, footerY);
+  ctx.fillStyle = "#64748B";
   ctx.textAlign = "right";
-  ctx.fillStyle = "rgba(255,255,255,0.85)";
-  ctx.font = `600 26px ${FONT_TEXT}`;
-  ctx.fillText(APP_URL.replace("https://", ""), W - 70, footerY + 18);
+  ctx.font = `500 20px ${FONT_TEXT}`;
+  ctx.fillText(APP_URL.replace("https://", ""), cardX + cardW - 44, footerY + 1);
   ctx.textAlign = "left";
 
   return await new Promise<Blob>((resolve, reject) => {

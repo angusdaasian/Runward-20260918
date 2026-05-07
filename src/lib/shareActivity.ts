@@ -235,6 +235,38 @@ const FONT_TEXT =
 const FONT_HAND =
   "'Bradley Hand', 'Noteworthy', 'Marker Felt', 'Comic Sans MS', 'PingFang TC', cursive";
 
+// Draws an Instagram glyph + @runward.app handle right-aligned, vertically centered at midY.
+function drawIgHandle(
+  ctx: CanvasRenderingContext2D,
+  rightX: number,
+  midY: number,
+  color: string = "#0F172A",
+) {
+  const handle = "@runward.app";
+  ctx.save();
+  ctx.textAlign = "right";
+  ctx.textBaseline = "middle";
+  ctx.fillStyle = color;
+  ctx.font = `600 20px ${FONT_TEXT}`;
+  const handleW = ctx.measureText(handle).width;
+  ctx.fillText(handle, rightX, midY);
+  const igSize = 30;
+  const igX = rightX - handleW - 12 - igSize;
+  const igY = midY - igSize / 2;
+  ctx.strokeStyle = color;
+  ctx.fillStyle = color;
+  ctx.lineWidth = 2.2;
+  roundedRect(ctx, igX, igY, igSize, igSize, 8);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(igX + igSize / 2, igY + igSize / 2, igSize * 0.26, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(igX + igSize - 7, igY + 7, 2, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
 // Decode Google encoded polyline → [lat, lng] pairs
 function decodePolyline(encoded: string): [number, number][] {
   const points: [number, number][] = [];

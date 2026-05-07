@@ -251,6 +251,7 @@ const SuggestedNextWorkout = ({ lang, latestActivityId, latestActivityDate }: Pr
         if (!translated) return;
         const next: CachedGenerated = {
           ...generated,
+          cacheVersion: GENERATED_SUGGESTION_CACHE_VERSION,
           suggestion_en: isZh ? generated.suggestion_en : translated,
           suggestion_zh: isZh ? translated : generated.suggestion_zh,
         };
@@ -315,6 +316,7 @@ const SuggestedNextWorkout = ({ lang, latestActivityId, latestActivityDate }: Pr
         generatedAt: new Date().toISOString(),
         basisActivityDate: latestActivityDate,
         workoutType,
+        cacheVersion: GENERATED_SUGGESTION_CACHE_VERSION,
       };
       writeCachedGenerated(user.id, cached);
       setGenerated(cached);

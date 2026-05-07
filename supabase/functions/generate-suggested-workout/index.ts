@@ -154,7 +154,7 @@ serve(async (req) => {
     // --- Pull last 7 days of runs from all 3 sources + active training plan ---
     const since = new Date(Date.now() - SEVEN_DAYS_MS).toISOString();
 
-    const [stravaRes, ahRes, garminRes, profileRes, planRes] = await Promise.all([
+    const [stravaRes, ahRes, garminRes, terraRes, profileRes, planRes] = await Promise.all([
       svc.from("strava_activities")
         .select("name, sport_type, distance, moving_time, average_speed, average_heartrate, start_date")
         .eq("user_id", user.id).gte("start_date", since).order("start_date", { ascending: false }),
@@ -163,6 +163,9 @@ serve(async (req) => {
         .eq("user_id", user.id).gte("start_date", since).order("start_date", { ascending: false }),
       svc.from("garmin_activities")
         .select("activity_name, activity_type, distance_meters, duration_seconds, average_speed, average_hr, start_time")
+        .eq("user_id", user.id).gte("start_time", since).order("start_time", { ascending: false }),
+      svc.from("terra_activities")
+        .select("activity_name, activity_type, distance_meters, duration_seconds, average_speed, average_hr, start_time, provider")
         .eq("user_id", user.id).gte("start_time", since).order("start_time", { ascending: false }),
       svc.from("profiles")
         .select("training_score, runs_per_week, age, sex")
@@ -206,6 +209,20 @@ serve(async (req) => {
         pace: paceFromSpeed(speed),
         avg_hr: a.average_hr,
         source: "Garmin",
+      });
+    for (const a of (terraRes.data || [])) {
+      const t = (a.activity_type || "").toLowerCase();
+      if (!RUNNING_SPORTS.has(a.activity_type) && !t.includes("run")) continue;
+      const speed = a.average_speed && a.average_speed > 0
+        ? a.average_speed
+        : (a.distance_meters && a.duration_seconds ? a.distance_meters / a.duration_seconds : 0);
+      recent.push({
+        date: a.start_time,
+        distance_km: +((a.distance_meters || 0) / 1000).toFixed(2),
+        duration_min: Math.round((a.duration_seconds || 0) / 60),
+        pace: paceFromSpeed(speed),
+        avg_hr: a.average_hr,
+        source: a.provider || "Terra",
       });
     }
     recent.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());

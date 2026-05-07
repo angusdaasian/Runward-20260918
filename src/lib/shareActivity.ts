@@ -724,7 +724,7 @@ export async function shareActivity(input: ShareActivityInput): Promise<void> {
 async function renderSplitsCard(input: ShareSplitsInput): Promise<Blob> {
   const isZh = input.lang === "zh";
 
-  // Filter GPS-noise laps + detect intervals (mirrors ActivityDetail logic)
+  // Filter GPS-noise laps + detect intervals
   const NOISE_DIST_M = 50;
   const NOISE_TIME_S = 10;
   const visible = input.splits.filter(
@@ -742,70 +742,113 @@ async function renderSplitsCard(input: ShareSplitsInput): Promise<Blob> {
     isInterval = ratio >= 1.4 || (ratio >= 1.25 && hrSpread >= 20);
   }
 
+  // Totals
+  const totalDist = visible.reduce((a, s) => a + (s.distance || 0), 0);
+  const totalTime = visible.reduce((a, s) => a + (s.elapsed_time || 0), 0);
+  const avgSpeedTotal = totalTime > 0 ? totalDist / totalTime : 0;
+  const hrWeighted = visible.reduce((a, s) => a + ((s.average_heartrate || 0) * (s.elapsed_time || 0)), 0);
+  const hrTimeSum = visible.reduce((a, s) => a + (s.average_heartrate ? (s.elapsed_time || 0) : 0), 0);
+  const avgHrTotal = hrTimeSum > 0 ? Math.round(hrWeighted / hrTimeSum) : null;
+
+  const fmtPaceMM = (mps: number) => {
+    if (!(mps > 0)) return "--";
+    const p = 1000 / mps;
+    const m = Math.floor(p / 60);
+    const sec = Math.floor(p % 60);
+    return `${m}:${String(sec).padStart(2, "0")}`;
+  };
+
   const W = 1080;
-  const headerH = 240;
-  const rowH = 72;
-  const tableHeaderH = 70;
-  const footerH = 140;
-  const padX = 60;
-  const tablePadTop = 30;
-  const H = headerH + tableHeaderH + visible.length * rowH + tablePadTop + footerH + 40;
+  const headerH = 220;
+  const rowH = 60;
+  const tableHeaderH = 56;
+  const totalRowH = 78;
+  const footerH = 96;
+  const padX = 48;
+  const tablePadTop = 18;
+  const H = headerH + tableHeaderH + visible.length * rowH + totalRowH + tablePadTop + footerH + 80;
 
   const canvas = document.createElement("canvas");
   canvas.width = W;
   canvas.height = H;
   const ctx = canvas.getContext("2d")!;
 
-  // Background — clean, no photo
-  ctx.fillStyle = "#0B0F1A";
+  // Soft warm background
+  const bg = ctx.createLinearGradient(0, 0, 0, H);
+  bg.addColorStop(0, "#FFFFFF");
+  bg.addColorStop(1, "#F4F1EC");
+  ctx.fillStyle = bg;
   ctx.fillRect(0, 0, W, H);
-  // Subtle gradient accent at top
-  const g = ctx.createLinearGradient(0, 0, 0, headerH);
-  g.addColorStop(0, "rgba(252, 76, 2, 0.20)");
-  g.addColorStop(1, "rgba(252, 76, 2, 0)");
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, W, headerH);
 
-  // ---------- Header (logo + brand + title) ----------
+  // Outer card
+  const cardX = padX;
+  const cardY = padX;
+  const cardW = W - padX * 2;
+  const cardH = H - padX * 2;
+  const cardR = 36;
+
+  ctx.save();
+  ctx.shadowColor = "rgba(15, 23, 42, 0.10)";
+  ctx.shadowBlur = 36;
+  ctx.shadowOffsetY = 12;
+  ctx.fillStyle = "#FFFFFF";
+  roundedRect(ctx, cardX, cardY, cardW, cardH, cardR);
+  ctx.fill();
+  ctx.restore();
+
+  ctx.strokeStyle = "rgba(15,23,42,0.06)";
+  ctx.lineWidth = 1.5;
+  roundedRect(ctx, cardX + 0.5, cardY + 0.5, cardW - 1, cardH - 1, cardR);
+  ctx.stroke();
+
+  const innerPad = 40;
+  const innerX = cardX + innerPad;
+  const innerW = cardW - innerPad * 2;
+
+  // Header
+  const headerY = cardY + 36;
   try {
     const icon = await loadImage(appIcon);
     ctx.save();
-    roundedRect(ctx, padX, 60, 80, 80, 18);
+    roundedRect(ctx, innerX, headerY, 56, 56, 14);
     ctx.clip();
-    ctx.drawImage(icon, padX, 60, 80, 80);
+    ctx.drawImage(icon, innerX, headerY, 56, 56);
     ctx.restore();
   } catch { /* ignore */ }
 
-  ctx.fillStyle = "#FFFFFF";
+  ctx.fillStyle = "#0F172A";
   ctx.textBaseline = "top";
-  ctx.font = `700 42px ${FONT_DISPLAY}`;
-  ctx.fillText(APP_NAME, padX + 100, 70);
-  ctx.fillStyle = "rgba(255,255,255,0.65)";
-  ctx.font = `500 24px ${FONT_TEXT}`;
-  ctx.fillText(fmtDate(input.startDate, input.lang), padX + 100, 120);
+  ctx.font = `700 28px ${FONT_DISPLAY}`;
+  ctx.fillText(APP_NAME, innerX + 72, headerY + 4);
+  ctx.fillStyle = "#64748B";
+  ctx.font = `500 18px ${FONT_TEXT}`;
+  ctx.fillText(isZh ? "AI 跑步教練" : "AI Running Coach", innerX + 72, headerY + 34);
+
+  ctx.textAlign = "right";
+  ctx.fillStyle = "#64748B";
+  ctx.font = `600 20px ${FONT_TEXT}`;
+  ctx.fillText(fmtDate(input.startDate, input.lang), innerX + innerW, headerY + 18);
+  ctx.textAlign = "left";
 
   // Title
-  ctx.fillStyle = "#FFFFFF";
-  ctx.font = `800 52px ${FONT_DISPLAY}`;
-  wrapText(ctx, input.name, padX, 170, W - padX * 2, 56, 1);
+  const titleY = headerY + 96;
+  ctx.fillStyle = "#0F172A";
+  ctx.font = `800 44px ${FONT_DISPLAY}`;
+  const titleEnd = wrapText(ctx, isZh ? "分段" : "Intervals", innerX, titleY, innerW, 50, 1);
+  ctx.fillStyle = "#FC4C02";
+  ctx.fillRect(innerX, titleEnd + 8, 56, 4);
 
-  // ---------- Table header ----------
+  // Table header
   const tableY = headerH;
-  ctx.fillStyle = "rgba(255,255,255,0.04)";
-  ctx.fillRect(0, tableY, W, tableHeaderH);
+  const HR_RIGHT = innerX + innerW;
+  const PACE_RIGHT = HR_RIGHT - 150;
+  const DIST_RIGHT = PACE_RIGHT - 150;
+  const TIME_RIGHT = DIST_RIGHT - 150;
+  const NUM_LEFT = innerX;
+  const TYPE_LEFT = innerX + 70;
 
-  // Column layout — right-aligned numeric columns with generous spacing
-  // so HR is never clipped or overlapped.
-  // # | Type | ... Time | Dist | Pace | HR (each numeric col 170px apart)
-  const HR_RIGHT = W - padX;            // 1020
-  const PACE_RIGHT = HR_RIGHT - 170;    // 850
-  const DIST_RIGHT = PACE_RIGHT - 170;  // 680
-  const TIME_RIGHT = DIST_RIGHT - 170;  // 510
-  const NUM_LEFT = padX;                // 60
-  const TYPE_LEFT = padX + 80;          // 140
-
-  ctx.fillStyle = "rgba(255,255,255,0.55)";
-  ctx.font = `700 22px ${FONT_TEXT}`;
+  ctx.fillStyle = "#94A3B8";
+  ctx.font = `700 16px ${FONT_TEXT}`;
   ctx.textBaseline = "middle";
   const headerMid = tableY + tableHeaderH / 2;
   ctx.textAlign = "left";
@@ -817,7 +860,14 @@ async function renderSplitsCard(input: ShareSplitsInput): Promise<Blob> {
   ctx.fillText(isZh ? "配速" : "PACE", PACE_RIGHT, headerMid);
   ctx.fillText("HR", HR_RIGHT, headerMid);
 
-  // ---------- Rows ----------
+  ctx.strokeStyle = "rgba(15,23,42,0.10)";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(innerX, tableY + tableHeaderH);
+  ctx.lineTo(innerX + innerW, tableY + tableHeaderH);
+  ctx.stroke();
+
+  // Rows
   let runNum = 0;
   visible.forEach((s, idx) => {
     const y = tableY + tableHeaderH + tablePadTop + idx * rowH;
@@ -826,33 +876,33 @@ async function renderSplitsCard(input: ShareSplitsInput): Promise<Blob> {
     if (!isRest) runNum++;
 
     if (isRest) {
-      ctx.fillStyle = "rgba(255,255,255,0.03)";
-      ctx.fillRect(0, y, W, rowH);
+      ctx.fillStyle = "rgba(15,23,42,0.03)";
+      ctx.fillRect(innerX, y, innerW, rowH);
     }
 
-    ctx.strokeStyle = "rgba(255,255,255,0.06)";
+    ctx.strokeStyle = "rgba(15,23,42,0.06)";
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.moveTo(padX, y + rowH);
-    ctx.lineTo(W - padX, y + rowH);
+    ctx.moveTo(innerX, y + rowH);
+    ctx.lineTo(innerX + innerW, y + rowH);
     ctx.stroke();
 
     const mid = y + rowH / 2;
-    const baseColor = isRest ? "rgba(255,255,255,0.45)" : "#FFFFFF";
+    const baseColor = isRest ? "#94A3B8" : "#0F172A";
     const accentWeight = isRest ? "500" : "700";
 
     if (!isRest) {
       ctx.fillStyle = "#FC4C02";
       ctx.beginPath();
-      ctx.arc(NUM_LEFT + 14, mid, 6, 0, Math.PI * 2);
+      ctx.arc(NUM_LEFT + 10, mid, 5, 0, Math.PI * 2);
       ctx.fill();
     }
     ctx.fillStyle = baseColor;
-    ctx.font = `700 26px ${FONT_TEXT}`;
+    ctx.font = `700 22px ${FONT_TEXT}`;
     ctx.textAlign = "left";
-    ctx.fillText(isRest ? "" : String(runNum), NUM_LEFT + 28, mid);
+    ctx.fillText(isRest ? "" : String(runNum), NUM_LEFT + 24, mid);
 
-    ctx.font = `${accentWeight} 26px ${FONT_TEXT}`;
+    ctx.font = `${accentWeight} 22px ${FONT_TEXT}`;
     ctx.fillStyle = baseColor;
     ctx.fillText(
       isRest ? (isZh ? "休息" : "Rest") : (isZh ? "跑步" : "Run"),
@@ -861,85 +911,59 @@ async function renderSplitsCard(input: ShareSplitsInput): Promise<Blob> {
     );
 
     ctx.textAlign = "right";
-    ctx.font = `${accentWeight} 26px ${FONT_TEXT}`;
+    ctx.font = `${accentWeight} 22px ${FONT_TEXT}`;
     ctx.fillText(fmtTimeShort(s.elapsed_time, false).replace(/\s/g, ""), TIME_RIGHT, mid);
     ctx.fillText(String(Math.round(s.distance || 0)), DIST_RIGHT, mid);
-    ctx.fillText(
-      s.average_speed > 0
-        ? (() => {
-            const p = 1000 / s.average_speed;
-            const m = Math.floor(p / 60);
-            const sec = Math.floor(p % 60);
-            return `${m}:${String(sec).padStart(2, "0")}`;
-          })()
-        : "--",
-      PACE_RIGHT,
-      mid,
-    );
+    ctx.fillText(fmtPaceMM(s.average_speed), PACE_RIGHT, mid);
     ctx.fillText(s.average_heartrate ? String(Math.round(s.average_heartrate)) : "--", HR_RIGHT, mid);
   });
 
-  // ---------- Footer ----------
-  ctx.textAlign = "left";
-  ctx.textBaseline = "top";
-  const footerY = H - footerH + 20;
-
-  // Divider
-  ctx.strokeStyle = "rgba(255,255,255,0.08)";
-  ctx.beginPath();
-  ctx.moveTo(padX, footerY);
-  ctx.lineTo(W - padX, footerY);
-  ctx.stroke();
-
-  try {
-    const icon = await loadImage(appIcon);
-    ctx.save();
-    roundedRect(ctx, padX, footerY + 30, 56, 56, 14);
-    ctx.clip();
-    ctx.drawImage(icon, padX, footerY + 30, 56, 56);
-    ctx.restore();
-  } catch { /* ignore */ }
-
-  ctx.fillStyle = "#FFFFFF";
-  ctx.font = `800 30px ${FONT_DISPLAY}`;
-  ctx.fillText(APP_NAME, padX + 76, footerY + 32);
-  ctx.fillStyle = "rgba(255,255,255,0.55)";
-  ctx.font = `500 20px ${FONT_TEXT}`;
-  ctx.fillText(isZh ? "用 AI 訓練得更聰明" : "Train smarter with AI", padX + 76, footerY + 66);
-
-  // Instagram handle (right side): IG glyph + @runward.app
-  const handle = "@runward.app";
-  ctx.textAlign = "right";
-  ctx.textBaseline = "middle";
-  ctx.fillStyle = "#FFFFFF";
-  ctx.font = `600 22px ${FONT_TEXT}`;
-  const handleY = footerY + 58;
-  const handleW = ctx.measureText(handle).width;
-  ctx.fillText(handle, W - padX, handleY);
-
-  // Draw IG glyph just left of the handle
-  const igSize = 36;
-  const igX = W - padX - handleW - 16 - igSize;
-  const igY = handleY - igSize / 2;
+  // Total row
+  const totalY = tableY + tableHeaderH + tablePadTop + visible.length * rowH + 10;
+  const totalH = totalRowH - 18;
   ctx.save();
-  ctx.strokeStyle = "#FFFFFF";
-  ctx.fillStyle = "#FFFFFF";
-  ctx.lineWidth = 2.5;
-  // Rounded square
-  roundedRect(ctx, igX, igY, igSize, igSize, 9);
-  ctx.stroke();
-  // Lens circle
-  ctx.beginPath();
-  ctx.arc(igX + igSize / 2, igY + igSize / 2, igSize * 0.26, 0, Math.PI * 2);
-  ctx.stroke();
-  // Top-right dot
-  ctx.beginPath();
-  ctx.arc(igX + igSize - 8, igY + 8, 2.2, 0, Math.PI * 2);
+  roundedRect(ctx, innerX, totalY, innerW, totalH, 14);
+  ctx.fillStyle = "rgba(252,76,2,0.08)";
   ctx.fill();
   ctx.restore();
 
+  const totalMid = totalY + totalH / 2;
+  ctx.fillStyle = "#FC4C02";
+  ctx.font = `800 22px ${FONT_DISPLAY}`;
+  ctx.textAlign = "left";
+  ctx.textBaseline = "middle";
+  ctx.fillText("Σ", NUM_LEFT + 4, totalMid);
+  ctx.fillStyle = "#0F172A";
+  ctx.font = `800 22px ${FONT_DISPLAY}`;
+  ctx.fillText(isZh ? "總計" : "TOTAL", TYPE_LEFT, totalMid);
+
+  ctx.textAlign = "right";
+  ctx.font = `800 22px ${FONT_DISPLAY}`;
+  ctx.fillText(fmtTimeShort(totalTime, false).replace(/\s/g, ""), TIME_RIGHT, totalMid);
+  ctx.fillText(String(Math.round(totalDist)), DIST_RIGHT, totalMid);
+  ctx.fillText(fmtPaceMM(avgSpeedTotal), PACE_RIGHT, totalMid);
+  ctx.fillText(avgHrTotal != null ? String(avgHrTotal) : "--", HR_RIGHT, totalMid);
+
+  // Footer
   ctx.textAlign = "left";
   ctx.textBaseline = "top";
+  const footerY = cardY + cardH - 56;
+  ctx.strokeStyle = "rgba(15,23,42,0.08)";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(innerX, footerY - 16);
+  ctx.lineTo(innerX + innerW, footerY - 16);
+  ctx.stroke();
+
+  ctx.fillStyle = "#0F172A";
+  ctx.font = `700 22px ${FONT_DISPLAY}`;
+  ctx.fillText(APP_NAME, innerX, footerY);
+  ctx.fillStyle = "#64748B";
+  ctx.textAlign = "right";
+  ctx.font = `500 20px ${FONT_TEXT}`;
+  ctx.fillText(APP_URL.replace("https://", ""), innerX + innerW, footerY + 1);
+  ctx.textAlign = "left";
+
 
   return await new Promise<Blob>((resolve, reject) => {
     canvas.toBlob(
@@ -1045,20 +1069,27 @@ function drawChart(
 ) {
   const { x, y, w, h } = rect;
 
-  // Card background
-  ctx.fillStyle = "rgba(255,255,255,0.04)";
-  roundedRect(ctx, x, y, w, h, 20);
+  // Card background — light, matches activity share card
+  ctx.fillStyle = "#FFFFFF";
+  roundedRect(ctx, x, y, w, h, 24);
   ctx.fill();
+  ctx.strokeStyle = "rgba(15,23,42,0.08)";
+  ctx.lineWidth = 1.5;
+  roundedRect(ctx, x + 0.5, y + 0.5, w - 1, h - 1, 24);
+  ctx.stroke();
 
   // Title
-  ctx.fillStyle = "#FFFFFF";
+  ctx.fillStyle = "#0F172A";
   ctx.textAlign = "left";
   ctx.textBaseline = "top";
-  ctx.font = `700 30px ${FONT_DISPLAY}`;
+  ctx.font = `800 30px ${FONT_DISPLAY}`;
   ctx.fillText(opts.title, x + 28, y + 22);
-  ctx.fillStyle = "rgba(255,255,255,0.55)";
-  ctx.font = `500 18px ${FONT_TEXT}`;
-  ctx.fillText(opts.unit, x + 28, y + 60);
+  ctx.fillStyle = "#94A3B8";
+  ctx.font = `600 16px ${FONT_TEXT}`;
+  ctx.fillText(opts.unit.toUpperCase(), x + 28, y + 60);
+  // Accent underline under title
+  ctx.fillStyle = opts.color;
+  ctx.fillRect(x + 28, y + 56, 36, 3);
 
   // Plot area
   const padL = 90, padR = 36, padT = 100, padB = 56;
@@ -1068,7 +1099,7 @@ function drawChart(
   const plotH = h - padT - padB;
 
   if (points.length < 2) {
-    ctx.fillStyle = "rgba(255,255,255,0.45)";
+    ctx.fillStyle = "#94A3B8";
     ctx.font = `500 22px ${FONT_TEXT}`;
     ctx.textAlign = "center";
     ctx.fillText(opts.isZh ? "沒有資料" : "No data", x + w / 2, y + h / 2);
@@ -1125,13 +1156,13 @@ function drawChart(
   const smooth = downsample(points, 120);
 
   // Dotted grid + Y labels (4 ticks)
-  ctx.fillStyle = "rgba(255,255,255,0.45)";
-  ctx.font = `500 15px ${FONT_TEXT}`;
+  ctx.fillStyle = "#94A3B8";
+  ctx.font = `600 14px ${FONT_TEXT}`;
   ctx.textAlign = "right";
   ctx.textBaseline = "middle";
   ctx.save();
   ctx.setLineDash([2, 6]);
-  ctx.strokeStyle = "rgba(255,255,255,0.10)";
+  ctx.strokeStyle = "rgba(15,23,42,0.10)";
   ctx.lineWidth = 1;
   for (let i = 0; i <= 4; i++) {
     const yVal = yMin + ((yMax - yMin) * i) / 4;
@@ -1147,8 +1178,8 @@ function drawChart(
   // X labels
   ctx.textAlign = "center";
   ctx.textBaseline = "top";
-  ctx.fillStyle = "rgba(255,255,255,0.45)";
-  ctx.font = `500 15px ${FONT_TEXT}`;
+  ctx.fillStyle = "#94A3B8";
+  ctx.font = `600 14px ${FONT_TEXT}`;
   for (const t of [0, 0.5, 1]) {
     const xVal = xMin + (xMax - xMin) * t;
     ctx.fillText(opts.xFmt(xVal), sx(xVal), plotY + plotH + 14);
@@ -1298,48 +1329,80 @@ async function renderChartsCard(input: ShareChartsInput): Promise<Blob> {
   const isZh = input.lang === "zh";
   const W = 1080;
   const headerH = 240;
-  const chartH = 520;
-  const chartGap = 32;
-  const footerH = 140;
-  const padX = 60;
-  const H = headerH + chartH * 2 + chartGap + footerH + 40;
+  const chartH = 460;
+  const chartGap = 28;
+  const footerH = 96;
+  const padX = 48;
+  const innerPad = 40;
+  const H = headerH + chartH * 2 + chartGap + footerH + 80;
 
   const canvas = document.createElement("canvas");
   canvas.width = W;
   canvas.height = H;
   const ctx = canvas.getContext("2d")!;
 
-  // Background
-  ctx.fillStyle = "#0B0F1A";
+  // Soft warm background (matches activity card)
+  const bg = ctx.createLinearGradient(0, 0, 0, H);
+  bg.addColorStop(0, "#FFFFFF");
+  bg.addColorStop(1, "#F4F1EC");
+  ctx.fillStyle = bg;
   ctx.fillRect(0, 0, W, H);
-  const g = ctx.createLinearGradient(0, 0, 0, headerH);
-  g.addColorStop(0, "rgba(252, 76, 2, 0.20)");
-  g.addColorStop(1, "rgba(252, 76, 2, 0)");
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, W, headerH);
+
+  // Outer card
+  const cardX = padX;
+  const cardY = padX;
+  const cardW = W - padX * 2;
+  const cardH = H - padX * 2;
+  const cardR = 36;
+  ctx.save();
+  ctx.shadowColor = "rgba(15, 23, 42, 0.10)";
+  ctx.shadowBlur = 36;
+  ctx.shadowOffsetY = 12;
+  ctx.fillStyle = "#FFFFFF";
+  roundedRect(ctx, cardX, cardY, cardW, cardH, cardR);
+  ctx.fill();
+  ctx.restore();
+  ctx.strokeStyle = "rgba(15,23,42,0.06)";
+  ctx.lineWidth = 1.5;
+  roundedRect(ctx, cardX + 0.5, cardY + 0.5, cardW - 1, cardH - 1, cardR);
+  ctx.stroke();
+
+  const innerX = cardX + innerPad;
+  const innerW = cardW - innerPad * 2;
 
   // Header
   let iconImg: HTMLImageElement | null = null;
+  const headerY = cardY + 36;
   try {
     iconImg = await loadImage(appIcon);
     ctx.save();
-    roundedRect(ctx, padX, 60, 80, 80, 18);
+    roundedRect(ctx, innerX, headerY, 56, 56, 14);
     ctx.clip();
-    ctx.drawImage(iconImg, padX, 60, 80, 80);
+    ctx.drawImage(iconImg, innerX, headerY, 56, 56);
     ctx.restore();
   } catch { /* ignore */ }
 
-  ctx.fillStyle = "#FFFFFF";
+  ctx.fillStyle = "#0F172A";
   ctx.textBaseline = "top";
-  ctx.font = `700 42px ${FONT_DISPLAY}`;
-  ctx.fillText(APP_NAME, padX + 100, 70);
-  ctx.fillStyle = "rgba(255,255,255,0.65)";
-  ctx.font = `500 24px ${FONT_TEXT}`;
-  ctx.fillText(fmtDate(input.startDate, input.lang), padX + 100, 120);
+  ctx.font = `700 28px ${FONT_DISPLAY}`;
+  ctx.fillText(APP_NAME, innerX + 72, headerY + 4);
+  ctx.fillStyle = "#64748B";
+  ctx.font = `500 18px ${FONT_TEXT}`;
+  ctx.fillText(isZh ? "AI 跑步教練" : "AI Running Coach", innerX + 72, headerY + 34);
 
-  ctx.fillStyle = "#FFFFFF";
-  ctx.font = `800 52px ${FONT_DISPLAY}`;
-  wrapText(ctx, input.name, padX, 170, W - padX * 2, 56, 1);
+  ctx.textAlign = "right";
+  ctx.fillStyle = "#64748B";
+  ctx.font = `600 20px ${FONT_TEXT}`;
+  ctx.fillText(fmtDate(input.startDate, input.lang), innerX + innerW, headerY + 18);
+  ctx.textAlign = "left";
+
+  // Title
+  const titleY = headerY + 96;
+  ctx.fillStyle = "#0F172A";
+  ctx.font = `800 44px ${FONT_DISPLAY}`;
+  const titleEnd = wrapText(ctx, input.name, innerX, titleY, innerW, 50, 1);
+  ctx.fillStyle = "#FC4C02";
+  ctx.fillRect(innerX, titleEnd + 8, 56, 4);
 
   // Build series
   const pacePts = input.data
@@ -1353,14 +1416,14 @@ async function renderChartsCard(input: ShareChartsInput): Promise<Blob> {
 
   drawChart(
     ctx,
-    { x: padX, y: headerH, w: W - padX * 2, h: chartH },
+    { x: innerX, y: headerH, w: innerW, h: chartH },
     pacePts,
     {
       title: isZh ? "配速" : "Pace",
       unit: isZh ? "分鐘 / 公里" : "min / km",
       color: "#FC4C02",
-      fillColor: "rgba(252,76,2,0.35)",
-      invertY: true, // faster pace at top
+      fillColor: "rgba(252,76,2,0.25)",
+      invertY: true,
       yFmt: fmtPaceMin,
       xFmt,
       isZh,
@@ -1369,20 +1432,38 @@ async function renderChartsCard(input: ShareChartsInput): Promise<Blob> {
 
   drawChart(
     ctx,
-    { x: padX, y: headerH + chartH + chartGap, w: W - padX * 2, h: chartH },
+    { x: innerX, y: headerH + chartH + chartGap, w: innerW, h: chartH },
     hrPts,
     {
       title: isZh ? "心率" : "Heart Rate",
       unit: "bpm",
       color: "#EF4444",
-      fillColor: "rgba(239,68,68,0.35)",
+      fillColor: "rgba(239,68,68,0.25)",
       yFmt: (v) => String(Math.round(v)),
       xFmt,
       isZh,
     },
   );
 
-  drawInstagramFooter(ctx, W, H, padX, isZh, iconImg);
+  // Footer
+  ctx.textAlign = "left";
+  ctx.textBaseline = "top";
+  const footerY = cardY + cardH - 56;
+  ctx.strokeStyle = "rgba(15,23,42,0.08)";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(innerX, footerY - 16);
+  ctx.lineTo(innerX + innerW, footerY - 16);
+  ctx.stroke();
+
+  ctx.fillStyle = "#0F172A";
+  ctx.font = `700 22px ${FONT_DISPLAY}`;
+  ctx.fillText(APP_NAME, innerX, footerY);
+  ctx.fillStyle = "#64748B";
+  ctx.textAlign = "right";
+  ctx.font = `500 20px ${FONT_TEXT}`;
+  ctx.fillText(APP_URL.replace("https://", ""), innerX + innerW, footerY + 1);
+  ctx.textAlign = "left";
 
   return await new Promise<Blob>((resolve, reject) => {
     canvas.toBlob(

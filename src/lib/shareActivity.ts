@@ -1329,48 +1329,80 @@ async function renderChartsCard(input: ShareChartsInput): Promise<Blob> {
   const isZh = input.lang === "zh";
   const W = 1080;
   const headerH = 240;
-  const chartH = 520;
-  const chartGap = 32;
-  const footerH = 140;
-  const padX = 60;
-  const H = headerH + chartH * 2 + chartGap + footerH + 40;
+  const chartH = 460;
+  const chartGap = 28;
+  const footerH = 96;
+  const padX = 48;
+  const innerPad = 40;
+  const H = headerH + chartH * 2 + chartGap + footerH + 80;
 
   const canvas = document.createElement("canvas");
   canvas.width = W;
   canvas.height = H;
   const ctx = canvas.getContext("2d")!;
 
-  // Background
-  ctx.fillStyle = "#0B0F1A";
+  // Soft warm background (matches activity card)
+  const bg = ctx.createLinearGradient(0, 0, 0, H);
+  bg.addColorStop(0, "#FFFFFF");
+  bg.addColorStop(1, "#F4F1EC");
+  ctx.fillStyle = bg;
   ctx.fillRect(0, 0, W, H);
-  const g = ctx.createLinearGradient(0, 0, 0, headerH);
-  g.addColorStop(0, "rgba(252, 76, 2, 0.20)");
-  g.addColorStop(1, "rgba(252, 76, 2, 0)");
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, W, headerH);
+
+  // Outer card
+  const cardX = padX;
+  const cardY = padX;
+  const cardW = W - padX * 2;
+  const cardH = H - padX * 2;
+  const cardR = 36;
+  ctx.save();
+  ctx.shadowColor = "rgba(15, 23, 42, 0.10)";
+  ctx.shadowBlur = 36;
+  ctx.shadowOffsetY = 12;
+  ctx.fillStyle = "#FFFFFF";
+  roundedRect(ctx, cardX, cardY, cardW, cardH, cardR);
+  ctx.fill();
+  ctx.restore();
+  ctx.strokeStyle = "rgba(15,23,42,0.06)";
+  ctx.lineWidth = 1.5;
+  roundedRect(ctx, cardX + 0.5, cardY + 0.5, cardW - 1, cardH - 1, cardR);
+  ctx.stroke();
+
+  const innerX = cardX + innerPad;
+  const innerW = cardW - innerPad * 2;
 
   // Header
   let iconImg: HTMLImageElement | null = null;
+  const headerY = cardY + 36;
   try {
     iconImg = await loadImage(appIcon);
     ctx.save();
-    roundedRect(ctx, padX, 60, 80, 80, 18);
+    roundedRect(ctx, innerX, headerY, 56, 56, 14);
     ctx.clip();
-    ctx.drawImage(iconImg, padX, 60, 80, 80);
+    ctx.drawImage(iconImg, innerX, headerY, 56, 56);
     ctx.restore();
   } catch { /* ignore */ }
 
-  ctx.fillStyle = "#FFFFFF";
+  ctx.fillStyle = "#0F172A";
   ctx.textBaseline = "top";
-  ctx.font = `700 42px ${FONT_DISPLAY}`;
-  ctx.fillText(APP_NAME, padX + 100, 70);
-  ctx.fillStyle = "rgba(255,255,255,0.65)";
-  ctx.font = `500 24px ${FONT_TEXT}`;
-  ctx.fillText(fmtDate(input.startDate, input.lang), padX + 100, 120);
+  ctx.font = `700 28px ${FONT_DISPLAY}`;
+  ctx.fillText(APP_NAME, innerX + 72, headerY + 4);
+  ctx.fillStyle = "#64748B";
+  ctx.font = `500 18px ${FONT_TEXT}`;
+  ctx.fillText(isZh ? "AI 跑步教練" : "AI Running Coach", innerX + 72, headerY + 34);
 
-  ctx.fillStyle = "#FFFFFF";
-  ctx.font = `800 52px ${FONT_DISPLAY}`;
-  wrapText(ctx, input.name, padX, 170, W - padX * 2, 56, 1);
+  ctx.textAlign = "right";
+  ctx.fillStyle = "#64748B";
+  ctx.font = `600 20px ${FONT_TEXT}`;
+  ctx.fillText(fmtDate(input.startDate, input.lang), innerX + innerW, headerY + 18);
+  ctx.textAlign = "left";
+
+  // Title
+  const titleY = headerY + 96;
+  ctx.fillStyle = "#0F172A";
+  ctx.font = `800 44px ${FONT_DISPLAY}`;
+  const titleEnd = wrapText(ctx, input.name, innerX, titleY, innerW, 50, 1);
+  ctx.fillStyle = "#FC4C02";
+  ctx.fillRect(innerX, titleEnd + 8, 56, 4);
 
   // Build series
   const pacePts = input.data
@@ -1384,14 +1416,14 @@ async function renderChartsCard(input: ShareChartsInput): Promise<Blob> {
 
   drawChart(
     ctx,
-    { x: padX, y: headerH, w: W - padX * 2, h: chartH },
+    { x: innerX, y: headerH, w: innerW, h: chartH },
     pacePts,
     {
       title: isZh ? "配速" : "Pace",
       unit: isZh ? "分鐘 / 公里" : "min / km",
       color: "#FC4C02",
-      fillColor: "rgba(252,76,2,0.35)",
-      invertY: true, // faster pace at top
+      fillColor: "rgba(252,76,2,0.25)",
+      invertY: true,
       yFmt: fmtPaceMin,
       xFmt,
       isZh,
@@ -1400,20 +1432,38 @@ async function renderChartsCard(input: ShareChartsInput): Promise<Blob> {
 
   drawChart(
     ctx,
-    { x: padX, y: headerH + chartH + chartGap, w: W - padX * 2, h: chartH },
+    { x: innerX, y: headerH + chartH + chartGap, w: innerW, h: chartH },
     hrPts,
     {
       title: isZh ? "心率" : "Heart Rate",
       unit: "bpm",
       color: "#EF4444",
-      fillColor: "rgba(239,68,68,0.35)",
+      fillColor: "rgba(239,68,68,0.25)",
       yFmt: (v) => String(Math.round(v)),
       xFmt,
       isZh,
     },
   );
 
-  drawInstagramFooter(ctx, W, H, padX, isZh, iconImg);
+  // Footer
+  ctx.textAlign = "left";
+  ctx.textBaseline = "top";
+  const footerY = cardY + cardH - 56;
+  ctx.strokeStyle = "rgba(15,23,42,0.08)";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(innerX, footerY - 16);
+  ctx.lineTo(innerX + innerW, footerY - 16);
+  ctx.stroke();
+
+  ctx.fillStyle = "#0F172A";
+  ctx.font = `700 22px ${FONT_DISPLAY}`;
+  ctx.fillText(APP_NAME, innerX, footerY);
+  ctx.fillStyle = "#64748B";
+  ctx.textAlign = "right";
+  ctx.font = `500 20px ${FONT_TEXT}`;
+  ctx.fillText(APP_URL.replace("https://", ""), innerX + innerW, footerY + 1);
+  ctx.textAlign = "left";
 
   return await new Promise<Blob>((resolve, reject) => {
     canvas.toBlob(

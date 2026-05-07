@@ -1005,6 +1005,19 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
                 </div>
               );
             });
+            return (
+              <>
+                {rows}
+                <div className="grid grid-cols-[36px_1fr_1fr_1fr_1fr_56px] items-center gap-2 px-4 py-3 text-xs bg-muted/40 border-t border-border">
+                  <span className="font-bold text-foreground">Σ</span>
+                  <span className="font-bold text-foreground">{lang === "zh" ? "總計" : "Total"}</span>
+                  <span className="text-right tabular-nums font-bold text-foreground">{formatDuration(totalTime)}</span>
+                  <span className="text-right tabular-nums font-bold text-foreground">{Math.round(totalDist)}</span>
+                  <span className="text-right tabular-nums font-bold text-foreground">{formatPace(avgSpeedTotal)}</span>
+                  <span className="text-right tabular-nums font-bold text-foreground">{avgHrTotal ?? "--"}</span>
+                </div>
+              </>
+            );
           })()}
         </div>
       )}

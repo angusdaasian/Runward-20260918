@@ -115,7 +115,7 @@ const ActivityMap = ({ polyline }: Props) => {
     const coords = decodePolyline(polyline);
     if (coords.length === 0) return;
 
-    // Small delay so the dialog has finished sizing
+    // Wait for the dialog enter animation to complete so the container has size
     const timer = setTimeout(() => {
       if (!fullRef.current) return;
       const map = L.map(fullRef.current, {
@@ -128,7 +128,10 @@ const ActivityMap = ({ polyline }: Props) => {
       });
       fullMapRef.current = map;
       renderRoute(map, coords, [30, 30]);
-    }, 50);
+      // Force Leaflet to recompute size now that the dialog is fully open
+      requestAnimationFrame(() => map.invalidateSize());
+      setTimeout(() => map.invalidateSize(), 250);
+    }, 250);
 
     return () => {
       clearTimeout(timer);

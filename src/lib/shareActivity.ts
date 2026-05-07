@@ -344,7 +344,8 @@ async function drawMapWithTiles(
     if (ln > maxLng) maxLng = ln;
   }
   const TILE = 256; // tile world units; @2x retina images source for sharpness
-  const pad = 32;
+  const pad = 56;
+  const MAX_TILE_SCALE = 2; // @2x tiles stay sharp up to this draw scale
   const aw = w - pad * 2;
   const ah = h - pad * 2;
 
@@ -360,18 +361,22 @@ async function drawMapWithTiles(
 
   const tlW = lonLatToWorld(maxLat, minLng, zoom);
   const brW = lonLatToWorld(minLat, maxLng, zoom);
-  const routePxW = Math.max(1, (brW.x - tlW.x) * TILE);
-  const routePxH = Math.max(1, (brW.y - tlW.y) * TILE);
-  const scale = Math.min(aw / routePxW, ah / routePxH);
-  const drawW = routePxW * scale;
-  const drawH = routePxH * scale;
-  const offX = x + (w - drawW) / 2;
-  const offY = y + (h - drawH) / 2;
+  const minWorldX = tlW.x * TILE;
+  const minWorldY = tlW.y * TILE;
+  const maxWorldX = brW.x * TILE;
+  const maxWorldY = brW.y * TILE;
+  const routePxW = Math.max(1, maxWorldX - minWorldX);
+  const routePxH = Math.max(1, maxWorldY - minWorldY);
+  const scale = Math.min(aw / routePxW, ah / routePxH, MAX_TILE_SCALE);
+  const viewportOriginX = (minWorldX + maxWorldX) / 2 - w / (2 * scale);
+  const viewportOriginY = (minWorldY + maxWorldY) / 2 - h / (2 * scale);
+  const viewportEndX = viewportOriginX + w / scale;
+  const viewportEndY = viewportOriginY + h / scale;
 
-  const minTx = Math.floor(tlW.x);
-  const maxTx = Math.floor(brW.x);
-  const minTy = Math.floor(tlW.y);
-  const maxTy = Math.floor(brW.y);
+  const minTx = Math.floor(viewportOriginX / TILE);
+  const maxTx = Math.floor(viewportEndX / TILE);
+  const minTy = Math.floor(viewportOriginY / TILE);
+  const maxTy = Math.floor(viewportEndY / TILE);
 
   const tasks: Promise<{ tx: number; ty: number; img: HTMLImageElement | null }>[] = [];
   for (let ty = minTy; ty <= maxTy; ty++) {
@@ -385,8 +390,6 @@ async function drawMapWithTiles(
   }
   const tiles = await Promise.all(tasks);
 
-  const worldOriginX = tlW.x * TILE;
-  const worldOriginY = tlW.y * TILE;
   const prevSmooth = ctx.imageSmoothingEnabled;
   const prevQuality = ctx.imageSmoothingQuality;
   ctx.imageSmoothingEnabled = true;
@@ -395,8 +398,8 @@ async function drawMapWithTiles(
     if (!t.img) continue;
     const tilePxX = t.tx * TILE;
     const tilePxY = t.ty * TILE;
-    const dx = offX + (tilePxX - worldOriginX) * scale;
-    const dy = offY + (tilePxY - worldOriginY) * scale;
+    const dx = x + (tilePxX - viewportOriginX) * scale;
+    const dy = y + (tilePxY - viewportOriginY) * scale;
     const ds = TILE * scale;
     ctx.drawImage(t.img, dx, dy, ds, ds);
   }
@@ -406,8 +409,8 @@ async function drawMapWithTiles(
   const project = (lat: number, lng: number): [number, number] => {
     const wp = lonLatToWorld(lat, lng, zoom);
     return [
-      offX + (wp.x * TILE - worldOriginX) * scale,
-      offY + (wp.y * TILE - worldOriginY) * scale,
+      x + (wp.x * TILE - viewportOriginX) * scale,
+      y + (wp.y * TILE - viewportOriginY) * scale,
     ];
   };
 

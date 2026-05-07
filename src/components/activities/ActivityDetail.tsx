@@ -623,8 +623,9 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
                     movingTimeSeconds: activity.moving_time,
                     averageSpeed: activity.average_speed,
                     startDate: activity.start_date,
-                    analysis: aiAnalysis,
-                    nextWorkout: aiNextWorkout,
+                    averageHeartrate: activity.average_heartrate ?? null,
+                    elevationGainMeters: activity.total_elevation_gain ?? null,
+                    summaryPolyline: activity.summary_polyline ?? null,
                     lang,
                   })
                 }

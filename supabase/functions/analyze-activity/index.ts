@@ -62,6 +62,13 @@ async function callVertexAI(opts: {
 
   const body: any = { contents };
   if (systemParts.length) body.systemInstruction = { parts: systemParts };
+  // Enable medium thinking for Gemini 3 reasoning models
+  if (model.startsWith("gemini-3")) {
+    body.generationConfig = {
+      ...(body.generationConfig || {}),
+      thinkingConfig: { thinkingLevel: "medium" },
+    };
+  }
 
   const vRes = await fetch(url, {
     method: "POST",

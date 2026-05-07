@@ -987,10 +987,7 @@ async function renderSplitsCard(input: ShareSplitsInput): Promise<Blob> {
   ctx.fillStyle = "#0F172A";
   ctx.font = `700 22px ${FONT_DISPLAY}`;
   ctx.fillText(APP_NAME, innerX, footerY);
-  ctx.fillStyle = "#64748B";
-  ctx.textAlign = "right";
-  ctx.font = `500 20px ${FONT_TEXT}`;
-  ctx.fillText(APP_URL.replace("https://", ""), innerX + innerW, footerY + 1);
+  drawIgHandle(ctx, innerX + innerW, footerY + 12, "#0F172A");
   ctx.textAlign = "left";
 
 

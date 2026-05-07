@@ -343,7 +343,7 @@ async function drawMapWithTiles(
     if (ln < minLng) minLng = ln;
     if (ln > maxLng) maxLng = ln;
   }
-  const TILE = 256;
+  const TILE = 256; // tile world units; @2x retina images source for sharpness
   const pad = 32;
   const aw = w - pad * 2;
   const ah = h - pad * 2;
@@ -377,7 +377,7 @@ async function drawMapWithTiles(
   for (let ty = minTy; ty <= maxTy; ty++) {
     for (let tx = minTx; tx <= maxTx; tx++) {
       const sub = "abcd"[(tx + ty) & 3];
-      const url = `https://${sub}.basemaps.cartocdn.com/rastertiles/voyager/${zoom}/${tx}/${ty}.png`;
+      const url = `https://${sub}.basemaps.cartocdn.com/rastertiles/voyager/${zoom}/${tx}/${ty}@2x.png`;
       tasks.push(
         loadImage(url).then((img) => ({ tx, ty, img })).catch(() => ({ tx, ty, img: null as any })),
       );
@@ -387,6 +387,10 @@ async function drawMapWithTiles(
 
   const worldOriginX = tlW.x * TILE;
   const worldOriginY = tlW.y * TILE;
+  const prevSmooth = ctx.imageSmoothingEnabled;
+  const prevQuality = ctx.imageSmoothingQuality;
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
   for (const t of tiles) {
     if (!t.img) continue;
     const tilePxX = t.tx * TILE;
@@ -396,6 +400,8 @@ async function drawMapWithTiles(
     const ds = TILE * scale;
     ctx.drawImage(t.img, dx, dy, ds, ds);
   }
+  ctx.imageSmoothingEnabled = prevSmooth;
+  ctx.imageSmoothingQuality = prevQuality;
 
   const project = (lat: number, lng: number): [number, number] => {
     const wp = lonLatToWorld(lat, lng, zoom);

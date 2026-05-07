@@ -210,6 +210,20 @@ serve(async (req) => {
         avg_hr: a.average_hr,
         source: "Garmin",
       });
+    for (const a of (terraRes.data || [])) {
+      const t = (a.activity_type || "").toLowerCase();
+      if (!RUNNING_SPORTS.has(a.activity_type) && !t.includes("run")) continue;
+      const speed = a.average_speed && a.average_speed > 0
+        ? a.average_speed
+        : (a.distance_meters && a.duration_seconds ? a.distance_meters / a.duration_seconds : 0);
+      recent.push({
+        date: a.start_time,
+        distance_km: +((a.distance_meters || 0) / 1000).toFixed(2),
+        duration_min: Math.round((a.duration_seconds || 0) / 60),
+        pace: paceFromSpeed(speed),
+        avg_hr: a.average_hr,
+        source: a.provider || "Terra",
+      });
     }
     recent.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 

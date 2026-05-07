@@ -757,6 +757,7 @@ async function processWebhook(
             laps: finalLaps,
             hr_samples: finalHrSamples,
             distance_samples: finalDistanceSamples,
+            elevation_samples: finalElevationSamples,
             raw_json: null,
           }, { onConflict: "user_id,terra_activity_id" });
           await deleteMatchingGarminDuplicate(appUserId, meta?.start_time ?? null, distanceMeters);

@@ -524,48 +524,24 @@ async function renderShareCard(input: ShareActivityInput): Promise<Blob> {
   ctx.save();
   roundedRect(ctx, mapX, mapY, mapW, mapH, mapR);
   ctx.clip();
-  // Subtle paper texture / gradient inside the map card
-  const mg = ctx.createLinearGradient(mapX, mapY, mapX, mapY + mapH);
-  mg.addColorStop(0, "#0F172A");
-  mg.addColorStop(1, "#1E293B");
-  ctx.fillStyle = mg;
+  // Light map background (in case tiles fail)
+  ctx.fillStyle = "#E8EEF4";
   ctx.fillRect(mapX, mapY, mapW, mapH);
 
-  // Faint grid
-  ctx.strokeStyle = "rgba(255,255,255,0.05)";
-  ctx.lineWidth = 1;
-  const grid = 60;
-  for (let gx = mapX; gx < mapX + mapW; gx += grid) {
-    ctx.beginPath();
-    ctx.moveTo(gx, mapY);
-    ctx.lineTo(gx, mapY + mapH);
-    ctx.stroke();
-  }
-  for (let gy = mapY; gy < mapY + mapH; gy += grid) {
-    ctx.beginPath();
-    ctx.moveTo(mapX, gy);
-    ctx.lineTo(mapX + mapW, gy);
-    ctx.stroke();
-  }
-
-  // Route polyline
+  // Route polyline + tiled basemap
+  let drewRoute = false;
   if (input.summaryPolyline) {
     try {
       const coords = decodePolyline(input.summaryPolyline);
       if (coords.length >= 2) {
-        drawRouteOnCanvas(ctx, coords, mapX, mapY, mapW, mapH);
-      } else {
-        ctx.fillStyle = "rgba(255,255,255,0.5)";
-        ctx.font = `500 24px ${FONT_TEXT}`;
-        ctx.textAlign = "center";
-        ctx.fillText(isZh ? "無 GPS 軌跡" : "No GPS route", mapX + mapW / 2, mapY + mapH / 2 - 12);
-        ctx.textAlign = "left";
+        drewRoute = await drawMapWithTiles(ctx, coords, mapX, mapY, mapW, mapH);
       }
-    } catch {
-      // ignore
+    } catch (err) {
+      console.warn("[Share] map render failed:", err);
     }
-  } else {
-    ctx.fillStyle = "rgba(255,255,255,0.5)";
+  }
+  if (!drewRoute) {
+    ctx.fillStyle = "#94A3B8";
     ctx.font = `500 24px ${FONT_TEXT}`;
     ctx.textAlign = "center";
     ctx.fillText(isZh ? "無 GPS 軌跡" : "No GPS route", mapX + mapW / 2, mapY + mapH / 2 - 12);

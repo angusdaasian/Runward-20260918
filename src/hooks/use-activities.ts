@@ -263,6 +263,7 @@ async function fetchTerraActivities(userId: string): Promise<StravaActivity[]> {
       laps: a.laps || [],
       hr_samples: a.hr_samples || null,
       distance_samples: a.distance_samples || null,
+      elevation_samples: (a as any).elevation_samples || null,
       garmin_training_load: a.training_load ?? null,
       provenance: "terra" as const,
     } as StravaActivity;

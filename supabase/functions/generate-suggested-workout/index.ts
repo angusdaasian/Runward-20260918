@@ -210,6 +210,7 @@ serve(async (req) => {
         avg_hr: a.average_hr,
         source: "Garmin",
       });
+    }
     for (const a of (terraRes.data || [])) {
       const t = (a.activity_type || "").toLowerCase();
       if (!RUNNING_SPORTS.has(a.activity_type) && !t.includes("run")) continue;

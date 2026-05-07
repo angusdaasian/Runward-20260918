@@ -341,7 +341,7 @@ Format:
 
     const aiResp = await callVertexAI({
       apiKey: VERTEX_API_KEY,
-      model: "google/gemini-3.1-flash-lite-preview",
+      model: "google/gemini-2.5-pro",
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: context },

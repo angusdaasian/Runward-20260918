@@ -30,8 +30,11 @@ export interface ShareActivityInput {
   movingTimeSeconds: number;
   averageSpeed: number; // m/s
   startDate: string;
-  analysis?: string | null;
-  nextWorkout?: string | null;
+  averageHeartrate?: number | null;
+  elevationGainMeters?: number | null;
+  summaryPolyline?: string | null;
+  analysis?: string | null; // unused (kept for backwards compat)
+  nextWorkout?: string | null; // unused
   lang: Lang;
 }
 

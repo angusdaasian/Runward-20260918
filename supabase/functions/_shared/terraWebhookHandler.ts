@@ -418,6 +418,23 @@ function extractDistanceSamples(a: any): Array<{ t: number; d: number }> {
   return out.length > 7200 ? out.slice(0, 7200) : out;
 }
 
+function extractElevationSamplesForChart(a: any): Array<{ t: number; e: number }> {
+  const raw = extractElevationSamples(a);
+  if (!raw.length) return [];
+  const startMs = a?.metadata?.start_time ? new Date(a.metadata.start_time).getTime() : NaN;
+  const bySecond = new Map<number, number>();
+  for (const s of raw) {
+    let t: number | null = s.timerSeconds;
+    if (t == null && s.timestampMs != null && Number.isFinite(startMs)) {
+      t = (s.timestampMs - startMs) / 1000;
+    }
+    if (t == null || !Number.isFinite(t) || t < 0) continue;
+    bySecond.set(Math.floor(t), Math.round(s.elevMeters * 10) / 10);
+  }
+  const out = Array.from(bySecond.entries()).sort((a, b) => a[0] - b[0]).map(([t, e]) => ({ t, e }));
+  return out.length > 7200 ? out.slice(0, 7200) : out;
+}
+
 function recomputeLapAvgHr(laps: any[], samples: Array<{ t: number; bpm: number }>, activityStartTime: string | null): any[] {
   if (!samples.length || !laps.length) return laps;
   const startMs = activityStartTime ? new Date(activityStartTime).getTime() : NaN;
@@ -692,13 +709,14 @@ async function processWebhook(
           const rawLaps = extractLaps(a);
           const hrSamples = extractHrSamples(a);
           const distanceSamples = extractDistanceSamples(a);
+          const elevationSamples = extractElevationSamplesForChart(a);
           const laps = hrSamples.length > 0 && rawLaps.length > 0
             ? recomputeLapAvgHr(rawLaps, hrSamples, meta?.start_time ?? null)
             : rawLaps;
           // Read existing row so we don't overwrite good polyline/laps/hr_samples with empty
           const { data: existing } = await supa
             .from("terra_activities")
-            .select("summary_polyline, laps, has_gps, hr_samples, distance_samples")
+            .select("summary_polyline, laps, has_gps, hr_samples, distance_samples, elevation_samples")
             .eq("user_id", appUserId)
             .eq("terra_activity_id", aid)
             .maybeSingle();
@@ -714,7 +732,10 @@ async function processWebhook(
           const finalDistanceSamples = distanceSamples.length > 0
             ? distanceSamples
             : (Array.isArray((existing as any)?.distance_samples) ? (existing as any).distance_samples : null);
-          console.log(`[terra-webhook] activity upsert ${aid} hr_samples=${hrSamples.length} dist_samples=${distanceSamples.length} laps=${rawLaps.length}`);
+          const finalElevationSamples = elevationSamples.length > 0
+            ? elevationSamples
+            : (Array.isArray((existing as any)?.elevation_samples) ? (existing as any).elevation_samples : null);
+          console.log(`[terra-webhook] activity upsert ${aid} hr_samples=${hrSamples.length} dist_samples=${distanceSamples.length} elev_samples=${elevationSamples.length} laps=${rawLaps.length}`);
           await supa.from("terra_activities").upsert({
             user_id: appUserId,
             provider,
@@ -736,6 +757,7 @@ async function processWebhook(
             laps: finalLaps,
             hr_samples: finalHrSamples,
             distance_samples: finalDistanceSamples,
+            elevation_samples: finalElevationSamples,
             raw_json: null,
           }, { onConflict: "user_id,terra_activity_id" });
           await deleteMatchingGarminDuplicate(appUserId, meta?.start_time ?? null, distanceMeters);

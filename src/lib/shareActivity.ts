@@ -235,6 +235,38 @@ const FONT_TEXT =
 const FONT_HAND =
   "'Bradley Hand', 'Noteworthy', 'Marker Felt', 'Comic Sans MS', 'PingFang TC', cursive";
 
+// Draws an Instagram glyph + @runward.app handle right-aligned, vertically centered at midY.
+function drawIgHandle(
+  ctx: CanvasRenderingContext2D,
+  rightX: number,
+  midY: number,
+  color: string = "#0F172A",
+) {
+  const handle = "@runward.app";
+  ctx.save();
+  ctx.textAlign = "right";
+  ctx.textBaseline = "middle";
+  ctx.fillStyle = color;
+  ctx.font = `600 20px ${FONT_TEXT}`;
+  const handleW = ctx.measureText(handle).width;
+  ctx.fillText(handle, rightX, midY);
+  const igSize = 30;
+  const igX = rightX - handleW - 12 - igSize;
+  const igY = midY - igSize / 2;
+  ctx.strokeStyle = color;
+  ctx.fillStyle = color;
+  ctx.lineWidth = 2.2;
+  roundedRect(ctx, igX, igY, igSize, igSize, 8);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(igX + igSize / 2, igY + igSize / 2, igSize * 0.26, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(igX + igSize - 7, igY + 7, 2, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
 // Decode Google encoded polyline → [lat, lng] pairs
 function decodePolyline(encoded: string): [number, number][] {
   const points: [number, number][] = [];
@@ -614,10 +646,7 @@ async function renderShareCard(input: ShareActivityInput): Promise<Blob> {
   ctx.textBaseline = "top";
   ctx.font = `700 22px ${FONT_DISPLAY}`;
   ctx.fillText(APP_NAME, cardX + 44, footerY);
-  ctx.fillStyle = "#64748B";
-  ctx.textAlign = "right";
-  ctx.font = `500 20px ${FONT_TEXT}`;
-  ctx.fillText(APP_URL.replace("https://", ""), cardX + cardW - 44, footerY + 1);
+  drawIgHandle(ctx, cardX + cardW - 44, footerY + 12, "#0F172A");
   ctx.textAlign = "left";
 
   return await new Promise<Blob>((resolve, reject) => {
@@ -958,10 +987,7 @@ async function renderSplitsCard(input: ShareSplitsInput): Promise<Blob> {
   ctx.fillStyle = "#0F172A";
   ctx.font = `700 22px ${FONT_DISPLAY}`;
   ctx.fillText(APP_NAME, innerX, footerY);
-  ctx.fillStyle = "#64748B";
-  ctx.textAlign = "right";
-  ctx.font = `500 20px ${FONT_TEXT}`;
-  ctx.fillText(APP_URL.replace("https://", ""), innerX + innerW, footerY + 1);
+  drawIgHandle(ctx, innerX + innerW, footerY + 12, "#0F172A");
   ctx.textAlign = "left";
 
 
@@ -1459,10 +1485,7 @@ async function renderChartsCard(input: ShareChartsInput): Promise<Blob> {
   ctx.fillStyle = "#0F172A";
   ctx.font = `700 22px ${FONT_DISPLAY}`;
   ctx.fillText(APP_NAME, innerX, footerY);
-  ctx.fillStyle = "#64748B";
-  ctx.textAlign = "right";
-  ctx.font = `500 20px ${FONT_TEXT}`;
-  ctx.fillText(APP_URL.replace("https://", ""), innerX + innerW, footerY + 1);
+  drawIgHandle(ctx, innerX + innerW, footerY + 12, "#0F172A");
   ctx.textAlign = "left";
 
   return await new Promise<Blob>((resolve, reject) => {

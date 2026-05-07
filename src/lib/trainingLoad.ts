@@ -32,8 +32,8 @@ export function isCardio(sportType?: string): boolean {
 }
 
 const runningTypes = new Set([
-  "Run", "TrailRun", "VirtualRun", "Treadmill",
-  "running", "trail_running", "treadmill_running",
+  "Run", "TrailRun", "VirtualRun", "Treadmill", "TrackRun",
+  "running", "trail_running", "treadmill_running", "track_running", "virtual_running",
 ]);
 
 export function isRunning(sportType?: string): boolean {
@@ -242,8 +242,8 @@ function emptyAgg(): WindowAgg {
 }
 
 const runningSports = new Set([
-  "Run", "TrailRun", "VirtualRun", "Treadmill",
-  "running", "trail_running", "treadmill_running",
+  "Run", "TrailRun", "VirtualRun", "Treadmill", "TrackRun",
+  "running", "trail_running", "treadmill_running", "track_running", "virtual_running",
 ]);
 
 function pctChange(curr: number, prev: number): number {

@@ -362,7 +362,7 @@ async function drawMapWithTiles(
   const brW = lonLatToWorld(minLat, maxLng, zoom);
   const routePxW = Math.max(1, (brW.x - tlW.x) * TILE);
   const routePxH = Math.max(1, (brW.y - tlW.y) * TILE);
-  const scale = Math.min(aw / routePxW, ah / routePxH, 1);
+  const scale = Math.min(aw / routePxW, ah / routePxH);
   const drawW = routePxW * scale;
   const drawH = routePxH * scale;
   const offX = x + (w - drawW) / 2;

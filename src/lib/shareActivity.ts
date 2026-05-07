@@ -349,7 +349,7 @@ async function drawMapWithTiles(
   const ah = h - pad * 2;
 
   let zoom = 2;
-  for (let z = 16; z >= 2; z--) {
+  for (let z = 19; z >= 2; z--) {
     const tl = lonLatToWorld(maxLat, minLng, z);
     const br = lonLatToWorld(minLat, maxLng, z);
     const pxW = (br.x - tl.x) * TILE;

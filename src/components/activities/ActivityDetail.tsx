@@ -1010,13 +1010,13 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
             return (
               <>
                 {rows}
-                <div className="grid grid-cols-[36px_1fr_1fr_1fr_1fr_56px] items-center gap-2 px-4 py-3 text-xs bg-muted/40 border-t border-border">
-                  <span className="font-bold text-foreground">Σ</span>
-                  <span className="font-bold text-foreground">{lang === "zh" ? "總計" : "Total"}</span>
-                  <span className="text-right tabular-nums font-bold text-foreground">{formatDuration(totalTime)}</span>
-                  <span className="text-right tabular-nums font-bold text-foreground">{Math.round(totalDist)}</span>
-                  <span className="text-right tabular-nums font-bold text-foreground">{formatPace(avgSpeedTotal)}</span>
-                  <span className="text-right tabular-nums font-bold text-foreground">{avgHrTotal ?? "--"}</span>
+                <div className="grid grid-cols-[36px_1fr_1fr_1fr_1fr_56px] items-center gap-2 px-5 py-3.5 text-xs bg-slate-100 border-t border-slate-200">
+                  <span className="font-bold text-slate-900">Σ</span>
+                  <span className="font-bold text-slate-900">{lang === "zh" ? "總計" : "Total"}</span>
+                  <span className="text-right tabular-nums font-bold text-slate-900">{formatDuration(totalTime)}</span>
+                  <span className="text-right tabular-nums font-bold text-slate-900">{Math.round(totalDist)}</span>
+                  <span className="text-right tabular-nums font-bold text-slate-900">{formatPace(avgSpeedTotal)}</span>
+                  <span className="text-right tabular-nums font-bold text-slate-900">{avgHrTotal ?? "--"}</span>
                 </div>
               </>
             );

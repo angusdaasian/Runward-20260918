@@ -1178,8 +1178,8 @@ function drawChart(
   // X labels
   ctx.textAlign = "center";
   ctx.textBaseline = "top";
-  ctx.fillStyle = "rgba(255,255,255,0.45)";
-  ctx.font = `500 15px ${FONT_TEXT}`;
+  ctx.fillStyle = "#94A3B8";
+  ctx.font = `600 14px ${FONT_TEXT}`;
   for (const t of [0, 0.5, 1]) {
     const xVal = xMin + (xMax - xMin) * t;
     ctx.fillText(opts.xFmt(xVal), sx(xVal), plotY + plotH + 14);

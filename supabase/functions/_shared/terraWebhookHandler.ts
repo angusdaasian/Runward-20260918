@@ -678,6 +678,7 @@ async function processWebhook(
           );
         }
         let newActivityCount = 0;
+        const newActivityKeys: string[] = [];
         for (const a of acts) {
           const meta = a?.metadata ?? {};
           const dist = a?.distance_data?.summary ?? {};
@@ -741,12 +742,18 @@ async function processWebhook(
           if (hrSamples.length === 0 && terraUserId && (meta?.summary_id ?? meta?.id)) {
             await requestActivityHrSamplesWebhook(terraUserId, referenceId, provider, String(meta.summary_id ?? meta.id), meta?.start_time ?? null, env);
           }
-          if (isNew && (distanceMeters ?? 0) > 0) newActivityCount++;
+          if (isNew && (distanceMeters ?? 0) > 0) {
+            newActivityCount++;
+            newActivityKeys.push(`terra:${provider}:${aid}`);
+          }
         }
         // Recalculate XP & leaderboard rank from terra_activities
         await recalcUserXp(appUserId);
         if (newActivityCount > 0) {
-          await pushActivityUploadedNotification(appUserId);
+          // Send one push per new activity, deduped by activity_push_log
+          for (const key of newActivityKeys) {
+            await pushActivityUploadedNotification(appUserId, key);
+          }
         }
       } else if (type === "daily" && appUserId) {
         const items = Array.isArray(payload?.data) ? payload.data : [payload?.data].filter(Boolean);

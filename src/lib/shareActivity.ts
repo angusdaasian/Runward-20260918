@@ -319,9 +319,123 @@ function drawRouteOnCanvas(
     ctx.fillStyle = fill;
     ctx.fill();
   };
+}
+
+// Web Mercator projection helpers
+function lonLatToWorld(lat: number, lng: number, z: number): { x: number; y: number } {
+  const n = Math.pow(2, z);
+  const x = ((lng + 180) / 360) * n;
+  const latRad = (lat * Math.PI) / 180;
+  const y = ((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2) * n;
+  return { x, y };
+}
+
+async function drawMapWithTiles(
+  ctx: CanvasRenderingContext2D,
+  coords: [number, number][],
+  x: number, y: number, w: number, h: number,
+): Promise<boolean> {
+  if (coords.length < 2) return false;
+  let minLat = Infinity, maxLat = -Infinity, minLng = Infinity, maxLng = -Infinity;
+  for (const [la, ln] of coords) {
+    if (la < minLat) minLat = la;
+    if (la > maxLat) maxLat = la;
+    if (ln < minLng) minLng = ln;
+    if (ln > maxLng) maxLng = ln;
+  }
+  const TILE = 256;
+  const pad = 32;
+  const aw = w - pad * 2;
+  const ah = h - pad * 2;
+
+  let zoom = 2;
+  for (let z = 16; z >= 2; z--) {
+    const tl = lonLatToWorld(maxLat, minLng, z);
+    const br = lonLatToWorld(minLat, maxLng, z);
+    const pxW = (br.x - tl.x) * TILE;
+    const pxH = (br.y - tl.y) * TILE;
+    if (pxW <= aw && pxH <= ah) { zoom = z; break; }
+    zoom = z;
+  }
+
+  const tlW = lonLatToWorld(maxLat, minLng, zoom);
+  const brW = lonLatToWorld(minLat, maxLng, zoom);
+  const routePxW = Math.max(1, (brW.x - tlW.x) * TILE);
+  const routePxH = Math.max(1, (brW.y - tlW.y) * TILE);
+  const scale = Math.min(aw / routePxW, ah / routePxH, 1);
+  const drawW = routePxW * scale;
+  const drawH = routePxH * scale;
+  const offX = x + (w - drawW) / 2;
+  const offY = y + (h - drawH) / 2;
+
+  const minTx = Math.floor(tlW.x);
+  const maxTx = Math.floor(brW.x);
+  const minTy = Math.floor(tlW.y);
+  const maxTy = Math.floor(brW.y);
+
+  const tasks: Promise<{ tx: number; ty: number; img: HTMLImageElement | null }>[] = [];
+  for (let ty = minTy; ty <= maxTy; ty++) {
+    for (let tx = minTx; tx <= maxTx; tx++) {
+      const sub = "abcd"[(tx + ty) & 3];
+      const url = `https://${sub}.basemaps.cartocdn.com/rastertiles/voyager/${zoom}/${tx}/${ty}.png`;
+      tasks.push(
+        loadImage(url).then((img) => ({ tx, ty, img })).catch(() => ({ tx, ty, img: null as any })),
+      );
+    }
+  }
+  const tiles = await Promise.all(tasks);
+
+  const worldOriginX = tlW.x * TILE;
+  const worldOriginY = tlW.y * TILE;
+  for (const t of tiles) {
+    if (!t.img) continue;
+    const tilePxX = t.tx * TILE;
+    const tilePxY = t.ty * TILE;
+    const dx = offX + (tilePxX - worldOriginX) * scale;
+    const dy = offY + (tilePxY - worldOriginY) * scale;
+    const ds = TILE * scale;
+    ctx.drawImage(t.img, dx, dy, ds, ds);
+  }
+
+  const project = (lat: number, lng: number): [number, number] => {
+    const wp = lonLatToWorld(lat, lng, zoom);
+    return [
+      offX + (wp.x * TILE - worldOriginX) * scale,
+      offY + (wp.y * TILE - worldOriginY) * scale,
+    ];
+  };
+
+  ctx.beginPath();
+  for (let i = 0; i < coords.length; i++) {
+    const [px, py] = project(coords[i][0], coords[i][1]);
+    if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+  }
+  ctx.lineJoin = "round";
+  ctx.lineCap = "round";
+  ctx.strokeStyle = "rgba(255,255,255,0.95)";
+  ctx.lineWidth = 9;
+  ctx.stroke();
+  ctx.strokeStyle = "#FC4C02";
+  ctx.lineWidth = 5;
+  ctx.stroke();
+
+  const drawDot = (lat: number, lng: number, fill: string) => {
+    const [px, py] = project(lat, lng);
+    ctx.beginPath();
+    ctx.arc(px, py, 12, 0, Math.PI * 2);
+    ctx.fillStyle = "#FFFFFF";
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(px, py, 7, 0, Math.PI * 2);
+    ctx.fillStyle = fill;
+    ctx.fill();
+  };
   drawDot(coords[0][0], coords[0][1], "#22C55E");
   drawDot(coords[coords.length - 1][0], coords[coords.length - 1][1], "#EF4444");
+
+  return true;
 }
+
 
 async function renderShareCard(input: ShareActivityInput): Promise<Blob> {
   const W = 1080;
@@ -410,48 +524,24 @@ async function renderShareCard(input: ShareActivityInput): Promise<Blob> {
   ctx.save();
   roundedRect(ctx, mapX, mapY, mapW, mapH, mapR);
   ctx.clip();
-  // Subtle paper texture / gradient inside the map card
-  const mg = ctx.createLinearGradient(mapX, mapY, mapX, mapY + mapH);
-  mg.addColorStop(0, "#0F172A");
-  mg.addColorStop(1, "#1E293B");
-  ctx.fillStyle = mg;
+  // Light map background (in case tiles fail)
+  ctx.fillStyle = "#E8EEF4";
   ctx.fillRect(mapX, mapY, mapW, mapH);
 
-  // Faint grid
-  ctx.strokeStyle = "rgba(255,255,255,0.05)";
-  ctx.lineWidth = 1;
-  const grid = 60;
-  for (let gx = mapX; gx < mapX + mapW; gx += grid) {
-    ctx.beginPath();
-    ctx.moveTo(gx, mapY);
-    ctx.lineTo(gx, mapY + mapH);
-    ctx.stroke();
-  }
-  for (let gy = mapY; gy < mapY + mapH; gy += grid) {
-    ctx.beginPath();
-    ctx.moveTo(mapX, gy);
-    ctx.lineTo(mapX + mapW, gy);
-    ctx.stroke();
-  }
-
-  // Route polyline
+  // Route polyline + tiled basemap
+  let drewRoute = false;
   if (input.summaryPolyline) {
     try {
       const coords = decodePolyline(input.summaryPolyline);
       if (coords.length >= 2) {
-        drawRouteOnCanvas(ctx, coords, mapX, mapY, mapW, mapH);
-      } else {
-        ctx.fillStyle = "rgba(255,255,255,0.5)";
-        ctx.font = `500 24px ${FONT_TEXT}`;
-        ctx.textAlign = "center";
-        ctx.fillText(isZh ? "無 GPS 軌跡" : "No GPS route", mapX + mapW / 2, mapY + mapH / 2 - 12);
-        ctx.textAlign = "left";
+        drewRoute = await drawMapWithTiles(ctx, coords, mapX, mapY, mapW, mapH);
       }
-    } catch {
-      // ignore
+    } catch (err) {
+      console.warn("[Share] map render failed:", err);
     }
-  } else {
-    ctx.fillStyle = "rgba(255,255,255,0.5)";
+  }
+  if (!drewRoute) {
+    ctx.fillStyle = "#94A3B8";
     ctx.font = `500 24px ${FONT_TEXT}`;
     ctx.textAlign = "center";
     ctx.fillText(isZh ? "無 GPS 軌跡" : "No GPS route", mapX + mapW / 2, mapY + mapH / 2 - 12);

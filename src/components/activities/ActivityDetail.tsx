@@ -471,10 +471,11 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
     // Highest fidelity: per-second HR + distance samples from Terra (when available).
     const hrSamples = Array.isArray(activity.hr_samples) ? activity.hr_samples : null;
     const distSamples = Array.isArray(activity.distance_samples) ? activity.distance_samples : null;
-    if ((hrSamples && hrSamples.length > 10) || (distSamples && distSamples.length > 10)) {
+    const elevSamples = Array.isArray(activity.elevation_samples) ? activity.elevation_samples : null;
+    if ((hrSamples && hrSamples.length > 10) || (distSamples && distSamples.length > 10) || (elevSamples && elevSamples.length > 10)) {
       const totalDist = activity.distance || 0;
       // Build a unified per-second view keyed by t.
-      const tMap = new Map<number, { heartrate?: number; distM?: number }>();
+      const tMap = new Map<number, { heartrate?: number; distM?: number; altitude?: number }>();
       if (hrSamples) {
         for (const s of hrSamples) {
           tMap.set(s.t, { ...(tMap.get(s.t) || {}), heartrate: s.bpm });
@@ -483,6 +484,11 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
       if (distSamples) {
         for (const s of distSamples) {
           tMap.set(s.t, { ...(tMap.get(s.t) || {}), distM: s.d });
+        }
+      }
+      if (elevSamples) {
+        for (const s of elevSamples) {
+          tMap.set(s.t, { ...(tMap.get(s.t) || {}), altitude: s.e });
         }
       }
       const ordered = Array.from(tMap.entries()).sort((a, b) => a[0] - b[0]);

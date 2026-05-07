@@ -23,6 +23,7 @@ interface CachedGenerated {
   /** ISO date of the latest activity at the time of generation, or null if none. */
   basisActivityDate: string | null;
   workoutType?: string;
+  cacheVersion?: number;
 }
 
 type WorkoutType =
@@ -50,11 +51,19 @@ const WORKOUT_TYPE_LABELS: Record<WorkoutType, { en: string; zh: string }> = {
   race_pace: { en: "Race-pace workout", zh: "比賽配速訓練" },
 };
 
+const GENERATED_SUGGESTION_CACHE_VERSION = 2;
+
 function readCachedGenerated(userId: string): CachedGenerated | null {
   try {
-    const raw = localStorage.getItem(`generated_suggestion_${userId}`);
+    const key = `generated_suggestion_${userId}`;
+    const raw = localStorage.getItem(key);
     if (!raw) return null;
-    return JSON.parse(raw);
+    const parsed = JSON.parse(raw) as CachedGenerated;
+    if (parsed.cacheVersion !== GENERATED_SUGGESTION_CACHE_VERSION) {
+      localStorage.removeItem(key);
+      return null;
+    }
+    return parsed;
   } catch {
     return null;
   }
@@ -62,7 +71,10 @@ function readCachedGenerated(userId: string): CachedGenerated | null {
 
 function writeCachedGenerated(userId: string, val: CachedGenerated) {
   try {
-    localStorage.setItem(`generated_suggestion_${userId}`, JSON.stringify(val));
+    localStorage.setItem(`generated_suggestion_${userId}`, JSON.stringify({
+      ...val,
+      cacheVersion: GENERATED_SUGGESTION_CACHE_VERSION,
+    }));
   } catch {
     // ignore
   }
@@ -239,6 +251,7 @@ const SuggestedNextWorkout = ({ lang, latestActivityId, latestActivityDate }: Pr
         if (!translated) return;
         const next: CachedGenerated = {
           ...generated,
+          cacheVersion: GENERATED_SUGGESTION_CACHE_VERSION,
           suggestion_en: isZh ? generated.suggestion_en : translated,
           suggestion_zh: isZh ? translated : generated.suggestion_zh,
         };
@@ -303,6 +316,7 @@ const SuggestedNextWorkout = ({ lang, latestActivityId, latestActivityDate }: Pr
         generatedAt: new Date().toISOString(),
         basisActivityDate: latestActivityDate,
         workoutType,
+        cacheVersion: GENERATED_SUGGESTION_CACHE_VERSION,
       };
       writeCachedGenerated(user.id, cached);
       setGenerated(cached);

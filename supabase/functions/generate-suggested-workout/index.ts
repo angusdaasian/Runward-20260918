@@ -14,6 +14,8 @@ const RUNNING_SPORTS = new Set([
   "Run", "TrailRun", "VirtualRun", "Treadmill",
   "running", "trail_running", "treadmill_running",
 ]);
+const RUNNING_TYPE_CODES = new Set(["8", "58"]); // Terra/Garmin numeric codes seen for outdoor + indoor runs.
+const RUNNING_NAME_KEYWORDS = ["run", "running", "treadmill", "track running", "跑步", "越野跑", "室內跑"];
 
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -45,6 +47,17 @@ function paceFromSpeed(speedMps: number): string {
   const m = Math.floor(sec / 60);
   const s = Math.floor(sec % 60);
   return `${m}:${String(s).padStart(2, "0")} /km`;
+}
+
+function isRunningActivity(activityType?: unknown, activityName?: unknown): boolean {
+  const type = String(activityType ?? "").trim();
+  const lowerType = type.toLowerCase();
+  const lowerName = String(activityName ?? "").toLowerCase();
+  return RUNNING_SPORTS.has(type)
+    || RUNNING_SPORTS.has(lowerType)
+    || RUNNING_TYPE_CODES.has(type)
+    || lowerType.includes("run")
+    || RUNNING_NAME_KEYWORDS.some((keyword) => lowerName.includes(keyword));
 }
 
 // ── Vertex AI helper ──
@@ -177,7 +190,7 @@ serve(async (req) => {
 
     const recent: RecentRun[] = [];
     for (const a of (stravaRes.data || [])) {
-      if (!RUNNING_SPORTS.has(a.sport_type)) continue;
+      if (!isRunningActivity(a.sport_type, a.name)) continue;
       recent.push({
         date: a.start_date,
         distance_km: +(a.distance / 1000).toFixed(2),
@@ -188,7 +201,7 @@ serve(async (req) => {
       });
     }
     for (const a of (ahRes.data || [])) {
-      if (!RUNNING_SPORTS.has(a.sport_type)) continue;
+      if (!isRunningActivity(a.sport_type, a.name)) continue;
       recent.push({
         date: a.start_date,
         distance_km: +(a.distance / 1000).toFixed(2),
@@ -212,8 +225,7 @@ serve(async (req) => {
       });
     }
     for (const a of (terraRes.data || [])) {
-      const t = (a.activity_type || "").toLowerCase();
-      if (!RUNNING_SPORTS.has(a.activity_type) && !t.includes("run")) continue;
+      if (!isRunningActivity(a.activity_type, a.activity_name)) continue;
       const speed = a.average_speed && a.average_speed > 0
         ? a.average_speed
         : (a.distance_meters && a.duration_seconds ? a.distance_meters / a.duration_seconds : 0);

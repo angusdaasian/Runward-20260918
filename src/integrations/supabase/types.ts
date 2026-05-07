@@ -59,6 +59,27 @@ export type Database = {
         }
         Relationships: []
       }
+      activity_push_log: {
+        Row: {
+          activity_key: string
+          id: string
+          sent_at: string
+          user_id: string
+        }
+        Insert: {
+          activity_key: string
+          id?: string
+          sent_at?: string
+          user_id: string
+        }
+        Update: {
+          activity_key?: string
+          id?: string
+          sent_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       ai_coach_conversations: {
         Row: {
           content: string

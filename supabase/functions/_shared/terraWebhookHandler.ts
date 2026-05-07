@@ -451,8 +451,20 @@ async function deleteMatchingGarminDuplicate(userId: string, startTime: string |
     .lte("distance_meters", distanceMeters + 100);
 }
 
-async function pushActivityUploadedNotification(appUserId: string) {
+async function pushActivityUploadedNotification(appUserId: string, activityKey: string) {
   try {
+    // Idempotency guard: only the first call for this (user, activity) wins.
+    // Concurrent webhook deliveries for the same activity will conflict here
+    // and be skipped, preventing duplicate push notifications.
+    const { data: claim, error: claimErr } = await supa
+      .from("activity_push_log")
+      .insert({ user_id: appUserId, activity_key: activityKey })
+      .select("id")
+      .maybeSingle();
+    if (claimErr || !claim) {
+      console.log(`[terra-webhook] push already sent for ${appUserId} ${activityKey}, skipping`);
+      return;
+    }
     const { data: profile } = await supa
       .from("profiles")
       .select("activity_notifications")

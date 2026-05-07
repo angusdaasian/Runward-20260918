@@ -14,10 +14,11 @@ function jsonResponse(body: Record<string, unknown>, status = 200) {
 
 // ── Vertex AI helper (OpenAI-compatible response shape) ──
 const VERTEX_MODEL_MAP: Record<string, string> = {
+const VERTEX_MODEL_MAP: Record<string, string> = {
   "google/gemini-3-flash-preview": "gemini-3-flash-preview",
   "google/gemini-3.1-flash-lite-preview": "gemini-3.1-flash-lite-preview",
-  "google/gemini-3-flash-preview": "gemini-3-flash-preview",
-  "google/gemini-3-flash-preview-lite": "gemini-2.5-flash-lite",
+  "google/gemini-2.5-flash": "gemini-2.5-flash",
+  "google/gemini-2.5-flash-lite": "gemini-2.5-flash-lite",
   "google/gemini-2.5-pro": "gemini-2.5-pro",
 };
 

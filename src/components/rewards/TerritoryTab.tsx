@@ -63,12 +63,12 @@ const TerritoryTab = ({ lang }: Props) => {
     try {
       const { data, error } = await supabase.functions.invoke("process-territory");
       if (error) throw error;
-      const d = data as { processedActivities: number; newHexes: number; stolenHexes: number };
+      const d = data as { processedActivities: number; newZones: number; stolenZones: number };
       if (d.processedActivities > 0) {
         toast.success(
           lang === "zh"
-            ? `處理 ${d.processedActivities} 次跑步 · 新地塊 ${d.newHexes} · 搶占 ${d.stolenHexes}`
-            : `Processed ${d.processedActivities} runs · ${d.newHexes} new · ${d.stolenHexes} stolen`,
+            ? `處理 ${d.processedActivities} 次跑步 · 新區域 ${d.newZones} · 搶占 ${d.stolenZones}`
+            : `Processed ${d.processedActivities} runs · ${d.newZones} new · ${d.stolenZones} stolen`,
         );
       }
       await loadHexes();

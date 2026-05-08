@@ -268,6 +268,9 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
   const [existingPlan, setExistingPlan] = useState<any>(null);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [showWeeklyReview, setShowWeeklyReview] = useState(false);
+  const [terraProvider, setTerraProvider] = useState<"GARMIN" | "COROS" | null>(null);
+  const [pushedKeys, setPushedKeys] = useState<Set<string>>(new Set());
+  const [pushBusy, setPushBusy] = useState<string | null>(null);
 
   // Add/Edit workout
   const [addingDayIdx, setAddingDayIdx] = useState<number | null>(null);

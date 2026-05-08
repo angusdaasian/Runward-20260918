@@ -20,6 +20,16 @@ interface DayPlan {
 }
 interface WeekPlan { week: number; startDate: string; days: DayPlan[]; }
 
+const SAMPLE_ROUTE_WAYPOINTS = [
+  { latitude: 51.5074, longitude: -0.1278, elevation_meters: 12 },
+  { latitude: 51.51, longitude: -0.124, elevation_meters: 20 },
+  { latitude: 51.513, longitude: -0.12, elevation_meters: 35 },
+  { latitude: 51.515, longitude: -0.116, elevation_meters: 50 },
+  { latitude: 51.512, longitude: -0.113, elevation_meters: 42 },
+  { latitude: 51.509, longitude: -0.116, elevation_meters: 28 },
+  { latitude: 51.5074, longitude: -0.1278, elevation_meters: 12 },
+];
+
 const SKIP_TYPES = new Set(["Rest", "Cross Training"]);
 
 // "5:30/km" -> 330 seconds per km. Returns null if unparseable.
@@ -149,6 +159,31 @@ function buildPlannedWorkout(day: DayPlan, provider: "GARMIN" | "COROS"): any | 
       planned_date: day.date,
       estimated_duration_seconds: estimatedDurationSeconds,
     },
+  };
+}
+
+function buildRoutePayload(day: DayPlan, conn: any): any | null {
+  if (SKIP_TYPES.has(day.type)) return null;
+  const distanceMeters = day.distance_km ? Math.round(day.distance_km * 1000) : 5000;
+  const name = (day.title || day.type || "Run").replace(/[^\x20-\x7E]/g, "").replace(/\s+/g, " ").trim() || "Run";
+  return {
+    data: [{
+      name,
+      sport: "running",
+      distance_meters: distanceMeters,
+      elevation_gain_meters: 45,
+      elevation_loss_meters: 45,
+      waypoints: SAMPLE_ROUTE_WAYPOINTS,
+    }],
+    user: {
+      scopes: Array.isArray(conn.scopes) ? conn.scopes.join(",") : (conn.scopes || ""),
+      user_id: conn.terra_user_id,
+      reference_id: conn.reference_id || conn.user_id,
+      last_webhook_update: conn.last_webhook_at || conn.updated_at || null,
+      provider: "GARMIN",
+    },
+    type: "routes",
+    version: "2022-03-16",
   };
 }
 

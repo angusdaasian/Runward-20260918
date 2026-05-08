@@ -687,7 +687,7 @@ const ProgramsTab = ({ lang, onLoginRequest }: Props) => {
         {/* Generate */}
         <Button
           onClick={handleGenerate}
-          disabled={!distance || !targetTime || !raceDate || !dateValid || loading}
+          disabled={!distance || !targetTime || !raceDate || !dateValid || loading || restDays.length !== 7 - daysPerWeek}
           className="w-full"
           size="lg"
         >

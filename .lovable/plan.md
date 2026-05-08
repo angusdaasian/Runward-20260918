@@ -1,83 +1,80 @@
-# City Coverage Progress
+# Push AI Plans to Garmin & Coros (Terra Write API)
 
-Add per-city exploration progress, tap-to-zoom heatmap, and milestone badges to the Territory tab.
+Terra supports writing **planned workouts** to Garmin and Coros (also Hammerhead, TodaysPlan) via `POST /v2/plannedWorkout`. Once written, the workout shows up in the user's device library and they can follow it step-by-step on their watch. We already have Terra connected for these providers, so we just need a translator + a push action.
 
-## Data model
+## What we'll build
 
-New table **`territory_cities`** — one row per city ever encountered:
-- `slug` (text, PK) — e.g. `taipei-tw`
-- `display_name` (text), `display_name_zh` (text, nullable)
-- `country` (text, 2-letter), `admin1` (text, nullable)
-- `bbox` (jsonb) — `[minLat, minLng, maxLat, maxLng]` for map fitBounds
-- `center_lat`, `center_lng` (numeric)
-- `total_hex_count` (int) — H3 res 8 hexes inside city polygon
-- `polygon_filled_at` (timestamptz, nullable) — when polyfill finished
+1. **Edge function `terra-write-workout`** — translates one or more days from a `training_plans.plan_data` entry into Terra's planned-workout JSON and POSTs it to Terra. Supports single-day push and "push entire week" / "push entire plan".
+2. **DB table `pushed_workouts`** — tracks which plan day has been pushed to which provider, storing Terra's returned `log_id` so we can later delete/update.
+3. **UI: "Send to watch" button** in `ProgramsTab` (and the day-detail view) — visible only when the user has a Terra Garmin or Coros connection. Lets them push a single workout, the current week, or the whole plan. Toast on success/failure.
+4. **Optional: delete pushed workout** — small "Remove from watch" action that calls `DELETE /v2/plannedWorkout` with the stored `log_id`.
 
-New table **`territory_city_hexes`** — membership lookup (one row per hex inside a city polygon):
-- `hex_id` (text, PK) — H3 cell id
-- `city_slug` (text, FK → territory_cities.slug, indexed)
+## Workout translation
 
-Add column **`city_slug`** (text, nullable, indexed) to `territory_hexes`.
+Our plan day shape:
+```
+{ day, type, title, description, distance_km, pace, date }
+```
+Mapping to Terra's schema:
 
-RLS: both tables readable by all authenticated users; service role full access.
+| Our type | Terra step `intensity` | duration | targets |
+|---|---|---|---|
+| Easy Run / Long Run / Recovery / Race Pace / Progression / Tempo | active (5) / cool (varies) | `duration_type=1` distance in meters (`distance_km*1000`) | `target_type=15` pace bounds (m/s) from `pace`, ±5% |
+| Interval | parse `"800m x 6 at 4:00/km, rest 2:00 between sets"` → 1 warmup (warmup type) + repeat block with N sub-steps (work step distance + recovery step time) + cooldown | mix of distance + time | pace target on work step |
+| Rest / Cross Training | skip (don't push) |
 
-## Backend
+Top-level payload per workout:
+```json
+{
+  "data": [{
+    "name": "<title> (<date>)",
+    "description": "<our description>",
+    "exercise_type": "running",
+    "steps": [ ... ]
+  }]
+}
+```
 
-**New edge function `resolve-city`** (called from `process-territory` per unseen hex):
-1. Take a hex_id → `cellToLatLng` → reverse-geocode via Nominatim (`/reverse?lat=&lon=&zoom=10&format=json&accept-language=en`).
-2. Derive `slug` from `address.city || address.town || address.county` + country code.
-3. If city already in `territory_cities`, return cached slug.
-4. Otherwise:
-   - Fetch boundary polygon via Nominatim (`/search?q=<city>&polygon_geojson=1&limit=1`).
-   - Compute bbox + centroid.
-   - Use `polygonToCells` (h3-js) at res 8 to enumerate all hex_ids inside polygon.
-   - Insert `territory_cities` row with `total_hex_count`, then bulk-insert into `territory_city_hexes`.
-5. Return `{ slug, display_name }`.
+For provider-specific tweaks Terra documents (e.g. Garmin vs Coros structure), we'll pass `data_provider=GARMIN` or `COROS` in the query string and use the "Adapted to Garmin" shape from the docs (nested step groups with `type=1` containers + `duration_type=9` reps for repeats).
 
-**Modify `process-territory/index.ts`**:
-- After computing the hex set for an activity, look up `city_slug` for each hex via:
-  1. Check `territory_city_hexes` table (cheap, indexed).
-  2. If miss, call `resolve-city` for that hex's coords (rate-limit: max 1 Nominatim call per 1.1s, dedupe by approximate lat/lng).
-- Stamp `city_slug` on each `territory_hexes` upsert row.
+## Edge function shape
 
-**Nominatim etiquette**: hardcoded `User-Agent: lovable-territory/1.0`, sequential calls only.
+`POST supabase/functions/terra-write-workout`
+```ts
+body: { plan_id: string, scope: "day" | "week" | "all", week?: number, day_index?: number, provider?: "GARMIN" | "COROS" }
+```
+Steps:
+1. Validate JWT, load `training_plans` row (RLS via service role + `user_id` check).
+2. Look up active `terra_connections` for user → pick Garmin/Coros (or use `provider` param).
+3. Build workout payloads from `plan_data`.
+4. For each: `POST https://api.tryterra.co/v2/plannedWorkout?user_id={terra_user_id}` with headers `dev-id`, `x-api-key`, body `{ data: [...] }`.
+5. Upsert each returned `log_id` into `pushed_workouts(user_id, plan_id, week, day_index, provider, terra_log_id, pushed_at)`.
+6. Return summary `{ pushed: N, failed: M, errors: [...] }`.
 
-## Frontend
+Reuses existing Terra env vars (`TERRA_DEV_ID`, `TERRA_API_KEY`) already set as secrets.
 
-**New file `src/components/rewards/CityProgressList.tsx`**:
-- Query: `select hex_id, city_slug from territory_hexes where owner_user_id = me`.
-- Group by `city_slug`, count.
-- Join with `territory_cities` for name + total.
-- Render sorted by % desc:
-  ```
-  Taipei  ━━━━━░░░░░  2.4% explored
-          428 of 17,832 hexes  · 🥉 1%
-  ```
-- Badge tier shown next to row: 🥉 1%, 🥈 5%, 🏅 10%, 🏆 25%, 💎 50%, 👑 100% (highest earned only).
-- Tap row → calls `onCityFocus(slug)` prop.
+## UI changes (`ProgramsTab.tsx`)
 
-**New file `src/lib/cityBadges.ts`**:
-- `const CITY_BADGE_TIERS = [1, 5, 10, 25, 50, 100]`
-- `getCityBadge(percent) → { tier, icon, label }`
+- New small icon button on each non-rest day card → "Send to watch" (disabled if no Garmin/Coros Terra connection).
+- Header action menu: "Push this week to watch" / "Push entire plan to watch".
+- Show a small ✓ + provider badge on days already in `pushed_workouts`.
+- On click → call `supabase.functions.invoke("terra-write-workout", { body })` → toast result.
 
-**Modify `TerritoryMap.tsx`**:
-- New prop `focusCity?: { bbox: [number,number,number,number]; slug: string } | null`.
-- When set, `fitBounds` to bbox and dim hexes whose `city_slug !== slug` (lower opacity).
-- Add `city_slug` to `Hex` interface.
+## Files to add / change
 
-**Modify `TerritoryTab.tsx`**:
-- Fetch `territory_cities` rows the user has hexes in.
-- Render `<CityProgressList>` above the map.
-- Track `focusedCity` state; pass to `<TerritoryMap>`.
-- Add a small "Show all" pill when focused.
+- **new** `supabase/functions/terra-write-workout/index.ts`
+- **new** migration for `pushed_workouts` table + RLS (user can read/insert/delete own rows)
+- **edit** `src/components/ProgramsTab.tsx` (button + menu + state)
+- **edit** `supabase/config.toml` — not needed (verify_jwt default works)
 
-## i18n
+## Out of scope (for this iteration)
 
-Strings (en/zh) added inline in components:
-- "X explored" / "已探索 X"
-- "Y of Z hexes" / "Y / Z 地塊"
-- Badge labels: Bronze/Silver/Gold/Platinum/Diamond/Crown — keep emoji, localize tooltip.
+- Strava (Terra doesn't support write to Strava).
+- Apple Health (no write path through Terra).
+- Two-way sync of workout completion status (we already pull completed activities via `terra-sync`).
+- Editing a pushed workout — we'll delete + re-push if user regenerates the plan.
 
-## Out of scope
-- Backfill of existing `territory_hexes` rows (city_slug stays null until next sync touches them; we'll add a one-shot backfill button later if needed).
-- City leaderboards (separate feature).
+## Open questions
+
+1. Default scope on the button — push **single day** only, or offer "this week / entire plan" from day one?
+2. Should we auto-push the next 7 days whenever a new plan is generated, or always require an explicit user action?

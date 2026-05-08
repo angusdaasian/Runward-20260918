@@ -153,6 +153,21 @@ const ActivityCalendar = ({ lang, activities, plannedWorkouts, userRaces = [], o
     return total;
   }, [activities, viewYear, viewMonth]);
 
+  // This week's total km (Mon–Sun, based on real today)
+  const weeklyTotalKm = useMemo(() => {
+    const now = new Date();
+    const day = now.getDay();
+    const offsetToMon = day === 0 ? 6 : day - 1;
+    const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - offsetToMon);
+    const sundayEnd = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + 7);
+    let total = 0;
+    for (const act of activities) {
+      const d = new Date(act.start_date);
+      if (d >= monday && d < sundayEnd) total += act.distance / 1000;
+    }
+    return total;
+  }, [activities]);
+
   const prevMonth = () => {
     if (viewMonth === 0) { setViewYear(viewYear - 1); setViewMonth(11); }
     else setViewMonth(viewMonth - 1);
@@ -179,7 +194,7 @@ const ActivityCalendar = ({ lang, activities, plannedWorkouts, userRaces = [], o
           </h3>
           <p className="text-[10px] text-muted-foreground">
             {monthlyTotalKm > 0
-              ? `${monthlyTotalKm.toFixed(1)} km ${lang === "zh" ? "已跑" : "ran"}`
+              ? `${monthlyTotalKm.toFixed(1)} km ${lang === "zh" ? "已跑" : "ran"} / ${weeklyTotalKm.toFixed(1)} km ${lang === "zh" ? "本週已跑" : "ran this week"}`
               : lang === "zh" ? "暫無活動" : "No activities"}
           </p>
         </div>

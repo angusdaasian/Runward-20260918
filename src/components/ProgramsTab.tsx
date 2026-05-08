@@ -249,6 +249,15 @@ const ProgramsTab = ({ lang, onLoginRequest }: Props) => {
     load();
   }, [user]);
 
+  // Keep restDays valid: never include longRunDay, never exceed 7 - daysPerWeek
+  useEffect(() => {
+    const max = 7 - daysPerWeek;
+    setRestDays((prev) => {
+      const filtered = prev.filter((d) => d !== longRunDay);
+      return filtered.slice(0, Math.max(0, max));
+    });
+  }, [daysPerWeek, longRunDay]);
+
   const weeksUntilRace = useMemo(() => {
     if (!raceDate) return 0;
     const diff = new Date(raceDate).getTime() - new Date().getTime();

@@ -44,7 +44,7 @@ serve(async (req) => {
   }
 
   try {
-    const { goal, distance, targetTime, raceDate, startDate, weeks, daysPerWeek, weeklyKm, longRunDay, restDays, lang } = await req.json();
+    const { goal, distance, targetTime, raceDate, startDate, weeks, daysPerWeek, weeklyKm, longRunDay, restDays, raceName, raceCity, raceCountry, lang } = await req.json();
 
     const isZh = lang === "zh";
     const distanceFull =
@@ -59,6 +59,7 @@ Goal: ${goal}
 Race: ${distanceFull}
 Target time: ${targetTime}
 Race date: ${raceDate}
+${raceName ? `Target race event: "${raceName}"${raceCity ? ` in ${raceCity}${raceCountry ? `, ${raceCountry}` : ""}` : ""}. Tailor the plan to this specific race — consider its typical course profile (hills, flat, elevation), climate/weather for the race date, and any well-known characteristics of this event when shaping long runs, race-pace sessions, and the taper. Briefly mention the race-specific rationale in the description of key workouts (e.g. hill sessions if the course is hilly, heat acclimation if the race is in a hot climate).` : ""}
 Running days per week: ${daysPerWeek || 4}
 Preferred weekly volume: approximately ${weeklyKm || 30} km per week (adjust progressively)
 

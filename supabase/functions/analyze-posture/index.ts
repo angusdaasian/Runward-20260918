@@ -44,7 +44,11 @@ async function callVertexAI(opts: { apiKey: string; model?: string; messages: Ar
   const body: any = { contents };
   if (systemParts.length) body.systemInstruction = { parts: systemParts };
   const vRes = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-  if (!vRes.ok) return new Response(await vRes.text(), { status: vRes.status });
+  if (!vRes.ok) {
+    const errBody = await vRes.text();
+    console.error("Vertex error:", vRes.status, "model:", model, "body:", errBody.slice(0, 1000));
+    return new Response(errBody, { status: vRes.status });
+  }
   const vData = await vRes.json();
   const text = vData?.candidates?.[0]?.content?.parts?.map((p: any) => p.text || "").join("") || "";
   return new Response(JSON.stringify({ choices: [{ message: { content: text } }] }), { status: 200, headers: { "Content-Type": "application/json" } });

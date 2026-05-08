@@ -241,7 +241,7 @@ const translations = {
     editEmail: "編輯電郵",
     skipAll: "跳過",
     activities: "活動",
-    community: "獎勵",
+    community: "競技場",
     races: "賽事",
     connectFitnessApps: "連結健身應用",
     connectStrava: "連結 Strava",

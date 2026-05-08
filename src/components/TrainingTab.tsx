@@ -1251,7 +1251,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                       value={startDate}
                       onChange={(e) => setStartDate(e.target.value)}
                       min={new Date().toISOString().split("T")[0]}
-                      className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm text-foreground"
+                      className="block w-full min-w-0 box-border appearance-none rounded-md border border-border bg-card px-3 py-2 text-sm text-foreground"
                     />
                     <p className="text-xs text-muted-foreground mt-1">{lang === "zh" ? "計劃從哪天開始？" : "When should the plan start?"}</p>
                   </div>
@@ -1264,7 +1264,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                       value={raceDate}
                       onChange={(e) => setRaceDate(e.target.value)}
                       min={startDate ? new Date(new Date(startDate + "T00:00:00").getTime() + minWeeks * 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0] : new Date(Date.now() + minWeeks * 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0]}
-                      className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm text-foreground"
+                      className="block w-full min-w-0 box-border appearance-none rounded-md border border-border bg-card px-3 py-2 text-sm text-foreground"
                     />
                     {raceDate && startDate && !dateValid && <p className="text-xs text-destructive mt-1">{lang === "zh" ? `開始日期與比賽之間至少需要 ${minWeeks} 週` : `At least ${minWeeks} weeks needed between start and race date`}</p>}
                     {raceDate && startDate && dateValid && <p className="text-xs text-muted-foreground mt-1">{weeksUntilRace} {lang === "zh" ? "週訓練計劃" : "weeks training plan"}</p>}

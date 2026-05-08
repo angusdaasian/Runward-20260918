@@ -167,7 +167,8 @@ serve(async (req) => {
     // --- Pull last 7 days of runs from all 3 sources + active training plan ---
     const since = new Date(Date.now() - SEVEN_DAYS_MS).toISOString();
 
-    const [stravaRes, ahRes, garminRes, terraRes, profileRes, planRes] = await Promise.all([
+    const since60 = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const [stravaRes, ahRes, garminRes, terraRes, profileRes, planRes, hrvRes] = await Promise.all([
       svc.from("strava_activities")
         .select("name, sport_type, distance, moving_time, average_speed, average_heartrate, start_date")
         .eq("user_id", user.id).gte("start_date", since).order("start_date", { ascending: false }),

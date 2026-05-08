@@ -1244,6 +1244,19 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                           <span className="ml-2 bg-primary/15 text-primary text-xs font-bold px-2 py-0.5 rounded-full">WEEK {currentWeek.week}</span>
                         </div>
                         <div className="flex items-center gap-1">
+                          {terraProvider && (
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <button className="p-1 rounded hover:bg-accent" aria-label={lang === "zh" ? "傳送至手錶" : "Send to watch"}>
+                                  {pushBusy === "week" || pushBusy === "all" ? <Loader2 size={16} className="animate-spin text-primary" /> : <Watch size={16} className="text-primary" />}
+                                </button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => sendToWatch("week", currentWeek.week)}>{lang === "zh" ? `傳送本週至 ${terraProvider}` : `Send this week to ${terraProvider}`}</DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => sendToWatch("all")}>{lang === "zh" ? `傳送整個計劃至 ${terraProvider}` : `Send entire plan to ${terraProvider}`}</DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          )}
                           <button onClick={() => setCurrentWeekIdx(Math.max(0, currentWeekIdx - 1))} disabled={currentWeekIdx === 0} className="p-1 rounded hover:bg-accent disabled:opacity-30"><ChevronLeft size={16} /></button>
                           <button onClick={() => setCurrentWeekIdx(Math.min(plan.length - 1, currentWeekIdx + 1))} disabled={currentWeekIdx === plan.length - 1} className="p-1 rounded hover:bg-accent disabled:opacity-30"><ChevronRight size={16} /></button>
                         </div>
@@ -1277,6 +1290,16 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
                                       {day.pace && <span>{day.pace}</span>}
                                       {day.distance_km && <span>{day.distance_km} km</span>}
+                                      {terraProvider && (
+                                        <button
+                                          onClick={(e) => { e.stopPropagation(); sendToWatch("day", currentWeek.week, i); }}
+                                          disabled={pushBusy === `${currentWeek.week}:${i}`}
+                                          title={pushedKeys.has(`${currentWeek.week}:${i}`) ? (lang === "zh" ? `已傳送至 ${terraProvider}` : `Sent to ${terraProvider}`) : (lang === "zh" ? `傳送至 ${terraProvider}` : `Send to ${terraProvider}`)}
+                                          className="p-1 rounded hover:bg-accent disabled:opacity-50"
+                                        >
+                                          {pushBusy === `${currentWeek.week}:${i}` ? <Loader2 size={12} className="animate-spin" /> : pushedKeys.has(`${currentWeek.week}:${i}`) ? <Check size={12} className="text-primary" /> : <Watch size={12} />}
+                                        </button>
+                                      )}
                                     </div>
                                   </div>
                                   <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{localizeDescription(day, lang)}</p>

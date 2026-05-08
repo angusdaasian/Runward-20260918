@@ -864,6 +864,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
       const idx = mappedPlan.findIndex((w: WeekPlan) => w.days.some((d: DayPlan) => d.date >= today));
       setCurrentWeekIdx(Math.max(0, idx));
 
+      notifyPlanChanged();
       toast({ title: lang === "zh" ? "已加入日曆" : "Added to Calendar", description: lang === "zh" ? "計劃已加入活動日曆" : "Plan added to your activity calendar" });
       setShowAddToCalendar(false);
       setCalendarStartDate("");

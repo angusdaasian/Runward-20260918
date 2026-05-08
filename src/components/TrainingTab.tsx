@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, lazy, Suspense } from "react";
+import React, { useState, useEffect, useMemo, lazy, Suspense } from "react";
 import { Lang, t } from "@/lib/i18n";
 import { getMainPaces, predictTime, formatTime, raceDistances } from "@/lib/vdot";
 import { Button } from "@/components/ui/button";

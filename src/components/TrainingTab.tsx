@@ -325,6 +325,65 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
     load();
   }, [user, online]);
 
+  useEffect(() => {
+    if (!user || !online) return;
+    (async () => {
+      const { data } = await (supabase as any)
+        .from("terra_connections")
+        .select("provider")
+        .eq("user_id", user.id)
+        .eq("active", true)
+        .in("provider", ["GARMIN", "COROS"])
+        .limit(1);
+      setTerraProvider((data?.[0]?.provider as "GARMIN" | "COROS" | undefined) ?? null);
+    })();
+  }, [user, online]);
+
+  useEffect(() => {
+    if (!user || !existingPlan?.id || !online) { setPushedKeys(new Set()); return; }
+    (async () => {
+      const { data } = await (supabase as any)
+        .from("pushed_workouts")
+        .select("week, day_index")
+        .eq("user_id", user.id)
+        .eq("plan_id", existingPlan.id);
+      setPushedKeys(new Set((data ?? []).map((r: any) => `${r.week}:${r.day_index}`)));
+    })();
+  }, [user, existingPlan?.id, online]);
+
+  const sendToWatch = async (scope: "day" | "week" | "all", week?: number, dayIdx?: number) => {
+    if (!existingPlan?.id || !terraProvider) return;
+    const busyKey = scope === "day" ? `${week}:${dayIdx}` : scope;
+    setPushBusy(busyKey);
+    try {
+      const { data, error } = await supabase.functions.invoke("terra-write-workout", {
+        body: { plan_id: existingPlan.id, scope, week, day_index: dayIdx, provider: terraProvider },
+      });
+      if (error) throw error;
+      const pushed = data?.pushed ?? 0;
+      const failed = data?.failed ?? 0;
+      if (scope === "day" && week !== undefined && dayIdx !== undefined && pushed > 0) {
+        setPushedKeys((prev) => new Set(prev).add(`${week}:${dayIdx}`));
+      } else if (pushed > 0) {
+        const { data: rows } = await (supabase as any)
+          .from("pushed_workouts")
+          .select("week, day_index")
+          .eq("user_id", user!.id)
+          .eq("plan_id", existingPlan.id);
+        setPushedKeys(new Set((rows ?? []).map((r: any) => `${r.week}:${r.day_index}`)));
+      }
+      toast({
+        title: failed ? (lang === "zh" ? "部分傳送完成" : "Partially sent") : (lang === "zh" ? "已傳送至手錶" : "Sent to watch"),
+        description: `${terraProvider}: ${pushed} ${lang === "zh" ? "個訓練" : "workout(s)"}${failed ? ` (${failed} ${lang === "zh" ? "失敗" : "failed"})` : ""}`,
+        variant: failed ? "destructive" : "default",
+      });
+    } catch (e: any) {
+      toast({ title: lang === "zh" ? "傳送失敗" : "Send failed", description: e?.message ?? "", variant: "destructive" });
+    } finally {
+      setPushBusy(null);
+    }
+  };
+
   // Load free plans for selected distance (cache-then-network)
   useEffect(() => {
     const cacheKey = CacheKeys.freePlans(freeDistance);

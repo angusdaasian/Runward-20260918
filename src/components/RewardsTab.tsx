@@ -13,6 +13,7 @@ import RateAppReward from "@/components/rewards/RateAppReward";
 import LeaderboardTabs from "@/components/rewards/LeaderboardTabs";
 import RankUpOverlay from "@/components/rewards/RankUpOverlay";
 import XpExplainer from "@/components/rewards/XpExplainer";
+import TerritoryTab from "@/components/rewards/TerritoryTab";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import type { RankTier } from "@/lib/ranks";
 
@@ -93,12 +94,15 @@ const RewardsTab = ({ lang }: Props) => {
       <FadeIn className="px-5 pt-4 max-w-lg mx-auto pb-24 space-y-5">
         {/* Sub-tabs: Rewards | Leaderboards — at the top */}
         <Tabs defaultValue="rewards" className="w-full">
-          <TabsList className="w-full grid grid-cols-2">
+          <TabsList className="w-full grid grid-cols-3">
             <TabsTrigger value="rewards">
               {lang === "zh" ? "獎勵" : "Rewards"}
             </TabsTrigger>
             <TabsTrigger value="leaderboards">
               {lang === "zh" ? "排行榜" : "Leaderboards"}
+            </TabsTrigger>
+            <TabsTrigger value="territory">
+              {lang === "zh" ? "地塊" : "Territory"}
             </TabsTrigger>
           </TabsList>
 
@@ -147,6 +151,10 @@ const RewardsTab = ({ lang }: Props) => {
 
           <TabsContent value="leaderboards" className="mt-4">
             <LeaderboardTabs lang={lang} refreshKey={leaderboardKey} />
+          </TabsContent>
+
+          <TabsContent value="territory" className="mt-4">
+            <TerritoryTab lang={lang} />
           </TabsContent>
         </Tabs>
       </FadeIn>

@@ -4,7 +4,6 @@ import { getMainPaces, predictTime, formatTime, raceDistances } from "@/lib/vdot
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import { usePremium } from "@/contexts/PremiumContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -13,7 +12,7 @@ import { useOnlineStatus, isOnline } from "@/hooks/use-online-status";
 import { getCached, setCached, CacheKeys } from "@/lib/offlineCache";
 import {
   Loader2, Lock, ChevronLeft, ChevronRight, Plus, Calendar, Target, Trophy,
-  Repeat, Route, Check, HelpCircle, X, WifiOff, Sparkles, Watch
+  Repeat, Route, HelpCircle, X, WifiOff, Sparkles
 } from "lucide-react";
 import WeeklyReviewModal from "@/components/training/WeeklyReviewModal";
 const CalculatorTab = lazy(() => import("@/components/CalculatorTab"));
@@ -268,9 +267,6 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
   const [existingPlan, setExistingPlan] = useState<any>(null);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [showWeeklyReview, setShowWeeklyReview] = useState(false);
-  const [terraProvider, setTerraProvider] = useState<"GARMIN" | "COROS" | null>(null);
-  const [pushedKeys, setPushedKeys] = useState<Set<string>>(new Set());
-  const [pushBusy, setPushBusy] = useState<string | null>(null);
 
   // Add/Edit workout
   const [addingDayIdx, setAddingDayIdx] = useState<number | null>(null);

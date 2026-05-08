@@ -25,11 +25,22 @@ interface Props {
   focusCity?: FocusCity | null;
 }
 
+interface Landmark {
+  hex_id: string;
+  name: string;
+  name_zh: string | null;
+  icon: string | null;
+  category: string;
+}
+
 const TerritoryMap = ({ hexes, currentUserId, focusCity }: Props) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const layerRef = useRef<L.LayerGroup | null>(null);
+  const landmarkLayerRef = useRef<L.LayerGroup | null>(null);
   const fittedRef = useRef(false);
+  const landmarksRef = useRef<Landmark[]>([]);
+  const myLandmarkSetRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;

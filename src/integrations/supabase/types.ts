@@ -1259,6 +1259,90 @@ export type Database = {
         }
         Relationships: []
       }
+      territory_captures: {
+        Row: {
+          activity_id: string | null
+          captured_at: string
+          hex_id: string
+          id: string
+          region: string
+          user_id: string
+        }
+        Insert: {
+          activity_id?: string | null
+          captured_at?: string
+          hex_id: string
+          id?: string
+          region: string
+          user_id: string
+        }
+        Update: {
+          activity_id?: string | null
+          captured_at?: string
+          hex_id?: string
+          id?: string
+          region?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      territory_hexes: {
+        Row: {
+          capture_count: number
+          captured_activity_id: string | null
+          captured_at: string
+          hex_id: string
+          id: string
+          owner_display_name: string | null
+          owner_user_id: string
+          region: string
+        }
+        Insert: {
+          capture_count?: number
+          captured_activity_id?: string | null
+          captured_at?: string
+          hex_id: string
+          id?: string
+          owner_display_name?: string | null
+          owner_user_id: string
+          region: string
+        }
+        Update: {
+          capture_count?: number
+          captured_activity_id?: string | null
+          captured_at?: string
+          hex_id?: string
+          id?: string
+          owner_display_name?: string | null
+          owner_user_id?: string
+          region?: string
+        }
+        Relationships: []
+      }
+      territory_processed_activities: {
+        Row: {
+          activity_id: string
+          activity_source: string
+          id: string
+          processed_at: string
+          user_id: string
+        }
+        Insert: {
+          activity_id: string
+          activity_source: string
+          id?: string
+          processed_at?: string
+          user_id: string
+        }
+        Update: {
+          activity_id?: string
+          activity_source?: string
+          id?: string
+          processed_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       training_plans: {
         Row: {
           created_at: string

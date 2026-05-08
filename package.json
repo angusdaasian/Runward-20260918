@@ -58,6 +58,7 @@
     "embla-carousel-react": "^8.6.0",
     "fit-file-parser": "^2.3.3",
     "framer-motion": "^12.38.0",
+    "h3-js": "^4.4.0",
     "input-otp": "^1.4.2",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.462.0",

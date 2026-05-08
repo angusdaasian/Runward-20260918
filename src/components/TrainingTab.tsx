@@ -384,6 +384,57 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
     setRestDays((prev) => prev.filter((d) => d !== longRunDay).slice(0, Math.max(0, max)));
   }, [daysPerWeek, longRunDay]);
 
+  // Load upcoming races for optional race picker
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await supabase
+          .from("races")
+          .select("id,name,name_zh,race_date,city,country")
+          .gte("race_date", new Date().toISOString().split("T")[0])
+          .order("race_date", { ascending: true })
+          .limit(500);
+        if (!cancelled && data) {
+          // Dedupe by name + date (multiple categories share a race)
+          const seen = new Set<string>();
+          const unique: any[] = [];
+          for (const r of data as any[]) {
+            const key = `${r.name}__${r.race_date}`;
+            if (seen.has(key)) continue;
+            seen.add(key);
+            unique.push(r);
+          }
+          setRaceOptions(unique);
+        }
+      } catch {
+        /* ignore */
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const selectedRace = useMemo(
+    () => raceOptions.find((r) => r.id === selectedRaceId) || null,
+    [raceOptions, selectedRaceId]
+  );
+  const resolvedRaceName = selectedRace
+    ? (lang === "zh" && selectedRace.name_zh ? selectedRace.name_zh : selectedRace.name)
+    : (customRaceName.trim() || null);
+
+  const filteredRaces = useMemo(() => {
+    const q = raceSearch.trim().toLowerCase();
+    const list = q
+      ? raceOptions.filter((r) =>
+          r.name.toLowerCase().includes(q) ||
+          (r.name_zh || "").toLowerCase().includes(q) ||
+          (r.city || "").toLowerCase().includes(q) ||
+          (r.country || "").toLowerCase().includes(q)
+        )
+      : raceOptions;
+    return list.slice(0, 30);
+  }, [raceOptions, raceSearch]);
+
   const handleGenerate = async () => {
     if (!distance || !targetTime || !raceDate || !startDate || !dateValid) return;
     if (!isOnline()) {

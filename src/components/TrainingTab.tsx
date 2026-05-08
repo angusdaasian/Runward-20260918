@@ -260,6 +260,8 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
   const [loading, setLoading] = useState(false);
   const [daysPerWeek, setDaysPerWeek] = useState<number>(4);
   const [weeklyKm, setWeeklyKm] = useState<number>(30);
+  const [longRunDay, setLongRunDay] = useState<string>("Sun");
+  const [restDays, setRestDays] = useState<string[]>(["Mon"]);
 
   // Calendar state
   const [plan, setPlan] = useState<WeekPlan[]>([]);
@@ -371,6 +373,11 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
     return `${m}:${s.toString().padStart(2, "0")} / km`;
   };
 
+  // Keep restDays valid given daysPerWeek and longRunDay
+  useEffect(() => {
+    const max = 7 - daysPerWeek;
+    setRestDays((prev) => prev.filter((d) => d !== longRunDay).slice(0, Math.max(0, max)));
+  }, [daysPerWeek, longRunDay]);
 
   const handleGenerate = async () => {
     if (!distance || !targetTime || !raceDate || !startDate || !dateValid) return;
@@ -392,7 +399,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
           apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
           Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
         },
-        body: JSON.stringify({ goal, distance, targetTime, raceDate, startDate, weeks: weeksUntilRace, daysPerWeek, weeklyKm, lang }),
+        body: JSON.stringify({ goal, distance, targetTime, raceDate, startDate, weeks: weeksUntilRace, daysPerWeek, weeklyKm, longRunDay, restDays, lang }),
       });
       if (!response.ok) { const err = await response.json().catch(() => ({})); throw new Error(err.error || "Failed to generate"); }
       const result = await response.json();
@@ -1133,7 +1140,54 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                     </div>
                   )}
 
-                  {/* Start Date */}
+                  {/* Long Run Day */}
+                  {distance && (
+                    <div className="mb-5">
+                      <label className="text-sm font-semibold text-foreground mb-2 block flex items-center gap-2"><Route size={14} />{lang === "zh" ? "長跑日" : "Long Run Day"}</label>
+                      <div className="flex flex-wrap gap-2">
+                        {["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map((d) => {
+                          const labelZh: Record<string,string> = {Mon:"一",Tue:"二",Wed:"三",Thu:"四",Fri:"五",Sat:"六",Sun:"日"};
+                          const isRest = restDays.includes(d);
+                          return (
+                            <button key={d} onClick={() => { setLongRunDay(d); setRestDays(restDays.filter(r => r !== d)); }}
+                              className={`w-12 h-10 rounded-full text-sm font-medium transition-colors border ${longRunDay === d ? "bg-primary text-primary-foreground border-primary" : isRest ? "bg-muted text-muted-foreground border-border opacity-40" : "bg-card text-foreground border-border hover:bg-accent"}`}>
+                              {lang === "zh" ? labelZh[d] : d}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">{lang === "zh" ? "選擇你想做長跑的日子" : "Pick the day you'd like to do your long run"}</p>
+                    </div>
+                  )}
+
+                  {/* Rest Days */}
+                  {distance && (
+                    <div className="mb-5">
+                      <label className="text-sm font-semibold text-foreground mb-2 block flex items-center gap-2">
+                        <Calendar size={14} />{lang === "zh" ? "休息日" : "Rest Day(s)"}
+                        <span className="text-xs font-normal text-muted-foreground">({restDays.length}/{7 - daysPerWeek})</span>
+                      </label>
+                      <div className="flex flex-wrap gap-2">
+                        {["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map((d) => {
+                          const labelZh: Record<string,string> = {Mon:"一",Tue:"二",Wed:"三",Thu:"四",Fri:"五",Sat:"六",Sun:"日"};
+                          const isLong = longRunDay === d;
+                          const selected = restDays.includes(d);
+                          const maxRest = 7 - daysPerWeek;
+                          const atMax = !selected && restDays.length >= maxRest;
+                          const disabled = isLong || atMax;
+                          return (
+                            <button key={d} disabled={disabled}
+                              onClick={() => { if (disabled) return; setRestDays(selected ? restDays.filter(r => r !== d) : [...restDays, d]); }}
+                              className={`w-12 h-10 rounded-full text-sm font-medium transition-colors border ${selected ? "bg-primary text-primary-foreground border-primary" : disabled ? "bg-muted text-muted-foreground border-border opacity-40 cursor-not-allowed" : "bg-card text-foreground border-border hover:bg-accent"}`}>
+                              {lang === "zh" ? labelZh[d] : d}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">{lang === "zh" ? `根據每週 ${daysPerWeek} 天訓練，請選擇 ${7 - daysPerWeek} 個休息日` : `Pick ${7 - daysPerWeek} rest day${7 - daysPerWeek === 1 ? "" : "s"} based on ${daysPerWeek} training days/week`}</p>
+                    </div>
+                  )}
+
                   <div className="mb-5">
                     <label className="text-sm font-semibold text-foreground mb-2 block flex items-center gap-2"><Calendar size={14} />{lang === "zh" ? "開始日期" : "Start Date"}</label>
                     <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} min={new Date().toISOString().split("T")[0]} className="w-full" />
@@ -1148,7 +1202,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                     {raceDate && startDate && dateValid && <p className="text-xs text-muted-foreground mt-1">{weeksUntilRace} {lang === "zh" ? "週訓練計劃" : "weeks training plan"}</p>}
                   </div>
 
-                  <Button onClick={handleGenerateClick} disabled={!distance || !targetTime || !raceDate || !startDate || !dateValid || loading} className="w-full" size="lg">
+                  <Button onClick={handleGenerateClick} disabled={!distance || !targetTime || !raceDate || !startDate || !dateValid || loading || restDays.length !== 7 - daysPerWeek} className="w-full" size="lg">
                     {loading ? (<><Loader2 className="animate-spin mr-2" size={18} />{lang === "zh" ? "生成中，請耐心等候，最多需要一分鐘" : "Generating. Please be patient, it can take up to a minute"}</>) : (lang === "zh" ? "生成訓練計劃" : "Generate Training Plan")}
                   </Button>
                 </div>

@@ -44,7 +44,7 @@ serve(async (req) => {
   }
 
   try {
-    const { goal, distance, targetTime, raceDate, startDate, weeks, daysPerWeek, weeklyKm, lang } = await req.json();
+    const { goal, distance, targetTime, raceDate, startDate, weeks, daysPerWeek, weeklyKm, longRunDay, restDays, lang } = await req.json();
 
     const isZh = lang === "zh";
     const distanceFull =
@@ -79,6 +79,11 @@ WORKOUT TYPE DESCRIPTIONS (include a brief note of the type purpose in descripti
 - Rest: Full rest day for recovery.
 
 IMPORTANT: The runner wants to train exactly ${daysPerWeek || 4} days per week. The remaining days should be Rest days. Distribute the weekly volume of ~${weeklyKm || 30} km across the running days, building progressively over the weeks with a taper in the last 1-2 weeks.
+
+CRITICAL SCHEDULING CONSTRAINTS (apply to EVERY week of the plan):
+- The runner's preferred LONG RUN day is "${longRunDay || "Sun"}". Schedule the "Long Run" workout on this day every week (except optional taper/race week adjustments).
+- The runner's preferred REST day(s) are: ${Array.isArray(restDays) && restDays.length ? restDays.map((d: string) => `"${d}"`).join(", ") : '"Mon"'}. These days MUST be "Rest" type every week.
+- Place quality sessions (Tempo, Interval, Progression, Race Pace) on non-rest days, ideally with at least one easy/recovery day between hard efforts and before the long run.
 
 IMPORTANT: Use a VARIETY of workout types throughout the plan. Do NOT only use Easy Run, Tempo Run, Interval, Long Run, and Rest. You MUST include Cross Training days (especially for recovery days) and Progression Run sessions (at least once every 2-3 weeks). A good plan uses ALL available workout types across the training cycle.
 

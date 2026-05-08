@@ -204,6 +204,8 @@ const ProgramsTab = ({ lang, onLoginRequest }: Props) => {
   const [loading, setLoading] = useState(false);
   const [daysPerWeek, setDaysPerWeek] = useState<number>(4);
   const [weeklyKm, setWeeklyKm] = useState<number>(30);
+  const [longRunDay, setLongRunDay] = useState<string>("Sun");
+  const [restDays, setRestDays] = useState<string[]>(["Mon"]);
 
   // Calendar state
   const [plan, setPlan] = useState<WeekPlan[]>([]);
@@ -247,6 +249,15 @@ const ProgramsTab = ({ lang, onLoginRequest }: Props) => {
     load();
   }, [user]);
 
+  // Keep restDays valid: never include longRunDay, never exceed 7 - daysPerWeek
+  useEffect(() => {
+    const max = 7 - daysPerWeek;
+    setRestDays((prev) => {
+      const filtered = prev.filter((d) => d !== longRunDay);
+      return filtered.slice(0, Math.max(0, max));
+    });
+  }, [daysPerWeek, longRunDay]);
+
   const weeksUntilRace = useMemo(() => {
     if (!raceDate) return 0;
     const diff = new Date(raceDate).getTime() - new Date().getTime();
@@ -288,6 +299,8 @@ const ProgramsTab = ({ lang, onLoginRequest }: Props) => {
           weeks: weeksUntilRace,
           daysPerWeek,
           weeklyKm,
+          longRunDay,
+          restDays,
           lang,
         }),
       });
@@ -542,6 +555,87 @@ const ProgramsTab = ({ lang, onLoginRequest }: Props) => {
           </div>
         )}
 
+        {/* Long Run Day */}
+        {distance && (
+          <div className="mb-5">
+            <label className="text-sm font-semibold text-foreground mb-2 block flex items-center gap-2">
+              <Route size={14} />
+              {lang === "zh" ? "長跑日" : "Long Run Day"}
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map((d) => {
+                const labelZh: Record<string,string> = {Mon:"一",Tue:"二",Wed:"三",Thu:"四",Fri:"五",Sat:"六",Sun:"日"};
+                const isRest = restDays.includes(d);
+                return (
+                  <button
+                    key={d}
+                    onClick={() => { setLongRunDay(d); setRestDays(restDays.filter(r => r !== d)); }}
+                    className={`w-12 h-10 rounded-full text-sm font-medium transition-colors border ${
+                      longRunDay === d
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : isRest
+                        ? "bg-muted text-muted-foreground border-border opacity-40"
+                        : "bg-card text-foreground border-border hover:bg-accent"
+                    }`}
+                  >
+                    {lang === "zh" ? labelZh[d] : d}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {lang === "zh" ? "選擇你想做長跑的日子" : "Pick the day you'd like to do your long run"}
+            </p>
+          </div>
+        )}
+
+        {/* Rest Days */}
+        {distance && (
+          <div className="mb-5">
+            <label className="text-sm font-semibold text-foreground mb-2 block flex items-center gap-2">
+              <Calendar size={14} />
+              {lang === "zh" ? "休息日" : "Rest Day(s)"}
+              <span className="text-xs font-normal text-muted-foreground">
+                ({restDays.length}/{7 - daysPerWeek})
+              </span>
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map((d) => {
+                const labelZh: Record<string,string> = {Mon:"一",Tue:"二",Wed:"三",Thu:"四",Fri:"五",Sat:"六",Sun:"日"};
+                const isLong = longRunDay === d;
+                const selected = restDays.includes(d);
+                const maxRest = 7 - daysPerWeek;
+                const atMax = !selected && restDays.length >= maxRest;
+                const disabled = isLong || atMax;
+                return (
+                  <button
+                    key={d}
+                    onClick={() => {
+                      if (disabled) return;
+                      setRestDays(selected ? restDays.filter(r => r !== d) : [...restDays, d]);
+                    }}
+                    disabled={disabled}
+                    className={`w-12 h-10 rounded-full text-sm font-medium transition-colors border ${
+                      selected
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : disabled
+                        ? "bg-muted text-muted-foreground border-border opacity-40 cursor-not-allowed"
+                        : "bg-card text-foreground border-border hover:bg-accent"
+                    }`}
+                  >
+                    {lang === "zh" ? labelZh[d] : d}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {lang === "zh"
+                ? `根據每週 ${daysPerWeek} 天訓練，請選擇 ${7 - daysPerWeek} 個休息日`
+                : `Pick ${7 - daysPerWeek} rest day${7 - daysPerWeek === 1 ? "" : "s"} based on ${daysPerWeek} training days/week`}
+            </p>
+          </div>
+        )}
+
         {/* Weekly km preference */}
         {distance && (
           <div className="mb-5">
@@ -593,7 +687,7 @@ const ProgramsTab = ({ lang, onLoginRequest }: Props) => {
         {/* Generate */}
         <Button
           onClick={handleGenerate}
-          disabled={!distance || !targetTime || !raceDate || !dateValid || loading}
+          disabled={!distance || !targetTime || !raceDate || !dateValid || loading || restDays.length !== 7 - daysPerWeek}
           className="w-full"
           size="lg"
         >
@@ -935,8 +1029,6 @@ const ProgramsTab = ({ lang, onLoginRequest }: Props) => {
                     className="w-full"
                   />
                 </div>
-
-
                 <Button
                   className="w-full"
                   onClick={() => {

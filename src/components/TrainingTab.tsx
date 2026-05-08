@@ -706,6 +706,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
       // Clear cached copy so the calendar reflects the deletion next load.
       const { clearCached } = await import("@/lib/offlineCache");
       clearCached(CacheKeys.trainingPlan(user.id));
+      notifyPlanChanged();
     }
     setProgramStep("details"); setDistance(null); setTargetTime(""); setTargetHours(""); setTargetMinutes(""); setTargetSeconds(""); setRaceDate(""); setStartDate(""); setPlan([]); setExistingPlan(null); setPlanDirty(false);
   };

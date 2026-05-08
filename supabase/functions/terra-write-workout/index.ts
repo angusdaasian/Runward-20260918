@@ -53,8 +53,15 @@ function parseInterval(desc: string): { distM: number; reps: number; paceSec: nu
 function buildPlannedWorkout(day: DayPlan, provider: "GARMIN" | "COROS"): any | null {
   if (SKIP_TYPES.has(day.type)) return null;
   const paceSec = paceToSecondsPerKm(day.pace);
+  const safeText = (value: string | null | undefined, fallback: string, max = 60) => {
+    const raw = (value || fallback || "Run").trim();
+    const ascii = raw.replace(/[^\x20-\x7E]/g, "").replace(/\s+/g, " ").trim();
+    return (provider === "GARMIN" ? (ascii || fallback || "Run") : raw).slice(0, max);
+  };
   // Pace bounds in m/s with ±5% window.
   const buildPaceTarget = (sec: number | null) => {
+    // Garmin is rejecting generated pace-target payloads through Terra; send duration-only workouts for reliability.
+    if (provider === "GARMIN") return [];
     if (!sec) return [];
     const center = 1000 / sec;
     return [{
@@ -67,7 +74,7 @@ function buildPlannedWorkout(day: DayPlan, provider: "GARMIN" | "COROS"): any | 
 
   // Wrap any inner step in a Garmin-style repeat container (type:1, reps:1).
   const wrap = (order: number, description: string, inner: any) => ({
-    type: 1, order, description,
+    type: 1, order, description: safeText(description, "Run"),
     durations: [{ duration_type: 9, reps: 1 }],
     steps: [inner],
   });
@@ -103,9 +110,9 @@ function buildPlannedWorkout(day: DayPlan, provider: "GARMIN" | "COROS"): any | 
       });
     } else {
       const distM = day.distance_km ? Math.round(day.distance_km * 1000) : 5000;
-      containers.push(wrap(1, day.description?.slice(0, 60) || "Interval", {
+      containers.push(wrap(1, day.description || "Interval", {
         type: 0, order: 0, intensity: 5,
-        description: (day.description || "Interval").slice(0, 60),
+        description: safeText(day.description, "Interval"),
         durations: [{ duration_type: 1, distance_meters: distM }],
         targets: buildPaceTarget(paceSec),
       }));
@@ -119,7 +126,7 @@ function buildPlannedWorkout(day: DayPlan, provider: "GARMIN" | "COROS"): any | 
     const distM = day.distance_km ? Math.round(day.distance_km * 1000) : null;
     containers.push(wrap(0, day.title || day.type, {
       type: 0, order: 0, intensity: 5,
-      description: (day.title || day.type).slice(0, 60),
+      description: safeText(day.title || day.type, day.type || "Run"),
       durations: distM
         ? [{ duration_type: 1, distance_meters: distM }]
         : [{ duration_type: 0, seconds: 1800 }],
@@ -135,9 +142,9 @@ function buildPlannedWorkout(day: DayPlan, provider: "GARMIN" | "COROS"): any | 
   return {
     steps: containers,
     metadata: {
-      type: 33, // RUN
-      name: (day.title || day.type || "Run").slice(0, 80),
-      description: (day.description || day.title || day.type || "Run").slice(0, 240),
+      type: "RUNNING",
+      name: safeText(day.title || day.type, day.type || "Run", 80),
+      description: safeText(day.description || day.title || day.type, day.type || "Run", 240),
       provider,
       planned_date: day.date,
       estimated_distance_meters: estimatedDistanceMeters,

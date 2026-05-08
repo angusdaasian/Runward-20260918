@@ -1,0 +1,1 @@
+DELETE FROM territory_processed_activities WHERE user_id='c7a7d1ca-c7bf-4288-bb9d-794006a04087' AND activity_source='terra' AND activity_id='1:22576813794';

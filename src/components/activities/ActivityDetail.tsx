@@ -27,6 +27,7 @@ import {
 import ActivityMap from "./ActivityMap";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from "recharts";
 import { loadForActivity, isRunning } from "@/lib/trainingLoad";
+import { calculateRunningScore } from "@/lib/vdot";
 
 interface StravaActivity {
   id: string;
@@ -119,6 +120,17 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
   const needsRpe = isAppleHealth || isGarmin || isTerraActivity || isCoros;
   const dbTable = isTerraActivity ? "terra_activities" : isAppleHealth ? "apple_health_activities" : isGarmin || isCoros ? "garmin_activities" : "strava_activities";
   const isRunningActivity = isRunning(activity.sport_type);
+
+  // Per-activity training score (VDOT) — computed from this activity's distance & time
+  const activityScore = useMemo(() => {
+    if (!isRunningActivity) return null;
+    if (!activity.distance || activity.distance < 400) return null;
+    if (!activity.moving_time || activity.moving_time < 60) return null;
+    const v = calculateRunningScore(activity.distance, activity.moving_time);
+    if (!isFinite(v) || v < 5 || v > 100) return null;
+    return Math.round(v * 10) / 10;
+  }, [activity.distance, activity.moving_time, isRunningActivity]);
+  const displayScore = activityScore ?? trainingScore ?? null;
 
   const [streams, setStreams] = useState<any[]>([]);
   const [splits, setSplits] = useState<Split[] | null>(null);
@@ -765,7 +777,7 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
             <StatBox icon={Zap} label={lang === "zh" ? "配速" : "Pace"} value={formatPace(activity.average_speed)} unit="/km" />
           </div>
           <div className="grid grid-cols-3 gap-2 mb-4">
-            <StatBox icon={TrendingUp} label={lang === "zh" ? "訓練分數" : "Training Score"} value={trainingScore != null ? trainingScore.toString() : "--"} />
+            <StatBox icon={TrendingUp} label={lang === "zh" ? "訓練分數" : "Training Score"} value={displayScore != null ? displayScore.toString() : "--"} />
             <StatBox icon={Flame} label={lang === "zh" ? "卡路里" : "Calories"} value={activity.calories != null ? activity.calories.toString() : "--"} unit="kcal" />
             <StatBox icon={Timer} label={lang === "zh" ? "總時間" : "Elapsed Time"} value={formatDuration(activity.elapsed_time)} />
           </div>
@@ -793,7 +805,7 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
             <StatBox icon={Zap} label={lang === "zh" ? "配速" : "Avg Pace"} value={formatPace(activity.average_speed)} unit="/km" />
           </div>
           <div className="grid grid-cols-3 gap-2 mb-4">
-            <StatBox icon={TrendingUp} label={lang === "zh" ? "訓練分數" : "Training Score"} value={trainingScore != null ? trainingScore.toString() : "--"} />
+            <StatBox icon={TrendingUp} label={lang === "zh" ? "訓練分數" : "Training Score"} value={displayScore != null ? displayScore.toString() : "--"} />
             <StatBox icon={Heart} label={lang === "zh" ? "平均心率" : "Avg HR"} value={activity.average_heartrate ? Math.round(activity.average_heartrate).toString() : "--"} unit="bpm" iconColor="text-destructive" />
             <StatBox icon={Mountain} label={lang === "zh" ? "爬升" : "Elevation"} value={Math.round(activity.total_elevation_gain).toString()} unit="m" />
           </div>

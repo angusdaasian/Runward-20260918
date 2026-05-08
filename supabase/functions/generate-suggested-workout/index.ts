@@ -167,7 +167,8 @@ serve(async (req) => {
     // --- Pull last 7 days of runs from all 3 sources + active training plan ---
     const since = new Date(Date.now() - SEVEN_DAYS_MS).toISOString();
 
-    const [stravaRes, ahRes, garminRes, terraRes, profileRes, planRes] = await Promise.all([
+    const since60 = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const [stravaRes, ahRes, garminRes, terraRes, profileRes, planRes, hrvRes] = await Promise.all([
       svc.from("strava_activities")
         .select("name, sport_type, distance, moving_time, average_speed, average_heartrate, start_date")
         .eq("user_id", user.id).gte("start_date", since).order("start_date", { ascending: false }),
@@ -186,6 +187,9 @@ serve(async (req) => {
       svc.from("training_plans")
         .select("distance, target_time, goal, race_date, weeks, plan_data")
         .eq("user_id", user.id).order("created_at", { ascending: false }).limit(1).maybeSingle(),
+      svc.from("terra_daily_health")
+        .select("provider, date, hrv, resting_hr")
+        .eq("user_id", user.id).gte("date", since60).order("date", { ascending: true }),
     ]);
 
     const recent: RecentRun[] = [];
@@ -304,6 +308,37 @@ serve(async (req) => {
     }
     if (trainingScore != null) context += `\nTraining score: ${trainingScore} (higher = fitter).\n`;
     if (runsPerWeek != null) context += `Typical runs/week: ${runsPerWeek}.\n`;
+
+    // ── HRV-based readiness (optional; only if Terra wearable provides HRV) ──
+    const hrvRows = (hrvRes?.data || []) as Array<{ provider: string; date: string; hrv: number | null; resting_hr: number | null }>;
+    const hrvSeries = hrvRows.filter((r) => r.hrv != null).map((r) => Number(r.hrv));
+    const rhrSeries = hrvRows.filter((r) => r.resting_hr != null).map((r) => Number(r.resting_hr));
+    if (hrvSeries.length >= 3) {
+      const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
+      const last7 = hrvSeries.slice(-7);
+      const last60 = hrvSeries.slice(-60);
+      const hrv7 = Math.round(mean(last7));
+      const baseline = Math.round(mean(last60));
+      const deltaPct = baseline > 0 ? Math.round(((mean(last7) - mean(last60)) / mean(last60)) * 1000) / 10 : 0;
+      const todayHrv = hrvSeries[hrvSeries.length - 1];
+      let band = "balanced";
+      if (deltaPct >= 5) band = "primed (well recovered)";
+      else if (deltaPct >= -3) band = "balanced";
+      else if (deltaPct >= -8) band = "moderate fatigue";
+      else if (deltaPct >= -15) band = "strained";
+      else band = "overreached";
+      context += `\nHRV readiness signal (from wearable):\n`;
+      context += `- Today's HRV: ${todayHrv} ms\n`;
+      context += `- 7-day avg HRV: ${hrv7} ms vs 60-day baseline: ${baseline} ms (${deltaPct >= 0 ? "+" : ""}${deltaPct}%)\n`;
+      if (rhrSeries.length >= 3) {
+        const rhr7 = Math.round(mean(rhrSeries.slice(-7)));
+        const rhrBase = Math.round(mean(rhrSeries.slice(-60)));
+        context += `- 7-day avg resting HR: ${rhr7} bpm vs 60-day baseline: ${rhrBase} bpm\n`;
+      }
+      context += `- Recovery state: ${band}\n`;
+      context += `Use this as an additional input: if recovery is strained/overreached, reduce intensity or recommend an easier session; if primed, the runner can handle quality work; if balanced, train as planned.\n`;
+    }
+
 
     // ── Weather context (used to recommend the best time to run today) ──
     if (weather && typeof weather === "object") {

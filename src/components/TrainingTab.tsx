@@ -4,6 +4,7 @@ import { getMainPaces, predictTime, formatTime, raceDistances } from "@/lib/vdot
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import { usePremium } from "@/contexts/PremiumContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -12,7 +13,7 @@ import { useOnlineStatus, isOnline } from "@/hooks/use-online-status";
 import { getCached, setCached, CacheKeys } from "@/lib/offlineCache";
 import {
   Loader2, Lock, ChevronLeft, ChevronRight, Plus, Calendar, Target, Trophy,
-  Repeat, Route, Check, HelpCircle, X, WifiOff, Sparkles
+  Repeat, Route, Check, HelpCircle, X, WifiOff, Sparkles, Watch
 } from "lucide-react";
 import WeeklyReviewModal from "@/components/training/WeeklyReviewModal";
 const CalculatorTab = lazy(() => import("@/components/CalculatorTab"));

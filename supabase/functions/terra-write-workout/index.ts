@@ -261,11 +261,12 @@ Deno.serve(async (req) => {
     let pushed = 0;
     let skipped = 0;
     for (const { week: wkNum, dayIdx, day } of targets) {
-      const payload = buildPlannedWorkout(day, provider);
+      const payload = provider === "GARMIN" ? buildRoutePayload(day, conn) : buildPlannedWorkout(day, provider);
       if (!payload) { skipped++; continue; }
-      const url = `https://api.tryterra.co/v2/plannedWorkout?user_id=${encodeURIComponent(conn.terra_user_id)}`;
+      const endpoint = provider === "GARMIN" ? "routes" : "plannedWorkout";
+      const url = `https://api.tryterra.co/v2/${endpoint}?user_id=${encodeURIComponent(conn.terra_user_id)}`;
       try {
-        const bodyStr = JSON.stringify({ data: [payload] });
+        const bodyStr = JSON.stringify(provider === "GARMIN" ? payload : { data: [payload] });
         const resp = await fetch(url, { method: "POST", headers, body: bodyStr });
         const text = await resp.text();
         let json: any = null;

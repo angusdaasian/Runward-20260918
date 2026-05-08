@@ -102,7 +102,7 @@ const RewardsTab = ({ lang }: Props) => {
               {lang === "zh" ? "排行榜" : "Leaderboards"}
             </TabsTrigger>
             <TabsTrigger value="territory">
-              {lang === "zh" ? "地塊" : "Territory"}
+              {lang === "zh" ? "城市獵人" : "CityHunter"}
             </TabsTrigger>
           </TabsList>
 

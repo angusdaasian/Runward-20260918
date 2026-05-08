@@ -50,6 +50,7 @@
         "embla-carousel-react": "^8.6.0",
         "fit-file-parser": "^2.3.3",
         "framer-motion": "^12.38.0",
+        "h3-js": "^4.4.0",
         "input-otp": "^1.4.2",
         "leaflet": "^1.9.4",
         "lucide-react": "^0.462.0",
@@ -860,6 +861,8 @@
     "gopd": ["gopd@1.2.0", "", {}, "sha512-ZUKRh6/kUFoAiTAtTYPZJ3hw9wNxx+BIBOijnlG9PnrJsCcSjs1wyyD6vJpaYtgnzDrKYRSqf3OO6Rfa93xsRg=="],
 
     "graphemer": ["graphemer@1.4.0", "", {}, "sha512-EtKwoO6kxCL9WO5xipiHTZlSzBm7WLT627TqC/uVRd0HKmq8NXyebnNYxDoBi7wt8eTWrUrKXCOVaFq9x1kgag=="],
+
+    "h3-js": ["h3-js@4.4.0", "https://europe-west1-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/h3-js/-/h3-js-4.4.0.tgz", {}, "sha512-DvJh07MhGgY2KcC4OeZc8SSyA+ZXpdvoh6uCzGpoKvWtZxJB+g6VXXC1+eWYkaMIsLz7J/ErhOalHCpcs1KYog=="],
 
     "hard-rejection": ["hard-rejection@2.1.0", "https://europe-west4-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/hard-rejection/-/hard-rejection-2.1.0.tgz", {}, "sha512-VIZB+ibDhx7ObhAe7OVtoEbuP4h/MuOTHJ+J8h/eBXotJYl0fBgR72xDFCKgIh22OJZIOVNxBMWuhAr10r8HdA=="],
 

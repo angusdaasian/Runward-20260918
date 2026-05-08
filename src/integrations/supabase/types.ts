@@ -1390,6 +1390,83 @@ export type Database = {
         }
         Relationships: []
       }
+      territory_landmark_captures: {
+        Row: {
+          activity_id: string | null
+          first_captured_at: string
+          hex_id: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          activity_id?: string | null
+          first_captured_at?: string
+          hex_id: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          activity_id?: string | null
+          first_captured_at?: string
+          hex_id?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "territory_landmark_captures_hex_id_fkey"
+            columns: ["hex_id"]
+            isOneToOne: false
+            referencedRelation: "territory_landmarks"
+            referencedColumns: ["hex_id"]
+          },
+        ]
+      }
+      territory_landmarks: {
+        Row: {
+          category: string
+          city_slug: string | null
+          country: string | null
+          created_at: string
+          hex_id: string
+          icon: string | null
+          lat: number
+          lng: number
+          name: string
+          name_zh: string | null
+          osm_id: number | null
+          osm_type: string | null
+        }
+        Insert: {
+          category: string
+          city_slug?: string | null
+          country?: string | null
+          created_at?: string
+          hex_id: string
+          icon?: string | null
+          lat: number
+          lng: number
+          name: string
+          name_zh?: string | null
+          osm_id?: number | null
+          osm_type?: string | null
+        }
+        Update: {
+          category?: string
+          city_slug?: string | null
+          country?: string | null
+          created_at?: string
+          hex_id?: string
+          icon?: string | null
+          lat?: number
+          lng?: number
+          name?: string
+          name_zh?: string | null
+          osm_id?: number | null
+          osm_type?: string | null
+        }
+        Relationships: []
+      }
       territory_processed_activities: {
         Row: {
           activity_id: string

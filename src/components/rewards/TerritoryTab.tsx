@@ -7,6 +7,8 @@ import { Loader2, RefreshCw, MapPin, Trophy, X } from "lucide-react";
 import { toast } from "sonner";
 import TerritoryMap from "./TerritoryMap";
 import CityProgressList from "./CityProgressList";
+import TrophyCase from "./TrophyCase";
+import { cellToLatLng } from "h3-js";
 
 interface Hex {
   hex_id: string;

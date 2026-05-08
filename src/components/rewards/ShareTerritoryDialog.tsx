@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import { toPng } from "html-to-image";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -23,7 +23,20 @@ interface Props {
 
 const ShareTerritoryDialog = ({ open, onOpenChange, hexes, displayName, lang }: Props) => {
   const cardRef = useRef<HTMLDivElement>(null);
+  const wrapRef = useRef<HTMLDivElement>(null);
   const [busy, setBusy] = useState(false);
+  const [scale, setScale] = useState(0.4);
+
+  useEffect(() => {
+    if (!open) return;
+    const update = () => {
+      const w = wrapRef.current?.clientWidth ?? 400;
+      setScale(w / 1080);
+    };
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, [open]);
 
   const generate = async (): Promise<Blob | null> => {
     if (!cardRef.current) return null;
@@ -95,20 +108,18 @@ const ShareTerritoryDialog = ({ open, onOpenChange, hexes, displayName, lang }: 
           </DialogTitle>
         </DialogHeader>
 
-        {/* Preview (scaled) */}
         <div
-          className="relative w-full overflow-hidden rounded-xl"
-          style={{ aspectRatio: "1080 / 1350" }}
+          ref={wrapRef}
+          className="relative w-full overflow-hidden rounded-xl bg-muted/30"
+          style={{ height: scale * 1350 }}
         >
           <div
             style={{
-              transform: "scale(var(--s))",
-              transformOrigin: "top left",
-              // @ts-ignore
-              "--s": "calc(100% / 1080)",
               position: "absolute",
               top: 0,
               left: 0,
+              transform: `scale(${scale})`,
+              transformOrigin: "top left",
             }}
           >
             <ShareTerritoryCard
@@ -118,8 +129,6 @@ const ShareTerritoryDialog = ({ open, onOpenChange, hexes, displayName, lang }: 
               lang={lang}
             />
           </div>
-          {/* Visual scaled preview using an inner wrapper */}
-          <PreviewScaled hexes={hexes} displayName={displayName} lang={lang} />
         </div>
 
         <div className="flex gap-2 mt-2">
@@ -134,38 +143,6 @@ const ShareTerritoryDialog = ({ open, onOpenChange, hexes, displayName, lang }: 
         </div>
       </DialogContent>
     </Dialog>
-  );
-};
-
-// CSS-scaled visible preview that mirrors the off-screen card
-const PreviewScaled = ({
-  hexes,
-  displayName,
-  lang,
-}: {
-  hexes: Hex[];
-  displayName: string;
-  lang: "en" | "zh";
-}) => {
-  return (
-    <div
-      style={{
-        position: "absolute",
-        inset: 0,
-        transform: "scale(0.4)",
-        transformOrigin: "top left",
-        width: 1080,
-        height: 1350,
-      }}
-      className="origin-top-left"
-    >
-      <ShareTerritoryCard
-        // @ts-ignore — separate visible instance
-        hexes={hexes}
-        displayName={displayName}
-        lang={lang}
-      />
-    </div>
   );
 };
 

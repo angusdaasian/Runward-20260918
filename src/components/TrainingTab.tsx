@@ -802,6 +802,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
   const handleCancelCustomPlan = async () => {
     if (user && customExistingPlan) {
       await supabase.from("training_plans" as any).delete().eq("id", customExistingPlan.id);
+      notifyPlanChanged();
     }
     setCustomExistingPlan(null);
     setCustomPlan([]);

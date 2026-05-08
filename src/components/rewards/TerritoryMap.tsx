@@ -148,6 +148,23 @@ const TerritoryMap = ({ hexes, currentUserId, focusCity }: Props) => {
     }
   }, [hexes, currentUserId, focusCity]);
 
+  // Refresh user's landmark captures whenever hexes update (post-sync)
+  useEffect(() => {
+    if (!currentUserId) return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from("territory_landmark_captures")
+        .select("hex_id")
+        .eq("user_id", currentUserId);
+      if (cancelled) return;
+      myLandmarkSetRef.current = new Set((data ?? []).map((r: any) => r.hex_id as string));
+      drawLandmarks();
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hexes.length, currentUserId]);
+
   return (
     <div
       ref={containerRef}

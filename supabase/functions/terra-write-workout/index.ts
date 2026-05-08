@@ -20,16 +20,6 @@ interface DayPlan {
 }
 interface WeekPlan { week: number; startDate: string; days: DayPlan[]; }
 
-const SAMPLE_ROUTE_WAYPOINTS = [
-  { latitude: 51.5074, longitude: -0.1278, elevation_meters: 12 },
-  { latitude: 51.51, longitude: -0.124, elevation_meters: 20 },
-  { latitude: 51.513, longitude: -0.12, elevation_meters: 35 },
-  { latitude: 51.515, longitude: -0.116, elevation_meters: 50 },
-  { latitude: 51.512, longitude: -0.113, elevation_meters: 42 },
-  { latitude: 51.509, longitude: -0.116, elevation_meters: 28 },
-  { latitude: 51.5074, longitude: -0.1278, elevation_meters: 12 },
-];
-
 const SKIP_TYPES = new Set(["Rest", "Cross Training"]);
 
 // "5:30/km" -> 330 seconds per km. Returns null if unparseable.
@@ -162,31 +152,6 @@ function buildPlannedWorkout(day: DayPlan, provider: "GARMIN" | "COROS"): any | 
   };
 }
 
-function buildRoutePayload(day: DayPlan, conn: any): any | null {
-  if (SKIP_TYPES.has(day.type)) return null;
-  const distanceMeters = day.distance_km ? Math.round(day.distance_km * 1000) : 5000;
-  const name = (day.title || day.type || "Run").replace(/[^\x20-\x7E]/g, "").replace(/\s+/g, " ").trim() || "Run";
-  return {
-    data: [{
-      name,
-      sport: "running",
-      distance_meters: distanceMeters,
-      elevation_gain_meters: 45,
-      elevation_loss_meters: 45,
-      waypoints: SAMPLE_ROUTE_WAYPOINTS,
-    }],
-    user: {
-      scopes: Array.isArray(conn.scopes) ? conn.scopes.join(",") : (conn.scopes || ""),
-      user_id: conn.terra_user_id,
-      reference_id: conn.reference_id || conn.user_id,
-      last_webhook_update: conn.last_webhook_at || conn.updated_at || null,
-      provider: "GARMIN",
-    },
-    type: "routes",
-    version: "2022-03-16",
-  };
-}
-
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   try {
@@ -261,12 +226,11 @@ Deno.serve(async (req) => {
     let pushed = 0;
     let skipped = 0;
     for (const { week: wkNum, dayIdx, day } of targets) {
-      const payload = provider === "GARMIN" ? buildRoutePayload(day, conn) : buildPlannedWorkout(day, provider);
+      const payload = buildPlannedWorkout(day, provider);
       if (!payload) { skipped++; continue; }
-      const endpoint = provider === "GARMIN" ? "routes" : "plannedWorkout";
-      const url = `https://api.tryterra.co/v2/${endpoint}?user_id=${encodeURIComponent(conn.terra_user_id)}`;
+      const url = `https://api.tryterra.co/v2/plannedWorkout?user_id=${encodeURIComponent(conn.terra_user_id)}`;
       try {
-        const bodyStr = JSON.stringify(provider === "GARMIN" ? payload : { data: [payload] });
+        const bodyStr = JSON.stringify({ data: [payload] });
         const resp = await fetch(url, { method: "POST", headers, body: bodyStr });
         const text = await resp.text();
         let json: any = null;

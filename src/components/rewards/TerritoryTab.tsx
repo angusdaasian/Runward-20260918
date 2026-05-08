@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Loader2, RefreshCw, MapPin, Trophy } from "lucide-react";
 import { toast } from "sonner";
 import TerritoryMap from "./TerritoryMap";
-import { REGION_BOUNDS, type Region } from "@/lib/territory";
 
 interface Hex {
   hex_id: string;
@@ -21,32 +20,23 @@ interface Props {
   lang: Lang;
 }
 
-const REGION_KEY = "territory_region";
-
 const TerritoryTab = ({ lang }: Props) => {
   const { user } = useAuth();
-  const [region, setRegion] = useState<Region>(
-    () => ((localStorage.getItem(REGION_KEY) as Region) || "HK"),
-  );
   const [hexes, setHexes] = useState<Hex[]>([]);
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [autoSynced, setAutoSynced] = useState(false);
-
-  useEffect(() => {
-    localStorage.setItem(REGION_KEY, region);
-  }, [region]);
 
   const loadHexes = useCallback(async () => {
     setLoading(true);
     const { data, error } = await supabase
       .from("territory_hexes")
       .select("hex_id, region, owner_user_id, owner_display_name, captured_at, capture_count")
-      .eq("region", region)
-      .limit(5000);
+      .order("captured_at", { ascending: false })
+      .limit(10000);
     if (!error && data) setHexes(data as Hex[]);
     setLoading(false);
-  }, [region]);
+  }, []);
 
   useEffect(() => { loadHexes(); }, [loadHexes]);
 
@@ -73,7 +63,6 @@ const TerritoryTab = ({ lang }: Props) => {
     }
   }, [user, syncing, lang, loadHexes]);
 
-  // Auto-sync once on mount when logged in
   useEffect(() => {
     if (user && !autoSynced) {
       setAutoSynced(true);
@@ -82,7 +71,7 @@ const TerritoryTab = ({ lang }: Props) => {
   }, [user, autoSynced, sync]);
 
   const myHexes = hexes.filter((h) => h.owner_user_id === user?.id).length;
-  const totalInRegion = hexes.length;
+  const totalHexes = hexes.length;
 
   if (!user) {
     return (
@@ -94,24 +83,6 @@ const TerritoryTab = ({ lang }: Props) => {
 
   return (
     <div className="space-y-4">
-      {/* Region toggle */}
-      <div className="flex gap-2">
-        {(["HK", "TW"] as Region[]).map((r) => (
-          <button
-            key={r}
-            onClick={() => setRegion(r)}
-            className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium border transition-colors ${
-              region === r
-                ? "bg-primary text-primary-foreground border-primary"
-                : "bg-card text-foreground border-border hover:bg-muted"
-            }`}
-          >
-            {lang === "zh" ? REGION_BOUNDS[r].labelZh : REGION_BOUNDS[r].label}
-          </button>
-        ))}
-      </div>
-
-      {/* Stats */}
       <div className="grid grid-cols-2 gap-2">
         <div className="rounded-lg border border-border bg-card p-3">
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -123,13 +94,12 @@ const TerritoryTab = ({ lang }: Props) => {
         <div className="rounded-lg border border-border bg-card p-3">
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <Trophy size={12} />
-            {lang === "zh" ? "區域總數" : "Total in region"}
+            {lang === "zh" ? "全球總數" : "Global total"}
           </div>
-          <div className="text-2xl font-bold mt-0.5">{totalInRegion}</div>
+          <div className="text-2xl font-bold mt-0.5">{totalHexes}</div>
         </div>
       </div>
 
-      {/* Sync button */}
       <Button
         onClick={sync}
         disabled={syncing}
@@ -144,13 +114,12 @@ const TerritoryTab = ({ lang }: Props) => {
         )}
       </Button>
 
-      {/* Map */}
       {loading && hexes.length === 0 ? (
         <div className="h-[60vh] rounded-lg border border-border bg-muted/30 flex items-center justify-center">
           <Loader2 className="animate-spin text-muted-foreground" size={20} />
         </div>
       ) : (
-        <TerritoryMap region={region} hexes={hexes} currentUserId={user.id} />
+        <TerritoryMap hexes={hexes} currentUserId={user.id} />
       )}
 
       <p className="text-[11px] text-muted-foreground text-center px-2">

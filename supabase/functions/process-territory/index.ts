@@ -7,18 +7,7 @@ const corsHeaders = {
 };
 
 const HEX_RES = 8;
-const REGION_BOUNDS = {
-  HK: { south: 22.15, north: 22.58, west: 113.83, east: 114.45 },
-  TW: { south: 21.85, north: 25.35, west: 119.30, east: 122.05 },
-} as const;
 
-function regionFor(lat: number, lng: number): "HK" | "TW" | null {
-  for (const r of ["HK", "TW"] as const) {
-    const b = REGION_BOUNDS[r];
-    if (lat >= b.south && lat <= b.north && lng >= b.west && lng <= b.east) return r;
-  }
-  return null;
-}
 
 function decodePolyline(encoded: string): [number, number][] {
   const points: [number, number][] = [];
@@ -85,39 +74,35 @@ Deno.serve(async (req) => {
 
     let newHexes = 0;
     let stolenHexes = 0;
-    const allRegionsTouched = new Set<string>();
 
     for (const act of activities) {
       const coords = decodePolyline(act.polyline);
       if (coords.length === 0) continue;
-      const hexMap = new Map<string, "HK" | "TW">();
+      const hexSet = new Set<string>();
       for (const [lat, lng] of coords) {
-        const r = regionFor(lat, lng);
-        if (!r) continue;
         const cell = latLngToCell(lat, lng, HEX_RES);
-        hexMap.set(cell, r);
+        hexSet.add(cell);
       }
-      if (hexMap.size === 0) {
+      if (hexSet.size === 0) {
         await admin.from("territory_processed_activities").insert({
           user_id: user.id, activity_source: act.source, activity_id: act.activity_id,
         });
         continue;
       }
 
-      const hexIds = Array.from(hexMap.keys());
+      const hexIds = Array.from(hexSet);
       const { data: existing } = await admin.from("territory_hexes").select("hex_id, owner_user_id, capture_count").in("hex_id", hexIds);
       const existingMap = new Map<string, { owner_user_id: string; capture_count: number }>();
       for (const e of (existing ?? []) as any[]) existingMap.set(e.hex_id, e);
 
       const upserts = hexIds.map((hex_id) => {
-        const region = hexMap.get(hex_id)!;
-        allRegionsTouched.add(region);
         const ex = existingMap.get(hex_id);
         if (!ex) newHexes++;
         else if (ex.owner_user_id !== user.id) stolenHexes++;
+        const [lat, lng] = cellToLatLng(hex_id);
         return {
           hex_id,
-          region,
+          region: `${lat.toFixed(1)},${lng.toFixed(1)}`,
           owner_user_id: user.id,
           owner_display_name: displayName,
           captured_at: new Date().toISOString(),
@@ -126,13 +111,12 @@ Deno.serve(async (req) => {
         };
       });
 
-      // Upsert in chunks
       const chunk = 500;
       for (let i = 0; i < upserts.length; i += chunk) {
         await admin.from("territory_hexes").upsert(upserts.slice(i, i + chunk), { onConflict: "hex_id" });
       }
-      const captureRows = hexIds.map((hex_id) => ({
-        hex_id, user_id: user.id, activity_id: act.activity_id, region: hexMap.get(hex_id)!,
+      const captureRows = upserts.map((u) => ({
+        hex_id: u.hex_id, user_id: user.id, activity_id: act.activity_id, region: u.region,
       }));
       for (let i = 0; i < captureRows.length; i += chunk) {
         await admin.from("territory_captures").insert(captureRows.slice(i, i + chunk));

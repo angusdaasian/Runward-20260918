@@ -824,6 +824,47 @@ export type Database = {
         }
         Relationships: []
       }
+      pushed_workouts: {
+        Row: {
+          day_index: number
+          id: string
+          plan_id: string
+          provider: string
+          pushed_at: string
+          terra_log_id: string | null
+          user_id: string
+          week: number
+        }
+        Insert: {
+          day_index: number
+          id?: string
+          plan_id: string
+          provider: string
+          pushed_at?: string
+          terra_log_id?: string | null
+          user_id: string
+          week: number
+        }
+        Update: {
+          day_index?: number
+          id?: string
+          plan_id?: string
+          provider?: string
+          pushed_at?: string
+          terra_log_id?: string | null
+          user_id?: string
+          week?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pushed_workouts_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "training_plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       races: {
         Row: {
           category: string

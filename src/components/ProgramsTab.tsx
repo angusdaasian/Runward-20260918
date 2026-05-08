@@ -204,6 +204,8 @@ const ProgramsTab = ({ lang, onLoginRequest }: Props) => {
   const [loading, setLoading] = useState(false);
   const [daysPerWeek, setDaysPerWeek] = useState<number>(4);
   const [weeklyKm, setWeeklyKm] = useState<number>(30);
+  const [longRunDay, setLongRunDay] = useState<string>("Sun");
+  const [restDays, setRestDays] = useState<string[]>(["Mon"]);
 
   // Calendar state
   const [plan, setPlan] = useState<WeekPlan[]>([]);

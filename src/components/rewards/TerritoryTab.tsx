@@ -132,6 +132,18 @@ const TerritoryTab = ({ lang }: Props) => {
         )}
       </Button>
 
+      <TrophyCase
+        userId={user.id}
+        lang={lang}
+        refreshKey={refreshKey}
+        onLandmarkFocus={(hex_id) => {
+          const [lat, lng] = cellToLatLng(hex_id);
+          // Tiny bbox around the hex to zoom in
+          const d = 0.01;
+          setFocusedCity({ slug: `landmark:${hex_id}`, bbox: [lat - d, lng - d, lat + d, lng + d] });
+        }}
+      />
+
       <CityProgressList
         userId={user.id}
         lang={lang}

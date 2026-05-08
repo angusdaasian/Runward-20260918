@@ -63,12 +63,12 @@ const TerritoryTab = ({ lang }: Props) => {
     try {
       const { data, error } = await supabase.functions.invoke("process-territory");
       if (error) throw error;
-      const d = data as { processedActivities: number; newHexes: number; stolenHexes: number };
+      const d = data as { processedActivities: number; newZones: number; stolenZones: number };
       if (d.processedActivities > 0) {
         toast.success(
           lang === "zh"
-            ? `處理 ${d.processedActivities} 次跑步 · 新地塊 ${d.newHexes} · 搶占 ${d.stolenHexes}`
-            : `Processed ${d.processedActivities} runs · ${d.newHexes} new · ${d.stolenHexes} stolen`,
+            ? `處理 ${d.processedActivities} 次跑步 · 新區域 ${d.newZones} · 搶占 ${d.stolenZones}`
+            : `Processed ${d.processedActivities} runs · ${d.newZones} new · ${d.stolenZones} stolen`,
         );
       }
       await loadHexes();
@@ -105,7 +105,7 @@ const TerritoryTab = ({ lang }: Props) => {
         <div className="rounded-lg border border-border bg-card p-3">
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <MapPin size={12} />
-            {lang === "zh" ? "我的地塊" : "Hexes owned"}
+            {lang === "zh" ? "我的區域" : "Zones owned"}
           </div>
           <div className="text-2xl font-bold mt-0.5">{myHexes}</div>
         </div>
@@ -158,7 +158,7 @@ const TerritoryTab = ({ lang }: Props) => {
           className="w-full inline-flex items-center justify-center gap-1.5 text-xs text-muted-foreground hover:text-foreground rounded-md border border-border py-1.5"
         >
           <X size={12} />
-          {lang === "zh" ? "顯示全部" : "Show all hexes"}
+          {lang === "zh" ? "顯示全部" : "Show all zones"}
         </button>
       )}
 
@@ -172,8 +172,8 @@ const TerritoryTab = ({ lang }: Props) => {
 
       <p className="text-[11px] text-muted-foreground text-center px-2">
         {lang === "zh"
-          ? "在地塊上跑步即可佔領,每個地塊可被多位跑者共同擁有"
-          : "Run through a hex to claim it. Hexes can be owned by multiple runners."}
+          ? "在區域上跑步即可佔領，每個區域可被多位跑者共同擁有"
+          : "Run through a zone to claim it. Zones can be owned by multiple runners."}
       </p>
     </div>
   );

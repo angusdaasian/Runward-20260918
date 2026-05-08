@@ -121,7 +121,7 @@ const CityProgressList = ({ userId, lang, onCityFocus, focusedSlug, refreshKey }
             <Progress value={Math.min(100, percent)} className="h-1.5" />
             <div className="flex items-center justify-between mt-1.5 text-[11px] text-muted-foreground">
               <span className="tabular-nums">
-                {owned.toLocaleString()} / {city.total_hex_count.toLocaleString()} {lang === "zh" ? "地塊" : "hexes"}
+                {owned.toLocaleString()} / {city.total_hex_count.toLocaleString()} {lang === "zh" ? "區域" : "zones"}
               </span>
               {next && (
                 <span>

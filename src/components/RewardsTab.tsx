@@ -92,7 +92,7 @@ const RewardsTab = ({ lang }: Props) => {
   return (
     <>
       <FadeIn className="px-5 pt-4 max-w-lg mx-auto pb-24 space-y-5">
-        {/* Sub-tabs: Rewards | Leaderboards — at the top */}
+        {/* Sub-tabs: Rewards | Leaderboards | CityHunter */}
         <Tabs defaultValue="rewards" className="w-full">
           <TabsList className="w-full grid grid-cols-3">
             <TabsTrigger value="rewards">
@@ -102,7 +102,7 @@ const RewardsTab = ({ lang }: Props) => {
               {lang === "zh" ? "排行榜" : "Leaderboards"}
             </TabsTrigger>
             <TabsTrigger value="territory">
-              {lang === "zh" ? "地塊" : "Territory"}
+              {lang === "zh" ? "城市獵人" : "CityHunter"}
             </TabsTrigger>
           </TabsList>
 

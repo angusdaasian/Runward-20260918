@@ -513,7 +513,7 @@ Deno.serve(async (req) => {
           const existing = dailyByDate[date] ?? {
             user_id: c.user_id, provider: c.provider, date,
             resting_hr: null, steps: null, vo2max: null,
-            sleep_seconds: null, sleep_score: null,
+            sleep_seconds: null, sleep_score: null, hrv: null,
           };
           if (existing.vo2max == null) existing.vo2max = vo2;
           dailyByDate[date] = existing;

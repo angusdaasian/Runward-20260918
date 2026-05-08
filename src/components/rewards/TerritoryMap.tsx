@@ -55,14 +55,52 @@ const TerritoryMap = ({ hexes, currentUserId, focusCity }: Props) => {
     ).addTo(map);
     mapRef.current = map;
     layerRef.current = L.layerGroup().addTo(map);
+    landmarkLayerRef.current = L.layerGroup().addTo(map);
 
     return () => {
       map.remove();
       mapRef.current = null;
       layerRef.current = null;
+      landmarkLayerRef.current = null;
       fittedRef.current = false;
     };
   }, []);
+
+  // Load landmarks once and the user's captured landmark set
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const [lmRes, capRes] = await Promise.all([
+        supabase.from("territory_landmarks").select("hex_id, name, name_zh, icon, category"),
+        currentUserId
+          ? supabase.from("territory_landmark_captures").select("hex_id").eq("user_id", currentUserId)
+          : Promise.resolve({ data: [] as any[] }),
+      ]);
+      if (cancelled) return;
+      landmarksRef.current = (lmRes.data ?? []) as Landmark[];
+      myLandmarkSetRef.current = new Set(((capRes.data ?? []) as any[]).map((r) => r.hex_id as string));
+      drawLandmarks();
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUserId]);
+
+  const drawLandmarks = () => {
+    if (!landmarkLayerRef.current) return;
+    landmarkLayerRef.current.clearLayers();
+    for (const lm of landmarksRef.current) {
+      const owned = myLandmarkSetRef.current.has(lm.hex_id);
+      const [lat, lng] = cellToLatLng(lm.hex_id);
+      const html = `<div style="display:flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;background:${owned ? "linear-gradient(135deg,#f59e0b,#fbbf24)" : "rgba(20,20,20,0.55)"};border:2px solid ${owned ? "#f59e0b" : "rgba(255,255,255,0.4)"};box-shadow:0 2px 6px rgba(0,0,0,0.35);font-size:16px;${owned ? "" : "filter:grayscale(0.7);opacity:0.85;"}">${lm.icon ?? "📍"}</div>`;
+      const marker = L.marker([lat, lng], {
+        icon: L.divIcon({ html, className: "", iconSize: [32, 32], iconAnchor: [16, 16] }),
+      });
+      marker.bindPopup(
+        `<div style="font-size:12px;text-align:center"><div style="font-size:22px">${lm.icon ?? "📍"}</div><strong>${lm.name}</strong>${lm.name_zh ? `<br/><span style="color:#666">${lm.name_zh}</span>` : ""}<br/><span style="color:${owned ? "#f59e0b" : "#888"}">${owned ? "✓ Captured" : "🔒 Locked — run here to claim"}</span></div>`,
+      );
+      marker.addTo(landmarkLayerRef.current);
+    }
+  };
 
   useEffect(() => {
     if (!mapRef.current || !layerRef.current) return;

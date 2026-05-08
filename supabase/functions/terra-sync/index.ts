@@ -471,9 +471,14 @@ Deno.serve(async (req) => {
           if (!date) continue;
           // VO2max lives in oxygen_data per Terra spec (ml/kg/min).
           // Prefer the day's stored value, then the day-avg over samples.
+          const vo2Samples = Array.isArray(d?.oxygen_data?.vo2_samples) ? d.oxygen_data.vo2_samples : [];
+          const lastVo2Sample = vo2Samples.length > 0
+            ? toFiniteNumber(vo2Samples[vo2Samples.length - 1]?.vo2max_ml_per_min_per_kg)
+            : null;
           const vo2 =
             toFiniteNumber(d?.oxygen_data?.vo2max_ml_per_min_per_kg) ??
-            toFiniteNumber(d?.oxygen_data?.day_avg_vo2max_ml_per_min_per_kg);
+            toFiniteNumber(d?.oxygen_data?.day_avg_vo2max_ml_per_min_per_kg) ??
+            lastVo2Sample;
           const dailyHrv = toFiniteNumber(d?.heart_rate_data?.summary?.avg_hrv_rmssd);
           dailyByDate[date] = {
             user_id: c.user_id,
@@ -506,8 +511,13 @@ Deno.serve(async (req) => {
             if (v != null) vo2 = v;
           }
           if (vo2 == null) {
+            const samples = Array.isArray(d?.oxygen_data?.vo2_samples) ? d.oxygen_data.vo2_samples : [];
+            const lastSample = samples.length > 0
+              ? toFiniteNumber(samples[samples.length - 1]?.vo2max_ml_per_min_per_kg)
+              : null;
             vo2 = toFiniteNumber(d?.oxygen_data?.vo2max_ml_per_min_per_kg)
-              ?? toFiniteNumber(d?.oxygen_data?.day_avg_vo2max_ml_per_min_per_kg);
+              ?? toFiniteNumber(d?.oxygen_data?.day_avg_vo2max_ml_per_min_per_kg)
+              ?? lastSample;
           }
           if (vo2 == null) continue;
           const existing = dailyByDate[date] ?? {

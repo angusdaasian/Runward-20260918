@@ -115,19 +115,30 @@ const TerritoryTab = ({ lang }: Props) => {
         </div>
       </div>
 
-      <Button
-        onClick={sync}
-        disabled={syncing}
-        variant="outline"
-        size="sm"
-        className="w-full"
-      >
-        {syncing ? (
-          <><Loader2 className="animate-spin mr-2" size={14} />{lang === "zh" ? "同步中..." : "Syncing..."}</>
-        ) : (
-          <><RefreshCw className="mr-2" size={14} />{lang === "zh" ? "從跑步同步地塊" : "Sync runs to claim territory"}</>
-        )}
-      </Button>
+      <div className="flex gap-2">
+        <Button
+          onClick={sync}
+          disabled={syncing}
+          variant="outline"
+          size="sm"
+          className="flex-1"
+        >
+          {syncing ? (
+            <><Loader2 className="animate-spin mr-2" size={14} />{lang === "zh" ? "同步中..." : "Syncing..."}</>
+          ) : (
+            <><RefreshCw className="mr-2" size={14} />{lang === "zh" ? "同步" : "Sync runs"}</>
+          )}
+        </Button>
+        <Button
+          onClick={() => setShareOpen(true)}
+          disabled={myHexes === 0}
+          size="sm"
+          className="flex-1"
+        >
+          <Share2 className="mr-2" size={14} />
+          {lang === "zh" ? "分享" : "Share"}
+        </Button>
+      </div>
 
       {loading && hexes.length === 0 ? (
         <div className="h-[60vh] rounded-lg border border-border bg-muted/30 flex items-center justify-center">

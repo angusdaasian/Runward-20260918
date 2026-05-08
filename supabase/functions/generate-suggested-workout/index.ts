@@ -187,6 +187,9 @@ serve(async (req) => {
       svc.from("training_plans")
         .select("distance, target_time, goal, race_date, weeks, plan_data")
         .eq("user_id", user.id).order("created_at", { ascending: false }).limit(1).maybeSingle(),
+      svc.from("terra_daily_health")
+        .select("provider, date, hrv, resting_hr")
+        .eq("user_id", user.id).gte("date", since60).order("date", { ascending: true }),
     ]);
 
     const recent: RecentRun[] = [];

@@ -373,6 +373,11 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
     return `${m}:${s.toString().padStart(2, "0")} / km`;
   };
 
+  // Keep restDays valid given daysPerWeek and longRunDay
+  useEffect(() => {
+    const max = 7 - daysPerWeek;
+    setRestDays((prev) => prev.filter((d) => d !== longRunDay).slice(0, Math.max(0, max)));
+  }, [daysPerWeek, longRunDay]);
 
   const handleGenerate = async () => {
     if (!distance || !targetTime || !raceDate || !startDate || !dateValid) return;

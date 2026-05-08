@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { notifyPlanChanged } from "@/lib/planEvents";
 
 type Goal = "race" | "distance" | "first5k" | "parkrun" | "general" | "postnatal" | "fitness" | "injury" | "postrace";
 type Distance = "5K" | "10K" | "HM" | "FM";

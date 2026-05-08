@@ -178,46 +178,77 @@ Deno.serve(async (req) => {
         await new Promise((r) => setTimeout(r, 1100));
       }
 
-      const upserts = hexIds.map((hex_id) => {
+      // New hexes (no record yet) → insert with this user as first owner
+      const newHexRows: any[] = [];
+      // Existing hexes where this user is a NEW contributor → bump capture_count
+      const newContributorHexIds: string[] = [];
+      // All hexes the user hasn't captured before → insert capture row
+      const captureRows: any[] = [];
+
+      for (const hex_id of hexIds) {
         const ex = existingMap.get(hex_id);
-        if (!ex) newHexes++;
-        else if (ex.owner_user_id !== user.id) stolenHexes++;
+        const userIsNewToHex = !myCapsSet.has(hex_id);
         const [lat, lng] = cellToLatLng(hex_id);
-        return {
-          hex_id,
-          region: `${lat.toFixed(1)},${lng.toFixed(1)}`,
-          city_slug: cityMap.get(hex_id) ?? null,
-          owner_user_id: user.id,
-          owner_display_name: displayName,
-          captured_at: new Date().toISOString(),
-          captured_activity_id: act.activity_id,
-          capture_count: (ex?.capture_count ?? 0) + 1,
-        };
-      });
+        const region = `${lat.toFixed(1)},${lng.toFixed(1)}`;
+
+        if (!ex) {
+          newHexes++;
+          newHexRows.push({
+            hex_id,
+            region,
+            city_slug: cityMap.get(hex_id) ?? null,
+            owner_user_id: user.id,
+            owner_display_name: displayName,
+            captured_at: new Date().toISOString(),
+            captured_activity_id: act.activity_id,
+            capture_count: 1,
+          });
+        } else if (userIsNewToHex) {
+          stolenHexes++; // repurposed: "newly claimed by this user (shared)"
+          newContributorHexIds.push(hex_id);
+        }
+
+        if (userIsNewToHex) {
+          captureRows.push({ hex_id, user_id: user.id, activity_id: act.activity_id, region });
+        }
+      }
 
       const chunk = 500;
-      let upsertFailed = false;
-      for (let i = 0; i < upserts.length; i += chunk) {
-        const { error: upErr } = await admin.from("territory_hexes").upsert(upserts.slice(i, i + chunk), { onConflict: "hex_id" });
-        if (upErr) { console.error("hex upsert failed", act.activity_id, upErr); upsertFailed = true; break; }
+      let writeFailed = false;
+
+      // Insert brand-new hexes
+      for (let i = 0; i < newHexRows.length; i += chunk) {
+        const { error } = await admin.from("territory_hexes").insert(newHexRows.slice(i, i + chunk));
+        if (error) { console.error("hex insert failed", act.activity_id, error); writeFailed = true; break; }
       }
-      if (upsertFailed) continue; // do NOT mark processed so it retries next sync
-      const captureRows = upserts.map((u) => ({
-        hex_id: u.hex_id, user_id: user.id, activity_id: act.activity_id, region: u.region,
-      }));
+      if (writeFailed) continue;
+
+      // Bump capture_count on existing hexes where the user is a new contributor
+      for (const hex_id of newContributorHexIds) {
+        const ex = existingMap.get(hex_id)!;
+        const { error } = await admin
+          .from("territory_hexes")
+          .update({ capture_count: (ex.capture_count ?? 0) + 1 })
+          .eq("hex_id", hex_id);
+        if (error) console.error("hex count bump failed", hex_id, error);
+      }
+
+      // Insert capture rows (only for new user/hex pairs)
       for (let i = 0; i < captureRows.length; i += chunk) {
         const { error: capErr } = await admin.from("territory_captures").insert(captureRows.slice(i, i + chunk));
         if (capErr) console.error("capture insert failed", act.activity_id, capErr);
       }
+
       await admin.from("territory_processed_activities").insert({
         user_id: user.id, activity_source: act.source, activity_id: act.activity_id,
       });
     }
 
+    // Total hexes the user has captured (across all owners)
     const { count: totalOwned } = await admin
-      .from("territory_hexes")
+      .from("territory_captures")
       .select("hex_id", { count: "exact", head: true })
-      .eq("owner_user_id", user.id);
+      .eq("user_id", user.id);
 
     return new Response(
       JSON.stringify({

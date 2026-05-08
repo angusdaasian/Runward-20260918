@@ -39,9 +39,19 @@ const TerritoryTab = ({ lang }: Props) => {
       .select("hex_id, region, owner_user_id, owner_display_name, captured_at, capture_count, city_slug")
       .order("captured_at", { ascending: false })
       .limit(10000);
-    if (!error && data) setHexes(data as Hex[]);
+    let myCaptured = new Set<string>();
+    if (user) {
+      const { data: caps } = await supabase
+        .from("territory_captures")
+        .select("hex_id")
+        .eq("user_id", user.id);
+      myCaptured = new Set((caps ?? []).map((r: any) => r.hex_id as string));
+    }
+    if (!error && data) {
+      setHexes((data as Hex[]).map((h) => ({ ...h, iOwn: myCaptured.has(h.hex_id) })));
+    }
     setLoading(false);
-  }, []);
+  }, [user]);
 
   useEffect(() => { loadHexes(); }, [loadHexes]);
 

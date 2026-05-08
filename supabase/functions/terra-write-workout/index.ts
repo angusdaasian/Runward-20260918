@@ -50,7 +50,7 @@ function parseInterval(desc: string): { distM: number; reps: number; paceSec: nu
 }
 
 // Build a Terra "data" entry for one day. Returns null for rest / skipped days.
-function buildPlannedWorkout(day: DayPlan): any | null {
+function buildPlannedWorkout(day: DayPlan, provider: "GARMIN" | "COROS"): any | null {
   if (SKIP_TYPES.has(day.type)) return null;
   const paceSec = paceToSecondsPerKm(day.pace);
   // Pace bounds in m/s with ±5% window.
@@ -58,10 +58,10 @@ function buildPlannedWorkout(day: DayPlan): any | null {
     if (!sec) return [];
     const center = 1000 / sec;
     return [{
-      target_type: 6, // pace
-      pace_meters_per_second_low: Number((center * 0.95).toFixed(3)),
-      pace_meters_per_second_high: Number((center * 1.05).toFixed(3)),
-      pace_meters_per_second: Number(center.toFixed(3)),
+      target_type: 11, // pace/speed target per Terra PlannedWorkoutStepTarget model
+      speed_meters_per_second_low: Number((center * 0.95).toFixed(3)),
+      speed_meters_per_second_high: Number((center * 1.05).toFixed(3)),
+      speed_meters_per_second: Number(center.toFixed(3)),
     }];
   };
 
@@ -127,7 +127,23 @@ function buildPlannedWorkout(day: DayPlan): any | null {
     }));
   }
 
-  return { steps: containers };
+  const estimatedDistanceMeters = day.distance_km ? Math.round(day.distance_km * 1000) : null;
+  const estimatedDurationSeconds = estimatedDistanceMeters && paceSec
+    ? Math.round((estimatedDistanceMeters / 1000) * paceSec)
+    : null;
+
+  return {
+    steps: containers,
+    metadata: {
+      type: 33, // RUN
+      name: (day.title || day.type || "Run").slice(0, 80),
+      description: (day.description || day.title || day.type || "Run").slice(0, 240),
+      provider,
+      planned_date: day.date,
+      estimated_distance_meters: estimatedDistanceMeters,
+      estimated_duration_seconds: estimatedDurationSeconds,
+    },
+  };
 }
 
 Deno.serve(async (req) => {
@@ -204,7 +220,7 @@ Deno.serve(async (req) => {
     let pushed = 0;
     let skipped = 0;
     for (const { week: wkNum, dayIdx, day } of targets) {
-      const payload = buildPlannedWorkout(day);
+      const payload = buildPlannedWorkout(day, provider);
       if (!payload) { skipped++; continue; }
       const url = `https://api.tryterra.co/v2/plannedWorkout?user_id=${encodeURIComponent(conn.terra_user_id)}`;
       try {

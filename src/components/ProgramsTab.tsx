@@ -290,6 +290,8 @@ const ProgramsTab = ({ lang, onLoginRequest }: Props) => {
           weeks: weeksUntilRace,
           daysPerWeek,
           weeklyKm,
+          longRunDay,
+          restDays,
           lang,
         }),
       });

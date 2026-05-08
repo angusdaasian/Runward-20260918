@@ -1,7 +1,8 @@
 import { useEffect, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { cellToBoundary } from "h3-js";
+import { cellToBoundary, cellToLatLng } from "h3-js";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Hex {
   hex_id: string;

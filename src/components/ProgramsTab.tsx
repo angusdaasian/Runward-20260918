@@ -334,6 +334,7 @@ const ProgramsTab = ({ lang, onLoginRequest }: Props) => {
           raw_output: result.raw || "",
         }).select().single();
         if (inserted) setExistingPlan(inserted);
+        notifyPlanChanged();
       }
     } catch (err: any) {
       console.error("Error generating program:", err);

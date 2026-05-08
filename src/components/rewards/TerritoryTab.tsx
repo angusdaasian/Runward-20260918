@@ -16,6 +16,7 @@ interface Hex {
   captured_at: string;
   capture_count: number;
   city_slug: string | null;
+  iOwn?: boolean;
 }
 
 interface Props {

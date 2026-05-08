@@ -378,7 +378,7 @@ const ProgramsTab = ({ lang, onLoginRequest }: Props) => {
         if (existingPlan) {
           await supabase.from("training_plans" as any).delete().eq("id", existingPlan.id);
         }
-        await (supabase.from("training_plans" as any) as any).insert({
+        const { data: inserted } = await (supabase.from("training_plans" as any) as any).insert({
           user_id: user.id,
           goal: goal || "race",
           distance,
@@ -387,7 +387,8 @@ const ProgramsTab = ({ lang, onLoginRequest }: Props) => {
           weeks: weeksUntilRace,
           plan_data: planData,
           raw_output: result.raw || "",
-        });
+        }).select().single();
+        if (inserted) setExistingPlan(inserted);
       }
     } catch (err: any) {
       console.error("Error generating program:", err);

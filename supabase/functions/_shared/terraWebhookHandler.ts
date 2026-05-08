@@ -790,21 +790,35 @@ async function processWebhook(
             .eq("provider", provider)
             .eq("date", date)
             .maybeSingle();
+          const newRestingHr = toFiniteNumber(d?.heart_rate_data?.summary?.resting_hr_bpm);
+          const newSteps = toFiniteNumber(d?.distance_data?.steps);
+          const newVo2max =
+            toFiniteNumber(d?.oxygen_data?.vo2max_ml_per_min_per_kg) ??
+            toFiniteNumber(d?.oxygen_data?.day_avg_vo2max_ml_per_min_per_kg);
+          const newHrv =
+            toFiniteNumber(d?.heart_rate_data?.summary?.avg_hrv_rmssd) ??
+            toFiniteNumber(d?.heart_rate_data?.summary?.hrv_rmssd) ??
+            toFiniteNumber(d?.heart_rate_data?.summary?.avg_hrv_sdnn) ??
+            toFiniteNumber(d?.heart_rate_data?.summary?.avg_hrv);
+
+          // Re-read existing row including current numeric stats so we don't blow them away with nulls.
+          const { data: existingFull } = await supa
+            .from("terra_daily_health")
+            .select("resting_hr, steps, vo2max, hrv")
+            .eq("user_id", appUserId)
+            .eq("provider", provider)
+            .eq("date", date)
+            .maybeSingle();
+
           await supa.from("terra_daily_health").upsert({
             user_id: appUserId,
             provider,
             date,
-            resting_hr: d?.heart_rate_data?.summary?.resting_hr_bpm ?? null,
-            steps: d?.distance_data?.steps ?? null,
-            vo2max:
-              toFiniteNumber(d?.oxygen_data?.vo2max_ml_per_min_per_kg) ??
-              toFiniteNumber(d?.oxygen_data?.day_avg_vo2max_ml_per_min_per_kg),
-            hrv:
-              toFiniteNumber(d?.heart_rate_data?.summary?.avg_hrv_rmssd) ??
-              toFiniteNumber(d?.heart_rate_data?.summary?.hrv_rmssd) ??
-              toFiniteNumber(d?.heart_rate_data?.summary?.avg_hrv_sdnn) ??
-              toFiniteNumber(d?.heart_rate_data?.summary?.avg_hrv) ??
-              null,
+            // Only overwrite if the new payload actually has a value; otherwise keep existing.
+            resting_hr: newRestingHr ?? existingFull?.resting_hr ?? null,
+            steps: newSteps ?? existingFull?.steps ?? null,
+            vo2max: newVo2max ?? existingFull?.vo2max ?? null,
+            hrv: newHrv ?? existingFull?.hrv ?? null,
             sleep_seconds: existing?.sleep_seconds ?? null,
             sleep_score: existing?.sleep_score ?? null,
           }, { onConflict: "user_id,provider,date" });
@@ -814,14 +828,50 @@ async function processWebhook(
         for (const s of items) {
           const date = extractSleepDate(s);
           if (!date) continue;
+
+          // Skip naps so they don't overwrite the main nightly sleep record.
+          const meta = s?.metadata ?? {};
+          const isNap =
+            meta?.is_nap === true ||
+            meta?.nap === true ||
+            (typeof meta?.sleep_type === "string" && meta.sleep_type.toLowerCase().includes("nap"));
+          if (isNap) {
+            console.log(`[terra-webhook] skipping nap sleep for ${appUserId} ${date}`);
+            continue;
+          }
+
           const sleepSeconds = extractSleepSeconds(s);
           const sleepScore = extractSleepScore(s);
+
+          // Defensive: very short sleep (<3h) is almost certainly a nap mis-tagged.
+          if (sleepSeconds != null && sleepSeconds < 3 * 3600) {
+            console.log(`[terra-webhook] skipping short sleep (${sleepSeconds}s) for ${appUserId} ${date}`);
+            continue;
+          }
+
+          // Don't overwrite a longer existing sleep with a shorter one for the same date.
+          const { data: existingSleep } = await supa
+            .from("terra_daily_health")
+            .select("sleep_seconds, sleep_score")
+            .eq("user_id", appUserId)
+            .eq("provider", provider)
+            .eq("date", date)
+            .maybeSingle();
+
+          const useNew =
+            sleepSeconds != null &&
+            (existingSleep?.sleep_seconds == null || sleepSeconds >= existingSleep.sleep_seconds);
+          const finalSleepSeconds = useNew ? sleepSeconds : (existingSleep?.sleep_seconds ?? null);
+          const finalSleepScore = useNew
+            ? (sleepScore ?? existingSleep?.sleep_score ?? null)
+            : (existingSleep?.sleep_score ?? null);
+
           await supa.from("terra_daily_health").upsert({
             user_id: appUserId,
             provider,
             date,
-            sleep_seconds: sleepSeconds,
-            sleep_score: sleepScore,
+            sleep_seconds: finalSleepSeconds,
+            sleep_score: finalSleepScore,
           }, { onConflict: "user_id,provider,date" });
         }
       }

@@ -190,7 +190,7 @@ const HRVReadinessCard = ({ lang }: Props) => {
         />
         <Stat
           icon={<HeartPulse size={13} className="text-rose-500" />}
-          label={lang === "zh" ? "靜息心率" : "Rest HR"}
+          label={lang === "zh" ? "7 天平均靜息心率" : "Avg RHR (7d)"}
           value={readiness.rhr7 != null ? `${readiness.rhr7}` : "—"}
           unit="bpm"
         />

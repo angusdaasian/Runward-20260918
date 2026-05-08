@@ -65,20 +65,26 @@ function buildPlannedWorkout(day: DayPlan): any | null {
     }];
   };
 
-  const steps: any[] = [];
+  // Wrap any inner step in a Garmin-style repeat container (type:1, reps:1).
+  const wrap = (order: number, description: string, inner: any) => ({
+    type: 1, order, description,
+    durations: [{ duration_type: 9, reps: 1 }],
+    steps: [inner],
+  });
+
+  const containers: any[] = [];
 
   if (day.type === "Interval") {
     const parsed = parseInterval(day.description);
-    // Warm-up
-    steps.push({
-      type: 0, order: 0, intensity: 1, description: "Warm-up",
+    containers.push(wrap(0, "Warm Up", {
+      type: 0, order: 0, intensity: 5, description: "Warm Up",
       durations: [{ duration_type: 0, seconds: 600 }],
       targets: [],
-    });
+    }));
     if (parsed) {
-      // Repeat block (container)
-      const repeatStep: any = {
-        type: 1, order: 1, description: `${parsed.reps} x ${parsed.distM}m`,
+      containers.push({
+        type: 1, order: 1,
+        description: `${parsed.reps} x ${parsed.distM}m`,
         durations: [{ duration_type: 9, reps: parsed.reps }],
         steps: [
           {
@@ -88,52 +94,40 @@ function buildPlannedWorkout(day: DayPlan): any | null {
             targets: buildPaceTarget(parsed.paceSec),
           },
           {
-            type: 0, order: 1, intensity: 4,
+            type: 0, order: 1, intensity: 5,
             description: parsed.restSec ? `${parsed.restSec}s recovery` : "Recovery",
             durations: [{ duration_type: 0, seconds: parsed.restSec ?? 90 }],
             targets: [],
           },
         ],
-      };
-      steps.push(repeatStep);
+      });
     } else {
-      // Fallback: single distance step using day.distance_km
       const distM = day.distance_km ? Math.round(day.distance_km * 1000) : 5000;
-      steps.push({
-        type: 0, order: 1, intensity: 5, description: day.description || "Interval",
+      containers.push(wrap(1, day.description?.slice(0, 60) || "Interval", {
+        type: 0, order: 0, intensity: 5,
+        description: (day.description || "Interval").slice(0, 60),
         durations: [{ duration_type: 1, distance_meters: distM }],
         targets: buildPaceTarget(paceSec),
-      });
+      }));
     }
-    // Cool-down
-    steps.push({
-      type: 0, order: 2, intensity: 2, description: "Cool-down",
+    containers.push(wrap(2, "Cool Down", {
+      type: 0, order: 0, intensity: 5, description: "Cool Down",
       durations: [{ duration_type: 0, seconds: 600 }],
       targets: [],
-    });
+    }));
   } else {
-    // Easy / Long / Tempo / Recovery / Race Pace / Progression
     const distM = day.distance_km ? Math.round(day.distance_km * 1000) : null;
-    const intensityMap: Record<string, number> = {
-      "Easy Run": 3, "Long Run": 3, "Recovery": 2, "Tempo Run": 5,
-      "Race Pace": 5, "Progression Run": 4, "Easy": 3, "Long": 3, "Tempo": 5, "Progression": 4,
-    };
-    steps.push({
-      type: 0, order: 0, intensity: intensityMap[day.type] ?? 3,
-      description: day.title || day.type,
+    containers.push(wrap(0, day.title || day.type, {
+      type: 0, order: 0, intensity: 5,
+      description: (day.title || day.type).slice(0, 60),
       durations: distM
         ? [{ duration_type: 1, distance_meters: distM }]
         : [{ duration_type: 0, seconds: 1800 }],
       targets: buildPaceTarget(paceSec),
-    });
+    }));
   }
 
-  return {
-    name: `${day.title || day.type} (${day.date})`,
-    description: day.description?.slice(0, 280) || day.title || day.type,
-    exercise_type: "running",
-    steps,
-  };
+  return { steps: containers };
 }
 
 Deno.serve(async (req) => {

@@ -287,6 +287,60 @@ const DraggableDay = ({
   );
 };
 
+// Calendar day list with long-press drag-to-swap (within a week)
+const CalendarDayList = ({
+  days, weekIdx, lang, onSwap, onAddClick, onEditClick,
+}: {
+  days: DayPlan[];
+  weekIdx: number;
+  lang: Lang;
+  onSwap: (fromIdx: number, toIdx: number) => void;
+  onAddClick: (idx: number) => void;
+  onEditClick: (idx: number, day: DayPlan) => void;
+}) => {
+  // Long-press: 250ms hold before drag begins (mouse + touch)
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { delay: 250, tolerance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } }),
+  );
+  const todayStr = new Date().toISOString().split("T")[0];
+  return (
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      onDragEnd={(e: DragEndEvent) => {
+        if (!e.over) return;
+        const fromIdx = Number(String(e.active.id).split(":")[1]);
+        const toIdx = Number(String(e.over.id).split(":")[1]);
+        if (Number.isFinite(fromIdx) && Number.isFinite(toIdx) && fromIdx !== toIdx) {
+          onSwap(fromIdx, toIdx);
+        }
+      }}
+    >
+      <div className="space-y-1">
+        {days.map((day, i) => {
+          const dateObj = day.date ? new Date(day.date + "T00:00:00") : null;
+          const dayNum = dateObj ? dateObj.getDate() : "";
+          const isToday = day.date === todayStr;
+          return (
+            <DraggableDay
+              key={`${weekIdx}:${i}`}
+              id={`day:${i}`}
+              idx={i}
+              day={day}
+              lang={lang}
+              isToday={isToday}
+              dayNum={dayNum}
+              onEditClick={() => onEditClick(i, day)}
+              onAddClick={() => onAddClick(i)}
+            />
+          );
+        })}
+      </div>
+    </DndContext>
+  );
+};
+
 const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
   const { isPremium } = usePremium();
   const { user } = useAuth();

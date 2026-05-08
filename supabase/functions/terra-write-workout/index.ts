@@ -208,13 +208,14 @@ Deno.serve(async (req) => {
       if (!payload) { skipped++; continue; }
       const url = `https://api.tryterra.co/v2/plannedWorkout?user_id=${encodeURIComponent(conn.terra_user_id)}`;
       try {
-        const resp = await fetch(url, {
-          method: "POST", headers,
-          body: JSON.stringify({ data: [payload] }),
-        });
-        const json = await resp.json().catch(() => null);
+        const bodyStr = JSON.stringify({ data: [payload] });
+        const resp = await fetch(url, { method: "POST", headers, body: bodyStr });
+        const text = await resp.text();
+        let json: any = null;
+        try { json = JSON.parse(text); } catch { /* keep as text */ }
         if (!resp.ok) {
-          errors.push({ week: wkNum, dayIdx, status: resp.status, body: json });
+          console.error("[terra-write-workout] Terra error", resp.status, text, "payload:", bodyStr);
+          errors.push({ week: wkNum, dayIdx, status: resp.status, body: json ?? text });
           continue;
         }
         const logId = Array.isArray(json?.log_ids) ? String(json.log_ids[0] ?? "") : null;

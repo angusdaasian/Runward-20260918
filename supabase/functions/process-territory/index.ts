@@ -248,6 +248,26 @@ Deno.serve(async (req) => {
         if (capErr) console.error("capture insert failed", act.activity_id, capErr);
       }
 
+      // Insert capture rows (only for new user/hex pairs)
+      // (already done above in lines 245-249) — now check landmark hits
+      const { data: hitLandmarks } = await admin
+        .from("territory_landmarks")
+        .select("hex_id")
+        .in("hex_id", hexIds);
+      const landmarkRows = (hitLandmarks ?? [])
+        .filter((l: any) => myCapsSet.has(l.hex_id) === false)
+        .map((l: any) => ({
+          user_id: user.id,
+          hex_id: l.hex_id,
+          activity_id: act.activity_id,
+        }));
+      if (landmarkRows.length > 0) {
+        const { error: lErr } = await admin
+          .from("territory_landmark_captures")
+          .upsert(landmarkRows, { onConflict: "user_id,hex_id", ignoreDuplicates: true });
+        if (lErr) console.error("landmark capture insert failed", lErr);
+      }
+
       await admin.from("territory_processed_activities").insert({
         user_id: user.id, activity_source: act.source, activity_id: act.activity_id,
       });

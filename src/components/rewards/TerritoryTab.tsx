@@ -7,6 +7,8 @@ import { Loader2, RefreshCw, MapPin, Trophy, X } from "lucide-react";
 import { toast } from "sonner";
 import TerritoryMap from "./TerritoryMap";
 import CityProgressList from "./CityProgressList";
+import TrophyCase from "./TrophyCase";
+import { cellToLatLng } from "h3-js";
 
 interface Hex {
   hex_id: string;
@@ -129,6 +131,18 @@ const TerritoryTab = ({ lang }: Props) => {
           <><RefreshCw className="mr-2" size={14} />{lang === "zh" ? "從跑步同步地塊" : "Sync runs to claim territory"}</>
         )}
       </Button>
+
+      <TrophyCase
+        userId={user.id}
+        lang={lang}
+        refreshKey={refreshKey}
+        onLandmarkFocus={(hex_id) => {
+          const [lat, lng] = cellToLatLng(hex_id);
+          // Tiny bbox around the hex to zoom in
+          const d = 0.01;
+          setFocusedCity({ slug: `landmark:${hex_id}`, bbox: [lat - d, lng - d, lat + d, lng + d] });
+        }}
+      />
 
       <CityProgressList
         userId={user.id}

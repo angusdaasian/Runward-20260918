@@ -92,7 +92,7 @@ const RewardsTab = ({ lang }: Props) => {
   return (
     <>
       <FadeIn className="px-5 pt-4 max-w-lg mx-auto pb-24 space-y-5">
-        {/* Sub-tabs: Rewards | Leaderboards — at the top */}
+        {/* Sub-tabs: Rewards | Leaderboards | CityHunter */}
         <Tabs defaultValue="rewards" className="w-full">
           <TabsList className="w-full grid grid-cols-3">
             <TabsTrigger value="rewards">

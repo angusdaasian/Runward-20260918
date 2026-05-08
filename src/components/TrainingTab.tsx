@@ -4,7 +4,6 @@ import { getMainPaces, predictTime, formatTime, raceDistances } from "@/lib/vdot
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import { usePremium } from "@/contexts/PremiumContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -13,7 +12,7 @@ import { useOnlineStatus, isOnline } from "@/hooks/use-online-status";
 import { getCached, setCached, CacheKeys } from "@/lib/offlineCache";
 import {
   Loader2, Lock, ChevronLeft, ChevronRight, Plus, Calendar, Target, Trophy,
-  Repeat, Route, Check, HelpCircle, X, WifiOff, Sparkles, Watch
+  Repeat, Route, HelpCircle, X, WifiOff, Sparkles
 } from "lucide-react";
 import WeeklyReviewModal from "@/components/training/WeeklyReviewModal";
 const CalculatorTab = lazy(() => import("@/components/CalculatorTab"));
@@ -268,9 +267,6 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
   const [existingPlan, setExistingPlan] = useState<any>(null);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [showWeeklyReview, setShowWeeklyReview] = useState(false);
-  const [terraProvider, setTerraProvider] = useState<"GARMIN" | "COROS" | null>(null);
-  const [pushedKeys, setPushedKeys] = useState<Set<string>>(new Set());
-  const [pushBusy, setPushBusy] = useState<string | null>(null);
 
   // Add/Edit workout
   const [addingDayIdx, setAddingDayIdx] = useState<number | null>(null);
@@ -324,68 +320,6 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
     };
     load();
   }, [user, online]);
-
-  useEffect(() => {
-    if (!user || !online) return;
-    (async () => {
-      const { data } = await (supabase as any)
-        .from("terra_connections")
-        .select("provider")
-        .eq("user_id", user.id)
-        .eq("active", true)
-        .in("provider", ["GARMIN", "COROS"])
-        .limit(1);
-      setTerraProvider((data?.[0]?.provider as "GARMIN" | "COROS" | undefined) ?? null);
-    })();
-  }, [user, online]);
-
-  useEffect(() => {
-    if (!user || !existingPlan?.id || !online) { setPushedKeys(new Set()); return; }
-    (async () => {
-      const { data } = await (supabase as any)
-        .from("pushed_workouts")
-        .select("week, day_index")
-        .eq("user_id", user.id)
-        .eq("plan_id", existingPlan.id);
-      setPushedKeys(new Set((data ?? []).map((r: any) => `${r.week}:${r.day_index}`)));
-    })();
-  }, [user, existingPlan?.id, online]);
-
-  const sendToWatch = async (scope: "day" | "week" | "all", week?: number, dayIdx?: number) => {
-    if (!existingPlan?.id || !terraProvider) return;
-    const busyKey = scope === "day" ? `${week}:${dayIdx}` : scope;
-    setPushBusy(busyKey);
-    try {
-      const { data, error } = await supabase.functions.invoke("terra-write-workout", {
-        body: { plan_id: existingPlan.id, scope, week, day_index: dayIdx, provider: terraProvider },
-      });
-      if (error) throw error;
-      const pushed = data?.pushed ?? 0;
-      const failed = data?.failed ?? 0;
-      if (scope === "day" && week !== undefined && dayIdx !== undefined && pushed > 0) {
-        setPushedKeys((prev) => new Set(prev).add(`${week}:${dayIdx}`));
-      } else if (pushed > 0) {
-        const { data: rows } = await (supabase as any)
-          .from("pushed_workouts")
-          .select("week, day_index")
-          .eq("user_id", user!.id)
-          .eq("plan_id", existingPlan.id);
-        setPushedKeys(new Set((rows ?? []).map((r: any) => `${r.week}:${r.day_index}`)));
-      }
-      const firstErr = Array.isArray(data?.errors) && data.errors[0]
-        ? (typeof data.errors[0].body === "string" ? data.errors[0].body : JSON.stringify(data.errors[0].body))
-        : "";
-      toast({
-        title: failed ? (lang === "zh" ? "部分傳送完成" : "Partially sent") : (lang === "zh" ? "已傳送至手錶" : "Sent to watch"),
-        description: `${terraProvider}: ${pushed} ${lang === "zh" ? "個訓練" : "workout(s)"}${failed ? ` (${failed} ${lang === "zh" ? "失敗" : "failed"}: ${firstErr.slice(0, 200)})` : ""}`,
-        variant: failed ? "destructive" : "default",
-      });
-    } catch (e: any) {
-      toast({ title: lang === "zh" ? "傳送失敗" : "Send failed", description: e?.message ?? "", variant: "destructive" });
-    } finally {
-      setPushBusy(null);
-    }
-  };
 
   // Load free plans for selected distance (cache-then-network)
   useEffect(() => {
@@ -1247,19 +1181,6 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                           <span className="ml-2 bg-primary/15 text-primary text-xs font-bold px-2 py-0.5 rounded-full">WEEK {currentWeek.week}</span>
                         </div>
                         <div className="flex items-center gap-1">
-                          {terraProvider && (
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <button className="p-1 rounded hover:bg-accent" aria-label={lang === "zh" ? "傳送至手錶" : "Send to watch"}>
-                                  {pushBusy === "week" || pushBusy === "all" ? <Loader2 size={16} className="animate-spin text-primary" /> : <Watch size={16} className="text-primary" />}
-                                </button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={() => sendToWatch("week", currentWeek.week)}>{lang === "zh" ? `傳送本週至 ${terraProvider}` : `Send this week to ${terraProvider}`}</DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => sendToWatch("all")}>{lang === "zh" ? `傳送整個計劃至 ${terraProvider}` : `Send entire plan to ${terraProvider}`}</DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          )}
                           <button onClick={() => setCurrentWeekIdx(Math.max(0, currentWeekIdx - 1))} disabled={currentWeekIdx === 0} className="p-1 rounded hover:bg-accent disabled:opacity-30"><ChevronLeft size={16} /></button>
                           <button onClick={() => setCurrentWeekIdx(Math.min(plan.length - 1, currentWeekIdx + 1))} disabled={currentWeekIdx === plan.length - 1} className="p-1 rounded hover:bg-accent disabled:opacity-30"><ChevronRight size={16} /></button>
                         </div>
@@ -1293,16 +1214,6 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
                                       {day.pace && <span>{day.pace}</span>}
                                       {day.distance_km && <span>{day.distance_km} km</span>}
-                                      {terraProvider && (
-                                        <button
-                                          onClick={(e) => { e.stopPropagation(); sendToWatch("day", currentWeek.week, i); }}
-                                          disabled={pushBusy === `${currentWeek.week}:${i}`}
-                                          title={pushedKeys.has(`${currentWeek.week}:${i}`) ? (lang === "zh" ? `已傳送至 ${terraProvider}` : `Sent to ${terraProvider}`) : (lang === "zh" ? `傳送至 ${terraProvider}` : `Send to ${terraProvider}`)}
-                                          className="p-1 rounded hover:bg-accent disabled:opacity-50"
-                                        >
-                                          {pushBusy === `${currentWeek.week}:${i}` ? <Loader2 size={12} className="animate-spin" /> : pushedKeys.has(`${currentWeek.week}:${i}`) ? <Check size={12} className="text-primary" /> : <Watch size={12} />}
-                                        </button>
-                                      )}
                                     </div>
                                   </div>
                                   <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{localizeDescription(day, lang)}</p>

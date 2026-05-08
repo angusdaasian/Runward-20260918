@@ -8,10 +8,11 @@ const corsHeaders = {
 async function callVertexAI(opts: { apiKey: string; model?: string; messages: Array<{ role: string; content: any }> }): Promise<Response> {
   const VERTEX_MODEL_MAP: Record<string, string> = {
     "google/gemini-3.1-pro-preview": "gemini-3.1-pro-preview",
-    "google/gemini-3.1-flash-preview": "gemini-3.1-flash-preview",
+    "google/gemini-3.1-flash-preview": "gemini-3-flash-preview",
     "google/gemini-3.1-flash-lite-preview": "gemini-3.1-flash-lite-preview",
+    "google/gemini-3-flash-preview": "gemini-3-flash-preview",
   };
-  const model = VERTEX_MODEL_MAP[opts.model || ""] || (opts.model || "gemini-3.1-flash-preview").replace(/^google\//, "");
+  const model = VERTEX_MODEL_MAP[opts.model || ""] || (opts.model || "gemini-3-flash-preview").replace(/^google\//, "");
   const url = `https://aiplatform.googleapis.com/v1/publishers/google/models/${model}:generateContent?key=${opts.apiKey}`;
   const systemParts: any[] = [];
   const contents: any[] = [];
@@ -43,7 +44,11 @@ async function callVertexAI(opts: { apiKey: string; model?: string; messages: Ar
   const body: any = { contents };
   if (systemParts.length) body.systemInstruction = { parts: systemParts };
   const vRes = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-  if (!vRes.ok) return new Response(await vRes.text(), { status: vRes.status });
+  if (!vRes.ok) {
+    const errBody = await vRes.text();
+    console.error("Vertex error:", vRes.status, "model:", model, "body:", errBody.slice(0, 1000));
+    return new Response(errBody, { status: vRes.status });
+  }
   const vData = await vRes.json();
   const text = vData?.candidates?.[0]?.content?.parts?.map((p: any) => p.text || "").join("") || "";
   return new Response(JSON.stringify({ choices: [{ message: { content: text } }] }), { status: 200, headers: { "Content-Type": "application/json" } });
@@ -217,7 +222,7 @@ Scores should be objective based on actual posture observed. Be specific in feed
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
-    console.error("posture analysis error:", e);
+    console.error("posture analysis error:", e, e instanceof Error ? e.stack : "");
     return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },

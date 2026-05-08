@@ -35,13 +35,24 @@ const CityProgressList = ({ userId, lang, onCityFocus, focusedSlug, refreshKey }
     let cancelled = false;
     (async () => {
       setLoading(true);
+      // Get hex_ids the user has captured
+      const { data: caps } = await supabase
+        .from("territory_captures")
+        .select("hex_id")
+        .eq("user_id", userId);
+      const hexIds = Array.from(new Set((caps ?? []).map((r: any) => r.hex_id as string)));
+      if (hexIds.length === 0) {
+        if (!cancelled) { setRows([]); setLoading(false); }
+        return;
+      }
+      // Look up city_slug for each captured hex
       const { data: hexRows } = await supabase
         .from("territory_hexes")
-        .select("city_slug")
-        .eq("owner_user_id", userId)
+        .select("hex_id, city_slug")
+        .in("hex_id", hexIds)
         .not("city_slug", "is", null);
       const counts = new Map<string, number>();
-      for (const r of (hexRows ?? []) as { city_slug: string }[]) {
+      for (const r of (hexRows ?? []) as { hex_id: string; city_slug: string }[]) {
         counts.set(r.city_slug, (counts.get(r.city_slug) ?? 0) + 1);
       }
       const slugs = Array.from(counts.keys());

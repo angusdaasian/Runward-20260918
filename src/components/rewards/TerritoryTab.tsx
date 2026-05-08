@@ -3,9 +3,10 @@ import { Lang } from "@/lib/i18n";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
-import { Loader2, RefreshCw, MapPin, Trophy } from "lucide-react";
+import { Loader2, RefreshCw, MapPin, Trophy, Share2 } from "lucide-react";
 import { toast } from "sonner";
 import TerritoryMap from "./TerritoryMap";
+import ShareTerritoryDialog from "./ShareTerritoryDialog";
 
 interface Hex {
   hex_id: string;

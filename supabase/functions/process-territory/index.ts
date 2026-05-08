@@ -137,6 +137,14 @@ Deno.serve(async (req) => {
       const existingMap = new Map<string, { owner_user_id: string; capture_count: number }>();
       for (const e of (existing ?? []) as any[]) existingMap.set(e.hex_id, e);
 
+      // Find which of these hexes the current user has already captured before
+      const { data: myCaps } = await admin
+        .from("territory_captures")
+        .select("hex_id")
+        .eq("user_id", user.id)
+        .in("hex_id", hexIds);
+      const myCapsSet = new Set((myCaps ?? []).map((r: any) => r.hex_id as string));
+
       // Look up city_slug for each hex
       const { data: cityMappings } = await admin.from("territory_city_hexes").select("hex_id, city_slug").in("hex_id", hexIds);
       const cityMap = new Map<string, string>();

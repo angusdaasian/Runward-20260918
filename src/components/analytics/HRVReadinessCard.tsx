@@ -197,11 +197,33 @@ const HRVReadinessCard = ({ lang }: Props) => {
       </div>
 
       <p className="mt-3 text-xs text-foreground leading-relaxed">{band.advice}</p>
-      <p className="mt-1.5 text-[10px] text-muted-foreground leading-relaxed">
-        {lang === "zh"
-          ? "分數依據你過去 60 天的 HRV (Ln RMSSD) 個人基線及靜息心率趨勢計算。個人基線比固定數值更準確 (Plews & Buchheit, 2013)。"
-          : "Score is based on your personal 60-day HRV baseline (Ln RMSSD) and resting-HR trend. Personal baselines outperform absolute thresholds (Plews & Buchheit, 2013)."}
-      </p>
+
+      {/* Readiness scale bar */}
+      <div className="mt-3">
+        <div className="relative h-2.5 rounded-full overflow-hidden bg-muted">
+          <div className="absolute inset-y-0 left-0 w-[40%] bg-rose-500/70" />
+          <div className="absolute inset-y-0 left-[40%] w-[30%] bg-amber-400/70" />
+          <div className="absolute inset-y-0 left-[70%] w-[30%] bg-emerald-500/70" />
+          <div
+            className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-3 h-3 rounded-full bg-foreground border-2 border-background shadow"
+            style={{ left: `${Math.min(100, Math.max(0, readiness.score))}%` }}
+          />
+        </div>
+        <div className="flex justify-between text-[9px] text-muted-foreground mt-1">
+          <span>0</span>
+          <span>40</span>
+          <span>70</span>
+          <span>100</span>
+        </div>
+        <div className="flex justify-between text-[10px] mt-1.5">
+          <span className="text-rose-500 font-medium">
+            {lang === "zh" ? "← 低：休息 / 易疲勞" : "← Lower: rest / fatigue risk"}
+          </span>
+          <span className="text-emerald-500 font-medium">
+            {lang === "zh" ? "高：可高強度訓練 →" : "Higher: ready to push →"}
+          </span>
+        </div>
+      </div>
     </Card>
   );
 };

@@ -842,6 +842,9 @@ async function processWebhook(
 
           const sleepSeconds = extractSleepSeconds(s);
           const sleepScore = extractSleepScore(s);
+          const sum = s?.heart_rate_data?.summary ?? {};
+          const sleepHrv = toFiniteNumber(sum?.avg_hrv_rmssd);
+          const sleepRhr = toFiniteNumber(sum?.resting_hr_bpm);
 
           // Defensive: very short sleep (<3h) is almost certainly a nap mis-tagged.
           if (sleepSeconds != null && sleepSeconds < 3 * 3600) {
@@ -852,7 +855,7 @@ async function processWebhook(
           // Don't overwrite a longer existing sleep with a shorter one for the same date.
           const { data: existingSleep } = await supa
             .from("terra_daily_health")
-            .select("sleep_seconds, sleep_score")
+            .select("sleep_seconds, sleep_score, hrv, resting_hr")
             .eq("user_id", appUserId)
             .eq("provider", provider)
             .eq("date", date)
@@ -865,6 +868,14 @@ async function processWebhook(
           const finalSleepScore = useNew
             ? (sleepScore ?? existingSleep?.sleep_score ?? null)
             : (existingSleep?.sleep_score ?? null);
+          const finalHrv = useNew
+            ? (sleepHrv ?? existingSleep?.hrv ?? null)
+            : (existingSleep?.hrv ?? sleepHrv ?? null);
+          const finalRhr = useNew
+            ? (sleepRhr ?? existingSleep?.resting_hr ?? null)
+            : (existingSleep?.resting_hr ?? sleepRhr ?? null);
+
+          console.log(`[terra-webhook] sleep ${appUserId} ${date} hrv=${sleepHrv} rhr=${sleepRhr} sec=${sleepSeconds}`);
 
           await supa.from("terra_daily_health").upsert({
             user_id: appUserId,
@@ -872,6 +883,8 @@ async function processWebhook(
             date,
             sleep_seconds: finalSleepSeconds,
             sleep_score: finalSleepScore,
+            hrv: finalHrv != null ? Math.round(Number(finalHrv) * 10) / 10 : null,
+            resting_hr: finalRhr != null ? Math.round(Number(finalRhr)) : null,
           }, { onConflict: "user_id,provider,date" });
         }
       }

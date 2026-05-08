@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo } from "react";
 import { Lang, t } from "@/lib/i18n";
 import { Button } from "@/components/ui/button";
-import { Loader2, Lock, ChevronLeft, ChevronRight, Plus, Calendar, Target, Trophy, Clock, Repeat, Route } from "lucide-react";
+import { Loader2, Lock, ChevronLeft, ChevronRight, Plus, Calendar, Target, Trophy, Clock, Repeat, Route, Watch, Check } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { usePremium } from "@/contexts/PremiumContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -220,6 +221,74 @@ const ProgramsTab = ({ lang, onLoginRequest }: Props) => {
   const [editingDayIdx, setEditingDayIdx] = useState<number | null>(null);
   const [editDistance, setEditDistance] = useState("");
   const [editPace, setEditPace] = useState("");
+
+  // Terra "send to watch" state
+  const [terraProvider, setTerraProvider] = useState<"GARMIN" | "COROS" | null>(null);
+  const [pushedKeys, setPushedKeys] = useState<Set<string>>(new Set()); // `${week}:${dayIdx}`
+  const [pushBusy, setPushBusy] = useState<string | null>(null);
+
+  // Detect Terra Garmin/Coros connection
+  useEffect(() => {
+    if (!user) return;
+    (async () => {
+      const { data } = await (supabase as any)
+        .from("terra_connections").select("provider")
+        .eq("user_id", user.id).eq("active", true)
+        .in("provider", ["GARMIN", "COROS"]);
+      const first = (data ?? [])[0];
+      setTerraProvider(first?.provider ?? null);
+    })();
+  }, [user]);
+
+  // Load already-pushed workouts for the current plan
+  useEffect(() => {
+    if (!user || !existingPlan?.id) { setPushedKeys(new Set()); return; }
+    (async () => {
+      const { data } = await (supabase as any)
+        .from("pushed_workouts").select("week, day_index")
+        .eq("user_id", user.id).eq("plan_id", existingPlan.id);
+      setPushedKeys(new Set((data ?? []).map((r: any) => `${r.week}:${r.day_index}`)));
+    })();
+  }, [user, existingPlan?.id]);
+
+  const sendToWatch = async (scope: "day" | "week" | "all", week?: number, dayIdx?: number) => {
+    if (!existingPlan?.id || !terraProvider) return;
+    const busyKey = scope === "day" ? `${week}:${dayIdx}` : scope;
+    setPushBusy(busyKey);
+    try {
+      const { data, error } = await supabase.functions.invoke("terra-write-workout", {
+        body: { plan_id: existingPlan.id, scope, week, day_index: dayIdx, provider: terraProvider },
+      });
+      if (error) throw error;
+      const pushed = (data as any)?.pushed ?? 0;
+      const failed = (data as any)?.failed ?? 0;
+      if (pushed > 0) {
+        toast({
+          title: lang === "zh" ? "已傳送至手錶" : "Sent to watch",
+          description: `${terraProvider}: ${pushed} ${lang === "zh" ? "個訓練" : "workout(s)"}${failed ? ` (${failed} ${lang === "zh" ? "失敗" : "failed"})` : ""}`,
+        });
+        // Refresh pushed keys
+        const { data: rows } = await (supabase as any)
+          .from("pushed_workouts").select("week, day_index")
+          .eq("user_id", user!.id).eq("plan_id", existingPlan.id);
+        setPushedKeys(new Set((rows ?? []).map((r: any) => `${r.week}:${r.day_index}`)));
+      } else {
+        toast({
+          title: lang === "zh" ? "傳送失敗" : "Send failed",
+          description: lang === "zh" ? "請稍後再試" : "Please try again later",
+          variant: "destructive",
+        });
+      }
+    } catch (e: any) {
+      toast({
+        title: lang === "zh" ? "傳送失敗" : "Send failed",
+        description: e?.message ?? "",
+        variant: "destructive",
+      });
+    } finally {
+      setPushBusy(null);
+    }
+  };
 
   // Load existing plan on mount
   useEffect(() => {
@@ -639,10 +708,35 @@ const ProgramsTab = ({ lang, onLoginRequest }: Props) => {
   return (
     <div className="px-5 pt-6 pb-8 max-w-lg mx-auto">
       {/* Header */}
-      <div className="flex items-center justify-center mb-4">
+      <div className="flex items-center justify-between mb-4">
+        <div className="w-8" />
         <h1 className="font-display text-lg font-bold text-foreground">
           {lang === "zh" ? "訓練日曆" : "Training Calendar"}
         </h1>
+        {terraProvider ? (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                className="p-1.5 rounded-full hover:bg-accent transition-colors"
+                aria-label={lang === "zh" ? "傳送至手錶" : "Send to watch"}
+              >
+                {pushBusy === "week" || pushBusy === "all"
+                  ? <Loader2 size={18} className="animate-spin text-primary" />
+                  : <Watch size={18} className="text-primary" />}
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => sendToWatch("week", currentWeek.week)}>
+                {lang === "zh" ? `傳送本週至 ${terraProvider}` : `Send this week to ${terraProvider}`}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => sendToWatch("all")}>
+                {lang === "zh" ? `傳送整個計劃至 ${terraProvider}` : `Send entire plan to ${terraProvider}`}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ) : (
+          <div className="w-8" />
+        )}
       </div>
 
       {/* Week navigation */}
@@ -724,6 +818,25 @@ const ProgramsTab = ({ lang, onLoginRequest }: Props) => {
                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
                         {day.pace && <span>{day.pace}</span>}
                         {day.distance_km && <span>{day.distance_km} km</span>}
+                        {terraProvider && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              sendToWatch("day", currentWeek.week, i);
+                            }}
+                            disabled={pushBusy === `${currentWeek.week}:${i}`}
+                            title={pushedKeys.has(`${currentWeek.week}:${i}`)
+                              ? (lang === "zh" ? `已傳送至 ${terraProvider}` : `Sent to ${terraProvider}`)
+                              : (lang === "zh" ? `傳送至 ${terraProvider}` : `Send to ${terraProvider}`)}
+                            className="p-1 rounded hover:bg-accent disabled:opacity-50"
+                          >
+                            {pushBusy === `${currentWeek.week}:${i}`
+                              ? <Loader2 size={12} className="animate-spin" />
+                              : pushedKeys.has(`${currentWeek.week}:${i}`)
+                                ? <Check size={12} className="text-green-500" />
+                                : <Watch size={12} />}
+                          </button>
+                        )}
                       </div>
                     </div>
                     <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{localizeDescription(day, lang)}</p>

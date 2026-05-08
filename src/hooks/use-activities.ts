@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { getAppEnvironment } from "@/lib/environment";
+import { subscribePlanChanged } from "@/lib/planEvents";
 
 export interface ActivityWeather {
   temp: number | null;

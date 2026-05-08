@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, lazy, Suspense } from "react";
+import React, { useState, useEffect, useMemo, lazy, Suspense } from "react";
 import { Lang, t } from "@/lib/i18n";
 import { getMainPaces, predictTime, formatTime, raceDistances } from "@/lib/vdot";
 import { Button } from "@/components/ui/button";
@@ -10,10 +10,16 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useOnlineStatus, isOnline } from "@/hooks/use-online-status";
 import { getCached, setCached, CacheKeys } from "@/lib/offlineCache";
+import { registerUnsavedChecker } from "@/lib/unsavedGuard";
 import {
   Loader2, Lock, ChevronLeft, ChevronRight, Plus, Calendar, Target, Trophy,
-  Repeat, Route, HelpCircle, X, WifiOff, Sparkles
+  Repeat, Route, HelpCircle, X, WifiOff, Sparkles, GripVertical, Save
 } from "lucide-react";
+import {
+  DndContext, PointerSensor, TouchSensor, useSensor, useSensors,
+  closestCenter, type DragEndEvent
+} from "@dnd-kit/core";
+import { useDraggable, useDroppable } from "@dnd-kit/core";
 import WeeklyReviewModal from "@/components/training/WeeklyReviewModal";
 const CalculatorTab = lazy(() => import("@/components/CalculatorTab"));
 import freePlan5k from "@/assets/free-plan-5k.jpg";
@@ -203,6 +209,138 @@ const labelForDay = (day: any, i: number): string => {
   return DAY_LABELS[i] || (day?.day?.substring(0, 3).toUpperCase() ?? "");
 };
 
+// Draggable + droppable day row for the AI calendar (long-press to swap)
+const DraggableDay = ({
+  id, idx, day, lang, isToday, dayNum,
+  onEditClick, onAddClick,
+}: {
+  id: string;
+  idx: number;
+  day: DayPlan;
+  lang: Lang;
+  isToday: boolean;
+  dayNum: number | string;
+  onEditClick: () => void;
+  onAddClick: () => void;
+}) => {
+  const { attributes, listeners, setNodeRef: setDragRef, isDragging, transform } = useDraggable({ id });
+  const { setNodeRef: setDropRef, isOver } = useDroppable({ id });
+
+  const setRefs = (node: HTMLDivElement | null) => {
+    setDragRef(node);
+    setDropRef(node);
+  };
+
+  const style: React.CSSProperties = {
+    transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
+    opacity: isDragging ? 0.5 : 1,
+    touchAction: "none",
+  };
+
+  return (
+    <div ref={setRefs} style={style} className={`flex items-stretch gap-2 rounded-lg ${isOver && !isDragging ? "ring-2 ring-primary bg-primary/5" : ""}`}>
+      <div className="w-10 flex-shrink-0 flex flex-col items-center pt-3">
+        <span className="text-[10px] font-medium text-muted-foreground uppercase">{labelForDay(day, idx)}</span>
+        <span className={`text-sm font-bold ${isToday ? "text-primary" : "text-foreground"}`}>{dayNum}</span>
+      </div>
+      {day.type === "Rest" ? (
+        <div className="flex-1 border-l-2 border-border pl-3 py-3 min-h-[48px] flex items-center gap-2">
+          <button
+            type="button"
+            {...listeners}
+            {...attributes}
+            className="text-muted-foreground/60 hover:text-muted-foreground cursor-grab active:cursor-grabbing touch-none"
+            aria-label="Drag to swap"
+          >
+            <GripVertical size={14} />
+          </button>
+          <button onClick={onAddClick} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
+            <Plus size={12} />{lang === "zh" ? "新增" : "Add"}
+          </button>
+        </div>
+      ) : (
+        <div className="flex-1 border-l-2 pl-3 py-2" style={{ borderColor: day.color || "hsl(var(--border))" }}>
+          <div className="bg-card border border-border rounded-lg p-3 hover:border-primary transition-colors flex items-stretch gap-2">
+            <button
+              type="button"
+              {...listeners}
+              {...attributes}
+              className="flex items-center text-muted-foreground/60 hover:text-muted-foreground cursor-grab active:cursor-grabbing touch-none -my-1 -ml-1 px-1"
+              aria-label="Drag to swap"
+            >
+              <GripVertical size={16} />
+            </button>
+            <div className="flex-1 min-w-0 cursor-pointer" onClick={onEditClick}>
+              <div className="flex items-center justify-between">
+                <span className="font-medium text-sm text-foreground">{localizeTitle(day.type, lang)}</span>
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  {day.pace && <span>{day.pace}</span>}
+                  {day.distance_km && <span>{day.distance_km} km</span>}
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{localizeDescription(day, lang)}</p>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Calendar day list with long-press drag-to-swap (within a week)
+const CalendarDayList = ({
+  days, weekIdx, lang, onSwap, onAddClick, onEditClick,
+}: {
+  days: DayPlan[];
+  weekIdx: number;
+  lang: Lang;
+  onSwap: (fromIdx: number, toIdx: number) => void;
+  onAddClick: (idx: number) => void;
+  onEditClick: (idx: number, day: DayPlan) => void;
+}) => {
+  // Long-press: 250ms hold before drag begins (mouse + touch)
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { delay: 250, tolerance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } }),
+  );
+  const todayStr = new Date().toISOString().split("T")[0];
+  return (
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      onDragEnd={(e: DragEndEvent) => {
+        if (!e.over) return;
+        const fromIdx = Number(String(e.active.id).split(":")[1]);
+        const toIdx = Number(String(e.over.id).split(":")[1]);
+        if (Number.isFinite(fromIdx) && Number.isFinite(toIdx) && fromIdx !== toIdx) {
+          onSwap(fromIdx, toIdx);
+        }
+      }}
+    >
+      <div className="space-y-1">
+        {days.map((day, i) => {
+          const dateObj = day.date ? new Date(day.date + "T00:00:00") : null;
+          const dayNum = dateObj ? dateObj.getDate() : "";
+          const isToday = day.date === todayStr;
+          return (
+            <DraggableDay
+              key={`${weekIdx}:${i}`}
+              id={`day:${i}`}
+              idx={i}
+              day={day}
+              lang={lang}
+              isToday={isToday}
+              dayNum={dayNum}
+              onEditClick={() => onEditClick(i, day)}
+              onAddClick={() => onAddClick(i)}
+            />
+          );
+        })}
+      </div>
+    </DndContext>
+  );
+};
+
 const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
   const { isPremium } = usePremium();
   const { user } = useAuth();
@@ -274,6 +412,8 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
   const [existingPlan, setExistingPlan] = useState<any>(null);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [showWeeklyReview, setShowWeeklyReview] = useState(false);
+  const [planDirty, setPlanDirty] = useState(false);
+  const [savingPlan, setSavingPlan] = useState(false);
 
   // Add/Edit workout
   const [addingDayIdx, setAddingDayIdx] = useState<number | null>(null);
@@ -376,6 +516,74 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
     const m = Math.floor(pacePerKm / 60);
     const s = Math.round(pacePerKm % 60);
     return `${m}:${s.toString().padStart(2, "0")} / km`;
+  };
+
+  // Register unsaved-changes guard for plan edits
+  useEffect(() => registerUnsavedChecker(() => planDirty), [planDirty]);
+
+  // Warn on browser close/refresh while plan is dirty
+  useEffect(() => {
+    if (!planDirty) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [planDirty]);
+
+  // Swap two days' workouts (within the current week) — preserves date & day label
+  const swapDays = (weekIdx: number, fromIdx: number, toIdx: number) => {
+    if (fromIdx === toIdx) return;
+    setPlan((prev) => {
+      const next = prev.map((w) => ({ ...w, days: w.days.slice() }));
+      const week = next[weekIdx];
+      if (!week) return prev;
+      const a = week.days[fromIdx];
+      const b = week.days[toIdx];
+      if (!a || !b) return prev;
+      // Swap workout content (everything except date & day label)
+      const swap = (x: DayPlan, y: DayPlan): DayPlan => ({
+        day: x.day,
+        date: x.date,
+        type: y.type,
+        title: y.title,
+        description: y.description,
+        distance_km: y.distance_km,
+        pace: y.pace,
+        color: y.color,
+      });
+      week.days[fromIdx] = swap(a, b);
+      week.days[toIdx] = swap(b, a);
+      return next;
+    });
+    setPlanDirty(true);
+  };
+
+  const savePlanEdits = async () => {
+    if (!user || !existingPlan?.id) return;
+    setSavingPlan(true);
+    try {
+      const { error } = await supabase
+        .from("training_plans" as any)
+        .update({ plan_data: plan as any })
+        .eq("id", existingPlan.id);
+      if (error) throw error;
+      setExistingPlan({ ...existingPlan, plan_data: plan });
+      setPlanDirty(false);
+      toast({
+        title: lang === "zh" ? "已儲存" : "Saved",
+        description: lang === "zh" ? "訓練計劃已更新" : "Your training plan has been updated",
+      });
+    } catch (err: any) {
+      toast({
+        title: lang === "zh" ? "儲存失敗" : "Save failed",
+        description: err.message || (lang === "zh" ? "請稍後再試" : "Please try again"),
+        variant: "destructive",
+      });
+    } finally {
+      setSavingPlan(false);
+    }
   };
 
   // Keep restDays valid given daysPerWeek and longRunDay
@@ -496,7 +704,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
       const { clearCached } = await import("@/lib/offlineCache");
       clearCached(CacheKeys.trainingPlan(user.id));
     }
-    setProgramStep("details"); setDistance(null); setTargetTime(""); setTargetHours(""); setTargetMinutes(""); setTargetSeconds(""); setRaceDate(""); setStartDate(""); setPlan([]); setExistingPlan(null);
+    setProgramStep("details"); setDistance(null); setTargetTime(""); setTargetHours(""); setTargetMinutes(""); setTargetSeconds(""); setRaceDate(""); setStartDate(""); setPlan([]); setExistingPlan(null); setPlanDirty(false);
   };
 
 
@@ -1389,48 +1597,30 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                        <p className="text-xs text-muted-foreground">{lang === "zh" ? "總計" : "Total"}: {totalKm.toFixed(1)} km</p>
                     </div>
 
-                    <div className="space-y-1">
-                      {currentWeek.days.map((day, i) => {
-                        const dateObj = day.date ? new Date(day.date + "T00:00:00") : null;
-                        const dayNum = dateObj ? dateObj.getDate() : "";
-                        const isToday = day.date === new Date().toISOString().split("T")[0];
-                        return (
-                          <div key={i} className="flex items-stretch gap-2">
-                            <div className="w-10 flex-shrink-0 flex flex-col items-center pt-3">
-                              <span className="text-[10px] font-medium text-muted-foreground uppercase">{labelForDay(day, i)}</span>
-                              <span className={`text-sm font-bold ${isToday ? "text-primary" : "text-foreground"}`}>{dayNum}</span>
-                            </div>
-                            {day.type === "Rest" ? (
-                              <div className="flex-1 border-l-2 border-border pl-3 py-3 min-h-[48px] flex items-center">
-                                <button onClick={() => { setAddingDayIdx(i); setAddRunType(null); setAddDistance(""); }} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
-                                  <Plus size={12} />{lang === "zh" ? "新增" : "Add"}
-                                </button>
-                              </div>
-                            ) : (
-                              <div className="flex-1 border-l-2 pl-3 py-2 cursor-pointer" style={{ borderColor: day.color || "hsl(var(--border))" }}
-                                onClick={() => { setEditingDayIdx(i); setEditDistance(day.distance_km?.toString() || ""); setEditPace(day.pace || ""); setEditDescription(day.description || ""); }}>
-                                <div className="bg-card border border-border rounded-lg p-3 hover:border-primary transition-colors">
-                                  <div className="flex items-center justify-between">
-                                    <span className="font-medium text-sm text-foreground">{localizeTitle(day.type, lang)}</span>
-                                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                      {day.pace && <span>{day.pace}</span>}
-                                      {day.distance_km && <span>{day.distance_km} km</span>}
-                                    </div>
-                                  </div>
-                                  <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{localizeDescription(day, lang)}</p>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
+                    <CalendarDayList
+                      days={currentWeek.days}
+                      weekIdx={currentWeekIdx}
+                      lang={lang}
+                      onSwap={(from, to) => swapDays(currentWeekIdx, from, to)}
+                      onAddClick={(i) => { setAddingDayIdx(i); setAddRunType(null); setAddDistance(""); }}
+                      onEditClick={(i, day) => { setEditingDayIdx(i); setEditDistance(day.distance_km?.toString() || ""); setEditPace(day.pace || ""); setEditDescription(day.description || ""); }}
+                    />
 
                     <div className="flex items-center justify-center gap-1 mt-6">
                       {plan.map((_, i) => (
                         <button key={i} onClick={() => setCurrentWeekIdx(i)} className={`w-2 h-2 rounded-full transition-colors ${i === currentWeekIdx ? "bg-primary" : "bg-border"}`} />
                       ))}
                     </div>
+
+                    {planDirty && (
+                      <Button onClick={savePlanEdits} disabled={savingPlan} className="w-full mt-4" size="lg">
+                        {savingPlan ? (
+                          <><Loader2 className="animate-spin mr-2" size={16} />{lang === "zh" ? "儲存中…" : "Saving…"}</>
+                        ) : (
+                          <><Save size={16} className="mr-2" />{lang === "zh" ? "儲存變更" : "Save Changes"}</>
+                        )}
+                      </Button>
+                    )}
 
                     {/* Weekly Review temporarily hidden for testing
                     <Button
@@ -1443,7 +1633,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                     </Button>
                     */}
 
-                    <Button variant="outline" className="w-full mt-2 text-destructive border-destructive/30 hover:bg-destructive/10" onClick={() => setShowCancelConfirm(true)}>
+                    <Button variant="outline" className="w-full mt-2 text-destructive border-destructive/30 hover:bg-destructive/10" onClick={() => { if (planDirty && !window.confirm(lang === "zh" ? "您有未儲存的變更，仍要取消計劃嗎？" : "You have unsaved changes. Cancel the plan anyway?")) return; setShowCancelConfirm(true); }}>
                       {lang === "zh" ? "取消計劃" : "Cancel Plan"}
                     </Button>
                   </>

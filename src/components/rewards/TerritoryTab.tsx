@@ -153,6 +153,14 @@ const TerritoryTab = ({ lang }: Props) => {
           ? "在地塊上跑步即可佔領,最後一位跑過的擁有該地塊"
           : "Run through a hex to claim it. Last runner to cross owns it."}
       </p>
+
+      <ShareTerritoryDialog
+        open={shareOpen}
+        onOpenChange={setShareOpen}
+        hexes={hexes.filter((h) => h.owner_user_id === user.id)}
+        displayName={displayName}
+        lang={lang}
+      />
     </div>
   );
 };

@@ -562,27 +562,18 @@ Deno.serve(async (req) => {
             toFiniteNumber(d?.scores?.overall) ??
             toFiniteNumber(d?.scores?.sleep_score) ??
             toFiniteNumber(d?.sleep_score);
-          // Sleep summary also carries overnight RHR + HRV (RMSSD) — the only
-          // place Garmin exposes HRV via Terra. Use as fallback / primary source.
-          const sleepHrSummary = d?.heart_rate_data?.summary ?? {};
-          const sleepRhr = toFiniteNumber(sleepHrSummary?.resting_hr_bpm);
-          const sleepHrv = toFiniteNumber(sleepHrSummary?.avg_hrv_rmssd);
           const existing = dailyByDate[date] ?? {
             user_id: c.user_id, provider: c.provider, date,
             resting_hr: null, steps: null, vo2max: null,
-            sleep_seconds: null, sleep_score: null, hrv: null,
+            sleep_seconds: null, sleep_score: null,
           };
           const newSec = totalSec ? Math.round(totalSec) : null;
           // Keep the longest sleep session for the day.
           if (newSec != null && (existing.sleep_seconds == null || newSec > existing.sleep_seconds)) {
             existing.sleep_seconds = newSec;
             if (score != null) existing.sleep_score = Math.round(score);
-            if (sleepRhr != null) existing.resting_hr = Math.round(sleepRhr);
-            if (sleepHrv != null) existing.hrv = Math.round(sleepHrv * 10) / 10;
-          } else {
-            if (existing.sleep_score == null && score != null) existing.sleep_score = Math.round(score);
-            if (existing.resting_hr == null && sleepRhr != null) existing.resting_hr = Math.round(sleepRhr);
-            if (existing.hrv == null && sleepHrv != null) existing.hrv = Math.round(sleepHrv * 10) / 10;
+          } else if (existing.sleep_score == null && score != null) {
+            existing.sleep_score = Math.round(score);
           }
           dailyByDate[date] = existing;
         }

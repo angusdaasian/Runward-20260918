@@ -1,61 +1,64 @@
-## Goal
+## HRV data check
 
-1. The **Sync** button on the Daily Health card (Analytics → Performance) should poll **sleep, sleep score, RHR, and HRV** for the active provider — Garmin included — by calling Terra's `/v2/sleep` endpoint where these values actually live.
-2. **Hide** the **Resync** button on the All-Activities view (don't delete the handler — it'll be reused later for a premium "refetch all activities since 2026" feature).
+Yes — HRV is being received and stored in `terra_daily_health.hrv` (nightly RMSSD in ms). Verified via DB query: COROS users have daily HRV values for the past week (range observed ~29-123 ms across users).
 
----
+The hook `useTerraDailyHealth` already selects `hrv` and returns up to 60 days, but the UI (`HealthStatsCard`) doesn't render it.
 
-## Why the current sync doesn't get Garmin HRV
+## What to build
 
-Confirmed by probing Terra's REST API directly for a Garmin user:
+### 1. New component: `HRVReadinessCard.tsx`
+Place under `src/components/analytics/`. Shown only when the user has at least 3 HRV data points in the last 14 days (otherwise hidden — same pattern as other cards).
 
-- `/v2/daily` for Garmin returns 500 / no HRV.
-- `/v2/sleep` returns nightly `avg_hrv_rmssd` (e.g. 78, 85, 78, 73.6 ms over the last few nights) **and** `resting_hr_bpm` — exactly the schema you quoted (`hrv_samples_rmssd[]` per night).
-- Webhooks for Garmin never include `rmssd` (0 of 10k+ events in 60 days).
+**Sections:**
+- Header: "HRV & Readiness" / "心率變異與訓練準備度", provider chip (same multi-provider switching as `HealthStatsCard`)
+- Big readiness score (0–100) with colored label (Recovered / Balanced / Strained / Overreached)
+- 7-day HRV sparkline using Recharts `LineChart` (last 7 entries, descending → re-sorted ascending), with shaded baseline band (mean ± 0.5·SD across last 60 days)
+- Today's HRV value + 7-day average + delta vs baseline (e.g. "62 ms · 7d avg 58 · +4 vs baseline")
+- Short explanation text (EN/ZH) describing what the score means
 
-Today `terra-sync` reads RHR from `/v2/daily` only (often null for Garmin) and never reads HRV from sleep summaries. That's why the Daily Health card shows `—` for HRV and the new Readiness card hides for Garmin users.
+### 2. Readiness score formula
 
----
+Based on the standard sport-science approach (Plews/Buchheit, HRV4Training, Whoop/Garmin Body Battery patterns) — using the **Ln(RMSSD) 7-day rolling mean vs 60-day personal baseline**, adjusted by RHR trend:
 
-## Changes
+```text
+1. baseline_mean   = mean( ln(hrv) ) over last 60 days (min 14 pts; fallback to all available)
+   baseline_sd     = stdev( ln(hrv) ) over same window  (floor at 0.05 to avoid div/0)
+2. recent_mean     = mean( ln(hrv) ) over last 7 days
+3. hrv_z           = (recent_mean - baseline_mean) / baseline_sd          // typically -3..+3
+4. rhr_baseline    = mean(resting_hr) last 60d
+   rhr_recent      = mean(resting_hr) last 7d
+   rhr_z           = (rhr_baseline - rhr_recent) / max(stdev_rhr, 1)      // higher RHR -> negative
+5. composite       = 0.75 * hrv_z + 0.25 * rhr_z
+6. readiness       = clamp( round( 50 + composite * 15 ), 1, 99 )
+```
 
-### 1. `supabase/functions/terra-sync/index.ts` — sleep loop now also captures RHR + HRV
+**Bands:**
+- 80–99 Primed (green) — well recovered, can handle hard sessions
+- 65–79 Balanced (emerald) — normal, train as planned
+- 45–64 Moderate (amber) — recovery slightly below baseline, prefer easy/moderate
+- 25–44 Strained (orange) — fatigue accumulating, easy day or rest
+- 1–24 Overreached (red) — strong rest/recovery signal
 
-In the existing `/v2/sleep` block (around line 530), in addition to `sleep_seconds` / `sleep_score`, also extract:
+This is a personalised z-score model — research consistently shows individual baselines outperform absolute thresholds for HRV-guided training (Plews 2013, Buchheit 2014, HRV4Training app).
 
-- `resting_hr = d.heart_rate_data.summary.resting_hr_bpm` (fallback when daily endpoint omits it — true for Garmin).
-- `hrv = d.heart_rate_data.summary.avg_hrv_rmssd` (the nightly RMSSD).
+### 3. Helper file: `src/lib/hrvReadiness.ts`
+Pure functions:
+- `computeReadiness(rows: TerraDailyHealthRow[]): { score, band, hrv7, baselineHrv, deltaPct, rhr7, rhrBaseline }`
+- `getReadinessBand(score, lang): { label, color, description }`
+- Selectors for the 7-day sparkline series (chronological)
 
-When merging the sleep record into `dailyByDate[date]`:
-- Always **prefer** the longest sleep session's `resting_hr` / `hrv` for that night.
-- Only overwrite `existing.resting_hr` / `existing.hrv` when the new value is non-null (don't clobber a value already set by `/v2/daily`).
+### 4. Wire into UI
+Mount `<HRVReadinessCard lang={lang} />` in `src/components/AnalyticsTab.tsx` directly below `<HealthStatsCard />` (or wherever the latter sits — confirm during build).
 
-Result: Garmin nights now land in `terra_daily_health` with `hrv` and `resting_hr` populated.
+## Files to add / change
 
-### 2. `src/hooks/use-terra-daily-health.ts` — already calls `terra-sync` with `healthOnly:true`
+- ADD `src/lib/hrvReadiness.ts`
+- ADD `src/components/analytics/HRVReadinessCard.tsx`
+- EDIT `src/components/AnalyticsTab.tsx` — render new card
+- (No DB / edge function / hook changes — existing hook already returns `hrv`)
 
-No change needed. The `Sync` button on the Daily Health card already invokes `terra-sync` with `{ healthOnly: true, provider }` — once the function above is fixed, one click pulls sleep / sleep score / RHR / HRV.
+## Out of scope
 
-### 3. Backfill the last 60 days for existing Garmin users
-
-After deploying the function, run a one-shot backfill so the Readiness card and Daily Health HRV light up immediately without users having to tap Sync. Plan: invoke `terra-sync` with `{ healthOnly: true, provider: "GARMIN", targetUserId }` (admin-only path already exists) for each active Garmin connection. Done from a small SQL → loop in the agent shell, no migration needed.
-
-### 4. `src/components/ActivitiesTab.tsx` — hide the Resync button
-
-Wrap the existing button (lines 570–579) in `{false && ahConnected && (...)}` (or comment it out behind a feature flag) so it disappears from the UI. **Keep** `handleResync`, `resyncing`, `setResyncing`, and `RefreshCw` import in place — they'll be repurposed for the upcoming premium "refetch all activities since 2026" feature.
-
----
-
-## Out of scope (kept for later)
-
-- Storing the per-sample `hrv_samples_rmssd[]` array (would need a new column / table). For now we only persist the nightly summary, which is what the Readiness algorithm needs.
-- The premium "refetch since 2026" button — this plan only frees the slot.
-
----
-
-## Verification after deploy
-
-1. Call `terra-sync` for the Garmin test user (`6hhxbmqfy7@…`) with `{ healthOnly: true, provider: "GARMIN" }`.
-2. `select date, hrv, resting_hr, sleep_seconds, sleep_score from terra_daily_health where provider='GARMIN' order by date desc limit 7;` — expect HRV values around 70–90 ms.
-3. Open Analytics → Performance: Daily Health card shows RHR + sleep, HRV & Readiness card now appears for Garmin and renders the 7-day curve.
-4. Open All Activities view: Resync button is gone.
+- Backfilling HRV for users on providers that don't currently send it (Garmin via Terra often omits HRV nightly avg)
+- Pushing readiness into the AI coach prompt — can be a follow-up
+- Storing computed readiness server-side (computed client-side from cached rows)

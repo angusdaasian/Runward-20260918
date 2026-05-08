@@ -16,6 +16,7 @@ interface Hex {
   captured_at: string;
   capture_count: number;
   city_slug: string | null;
+  iOwn?: boolean;
 }
 
 interface Props {
@@ -38,9 +39,19 @@ const TerritoryTab = ({ lang }: Props) => {
       .select("hex_id, region, owner_user_id, owner_display_name, captured_at, capture_count, city_slug")
       .order("captured_at", { ascending: false })
       .limit(10000);
-    if (!error && data) setHexes(data as Hex[]);
+    let myCaptured = new Set<string>();
+    if (user) {
+      const { data: caps } = await supabase
+        .from("territory_captures")
+        .select("hex_id")
+        .eq("user_id", user.id);
+      myCaptured = new Set((caps ?? []).map((r: any) => r.hex_id as string));
+    }
+    if (!error && data) {
+      setHexes((data as Hex[]).map((h) => ({ ...h, iOwn: myCaptured.has(h.hex_id) })));
+    }
     setLoading(false);
-  }, []);
+  }, [user]);
 
   useEffect(() => { loadHexes(); }, [loadHexes]);
 
@@ -75,7 +86,7 @@ const TerritoryTab = ({ lang }: Props) => {
     }
   }, [user, autoSynced, sync]);
 
-  const myHexes = hexes.filter((h) => h.owner_user_id === user?.id).length;
+  const myHexes = hexes.filter((h) => h.iOwn).length;
   const totalHexes = hexes.length;
 
   if (!user) {
@@ -147,8 +158,8 @@ const TerritoryTab = ({ lang }: Props) => {
 
       <p className="text-[11px] text-muted-foreground text-center px-2">
         {lang === "zh"
-          ? "在地塊上跑步即可佔領,最後一位跑過的擁有該地塊"
-          : "Run through a hex to claim it. Last runner to cross owns it."}
+          ? "在地塊上跑步即可佔領,每個地塊可被多位跑者共同擁有"
+          : "Run through a hex to claim it. Hexes can be owned by multiple runners."}
       </p>
     </div>
   );

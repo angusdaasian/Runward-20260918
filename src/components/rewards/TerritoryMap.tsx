@@ -9,14 +9,21 @@ interface Hex {
   owner_display_name: string | null;
   captured_at: string;
   capture_count: number;
+  city_slug?: string | null;
+}
+
+interface FocusCity {
+  slug: string;
+  bbox: [number, number, number, number]; // [minLat, minLng, maxLat, maxLng]
 }
 
 interface Props {
   hexes: Hex[];
   currentUserId: string | null;
+  focusCity?: FocusCity | null;
 }
 
-const TerritoryMap = ({ hexes, currentUserId }: Props) => {
+const TerritoryMap = ({ hexes, currentUserId, focusCity }: Props) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const layerRef = useRef<L.LayerGroup | null>(null);
@@ -55,6 +62,7 @@ const TerritoryMap = ({ hexes, currentUserId }: Props) => {
 
     for (const hex of hexes) {
       const isMine = hex.owner_user_id === currentUserId;
+      const dimmed = focusCity ? hex.city_slug !== focusCity.slug : false;
       const boundary = cellToBoundary(hex.hex_id) as [number, number][];
       boundary.forEach((p) => {
         allBounds.push(p);
@@ -64,7 +72,8 @@ const TerritoryMap = ({ hexes, currentUserId }: Props) => {
         color: isMine ? ownAccent : otherColor,
         weight: 1,
         fillColor: isMine ? ownAccent : otherColor,
-        fillOpacity: isMine ? 0.45 : 0.25,
+        fillOpacity: dimmed ? 0.08 : isMine ? 0.45 : 0.25,
+        opacity: dimmed ? 0.2 : 1,
       });
       const date = new Date(hex.captured_at).toLocaleDateString();
       polygon.bindPopup(
@@ -73,15 +82,20 @@ const TerritoryMap = ({ hexes, currentUserId }: Props) => {
       polygon.addTo(layerRef.current);
     }
 
-    // Auto-fit on first render with data — prefer the user's own hexes
-    if (!fittedRef.current && hexes.length > 0) {
+    if (focusCity) {
+      const [minLat, minLng, maxLat, maxLng] = focusCity.bbox;
+      mapRef.current.fitBounds(
+        L.latLngBounds([minLat, minLng], [maxLat, maxLng]),
+        { padding: [30, 30] },
+      );
+    } else if (!fittedRef.current && hexes.length > 0) {
       const target = myBounds.length > 0 ? myBounds : allBounds;
       if (target.length > 0) {
         mapRef.current.fitBounds(L.latLngBounds(target), { padding: [30, 30], maxZoom: 13 });
         fittedRef.current = true;
       }
     }
-  }, [hexes, currentUserId]);
+  }, [hexes, currentUserId, focusCity]);
 
   return (
     <div

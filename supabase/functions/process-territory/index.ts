@@ -95,6 +95,39 @@ Deno.serve(async (req) => {
       const existingMap = new Map<string, { owner_user_id: string; capture_count: number }>();
       for (const e of (existing ?? []) as any[]) existingMap.set(e.hex_id, e);
 
+      // Look up city_slug for each hex
+      const { data: cityMappings } = await admin.from("territory_city_hexes").select("hex_id, city_slug").in("hex_id", hexIds);
+      const cityMap = new Map<string, string>();
+      for (const m of (cityMappings ?? []) as any[]) cityMap.set(m.hex_id, m.city_slug);
+
+      // For unmapped hexes, call resolve-city (rate-limited, dedupe by ~10km grid)
+      const unmapped = hexIds.filter((h) => !cityMap.has(h));
+      const seenGrid = new Set<string>();
+      for (const hex_id of unmapped) {
+        const [lat, lng] = cellToLatLng(hex_id);
+        const gridKey = `${lat.toFixed(1)},${lng.toFixed(1)}`;
+        if (seenGrid.has(gridKey)) continue;
+        seenGrid.add(gridKey);
+        try {
+          const resp = await fetch(`${supabaseUrl}/functions/v1/resolve-city`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}`, apikey: serviceKey },
+            body: JSON.stringify({ hex_id }),
+          });
+          if (resp.ok) {
+            const body = await resp.json();
+            if (body?.slug) {
+              // Re-fetch mapping for all our hex ids — polygon insert may have covered many
+              const { data: refreshed } = await admin.from("territory_city_hexes").select("hex_id, city_slug").in("hex_id", hexIds);
+              for (const m of (refreshed ?? []) as any[]) cityMap.set(m.hex_id, m.city_slug);
+            }
+          }
+        } catch (e) {
+          console.error("resolve-city call failed", e);
+        }
+        await new Promise((r) => setTimeout(r, 1100));
+      }
+
       const upserts = hexIds.map((hex_id) => {
         const ex = existingMap.get(hex_id);
         if (!ex) newHexes++;
@@ -103,6 +136,7 @@ Deno.serve(async (req) => {
         return {
           hex_id,
           region: `${lat.toFixed(1)},${lng.toFixed(1)}`,
+          city_slug: cityMap.get(hex_id) ?? null,
           owner_user_id: user.id,
           owner_display_name: displayName,
           captured_at: new Date().toISOString(),

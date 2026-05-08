@@ -3,9 +3,10 @@ import { Lang } from "@/lib/i18n";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
-import { Loader2, RefreshCw, MapPin, Trophy } from "lucide-react";
+import { Loader2, RefreshCw, MapPin, Trophy, X } from "lucide-react";
 import { toast } from "sonner";
 import TerritoryMap from "./TerritoryMap";
+import CityProgressList from "./CityProgressList";
 
 interface Hex {
   hex_id: string;
@@ -14,6 +15,7 @@ interface Hex {
   owner_display_name: string | null;
   captured_at: string;
   capture_count: number;
+  city_slug: string | null;
 }
 
 interface Props {
@@ -26,12 +28,14 @@ const TerritoryTab = ({ lang }: Props) => {
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [autoSynced, setAutoSynced] = useState(false);
+  const [focusedCity, setFocusedCity] = useState<{ slug: string; bbox: [number, number, number, number] } | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const loadHexes = useCallback(async () => {
     setLoading(true);
     const { data, error } = await supabase
       .from("territory_hexes")
-      .select("hex_id, region, owner_user_id, owner_display_name, captured_at, capture_count")
+      .select("hex_id, region, owner_user_id, owner_display_name, captured_at, capture_count, city_slug")
       .order("captured_at", { ascending: false })
       .limit(10000);
     if (!error && data) setHexes(data as Hex[]);
@@ -55,6 +59,7 @@ const TerritoryTab = ({ lang }: Props) => {
         );
       }
       await loadHexes();
+      setRefreshKey((k) => k + 1);
     } catch (e: any) {
       toast.error(lang === "zh" ? "同步失敗" : "Sync failed");
       console.error(e);
@@ -114,12 +119,30 @@ const TerritoryTab = ({ lang }: Props) => {
         )}
       </Button>
 
+      <CityProgressList
+        userId={user.id}
+        lang={lang}
+        onCityFocus={setFocusedCity}
+        focusedSlug={focusedCity?.slug ?? null}
+        refreshKey={refreshKey}
+      />
+
+      {focusedCity && (
+        <button
+          onClick={() => setFocusedCity(null)}
+          className="w-full inline-flex items-center justify-center gap-1.5 text-xs text-muted-foreground hover:text-foreground rounded-md border border-border py-1.5"
+        >
+          <X size={12} />
+          {lang === "zh" ? "顯示全部" : "Show all hexes"}
+        </button>
+      )}
+
       {loading && hexes.length === 0 ? (
         <div className="h-[60vh] rounded-lg border border-border bg-muted/30 flex items-center justify-center">
           <Loader2 className="animate-spin text-muted-foreground" size={20} />
         </div>
       ) : (
-        <TerritoryMap hexes={hexes} currentUserId={user.id} />
+        <TerritoryMap hexes={hexes} currentUserId={user.id} focusCity={focusedCity} />
       )}
 
       <p className="text-[11px] text-muted-foreground text-center px-2">

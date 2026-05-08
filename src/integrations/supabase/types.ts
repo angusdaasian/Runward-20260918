@@ -1286,11 +1286,80 @@ export type Database = {
         }
         Relationships: []
       }
+      territory_cities: {
+        Row: {
+          admin1: string | null
+          bbox: Json
+          center_lat: number
+          center_lng: number
+          country: string | null
+          created_at: string
+          display_name: string
+          display_name_zh: string | null
+          polygon_filled_at: string | null
+          slug: string
+          total_hex_count: number
+        }
+        Insert: {
+          admin1?: string | null
+          bbox: Json
+          center_lat: number
+          center_lng: number
+          country?: string | null
+          created_at?: string
+          display_name: string
+          display_name_zh?: string | null
+          polygon_filled_at?: string | null
+          slug: string
+          total_hex_count?: number
+        }
+        Update: {
+          admin1?: string | null
+          bbox?: Json
+          center_lat?: number
+          center_lng?: number
+          country?: string | null
+          created_at?: string
+          display_name?: string
+          display_name_zh?: string | null
+          polygon_filled_at?: string | null
+          slug?: string
+          total_hex_count?: number
+        }
+        Relationships: []
+      }
+      territory_city_hexes: {
+        Row: {
+          city_slug: string
+          created_at: string
+          hex_id: string
+        }
+        Insert: {
+          city_slug: string
+          created_at?: string
+          hex_id: string
+        }
+        Update: {
+          city_slug?: string
+          created_at?: string
+          hex_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "territory_city_hexes_city_slug_fkey"
+            columns: ["city_slug"]
+            isOneToOne: false
+            referencedRelation: "territory_cities"
+            referencedColumns: ["slug"]
+          },
+        ]
+      }
       territory_hexes: {
         Row: {
           capture_count: number
           captured_activity_id: string | null
           captured_at: string
+          city_slug: string | null
           hex_id: string
           id: string
           owner_display_name: string | null
@@ -1301,6 +1370,7 @@ export type Database = {
           capture_count?: number
           captured_activity_id?: string | null
           captured_at?: string
+          city_slug?: string | null
           hex_id: string
           id?: string
           owner_display_name?: string | null
@@ -1311,6 +1381,7 @@ export type Database = {
           capture_count?: number
           captured_activity_id?: string | null
           captured_at?: string
+          city_slug?: string | null
           hex_id?: string
           id?: string
           owner_display_name?: string | null

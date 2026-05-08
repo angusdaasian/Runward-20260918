@@ -44,7 +44,7 @@ serve(async (req) => {
   }
 
   try {
-    const { goal, distance, targetTime, raceDate, startDate, weeks, daysPerWeek, weeklyKm, lang } = await req.json();
+    const { goal, distance, targetTime, raceDate, startDate, weeks, daysPerWeek, weeklyKm, longRunDay, restDays, lang } = await req.json();
 
     const isZh = lang === "zh";
     const distanceFull =

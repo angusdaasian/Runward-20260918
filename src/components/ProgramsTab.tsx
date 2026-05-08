@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { notifyPlanChanged } from "@/lib/planEvents";
 
 type Goal = "race" | "distance" | "first5k" | "parkrun" | "general" | "postnatal" | "fitness" | "injury" | "postrace";
 type Distance = "5K" | "10K" | "HM" | "FM";
@@ -333,6 +334,7 @@ const ProgramsTab = ({ lang, onLoginRequest }: Props) => {
           raw_output: result.raw || "",
         }).select().single();
         if (inserted) setExistingPlan(inserted);
+        notifyPlanChanged();
       }
     } catch (err: any) {
       console.error("Error generating program:", err);
@@ -969,7 +971,7 @@ const ProgramsTab = ({ lang, onLoginRequest }: Props) => {
 
                   // Save to DB
                   if (user && existingPlan) {
-                    supabase.from("training_plans" as any).update({ plan_data: updatedPlan } as any).eq("id", existingPlan.id).then(() => {});
+                    supabase.from("training_plans" as any).update({ plan_data: updatedPlan } as any).eq("id", existingPlan.id).then(() => { notifyPlanChanged(); });
                   }
 
                   setAddingDayIdx(null);
@@ -1046,7 +1048,7 @@ const ProgramsTab = ({ lang, onLoginRequest }: Props) => {
                     setPlan(updatedPlan);
 
                     if (user && existingPlan) {
-                      supabase.from("training_plans" as any).update({ plan_data: updatedPlan } as any).eq("id", existingPlan.id).then(() => {});
+                      supabase.from("training_plans" as any).update({ plan_data: updatedPlan } as any).eq("id", existingPlan.id).then(() => { notifyPlanChanged(); });
                     }
 
                     setEditingDayIdx(null);

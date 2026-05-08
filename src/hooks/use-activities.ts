@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { getAppEnvironment } from "@/lib/environment";
+import { subscribePlanChanged } from "@/lib/planEvents";
 
 export interface ActivityWeather {
   temp: number | null;
@@ -392,6 +393,15 @@ export function useActivities() {
     enabled: !!user,
     staleTime: 5 * 60 * 1000,
   });
+
+  // Instantly refresh planned workouts whenever the user changes their
+  // AI / free / custom training plan elsewhere in the app.
+  useEffect(() => {
+    if (!user) return;
+    return subscribePlanChanged(() => {
+      queryClient.invalidateQueries({ queryKey: ["planned-workouts", user.id] });
+    });
+  }, [user?.id, queryClient]);
 
   const userRacesQuery = useQuery({
     queryKey: ["user-races", user?.id],

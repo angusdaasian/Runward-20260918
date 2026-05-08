@@ -158,8 +158,8 @@ const TerritoryTab = ({ lang }: Props) => {
 
       <p className="text-[11px] text-muted-foreground text-center px-2">
         {lang === "zh"
-          ? "在地塊上跑步即可佔領,最後一位跑過的擁有該地塊"
-          : "Run through a hex to claim it. Last runner to cross owns it."}
+          ? "在地塊上跑步即可佔領,每個地塊可被多位跑者共同擁有"
+          : "Run through a hex to claim it. Hexes can be owned by multiple runners."}
       </p>
     </div>
   );

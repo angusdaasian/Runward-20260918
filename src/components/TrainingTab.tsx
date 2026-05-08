@@ -704,7 +704,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
       const { clearCached } = await import("@/lib/offlineCache");
       clearCached(CacheKeys.trainingPlan(user.id));
     }
-    setProgramStep("details"); setDistance(null); setTargetTime(""); setTargetHours(""); setTargetMinutes(""); setTargetSeconds(""); setRaceDate(""); setStartDate(""); setPlan([]); setExistingPlan(null);
+    setProgramStep("details"); setDistance(null); setTargetTime(""); setTargetHours(""); setTargetMinutes(""); setTargetSeconds(""); setRaceDate(""); setStartDate(""); setPlan([]); setExistingPlan(null); setPlanDirty(false);
   };
 
 

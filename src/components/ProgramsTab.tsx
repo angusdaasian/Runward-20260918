@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo } from "react";
 import { Lang, t } from "@/lib/i18n";
 import { Button } from "@/components/ui/button";
-import { Loader2, Lock, ChevronLeft, ChevronRight, Plus, Calendar, Target, Trophy, Clock, Repeat, Route } from "lucide-react";
+import { Loader2, Lock, ChevronLeft, ChevronRight, Plus, Calendar, Target, Trophy, Clock, Repeat, Route, Watch, Check } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { usePremium } from "@/contexts/PremiumContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";

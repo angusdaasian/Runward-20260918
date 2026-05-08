@@ -209,6 +209,84 @@ const labelForDay = (day: any, i: number): string => {
   return DAY_LABELS[i] || (day?.day?.substring(0, 3).toUpperCase() ?? "");
 };
 
+// Draggable + droppable day row for the AI calendar (long-press to swap)
+const DraggableDay = ({
+  id, idx, day, lang, isToday, dayNum,
+  onEditClick, onAddClick,
+}: {
+  id: string;
+  idx: number;
+  day: DayPlan;
+  lang: Lang;
+  isToday: boolean;
+  dayNum: number | string;
+  onEditClick: () => void;
+  onAddClick: () => void;
+}) => {
+  const { attributes, listeners, setNodeRef: setDragRef, isDragging, transform } = useDraggable({ id });
+  const { setNodeRef: setDropRef, isOver } = useDroppable({ id });
+
+  const setRefs = (node: HTMLDivElement | null) => {
+    setDragRef(node);
+    setDropRef(node);
+  };
+
+  const style: React.CSSProperties = {
+    transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
+    opacity: isDragging ? 0.5 : 1,
+    touchAction: "none",
+  };
+
+  return (
+    <div ref={setRefs} style={style} className={`flex items-stretch gap-2 rounded-lg ${isOver && !isDragging ? "ring-2 ring-primary bg-primary/5" : ""}`}>
+      <div className="w-10 flex-shrink-0 flex flex-col items-center pt-3">
+        <span className="text-[10px] font-medium text-muted-foreground uppercase">{labelForDay(day, idx)}</span>
+        <span className={`text-sm font-bold ${isToday ? "text-primary" : "text-foreground"}`}>{dayNum}</span>
+      </div>
+      {day.type === "Rest" ? (
+        <div className="flex-1 border-l-2 border-border pl-3 py-3 min-h-[48px] flex items-center gap-2">
+          <button
+            type="button"
+            {...listeners}
+            {...attributes}
+            className="text-muted-foreground/60 hover:text-muted-foreground cursor-grab active:cursor-grabbing touch-none"
+            aria-label="Drag to swap"
+          >
+            <GripVertical size={14} />
+          </button>
+          <button onClick={onAddClick} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
+            <Plus size={12} />{lang === "zh" ? "新增" : "Add"}
+          </button>
+        </div>
+      ) : (
+        <div className="flex-1 border-l-2 pl-3 py-2" style={{ borderColor: day.color || "hsl(var(--border))" }}>
+          <div className="bg-card border border-border rounded-lg p-3 hover:border-primary transition-colors flex items-stretch gap-2">
+            <button
+              type="button"
+              {...listeners}
+              {...attributes}
+              className="flex items-center text-muted-foreground/60 hover:text-muted-foreground cursor-grab active:cursor-grabbing touch-none -my-1 -ml-1 px-1"
+              aria-label="Drag to swap"
+            >
+              <GripVertical size={16} />
+            </button>
+            <div className="flex-1 min-w-0 cursor-pointer" onClick={onEditClick}>
+              <div className="flex items-center justify-between">
+                <span className="font-medium text-sm text-foreground">{localizeTitle(day.type, lang)}</span>
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  {day.pace && <span>{day.pace}</span>}
+                  {day.distance_km && <span>{day.distance_km} km</span>}
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{localizeDescription(day, lang)}</p>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
   const { isPremium } = usePremium();
   const { user } = useAuth();

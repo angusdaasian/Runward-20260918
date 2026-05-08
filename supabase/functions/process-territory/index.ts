@@ -282,8 +282,8 @@ Deno.serve(async (req) => {
     return new Response(
       JSON.stringify({
         processedActivities: activities.length,
-        newHexes,
-        stolenHexes,
+        newZones: newHexes,
+        stolenZones: stolenHexes,
         totalOwned: totalOwned ?? 0,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },

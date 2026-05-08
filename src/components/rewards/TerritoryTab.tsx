@@ -27,6 +27,20 @@ const TerritoryTab = ({ lang }: Props) => {
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [autoSynced, setAutoSynced] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
+  const [displayName, setDisplayName] = useState<string>("Runner");
+
+  useEffect(() => {
+    if (!user) return;
+    supabase
+      .from("profiles")
+      .select("display_name")
+      .eq("user_id", user.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data?.display_name) setDisplayName(data.display_name);
+      });
+  }, [user]);
 
   const loadHexes = useCallback(async () => {
     setLoading(true);

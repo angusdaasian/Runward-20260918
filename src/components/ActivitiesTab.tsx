@@ -550,7 +550,7 @@ const ActivitiesTab = ({ lang }: Props) => {
         }}
         onDeleted={invalidateAll}
         isPremium={isPremium}
-        trainingScore={averageScore > 0 ? Math.round(averageScore) : (profile?.training_score ?? undefined)}
+        trainingScore={profile?.training_score ?? undefined}
       />
     );
   }

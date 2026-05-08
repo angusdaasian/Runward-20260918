@@ -572,6 +572,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
       if (error) throw error;
       setExistingPlan({ ...existingPlan, plan_data: plan });
       setPlanDirty(false);
+      notifyPlanChanged();
       toast({
         title: lang === "zh" ? "已儲存" : "Saved",
         description: lang === "zh" ? "訓練計劃已更新" : "Your training plan has been updated",

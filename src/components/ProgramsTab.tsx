@@ -818,6 +818,25 @@ const ProgramsTab = ({ lang, onLoginRequest }: Props) => {
                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
                         {day.pace && <span>{day.pace}</span>}
                         {day.distance_km && <span>{day.distance_km} km</span>}
+                        {terraProvider && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              sendToWatch("day", currentWeek.week, i);
+                            }}
+                            disabled={pushBusy === `${currentWeek.week}:${i}`}
+                            title={pushedKeys.has(`${currentWeek.week}:${i}`)
+                              ? (lang === "zh" ? `已傳送至 ${terraProvider}` : `Sent to ${terraProvider}`)
+                              : (lang === "zh" ? `傳送至 ${terraProvider}` : `Send to ${terraProvider}`)}
+                            className="p-1 rounded hover:bg-accent disabled:opacity-50"
+                          >
+                            {pushBusy === `${currentWeek.week}:${i}`
+                              ? <Loader2 size={12} className="animate-spin" />
+                              : pushedKeys.has(`${currentWeek.week}:${i}`)
+                                ? <Check size={12} className="text-green-500" />
+                                : <Watch size={12} />}
+                          </button>
+                        )}
                       </div>
                     </div>
                     <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{localizeDescription(day, lang)}</p>

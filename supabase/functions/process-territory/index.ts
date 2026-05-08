@@ -7,18 +7,7 @@ const corsHeaders = {
 };
 
 const HEX_RES = 8;
-const REGION_BOUNDS = {
-  HK: { south: 22.15, north: 22.58, west: 113.83, east: 114.45 },
-  TW: { south: 21.85, north: 25.35, west: 119.30, east: 122.05 },
-} as const;
 
-function regionFor(lat: number, lng: number): "HK" | "TW" | null {
-  for (const r of ["HK", "TW"] as const) {
-    const b = REGION_BOUNDS[r];
-    if (lat >= b.south && lat <= b.north && lng >= b.west && lng <= b.east) return r;
-  }
-  return null;
-}
 
 function decodePolyline(encoded: string): [number, number][] {
   const points: [number, number][] = [];

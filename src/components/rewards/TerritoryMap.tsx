@@ -2,7 +2,6 @@ import { useEffect, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { cellToBoundary } from "h3-js";
-import { REGION_BOUNDS, type Region } from "@/lib/territory";
 
 interface Hex {
   hex_id: string;
@@ -13,33 +12,27 @@ interface Hex {
 }
 
 interface Props {
-  region: Region;
   hexes: Hex[];
   currentUserId: string | null;
 }
 
-const TerritoryMap = ({ region, hexes, currentUserId }: Props) => {
+const TerritoryMap = ({ hexes, currentUserId }: Props) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const layerRef = useRef<L.LayerGroup | null>(null);
+  const fittedRef = useRef(false);
 
-  // Init / re-init when region changes
   useEffect(() => {
-    if (!containerRef.current) return;
-    if (mapRef.current) {
-      mapRef.current.remove();
-      mapRef.current = null;
-    }
-    const b = REGION_BOUNDS[region];
+    if (!containerRef.current || mapRef.current) return;
     const map = L.map(containerRef.current, {
       zoomControl: true,
       attributionControl: false,
-    }).setView(b.center, b.zoom);
+      worldCopyJump: true,
+    }).setView([20, 0], 2);
     L.tileLayer(
       "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
       { maxZoom: 19, subdomains: "abcd" },
     ).addTo(map);
-    map.fitBounds([[b.south, b.west], [b.north, b.east]]);
     mapRef.current = map;
     layerRef.current = L.layerGroup().addTo(map);
 
@@ -47,19 +40,26 @@ const TerritoryMap = ({ region, hexes, currentUserId }: Props) => {
       map.remove();
       mapRef.current = null;
       layerRef.current = null;
+      fittedRef.current = false;
     };
-  }, [region]);
+  }, []);
 
-  // Render hex polygons
   useEffect(() => {
     if (!mapRef.current || !layerRef.current) return;
     layerRef.current.clearLayers();
     const ownAccent = "#FC4C02";
     const otherColor = "#94a3b8";
 
+    const allBounds: L.LatLngTuple[] = [];
+    const myBounds: L.LatLngTuple[] = [];
+
     for (const hex of hexes) {
       const isMine = hex.owner_user_id === currentUserId;
       const boundary = cellToBoundary(hex.hex_id) as [number, number][];
+      boundary.forEach((p) => {
+        allBounds.push(p);
+        if (isMine) myBounds.push(p);
+      });
       const polygon = L.polygon(boundary, {
         color: isMine ? ownAccent : otherColor,
         weight: 1,
@@ -71,6 +71,15 @@ const TerritoryMap = ({ region, hexes, currentUserId }: Props) => {
         `<div style="font-size:12px"><strong>${hex.owner_display_name ?? "Runner"}</strong><br/>Captured ${date}<br/>Total claims: ${hex.capture_count}</div>`,
       );
       polygon.addTo(layerRef.current);
+    }
+
+    // Auto-fit on first render with data — prefer the user's own hexes
+    if (!fittedRef.current && hexes.length > 0) {
+      const target = myBounds.length > 0 ? myBounds : allBounds;
+      if (target.length > 0) {
+        mapRef.current.fitBounds(L.latLngBounds(target), { padding: [30, 30], maxZoom: 13 });
+        fittedRef.current = true;
+      }
     }
   }, [hexes, currentUserId]);
 

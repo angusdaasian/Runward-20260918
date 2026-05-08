@@ -121,6 +121,17 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
   const dbTable = isTerraActivity ? "terra_activities" : isAppleHealth ? "apple_health_activities" : isGarmin || isCoros ? "garmin_activities" : "strava_activities";
   const isRunningActivity = isRunning(activity.sport_type);
 
+  // Per-activity training score (VDOT) — computed from this activity's distance & time
+  const activityScore = useMemo(() => {
+    if (!isRunningActivity) return null;
+    if (!activity.distance || activity.distance < 400) return null;
+    if (!activity.moving_time || activity.moving_time < 60) return null;
+    const v = calculateRunningScore(activity.distance, activity.moving_time);
+    if (!isFinite(v) || v < 5 || v > 100) return null;
+    return Math.round(v * 10) / 10;
+  }, [activity.distance, activity.moving_time, isRunningActivity]);
+  const displayScore = activityScore ?? trainingScore ?? null;
+
   const [streams, setStreams] = useState<any[]>([]);
   const [splits, setSplits] = useState<Split[] | null>(null);
   const [loading, setLoading] = useState(true);

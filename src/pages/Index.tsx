@@ -282,7 +282,11 @@ const Index = () => {
           {tabs.map(({ id, icon: Icon, labelKey }) => (
             <button
               key={id}
-              onClick={() => { setActiveTab(id); setShowConnectApps(false); }}
+              onClick={() => {
+                if (id !== activeTab && !confirmLeave(lang === "zh" ? "您的訓練計劃有未儲存的變更。確定要離開嗎？" : "You have unsaved changes to your training plan. Leave without saving?")) return;
+                setActiveTab(id);
+                setShowConnectApps(false);
+              }}
               className={`relative z-10 flex flex-1 flex-col items-center gap-0.5 px-3 py-1.5 transition-colors ${
                 activeTab === id ? "text-tab-active" : "text-tab-inactive"
               }`}

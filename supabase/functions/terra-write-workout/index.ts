@@ -142,12 +142,11 @@ function buildPlannedWorkout(day: DayPlan, provider: "GARMIN" | "COROS"): any | 
   return {
     steps: containers,
     metadata: {
-      type: "RUNNING",
+      type: 1,
       name: safeText(day.title || day.type, day.type || "Run", 80),
       description: safeText(day.description || day.title || day.type, day.type || "Run", 240),
       provider,
       planned_date: day.date,
-      estimated_distance_meters: estimatedDistanceMeters,
       estimated_duration_seconds: estimatedDurationSeconds,
     },
   };

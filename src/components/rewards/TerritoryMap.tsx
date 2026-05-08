@@ -62,7 +62,7 @@ const TerritoryMap = ({ hexes, currentUserId, focusCity }: Props) => {
     const myBounds: L.LatLngTuple[] = [];
 
     for (const hex of hexes) {
-      const isMine = hex.owner_user_id === currentUserId;
+      const isMine = hex.iOwn ?? (hex.owner_user_id === currentUserId);
       const dimmed = focusCity ? hex.city_slug !== focusCity.slug : false;
       const boundary = cellToBoundary(hex.hex_id) as [number, number][];
       boundary.forEach((p) => {
@@ -78,7 +78,7 @@ const TerritoryMap = ({ hexes, currentUserId, focusCity }: Props) => {
       });
       const date = new Date(hex.captured_at).toLocaleDateString();
       polygon.bindPopup(
-        `<div style="font-size:12px"><strong>${hex.owner_display_name ?? "Runner"}</strong><br/>Captured ${date}<br/>Total claims: ${hex.capture_count}</div>`,
+        `<div style="font-size:12px"><strong>First claimed by ${hex.owner_display_name ?? "Runner"}</strong><br/>on ${date}<br/>Owned by ${hex.capture_count} runner${hex.capture_count === 1 ? "" : "s"}</div>`,
       );
       polygon.addTo(layerRef.current);
     }

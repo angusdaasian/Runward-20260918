@@ -105,7 +105,7 @@ const TerritoryTab = ({ lang }: Props) => {
         <div className="rounded-lg border border-border bg-card p-3">
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <MapPin size={12} />
-            {lang === "zh" ? "我的地塊" : "Hexes owned"}
+            {lang === "zh" ? "我的區域" : "Zones owned"}
           </div>
           <div className="text-2xl font-bold mt-0.5">{myHexes}</div>
         </div>

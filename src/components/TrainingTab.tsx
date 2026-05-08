@@ -1202,7 +1202,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                     {raceDate && startDate && dateValid && <p className="text-xs text-muted-foreground mt-1">{weeksUntilRace} {lang === "zh" ? "週訓練計劃" : "weeks training plan"}</p>}
                   </div>
 
-                  <Button onClick={handleGenerateClick} disabled={!distance || !targetTime || !raceDate || !startDate || !dateValid || loading} className="w-full" size="lg">
+                  <Button onClick={handleGenerateClick} disabled={!distance || !targetTime || !raceDate || !startDate || !dateValid || loading || restDays.length !== 7 - daysPerWeek} className="w-full" size="lg">
                     {loading ? (<><Loader2 className="animate-spin mr-2" size={18} />{lang === "zh" ? "生成中，請耐心等候，最多需要一分鐘" : "Generating. Please be patient, it can take up to a minute"}</>) : (lang === "zh" ? "生成訓練計劃" : "Generate Training Plan")}
                   </Button>
                 </div>

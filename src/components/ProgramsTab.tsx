@@ -970,7 +970,7 @@ const ProgramsTab = ({ lang, onLoginRequest }: Props) => {
 
                   // Save to DB
                   if (user && existingPlan) {
-                    supabase.from("training_plans" as any).update({ plan_data: updatedPlan } as any).eq("id", existingPlan.id).then(() => {});
+                    supabase.from("training_plans" as any).update({ plan_data: updatedPlan } as any).eq("id", existingPlan.id).then(() => { notifyPlanChanged(); });
                   }
 
                   setAddingDayIdx(null);
@@ -1047,7 +1047,7 @@ const ProgramsTab = ({ lang, onLoginRequest }: Props) => {
                     setPlan(updatedPlan);
 
                     if (user && existingPlan) {
-                      supabase.from("training_plans" as any).update({ plan_data: updatedPlan } as any).eq("id", existingPlan.id).then(() => {});
+                      supabase.from("training_plans" as any).update({ plan_data: updatedPlan } as any).eq("id", existingPlan.id).then(() => { notifyPlanChanged(); });
                     }
 
                     setEditingDayIdx(null);

@@ -1839,7 +1839,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                 const updatedPlan = [...plan]; const week = { ...updatedPlan[currentWeekIdx] }; const days = [...week.days];
                 days[addingDayIdx] = { ...days[addingDayIdx], type: addRunType, title: lang === "zh" ? rt.zh : rt.en, description: lang === "zh" ? paceInfo.descZh : paceInfo.description, distance_km: Number(addDistance), pace: paceInfo.pace, color: rt.color };
                 week.days = days; updatedPlan[currentWeekIdx] = week; setPlan(updatedPlan);
-                if (user && existingPlan) supabase.from("training_plans" as any).update({ plan_data: updatedPlan } as any).eq("id", existingPlan.id).then(() => {});
+                if (user && existingPlan) supabase.from("training_plans" as any).update({ plan_data: updatedPlan } as any).eq("id", existingPlan.id).then(() => { notifyPlanChanged(); });
                 setAddingDayIdx(null);
                 toast({ title: lang === "zh" ? "已新增訓練" : "Workout Added", description: `${lang === "zh" ? rt.zh : rt.en} - ${addDistance} km` });
               }}>{lang === "zh" ? "新增訓練" : "Add Workout"}</Button>
@@ -1864,7 +1864,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                   const updatedPlan = [...plan]; const week = { ...updatedPlan[currentWeekIdx] }; const days = [...week.days];
                   days[editingDayIdx] = { ...days[editingDayIdx], distance_km: editDistance ? Number(editDistance) : days[editingDayIdx].distance_km, pace: editPace || days[editingDayIdx].pace, description: editDescription };
                   week.days = days; updatedPlan[currentWeekIdx] = week; setPlan(updatedPlan);
-                  if (user && existingPlan) supabase.from("training_plans" as any).update({ plan_data: updatedPlan } as any).eq("id", existingPlan.id).then(() => {});
+                  if (user && existingPlan) supabase.from("training_plans" as any).update({ plan_data: updatedPlan } as any).eq("id", existingPlan.id).then(() => { notifyPlanChanged(); });
                   setEditingDayIdx(null);
                   toast({ title: lang === "zh" ? "已更新訓練" : "Workout Updated" });
                 }}>{lang === "zh" ? "儲存變更" : "Save Changes"}</Button>
@@ -1873,7 +1873,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                   const updatedPlan = [...plan]; const week = { ...updatedPlan[currentWeekIdx] }; const days = [...week.days];
                   days[editingDayIdx] = { ...days[editingDayIdx], type: "Rest", title: lang === "zh" ? "休息" : "Rest Day", description: lang === "zh" ? "全日休息恢復。" : "Full rest day for recovery.", distance_km: null, pace: null, color: "#607D8B" };
                   week.days = days; updatedPlan[currentWeekIdx] = week; setPlan(updatedPlan);
-                  if (user && existingPlan) supabase.from("training_plans" as any).update({ plan_data: updatedPlan } as any).eq("id", existingPlan.id).then(() => {});
+                  if (user && existingPlan) supabase.from("training_plans" as any).update({ plan_data: updatedPlan } as any).eq("id", existingPlan.id).then(() => { notifyPlanChanged(); });
                   setEditingDayIdx(null);
                   toast({ title: lang === "zh" ? "已刪除訓練" : "Workout Deleted" });
                 }}>{lang === "zh" ? "刪除訓練" : "Delete Workout"}</Button>
@@ -1986,7 +1986,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                 const updatedPlan = [...customPlan]; const week = { ...updatedPlan[customWeekIdx] }; const days = [...week.days];
                 days[customAddingDayIdx] = { ...days[customAddingDayIdx], type: customAddRunType, title: lang === "zh" ? rt.zh : rt.en, description: "", distance_km: Number(customAddDistance), pace: null, color: rt.color };
                 week.days = days; updatedPlan[customWeekIdx] = week; setCustomPlan(updatedPlan);
-                if (user && customExistingPlan) supabase.from("training_plans" as any).update({ plan_data: updatedPlan } as any).eq("id", customExistingPlan.id).then(() => {});
+                if (user && customExistingPlan) supabase.from("training_plans" as any).update({ plan_data: updatedPlan } as any).eq("id", customExistingPlan.id).then(() => { notifyPlanChanged(); });
                 setCustomAddingDayIdx(null);
                 toast({ title: lang === "zh" ? "已新增訓練" : "Workout Added", description: `${lang === "zh" ? rt.zh : rt.en} - ${customAddDistance} km` });
               }}>{lang === "zh" ? "新增訓練" : "Add Workout"}</Button>
@@ -2012,7 +2012,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                   const updatedPlan = [...customPlan]; const week = { ...updatedPlan[customWeekIdx] }; const days = [...week.days];
                   days[customEditingDayIdx] = { ...days[customEditingDayIdx], distance_km: customEditDistance ? Number(customEditDistance) : days[customEditingDayIdx].distance_km, pace: customEditPace || days[customEditingDayIdx].pace, description: customEditDescription };
                   week.days = days; updatedPlan[customWeekIdx] = week; setCustomPlan(updatedPlan);
-                  if (user && customExistingPlan) supabase.from("training_plans" as any).update({ plan_data: updatedPlan } as any).eq("id", customExistingPlan.id).then(() => {});
+                  if (user && customExistingPlan) supabase.from("training_plans" as any).update({ plan_data: updatedPlan } as any).eq("id", customExistingPlan.id).then(() => { notifyPlanChanged(); });
                   setCustomEditingDayIdx(null);
                   toast({ title: lang === "zh" ? "已更新訓練" : "Workout Updated" });
                 }}>{lang === "zh" ? "儲存變更" : "Save Changes"}</Button>
@@ -2021,7 +2021,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                   const updatedPlan = [...customPlan]; const week = { ...updatedPlan[customWeekIdx] }; const days = [...week.days];
                   days[customEditingDayIdx] = { ...days[customEditingDayIdx], type: "Rest", title: lang === "zh" ? "休息" : "Rest Day", description: "", distance_km: null, pace: null, color: "#607D8B" };
                   week.days = days; updatedPlan[customWeekIdx] = week; setCustomPlan(updatedPlan);
-                  if (user && customExistingPlan) supabase.from("training_plans" as any).update({ plan_data: updatedPlan } as any).eq("id", customExistingPlan.id).then(() => {});
+                  if (user && customExistingPlan) supabase.from("training_plans" as any).update({ plan_data: updatedPlan } as any).eq("id", customExistingPlan.id).then(() => { notifyPlanChanged(); });
                   setCustomEditingDayIdx(null);
                   toast({ title: lang === "zh" ? "已刪除訓練" : "Workout Deleted" });
                 }}>{lang === "zh" ? "刪除訓練" : "Delete Workout"}</Button>

@@ -49,6 +49,15 @@ function parseInterval(desc: string): { distM: number; reps: number; paceSec: nu
   return { distM, reps, paceSec, restSec: Number.isFinite(restSec ?? NaN) ? restSec : null };
 }
 
+function toTerraTimestamp(value: string | null | undefined, fallbackHour = 8): string {
+  const raw = (value || "").trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    return `${raw}T${String(fallbackHour).padStart(2, "0")}:00:00.000000+00:00`;
+  }
+  const date = raw && !Number.isNaN(Date.parse(raw)) ? new Date(raw) : new Date();
+  return date.toISOString().replace(/\.\d{3}Z$/, ".000000+00:00");
+}
+
 // Build a Terra "data" entry for one day. Returns null for rest / skipped days.
 function buildPlannedWorkout(day: DayPlan, provider: "GARMIN" | "COROS"): any | null {
   if (SKIP_TYPES.has(day.type)) return null;
@@ -60,78 +69,51 @@ function buildPlannedWorkout(day: DayPlan, provider: "GARMIN" | "COROS"): any | 
   };
   // Pace bounds in m/s with ±5% window.
   const buildPaceTarget = (sec: number | null) => {
-    // Garmin is rejecting generated pace-target payloads through Terra; send duration-only workouts for reliability.
-    if (provider === "GARMIN") return [];
     if (!sec) return [];
     const center = 1000 / sec;
     return [{
-      target_type: 11, // pace/speed target per Terra PlannedWorkoutStepTarget model
+      target_type: 3,
       speed_meters_per_second_low: Number((center * 0.95).toFixed(3)),
       speed_meters_per_second_high: Number((center * 1.05).toFixed(3)),
       speed_meters_per_second: Number(center.toFixed(3)),
     }];
   };
-
-  // Wrap any inner step in a Garmin-style repeat container (type:1, reps:1).
-  const wrap = (order: number, description: string, inner: any) => ({
-    type: 1, order, description: safeText(description, "Run"),
-    durations: [{ duration_type: 9, reps: 1 }],
-    steps: [inner],
+  const timeDuration = (seconds: number) => ({ duration_type: 1, seconds });
+  const distanceDuration = (distance_meters: number) => ({ duration_type: 2, distance_meters });
+  const makeStep = (order: number, description: string, intensity: number, durations: any[], targets: any[] = []) => ({
+    description: safeText(description, "Run"),
+    order,
+    intensity,
+    type: 1,
+    durations,
+    targets,
   });
 
-  const containers: any[] = [];
+  const steps: any[] = [];
 
   if (day.type === "Interval") {
     const parsed = parseInterval(day.description);
-    containers.push(wrap(0, "Warm Up", {
-      type: 0, order: 0, intensity: 5, description: "Warm Up",
-      durations: [{ duration_type: 0, seconds: 600 }],
-      targets: [],
-    }));
+    steps.push(makeStep(1, "Warm up", 1, [timeDuration(600)]));
     if (parsed) {
-      containers.push({
-        type: 1, order: 1,
-        description: `${parsed.reps} x ${parsed.distM}m`,
-        durations: [{ duration_type: 9, reps: parsed.reps }],
-        steps: [
-          {
-            type: 0, order: 0, intensity: 5,
-            description: `${parsed.distM}m work`,
-            durations: [{ duration_type: 1, distance_meters: parsed.distM }],
-            targets: buildPaceTarget(parsed.paceSec),
-          },
-          {
-            type: 0, order: 1, intensity: 5,
-            description: parsed.restSec ? `${parsed.restSec}s recovery` : "Recovery",
-            durations: [{ duration_type: 0, seconds: parsed.restSec ?? 90 }],
-            targets: [],
-          },
-        ],
-      });
+      for (let rep = 0; rep < parsed.reps; rep++) {
+        steps.push(makeStep(steps.length + 1, `${parsed.distM}m work`, 2, [distanceDuration(parsed.distM)], buildPaceTarget(parsed.paceSec)));
+        steps.push(makeStep(steps.length + 1, parsed.restSec ? `${parsed.restSec}s recovery` : "Recovery", 1, [timeDuration(parsed.restSec ?? 90)]));
+      }
     } else {
       const distM = day.distance_km ? Math.round(day.distance_km * 1000) : 5000;
-      containers.push(wrap(1, day.description || "Interval", {
-        type: 0, order: 0, intensity: 5,
-        description: safeText(day.description, "Interval"),
-        durations: [{ duration_type: 1, distance_meters: distM }],
-        targets: buildPaceTarget(paceSec),
-      }));
+      steps.push(makeStep(2, day.description || "Interval", 2, [distanceDuration(distM)], buildPaceTarget(paceSec)));
     }
-    containers.push(wrap(2, "Cool Down", {
-      type: 0, order: 0, intensity: 5, description: "Cool Down",
-      durations: [{ duration_type: 0, seconds: 600 }],
-      targets: [],
-    }));
+    steps.push(makeStep(steps.length + 1, "Cool down", 1, [timeDuration(600)]));
   } else {
     const distM = day.distance_km ? Math.round(day.distance_km * 1000) : null;
-    containers.push(wrap(0, day.title || day.type, {
-      type: 0, order: 0, intensity: 5,
-      description: safeText(day.title || day.type, day.type || "Run"),
-      durations: distM
-        ? [{ duration_type: 1, distance_meters: distM }]
-        : [{ duration_type: 0, seconds: 1800 }],
-      targets: buildPaceTarget(paceSec),
-    }));
+    if (distM && distM > 2500) {
+      const mainDistance = Math.max(1000, distM - 2000);
+      steps.push(makeStep(1, "Warm up", 1, [timeDuration(600)]));
+      steps.push(makeStep(2, day.title || day.type, 2, [distanceDuration(mainDistance)], buildPaceTarget(paceSec)));
+      steps.push(makeStep(3, "Cool down", 1, [timeDuration(300)]));
+    } else {
+      steps.push(makeStep(1, day.title || day.type, 2, distM ? [distanceDuration(distM)] : [timeDuration(1800)], buildPaceTarget(paceSec)));
+    }
   }
 
   const estimatedDistanceMeters = day.distance_km ? Math.round(day.distance_km * 1000) : null;
@@ -139,16 +121,28 @@ function buildPlannedWorkout(day: DayPlan, provider: "GARMIN" | "COROS"): any | 
     ? Math.round((estimatedDistanceMeters / 1000) * paceSec)
     : null;
 
-  return {
-    steps: containers,
-    metadata: {
+  const metadataId = `pw_${provider.toLowerCase()}_${(day.date || "date").replace(/[^0-9a-z]/gi, "")}_${safeText(day.title || day.type, "run", 32).toLowerCase().replace(/[^0-9a-z]+/g, "_")}`;
+  const metadata: Record<string, unknown> = {
+      id: metadataId,
       type: 1,
       name: safeText(day.title || day.type, day.type || "Run", 80),
       description: safeText(day.description || day.title || day.type, day.type || "Run", 240),
       provider,
-      planned_date: day.date,
-      estimated_duration_seconds: estimatedDurationSeconds,
-    },
+      planned_date: toTerraTimestamp(day.date),
+      created_date: toTerraTimestamp(new Date().toISOString(), new Date().getUTCHours()),
+  };
+  if (estimatedDistanceMeters) metadata.estimated_distance_meters = estimatedDistanceMeters;
+  if (estimatedDurationSeconds) {
+    metadata.estimated_duration_seconds = estimatedDurationSeconds;
+    metadata.estimated_speed_meters_per_second = Number((estimatedDistanceMeters! / estimatedDurationSeconds).toFixed(3));
+    const calories = Math.round((estimatedDistanceMeters! / 1000) * 60);
+    metadata.estimated_calories = calories;
+    metadata.estimated_energy_kj = Math.round(calories * 4.184);
+  }
+
+  return {
+    metadata,
+    steps,
   };
 }
 
@@ -230,7 +224,19 @@ Deno.serve(async (req) => {
       if (!payload) { skipped++; continue; }
       const url = `https://api.tryterra.co/v2/plannedWorkout?user_id=${encodeURIComponent(conn.terra_user_id)}`;
       try {
-        const bodyStr = JSON.stringify({ data: [payload] });
+        const requestBody = {
+          data: [payload],
+          user: {
+            scopes: Array.isArray(conn.scopes) ? conn.scopes.join(",") : String(conn.scopes ?? ""),
+            user_id: conn.terra_user_id,
+            reference_id: conn.reference_id ?? user.id,
+            last_webhook_update: conn.last_webhook_at ? toTerraTimestamp(conn.last_webhook_at) : toTerraTimestamp(new Date().toISOString()),
+            provider,
+          },
+          type: "planned_workout",
+          version: "2022-03-16",
+        };
+        const bodyStr = JSON.stringify(requestBody);
         const resp = await fetch(url, { method: "POST", headers, body: bodyStr });
         const text = await resp.text();
         let json: any = null;

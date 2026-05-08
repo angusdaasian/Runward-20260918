@@ -158,7 +158,7 @@ const TerritoryTab = ({ lang }: Props) => {
           className="w-full inline-flex items-center justify-center gap-1.5 text-xs text-muted-foreground hover:text-foreground rounded-md border border-border py-1.5"
         >
           <X size={12} />
-          {lang === "zh" ? "顯示全部" : "Show all hexes"}
+          {lang === "zh" ? "顯示全部" : "Show all zones"}
         </button>
       )}
 

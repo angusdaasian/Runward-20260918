@@ -222,6 +222,74 @@ const ProgramsTab = ({ lang, onLoginRequest }: Props) => {
   const [editDistance, setEditDistance] = useState("");
   const [editPace, setEditPace] = useState("");
 
+  // Terra "send to watch" state
+  const [terraProvider, setTerraProvider] = useState<"GARMIN" | "COROS" | null>(null);
+  const [pushedKeys, setPushedKeys] = useState<Set<string>>(new Set()); // `${week}:${dayIdx}`
+  const [pushBusy, setPushBusy] = useState<string | null>(null);
+
+  // Detect Terra Garmin/Coros connection
+  useEffect(() => {
+    if (!user) return;
+    (async () => {
+      const { data } = await (supabase as any)
+        .from("terra_connections").select("provider")
+        .eq("user_id", user.id).eq("active", true)
+        .in("provider", ["GARMIN", "COROS"]);
+      const first = (data ?? [])[0];
+      setTerraProvider(first?.provider ?? null);
+    })();
+  }, [user]);
+
+  // Load already-pushed workouts for the current plan
+  useEffect(() => {
+    if (!user || !existingPlan?.id) { setPushedKeys(new Set()); return; }
+    (async () => {
+      const { data } = await (supabase as any)
+        .from("pushed_workouts").select("week, day_index")
+        .eq("user_id", user.id).eq("plan_id", existingPlan.id);
+      setPushedKeys(new Set((data ?? []).map((r: any) => `${r.week}:${r.day_index}`)));
+    })();
+  }, [user, existingPlan?.id]);
+
+  const sendToWatch = async (scope: "day" | "week" | "all", week?: number, dayIdx?: number) => {
+    if (!existingPlan?.id || !terraProvider) return;
+    const busyKey = scope === "day" ? `${week}:${dayIdx}` : scope;
+    setPushBusy(busyKey);
+    try {
+      const { data, error } = await supabase.functions.invoke("terra-write-workout", {
+        body: { plan_id: existingPlan.id, scope, week, day_index: dayIdx, provider: terraProvider },
+      });
+      if (error) throw error;
+      const pushed = (data as any)?.pushed ?? 0;
+      const failed = (data as any)?.failed ?? 0;
+      if (pushed > 0) {
+        toast({
+          title: lang === "zh" ? "已傳送至手錶" : "Sent to watch",
+          description: `${terraProvider}: ${pushed} ${lang === "zh" ? "個訓練" : "workout(s)"}${failed ? ` (${failed} ${lang === "zh" ? "失敗" : "failed"})` : ""}`,
+        });
+        // Refresh pushed keys
+        const { data: rows } = await (supabase as any)
+          .from("pushed_workouts").select("week, day_index")
+          .eq("user_id", user!.id).eq("plan_id", existingPlan.id);
+        setPushedKeys(new Set((rows ?? []).map((r: any) => `${r.week}:${r.day_index}`)));
+      } else {
+        toast({
+          title: lang === "zh" ? "傳送失敗" : "Send failed",
+          description: lang === "zh" ? "請稍後再試" : "Please try again later",
+          variant: "destructive",
+        });
+      }
+    } catch (e: any) {
+      toast({
+        title: lang === "zh" ? "傳送失敗" : "Send failed",
+        description: e?.message ?? "",
+        variant: "destructive",
+      });
+    } finally {
+      setPushBusy(null);
+    }
+  };
+
   // Load existing plan on mount
   useEffect(() => {
     if (!user) return;

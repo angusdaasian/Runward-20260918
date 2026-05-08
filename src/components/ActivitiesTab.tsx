@@ -567,7 +567,10 @@ const ActivitiesTab = ({ lang }: Props) => {
               {lang === "zh" ? "所有活動" : "All Activities"}
             </h1>
           </div>
-          {ahConnected && (
+          {/* Resync button hidden — slot reserved for upcoming premium
+              "refetch all activities since 2026" feature. handleResync /
+              resyncing state intentionally retained for that future use. */}
+          {false && ahConnected && (
             <button
               onClick={handleResync}
               disabled={resyncing}

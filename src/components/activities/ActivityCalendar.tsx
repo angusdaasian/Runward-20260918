@@ -194,7 +194,11 @@ const ActivityCalendar = ({ lang, activities, plannedWorkouts, userRaces = [], o
           </h3>
           <p className="text-[10px] text-muted-foreground">
             {monthlyTotalKm > 0
-              ? `${monthlyTotalKm.toFixed(1)} km ${lang === "zh" ? "已跑" : "ran"} / ${weeklyTotalKm.toFixed(1)} km ${lang === "zh" ? "本週已跑" : "ran this week"}`
+              ? `${monthlyTotalKm.toFixed(1)} km ${lang === "zh" ? "已跑" : "ran"}${
+                  viewYear === today.getFullYear() && viewMonth === today.getMonth()
+                    ? ` / ${weeklyTotalKm.toFixed(1)} km ${lang === "zh" ? "本週已跑" : "ran this week"}`
+                    : ""
+                }`
               : lang === "zh" ? "暫無活動" : "No activities"}
           </p>
         </div>

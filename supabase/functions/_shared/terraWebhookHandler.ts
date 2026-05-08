@@ -792,9 +792,14 @@ async function processWebhook(
             .maybeSingle();
           const newRestingHr = toFiniteNumber(d?.heart_rate_data?.summary?.resting_hr_bpm);
           const newSteps = toFiniteNumber(d?.distance_data?.steps);
+          const vo2SamplesArr = Array.isArray(d?.oxygen_data?.vo2_samples) ? d.oxygen_data.vo2_samples : [];
+          const lastVo2 = vo2SamplesArr.length > 0
+            ? toFiniteNumber(vo2SamplesArr[vo2SamplesArr.length - 1]?.vo2max_ml_per_min_per_kg)
+            : null;
           const newVo2max =
             toFiniteNumber(d?.oxygen_data?.vo2max_ml_per_min_per_kg) ??
-            toFiniteNumber(d?.oxygen_data?.day_avg_vo2max_ml_per_min_per_kg);
+            toFiniteNumber(d?.oxygen_data?.day_avg_vo2max_ml_per_min_per_kg) ??
+            lastVo2;
           const newHrv =
             toFiniteNumber(d?.heart_rate_data?.summary?.avg_hrv_rmssd) ??
             toFiniteNumber(d?.heart_rate_data?.summary?.hrv_rmssd) ??

@@ -372,9 +372,12 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
           .eq("plan_id", existingPlan.id);
         setPushedKeys(new Set((rows ?? []).map((r: any) => `${r.week}:${r.day_index}`)));
       }
+      const firstErr = Array.isArray(data?.errors) && data.errors[0]
+        ? (typeof data.errors[0].body === "string" ? data.errors[0].body : JSON.stringify(data.errors[0].body))
+        : "";
       toast({
         title: failed ? (lang === "zh" ? "部分傳送完成" : "Partially sent") : (lang === "zh" ? "已傳送至手錶" : "Sent to watch"),
-        description: `${terraProvider}: ${pushed} ${lang === "zh" ? "個訓練" : "workout(s)"}${failed ? ` (${failed} ${lang === "zh" ? "失敗" : "failed"})` : ""}`,
+        description: `${terraProvider}: ${pushed} ${lang === "zh" ? "個訓練" : "workout(s)"}${failed ? ` (${failed} ${lang === "zh" ? "失敗" : "failed"}: ${firstErr.slice(0, 200)})` : ""}`,
         variant: failed ? "destructive" : "default",
       });
     } catch (e: any) {

@@ -474,13 +474,17 @@ Deno.serve(async (req) => {
           const vo2 =
             toFiniteNumber(d?.oxygen_data?.vo2max_ml_per_min_per_kg) ??
             toFiniteNumber(d?.oxygen_data?.day_avg_vo2max_ml_per_min_per_kg);
+          const dailyHrv = toFiniteNumber(d?.heart_rate_data?.summary?.avg_hrv_rmssd);
           dailyByDate[date] = {
             user_id: c.user_id,
             provider: c.provider,
             date,
-            resting_hr: d?.heart_rate_data?.summary?.resting_hr_bpm ?? null,
+            resting_hr: toFiniteNumber(d?.heart_rate_data?.summary?.resting_hr_bpm) ?? null,
             steps: d?.distance_data?.steps ?? null,
             vo2max: vo2,
+            hrv: dailyHrv != null ? Math.round(dailyHrv * 10) / 10 : null,
+            sleep_seconds: null,
+            sleep_score: null,
           };
         }
       } catch (e) { console.error("daily fetch failed", c.provider, e); }
@@ -509,7 +513,7 @@ Deno.serve(async (req) => {
           const existing = dailyByDate[date] ?? {
             user_id: c.user_id, provider: c.provider, date,
             resting_hr: null, steps: null, vo2max: null,
-            sleep_seconds: null, sleep_score: null,
+            sleep_seconds: null, sleep_score: null, hrv: null,
           };
           if (existing.vo2max == null) existing.vo2max = vo2;
           dailyByDate[date] = existing;

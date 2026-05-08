@@ -1,61 +1,63 @@
-## Goal
+## Verified against Terra's OpenAPI spec
 
-1. The **Sync** button on the Daily Health card (Analytics → Performance) should poll **sleep, sleep score, RHR, and HRV** for the active provider — Garmin included — by calling Terra's `/v2/sleep` endpoint where these values actually live.
-2. **Hide** the **Resync** button on the All-Activities view (don't delete the handler — it'll be reused later for a premium "refetch all activities since 2026" feature).
+Per Terra's docs, both `/v2/daily` and `/v2/sleep` responses (and their webhook payloads) carry the same `heart_rate_data.summary` object:
 
----
+```json
+"heart_rate_data": {
+  "summary": {
+    "avg_hr_bpm": 145,
+    "avg_hrv_rmssd": 35.2,
+    "avg_hrv_sdnn": 45.5,
+    "resting_hr_bpm": 65,
+    ...
+  }
+}
+```
 
-## Why the current sync doesn't get Garmin HRV
+Our code only partially reads this. Two real bugs:
 
-Confirmed by probing Terra's REST API directly for a Garmin user:
+### Bug 1 — `terra-sync` `/v2/daily` branch ignores HRV
+`supabase/functions/terra-sync/index.ts` lines 477–484 build the daily row with only `resting_hr` + `steps` + `vo2max`. It never reads `heart_rate_data.summary.avg_hrv_rmssd`, even though the spec says it's there. The earlier fix only patched the sleep loop.
 
-- `/v2/daily` for Garmin returns 500 / no HRV.
-- `/v2/sleep` returns nightly `avg_hrv_rmssd` (e.g. 78, 85, 78, 73.6 ms over the last few nights) **and** `resting_hr_bpm` — exactly the schema you quoted (`hrv_samples_rmssd[]` per night).
-- Webhooks for Garmin never include `rmssd` (0 of 10k+ events in 60 days).
+### Bug 2 — `terra-webhook` sleep handler drops HRV + RHR
+`supabase/functions/_shared/terraWebhookHandler.ts` lines 826–876 handles `type === "sleep"` and writes only `sleep_seconds` + `sleep_score`. Garmin sleep almost always arrives via webhook (cron `/v2/sleep` returns `items=0` after webhook delivery — confirmed in logs), so this is why every Garmin night in `terra_daily_health` has `hrv = null`.
 
-Today `terra-sync` reads RHR from `/v2/daily` only (often null for Garmin) and never reads HRV from sleep summaries. That's why the Daily Health card shows `—` for HRV and the new Readiness card hides for Garmin users.
-
----
+Webhook `type === "daily"` already extracts HRV correctly (lines 799–802) — leave it.
 
 ## Changes
 
-### 1. `supabase/functions/terra-sync/index.ts` — sleep loop now also captures RHR + HRV
+### 1. `supabase/functions/terra-sync/index.ts` — read HRV from `/v2/daily`
 
-In the existing `/v2/sleep` block (around line 530), in addition to `sleep_seconds` / `sleep_score`, also extract:
+In the daily loop (around line 474):
+- Extract `const dailyHrv = toFiniteNumber(d?.heart_rate_data?.summary?.avg_hrv_rmssd);`
+- Add `hrv: dailyHrv != null ? Math.round(dailyHrv * 10) / 10 : null` to the `dailyByDate[date]` row.
+- Update both `existing = dailyByDate[date] ?? { ... }` defaults (lines 509–513 in the body loop, line 572 in the sleep loop) so they include `hrv: null` consistently — already done in the sleep loop, just add to the body loop default.
 
-- `resting_hr = d.heart_rate_data.summary.resting_hr_bpm` (fallback when daily endpoint omits it — true for Garmin).
-- `hrv = d.heart_rate_data.summary.avg_hrv_rmssd` (the nightly RMSSD).
+### 2. `supabase/functions/_shared/terraWebhookHandler.ts` — extract HRV + RHR in sleep webhook
 
-When merging the sleep record into `dailyByDate[date]`:
-- Always **prefer** the longest sleep session's `resting_hr` / `hrv` for that night.
-- Only overwrite `existing.resting_hr` / `existing.hrv` when the new value is non-null (don't clobber a value already set by `/v2/daily`).
+In the `type === "sleep"` branch (around line 869):
+- `const sum = s?.heart_rate_data?.summary ?? {};`
+- `const sleepHrv = toFiniteNumber(sum.avg_hrv_rmssd);`
+- `const sleepRhr = toFiniteNumber(sum.resting_hr_bpm);`
+- Extend the existing `existingSleep` select to also include `hrv, resting_hr`.
+- Apply the same "longest-sleep wins" rule already used for `sleep_seconds`/`sleep_score`:
+  - If `useNew`: prefer the new value, fall back to existing when null.
+  - Else: only fill when existing is null.
+- Add `hrv` (rounded to 1 dp) and `resting_hr` to the upsert payload.
+- Add a log line `console.log(\`[terra-webhook] sleep ${appUserId} ${date} hrv=${sleepHrv} rhr=${sleepRhr}\`)` so we can verify in logs.
 
-Result: Garmin nights now land in `terra_daily_health` with `hrv` and `resting_hr` populated.
+### 3. Backfill last 60 days for active Garmin users
 
-### 2. `src/hooks/use-terra-daily-health.ts` — already calls `terra-sync` with `healthOnly:true`
+After deploy, future webhook events will populate HRV. To fill historical rows, run a one-shot script via the agent shell that, for each active Garmin connection, calls Terra's `/v2/sleep?...&to_webhook=true` to re-deliver each night — the patched webhook will then write HRV/RHR.
 
-No change needed. The `Sync` button on the Daily Health card already invokes `terra-sync` with `{ healthOnly: true, provider }` — once the function above is fixed, one click pulls sleep / sleep score / RHR / HRV.
+(We won't rely on `terra-sync`'s `/v2/sleep` path because Terra dedupes range fetches once a webhook has delivered the record — that's why the current "sync" returns `items=0`.)
 
-### 3. Backfill the last 60 days for existing Garmin users
+### 4. Verification
 
-After deploying the function, run a one-shot backfill so the Readiness card and Daily Health HRV light up immediately without users having to tap Sync. Plan: invoke `terra-sync` with `{ healthOnly: true, provider: "GARMIN", targetUserId }` (admin-only path already exists) for each active Garmin connection. Done from a small SQL → loop in the agent shell, no migration needed.
+- Tail `terra-webhook` logs after deploy → look for the new `sleep ... hrv=…` log lines.
+- `select date, hrv, resting_hr, sleep_seconds, sleep_score from terra_daily_health where provider='GARMIN' and user_id='c7a7d1ca-…' order by date desc limit 14;` → expect HRV 60–90 ms.
+- Open Analytics → Performance: Daily Health card shows HRV value, HRV & Readiness card renders for Garmin.
 
-### 4. `src/components/ActivitiesTab.tsx` — hide the Resync button
-
-Wrap the existing button (lines 570–579) in `{false && ahConnected && (...)}` (or comment it out behind a feature flag) so it disappears from the UI. **Keep** `handleResync`, `resyncing`, `setResyncing`, and `RefreshCw` import in place — they'll be repurposed for the upcoming premium "refetch all activities since 2026" feature.
-
----
-
-## Out of scope (kept for later)
-
-- Storing the per-sample `hrv_samples_rmssd[]` array (would need a new column / table). For now we only persist the nightly summary, which is what the Readiness algorithm needs.
-- The premium "refetch since 2026" button — this plan only frees the slot.
-
----
-
-## Verification after deploy
-
-1. Call `terra-sync` for the Garmin test user (`6hhxbmqfy7@…`) with `{ healthOnly: true, provider: "GARMIN" }`.
-2. `select date, hrv, resting_hr, sleep_seconds, sleep_score from terra_daily_health where provider='GARMIN' order by date desc limit 7;` — expect HRV values around 70–90 ms.
-3. Open Analytics → Performance: Daily Health card shows RHR + sleep, HRV & Readiness card now appears for Garmin and renders the 7-day curve.
-4. Open All Activities view: Resync button is gone.
+## Out of scope
+- Per-sample `hrv_samples_rmssd[]` storage — only nightly summary is needed for the readiness algorithm.
+- `avg_hrv_sdnn` — current schema column is `hrv` (RMSSD), keep it that way.

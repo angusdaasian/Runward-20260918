@@ -611,6 +611,29 @@ async function processWebhook(
     } else {
       const appUserId = await findUserId(terraUserId, referenceId);
 
+      // Auto-heal: ensure a terra_connections row exists whenever we can map
+      // terra_user_id -> app user. Some users never produced an `auth`
+      // webhook (or it predates the upsert code), so we'd otherwise have
+      // active webhook traffic with no connection row.
+      if (appUserId && terraUserId && provider && type !== "auth" && type !== "deauth" && type !== "access_revoked") {
+        const { data: existingConn } = await supa
+          .from("terra_connections")
+          .select("id")
+          .eq("user_id", appUserId)
+          .eq("provider", provider)
+          .maybeSingle();
+        if (!existingConn) {
+          await supa.from("terra_connections").upsert({
+            user_id: appUserId,
+            terra_user_id: terraUserId,
+            provider,
+            reference_id: referenceId,
+            active: true,
+            last_webhook_at: new Date().toISOString(),
+          }, { onConflict: "user_id,provider" });
+        }
+      }
+
       if (type === "auth" && appUserId && terraUserId) {
         const rawScopes = user?.scopes;
         const scopesArr = Array.isArray(rawScopes)

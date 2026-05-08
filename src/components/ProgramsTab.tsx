@@ -708,10 +708,35 @@ const ProgramsTab = ({ lang, onLoginRequest }: Props) => {
   return (
     <div className="px-5 pt-6 pb-8 max-w-lg mx-auto">
       {/* Header */}
-      <div className="flex items-center justify-center mb-4">
+      <div className="flex items-center justify-between mb-4">
+        <div className="w-8" />
         <h1 className="font-display text-lg font-bold text-foreground">
           {lang === "zh" ? "訓練日曆" : "Training Calendar"}
         </h1>
+        {terraProvider ? (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                className="p-1.5 rounded-full hover:bg-accent transition-colors"
+                aria-label={lang === "zh" ? "傳送至手錶" : "Send to watch"}
+              >
+                {pushBusy === "week" || pushBusy === "all"
+                  ? <Loader2 size={18} className="animate-spin text-primary" />
+                  : <Watch size={18} className="text-primary" />}
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => sendToWatch("week", currentWeek.week)}>
+                {lang === "zh" ? `傳送本週至 ${terraProvider}` : `Send this week to ${terraProvider}`}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => sendToWatch("all")}>
+                {lang === "zh" ? `傳送整個計劃至 ${terraProvider}` : `Send entire plan to ${terraProvider}`}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ) : (
+          <div className="w-8" />
+        )}
       </div>
 
       {/* Week navigation */}

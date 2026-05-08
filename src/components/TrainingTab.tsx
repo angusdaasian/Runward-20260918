@@ -10,10 +10,16 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useOnlineStatus, isOnline } from "@/hooks/use-online-status";
 import { getCached, setCached, CacheKeys } from "@/lib/offlineCache";
+import { registerUnsavedChecker } from "@/lib/unsavedGuard";
 import {
   Loader2, Lock, ChevronLeft, ChevronRight, Plus, Calendar, Target, Trophy,
-  Repeat, Route, HelpCircle, X, WifiOff, Sparkles
+  Repeat, Route, HelpCircle, X, WifiOff, Sparkles, GripVertical, Save
 } from "lucide-react";
+import {
+  DndContext, PointerSensor, TouchSensor, useSensor, useSensors,
+  closestCenter, type DragEndEvent
+} from "@dnd-kit/core";
+import { useDraggable, useDroppable } from "@dnd-kit/core";
 import WeeklyReviewModal from "@/components/training/WeeklyReviewModal";
 const CalculatorTab = lazy(() => import("@/components/CalculatorTab"));
 import freePlan5k from "@/assets/free-plan-5k.jpg";

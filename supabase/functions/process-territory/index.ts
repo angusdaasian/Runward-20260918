@@ -75,6 +75,48 @@ Deno.serve(async (req) => {
     let newHexes = 0;
     let stolenHexes = 0;
 
+    // Backfill city_slug for any of this user's hexes that are untagged
+    const { data: untagged } = await admin
+      .from("territory_hexes")
+      .select("hex_id")
+      .eq("owner_user_id", user.id)
+      .is("city_slug", null);
+    const untaggedIds = (untagged ?? []).map((r: any) => r.hex_id as string);
+    if (untaggedIds.length > 0) {
+      const { data: alreadyMapped } = await admin
+        .from("territory_city_hexes").select("hex_id, city_slug").in("hex_id", untaggedIds);
+      const cityByHex = new Map<string, string>();
+      for (const m of (alreadyMapped ?? []) as any[]) cityByHex.set(m.hex_id, m.city_slug);
+      const stillUnmapped = untaggedIds.filter((h) => !cityByHex.has(h));
+      const seenGrid = new Set<string>();
+      for (const hex_id of stillUnmapped) {
+        const [lat, lng] = cellToLatLng(hex_id);
+        const gridKey = `${lat.toFixed(1)},${lng.toFixed(1)}`;
+        if (seenGrid.has(gridKey)) continue;
+        seenGrid.add(gridKey);
+        try {
+          const resp = await fetch(`${supabaseUrl}/functions/v1/resolve-city`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}`, apikey: serviceKey },
+            body: JSON.stringify({ hex_id }),
+          });
+          if (resp.ok) await resp.json(); else console.error("backfill resolve-city status", resp.status);
+        } catch (e) { console.error("backfill resolve-city err", e); }
+        await new Promise((r) => setTimeout(r, 1100));
+      }
+      const { data: refreshed } = await admin
+        .from("territory_city_hexes").select("hex_id, city_slug").in("hex_id", untaggedIds);
+      const updates = new Map<string, string[]>();
+      for (const m of (refreshed ?? []) as any[]) {
+        const arr = updates.get(m.city_slug) ?? [];
+        arr.push(m.hex_id);
+        updates.set(m.city_slug, arr);
+      }
+      for (const [slug, ids] of updates) {
+        await admin.from("territory_hexes").update({ city_slug: slug }).in("hex_id", ids);
+      }
+    }
+
     for (const act of activities) {
       const coords = decodePolyline(act.polyline);
       if (coords.length === 0) continue;

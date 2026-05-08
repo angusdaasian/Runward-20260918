@@ -1020,16 +1020,6 @@ const ProgramsTab = ({ lang, onLoginRequest }: Props) => {
                     className="w-full"
                   />
                 </div>
-  // Keep restDays valid: never include longRunDay, never exceed 7 - daysPerWeek
-  useEffect(() => {
-    const max = 7 - daysPerWeek;
-    setRestDays((prev) => {
-      const filtered = prev.filter((d) => d !== longRunDay);
-      return filtered.slice(0, Math.max(0, max));
-    });
-  }, [daysPerWeek, longRunDay]);
-
-
                 <Button
                   className="w-full"
                   onClick={() => {

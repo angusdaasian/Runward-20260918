@@ -78,7 +78,7 @@ const TerritoryMap = ({ hexes, currentUserId, focusCity }: Props) => {
       });
       const date = new Date(hex.captured_at).toLocaleDateString();
       polygon.bindPopup(
-        `<div style="font-size:12px"><strong>First claimed by ${hex.owner_display_name ?? "Runner"}</strong><br/>on ${date}<br/>Owned by ${hex.capture_count} runner${hex.capture_count === 1 ? "" : "s"}</div>`,
+        `<div style="font-size:12px"><strong>Latest claim by ${hex.owner_display_name ?? "Runner"}</strong><br/>on ${date}<br/>Owned by ${hex.capture_count} runner${hex.capture_count === 1 ? "" : "s"}</div>`,
       );
       polygon.addTo(layerRef.current);
     }

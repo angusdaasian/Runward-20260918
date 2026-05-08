@@ -231,7 +231,13 @@ Deno.serve(async (req) => {
         const ex = existingMap.get(hex_id)!;
         const { error } = await admin
           .from("territory_hexes")
-          .update({ capture_count: (ex.capture_count ?? 0) + 1 })
+          .update({
+            capture_count: (ex.capture_count ?? 0) + 1,
+            owner_user_id: user.id,
+            owner_display_name: displayName,
+            captured_at: new Date().toISOString(),
+            captured_activity_id: act.activity_id,
+          })
           .eq("hex_id", hex_id);
         if (error) console.error("hex count bump failed", hex_id, error);
       }

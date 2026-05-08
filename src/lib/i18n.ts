@@ -90,7 +90,7 @@ const translations = {
     editEmail: "Edit Email",
     skipAll: "Skip",
     activities: "Activities",
-    community: "Rewards",
+    community: "Arena",
     races: "Races",
     connectFitnessApps: "Connect to Fitness Apps",
     connectStrava: "Connect with Strava",

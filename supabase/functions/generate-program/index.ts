@@ -80,6 +80,11 @@ WORKOUT TYPE DESCRIPTIONS (include a brief note of the type purpose in descripti
 
 IMPORTANT: The runner wants to train exactly ${daysPerWeek || 4} days per week. The remaining days should be Rest days. Distribute the weekly volume of ~${weeklyKm || 30} km across the running days, building progressively over the weeks with a taper in the last 1-2 weeks.
 
+CRITICAL SCHEDULING CONSTRAINTS (apply to EVERY week of the plan):
+- The runner's preferred LONG RUN day is "${longRunDay || "Sun"}". Schedule the "Long Run" workout on this day every week (except optional taper/race week adjustments).
+- The runner's preferred REST day(s) are: ${Array.isArray(restDays) && restDays.length ? restDays.map((d: string) => `"${d}"`).join(", ") : '"Mon"'}. These days MUST be "Rest" type every week.
+- Place quality sessions (Tempo, Interval, Progression, Race Pace) on non-rest days, ideally with at least one easy/recovery day between hard efforts and before the long run.
+
 IMPORTANT: Use a VARIETY of workout types throughout the plan. Do NOT only use Easy Run, Tempo Run, Interval, Long Run, and Rest. You MUST include Cross Training days (especially for recovery days) and Progression Run sessions (at least once every 2-3 weeks). A good plan uses ALL available workout types across the training cycle.
 
 IMPORTANT: For each non-rest workout, calculate and include the appropriate pace per km based on the target finish time. Include specific paces for easy runs, tempo runs, intervals, long runs, etc.

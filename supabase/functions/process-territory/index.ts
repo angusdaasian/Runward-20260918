@@ -75,12 +75,15 @@ Deno.serve(async (req) => {
     let newHexes = 0;
     let stolenHexes = 0;
 
-    // Backfill city_slug for any of this user's hexes that are untagged
-    const { data: untagged } = await admin
-      .from("territory_hexes")
+    // Backfill city_slug for any hexes the user has captured that are still untagged
+    const { data: myCapHexes } = await admin
+      .from("territory_captures")
       .select("hex_id")
-      .eq("owner_user_id", user.id)
-      .is("city_slug", null);
+      .eq("user_id", user.id);
+    const myHexIds = Array.from(new Set((myCapHexes ?? []).map((r: any) => r.hex_id as string)));
+    const { data: untagged } = myHexIds.length > 0
+      ? await admin.from("territory_hexes").select("hex_id").in("hex_id", myHexIds).is("city_slug", null)
+      : { data: [] as any[] };
     const untaggedIds = (untagged ?? []).map((r: any) => r.hex_id as string);
     if (untaggedIds.length > 0) {
       const { data: alreadyMapped } = await admin

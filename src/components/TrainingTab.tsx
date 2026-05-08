@@ -683,6 +683,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
         const nextPlan = saved || inserted;
         setExistingPlan(nextPlan);
         setCached(CacheKeys.trainingPlan(user.id), nextPlan);
+        notifyPlanChanged();
       }
     } catch (err: any) {
       console.error("Error generating program:", err);

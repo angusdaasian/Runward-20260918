@@ -794,6 +794,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
       setExistingPlan(null);
       setPlan([]);
       setCached(CacheKeys.trainingPlan(user.id), data);
+      notifyPlanChanged();
       toast({ title: lang === "zh" ? "計劃已建立" : "Program Created" });
     }
   };

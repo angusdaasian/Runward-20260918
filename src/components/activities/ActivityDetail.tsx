@@ -777,7 +777,7 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
             <StatBox icon={Zap} label={lang === "zh" ? "配速" : "Pace"} value={formatPace(activity.average_speed)} unit="/km" />
           </div>
           <div className="grid grid-cols-3 gap-2 mb-4">
-            <StatBox icon={TrendingUp} label={lang === "zh" ? "訓練分數" : "Training Score"} value={trainingScore != null ? trainingScore.toString() : "--"} />
+            <StatBox icon={TrendingUp} label={lang === "zh" ? "訓練分數" : "Training Score"} value={displayScore != null ? displayScore.toString() : "--"} />
             <StatBox icon={Flame} label={lang === "zh" ? "卡路里" : "Calories"} value={activity.calories != null ? activity.calories.toString() : "--"} unit="kcal" />
             <StatBox icon={Timer} label={lang === "zh" ? "總時間" : "Elapsed Time"} value={formatDuration(activity.elapsed_time)} />
           </div>
@@ -805,7 +805,7 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
             <StatBox icon={Zap} label={lang === "zh" ? "配速" : "Avg Pace"} value={formatPace(activity.average_speed)} unit="/km" />
           </div>
           <div className="grid grid-cols-3 gap-2 mb-4">
-            <StatBox icon={TrendingUp} label={lang === "zh" ? "訓練分數" : "Training Score"} value={trainingScore != null ? trainingScore.toString() : "--"} />
+            <StatBox icon={TrendingUp} label={lang === "zh" ? "訓練分數" : "Training Score"} value={displayScore != null ? displayScore.toString() : "--"} />
             <StatBox icon={Heart} label={lang === "zh" ? "平均心率" : "Avg HR"} value={activity.average_heartrate ? Math.round(activity.average_heartrate).toString() : "--"} unit="bpm" iconColor="text-destructive" />
             <StatBox icon={Mountain} label={lang === "zh" ? "爬升" : "Elevation"} value={Math.round(activity.total_elevation_gain).toString()} unit="m" />
           </div>

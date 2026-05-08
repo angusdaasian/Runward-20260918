@@ -224,7 +224,19 @@ Deno.serve(async (req) => {
       if (!payload) { skipped++; continue; }
       const url = `https://api.tryterra.co/v2/plannedWorkout?user_id=${encodeURIComponent(conn.terra_user_id)}`;
       try {
-        const bodyStr = JSON.stringify({ data: [payload] });
+        const requestBody = {
+          data: [payload],
+          user: {
+            scopes: Array.isArray(conn.scopes) ? conn.scopes.join(",") : String(conn.scopes ?? ""),
+            user_id: conn.terra_user_id,
+            reference_id: conn.reference_id ?? user.id,
+            last_webhook_update: conn.last_webhook_at ? toTerraTimestamp(conn.last_webhook_at) : toTerraTimestamp(new Date().toISOString()),
+            provider,
+          },
+          type: "planned_workout",
+          version: "2022-03-16",
+        };
+        const bodyStr = JSON.stringify(requestBody);
         const resp = await fetch(url, { method: "POST", headers, body: bodyStr });
         const text = await resp.text();
         let json: any = null;

@@ -112,14 +112,18 @@ Deno.serve(async (req) => {
       });
 
       const chunk = 500;
+      let upsertFailed = false;
       for (let i = 0; i < upserts.length; i += chunk) {
-        await admin.from("territory_hexes").upsert(upserts.slice(i, i + chunk), { onConflict: "hex_id" });
+        const { error: upErr } = await admin.from("territory_hexes").upsert(upserts.slice(i, i + chunk), { onConflict: "hex_id" });
+        if (upErr) { console.error("hex upsert failed", act.activity_id, upErr); upsertFailed = true; break; }
       }
+      if (upsertFailed) continue; // do NOT mark processed so it retries next sync
       const captureRows = upserts.map((u) => ({
         hex_id: u.hex_id, user_id: user.id, activity_id: act.activity_id, region: u.region,
       }));
       for (let i = 0; i < captureRows.length; i += chunk) {
-        await admin.from("territory_captures").insert(captureRows.slice(i, i + chunk));
+        const { error: capErr } = await admin.from("territory_captures").insert(captureRows.slice(i, i + chunk));
+        if (capErr) console.error("capture insert failed", act.activity_id, capErr);
       }
       await admin.from("territory_processed_activities").insert({
         user_id: user.id, activity_source: act.source, activity_id: act.activity_id,

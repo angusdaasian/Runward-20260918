@@ -386,6 +386,74 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
     return `${m}:${s.toString().padStart(2, "0")} / km`;
   };
 
+  // Register unsaved-changes guard for plan edits
+  useEffect(() => registerUnsavedChecker(() => planDirty), [planDirty]);
+
+  // Warn on browser close/refresh while plan is dirty
+  useEffect(() => {
+    if (!planDirty) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [planDirty]);
+
+  // Swap two days' workouts (within the current week) — preserves date & day label
+  const swapDays = (weekIdx: number, fromIdx: number, toIdx: number) => {
+    if (fromIdx === toIdx) return;
+    setPlan((prev) => {
+      const next = prev.map((w) => ({ ...w, days: w.days.slice() }));
+      const week = next[weekIdx];
+      if (!week) return prev;
+      const a = week.days[fromIdx];
+      const b = week.days[toIdx];
+      if (!a || !b) return prev;
+      // Swap workout content (everything except date & day label)
+      const swap = (x: DayPlan, y: DayPlan): DayPlan => ({
+        day: x.day,
+        date: x.date,
+        type: y.type,
+        title: y.title,
+        description: y.description,
+        distance_km: y.distance_km,
+        pace: y.pace,
+        color: y.color,
+      });
+      week.days[fromIdx] = swap(a, b);
+      week.days[toIdx] = swap(b, a);
+      return next;
+    });
+    setPlanDirty(true);
+  };
+
+  const savePlanEdits = async () => {
+    if (!user || !existingPlan?.id) return;
+    setSavingPlan(true);
+    try {
+      const { error } = await supabase
+        .from("training_plans" as any)
+        .update({ plan_data: plan as any })
+        .eq("id", existingPlan.id);
+      if (error) throw error;
+      setExistingPlan({ ...existingPlan, plan_data: plan });
+      setPlanDirty(false);
+      toast({
+        title: lang === "zh" ? "已儲存" : "Saved",
+        description: lang === "zh" ? "訓練計劃已更新" : "Your training plan has been updated",
+      });
+    } catch (err: any) {
+      toast({
+        title: lang === "zh" ? "儲存失敗" : "Save failed",
+        description: err.message || (lang === "zh" ? "請稍後再試" : "Please try again"),
+        variant: "destructive",
+      });
+    } finally {
+      setSavingPlan(false);
+    }
+  };
+
   // Keep restDays valid given daysPerWeek and longRunDay
   useEffect(() => {
     const max = 7 - daysPerWeek;

@@ -478,6 +478,8 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps }: Props
         </DialogContent>
       </Dialog>
 
+      <PlanComparisonDialog open={showPlanCompare} onOpenChange={setShowPlanCompare} lang={lang} />
+
     </div>
   );
 };

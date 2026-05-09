@@ -1691,9 +1691,28 @@ function drawSplitsSection(
   const visible = splits.filter(
     (s) => !((s.distance || 0) < NOISE_DIST_M && (s.elapsed_time || 0) < NOISE_TIME_S),
   );
-  // Cap rows for layout sanity
   const MAX_ROWS = 20;
   const rows = visible.slice(0, MAX_ROWS);
+
+  // Interval detection
+  const speeds = rows.map((s) => s.average_speed).filter((v) => v > 0);
+  const hrs = rows.map((s) => s.average_heartrate ?? 0).filter((v) => v > 0);
+  const fastestSpeed = speeds.length ? Math.max(...speeds) : 0;
+  const slowestSpeed = speeds.length ? Math.min(...speeds) : 0;
+  let isInterval = false;
+  if (speeds.length >= 3 && slowestSpeed > 0) {
+    const ratio = fastestSpeed / slowestSpeed;
+    const hrSpread = hrs.length >= 3 ? Math.max(...hrs) - Math.min(...hrs) : 0;
+    isInterval = ratio >= 1.4 || (ratio >= 1.25 && hrSpread >= 20);
+  }
+
+  // Totals
+  const totalDist = rows.reduce((a, s) => a + (s.distance || 0), 0);
+  const totalTime = rows.reduce((a, s) => a + (s.elapsed_time || 0), 0);
+  const avgSpeedTotal = totalTime > 0 ? totalDist / totalTime : 0;
+  const hrWeighted = rows.reduce((a, s) => a + ((s.average_heartrate || 0) * (s.elapsed_time || 0)), 0);
+  const hrTimeSum = rows.reduce((a, s) => a + (s.average_heartrate ? (s.elapsed_time || 0) : 0), 0);
+  const avgHrTotal = hrTimeSum > 0 ? Math.round(hrWeighted / hrTimeSum) : null;
 
   const fmtPaceMM = (mps: number) => {
     if (!(mps > 0)) return "--";
@@ -1712,23 +1731,29 @@ function drawSplitsSection(
   ctx.fillStyle = "#FC4C02";
   ctx.fillRect(x, y + 36, 36, 3);
 
-  const tableHeaderH = 44;
-  const rowH = 50;
+  const tableHeaderH = 56;
+  const rowH = 60;
+  const tablePadTop = 18;
+  const totalRowH = 78;
   const tableY = y + 60;
 
   const HR_RIGHT = x + w;
   const PACE_RIGHT = HR_RIGHT - 130;
-  const TIME_RIGHT = PACE_RIGHT - 130;
+  const DIST_RIGHT = PACE_RIGHT - 130;
+  const TIME_RIGHT = DIST_RIGHT - 130;
   const NUM_LEFT = x;
+  const TYPE_LEFT = x + 60;
 
   ctx.fillStyle = "#94A3B8";
   ctx.font = `700 14px ${FONT_TEXT}`;
   ctx.textBaseline = "middle";
   const headerMid = tableY + tableHeaderH / 2;
   ctx.textAlign = "left";
-  ctx.fillText(isZh ? "距離" : "DIST", NUM_LEFT, headerMid);
+  ctx.fillText("#", NUM_LEFT, headerMid);
+  ctx.fillText(isZh ? "類型" : "TYPE", TYPE_LEFT, headerMid);
   ctx.textAlign = "right";
   ctx.fillText(isZh ? "時間" : "TIME", TIME_RIGHT, headerMid);
+  ctx.fillText(isZh ? "距離(m)" : "DIST(m)", DIST_RIGHT, headerMid);
   ctx.fillText(isZh ? "配速" : "PACE", PACE_RIGHT, headerMid);
   ctx.fillText("HR", HR_RIGHT, headerMid);
 
@@ -1739,9 +1764,18 @@ function drawSplitsSection(
   ctx.lineTo(x + w, tableY + tableHeaderH);
   ctx.stroke();
 
-  let cumDist = 0;
+  let runNum = 0;
   rows.forEach((s, idx) => {
-    const ry = tableY + tableHeaderH + idx * rowH;
+    const ry = tableY + tableHeaderH + tablePadTop + idx * rowH;
+    const isRest =
+      isInterval && fastestSpeed > 0 && s.average_speed > 0 && s.average_speed < fastestSpeed * 0.7;
+    if (!isRest) runNum++;
+
+    if (isRest) {
+      ctx.fillStyle = "rgba(15,23,42,0.03)";
+      ctx.fillRect(x, ry, w, rowH);
+    }
+
     ctx.strokeStyle = "rgba(15,23,42,0.06)";
     ctx.lineWidth = 1;
     ctx.beginPath();
@@ -1750,28 +1784,65 @@ function drawSplitsSection(
     ctx.stroke();
 
     const mid = ry + rowH / 2;
-    cumDist += s.distance || 0;
-    const km = cumDist / 1000;
-    const label = km >= 10 ? `${km.toFixed(1)} km` : `${km.toFixed(2)} km`;
-    ctx.fillStyle = "#FC4C02";
-    ctx.beginPath();
-    ctx.arc(NUM_LEFT + 6, mid, 4, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = "#0F172A";
-    ctx.font = `700 18px ${FONT_TEXT}`;
+    const baseColor = isRest ? "#94A3B8" : "#0F172A";
+    const accentWeight = isRest ? "500" : "700";
+
+    if (!isRest) {
+      ctx.fillStyle = "#FC4C02";
+      ctx.beginPath();
+      ctx.arc(NUM_LEFT + 8, mid, 4, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.fillStyle = baseColor;
+    ctx.font = `700 20px ${FONT_TEXT}`;
     ctx.textAlign = "left";
-    ctx.fillText(label, NUM_LEFT + 18, mid);
+    ctx.fillText(isRest ? "" : String(runNum), NUM_LEFT + 20, mid);
+
+    ctx.font = `${accentWeight} 20px ${FONT_TEXT}`;
+    ctx.fillStyle = baseColor;
+    ctx.fillText(
+      isRest ? (isZh ? "休息" : "Rest") : (isZh ? "跑步" : "Run"),
+      TYPE_LEFT,
+      mid,
+    );
 
     ctx.textAlign = "right";
-    ctx.font = `700 18px ${FONT_TEXT}`;
+    ctx.font = `${accentWeight} 20px ${FONT_TEXT}`;
     ctx.fillText(fmtTimeShort(s.elapsed_time, false).replace(/\s/g, ""), TIME_RIGHT, mid);
+    ctx.fillText(String(Math.round(s.distance || 0)), DIST_RIGHT, mid);
     ctx.fillText(fmtPaceMM(s.average_speed), PACE_RIGHT, mid);
     ctx.fillText(s.average_heartrate ? String(Math.round(s.average_heartrate)) : "--", HR_RIGHT, mid);
   });
 
+  // Total row
+  const totalY = tableY + tableHeaderH + tablePadTop + rows.length * rowH + 10;
+  const totalH = totalRowH - 18;
+  ctx.save();
+  roundedRect(ctx, x, totalY, w, totalH, 14);
+  ctx.fillStyle = "rgba(252,76,2,0.08)";
+  ctx.fill();
+  ctx.restore();
+
+  const totalMid = totalY + totalH / 2;
+  ctx.fillStyle = "#FC4C02";
+  ctx.font = `800 20px ${FONT_DISPLAY}`;
+  ctx.textAlign = "left";
+  ctx.textBaseline = "middle";
+  ctx.fillText("Σ", NUM_LEFT + 4, totalMid);
+  ctx.fillStyle = "#0F172A";
+  ctx.font = `800 20px ${FONT_DISPLAY}`;
+  ctx.fillText(isZh ? "總計" : "TOTAL", TYPE_LEFT, totalMid);
+
+  ctx.textAlign = "right";
+  ctx.font = `800 20px ${FONT_DISPLAY}`;
+  ctx.fillText(fmtTimeShort(totalTime, false).replace(/\s/g, ""), TIME_RIGHT, totalMid);
+  ctx.fillText(String(Math.round(totalDist)), DIST_RIGHT, totalMid);
+  ctx.fillText(fmtPaceMM(avgSpeedTotal), PACE_RIGHT, totalMid);
+  ctx.fillText(avgHrTotal != null ? String(avgHrTotal) : "--", HR_RIGHT, totalMid);
+
   ctx.textAlign = "left";
   ctx.textBaseline = "top";
-  return 60 + tableHeaderH + rows.length * rowH + 8;
+  return 60 + tableHeaderH + tablePadTop + rows.length * rowH + totalRowH + 8;
 }
 
 async function renderCustomCard(input: CustomShareInput): Promise<Blob> {
@@ -1825,7 +1896,7 @@ async function renderCustomCard(input: CustomShareInput): Promise<Blob> {
   // Splits
   const splitsArr = sel.splits && input.splits ? input.splits.filter((s) => !((s.distance || 0) < 50 && (s.elapsed_time || 0) < 10)).slice(0, 20) : [];
   if (splitsArr.length > 0) {
-    sections.push({ type: "splits", h: 60 + 44 + splitsArr.length * 50 + 8 });
+    sections.push({ type: "splits", h: 60 + 56 + 18 + splitsArr.length * 60 + 78 + 8 });
   }
 
   // Charts

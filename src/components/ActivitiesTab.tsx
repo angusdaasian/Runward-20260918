@@ -554,6 +554,7 @@ const ActivitiesTab = ({ lang }: Props) => {
         profileAge={(profile as any)?.age ?? null}
         profileMaxHr={(profile as any)?.max_heartrate ?? null}
         profileRestingHr={(profile as any)?.resting_heartrate ?? null}
+        profileCustomZones={(profile as any)?.custom_hr_zones ?? null}
       />
     );
   }

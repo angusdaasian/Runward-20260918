@@ -77,6 +77,7 @@ interface Props {
   profileAge?: number | null;
   profileMaxHr?: number | null;
   profileRestingHr?: number | null;
+  profileCustomZones?: number[] | null;
 }
 
 function formatDuration(seconds: number): string {
@@ -118,7 +119,7 @@ const StatBox = ({ icon: Icon, label, value, unit, iconColor }: {
   </div>
 );
 
-const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, trainingScore, profileAge, profileMaxHr, profileRestingHr }: Props) => {
+const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, trainingScore, profileAge, profileMaxHr, profileRestingHr, profileCustomZones }: Props) => {
   const isAppleHealth = activity.source === "Apple Health";
   const isTerraActivity = activity.provenance === "terra" || (activity.source?.startsWith("Terra") ?? false);
   const isGarmin = activity.provenance === "garmin" && activity.source === "Garmin";
@@ -634,17 +635,18 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
   const hrZones = useMemo(() => {
     const maxHr = estimateMaxHr(profileAge ?? null, profileMaxHr ?? null);
     const restHr = estimateRestingHr(profileRestingHr ?? null);
+    const custom = profileCustomZones ?? null;
     // 1. Terra per-second samples
     if (Array.isArray(activity.hr_samples) && activity.hr_samples.length > 10) {
-      return computeZonePct(activity.hr_samples.map((s: any) => s.bpm), maxHr, restHr);
+      return computeZonePct(activity.hr_samples.map((s: any) => s.bpm), maxHr, restHr, custom);
     }
     // 2. Strava heartrate stream
     const hrStream = streams.find((s: any) => s.type === "heartrate");
     if (hrStream && Array.isArray(hrStream.data) && hrStream.data.length > 10) {
-      return computeZonePct(hrStream.data, maxHr, restHr);
+      return computeZonePct(hrStream.data, maxHr, restHr, custom);
     }
     return null;
-  }, [activity.hr_samples, profileMaxHr, profileAge, profileRestingHr, streams]);
+  }, [activity.hr_samples, profileMaxHr, profileAge, profileRestingHr, profileCustomZones, streams]);
 
   const dateStr = new Date(activity.start_date).toLocaleDateString(
     lang === "zh" ? "zh-TW" : "en-US",
@@ -1007,9 +1009,11 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
             zones={hrZones}
             lang={lang}
             subtitle={
-              lang === "zh"
-                ? `Karvonen %HRR · 最大 ${estimateMaxHr(profileAge ?? null, profileMaxHr ?? null)} / 靜息 ${estimateRestingHr(profileRestingHr ?? null)} bpm`
-                : `Karvonen %HRR · max ${estimateMaxHr(profileAge ?? null, profileMaxHr ?? null)} / rest ${estimateRestingHr(profileRestingHr ?? null)} bpm`
+              profileCustomZones && profileCustomZones.length === 5
+                ? (lang === "zh" ? "自訂心率區間" : "Custom HR zones")
+                : (lang === "zh"
+                    ? `Karvonen %HRR · 最大 ${estimateMaxHr(profileAge ?? null, profileMaxHr ?? null)} / 靜息 ${estimateRestingHr(profileRestingHr ?? null)} bpm`
+                    : `Karvonen %HRR · max ${estimateMaxHr(profileAge ?? null, profileMaxHr ?? null)} / rest ${estimateRestingHr(profileRestingHr ?? null)} bpm`)
             }
           />
         </div>

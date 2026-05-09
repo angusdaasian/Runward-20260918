@@ -387,9 +387,10 @@ const ProfileSection = ({ lang }: { lang: Lang }) => {
           {profile.age && <span>{profile.age} yrs</span>}
           {profile.sex && <span>{profile.sex}</span>}
           {profile.runs_per_week && <span>{profile.runs_per_week}x/week</span>}
+        </div>
       </div>
 
-      {/* Heart Rate Zones */}
+      {/* Heart Rate Zones — separate card */}
       <HeartRateZonesCard
         lang={lang}
         initialAge={profile.age}
@@ -403,7 +404,6 @@ const ProfileSection = ({ lang }: { lang: Lang }) => {
           });
         }}
       />
-      </div>
 
       {/* Running Score */}
       {runningScore && (

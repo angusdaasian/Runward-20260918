@@ -106,11 +106,21 @@ export default function AiPosterDialog({ open, onOpenChange, stats, lang }: Prop
     setLoading(true);
     setResult(null);
     try {
-      const { base64, mimeType } = await fileToBase64(file);
+      const { base64, mimeType } = await downscaleImage(file, 1280, 0.82);
       const { data, error } = await supabase.functions.invoke("generate-share-poster", {
         body: { imageBase64: base64, mimeType, stats, stylePreset: style, lang },
       });
-      if (error) throw error;
+      if (error) {
+        let msg = error.message;
+        try {
+          const ctx = (error as any)?.context;
+          if (ctx && typeof ctx.json === "function") {
+            const j = await ctx.json();
+            if (j?.error) msg = j.error;
+          }
+        } catch { /* ignore */ }
+        throw new Error(msg);
+      }
       if ((data as any)?.error) throw new Error((data as any).error);
       const url = (data as any)?.imageDataUrl;
       if (!url) throw new Error("No image returned");

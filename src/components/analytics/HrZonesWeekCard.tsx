@@ -23,6 +23,7 @@ const HrZonesWeekCard = ({ lang }: Props) => {
   }, [activities]);
 
   const age = (profile as any)?.age ?? null;
+  const profileMaxHr = (profile as any)?.max_heartrate ?? null;
 
   useEffect(() => {
     if (!isPremium) return;

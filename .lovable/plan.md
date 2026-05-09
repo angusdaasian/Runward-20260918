@@ -1,55 +1,64 @@
-## Race Predictor (Premium)
+## Rename "VDOT" → "Fitness Score" + smarter recent-fitness estimation
 
-Add a Race Predictor card to the Analytics → Performance tab. Predicts 5K, 10K, Half Marathon, and Marathon finish times from the user's current fitness, blended with their PB-based VDOT, and adjusted for forecast race-day weather.
+### 1. Rename in the Race Predictor UI
 
-### Where it lives
-- New component: `src/components/analytics/RacePredictorCard.tsx`
-- Mounted in `PerformanceTab.tsx` above `TrendsCard`
-- 5K prediction visible to all; 10K / HM / Marathon blurred with a lock + "Upgrade" CTA for non‑premium (reuse `usePremium()` pattern from existing locked cards like `TrainingLoadChartLocked`)
+In `src/components/analytics/RacePredictorCard.tsx`:
+- Replace the "VDOT" badge label (top-right) with **"Fitness Score"** (zh: **體能分數**).
+- To keep it visually clean, render it as a small uppercase caption (`FITNESS SCORE` / `體能分數`) above the numeric value, identical layout to today — no extra row, no extra chip.
+- Update the caption under the title from "From training score + PB, weather-adjusted" to "70% PB · 30% recent training" (zh: "70% 個人最佳 · 30% 近期訓練").
+- Internal variable names (`vdot`, etc.) stay — only user-facing copy changes.
 
-### Inputs to the prediction
-1. **Training Score** — current Running Score from `useActivities()` / profile (`profile.training_score`), representing recent fitness.
-2. **PB-based VDOT** — for each row in `personal_bests`, compute a Running Score via `calculateRunningScore(distanceMeters, totalSeconds)` from `src/lib/vdot.ts`. Take the max across PBs.
-3. **Effective VDOT** = weighted blend, e.g. `0.6 × trainingScore + 0.4 × bestPbScore` (fall back to whichever is available; if neither, show empty state "Add a PB or sync activities").
-4. **Weather adjustment** — optional city input (default to user's last activity location or a manual city field). Call existing `get-weather` edge function for current/forecast conditions, then apply a heat/humidity penalty to predicted time.
-
-### Weather adjustment model
-Apply a multiplicative slowdown factor to the predicted time, based on heat index (temperature + humidity):
+### 2. New Fitness Score formula
 
 ```text
-heatIndex (°C)  | slowdown
-< 13            | 1.00 (ideal)
-13–18           | 1.00
-18–22           | 1.01
-22–26           | 1.02
-26–30           | 1.04
-30–34           | 1.07
-> 34            | 1.10
+fitnessScore = 0.7 × pbVdot + 0.3 × recentTrainingVdot
 ```
-Plus a small wind/rain note (display only, no math) — heavy rain/wind shown as an info chip.
 
-### UI
-- Card title: "Race Predictor" / "比賽預測"
-- Top row: effective VDOT badge + small "based on training + PB" caption + city/weather chip (tap to change city)
-- 4 distance rows (5K / 10K / HM / Marathon): predicted time, average pace, and a small delta showing weather impact (e.g. `+0:45 due to heat`)
-- Premium-locked rows show blurred time + lock icon; tapping opens existing upgrade modal
-- Loading skeleton while fetching weather
+- If `pbVdot` is missing → use `recentTrainingVdot` only.
+- If `recentTrainingVdot` is missing → use `pbVdot` only.
+- If both missing → empty state (unchanged).
 
-### Technical notes
-- Reuse `predictTime()` and `formatTime()` from `src/lib/vdot.ts`
-- Read PBs via `supabase.from("personal_bests").select(...).eq("user_id", user.id)`
-- Use `usePremium()` from `PremiumContext` for gating; reuse `UpgradeModal` from `src/components/coach/UpgradeModal.tsx`
-- Weather: call `get-weather` edge function (already exists); cache in component state; allow user to type a city
-- All numbers computed client-side — no new edge function needed
-- No DB schema changes
+The stored `profile.training_score` is no longer used by the predictor (it represents long-term fitness and overlaps with PB). All "recent" signal comes from activities in the last 30 days.
 
-### Out of scope (per your answers)
-- Future-date fitness projection
-- Track distances
-- Manual race-time entry override (training score + PBs already cover this)
+### 3. How `recentTrainingVdot` is computed (the hard part)
 
-### Files to create / edit
-- create `src/components/analytics/RacePredictorCard.tsx`
-- create `src/lib/racePrediction.ts` (weather adjustment + effective VDOT helpers)
-- edit `src/components/PerformanceTab.tsx` (mount the card)
-- edit `src/lib/i18n.ts` (new strings)
+Problem: a single easy run gives a very low VDOT and would crater the score, while a hard tempo gives a realistic one. We need to weight runs by how close they were to a maximal effort.
+
+Approach — **effort-weighted recent VDOT**, inspired by how Daniels' VDOT is normally derived only from race-pace efforts:
+
+1. Look at run activities from the last **30 days** with distance ≥ 1.5 km and moving_time ≥ 5 min.
+2. For each run, compute its raw VDOT via `calculateRunningScore(distance, moving_time)`.
+3. Compute an **effort weight** ∈ [0, 1]:
+   - Primary signal — **intensity ratio** vs. the runner's own ceiling:
+     `intensity = rawVdot / maxRawVdotInWindow`  (so the hardest run in the window = 1.0).
+   - Apply a curve so easy runs are heavily discounted and only quality efforts contribute meaningfully:
+     `weight = max(0, (intensity − 0.85) / 0.15)²`
+     - intensity ≤ 0.85 → weight 0 (pure easy run, ignored)
+     - intensity 0.90 → weight ≈ 0.11
+     - intensity 0.95 → weight ≈ 0.44
+     - intensity 1.00 → weight 1.0
+   - Bonus multiplier for longer efforts (long runs and races are more telling than short intervals):
+     `weight *= min(1, distance_km / 5)` capped at 1 for runs ≥ 5 km.
+4. `recentTrainingVdot = Σ(weight × rawVdot) / Σ(weight)` — a weighted average.
+5. If `Σ(weight) < 0.3` (no quality efforts in the window), return `null` and fall back to PB only.
+
+Why this works:
+- An all-easy month yields no recent signal → predictor uses PB only (sensible: no evidence fitness changed).
+- One hard tempo or long run anchors the recent estimate near that effort's VDOT.
+- Multiple quality sessions average out noise.
+- This mirrors the standard advice "use a recent hard effort to estimate VDOT" but does it automatically across the window.
+
+### 4. Files to edit
+
+- `src/lib/racePrediction.ts`
+  - Replace `recentVdot()` with the effort-weighted version above.
+  - Simplify `effectiveVdot(recentTraining, pbScore)` to the 70/30 PB-weighted blend (drops the `trainingScore` parameter).
+- `src/components/analytics/RacePredictorCard.tsx`
+  - Update label/caption strings.
+  - Update `effectiveVdot(...)` call site (no `trainingScore` arg).
+
+### Out of scope
+
+- No DB changes.
+- No changes to how `profile.training_score` is computed elsewhere in the app.
+- No weather-model changes.

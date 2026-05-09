@@ -23,6 +23,7 @@ const HrZonesWeekCard = ({ lang }: Props) => {
   }, [activities]);
 
   const age = (profile as any)?.age ?? null;
+  const profileMaxHr = (profile as any)?.max_heartrate ?? null;
 
   useEffect(() => {
     if (!isPremium) return;
@@ -35,7 +36,7 @@ const HrZonesWeekCard = ({ lang }: Props) => {
 
         // Terra hr_samples already loaded
         for (const a of weekActivities) {
-          const maxHr = estimateMaxHr(age, a.max_heartrate);
+          const maxHr = estimateMaxHr(age, profileMaxHr);
           if (Array.isArray(a.hr_samples) && a.hr_samples.length > 10) {
             parts.push({ samples: a.hr_samples.map((s: any) => s.bpm), maxHr });
             used++;
@@ -56,7 +57,7 @@ const HrZonesWeekCard = ({ lang }: Props) => {
                 if (error || !data?.streams) return null;
                 const hrStream = data.streams.find((s: any) => s.type === "heartrate");
                 if (!hrStream?.data?.length) return null;
-                return { samples: hrStream.data, maxHr: estimateMaxHr(age, a.max_heartrate) };
+                return { samples: hrStream.data, maxHr: estimateMaxHr(age, profileMaxHr) };
               } catch {
                 return null;
               }
@@ -81,7 +82,7 @@ const HrZonesWeekCard = ({ lang }: Props) => {
     return () => {
       cancelled = true;
     };
-  }, [isPremium, weekActivities, age]);
+  }, [isPremium, weekActivities, age, profileMaxHr]);
 
   if (!isPremium) {
     return (
@@ -130,8 +131,8 @@ const HrZonesWeekCard = ({ lang }: Props) => {
         <>
           <p className="text-[11px] text-slate-500 mb-3">
             {lang === "zh"
-              ? `基於 ${activityCount} 次活動 · 最大心率 ${estimateMaxHr(age, null)} bpm`
-              : `Based on ${activityCount} activities · max HR ${estimateMaxHr(age, null)} bpm`}
+              ? `基於 ${activityCount} 次活動 · 最大心率 ${estimateMaxHr(age, profileMaxHr)} bpm`
+              : `Based on ${activityCount} activities · max HR ${estimateMaxHr(age, profileMaxHr)} bpm`}
           </p>
           <div className="space-y-2">
             {ZONE_LABELS.map((z) => {

@@ -99,7 +99,7 @@ async function fetchAppleHealthActivities(userId: string): Promise<StravaActivit
 async function fetchProfile(userId: string) {
   const { data } = await supabase
     .from("profiles")
-    .select("training_score, display_name, age, sex, avatar_url")
+    .select("training_score, display_name, age, sex, avatar_url, max_heartrate")
     .eq("user_id", userId)
     .single();
   return data as any;

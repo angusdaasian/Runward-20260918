@@ -552,6 +552,7 @@ const ActivitiesTab = ({ lang }: Props) => {
         isPremium={isPremium}
         trainingScore={profile?.training_score ?? undefined}
         profileAge={(profile as any)?.age ?? null}
+        profileMaxHr={(profile as any)?.max_heartrate ?? null}
       />
     );
   }

@@ -11,6 +11,7 @@ import { calculateRunningScore } from "@/lib/vdot";
 import { Skeleton } from "@/components/ui/skeleton";
 import { updateHeaderCache } from "@/components/AppHeader";
 import { useActivities } from "@/hooks/use-activities";
+import HeartRateZonesCard from "@/components/HeartRateZonesCard";
 
 interface Profile {
   display_name: string | null;
@@ -18,6 +19,7 @@ interface Profile {
   age: number | null;
   sex: string | null;
   runs_per_week: number | null;
+  max_heartrate: number | null;
 }
 
 // Module-level cache to prevent flickering on tab switches
@@ -384,7 +386,21 @@ const ProfileSection = ({ lang }: { lang: Lang }) => {
           {profile.age && <span>{profile.age} yrs</span>}
           {profile.sex && <span>{profile.sex}</span>}
           {profile.runs_per_week && <span>{profile.runs_per_week}x/week</span>}
-        </div>
+      </div>
+
+      {/* Heart Rate Zones */}
+      <HeartRateZonesCard
+        lang={lang}
+        initialAge={profile.age}
+        initialMaxHr={profile.max_heartrate}
+        onSaved={(maxHr) => {
+          setProfile((p) => {
+            const updated = p ? { ...p, max_heartrate: maxHr } : p;
+            _cachedProfile = updated;
+            return updated;
+          });
+        }}
+      />
       </div>
 
       {/* Running Score */}

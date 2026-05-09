@@ -75,6 +75,7 @@ interface Props {
   isPremium?: boolean;
   trainingScore?: number;
   profileAge?: number | null;
+  profileMaxHr?: number | null;
 }
 
 function formatDuration(seconds: number): string {
@@ -116,7 +117,7 @@ const StatBox = ({ icon: Icon, label, value, unit, iconColor }: {
   </div>
 );
 
-const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, trainingScore, profileAge }: Props) => {
+const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, trainingScore, profileAge, profileMaxHr }: Props) => {
   const isAppleHealth = activity.source === "Apple Health";
   const isTerraActivity = activity.provenance === "terra" || (activity.source?.startsWith("Terra") ?? false);
   const isGarmin = activity.provenance === "garmin" && activity.source === "Garmin";
@@ -630,7 +631,7 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
 
   // HR zone distribution from highest-resolution source available.
   const hrZones = useMemo(() => {
-    const maxHr = estimateMaxHr(profileAge ?? null, activity.max_heartrate);
+    const maxHr = estimateMaxHr(profileAge ?? null, profileMaxHr ?? null);
     // 1. Terra per-second samples
     if (Array.isArray(activity.hr_samples) && activity.hr_samples.length > 10) {
       return computeZonePct(activity.hr_samples.map((s: any) => s.bpm), maxHr);
@@ -641,7 +642,7 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
       return computeZonePct(hrStream.data, maxHr);
     }
     return null;
-  }, [activity.hr_samples, activity.max_heartrate, profileAge, streams]);
+  }, [activity.hr_samples, profileMaxHr, profileAge, streams]);
 
   const dateStr = new Date(activity.start_date).toLocaleDateString(
     lang === "zh" ? "zh-TW" : "en-US",
@@ -1005,8 +1006,8 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
             lang={lang}
             subtitle={
               lang === "zh"
-                ? `基於最大心率 ${estimateMaxHr(profileAge ?? null, activity.max_heartrate)} bpm`
-                : `Based on max HR ${estimateMaxHr(profileAge ?? null, activity.max_heartrate)} bpm`
+                ? `基於最大心率 ${estimateMaxHr(profileAge ?? null, profileMaxHr ?? null)} bpm`
+                : `Based on max HR ${estimateMaxHr(profileAge ?? null, profileMaxHr ?? null)} bpm`
             }
           />
         </div>

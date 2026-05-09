@@ -1570,3 +1570,517 @@ export async function distributeImageBlob(
     toast.error(isZh ? "無法分享" : "Unable to share");
   }
 }
+
+// ====================================================================
+// CUSTOM SHARE CARD — user-selected sections
+// ====================================================================
+
+export type ZonePctLite = { z1: number; z2: number; z3: number; z4: number; z5: number };
+
+export interface CustomShareSelections {
+  route: boolean;
+  splits: boolean;
+  hrZones: boolean;
+  stats: {
+    distance: boolean;
+    totalTime: boolean;
+    pace: boolean;
+    avgHr: boolean;
+    maxHr: boolean;
+    elevation: boolean;
+    calories: boolean;
+  };
+  charts: {
+    pace: boolean;
+    hr: boolean;
+    altitude: boolean;
+  };
+}
+
+export interface CustomShareChartPoint {
+  distance_km: number;
+  pace?: number;
+  heartrate?: number;
+  altitude?: number;
+}
+
+export interface CustomShareInput {
+  name: string;
+  startDate: string;
+  lang: Lang;
+  distanceMeters: number;
+  movingTimeSeconds: number;
+  averageSpeed: number;
+  averageHeartrate?: number | null;
+  maxHeartrate?: number | null;
+  elevationGainMeters?: number | null;
+  calories?: number | null;
+  summaryPolyline?: string | null;
+  splits?: ShareSplit[];
+  chartData?: CustomShareChartPoint[];
+  hrZones?: ZonePctLite | null;
+  selections: CustomShareSelections;
+}
+
+const ZONE_META: Array<{ key: keyof ZonePctLite; label: string; labelZh: string; color: string }> = [
+  { key: "z1", label: "Z1 Recovery",  labelZh: "Z1 恢復",   color: "#94A3B8" },
+  { key: "z2", label: "Z2 Easy",      labelZh: "Z2 輕鬆",   color: "#3B82F6" },
+  { key: "z3", label: "Z3 Aerobic",   labelZh: "Z3 有氧",   color: "#10B981" },
+  { key: "z4", label: "Z4 Threshold", labelZh: "Z4 乳酸閾", color: "#F59E0B" },
+  { key: "z5", label: "Z5 Max",       labelZh: "Z5 極限",   color: "#EF4444" },
+];
+
+function drawHrZonesSection(
+  ctx: CanvasRenderingContext2D,
+  x: number, y: number, w: number,
+  zones: ZonePctLite, isZh: boolean,
+): number {
+  const titleH = 50;
+  ctx.fillStyle = "#0F172A";
+  ctx.textAlign = "left";
+  ctx.textBaseline = "top";
+  ctx.font = `800 30px ${FONT_DISPLAY}`;
+  ctx.fillText(isZh ? "心率區間" : "HR Zones", x, y);
+  ctx.fillStyle = "#FC4C02";
+  ctx.fillRect(x, y + 36, 36, 3);
+
+  const rowGap = 14;
+  const rowH = 38;
+  const labelW = 180;
+  const valueW = 90;
+  const barX = x + labelW;
+  const barW = w - labelW - valueW;
+  let cy = y + titleH;
+
+  for (const z of ZONE_META) {
+    const pct = Math.max(0, Math.min(100, Number(zones[z.key] || 0)));
+    // label
+    ctx.fillStyle = "#0F172A";
+    ctx.font = `700 18px ${FONT_TEXT}`;
+    ctx.textBaseline = "middle";
+    ctx.textAlign = "left";
+    ctx.fillText(isZh ? z.labelZh : z.label, x, cy + rowH / 2);
+    // bar bg
+    ctx.fillStyle = "rgba(15,23,42,0.06)";
+    roundedRect(ctx, barX, cy + 8, barW, rowH - 16, 8);
+    ctx.fill();
+    // bar fill
+    const fillW = Math.max(2, (pct / 100) * barW);
+    ctx.fillStyle = z.color;
+    roundedRect(ctx, barX, cy + 8, fillW, rowH - 16, 8);
+    ctx.fill();
+    // value
+    ctx.fillStyle = "#0F172A";
+    ctx.font = `700 18px ${FONT_TEXT}`;
+    ctx.textAlign = "right";
+    ctx.fillText(`${pct.toFixed(0)}%`, x + w, cy + rowH / 2);
+    cy += rowH + rowGap;
+  }
+  ctx.textAlign = "left";
+  ctx.textBaseline = "top";
+  return cy - y;
+}
+
+function drawSplitsSection(
+  ctx: CanvasRenderingContext2D,
+  x: number, y: number, w: number,
+  splits: ShareSplit[], isZh: boolean,
+): number {
+  const NOISE_DIST_M = 50;
+  const NOISE_TIME_S = 10;
+  const visible = splits.filter(
+    (s) => !((s.distance || 0) < NOISE_DIST_M && (s.elapsed_time || 0) < NOISE_TIME_S),
+  );
+  // Cap rows for layout sanity
+  const MAX_ROWS = 20;
+  const rows = visible.slice(0, MAX_ROWS);
+
+  const fmtPaceMM = (mps: number) => {
+    if (!(mps > 0)) return "--";
+    const p = 1000 / mps;
+    const m = Math.floor(p / 60);
+    const sec = Math.floor(p % 60);
+    return `${m}:${String(sec).padStart(2, "0")}`;
+  };
+
+  // Title
+  ctx.fillStyle = "#0F172A";
+  ctx.textAlign = "left";
+  ctx.textBaseline = "top";
+  ctx.font = `800 30px ${FONT_DISPLAY}`;
+  ctx.fillText(isZh ? "分段" : "Splits", x, y);
+  ctx.fillStyle = "#FC4C02";
+  ctx.fillRect(x, y + 36, 36, 3);
+
+  const tableHeaderH = 44;
+  const rowH = 50;
+  const tableY = y + 60;
+
+  const HR_RIGHT = x + w;
+  const PACE_RIGHT = HR_RIGHT - 130;
+  const TIME_RIGHT = PACE_RIGHT - 130;
+  const NUM_LEFT = x;
+
+  ctx.fillStyle = "#94A3B8";
+  ctx.font = `700 14px ${FONT_TEXT}`;
+  ctx.textBaseline = "middle";
+  const headerMid = tableY + tableHeaderH / 2;
+  ctx.textAlign = "left";
+  ctx.fillText("#", NUM_LEFT, headerMid);
+  ctx.textAlign = "right";
+  ctx.fillText(isZh ? "時間" : "TIME", TIME_RIGHT, headerMid);
+  ctx.fillText(isZh ? "配速" : "PACE", PACE_RIGHT, headerMid);
+  ctx.fillText("HR", HR_RIGHT, headerMid);
+
+  ctx.strokeStyle = "rgba(15,23,42,0.10)";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(x, tableY + tableHeaderH);
+  ctx.lineTo(x + w, tableY + tableHeaderH);
+  ctx.stroke();
+
+  rows.forEach((s, idx) => {
+    const ry = tableY + tableHeaderH + idx * rowH;
+    ctx.strokeStyle = "rgba(15,23,42,0.06)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(x, ry + rowH);
+    ctx.lineTo(x + w, ry + rowH);
+    ctx.stroke();
+
+    const mid = ry + rowH / 2;
+    ctx.fillStyle = "#FC4C02";
+    ctx.beginPath();
+    ctx.arc(NUM_LEFT + 6, mid, 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#0F172A";
+    ctx.font = `700 18px ${FONT_TEXT}`;
+    ctx.textAlign = "left";
+    ctx.fillText(String(idx + 1), NUM_LEFT + 18, mid);
+
+    ctx.textAlign = "right";
+    ctx.font = `700 18px ${FONT_TEXT}`;
+    ctx.fillText(fmtTimeShort(s.elapsed_time, false).replace(/\s/g, ""), TIME_RIGHT, mid);
+    ctx.fillText(fmtPaceMM(s.average_speed), PACE_RIGHT, mid);
+    ctx.fillText(s.average_heartrate ? String(Math.round(s.average_heartrate)) : "--", HR_RIGHT, mid);
+  });
+
+  ctx.textAlign = "left";
+  ctx.textBaseline = "top";
+  return 60 + tableHeaderH + rows.length * rowH + 8;
+}
+
+async function renderCustomCard(input: CustomShareInput): Promise<Blob> {
+  const isZh = input.lang === "zh";
+  const sel = input.selections;
+  const W = 1080;
+  const padX = 48;
+  const innerPad = 40;
+  const cardR = 36;
+  const innerW = W - padX * 2 - innerPad * 2;
+
+  // ---- Compute section heights ----
+  const HEADER_H = 100;
+  const TITLE_H = 80;
+  const MAP_H = 560;
+  const STATS_ROW_H = 110;
+  const CHART_H = 460;
+  const CHART_GAP = 28;
+  const FOOTER_H = 96;
+  const SECTION_GAP = 36;
+
+  type Section =
+    | { type: "map" }
+    | { type: "stats"; rows: number }
+    | { type: "splits"; h: number }
+    | { type: "chart"; kind: "pace" | "hr" | "altitude"; h: number }
+    | { type: "hrZones"; h: number };
+
+  const sections: Section[] = [];
+
+  // Map
+  const wantMap = sel.route && !!input.summaryPolyline;
+  if (wantMap) sections.push({ type: "map" });
+
+  // Stats — count selected fields
+  const statKeys: Array<{ key: keyof CustomShareSelections["stats"]; available: boolean }> = [
+    { key: "distance", available: true },
+    { key: "totalTime", available: true },
+    { key: "pace", available: input.averageSpeed > 0 },
+    { key: "avgHr", available: !!input.averageHeartrate && input.averageHeartrate > 0 },
+    { key: "maxHr", available: !!input.maxHeartrate && input.maxHeartrate > 0 },
+    { key: "elevation", available: !!input.elevationGainMeters && input.elevationGainMeters > 0 },
+    { key: "calories", available: !!input.calories && input.calories > 0 },
+  ];
+  const activeStats = statKeys.filter((k) => k.available && sel.stats[k.key]);
+  if (activeStats.length > 0) {
+    const rows = Math.ceil(activeStats.length / 3);
+    sections.push({ type: "stats", rows });
+  }
+
+  // Splits
+  const splitsArr = sel.splits && input.splits ? input.splits.filter((s) => !((s.distance || 0) < 50 && (s.elapsed_time || 0) < 10)).slice(0, 20) : [];
+  if (splitsArr.length > 0) {
+    sections.push({ type: "splits", h: 60 + 44 + splitsArr.length * 50 + 8 });
+  }
+
+  // Charts
+  const chartData = input.chartData || [];
+  const hasPaceData = chartData.some((d) => typeof d.pace === "number" && d.pace! > 0);
+  const hasHrData = chartData.some((d) => typeof d.heartrate === "number" && d.heartrate! > 0);
+  const hasAltData = chartData.some((d) => typeof d.altitude === "number");
+  if (sel.charts.pace && hasPaceData) sections.push({ type: "chart", kind: "pace", h: CHART_H });
+  if (sel.charts.hr && hasHrData) sections.push({ type: "chart", kind: "hr", h: CHART_H });
+  if (sel.charts.altitude && hasAltData) sections.push({ type: "chart", kind: "altitude", h: CHART_H });
+
+  // HR Zones
+  if (sel.hrZones && input.hrZones) {
+    sections.push({ type: "hrZones", h: 50 + 5 * (38 + 14) });
+  }
+
+  // ---- Compute total height ----
+  let bodyH = HEADER_H + TITLE_H;
+  for (const s of sections) {
+    bodyH += SECTION_GAP;
+    if (s.type === "map") bodyH += MAP_H;
+    else if (s.type === "stats") bodyH += s.rows * STATS_ROW_H;
+    else if (s.type === "splits") bodyH += s.h;
+    else if (s.type === "chart") bodyH += s.h;
+    else if (s.type === "hrZones") bodyH += s.h;
+  }
+  bodyH += FOOTER_H;
+
+  const cardH = bodyH + 80; // breathing room
+  const H = cardH + padX * 2;
+
+  // ---- Canvas setup ----
+  const canvas = document.createElement("canvas");
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext("2d")!;
+
+  const bg = ctx.createLinearGradient(0, 0, 0, H);
+  bg.addColorStop(0, "#FFFFFF");
+  bg.addColorStop(1, "#F4F1EC");
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, W, H);
+
+  // Outer card
+  const cardX = padX;
+  const cardY = padX;
+  const cardW = W - padX * 2;
+  ctx.save();
+  ctx.shadowColor = "rgba(15, 23, 42, 0.10)";
+  ctx.shadowBlur = 36;
+  ctx.shadowOffsetY = 12;
+  ctx.fillStyle = "#FFFFFF";
+  roundedRect(ctx, cardX, cardY, cardW, cardH, cardR);
+  ctx.fill();
+  ctx.restore();
+  ctx.strokeStyle = "rgba(15,23,42,0.06)";
+  ctx.lineWidth = 1.5;
+  roundedRect(ctx, cardX + 0.5, cardY + 0.5, cardW - 1, cardH - 1, cardR);
+  ctx.stroke();
+
+  const innerX = cardX + innerPad;
+
+  // Header
+  const headerY = cardY + 36;
+  let iconImg: HTMLImageElement | null = null;
+  try {
+    iconImg = await loadImage(appIcon);
+    ctx.save();
+    roundedRect(ctx, innerX, headerY, 56, 56, 14);
+    ctx.clip();
+    ctx.drawImage(iconImg, innerX, headerY, 56, 56);
+    ctx.restore();
+  } catch { /* ignore */ }
+
+  ctx.fillStyle = "#0F172A";
+  ctx.textBaseline = "top";
+  ctx.font = `700 28px ${FONT_DISPLAY}`;
+  ctx.fillText(APP_NAME, innerX + 72, headerY + 4);
+  ctx.fillStyle = "#64748B";
+  ctx.font = `500 18px ${FONT_TEXT}`;
+  ctx.fillText(isZh ? "AI 跑步教練" : "AI Running Coach", innerX + 72, headerY + 34);
+
+  ctx.textAlign = "right";
+  ctx.fillStyle = "#64748B";
+  ctx.font = `600 20px ${FONT_TEXT}`;
+  ctx.fillText(fmtDate(input.startDate, input.lang), innerX + innerW, headerY + 18);
+  ctx.textAlign = "left";
+
+  // Title
+  const titleY = headerY + 96;
+  ctx.fillStyle = "#0F172A";
+  ctx.font = `800 44px ${FONT_DISPLAY}`;
+  const titleEnd = wrapText(ctx, input.name, innerX, titleY, innerW, 50, 1);
+  ctx.fillStyle = "#FC4C02";
+  ctx.fillRect(innerX, titleEnd + 8, 56, 4);
+
+  // Sections
+  let cy = cardY + HEADER_H + TITLE_H;
+
+  for (const s of sections) {
+    cy += SECTION_GAP;
+    if (s.type === "map") {
+      const mapR = 24;
+      ctx.save();
+      roundedRect(ctx, innerX, cy, innerW, MAP_H, mapR);
+      ctx.clip();
+      ctx.fillStyle = "#E8EEF4";
+      ctx.fillRect(innerX, cy, innerW, MAP_H);
+      try {
+        const coords = decodePolyline(input.summaryPolyline!);
+        if (coords.length >= 2) {
+          await drawMapWithTiles(ctx, coords, innerX, cy, innerW, MAP_H);
+        }
+      } catch (err) {
+        console.warn("[CustomShare] map render failed:", err);
+      }
+      ctx.restore();
+      cy += MAP_H;
+    } else if (s.type === "stats") {
+      const cols = 3;
+      const colW = innerW / cols;
+      activeStats.forEach((stat, i) => {
+        const row = Math.floor(i / cols);
+        const col = i % cols;
+        const sx = innerX + col * colW;
+        const sy = cy + row * STATS_ROW_H;
+        let label = "", value = "";
+        switch (stat.key) {
+          case "distance":
+            label = isZh ? "距離" : "Distance";
+            value = `${fmtDistance(input.distanceMeters)} ${isZh ? "公里" : "km"}`;
+            break;
+          case "totalTime":
+            label = isZh ? "時間" : "Time";
+            value = fmtTimeShort(input.movingTimeSeconds, isZh);
+            break;
+          case "pace":
+            label = isZh ? "配速" : "Pace";
+            value = fmtPace(input.averageSpeed, isZh);
+            break;
+          case "avgHr":
+            label = isZh ? "平均心率" : "Avg HR";
+            value = `${Math.round(input.averageHeartrate || 0)} bpm`;
+            break;
+          case "maxHr":
+            label = isZh ? "最大心率" : "Max HR";
+            value = `${Math.round(input.maxHeartrate || 0)} bpm`;
+            break;
+          case "elevation":
+            label = isZh ? "爬升" : "Elevation";
+            value = `${Math.round(input.elevationGainMeters || 0)} m`;
+            break;
+          case "calories":
+            label = isZh ? "卡路里" : "Calories";
+            value = `${Math.round(input.calories || 0)} kcal`;
+            break;
+        }
+        ctx.textBaseline = "top";
+        ctx.fillStyle = "#94A3B8";
+        ctx.font = `600 16px ${FONT_TEXT}`;
+        ctx.fillText(label.toUpperCase(), sx, sy);
+        ctx.fillStyle = "#0F172A";
+        ctx.font = `800 36px ${FONT_DISPLAY}`;
+        ctx.fillText(value, sx, sy + 26);
+      });
+      cy += s.rows * STATS_ROW_H;
+    } else if (s.type === "splits") {
+      const used = drawSplitsSection(ctx, innerX, cy, innerW, splitsArr, isZh);
+      cy += used;
+    } else if (s.type === "chart") {
+      let pts: { x: number; y: number }[] = [];
+      let opts: any;
+      if (s.kind === "pace") {
+        pts = chartData
+          .filter((d) => typeof d.pace === "number" && d.pace! > 0)
+          .map((d) => ({ x: Number(d.distance_km), y: d.pace as number }));
+        opts = {
+          title: isZh ? "配速" : "Pace",
+          unit: isZh ? "分鐘 / 公里" : "min / km",
+          color: "#FC4C02",
+          fillColor: "rgba(252,76,2,0.25)",
+          invertY: true,
+          yFmt: fmtPaceMin,
+          xFmt: (v: number) => `${v.toFixed(1)} km`,
+          isZh,
+        };
+      } else if (s.kind === "hr") {
+        pts = chartData
+          .filter((d) => typeof d.heartrate === "number" && d.heartrate! > 0)
+          .map((d) => ({ x: Number(d.distance_km), y: d.heartrate as number }));
+        opts = {
+          title: isZh ? "心率" : "Heart Rate",
+          unit: "bpm",
+          color: "#EF4444",
+          fillColor: "rgba(239,68,68,0.25)",
+          yFmt: (v: number) => String(Math.round(v)),
+          xFmt: (v: number) => `${v.toFixed(1)} km`,
+          isZh,
+        };
+      } else {
+        pts = chartData
+          .filter((d) => typeof d.altitude === "number")
+          .map((d) => ({ x: Number(d.distance_km), y: d.altitude as number }));
+        opts = {
+          title: isZh ? "海拔" : "Elevation",
+          unit: "m",
+          color: "#0EA5E9",
+          fillColor: "rgba(14,165,233,0.25)",
+          yFmt: (v: number) => `${Math.round(v)}`,
+          xFmt: (v: number) => `${v.toFixed(1)} km`,
+          isZh,
+        };
+      }
+      drawChart(ctx, { x: innerX, y: cy, w: innerW, h: s.h }, pts, opts);
+      cy += s.h;
+    } else if (s.type === "hrZones") {
+      const used = drawHrZonesSection(ctx, innerX, cy, innerW, input.hrZones!, isZh);
+      cy += used;
+    }
+  }
+
+  // Footer
+  const footerY = cardY + cardH - 56;
+  ctx.strokeStyle = "rgba(15,23,42,0.08)";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(innerX, footerY - 16);
+  ctx.lineTo(innerX + innerW, footerY - 16);
+  ctx.stroke();
+
+  ctx.fillStyle = "#0F172A";
+  ctx.textBaseline = "top";
+  ctx.textAlign = "left";
+  ctx.font = `700 22px ${FONT_DISPLAY}`;
+  ctx.fillText(APP_NAME, innerX, footerY);
+  drawIgHandle(ctx, innerX + innerW, footerY + 12, "#0F172A");
+  ctx.textAlign = "left";
+
+  return await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob(
+      (b) => (b ? resolve(b) : reject(new Error("Canvas toBlob failed"))),
+      "image/png",
+      0.95,
+    );
+  });
+}
+
+export async function shareCustom(input: CustomShareInput): Promise<void> {
+  const isZh = input.lang === "zh";
+  const loadingId = toast.loading(isZh ? "正在生成分享圖片..." : "Generating share image...");
+  let blob: Blob;
+  try {
+    blob = await renderCustomCard(input);
+  } catch (err) {
+    console.error("[ShareCustom] Render failed:", err);
+    toast.dismiss(loadingId);
+    toast.error(isZh ? "無法生成圖片" : "Failed to create image");
+    return;
+  }
+  toast.dismiss(loadingId);
+  await distributeBlob(blob, input.lang);
+}

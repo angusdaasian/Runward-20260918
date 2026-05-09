@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { ArrowLeft, Clock, MapPin, Zap, Heart, TrendingUp, Mountain, Timer, Footprints, Trash2, Pencil, Sparkles, Lock, Gauge, AlertTriangle, Flame, Trophy, MessageSquare, RefreshCw, Share2 } from "lucide-react";
 import { shareActivity, shareSplits, shareCharts } from "@/lib/shareActivity";
 import AiPosterDialog from "./AiPosterDialog";
+import CustomShareDialog from "./CustomShareDialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -155,6 +156,7 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
   const [rpeInput, setRpeInput] = useState<string>("");
   const [rpeSubmitted, setRpeSubmitted] = useState(false);
   const [aiPosterOpen, setAiPosterOpen] = useState(false);
+  const [customShareOpen, setCustomShareOpen] = useState(false);
   const [analysisAttempted, setAnalysisAttempted] = useState(false);
 
   // Race tagging + comment state
@@ -685,6 +687,50 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
   return (
     <div className="px-5 pt-4 pb-8 max-w-lg mx-auto">
       <AiPosterDialog open={aiPosterOpen} onOpenChange={setAiPosterOpen} stats={posterStats} lang={lang} />
+      <CustomShareDialog
+        open={customShareOpen}
+        onOpenChange={setCustomShareOpen}
+        lang={lang}
+        data={{
+          name: activityName,
+          startDate: activity.start_date,
+          lang,
+          distanceMeters: activity.distance,
+          movingTimeSeconds: activity.moving_time,
+          averageSpeed: activity.average_speed,
+          averageHeartrate: activity.average_heartrate ?? null,
+          maxHeartrate: activity.max_heartrate ?? null,
+          elevationGainMeters: activity.total_elevation_gain ?? null,
+          calories: (activity as any).calories ?? null,
+          summaryPolyline: activity.summary_polyline ?? null,
+          splits: splits ? splits.map((s) => ({
+            distance: s.distance,
+            elapsed_time: s.elapsed_time,
+            average_speed: s.average_speed,
+            average_heartrate: s.average_heartrate ?? null,
+          })) : [],
+          chartData: chartData.map((d: any) => ({
+            distance_km: Number(d.distance_km),
+            pace: typeof d.pace === "number" ? d.pace : undefined,
+            heartrate: typeof d.heartrate === "number" ? d.heartrate : undefined,
+            altitude: typeof d.altitude === "number" ? d.altitude : undefined,
+          })),
+          hrZones: hrZones,
+        }}
+        available={{
+          route: !!activity.summary_polyline,
+          splits: !!splits && splits.length > 0,
+          hrZones: !!hrZones,
+          pace: activity.average_speed > 0,
+          avgHr: !!activity.average_heartrate && activity.average_heartrate > 0,
+          maxHr: !!activity.max_heartrate && activity.max_heartrate > 0,
+          elevation: !!activity.total_elevation_gain && activity.total_elevation_gain > 0,
+          calories: !!(activity as any).calories && (activity as any).calories > 0,
+          chartPace: chartData.some((d: any) => typeof d.pace === "number" && d.pace > 0),
+          chartHr: chartData.some((d: any) => typeof d.heartrate === "number" && d.heartrate > 0),
+          chartAlt: chartData.some((d: any) => typeof d.altitude === "number"),
+        }}
+      />
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <button onClick={onBack} className="flex items-center gap-1.5 text-sm text-primary hover:text-primary/80 transition-colors">
@@ -765,6 +811,21 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
               >
                 <span className="flex items-center gap-2 w-full">
                   {lang === "zh" ? "分享圖表" : "Share charts"}
+                  {!isPremium && <Lock size={12} className="ml-auto text-muted-foreground" />}
+                </span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => {
+                  if (!isPremium) {
+                    toast.error(lang === "zh" ? "升級 Premium 以解鎖" : "Upgrade to Premium to unlock");
+                    return;
+                  }
+                  setCustomShareOpen(true);
+                }}
+              >
+                <span className="flex items-center gap-2 w-full">
+                  <Sparkles size={12} className="text-primary" />
+                  {lang === "zh" ? "自訂分享卡片" : "Custom share card"}
                   {!isPremium && <Lock size={12} className="ml-auto text-muted-foreground" />}
                 </span>
               </DropdownMenuItem>

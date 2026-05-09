@@ -84,7 +84,7 @@ const HrZonesWeekCard = ({ lang }: Props) => {
     return () => {
       cancelled = true;
     };
-  }, [isPremium, weekActivities, age, profileMaxHr]);
+  }, [isPremium, weekActivities, age, profileMaxHr, profileRestingHr]);
 
   if (!isPremium) {
     return (

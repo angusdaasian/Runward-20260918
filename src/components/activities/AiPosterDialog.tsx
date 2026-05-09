@@ -29,18 +29,50 @@ const STYLES: Array<{ id: string; en: string; zh: string }> = [
   { id: "retro_magazine", en: "Retro Magazine", zh: "復古雜誌" },
 ];
 
-function fileToBase64(file: File): Promise<{ base64: string; mimeType: string }> {
+function loadImage(file: File): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
-    const r = new FileReader();
-    r.onload = () => {
-      const result = r.result as string;
-      const [meta, b64] = result.split(",");
-      const mt = meta.match(/data:([^;]+)/)?.[1] || file.type || "image/jpeg";
-      resolve({ base64: b64, mimeType: mt });
-    };
-    r.onerror = reject;
-    r.readAsDataURL(file);
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => { URL.revokeObjectURL(url); resolve(img); };
+    img.onerror = (e) => { URL.revokeObjectURL(url); reject(e); };
+    img.src = url;
   });
+}
+
+async function downscaleImage(
+  file: File,
+  maxEdge = 1280,
+  quality = 0.82,
+): Promise<{ base64: string; mimeType: string }> {
+  try {
+    const img = await loadImage(file);
+    const { width: w, height: h } = img;
+    const scale = Math.min(1, maxEdge / Math.max(w, h));
+    const tw = Math.round(w * scale);
+    const th = Math.round(h * scale);
+    const canvas = document.createElement("canvas");
+    canvas.width = tw;
+    canvas.height = th;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("no ctx");
+    ctx.drawImage(img, 0, 0, tw, th);
+    const dataUrl = canvas.toDataURL("image/jpeg", quality);
+    const [, b64] = dataUrl.split(",");
+    return { base64: b64, mimeType: "image/jpeg" };
+  } catch {
+    // Fallback: original file as-is.
+    return await new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => {
+        const result = r.result as string;
+        const [meta, b64] = result.split(",");
+        const mt = meta.match(/data:([^;]+)/)?.[1] || file.type || "image/jpeg";
+        resolve({ base64: b64, mimeType: mt });
+      };
+      r.onerror = reject;
+      r.readAsDataURL(file);
+    });
+  }
 }
 
 export default function AiPosterDialog({ open, onOpenChange, stats, lang }: Props) {

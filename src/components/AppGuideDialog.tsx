@@ -16,8 +16,8 @@ const AppGuideDialog = ({ open, onOpenChange, lang }: AppGuideDialogProps) => {
       icon: Activity,
       title: tx("Activities", "活動"),
       desc: tx(
-        "Auto-sync runs from Strava, Garmin, Apple Health & Terra. View detailed maps, splits, pace, heart rate and elevation for every activity.",
-        "自動從 Strava、Garmin、Apple Health 和 Terra 同步跑步資料。查看每次活動的詳細地圖、分段、配速、心率和爬升。"
+        "Auto-sync runs from Garmin, Coros, Suunto, Pacer & Apple Health. View detailed maps, splits, pace, heart rate and elevation for every activity.",
+        "自動從 Garmin、Coros、Suunto、Pacer 和 Apple Health 同步跑步資料。查看每次活動的詳細地圖、分段、配速、心率和爬升。"
       ),
     },
     {
@@ -80,8 +80,8 @@ const AppGuideDialog = ({ open, onOpenChange, lang }: AppGuideDialogProps) => {
       icon: Heart,
       title: tx("Health Integrations", "健康整合"),
       desc: tx(
-        "Connect Garmin, Apple Health, Strava, or Terra to sync sleep, HRV, stress and daily readiness data.",
-        "連接 Garmin、Apple Health、Strava 或 Terra 以同步睡眠、HRV、壓力和每日準備度數據。"
+        "Connect Garmin, Coros, Suunto, Pacer or Apple Health to sync sleep, HRV, stress and daily readiness data.",
+        "連接 Garmin、Coros、Suunto、Pacer 或 Apple Health 以同步睡眠、HRV、壓力和每日準備度數據。"
       ),
     },
     {
@@ -104,8 +104,8 @@ const AppGuideDialog = ({ open, onOpenChange, lang }: AppGuideDialogProps) => {
       icon: Users,
       title: tx("Settings & Plans", "設定與方案"),
       desc: tx(
-        "Manage profile, language, connected apps, and compare Free vs Premium features in Settings.",
-        "管理個人資料、語言、連接的應用程式，並在設定中比較免費版與付費版功能。"
+        "Manage profile, language, connected apps, customise heart rate zones, and compare Free vs Premium features in Settings.",
+        "管理個人資料、語言、連接的應用程式、自訂心率區間，並在設定中比較免費版與付費版功能。"
       ),
     },
   ];

@@ -64,6 +64,7 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps }: Props
 
   const [showLoginPrompt, setShowLoginPrompt] = useState(false);
   const [showRedeemDialog, setShowRedeemDialog] = useState(false);
+  const [showPlanCompare, setShowPlanCompare] = useState(false);
   const [offerCode, setOfferCode] = useState("");
   const [countdown, setCountdown] = useState("");
   const [activityNotifications, setActivityNotifications] = useState(true);

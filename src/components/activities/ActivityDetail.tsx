@@ -1008,8 +1008,8 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
             lang={lang}
             subtitle={
               lang === "zh"
-                ? `基於最大心率 ${estimateMaxHr(profileAge ?? null, profileMaxHr ?? null)} bpm`
-                : `Based on max HR ${estimateMaxHr(profileAge ?? null, profileMaxHr ?? null)} bpm`
+                ? `Karvonen %HRR · 最大 ${estimateMaxHr(profileAge ?? null, profileMaxHr ?? null)} / 靜息 ${estimateRestingHr(profileRestingHr ?? null)} bpm`
+                : `Karvonen %HRR · max ${estimateMaxHr(profileAge ?? null, profileMaxHr ?? null)} / rest ${estimateRestingHr(profileRestingHr ?? null)} bpm`
             }
           />
         </div>

@@ -200,7 +200,7 @@ serve(async (req) => {
     const {
       activity, splits, lang, translate, activityDbId, rpe, checkCacheOnly, garminLaps,
       raceId, raceName, userComment, forceRefresh,
-      hrSamples, distanceSamples, elevationSamples,
+      hrSamples, distanceSamples, elevationSamples, hrZones,
     } = body;
     const isZh = lang === "zh";
 
@@ -510,12 +510,21 @@ ${plannedWorkout ? `- ${plannedWorkout}` : ""}`;
       statsText += `\n- Activity Type: 🏁 RACE — ${resolvedRaceName}`;
     }
 
+    if (activity.total_elevation_gain != null && activity.total_elevation_gain >= 0) {
+      statsText += `\n- Total Elevation Gain: ${Math.round(activity.total_elevation_gain)} m  ⚠️ AUTHORITATIVE — this is the device-reported total. Do NOT recompute elevation gain from per-second samples; sample-derived sums include GPS noise and will be inflated. Use this value when discussing elevation.`;
+    }
     if (!isAppleHealth) {
-      if (activity.total_elevation_gain > 0) {
-        statsText += `\n- Total Elevation Gain: ${Math.round(activity.total_elevation_gain)} m`;
-      }
       if (activity.average_heartrate) statsText += `\n- Average HR: ${Math.round(activity.average_heartrate)} bpm`;
       if (activity.max_heartrate) statsText += `\n- Max HR: ${Math.round(activity.max_heartrate)} bpm`;
+    }
+
+    // --- HR zones (%HRR / Karvonen) — distribution across the run ---
+    if (hrZones && typeof hrZones === "object") {
+      const z: any = hrZones;
+      const fmt = (v: any) => (typeof v === "number" ? `${Math.round(v)}%` : "0%");
+      statsText += `\n\n❤️ HR Zone Distribution (% of time, Karvonen %HRR):`;
+      statsText += `\n  Z1 (Recovery): ${fmt(z.z1)} | Z2 (Easy/Aerobic): ${fmt(z.z2)} | Z3 (Tempo): ${fmt(z.z3)} | Z4 (Threshold): ${fmt(z.z4)} | Z5 (VO2max): ${fmt(z.z5)}`;
+      statsText += `\n  → Use this distribution to characterise the workout's intensity profile (e.g., mostly Z2 = aerobic base run; heavy Z4-Z5 = quality session).`;
     }
 
     // --- Lap analysis (interval-aware) — normalises field names across Garmin / Terra / Strava ---
@@ -751,7 +760,7 @@ ${plannedWorkout ? `- ${plannedWorkout}` : ""}`;
           const mean = (a: number[]) => a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0;
           statsText += `\n\n⛰️ Elevation profile (per-second):`;
           statsText += `\n  Range: ${Math.round(minE)}–${Math.round(maxE)} m (relief ${Math.round(maxE - minE)} m)`;
-          statsText += `\n  Cumulative gain ≈ ${Math.round(totalGain)} m / loss ≈ ${Math.round(totalLoss)} m`;
+          statsText += `\n  Cumulative gain (sample-derived, NOISY — do NOT quote this; use the AUTHORITATIVE Total Elevation Gain above) ≈ ${Math.round(totalGain)} m / loss ≈ ${Math.round(totalLoss)} m`;
           statsText += `\n  Sample buckets — CLIMB (>+2%): ${buckets.climb.length}s | FLAT (±2%): ${buckets.flat.length}s | DESCENT (<−2%): ${buckets.descent.length}s`;
           if (buckets.climb.length > 5 || buckets.descent.length > 5) {
             statsText += `\n  Avg HR — climb: ${Math.round(mean(buckets.climb))} bpm | flat: ${Math.round(mean(buckets.flat))} bpm | descent: ${Math.round(mean(buckets.descent))} bpm`;

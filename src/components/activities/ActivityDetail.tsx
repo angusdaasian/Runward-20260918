@@ -249,6 +249,9 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
       if (Array.isArray(activity.elevation_samples) && activity.elevation_samples.length > 10) {
         bodyPayload.elevationSamples = activity.elevation_samples;
       }
+      if (hrZones) {
+        bodyPayload.hrZones = hrZones;
+      }
       // Strava streams: derive HR/distance/elevation samples for the AI as well
       if (streams && streams.length > 0) {
         const timeStream = streams.find((s: any) => s.type === 'time');

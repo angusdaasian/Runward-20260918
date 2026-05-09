@@ -776,6 +776,21 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
                     toast.error(lang === "zh" ? "升級 Premium 以解鎖" : "Upgrade to Premium to unlock");
                     return;
                   }
+                  setCustomShareOpen(true);
+                }}
+              >
+                <span className="flex items-center gap-2 w-full">
+                  <Sparkles size={12} className="text-primary" />
+                  {lang === "zh" ? "自訂分享卡片" : "Custom share card"}
+                  {!isPremium && <Lock size={12} className="ml-auto text-muted-foreground" />}
+                </span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => {
+                  if (!isPremium) {
+                    toast.error(lang === "zh" ? "升級 Premium 以解鎖" : "Upgrade to Premium to unlock");
+                    return;
+                  }
                   setAiPosterOpen(true);
                 }}
               >

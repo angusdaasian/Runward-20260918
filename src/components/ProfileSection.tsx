@@ -5,7 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
-import { Camera, Save, LogOut, Trash2, Mail, Pencil, Zap, Sparkles, Loader2 } from "lucide-react";
+import { Camera, Save, LogOut, Trash2, Mail, Pencil, Zap, Sparkles, Loader2, X } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Lang, t } from "@/lib/i18n";
 import { calculateRunningScore } from "@/lib/vdot";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -80,6 +81,13 @@ const ProfileSection = ({ lang }: { lang: Lang }) => {
   const [newEmail, setNewEmail] = useState("");
   const [savingEmail, setSavingEmail] = useState(false);
 
+  // Onboarding info editing
+  const [editingInfo, setEditingInfo] = useState(false);
+  const [editAge, setEditAge] = useState("");
+  const [editSex, setEditSex] = useState<string>("");
+  const [editRpw, setEditRpw] = useState("");
+  const [savingInfo, setSavingInfo] = useState(false);
+
   // New PB form
   const [newDist, setNewDist] = useState("");
   const [newH, setNewH] = useState("");
@@ -147,6 +155,39 @@ const ProfileSection = ({ lang }: { lang: Lang }) => {
       setNewEmail("");
     }
     setSavingEmail(false);
+  };
+
+  const startEditInfo = () => {
+    setEditAge(profile?.age != null ? String(profile.age) : "");
+    setEditSex(profile?.sex || "");
+    setEditRpw(profile?.runs_per_week != null ? String(profile.runs_per_week) : "");
+    setEditingInfo(true);
+  };
+
+  const handleSaveInfo = async () => {
+    if (!user) return;
+    setSavingInfo(true);
+    const ageNum = editAge ? parseInt(editAge) : null;
+    const rpwNum = editRpw ? parseInt(editRpw) : null;
+    const sexVal = editSex || null;
+    const updates = {
+      age: Number.isFinite(ageNum as number) ? ageNum : null,
+      sex: sexVal,
+      runs_per_week: Number.isFinite(rpwNum as number) ? rpwNum : null,
+    };
+    const { error } = await supabase.from("profiles").update(updates).eq("user_id", user.id);
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } else {
+      setProfile((p) => {
+        const updated = p ? { ...p, ...updates } : p;
+        _cachedProfile = updated;
+        return updated;
+      });
+      setEditingInfo(false);
+      toast({ title: lang === "zh" ? "已儲存" : "Saved!" });
+    }
+    setSavingInfo(false);
   };
 
   const isPBFasterThanWR = () => {
@@ -384,11 +425,80 @@ const ProfileSection = ({ lang }: { lang: Lang }) => {
             </div>
           </div>
         </div>
-        <div className="flex gap-4 text-xs text-muted-foreground">
-          {profile.age && <span>{profile.age} yrs</span>}
-          {profile.sex && <span>{profile.sex}</span>}
-          {profile.runs_per_week && <span>{profile.runs_per_week}x/week</span>}
-        </div>
+        {editingInfo ? (
+          <div className="space-y-2 pt-1">
+            <div className="grid grid-cols-3 gap-2">
+              <div>
+                <label className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                  {lang === "zh" ? "年齡" : "Age"}
+                </label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={120}
+                  value={editAge}
+                  onChange={(e) => setEditAge(e.target.value)}
+                  className="h-8 text-sm"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                  {lang === "zh" ? "性別" : "Sex"}
+                </label>
+                <Select value={editSex} onValueChange={setEditSex}>
+                  <SelectTrigger className="h-8 text-sm">
+                    <SelectValue placeholder="—" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="male">{lang === "zh" ? "男" : "Male"}</SelectItem>
+                    <SelectItem value="female">{lang === "zh" ? "女" : "Female"}</SelectItem>
+                    <SelectItem value="other">{lang === "zh" ? "其他" : "Other"}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                  {lang === "zh" ? "每週次數" : "Runs/week"}
+                </label>
+                <Input
+                  type="number"
+                  min={0}
+                  max={14}
+                  value={editRpw}
+                  onChange={(e) => setEditRpw(e.target.value)}
+                  className="h-8 text-sm"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button size="sm" variant="ghost" onClick={() => setEditingInfo(false)} className="h-7 px-2">
+                <X size={14} />
+              </Button>
+              <Button size="sm" onClick={handleSaveInfo} disabled={savingInfo} className="h-7 px-3 gap-1">
+                {savingInfo ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
+                {lang === "zh" ? "儲存" : "Save"}
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
+              {profile.age ? <span>{profile.age} {lang === "zh" ? "歲" : "yrs"}</span> : null}
+              {profile.sex ? <span className="capitalize">{profile.sex}</span> : null}
+              {profile.runs_per_week ? <span>{profile.runs_per_week}{lang === "zh" ? " 次/週" : "x/week"}</span> : null}
+              {!profile.age && !profile.sex && !profile.runs_per_week && (
+                <span className="italic">{lang === "zh" ? "未設定" : "Not set"}</span>
+              )}
+            </div>
+            <button
+              onClick={startEditInfo}
+              className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
+            >
+              <Pencil size={11} />
+              {lang === "zh" ? "編輯" : "Edit"}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Heart Rate Zones — separate card */}

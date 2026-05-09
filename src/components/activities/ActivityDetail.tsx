@@ -697,6 +697,21 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
                   {!isPremium && <Lock size={12} className="ml-auto text-muted-foreground" />}
                 </span>
               </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => {
+                  if (!isPremium) {
+                    toast.error(lang === "zh" ? "升級 Premium 以解鎖" : "Upgrade to Premium to unlock");
+                    return;
+                  }
+                  setAiPosterOpen(true);
+                }}
+              >
+                <span className="flex items-center gap-2 w-full">
+                  <Sparkles size={12} className="text-primary" />
+                  {lang === "zh" ? "AI 海報（上傳照片）" : "AI poster (upload photo)"}
+                  {!isPremium && <Lock size={12} className="ml-auto text-muted-foreground" />}
+                </span>
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         <AlertDialog>

@@ -68,6 +68,7 @@ const AnalyticsTab = ({ lang }: Props) => {
         <div className="px-5 pt-4 max-w-lg mx-auto">
           <HealthStatsCard lang={lang} />
           <HRVReadinessCard lang={lang} />
+          <HrZonesWeekCard lang={lang} />
         </div>
         <Suspense fallback={<div className="px-5 pt-4"><PostureSkeleton /></div>}>
           <PerformanceTab lang={lang} />

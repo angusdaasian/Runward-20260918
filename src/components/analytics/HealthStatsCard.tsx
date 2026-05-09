@@ -68,8 +68,18 @@ const HealthStatsCard = ({ lang }: Props) => {
   if (providers.length === 0) return null;
   if (!active) return null;
 
-  const latest =
-    (terraHistory ?? []).find((r) => r.provider?.toUpperCase() === active) ?? null;
+  const providerRows = (terraHistory ?? []).filter(
+    (r) => r.provider?.toUpperCase() === active,
+  );
+  const latest = providerRows[0] ?? null;
+  // Each metric: take the most recent row where it's not null. The newest row
+  // can be a same-day summary that hasn't yet been joined with sleep data.
+  const pick = <K extends keyof typeof providerRows[number]>(key: K) =>
+    providerRows.find((r) => r[key] != null)?.[key] ?? null;
+  const vo2max = pick("vo2max") as number | null;
+  const restingHr = pick("resting_hr") as number | null;
+  const sleepSeconds = pick("sleep_seconds") as number | null;
+  const sleepScore = pick("sleep_score") as number | null;
 
   const handleRefresh = () => {
     refreshTerra(active);
@@ -120,25 +130,25 @@ const HealthStatsCard = ({ lang }: Props) => {
         <Stat
           icon={<Activity size={14} className="text-primary" />}
           label={lang === "zh" ? "最大攝氧量" : "VO₂max"}
-          value={latest?.vo2max != null ? Number(latest.vo2max).toFixed(1) : "—"}
+          value={vo2max != null ? Number(vo2max).toFixed(1) : "—"}
           unit="ml/kg/min"
         />
         <Stat
           icon={<HeartPulse size={14} className="text-rose-500" />}
           label={lang === "zh" ? "靜息心率" : "Resting HR"}
-          value={latest?.resting_hr != null ? String(latest.resting_hr) : "—"}
+          value={restingHr != null ? String(restingHr) : "—"}
           unit="bpm"
         />
         <Stat
           icon={<Moon size={14} className="text-indigo-400" />}
           label={lang === "zh" ? "睡眠時間" : "Sleep"}
-          value={fmtSleep(latest?.sleep_seconds ?? null)}
+          value={fmtSleep(sleepSeconds)}
         />
         <Stat
           icon={<Sparkles size={14} className="text-emerald-500" />}
           label={lang === "zh" ? "睡眠分數" : "Sleep Score"}
-          value={latest?.sleep_score != null ? String(latest.sleep_score) : "—"}
-          valueClass={sleepScoreClass(latest?.sleep_score ?? null)}
+          value={sleepScore != null ? String(sleepScore) : "—"}
+          valueClass={sleepScoreClass(sleepScore)}
         />
       </div>
     </Card>

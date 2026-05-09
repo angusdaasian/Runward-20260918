@@ -385,7 +385,21 @@ const ProfileSection = ({ lang }: { lang: Lang }) => {
           {profile.age && <span>{profile.age} yrs</span>}
           {profile.sex && <span>{profile.sex}</span>}
           {profile.runs_per_week && <span>{profile.runs_per_week}x/week</span>}
-        </div>
+      </div>
+
+      {/* Heart Rate Zones */}
+      <HeartRateZonesCard
+        lang={lang}
+        initialAge={profile.age}
+        initialMaxHr={profile.max_heartrate}
+        onSaved={(maxHr) => {
+          setProfile((p) => {
+            const updated = p ? { ...p, max_heartrate: maxHr } : p;
+            _cachedProfile = updated;
+            return updated;
+          });
+        }}
+      />
       </div>
 
       {/* Running Score */}

@@ -1726,7 +1726,7 @@ function drawSplitsSection(
   ctx.textBaseline = "middle";
   const headerMid = tableY + tableHeaderH / 2;
   ctx.textAlign = "left";
-  ctx.fillText("#", NUM_LEFT, headerMid);
+  ctx.fillText(isZh ? "距離" : "DIST", NUM_LEFT, headerMid);
   ctx.textAlign = "right";
   ctx.fillText(isZh ? "時間" : "TIME", TIME_RIGHT, headerMid);
   ctx.fillText(isZh ? "配速" : "PACE", PACE_RIGHT, headerMid);
@@ -1739,6 +1739,7 @@ function drawSplitsSection(
   ctx.lineTo(x + w, tableY + tableHeaderH);
   ctx.stroke();
 
+  let cumDist = 0;
   rows.forEach((s, idx) => {
     const ry = tableY + tableHeaderH + idx * rowH;
     ctx.strokeStyle = "rgba(15,23,42,0.06)";
@@ -1749,6 +1750,9 @@ function drawSplitsSection(
     ctx.stroke();
 
     const mid = ry + rowH / 2;
+    cumDist += s.distance || 0;
+    const km = cumDist / 1000;
+    const label = km >= 10 ? `${km.toFixed(1)} km` : `${km.toFixed(2)} km`;
     ctx.fillStyle = "#FC4C02";
     ctx.beginPath();
     ctx.arc(NUM_LEFT + 6, mid, 4, 0, Math.PI * 2);
@@ -1756,7 +1760,7 @@ function drawSplitsSection(
     ctx.fillStyle = "#0F172A";
     ctx.font = `700 18px ${FONT_TEXT}`;
     ctx.textAlign = "left";
-    ctx.fillText(String(idx + 1), NUM_LEFT + 18, mid);
+    ctx.fillText(label, NUM_LEFT + 18, mid);
 
     ctx.textAlign = "right";
     ctx.font = `700 18px ${FONT_TEXT}`;

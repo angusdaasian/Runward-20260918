@@ -237,7 +237,21 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps }: Props
                 {t("upgrade", lang)}
               </button>
             )}
+        </div>
+
+        {/* Compare Plans */}
+        <button
+          onClick={() => setShowPlanCompare(true)}
+          className="w-full bg-card border border-border rounded-xl p-4 flex items-center justify-between"
+        >
+          <div className="flex items-center gap-3">
+            <Info size={20} className="text-primary" />
+            <span className="font-medium text-foreground">
+              {lang === "zh" ? "比較免費版與 Premium" : "Compare Free vs Premium"}
+            </span>
           </div>
+          <ChevronRight size={18} className="text-muted-foreground" />
+        </button>
         </div>
 
         {/* Current Entitlement */}

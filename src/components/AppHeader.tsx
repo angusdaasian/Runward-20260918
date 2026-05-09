@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { Settings, Bell, Megaphone, Menu, Cloud } from "lucide-react";
+import { Settings, Bell, Megaphone, Menu, Cloud, HelpCircle } from "lucide-react";
+import AppGuideDialog from "@/components/AppGuideDialog";
 import { Lang } from "@/lib/i18n";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";

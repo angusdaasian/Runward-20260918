@@ -997,6 +997,21 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
         </div>
       ) : null}
 
+      {/* HR Zones distribution for this activity */}
+      {hrZones && (
+        <div className="mt-4">
+          <HrZoneBars
+            zones={hrZones}
+            lang={lang}
+            subtitle={
+              lang === "zh"
+                ? `基於最大心率 ${estimateMaxHr(profileAge ?? null, activity.max_heartrate)} bpm`
+                : `Based on max HR ${estimateMaxHr(profileAge ?? null, activity.max_heartrate)} bpm`
+            }
+          />
+        </div>
+      )}
+
       {/* Non-running notice */}
       {!isRunningActivity && (
         <div className="bg-card border border-border rounded-xl p-4 mt-4">

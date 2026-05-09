@@ -612,8 +612,31 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
     { hour: "2-digit", minute: "2-digit" }
   );
 
+  // Stats for AI poster
+  const posterStats = useMemo(() => {
+    const distanceKm = (activity.distance || 0) / 1000;
+    const sec = activity.moving_time || 0;
+    const h = Math.floor(sec / 3600);
+    const m = Math.floor((sec % 3600) / 60);
+    const s = Math.floor(sec % 60);
+    const timeStr = h > 0 ? `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}` : `${m}:${String(s).padStart(2, "0")}`;
+    const paceSec = activity.average_speed > 0 ? 1000 / activity.average_speed : 0;
+    const pm = Math.floor(paceSec / 60);
+    const ps = Math.floor(paceSec % 60);
+    const paceStr = paceSec > 0 ? `${pm}:${String(ps).padStart(2, "0")}` : "--";
+    return {
+      distanceKm,
+      timeStr,
+      paceStr,
+      calories: (activity as any).calories ?? null,
+      hr: activity.average_heartrate ?? null,
+      elevation: activity.total_elevation_gain ?? null,
+    };
+  }, [activity]);
+
   return (
     <div className="px-5 pt-4 pb-8 max-w-lg mx-auto">
+      <AiPosterDialog open={aiPosterOpen} onOpenChange={setAiPosterOpen} stats={posterStats} lang={lang} />
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <button onClick={onBack} className="flex items-center gap-1.5 text-sm text-primary hover:text-primary/80 transition-colors">

@@ -714,6 +714,7 @@ export type Database = {
           avatar_url: string | null
           check_in_streak: number
           created_at: string
+          custom_hr_zones: number[] | null
           display_name: string | null
           division: string
           id: string
@@ -740,6 +741,7 @@ export type Database = {
           avatar_url?: string | null
           check_in_streak?: number
           created_at?: string
+          custom_hr_zones?: number[] | null
           display_name?: string | null
           division?: string
           id?: string
@@ -766,6 +768,7 @@ export type Database = {
           avatar_url?: string | null
           check_in_streak?: number
           created_at?: string
+          custom_hr_zones?: number[] | null
           display_name?: string | null
           division?: string
           id?: string

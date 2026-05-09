@@ -633,17 +633,18 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
   // HR zone distribution from highest-resolution source available.
   const hrZones = useMemo(() => {
     const maxHr = estimateMaxHr(profileAge ?? null, profileMaxHr ?? null);
+    const restHr = estimateRestingHr(profileRestingHr ?? null);
     // 1. Terra per-second samples
     if (Array.isArray(activity.hr_samples) && activity.hr_samples.length > 10) {
-      return computeZonePct(activity.hr_samples.map((s: any) => s.bpm), maxHr);
+      return computeZonePct(activity.hr_samples.map((s: any) => s.bpm), maxHr, restHr);
     }
     // 2. Strava heartrate stream
     const hrStream = streams.find((s: any) => s.type === "heartrate");
     if (hrStream && Array.isArray(hrStream.data) && hrStream.data.length > 10) {
-      return computeZonePct(hrStream.data, maxHr);
+      return computeZonePct(hrStream.data, maxHr, restHr);
     }
     return null;
-  }, [activity.hr_samples, profileMaxHr, profileAge, streams]);
+  }, [activity.hr_samples, profileMaxHr, profileAge, profileRestingHr, streams]);
 
   const dateStr = new Date(activity.start_date).toLocaleDateString(
     lang === "zh" ? "zh-TW" : "en-US",

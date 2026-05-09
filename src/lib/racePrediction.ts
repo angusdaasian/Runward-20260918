@@ -78,7 +78,7 @@ export function effectiveVdot(
   const pb = pbScore && pbScore > 0 ? pbScore : null;
 
   const current = r ?? ts;
-  if (current && pb) return current * 0.7 + pb * 0.3;
+  if (current && pb) return current * 0.5 + pb * 0.5;
   return current ?? pb ?? null;
 }
 

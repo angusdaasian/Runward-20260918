@@ -642,7 +642,7 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
       return computeZonePct(hrStream.data, maxHr);
     }
     return null;
-  }, [activity.hr_samples, activity.max_heartrate, profileAge, streams]);
+  }, [activity.hr_samples, profileMaxHr, profileAge, streams]);
 
   const dateStr = new Date(activity.start_date).toLocaleDateString(
     lang === "zh" ? "zh-TW" : "en-US",

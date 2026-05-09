@@ -240,6 +240,28 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
       if (Array.isArray(activity.distance_samples) && activity.distance_samples.length > 10) {
         bodyPayload.distanceSamples = activity.distance_samples;
       }
+      if (Array.isArray(activity.elevation_samples) && activity.elevation_samples.length > 10) {
+        bodyPayload.elevationSamples = activity.elevation_samples;
+      }
+      // Strava streams: derive HR/distance/elevation samples for the AI as well
+      if (streams && streams.length > 0) {
+        const timeStream = streams.find((s: any) => s.type === 'time');
+        const hrStream = streams.find((s: any) => s.type === 'heartrate');
+        const distStream = streams.find((s: any) => s.type === 'distance');
+        const altStream = streams.find((s: any) => s.type === 'altitude');
+        if (timeStream && Array.isArray(timeStream.data)) {
+          const times: number[] = timeStream.data;
+          if (!bodyPayload.hrSamples && hrStream && Array.isArray(hrStream.data)) {
+            bodyPayload.hrSamples = times.map((t, i) => ({ t, bpm: hrStream.data[i] })).filter(s => s.bpm != null);
+          }
+          if (!bodyPayload.distanceSamples && distStream && Array.isArray(distStream.data)) {
+            bodyPayload.distanceSamples = times.map((t, i) => ({ t, d: distStream.data[i] })).filter(s => s.d != null);
+          }
+          if (!bodyPayload.elevationSamples && altStream && Array.isArray(altStream.data)) {
+            bodyPayload.elevationSamples = times.map((t, i) => ({ t, e: altStream.data[i] })).filter(s => s.e != null);
+          }
+        }
+      }
       const { data, error } = await supabase.functions.invoke("analyze-activity", { body: bodyPayload });
       if (error) {
         const errMsg = typeof error === "object" && error?.message ? error.message : String(error);

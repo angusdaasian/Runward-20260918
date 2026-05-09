@@ -200,7 +200,7 @@ serve(async (req) => {
     const {
       activity, splits, lang, translate, activityDbId, rpe, checkCacheOnly, garminLaps,
       raceId, raceName, userComment, forceRefresh,
-      hrSamples, distanceSamples,
+      hrSamples, distanceSamples, elevationSamples,
     } = body;
     const isZh = lang === "zh";
 
@@ -656,20 +656,22 @@ ${plannedWorkout ? `- ${plannedWorkout}` : ""}`;
       }
     }
 
-    // --- Per-second sample analysis (Terra): detect interval pattern from HR + pace volatility ---
+    // --- Per-second sample analysis (Terra/Strava): detect interval pattern + HR vs elevation/grade ---
     try {
       const hrArr: Array<{ t: number; bpm: number }> = Array.isArray(hrSamples) ? hrSamples : [];
       const dArr: Array<{ t: number; d: number }> = Array.isArray(distanceSamples) ? distanceSamples : [];
-      if (hrArr.length > 30 || dArr.length > 30) {
-        const tMap = new Map<number, { bpm?: number; d?: number }>();
+      const eArr: Array<{ t: number; e: number }> = Array.isArray(elevationSamples) ? elevationSamples : [];
+      if (hrArr.length > 30 || dArr.length > 30 || eArr.length > 30) {
+        const tMap = new Map<number, { bpm?: number; d?: number; e?: number }>();
         for (const s of hrArr) tMap.set(s.t, { ...(tMap.get(s.t) || {}), bpm: s.bpm });
         for (const s of dArr) tMap.set(s.t, { ...(tMap.get(s.t) || {}), d: s.d });
+        for (const s of eArr) tMap.set(s.t, { ...(tMap.get(s.t) || {}), e: s.e });
         const ordered = Array.from(tMap.entries()).sort((a, b) => a[0] - b[0]);
         const WINDOW = 30;
-        const series: Array<{ t: number; bpm?: number; paceSecPerKm?: number }> = [];
+        const series: Array<{ t: number; bpm?: number; paceSecPerKm?: number; e?: number; gradePct?: number }> = [];
         for (let i = 0; i < ordered.length; i++) {
           const [t, v] = ordered[i];
-          const item: any = { t, bpm: v.bpm };
+          const item: any = { t, bpm: v.bpm, e: v.e };
           if (v.d != null) {
             let j = i;
             while (j > 0 && t - ordered[j][0] < WINDOW) j--;
@@ -678,6 +680,11 @@ ${plannedWorkout ? `- ${plannedWorkout}` : ""}`;
             if (prev != null && dt >= 5) {
               const dd = v.d - prev;
               if (dd > 0) item.paceSecPerKm = (dt / dd) * 1000;
+              // grade from elevation delta over same window
+              const prevE = ordered[j][1].e;
+              if (v.e != null && prevE != null && dd > 0) {
+                item.gradePct = ((v.e - prevE) / dd) * 100;
+              }
             }
           }
           series.push(item);
@@ -717,6 +724,45 @@ ${plannedWorkout ? `- ${plannedWorkout}` : ""}`;
           statsText += `\n  ⚡ HR + pace charts oscillate sharply — this STRONGLY suggests an INTERVAL workout. Look at the splits/laps above to identify the specific interval structure (e.g., 8×400m, 5×1km, 4×800m, fartlek), recovery type (jog/walk/standing), and report this in your analysis.`;
         } else {
           statsText += `\n  Pace + HR are relatively steady — likely a continuous-effort run (easy / tempo / long), NOT intervals.`;
+        }
+
+        // --- Elevation / grade analysis (HR vs hills) ---
+        const eVals = series.map((s) => s.e).filter((x): x is number => typeof x === "number");
+        if (eVals.length > 20) {
+          const minE = Math.min(...eVals);
+          const maxE = Math.max(...eVals);
+          let totalGain = 0, totalLoss = 0;
+          for (let i = 1; i < eVals.length; i++) {
+            const d = eVals[i] - eVals[i - 1];
+            if (d > 0) totalGain += d; else totalLoss += -d;
+          }
+          // Bucket samples (with both HR + grade) into climb / flat / descent
+          const buckets = { climb: [] as number[], flat: [] as number[], descent: [] as number[] };
+          const paceBuckets = { climb: [] as number[], flat: [] as number[], descent: [] as number[] };
+          for (const s of series) {
+            if (s.bpm == null || s.gradePct == null) continue;
+            const g = s.gradePct;
+            const key = g > 2 ? "climb" : g < -2 ? "descent" : "flat";
+            buckets[key].push(s.bpm);
+            if (s.paceSecPerKm != null && s.paceSecPerKm > 120 && s.paceSecPerKm < 900) {
+              paceBuckets[key].push(s.paceSecPerKm);
+            }
+          }
+          const mean = (a: number[]) => a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0;
+          statsText += `\n\n⛰️ Elevation profile (per-second):`;
+          statsText += `\n  Range: ${Math.round(minE)}–${Math.round(maxE)} m (relief ${Math.round(maxE - minE)} m)`;
+          statsText += `\n  Cumulative gain ≈ ${Math.round(totalGain)} m / loss ≈ ${Math.round(totalLoss)} m`;
+          statsText += `\n  Sample buckets — CLIMB (>+2%): ${buckets.climb.length}s | FLAT (±2%): ${buckets.flat.length}s | DESCENT (<−2%): ${buckets.descent.length}s`;
+          if (buckets.climb.length > 5 || buckets.descent.length > 5) {
+            statsText += `\n  Avg HR — climb: ${Math.round(mean(buckets.climb))} bpm | flat: ${Math.round(mean(buckets.flat))} bpm | descent: ${Math.round(mean(buckets.descent))} bpm`;
+            if (paceBuckets.climb.length > 5 || paceBuckets.descent.length > 5) {
+              statsText += `\n  Avg pace — climb: ${fmtPace(mean(paceBuckets.climb))} | flat: ${fmtPace(mean(paceBuckets.flat))} | descent: ${fmtPace(mean(paceBuckets.descent))}`;
+            }
+            const climbDelta = Math.round(mean(buckets.climb) - mean(buckets.flat));
+            statsText += `\n  → HR was ~${climbDelta >= 0 ? "+" : ""}${climbDelta} bpm higher on climbs vs flat. Use this to explain HR spikes that line up with hills (cardiac drift on uphills is normal and not a fitness regression).`;
+          } else {
+            statsText += `\n  → Mostly flat course; elevation unlikely to be a major HR driver.`;
+          }
         }
       }
     } catch (e) {

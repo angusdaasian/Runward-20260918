@@ -392,20 +392,7 @@ const ProfileSection = ({ lang }: { lang: Lang }) => {
       </div>
 
       {/* Heart Rate Zones — separate card */}
-      <div
-        id="hr-zones"
-        ref={(el) => {
-          if (el && typeof window !== "undefined" && window.location.hash === "#hr-zones") {
-            setTimeout(() => {
-              el.scrollIntoView({ behavior: "smooth", block: "start" });
-              el.classList.add("ring-2", "ring-primary");
-              setTimeout(() => el.classList.remove("ring-2", "ring-primary"), 2000);
-              history.replaceState(null, "", window.location.pathname + window.location.search);
-            }, 100);
-          }
-        }}
-        className="rounded-xl transition-all"
-      >
+      <HrZonesScrollTarget>
         <HeartRateZonesCard
           lang={lang}
           initialAge={profile.age}
@@ -420,7 +407,7 @@ const ProfileSection = ({ lang }: { lang: Lang }) => {
             });
           }}
         />
-      </div>
+      </HrZonesScrollTarget>
 
       {/* Running Score */}
       {runningScore && (

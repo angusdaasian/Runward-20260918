@@ -114,7 +114,7 @@ const StatBox = ({ icon: Icon, label, value, unit, iconColor }: {
   </div>
 );
 
-const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, trainingScore }: Props) => {
+const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, trainingScore, profileAge }: Props) => {
   const isAppleHealth = activity.source === "Apple Health";
   const isTerraActivity = activity.provenance === "terra" || (activity.source?.startsWith("Terra") ?? false);
   const isGarmin = activity.provenance === "garmin" && activity.source === "Garmin";

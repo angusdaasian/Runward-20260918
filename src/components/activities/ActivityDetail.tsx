@@ -1009,25 +1009,10 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
             zones={hrZones}
             lang={lang}
             onEdit={() => {
-              const target = "/?tab=more#hr-zones";
-              const sameUrl =
-                window.location.pathname === "/" &&
-                window.location.search === "?tab=more";
-              if (sameUrl) {
-                // Already on the more tab URL — just trigger focus
-                if (window.location.hash !== "#hr-zones") {
-                  window.location.hash = "hr-zones";
-                }
-                window.dispatchEvent(new Event("focus-hr-zones"));
-              } else {
-                // Cross-tab navigation — hard reload to ensure MoreTab mounts
-                window.location.href = target;
-                setTimeout(() => {
-                  if (window.location.hash === "#hr-zones") {
-                    window.location.reload();
-                  }
-                }, 50);
-              }
+              // Always force a real navigation (cache-busting param) so MoreTab
+              // mounts and ProfileSection's hash listener fires reliably.
+              const target = `/?tab=more&_hr=${Date.now()}#hr-zones`;
+              window.location.href = target;
             }}
             subtitle={
               profileCustomZones && profileCustomZones.length === 5

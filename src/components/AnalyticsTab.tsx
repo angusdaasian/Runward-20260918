@@ -4,6 +4,7 @@ import { Lang } from "@/lib/i18n";
 import { PostureSkeleton } from "@/components/ui/PageSkeleton";
 import HealthStatsCard from "@/components/analytics/HealthStatsCard";
 import HRVReadinessCard from "@/components/analytics/HRVReadinessCard";
+import HrZonesWeekCard from "@/components/analytics/HrZonesWeekCard";
 
 const PostureTab = lazy(() => import("@/components/PostureTab"));
 const PerformanceTab = lazy(() => import("@/components/PerformanceTab"));

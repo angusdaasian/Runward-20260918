@@ -29,6 +29,8 @@ import ActivityMap from "./ActivityMap";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from "recharts";
 import { loadForActivity, isRunning } from "@/lib/trainingLoad";
 import { calculateRunningScore } from "@/lib/vdot";
+import { computeZonePct, estimateMaxHr } from "@/lib/hrZones";
+import HrZoneBars from "./HrZoneBars";
 
 interface StravaActivity {
   id: string;

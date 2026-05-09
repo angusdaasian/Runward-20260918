@@ -510,12 +510,21 @@ ${plannedWorkout ? `- ${plannedWorkout}` : ""}`;
       statsText += `\n- Activity Type: 🏁 RACE — ${resolvedRaceName}`;
     }
 
+    if (activity.total_elevation_gain != null && activity.total_elevation_gain >= 0) {
+      statsText += `\n- Total Elevation Gain: ${Math.round(activity.total_elevation_gain)} m  ⚠️ AUTHORITATIVE — this is the device-reported total. Do NOT recompute elevation gain from per-second samples; sample-derived sums include GPS noise and will be inflated. Use this value when discussing elevation.`;
+    }
     if (!isAppleHealth) {
-      if (activity.total_elevation_gain > 0) {
-        statsText += `\n- Total Elevation Gain: ${Math.round(activity.total_elevation_gain)} m`;
-      }
       if (activity.average_heartrate) statsText += `\n- Average HR: ${Math.round(activity.average_heartrate)} bpm`;
       if (activity.max_heartrate) statsText += `\n- Max HR: ${Math.round(activity.max_heartrate)} bpm`;
+    }
+
+    // --- HR zones (%HRR / Karvonen) — distribution across the run ---
+    if (hrZones && typeof hrZones === "object") {
+      const z: any = hrZones;
+      const fmt = (v: any) => (typeof v === "number" ? `${Math.round(v)}%` : "0%");
+      statsText += `\n\n❤️ HR Zone Distribution (% of time, Karvonen %HRR):`;
+      statsText += `\n  Z1 (Recovery): ${fmt(z.z1)} | Z2 (Easy/Aerobic): ${fmt(z.z2)} | Z3 (Tempo): ${fmt(z.z3)} | Z4 (Threshold): ${fmt(z.z4)} | Z5 (VO2max): ${fmt(z.z5)}`;
+      statsText += `\n  → Use this distribution to characterise the workout's intensity profile (e.g., mostly Z2 = aerobic base run; heavy Z4-Z5 = quality session).`;
     }
 
     // --- Lap analysis (interval-aware) — normalises field names across Garmin / Terra / Strava ---

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { Settings, Bell, Megaphone, Menu, Cloud } from "lucide-react";
+import { Settings, Bell, Megaphone, Menu, Cloud, HelpCircle } from "lucide-react";
+import AppGuideDialog from "@/components/AppGuideDialog";
 import { Lang } from "@/lib/i18n";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -131,6 +132,7 @@ const AppHeader = ({ lang, onNavigateSettings, onOpenPromoBanner, isGuest }: App
   const [profile, setProfile] = useState(() =>
     _headerUserId === user?.id ? _headerProfile : null
   );
+  const [guideOpen, setGuideOpen] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -219,6 +221,14 @@ const AppHeader = ({ lang, onNavigateSettings, onOpenPromoBanner, isGuest }: App
         )}
       </div>
       <div className="flex items-center gap-2">
+        <button
+          aria-label={lang === "zh" ? "應用程式指南" : "App guide"}
+          onClick={() => setGuideOpen(true)}
+          className="w-10 h-10 rounded-full bg-muted flex items-center justify-center hover:bg-muted/80 active:scale-90 active:bg-muted/60 transition-all duration-150"
+        >
+          <HelpCircle size={18} className="text-foreground" />
+        </button>
+        <AppGuideDialog open={guideOpen} onOpenChange={setGuideOpen} lang={lang} />
         <Popover>
           <PopoverTrigger asChild>
             <button

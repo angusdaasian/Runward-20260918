@@ -157,6 +157,39 @@ const ProfileSection = ({ lang }: { lang: Lang }) => {
     setSavingEmail(false);
   };
 
+  const startEditInfo = () => {
+    setEditAge(profile?.age != null ? String(profile.age) : "");
+    setEditSex(profile?.sex || "");
+    setEditRpw(profile?.runs_per_week != null ? String(profile.runs_per_week) : "");
+    setEditingInfo(true);
+  };
+
+  const handleSaveInfo = async () => {
+    if (!user) return;
+    setSavingInfo(true);
+    const ageNum = editAge ? parseInt(editAge) : null;
+    const rpwNum = editRpw ? parseInt(editRpw) : null;
+    const sexVal = editSex || null;
+    const updates = {
+      age: Number.isFinite(ageNum as number) ? ageNum : null,
+      sex: sexVal,
+      runs_per_week: Number.isFinite(rpwNum as number) ? rpwNum : null,
+    };
+    const { error } = await supabase.from("profiles").update(updates).eq("user_id", user.id);
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } else {
+      setProfile((p) => {
+        const updated = p ? { ...p, ...updates } : p;
+        _cachedProfile = updated;
+        return updated;
+      });
+      setEditingInfo(false);
+      toast({ title: lang === "zh" ? "已儲存" : "Saved!" });
+    }
+    setSavingInfo(false);
+  };
+
   const isPBFasterThanWR = () => {
     if (!newDist) return false;
     const wr = PB_WORLD_RECORDS[newDist];

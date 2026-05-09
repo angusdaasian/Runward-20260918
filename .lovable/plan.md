@@ -1,64 +1,57 @@
-## Rename "VDOT" → "Fitness Score" + smarter recent-fitness estimation
+# AI Poster Share
 
-### 1. Rename in the Race Predictor UI
+Add a new share option on Activity Detail that lets the user upload a photo of themselves, and uses Gemini (Nano Banana 2 image edit) to generate a stylized motivational poster with their run stats overlaid — similar in spirit to the reference image (big number, hand-drawn vibe, stat sticker, quote).
 
-In `src/components/analytics/RacePredictorCard.tsx`:
-- Replace the "VDOT" badge label (top-right) with **"Fitness Score"** (zh: **體能分數**).
-- To keep it visually clean, render it as a small uppercase caption (`FITNESS SCORE` / `體能分數`) above the numeric value, identical layout to today — no extra row, no extra chip.
-- Update the caption under the title from "From training score + PB, weather-adjusted" to "70% PB · 30% recent training" (zh: "70% 個人最佳 · 30% 近期訓練").
-- Internal variable names (`vdot`, etc.) stay — only user-facing copy changes.
+## Flow
 
-### 2. New Fitness Score formula
+1. On `ActivityDetail`, add a 4th item in the Share dropdown: **"Generate AI Poster" / "AI 海報"** (Premium-gated like the others).
+2. Clicking opens a new `AiPosterDialog`:
+   - File input ("Upload your photo")
+   - Language toggle reuses current `lang`
+   - Optional style preset chip row (e.g. *Bold Hype*, *Minimal Zen*, *Retro Magazine*) — picks a different prompt template
+   - "Generate" button → calls edge function with photo + activity stats
+   - Loading state with progress text (Gemini image gen takes ~10–30s)
+   - Result preview, then **Share / Save / Regenerate** buttons (reuse existing despia / Web Share / download distribution helpers from `shareActivity.ts`).
 
-```text
-fitnessScore = 0.7 × pbVdot + 0.3 × recentTrainingVdot
-```
+## Backend
 
-- If `pbVdot` is missing → use `recentTrainingVdot` only.
-- If `recentTrainingVdot` is missing → use `pbVdot` only.
-- If both missing → empty state (unchanged).
+New edge function `supabase/functions/generate-share-poster/index.ts`:
 
-The stored `profile.training_score` is no longer used by the predictor (it represents long-term fitness and overlaps with PB). All "recent" signal comes from activities in the last 30 days.
+- Auth via JWT (verify_jwt = true), CORS like other functions.
+- Body: `{ imageBase64, mimeType, stats: { distanceKm, timeStr, paceStr, calories?, hr?, elevation? }, quote?, stylePreset, lang }`.
+- If no `quote` provided, first do a tiny text completion (`google/gemini-3-flash-preview`) to generate a single short motivational running quote in the requested language.
+- Build the image-edit prompt and call AI Gateway with `google/gemini-3.1-flash-image-preview` (Nano Banana 2 — best quality/speed for this), `modalities: ["image","text"]`, with the user's photo as the input image.
+- Prompt template (English example, mirrored for zh):
+  > Create a vertical 4:5 motivational running poster using this photo as the hero. Keep the person clearly visible and unaltered. Add bold hand-painted brush typography for the headline `{distanceKm}K DONE` in vivid yellow. Add a translucent rounded glass stat card in the lower-left containing: Distance {distanceKm} km, Time {timeStr}, Pace {paceStr}/km, Calories {calories} kcal — clean sans-serif, small icons. Add a hand-written motivational quote in the upper-right: "{quote}". Add small doodles (hearts, arrows, sun) sparingly. Style: energetic, magazine-poster, slight grain, high contrast. Do NOT add watermarks or extra text. Output a single image.
+- Map style preset → tweaks (color palette, doodle density, font vibe).
+- Handle 429/402 → return JSON error; client toasts.
+- Return `{ imageDataUrl }` (base64 from Gemini response).
 
-### 3. How `recentTrainingVdot` is computed (the hard part)
+## Frontend additions
 
-Problem: a single easy run gives a very low VDOT and would crater the score, while a hard tempo gives a realistic one. We need to weight runs by how close they were to a maximal effort.
+- `src/components/activities/AiPosterDialog.tsx` (new)
+  - Uses shadcn `Dialog`, `Button`, `Input type=file`, `RadioGroup` for style.
+  - Reads file → base64; calls `supabase.functions.invoke("generate-share-poster", { body })`.
+  - On success, renders the returned data URL in an `<img>` and exposes Save/Share via a small helper extracted from `shareActivity.ts` (`distributeBlob(blob, filename)`).
+- Tiny refactor in `src/lib/shareActivity.ts`: extract the existing despia/Web Share/download branch into an exported `distributeImageBlob(blob, filename, lang)` so the new dialog reuses it (no behavior change for current shares).
+- `ActivityDetail.tsx`: add the new dropdown item, gated by `isPremium`, opens the dialog with current activity stats.
 
-Approach — **effort-weighted recent VDOT**, inspired by how Daniels' VDOT is normally derived only from race-pace efforts:
+## Stats passed in
 
-1. Look at run activities from the last **30 days** with distance ≥ 1.5 km and moving_time ≥ 5 min.
-2. For each run, compute its raw VDOT via `calculateRunningScore(distance, moving_time)`.
-3. Compute an **effort weight** ∈ [0, 1]:
-   - Primary signal — **intensity ratio** vs. the runner's own ceiling:
-     `intensity = rawVdot / maxRawVdotInWindow`  (so the hardest run in the window = 1.0).
-   - Apply a curve so easy runs are heavily discounted and only quality efforts contribute meaningfully:
-     `weight = max(0, (intensity − 0.85) / 0.15)²`
-     - intensity ≤ 0.85 → weight 0 (pure easy run, ignored)
-     - intensity 0.90 → weight ≈ 0.11
-     - intensity 0.95 → weight ≈ 0.44
-     - intensity 1.00 → weight 1.0
-   - Bonus multiplier for longer efforts (long runs and races are more telling than short intervals):
-     `weight *= min(1, distance_km / 5)` capped at 1 for runs ≥ 5 km.
-4. `recentTrainingVdot = Σ(weight × rawVdot) / Σ(weight)` — a weighted average.
-5. If `Σ(weight) < 0.3` (no quality efforts in the window), return `null` and fall back to PB only.
+Computed once in `ActivityDetail` from the activity:
+`distanceKm` (2 dp), `timeStr` (h:mm:ss or m:ss), `paceStr` (m:ss), optional `calories`, `avgHr`, `elevationGain`.
 
-Why this works:
-- An all-easy month yields no recent signal → predictor uses PB only (sensible: no evidence fitness changed).
-- One hard tempo or long run anchors the recent estimate near that effort's VDOT.
-- Multiple quality sessions average out noise.
-- This mirrors the standard advice "use a recent hard effort to estimate VDOT" but does it automatically across the window.
+## Out of scope
 
-### 4. Files to edit
+- No DB schema changes, no storing of generated posters.
+- No edits to existing `shareActivity` / `shareSplits` / `shareCharts` rendering.
+- No camera capture flow — file upload only (works on mobile via native picker).
+- No multi-image input.
 
-- `src/lib/racePrediction.ts`
-  - Replace `recentVdot()` with the effort-weighted version above.
-  - Simplify `effectiveVdot(recentTraining, pbScore)` to the 70/30 PB-weighted blend (drops the `trainingScore` parameter).
-- `src/components/analytics/RacePredictorCard.tsx`
-  - Update label/caption strings.
-  - Update `effectiveVdot(...)` call site (no `trainingScore` arg).
+## Files
 
-### Out of scope
-
-- No DB changes.
-- No changes to how `profile.training_score` is computed elsewhere in the app.
-- No weather-model changes.
+- new: `supabase/functions/generate-share-poster/index.ts`
+- new: `src/components/activities/AiPosterDialog.tsx`
+- edit: `src/components/activities/ActivityDetail.tsx` (add dropdown item + dialog mount)
+- edit: `src/lib/shareActivity.ts` (export `distributeImageBlob` helper)
+- edit: `supabase/config.toml` (register new function, `verify_jwt = true`)

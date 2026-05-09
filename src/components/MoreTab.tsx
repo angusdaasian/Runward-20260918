@@ -237,9 +237,10 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps }: Props
                 {t("upgrade", lang)}
               </button>
             )}
+          </div>
         </div>
 
-        {/* Compare Plans */}
+        {/* Compare Plans — independent section */}
         <button
           onClick={() => setShowPlanCompare(true)}
           className="w-full bg-card border border-border rounded-xl p-4 flex items-center justify-between"
@@ -252,7 +253,6 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps }: Props
           </div>
           <ChevronRight size={18} className="text-muted-foreground" />
         </button>
-        </div>
 
         {/* Current Entitlement */}
         {isPremium && rcEntitlement && (

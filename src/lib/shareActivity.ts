@@ -1896,7 +1896,7 @@ async function renderCustomCard(input: CustomShareInput): Promise<Blob> {
   // Splits
   const splitsArr = sel.splits && input.splits ? input.splits.filter((s) => !((s.distance || 0) < 50 && (s.elapsed_time || 0) < 10)).slice(0, 20) : [];
   if (splitsArr.length > 0) {
-    sections.push({ type: "splits", h: 60 + 44 + splitsArr.length * 50 + 8 });
+    sections.push({ type: "splits", h: 60 + 56 + 18 + splitsArr.length * 60 + 78 + 8 });
   }
 
   // Charts

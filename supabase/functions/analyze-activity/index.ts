@@ -760,7 +760,7 @@ ${plannedWorkout ? `- ${plannedWorkout}` : ""}`;
           const mean = (a: number[]) => a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0;
           statsText += `\n\n⛰️ Elevation profile (per-second):`;
           statsText += `\n  Range: ${Math.round(minE)}–${Math.round(maxE)} m (relief ${Math.round(maxE - minE)} m)`;
-          statsText += `\n  Cumulative gain ≈ ${Math.round(totalGain)} m / loss ≈ ${Math.round(totalLoss)} m`;
+          statsText += `\n  Cumulative gain (sample-derived, NOISY — do NOT quote this; use the AUTHORITATIVE Total Elevation Gain above) ≈ ${Math.round(totalGain)} m / loss ≈ ${Math.round(totalLoss)} m`;
           statsText += `\n  Sample buckets — CLIMB (>+2%): ${buckets.climb.length}s | FLAT (±2%): ${buckets.flat.length}s | DESCENT (<−2%): ${buckets.descent.length}s`;
           if (buckets.climb.length > 5 || buckets.descent.length > 5) {
             statsText += `\n  Avg HR — climb: ${Math.round(mean(buckets.climb))} bpm | flat: ${Math.round(mean(buckets.flat))} bpm | descent: ${Math.round(mean(buckets.descent))} bpm`;

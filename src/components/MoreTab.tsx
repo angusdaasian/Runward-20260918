@@ -18,6 +18,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useDespiaPurchases } from "@/hooks/use-despia-purchases";
+import PlanComparisonDialog from "@/components/PlanComparisonDialog";
 
 interface Props {
   lang: Lang;
@@ -63,6 +64,7 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps }: Props
 
   const [showLoginPrompt, setShowLoginPrompt] = useState(false);
   const [showRedeemDialog, setShowRedeemDialog] = useState(false);
+  const [showPlanCompare, setShowPlanCompare] = useState(false);
   const [offerCode, setOfferCode] = useState("");
   const [countdown, setCountdown] = useState("");
   const [activityNotifications, setActivityNotifications] = useState(true);
@@ -235,7 +237,21 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps }: Props
                 {t("upgrade", lang)}
               </button>
             )}
+        </div>
+
+        {/* Compare Plans */}
+        <button
+          onClick={() => setShowPlanCompare(true)}
+          className="w-full bg-card border border-border rounded-xl p-4 flex items-center justify-between"
+        >
+          <div className="flex items-center gap-3">
+            <Info size={20} className="text-primary" />
+            <span className="font-medium text-foreground">
+              {lang === "zh" ? "比較免費版與 Premium" : "Compare Free vs Premium"}
+            </span>
           </div>
+          <ChevronRight size={18} className="text-muted-foreground" />
+        </button>
         </div>
 
         {/* Current Entitlement */}
@@ -461,6 +477,8 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps }: Props
           </Button>
         </DialogContent>
       </Dialog>
+
+      <PlanComparisonDialog open={showPlanCompare} onOpenChange={setShowPlanCompare} lang={lang} />
 
     </div>
   );

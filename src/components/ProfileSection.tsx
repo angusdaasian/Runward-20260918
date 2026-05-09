@@ -20,6 +20,7 @@ interface Profile {
   sex: string | null;
   runs_per_week: number | null;
   max_heartrate: number | null;
+  resting_heartrate: number | null;
 }
 
 // Module-level cache to prevent flickering on tab switches

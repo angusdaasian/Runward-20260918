@@ -11,6 +11,7 @@ import {
   bestPbScore,
   effectiveVdot,
   predictRace,
+  recentVdot,
   weatherSlowdown,
   type PB,
 } from "@/lib/racePrediction";

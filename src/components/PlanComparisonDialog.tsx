@@ -22,11 +22,11 @@ const PlanComparisonDialog = ({ open, onOpenChange, lang }: Props) => {
     { label: tx("Race predictor", "比賽預測"), free: tx("5K only", "僅 5K"), premium: tx("All distances", "全距離") },
     { label: tx("Community & leaderboards", "社群與排行榜"), free: true, premium: true },
     { label: tx("AI Running Coach (24/7 chat)", "AI 跑步教練（全天候）"), free: false, premium: true },
+    { label: tx("AI activity analysis", "AI 活動分析"), free: false, premium: true },
     { label: tx("Posture analysis", "跑姿分析"), free: tx("1 / day", "每日 1 次"), premium: tx("Unlimited", "無限") },
     { label: tx("HRV insights", "HRV 洞察"), free: true, premium: true },
     { label: tx("Training load charts", "訓練負荷圖表"), free: true, premium: true },
     { label: tx("AI activity share posters", "AI 活動分享海報"), free: false, premium: true },
-    { label: tx("Suggested next workout", "建議下一個訓練"), free: true, premium: true },
     { label: tx("Weekly plan reviews", "每週計劃回顧"), free: false, premium: tx("Coming soon", "即將推出") },
     { label: tx("Priority support", "優先支援"), free: false, premium: true },
   ];

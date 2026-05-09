@@ -1512,3 +1512,61 @@ export async function shareCharts(input: ShareChartsInput): Promise<void> {
   toast.dismiss(loadingId);
   await distributeBlob(blob, input.lang);
 }
+
+// ====================================================================
+// Generic distribution helper (Despia / Web Share / download fallback)
+// Used by AI poster generator and any other one-off image share.
+// ====================================================================
+export async function distributeImageBlob(
+  blob: Blob,
+  filename: string,
+  lang: Lang,
+): Promise<void> {
+  const isZh = lang === "zh";
+
+  if (hasNativeBridge()) {
+    try {
+      const dataUrl = await blobToDataUrl(blob);
+      despia(`savethisimage://?url=${dataUrl}`);
+      toast.success(isZh ? "已儲存到相簿" : "Saved to camera roll");
+      return;
+    } catch (err) {
+      console.warn("[Share] Despia save failed, falling back:", err);
+    }
+  }
+
+  const file = new File([blob], filename, { type: blob.type || "image/png" });
+  const navAny = navigator as any;
+  if (
+    typeof navigator !== "undefined" &&
+    typeof navigator.share === "function" &&
+    typeof navAny.canShare === "function" &&
+    navAny.canShare({ files: [file] })
+  ) {
+    try {
+      await navigator.share({
+        files: [file],
+        title: APP_NAME,
+        text: isZh ? `由 ${APP_NAME} 追蹤 · ${APP_URL}` : `Tracked with ${APP_NAME} · ${APP_URL}`,
+      });
+      return;
+    } catch (err: any) {
+      if (err?.name === "AbortError") return;
+      console.warn("[Share] navigator.share failed, falling back:", err);
+    }
+  }
+
+  try {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    toast.success(isZh ? "圖片已下載" : "Image downloaded");
+  } catch {
+    toast.error(isZh ? "無法分享" : "Unable to share");
+  }
+}

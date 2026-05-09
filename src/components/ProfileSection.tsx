@@ -81,6 +81,13 @@ const ProfileSection = ({ lang }: { lang: Lang }) => {
   const [newEmail, setNewEmail] = useState("");
   const [savingEmail, setSavingEmail] = useState(false);
 
+  // Onboarding info editing
+  const [editingInfo, setEditingInfo] = useState(false);
+  const [editAge, setEditAge] = useState("");
+  const [editSex, setEditSex] = useState<string>("");
+  const [editRpw, setEditRpw] = useState("");
+  const [savingInfo, setSavingInfo] = useState(false);
+
   // New PB form
   const [newDist, setNewDist] = useState("");
   const [newH, setNewH] = useState("");

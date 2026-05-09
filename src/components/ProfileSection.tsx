@@ -21,6 +21,7 @@ interface Profile {
   runs_per_week: number | null;
   max_heartrate: number | null;
   resting_heartrate: number | null;
+  custom_hr_zones: number[] | null;
 }
 
 // Module-level cache to prevent flickering on tab switches
@@ -396,9 +397,10 @@ const ProfileSection = ({ lang }: { lang: Lang }) => {
         initialAge={profile.age}
         initialMaxHr={profile.max_heartrate}
         initialRestingHr={profile.resting_heartrate}
-        onSaved={(maxHr, restingHr) => {
+        initialCustomZones={profile.custom_hr_zones}
+        onSaved={(maxHr, restingHr, customZones) => {
           setProfile((p) => {
-            const updated = p ? { ...p, max_heartrate: maxHr, resting_heartrate: restingHr } : p;
+            const updated = p ? { ...p, max_heartrate: maxHr, resting_heartrate: restingHr, custom_hr_zones: customZones } : p;
             _cachedProfile = updated;
             return updated;
           });

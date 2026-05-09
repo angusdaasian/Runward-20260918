@@ -26,6 +26,28 @@ export function estimateRestingHr(profileRestingHr?: number | null): number {
   return 60;
 }
 
+/** Validate a custom-zones array: must be 5 ascending integers in plausible bpm range. */
+export function isValidCustomZones(z: unknown): z is number[] {
+  if (!Array.isArray(z) || z.length !== 5) return false;
+  for (let i = 0; i < 5; i++) {
+    const v = z[i];
+    if (typeof v !== "number" || !isFinite(v) || v < 30 || v > 230) return false;
+    if (i > 0 && v <= z[i - 1]) return false;
+  }
+  return true;
+}
+
+/** Bucket a HR (bpm) using explicit zone lower-bounds (Z1..Z5). */
+function customZone(bpm: number, lowers: number[]): keyof ZonePct | null {
+  if (!isFinite(bpm) || bpm <= 30) return null;
+  if (bpm >= lowers[4]) return "z5";
+  if (bpm >= lowers[3]) return "z4";
+  if (bpm >= lowers[2]) return "z3";
+  if (bpm >= lowers[1]) return "z2";
+  if (bpm >= lowers[0]) return "z1";
+  return "z1"; // anything below Z1 lower bucketed into Z1
+}
+
 /** Bucket a HR (bpm) into a zone using %HRR. */
 function hrrZone(bpm: number, maxHr: number, restHr: number): keyof ZonePct | null {
   if (!isFinite(bpm) || bpm <= 30) return null;
@@ -39,27 +61,30 @@ function hrrZone(bpm: number, maxHr: number, restHr: number): keyof ZonePct | nu
   return "z5";
 }
 
-/** Returns lower bound bpm for each zone (Z1..Z5) using %HRR. */
-export function zoneBoundaries(maxHr: number, restHr: number): { z1: number; z2: number; z3: number; z4: number; z5: number } {
+function bucket(bpm: number, maxHr: number, restHr: number, custom?: number[] | null): keyof ZonePct | null {
+  if (custom && isValidCustomZones(custom)) return customZone(bpm, custom);
+  return hrrZone(bpm, maxHr, restHr);
+}
+
+/** Returns lower bound bpm for each zone (Z1..Z5). Honors custom zones if provided. */
+export function zoneBoundaries(maxHr: number, restHr: number, custom?: number[] | null): { z1: number; z2: number; z3: number; z4: number; z5: number } {
+  if (custom && isValidCustomZones(custom)) {
+    return { z1: custom[0], z2: custom[1], z3: custom[2], z4: custom[3], z5: custom[4] };
+  }
   const reserve = Math.max(1, maxHr - restHr);
   const at = (p: number) => Math.round(restHr + p * reserve);
-  return {
-    z1: at(0.5),
-    z2: at(0.6),
-    z3: at(0.7),
-    z4: at(0.8),
-    z5: at(0.9),
-  };
+  return { z1: at(0.5), z2: at(0.6), z3: at(0.7), z4: at(0.8), z5: at(0.9) };
 }
 
 /** Bucket per-second HR samples into zone time-shares (0..100). */
-export function computeZonePct(bpmSamples: Array<number | null | undefined>, maxHr: number, restHr: number): ZonePct | null {
-  if (!bpmSamples?.length || maxHr <= restHr) return null;
+export function computeZonePct(bpmSamples: Array<number | null | undefined>, maxHr: number, restHr: number, custom?: number[] | null): ZonePct | null {
+  if (!bpmSamples?.length) return null;
+  if (!(custom && isValidCustomZones(custom)) && maxHr <= restHr) return null;
   const counts = { z1: 0, z2: 0, z3: 0, z4: 0, z5: 0 };
   let total = 0;
   for (const v of bpmSamples) {
     if (typeof v !== "number") continue;
-    const z = hrrZone(v, maxHr, restHr);
+    const z = bucket(v, maxHr, restHr, custom);
     if (!z) continue;
     counts[z]++;
     total++;
@@ -75,14 +100,14 @@ export function computeZonePct(bpmSamples: Array<number | null | undefined>, max
 }
 
 /** Combine multiple per-second sample arrays (weighted by sample count = seconds). */
-export function combineZonePct(parts: Array<{ samples: Array<number | null | undefined>; maxHr: number; restHr: number }>): ZonePct | null {
+export function combineZonePct(parts: Array<{ samples: Array<number | null | undefined>; maxHr: number; restHr: number; custom?: number[] | null }>): ZonePct | null {
   const acc = { z1: 0, z2: 0, z3: 0, z4: 0, z5: 0 };
   let total = 0;
   for (const p of parts) {
-    if (p.maxHr <= p.restHr) continue;
+    if (!(p.custom && isValidCustomZones(p.custom)) && p.maxHr <= p.restHr) continue;
     for (const v of p.samples) {
       if (typeof v !== "number") continue;
-      const z = hrrZone(v, p.maxHr, p.restHr);
+      const z = bucket(v, p.maxHr, p.restHr, p.custom);
       if (!z) continue;
       acc[z]++;
       total++;

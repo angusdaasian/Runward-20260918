@@ -24,6 +24,7 @@ const HrZonesWeekCard = ({ lang }: Props) => {
 
   const age = (profile as any)?.age ?? null;
   const profileMaxHr = (profile as any)?.max_heartrate ?? null;
+  const profileRestingHr = (profile as any)?.resting_heartrate ?? null;
 
   useEffect(() => {
     if (!isPremium) return;
@@ -31,14 +32,15 @@ const HrZonesWeekCard = ({ lang }: Props) => {
     (async () => {
       setLoading(true);
       try {
-        const parts: Array<{ samples: Array<number | null | undefined>; maxHr: number }> = [];
+        const maxHr = estimateMaxHr(age, profileMaxHr);
+        const restHr = estimateRestingHr(profileRestingHr);
+        const parts: Array<{ samples: Array<number | null | undefined>; maxHr: number; restHr: number }> = [];
         let used = 0;
 
         // Terra hr_samples already loaded
         for (const a of weekActivities) {
-          const maxHr = estimateMaxHr(age, profileMaxHr);
           if (Array.isArray(a.hr_samples) && a.hr_samples.length > 10) {
-            parts.push({ samples: a.hr_samples.map((s: any) => s.bpm), maxHr });
+            parts.push({ samples: a.hr_samples.map((s: any) => s.bpm), maxHr, restHr });
             used++;
           }
         }
@@ -57,7 +59,7 @@ const HrZonesWeekCard = ({ lang }: Props) => {
                 if (error || !data?.streams) return null;
                 const hrStream = data.streams.find((s: any) => s.type === "heartrate");
                 if (!hrStream?.data?.length) return null;
-                return { samples: hrStream.data, maxHr: estimateMaxHr(age, profileMaxHr) };
+                return { samples: hrStream.data, maxHr, restHr };
               } catch {
                 return null;
               }

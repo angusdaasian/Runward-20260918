@@ -16,8 +16,8 @@ const AppGuideDialog = ({ open, onOpenChange, lang }: AppGuideDialogProps) => {
       icon: Activity,
       title: tx("Activities", "活動"),
       desc: tx(
-        "Auto-sync runs from Strava, Garmin, Apple Health & Terra. View detailed maps, splits, pace, heart rate and elevation for every activity.",
-        "自動從 Strava、Garmin、Apple Health 和 Terra 同步跑步資料。查看每次活動的詳細地圖、分段、配速、心率和爬升。"
+        "Auto-sync runs from Garmin, Coros, Suunto, Pacer & Apple Health. View detailed maps, splits, pace, heart rate and elevation for every activity.",
+        "自動從 Garmin、Coros、Suunto、Pacer 和 Apple Health 同步跑步資料。查看每次活動的詳細地圖、分段、配速、心率和爬升。"
       ),
     },
     {

@@ -81,7 +81,7 @@ const HeartRateZonesCard = ({ lang, initialAge, initialMaxHr, initialRestingHr, 
       });
       return;
     }
-    setMaxHr(String(210 - ageNum));
+    setMaxHr(String(220 - ageNum));
   };
 
   const handleResetToDefault = () => {
@@ -156,13 +156,13 @@ const HeartRateZonesCard = ({ lang, initialAge, initialMaxHr, initialRestingHr, 
       <div className="flex items-center gap-2 mb-3">
         <Heart size={16} className="text-destructive" />
         <h3 className="font-display font-bold text-sm text-foreground">
-          {lang === "zh" ? "心率區間 (Karvonen %HRR)" : "Heart Rate Zones (Karvonen %HRR)"}
+          {lang === "zh" ? "心率區間" : "Heart Rate Zones"}
         </h3>
       </div>
       <p className="text-xs text-muted-foreground mb-3 leading-relaxed">
         {lang === "zh"
-          ? "區間以 %HRR 計算：目標心率 = 靜息 + %HRR × (最大 − 靜息)。若不知最大心率，可由年齡估算 (210 − 年齡)。"
-          : "Zones use %HRR (Karvonen): target HR = rest + %HRR × (max − rest). If you don't know your max HR, estimate from age (210 − age)."}
+          ? "區間以 %HRR 計算：目標心率 = 靜息 + %HRR × (最大 − 靜息)。若不知最大心率，可由年齡估算 (220 − 年齡)。"
+          : "Zones use %HRR: target HR = rest + %HRR × (max − rest). If you don't know your max HR, estimate from age (220 − age)."}
       </p>
 
       <div className="grid grid-cols-3 gap-2 mb-3">
@@ -192,7 +192,7 @@ const HeartRateZonesCard = ({ lang, initialAge, initialMaxHr, initialRestingHr, 
       <div className="flex gap-2 mb-4">
         <Button type="button" variant="outline" size="sm" onClick={handleEstimate}
           disabled={!ageNum} className="flex-1 h-9 text-xs">
-          {lang === "zh" ? "估算最大 (210 − 年齡)" : "Estimate max (210 − age)"}
+          {lang === "zh" ? "估算最大 (220 − 年齡)" : "Estimate max (220 − age)"}
         </Button>
         <Button type="button" size="sm" onClick={handleSave} disabled={saving} className="flex-1 h-9 text-xs">
           {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} className="mr-1" />}

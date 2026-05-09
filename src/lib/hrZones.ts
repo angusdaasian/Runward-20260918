@@ -13,10 +13,10 @@ export const ZONE_LABELS: Array<{ key: keyof ZonePct; label: string; labelZh: st
   { key: "z5", label: "Z5 Max",       labelZh: "Z5 極限",   color: "#EF4444" },
 ];
 
-/** Resolve max HR. Priority: explicit profile value > 210 - age > 190. */
+/** Resolve max HR. Priority: explicit profile value > 220 - age > 190. */
 export function estimateMaxHr(age?: number | null, profileMaxHr?: number | null): number {
   if (profileMaxHr && profileMaxHr > 100 && profileMaxHr < 230) return profileMaxHr;
-  if (age && age > 0 && age < 120) return Math.max(120, 210 - age);
+  if (age && age > 0 && age < 120) return Math.max(120, 220 - age);
   return 190;
 }
 

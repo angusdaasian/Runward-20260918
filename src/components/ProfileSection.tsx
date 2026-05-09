@@ -501,4 +501,41 @@ const ProfileSection = ({ lang }: { lang: Lang }) => {
   );
 };
 
+const HrZonesScrollTarget = ({ children }: { children: React.ReactNode }) => {
+  const ref = useRef<HTMLDivElement>(null);
+
+  const focus = () => {
+    const el = ref.current;
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "start" });
+    el.classList.add("ring-2", "ring-primary");
+    setTimeout(() => el.classList.remove("ring-2", "ring-primary"), 2000);
+    if (window.location.hash === "#hr-zones") {
+      history.replaceState(null, "", window.location.pathname + window.location.search);
+    }
+  };
+
+  useEffect(() => {
+    if (window.location.hash === "#hr-zones") {
+      setTimeout(focus, 100);
+    }
+    const onHash = () => {
+      if (window.location.hash === "#hr-zones") focus();
+    };
+    const onCustom = () => focus();
+    window.addEventListener("hashchange", onHash);
+    window.addEventListener("focus-hr-zones", onCustom);
+    return () => {
+      window.removeEventListener("hashchange", onHash);
+      window.removeEventListener("focus-hr-zones", onCustom);
+    };
+  }, []);
+
+  return (
+    <div id="hr-zones" ref={ref} className="rounded-xl transition-all">
+      {children}
+    </div>
+  );
+};
+
 export default ProfileSection;

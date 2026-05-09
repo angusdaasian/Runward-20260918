@@ -40,12 +40,20 @@ export function bestPbScore(pbs: PB[]): number | null {
 }
 
 /**
- * Recent fitness VDOT — best running score from activities in the last `days` days.
- * Activity must be a run of at least 1.5 km and 5 minutes for the score to be meaningful.
+ * Effort-weighted recent VDOT from the last `days` days.
+ *
+ * Easy runs naturally produce a low raw VDOT and would crater the average.
+ * We weight each run by how close its raw VDOT is to the runner's own ceiling
+ * within the window — only quality efforts contribute meaningfully.
+ *
+ *   intensity = rawVdot / maxRawVdotInWindow
+ *   weight    = max(0, (intensity − 0.85) / 0.15)^2  × min(1, distance_km / 5)
+ *
+ * Returns null if no quality efforts are present (Σweight < 0.3).
  */
-export function recentVdot(activities: ScoringActivity[], days = 90): number | null {
+export function recentVdot(activities: ScoringActivity[], days = 30): number | null {
   const cutoff = Date.now() - days * 24 * 3600 * 1000;
-  let best: number | null = null;
+  const runs: Array<{ score: number; km: number }> = [];
   for (const a of activities) {
     const t = new Date(a.start_date).getTime();
     if (!isFinite(t) || t < cutoff) continue;
@@ -54,32 +62,41 @@ export function recentVdot(activities: ScoringActivity[], days = 90): number | n
     if (!a.moving_time || a.moving_time < 300) continue;
     const score = calculateRunningScore(a.distance, a.moving_time);
     if (!isFinite(score) || score < 5 || score > 100) continue;
-    if (best === null || score > best) best = score;
+    runs.push({ score, km: a.distance / 1000 });
   }
-  return best;
+  if (runs.length === 0) return null;
+
+  const ceiling = runs.reduce((m, r) => Math.max(m, r.score), 0);
+  if (ceiling <= 0) return null;
+
+  let weighted = 0;
+  let totalWeight = 0;
+  for (const r of runs) {
+    const intensity = r.score / ceiling;
+    const base = Math.max(0, (intensity - 0.85) / 0.15);
+    const distFactor = Math.min(1, r.km / 5);
+    const weight = base * base * distFactor;
+    if (weight <= 0) continue;
+    weighted += weight * r.score;
+    totalWeight += weight;
+  }
+  if (totalWeight < 0.3) return null;
+  return weighted / totalWeight;
 }
 
 /**
- * Effective VDOT for race prediction.
- * Prefer recent fitness; fall back to stored training_score; PBs only adjust when current.
- *
- * Weights:
- *  - recent VDOT (last 90d) carries 70%
- *  - PB carries 30% (likely older, less reliable for current fitness)
- *  - if no recent runs, fall back to stored training_score, then PB
+ * Fitness Score for race prediction.
+ *   fitness = 0.7 × pbVdot + 0.3 × recentTrainingVdot
+ * Falls back to whichever side is available.
  */
 export function effectiveVdot(
   recentScore: number | null,
-  trainingScore: number | null,
   pbScore: number | null
 ): number | null {
   const r = recentScore && recentScore > 0 ? recentScore : null;
-  const ts = trainingScore && trainingScore > 0 ? trainingScore : null;
   const pb = pbScore && pbScore > 0 ? pbScore : null;
-
-  const current = r ?? ts;
-  if (current && pb) return current * 0.5 + pb * 0.5;
-  return current ?? pb ?? null;
+  if (r && pb) return pb * 0.7 + r * 0.3;
+  return pb ?? r ?? null;
 }
 
 /**

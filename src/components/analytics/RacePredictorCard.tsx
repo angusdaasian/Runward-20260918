@@ -83,12 +83,11 @@ const RacePredictorCard = ({ lang }: Props) => {
     return () => { cancelled = true; };
   }, [city]);
 
-  const trainingScore = (profile as any)?.training_score ?? null;
   const pbScore = useMemo(() => bestPbScore(pbs), [pbs]);
-  const recentScore = useMemo(() => recentVdot(activities as any, 90), [activities]);
+  const recentScore = useMemo(() => recentVdot(activities as any, 30), [activities]);
   const vdot = useMemo(
-    () => effectiveVdot(recentScore, trainingScore, pbScore),
-    [recentScore, trainingScore, pbScore]
+    () => effectiveVdot(recentScore, pbScore),
+    [recentScore, pbScore]
   );
   const slowdown = useMemo(
     () => weatherSlowdown(weather?.temperature ?? null, weather?.humidity ?? null),
@@ -113,12 +112,14 @@ const RacePredictorCard = ({ lang }: Props) => {
             {tt("Race Predictor", "比賽預測")}
           </h3>
           <p className="text-[11px] text-muted-foreground mt-0.5">
-            {tt("From training score + PB, weather-adjusted", "基於訓練分數與個人最佳,並考慮天氣")}
+            {tt("70% PB · 30% recent training", "70% 個人最佳 · 30% 近期訓練")}
           </p>
         </div>
         {vdot !== null && (
           <div className="flex flex-col items-end">
-            <span className="text-[9px] uppercase tracking-wider text-muted-foreground">VDOT</span>
+            <span className="text-[9px] uppercase tracking-wider text-muted-foreground">
+              {tt("Fitness Score", "體能分數")}
+            </span>
             <span className="text-lg font-display font-bold text-foreground leading-none">
               {vdot.toFixed(1)}
             </span>

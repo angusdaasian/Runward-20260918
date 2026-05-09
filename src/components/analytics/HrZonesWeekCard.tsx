@@ -99,10 +99,8 @@ const HrZonesWeekCard = ({ lang }: Props) => {
         <h3 className="font-display font-bold text-slate-900 text-sm">
           {lang === "zh" ? "本週心率區間" : "Weekly HR Zones"}
         </h3>
-        <span className="ml-auto text-[10px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">
-          PREMIUM
-        </span>
       </div>
+
       {loading ? (
         <div className="flex items-center justify-center py-6">
           <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary" />

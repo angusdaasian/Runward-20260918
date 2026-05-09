@@ -37,8 +37,10 @@ export function bestPbScore(pbs: PB[]): number | null {
  * Blends current training score (recent fitness) with best PB-derived VDOT.
  */
 export function effectiveVdot(trainingScore: number | null, pbScore: number | null): number | null {
-  if (trainingScore && pbScore) return trainingScore * 0.6 + pbScore * 0.4;
-  return trainingScore ?? pbScore ?? null;
+  const ts = trainingScore && trainingScore > 0 ? trainingScore : null;
+  const pb = pbScore && pbScore > 0 ? pbScore : null;
+  if (ts && pb) return ts * 0.6 + pb * 0.4;
+  return ts ?? pb ?? null;
 }
 
 /**

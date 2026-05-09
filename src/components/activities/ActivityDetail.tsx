@@ -72,6 +72,7 @@ interface Props {
   onDeleted?: () => void;
   isPremium?: boolean;
   trainingScore?: number;
+  profileAge?: number | null;
 }
 
 function formatDuration(seconds: number): string {

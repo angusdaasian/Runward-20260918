@@ -112,7 +112,7 @@ const RacePredictorCard = ({ lang }: Props) => {
             {tt("Race Predictor", "比賽預測")}
           </h3>
           <p className="text-[11px] text-muted-foreground mt-0.5">
-            {tt("70% PB · 30% recent training", "70% 個人最佳 · 30% 近期訓練")}
+            {tt("Weather-adjusted predictions", "已根據天氣調整")}
           </p>
         </div>
         {vdot !== null && (

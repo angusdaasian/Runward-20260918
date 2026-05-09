@@ -89,25 +89,7 @@ const HrZonesWeekCard = ({ lang }: Props) => {
   }, [isPremium, weekActivities, age, profileMaxHr, profileRestingHr, profileCustomZones]);
 
   if (!isPremium) {
-    return (
-      <div className="bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200 rounded-2xl p-5 mb-4">
-        <div className="flex items-center gap-2 mb-2">
-          <Sparkles size={16} className="text-amber-600" />
-          <h3 className="font-display font-bold text-slate-900 text-sm">
-            {lang === "zh" ? "本週心率區間" : "Weekly HR Zones"}
-          </h3>
-          <span className="ml-auto text-[10px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">
-            PREMIUM
-          </span>
-        </div>
-        <div className="flex items-center gap-2 text-xs text-slate-600">
-          <Lock size={12} />
-          {lang === "zh"
-            ? "升級以解鎖過去 7 天的心率區間分布。"
-            : "Upgrade to see your time-in-zone distribution for the past 7 days."}
-        </div>
-      </div>
-    );
+    return null;
   }
 
   return (

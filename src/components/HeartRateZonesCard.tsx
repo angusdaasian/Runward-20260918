@@ -186,6 +186,11 @@ const HeartRateZonesCard = ({ lang, initialAge, initialMaxHr, initialRestingHr, 
           </label>
           <Input type="number" inputMode="numeric" min={30} max={110} value={restHr}
             onChange={(e) => setRestHr(e.target.value)} placeholder="60" className="h-9 text-sm" />
+          <p className="text-[10px] text-muted-foreground mt-1 leading-tight">
+            {lang === "zh"
+              ? "成人正常範圍 60–100 bpm（運動員可低至 40）。不確定可填 60。"
+              : "Typical adult range 60–100 bpm (athletes can be lower). Unsure? Use 60."}
+          </p>
         </div>
       </div>
 

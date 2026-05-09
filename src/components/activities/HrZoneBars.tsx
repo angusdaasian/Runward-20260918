@@ -1,14 +1,16 @@
 import { Lang } from "@/lib/i18n";
 import { ZonePct, ZONE_LABELS } from "@/lib/hrZones";
+import { Pencil } from "lucide-react";
 
 interface Props {
   zones: ZonePct;
   lang: Lang;
   title?: string;
   subtitle?: string;
+  onEdit?: () => void;
 }
 
-const HrZoneBars = ({ zones, lang, title, subtitle }: Props) => {
+const HrZoneBars = ({ zones, lang, title, subtitle, onEdit }: Props) => {
   const fmtMin = (totalPct: number, totalSeconds?: number) => {
     if (!totalSeconds) return `${totalPct.toFixed(0)}%`;
     const sec = Math.round((totalPct / 100) * totalSeconds);

@@ -148,6 +148,7 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
   const [aiLang, setAiLang] = useState<string>(lang);
   const [rpeInput, setRpeInput] = useState<string>("");
   const [rpeSubmitted, setRpeSubmitted] = useState(false);
+  const [aiPosterOpen, setAiPosterOpen] = useState(false);
   const [analysisAttempted, setAnalysisAttempted] = useState(false);
 
   // Race tagging + comment state

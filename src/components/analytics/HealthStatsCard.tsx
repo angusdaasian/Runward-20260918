@@ -68,8 +68,18 @@ const HealthStatsCard = ({ lang }: Props) => {
   if (providers.length === 0) return null;
   if (!active) return null;
 
-  const latest =
-    (terraHistory ?? []).find((r) => r.provider?.toUpperCase() === active) ?? null;
+  const providerRows = (terraHistory ?? []).filter(
+    (r) => r.provider?.toUpperCase() === active,
+  );
+  const latest = providerRows[0] ?? null;
+  // Each metric: take the most recent row where it's not null. The newest row
+  // can be a same-day summary that hasn't yet been joined with sleep data.
+  const pick = <K extends keyof typeof providerRows[number]>(key: K) =>
+    providerRows.find((r) => r[key] != null)?.[key] ?? null;
+  const vo2max = pick("vo2max") as number | null;
+  const restingHr = pick("resting_hr") as number | null;
+  const sleepSeconds = pick("sleep_seconds") as number | null;
+  const sleepScore = pick("sleep_score") as number | null;
 
   const handleRefresh = () => {
     refreshTerra(active);

@@ -726,6 +726,7 @@ export type Database = {
           monthly_xp: number
           onboarding_completed: boolean
           rank_tier: string
+          resting_heartrate: number | null
           runs_per_week: number | null
           sex: string | null
           training_score: number | null
@@ -751,6 +752,7 @@ export type Database = {
           monthly_xp?: number
           onboarding_completed?: boolean
           rank_tier?: string
+          resting_heartrate?: number | null
           runs_per_week?: number | null
           sex?: string | null
           training_score?: number | null
@@ -776,6 +778,7 @@ export type Database = {
           monthly_xp?: number
           onboarding_completed?: boolean
           rank_tier?: string
+          resting_heartrate?: number | null
           runs_per_week?: number | null
           sex?: string | null
           training_score?: number | null

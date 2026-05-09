@@ -721,6 +721,7 @@ export type Database = {
           last_check_in_date: string | null
           last_login: string | null
           lifetime_xp: number
+          max_heartrate: number | null
           monthly_goal_km: number
           monthly_xp: number
           onboarding_completed: boolean
@@ -745,6 +746,7 @@ export type Database = {
           last_check_in_date?: string | null
           last_login?: string | null
           lifetime_xp?: number
+          max_heartrate?: number | null
           monthly_goal_km?: number
           monthly_xp?: number
           onboarding_completed?: boolean
@@ -769,6 +771,7 @@ export type Database = {
           last_check_in_date?: string | null
           last_login?: string | null
           lifetime_xp?: number
+          max_heartrate?: number | null
           monthly_goal_km?: number
           monthly_xp?: number
           onboarding_completed?: boolean

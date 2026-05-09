@@ -11,10 +11,22 @@ export const ZONE_LABELS: Array<{ key: keyof ZonePct; label: string; labelZh: st
   { key: "z5", label: "Z5 Max",      labelZh: "Z5 極限",  color: "#EF4444" },
 ];
 
-export function estimateMaxHr(age?: number | null, fallbackActivityMaxHr?: number | null): number {
-  if (age && age > 0 && age < 120) return Math.max(120, 220 - age);
-  if (fallbackActivityMaxHr && fallbackActivityMaxHr > 130) return fallbackActivityMaxHr;
+/** Resolve a user's max HR. Priority: explicit profile value > 210 - age > 190. */
+export function estimateMaxHr(age?: number | null, profileMaxHr?: number | null): number {
+  if (profileMaxHr && profileMaxHr > 100 && profileMaxHr < 230) return profileMaxHr;
+  if (age && age > 0 && age < 120) return Math.max(120, 210 - age);
   return 190;
+}
+
+/** Returns lower bound bpm for each zone (Z1..Z5). */
+export function zoneBoundaries(maxHr: number): { z1: number; z2: number; z3: number; z4: number; z5: number } {
+  return {
+    z1: Math.round(maxHr * 0.5),
+    z2: Math.round(maxHr * 0.6),
+    z3: Math.round(maxHr * 0.7),
+    z4: Math.round(maxHr * 0.8),
+    z5: Math.round(maxHr * 0.9),
+  };
 }
 
 /** Bucket per-second HR samples into zone time-shares (0..100). */

@@ -80,8 +80,8 @@ const AppGuideDialog = ({ open, onOpenChange, lang }: AppGuideDialogProps) => {
       icon: Heart,
       title: tx("Health Integrations", "健康整合"),
       desc: tx(
-        "Connect Garmin, Apple Health, Strava, or Terra to sync sleep, HRV, stress and daily readiness data.",
-        "連接 Garmin、Apple Health、Strava 或 Terra 以同步睡眠、HRV、壓力和每日準備度數據。"
+        "Connect Garmin, Coros, Suunto, Pacer or Apple Health to sync sleep, HRV, stress and daily readiness data.",
+        "連接 Garmin、Coros、Suunto、Pacer 或 Apple Health 以同步睡眠、HRV、壓力和每日準備度數據。"
       ),
     },
     {

@@ -11,6 +11,7 @@ import { calculateRunningScore } from "@/lib/vdot";
 import { Skeleton } from "@/components/ui/skeleton";
 import { updateHeaderCache } from "@/components/AppHeader";
 import { useActivities } from "@/hooks/use-activities";
+import HeartRateZonesCard from "@/components/HeartRateZonesCard";
 
 interface Profile {
   display_name: string | null;

@@ -4,7 +4,7 @@ import { Lang } from "@/lib/i18n";
 import { useActivities } from "@/hooks/use-activities";
 import { usePremium } from "@/contexts/PremiumContext";
 import { supabase } from "@/integrations/supabase/client";
-import { combineZonePct, estimateMaxHr, ZonePct, ZONE_LABELS } from "@/lib/hrZones";
+import { combineZonePct, estimateMaxHr, estimateRestingHr, ZonePct, ZONE_LABELS } from "@/lib/hrZones";
 
 interface Props {
   lang: Lang;

@@ -1,80 +1,55 @@
-# Push AI Plans to Garmin & Coros (Terra Write API)
+## Race Predictor (Premium)
 
-Terra supports writing **planned workouts** to Garmin and Coros (also Hammerhead, TodaysPlan) via `POST /v2/plannedWorkout`. Once written, the workout shows up in the user's device library and they can follow it step-by-step on their watch. We already have Terra connected for these providers, so we just need a translator + a push action.
+Add a Race Predictor card to the Analytics → Performance tab. Predicts 5K, 10K, Half Marathon, and Marathon finish times from the user's current fitness, blended with their PB-based VDOT, and adjusted for forecast race-day weather.
 
-## What we'll build
+### Where it lives
+- New component: `src/components/analytics/RacePredictorCard.tsx`
+- Mounted in `PerformanceTab.tsx` above `TrendsCard`
+- 5K prediction visible to all; 10K / HM / Marathon blurred with a lock + "Upgrade" CTA for non‑premium (reuse `usePremium()` pattern from existing locked cards like `TrainingLoadChartLocked`)
 
-1. **Edge function `terra-write-workout`** — translates one or more days from a `training_plans.plan_data` entry into Terra's planned-workout JSON and POSTs it to Terra. Supports single-day push and "push entire week" / "push entire plan".
-2. **DB table `pushed_workouts`** — tracks which plan day has been pushed to which provider, storing Terra's returned `log_id` so we can later delete/update.
-3. **UI: "Send to watch" button** in `ProgramsTab` (and the day-detail view) — visible only when the user has a Terra Garmin or Coros connection. Lets them push a single workout, the current week, or the whole plan. Toast on success/failure.
-4. **Optional: delete pushed workout** — small "Remove from watch" action that calls `DELETE /v2/plannedWorkout` with the stored `log_id`.
+### Inputs to the prediction
+1. **Training Score** — current Running Score from `useActivities()` / profile (`profile.training_score`), representing recent fitness.
+2. **PB-based VDOT** — for each row in `personal_bests`, compute a Running Score via `calculateRunningScore(distanceMeters, totalSeconds)` from `src/lib/vdot.ts`. Take the max across PBs.
+3. **Effective VDOT** = weighted blend, e.g. `0.6 × trainingScore + 0.4 × bestPbScore` (fall back to whichever is available; if neither, show empty state "Add a PB or sync activities").
+4. **Weather adjustment** — optional city input (default to user's last activity location or a manual city field). Call existing `get-weather` edge function for current/forecast conditions, then apply a heat/humidity penalty to predicted time.
 
-## Workout translation
+### Weather adjustment model
+Apply a multiplicative slowdown factor to the predicted time, based on heat index (temperature + humidity):
 
-Our plan day shape:
+```text
+heatIndex (°C)  | slowdown
+< 13            | 1.00 (ideal)
+13–18           | 1.00
+18–22           | 1.01
+22–26           | 1.02
+26–30           | 1.04
+30–34           | 1.07
+> 34            | 1.10
 ```
-{ day, type, title, description, distance_km, pace, date }
-```
-Mapping to Terra's schema:
+Plus a small wind/rain note (display only, no math) — heavy rain/wind shown as an info chip.
 
-| Our type | Terra step `intensity` | duration | targets |
-|---|---|---|---|
-| Easy Run / Long Run / Recovery / Race Pace / Progression / Tempo | active (5) / cool (varies) | `duration_type=1` distance in meters (`distance_km*1000`) | `target_type=15` pace bounds (m/s) from `pace`, ±5% |
-| Interval | parse `"800m x 6 at 4:00/km, rest 2:00 between sets"` → 1 warmup (warmup type) + repeat block with N sub-steps (work step distance + recovery step time) + cooldown | mix of distance + time | pace target on work step |
-| Rest / Cross Training | skip (don't push) |
+### UI
+- Card title: "Race Predictor" / "比賽預測"
+- Top row: effective VDOT badge + small "based on training + PB" caption + city/weather chip (tap to change city)
+- 4 distance rows (5K / 10K / HM / Marathon): predicted time, average pace, and a small delta showing weather impact (e.g. `+0:45 due to heat`)
+- Premium-locked rows show blurred time + lock icon; tapping opens existing upgrade modal
+- Loading skeleton while fetching weather
 
-Top-level payload per workout:
-```json
-{
-  "data": [{
-    "name": "<title> (<date>)",
-    "description": "<our description>",
-    "exercise_type": "running",
-    "steps": [ ... ]
-  }]
-}
-```
+### Technical notes
+- Reuse `predictTime()` and `formatTime()` from `src/lib/vdot.ts`
+- Read PBs via `supabase.from("personal_bests").select(...).eq("user_id", user.id)`
+- Use `usePremium()` from `PremiumContext` for gating; reuse `UpgradeModal` from `src/components/coach/UpgradeModal.tsx`
+- Weather: call `get-weather` edge function (already exists); cache in component state; allow user to type a city
+- All numbers computed client-side — no new edge function needed
+- No DB schema changes
 
-For provider-specific tweaks Terra documents (e.g. Garmin vs Coros structure), we'll pass `data_provider=GARMIN` or `COROS` in the query string and use the "Adapted to Garmin" shape from the docs (nested step groups with `type=1` containers + `duration_type=9` reps for repeats).
+### Out of scope (per your answers)
+- Future-date fitness projection
+- Track distances
+- Manual race-time entry override (training score + PBs already cover this)
 
-## Edge function shape
-
-`POST supabase/functions/terra-write-workout`
-```ts
-body: { plan_id: string, scope: "day" | "week" | "all", week?: number, day_index?: number, provider?: "GARMIN" | "COROS" }
-```
-Steps:
-1. Validate JWT, load `training_plans` row (RLS via service role + `user_id` check).
-2. Look up active `terra_connections` for user → pick Garmin/Coros (or use `provider` param).
-3. Build workout payloads from `plan_data`.
-4. For each: `POST https://api.tryterra.co/v2/plannedWorkout?user_id={terra_user_id}` with headers `dev-id`, `x-api-key`, body `{ data: [...] }`.
-5. Upsert each returned `log_id` into `pushed_workouts(user_id, plan_id, week, day_index, provider, terra_log_id, pushed_at)`.
-6. Return summary `{ pushed: N, failed: M, errors: [...] }`.
-
-Reuses existing Terra env vars (`TERRA_DEV_ID`, `TERRA_API_KEY`) already set as secrets.
-
-## UI changes (`ProgramsTab.tsx`)
-
-- New small icon button on each non-rest day card → "Send to watch" (disabled if no Garmin/Coros Terra connection).
-- Header action menu: "Push this week to watch" / "Push entire plan to watch".
-- Show a small ✓ + provider badge on days already in `pushed_workouts`.
-- On click → call `supabase.functions.invoke("terra-write-workout", { body })` → toast result.
-
-## Files to add / change
-
-- **new** `supabase/functions/terra-write-workout/index.ts`
-- **new** migration for `pushed_workouts` table + RLS (user can read/insert/delete own rows)
-- **edit** `src/components/ProgramsTab.tsx` (button + menu + state)
-- **edit** `supabase/config.toml` — not needed (verify_jwt default works)
-
-## Out of scope (for this iteration)
-
-- Strava (Terra doesn't support write to Strava).
-- Apple Health (no write path through Terra).
-- Two-way sync of workout completion status (we already pull completed activities via `terra-sync`).
-- Editing a pushed workout — we'll delete + re-push if user regenerates the plan.
-
-## Open questions
-
-1. Default scope on the button — push **single day** only, or offer "this week / entire plan" from day one?
-2. Should we auto-push the next 7 days whenever a new plan is generated, or always require an explicit user action?
+### Files to create / edit
+- create `src/components/analytics/RacePredictorCard.tsx`
+- create `src/lib/racePrediction.ts` (weather adjustment + effective VDOT helpers)
+- edit `src/components/PerformanceTab.tsx` (mount the card)
+- edit `src/lib/i18n.ts` (new strings)

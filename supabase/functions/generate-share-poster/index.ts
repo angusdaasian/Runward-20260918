@@ -127,6 +127,25 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+    const userId = userData.user.id;
+
+    // Premium check
+    const serviceClient = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    );
+    const { data: subRow } = await serviceClient
+      .from("premium_subscriptions")
+      .select("expires_at")
+      .eq("user_id", userId)
+      .maybeSingle();
+    const isPremium = subRow && new Date(subRow.expires_at) > new Date();
+    if (!isPremium) {
+      return new Response(JSON.stringify({ error: "Premium required" }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {

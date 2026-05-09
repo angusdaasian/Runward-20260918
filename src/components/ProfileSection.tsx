@@ -20,6 +20,7 @@ interface Profile {
   sex: string | null;
   runs_per_week: number | null;
   max_heartrate: number | null;
+  resting_heartrate: number | null;
 }
 
 // Module-level cache to prevent flickering on tab switches
@@ -393,9 +394,10 @@ const ProfileSection = ({ lang }: { lang: Lang }) => {
         lang={lang}
         initialAge={profile.age}
         initialMaxHr={profile.max_heartrate}
-        onSaved={(maxHr) => {
+        initialRestingHr={profile.resting_heartrate}
+        onSaved={(maxHr, restingHr) => {
           setProfile((p) => {
-            const updated = p ? { ...p, max_heartrate: maxHr } : p;
+            const updated = p ? { ...p, max_heartrate: maxHr, resting_heartrate: restingHr } : p;
             _cachedProfile = updated;
             return updated;
           });

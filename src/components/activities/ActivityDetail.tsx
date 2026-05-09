@@ -29,7 +29,7 @@ import ActivityMap from "./ActivityMap";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from "recharts";
 import { loadForActivity, isRunning } from "@/lib/trainingLoad";
 import { calculateRunningScore } from "@/lib/vdot";
-import { computeZonePct, estimateMaxHr } from "@/lib/hrZones";
+import { computeZonePct, estimateMaxHr, estimateRestingHr } from "@/lib/hrZones";
 import HrZoneBars from "./HrZoneBars";
 
 interface StravaActivity {
@@ -76,6 +76,7 @@ interface Props {
   trainingScore?: number;
   profileAge?: number | null;
   profileMaxHr?: number | null;
+  profileRestingHr?: number | null;
 }
 
 function formatDuration(seconds: number): string {
@@ -117,7 +118,7 @@ const StatBox = ({ icon: Icon, label, value, unit, iconColor }: {
   </div>
 );
 
-const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, trainingScore, profileAge, profileMaxHr }: Props) => {
+const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, trainingScore, profileAge, profileMaxHr, profileRestingHr }: Props) => {
   const isAppleHealth = activity.source === "Apple Health";
   const isTerraActivity = activity.provenance === "terra" || (activity.source?.startsWith("Terra") ?? false);
   const isGarmin = activity.provenance === "garmin" && activity.source === "Garmin";
@@ -632,17 +633,18 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
   // HR zone distribution from highest-resolution source available.
   const hrZones = useMemo(() => {
     const maxHr = estimateMaxHr(profileAge ?? null, profileMaxHr ?? null);
+    const restHr = estimateRestingHr(profileRestingHr ?? null);
     // 1. Terra per-second samples
     if (Array.isArray(activity.hr_samples) && activity.hr_samples.length > 10) {
-      return computeZonePct(activity.hr_samples.map((s: any) => s.bpm), maxHr);
+      return computeZonePct(activity.hr_samples.map((s: any) => s.bpm), maxHr, restHr);
     }
     // 2. Strava heartrate stream
     const hrStream = streams.find((s: any) => s.type === "heartrate");
     if (hrStream && Array.isArray(hrStream.data) && hrStream.data.length > 10) {
-      return computeZonePct(hrStream.data, maxHr);
+      return computeZonePct(hrStream.data, maxHr, restHr);
     }
     return null;
-  }, [activity.hr_samples, profileMaxHr, profileAge, streams]);
+  }, [activity.hr_samples, profileMaxHr, profileAge, profileRestingHr, streams]);
 
   const dateStr = new Date(activity.start_date).toLocaleDateString(
     lang === "zh" ? "zh-TW" : "en-US",
@@ -1006,8 +1008,8 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
             lang={lang}
             subtitle={
               lang === "zh"
-                ? `基於最大心率 ${estimateMaxHr(profileAge ?? null, profileMaxHr ?? null)} bpm`
-                : `Based on max HR ${estimateMaxHr(profileAge ?? null, profileMaxHr ?? null)} bpm`
+                ? `Karvonen %HRR · 最大 ${estimateMaxHr(profileAge ?? null, profileMaxHr ?? null)} / 靜息 ${estimateRestingHr(profileRestingHr ?? null)} bpm`
+                : `Karvonen %HRR · max ${estimateMaxHr(profileAge ?? null, profileMaxHr ?? null)} / rest ${estimateRestingHr(profileRestingHr ?? null)} bpm`
             }
           />
         </div>

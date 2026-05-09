@@ -6,32 +6,37 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Lang } from "@/lib/i18n";
-import { ZONE_LABELS, zoneBoundaries, estimateMaxHr } from "@/lib/hrZones";
+import { ZONE_LABELS, zoneBoundaries, estimateMaxHr, estimateRestingHr } from "@/lib/hrZones";
 
 interface Props {
   lang: Lang;
   initialAge: number | null;
   initialMaxHr: number | null;
-  onSaved?: (maxHr: number) => void;
+  initialRestingHr: number | null;
+  onSaved?: (maxHr: number, restingHr: number) => void;
 }
 
-const HeartRateZonesCard = ({ lang, initialAge, initialMaxHr, onSaved }: Props) => {
+const HeartRateZonesCard = ({ lang, initialAge, initialMaxHr, initialRestingHr, onSaved }: Props) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [age, setAge] = useState<string>(initialAge ? String(initialAge) : "");
   const [maxHr, setMaxHr] = useState<string>(initialMaxHr ? String(initialMaxHr) : "");
+  const [restHr, setRestHr] = useState<string>(initialRestingHr ? String(initialRestingHr) : "");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     setAge(initialAge ? String(initialAge) : "");
     setMaxHr(initialMaxHr ? String(initialMaxHr) : "");
-  }, [initialAge, initialMaxHr]);
+    setRestHr(initialRestingHr ? String(initialRestingHr) : "");
+  }, [initialAge, initialMaxHr, initialRestingHr]);
 
   const ageNum = parseInt(age) || null;
   const maxHrNum = parseInt(maxHr) || null;
-  // Preview uses whatever the user has typed; fallback to 210 - age, then 190.
+  const restHrNum = parseInt(restHr) || null;
+
   const effectiveMaxHr = estimateMaxHr(ageNum, maxHrNum);
-  const bounds = zoneBoundaries(effectiveMaxHr);
+  const effectiveRestHr = estimateRestingHr(restHrNum);
+  const bounds = zoneBoundaries(effectiveMaxHr, effectiveRestHr);
 
   const handleEstimate = () => {
     if (!ageNum || ageNum < 5 || ageNum > 110) {
@@ -53,8 +58,15 @@ const HeartRateZonesCard = ({ lang, initialAge, initialMaxHr, onSaved }: Props) 
       });
       return;
     }
+    if (restHrNum && (restHrNum < 30 || restHrNum > 110)) {
+      toast({
+        title: lang === "zh" ? "靜息心率應在 30–110 之間" : "Resting HR must be between 30–110",
+        variant: "destructive",
+      });
+      return;
+    }
     setSaving(true);
-    const updates: any = { max_heartrate: maxHrNum };
+    const updates: any = { max_heartrate: maxHrNum, resting_heartrate: restHrNum };
     if (ageNum && ageNum >= 5 && ageNum <= 110) updates.age = ageNum;
 
     const { error } = await supabase
@@ -70,15 +82,15 @@ const HeartRateZonesCard = ({ lang, initialAge, initialMaxHr, onSaved }: Props) 
       title: lang === "zh" ? "已儲存" : "Saved",
       description: lang === "zh" ? "心率區間已更新" : "Heart rate zones updated",
     });
-    if (maxHrNum) onSaved?.(maxHrNum);
+    onSaved?.(maxHrNum ?? effectiveMaxHr, restHrNum ?? effectiveRestHr);
   };
 
-  const zoneRanges: Array<{ key: keyof typeof bounds; from: number; to: number | null }> = [
-    { key: "z1", from: bounds.z1, to: bounds.z2 - 1 },
-    { key: "z2", from: bounds.z2, to: bounds.z3 - 1 },
-    { key: "z3", from: bounds.z3, to: bounds.z4 - 1 },
-    { key: "z4", from: bounds.z4, to: bounds.z5 - 1 },
-    { key: "z5", from: bounds.z5, to: null },
+  const zoneRanges: Array<{ from: number; to: number | null }> = [
+    { from: bounds.z1, to: bounds.z2 - 1 },
+    { from: bounds.z2, to: bounds.z3 - 1 },
+    { from: bounds.z3, to: bounds.z4 - 1 },
+    { from: bounds.z4, to: bounds.z5 - 1 },
+    { from: bounds.z5, to: null },
   ];
 
   return (
@@ -86,16 +98,16 @@ const HeartRateZonesCard = ({ lang, initialAge, initialMaxHr, onSaved }: Props) 
       <div className="flex items-center gap-2 mb-3">
         <Heart size={16} className="text-destructive" />
         <h3 className="font-display font-bold text-sm text-foreground">
-          {lang === "zh" ? "心率區間" : "Heart Rate Zones"}
+          {lang === "zh" ? "心率區間 (Karvonen %HRR)" : "Heart Rate Zones (Karvonen %HRR)"}
         </h3>
       </div>
       <p className="text-xs text-muted-foreground mb-3 leading-relaxed">
         {lang === "zh"
-          ? "輸入你的最大心率以準確計算各區間，若不知道可由年齡估算（210 − 年齡）。"
-          : "Enter your max heart rate for accurate zones. If you don't know it, estimate from age (210 − age)."}
+          ? "區間以 %HRR 計算：目標心率 = 靜息 + %HRR × (最大 − 靜息)。若不知最大心率，可由年齡估算 (210 − 年齡)。"
+          : "Zones use %HRR (Karvonen): target HR = rest + %HRR × (max − rest). If you don't know your max HR, estimate from age (210 − age)."}
       </p>
 
-      <div className="grid grid-cols-2 gap-2 mb-3">
+      <div className="grid grid-cols-3 gap-2 mb-3">
         <div>
           <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide block mb-1">
             {lang === "zh" ? "年齡" : "Age"}
@@ -113,7 +125,7 @@ const HeartRateZonesCard = ({ lang, initialAge, initialMaxHr, onSaved }: Props) 
         </div>
         <div>
           <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide block mb-1">
-            {lang === "zh" ? "最大心率" : "Max HR"}
+            {lang === "zh" ? "最大" : "Max HR"}
           </label>
           <Input
             type="number"
@@ -123,6 +135,21 @@ const HeartRateZonesCard = ({ lang, initialAge, initialMaxHr, onSaved }: Props) 
             value={maxHr}
             onChange={(e) => setMaxHr(e.target.value)}
             placeholder="185"
+            className="h-9 text-sm"
+          />
+        </div>
+        <div>
+          <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide block mb-1">
+            {lang === "zh" ? "靜息" : "Resting"}
+          </label>
+          <Input
+            type="number"
+            inputMode="numeric"
+            min={30}
+            max={110}
+            value={restHr}
+            onChange={(e) => setRestHr(e.target.value)}
+            placeholder="60"
             className="h-9 text-sm"
           />
         </div>
@@ -137,7 +164,7 @@ const HeartRateZonesCard = ({ lang, initialAge, initialMaxHr, onSaved }: Props) 
           disabled={!ageNum}
           className="flex-1 h-9 text-xs"
         >
-          {lang === "zh" ? "由年齡估算 (210 − 年齡)" : "Estimate from age (210 − age)"}
+          {lang === "zh" ? "估算最大 (210 − 年齡)" : "Estimate max (210 − age)"}
         </Button>
         <Button
           type="button"
@@ -156,8 +183,8 @@ const HeartRateZonesCard = ({ lang, initialAge, initialMaxHr, onSaved }: Props) 
           <Info size={11} className="text-muted-foreground" />
           <span className="text-[11px] font-semibold text-muted-foreground">
             {lang === "zh"
-              ? `預覽（基於最大心率 ${effectiveMaxHr} bpm）`
-              : `Preview (max HR ${effectiveMaxHr} bpm)`}
+              ? `預覽 · 最大 ${effectiveMaxHr} / 靜息 ${effectiveRestHr} bpm`
+              : `Preview · max ${effectiveMaxHr} / rest ${effectiveRestHr} bpm`}
           </span>
         </div>
         <div className="space-y-1.5">

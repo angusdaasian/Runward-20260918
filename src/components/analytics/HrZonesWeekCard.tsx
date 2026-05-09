@@ -4,7 +4,7 @@ import { Lang } from "@/lib/i18n";
 import { useActivities } from "@/hooks/use-activities";
 import { usePremium } from "@/contexts/PremiumContext";
 import { supabase } from "@/integrations/supabase/client";
-import { combineZonePct, estimateMaxHr, ZonePct, ZONE_LABELS } from "@/lib/hrZones";
+import { combineZonePct, estimateMaxHr, estimateRestingHr, ZonePct, ZONE_LABELS } from "@/lib/hrZones";
 
 interface Props {
   lang: Lang;
@@ -24,6 +24,7 @@ const HrZonesWeekCard = ({ lang }: Props) => {
 
   const age = (profile as any)?.age ?? null;
   const profileMaxHr = (profile as any)?.max_heartrate ?? null;
+  const profileRestingHr = (profile as any)?.resting_heartrate ?? null;
 
   useEffect(() => {
     if (!isPremium) return;
@@ -31,14 +32,15 @@ const HrZonesWeekCard = ({ lang }: Props) => {
     (async () => {
       setLoading(true);
       try {
-        const parts: Array<{ samples: Array<number | null | undefined>; maxHr: number }> = [];
+        const maxHr = estimateMaxHr(age, profileMaxHr);
+        const restHr = estimateRestingHr(profileRestingHr);
+        const parts: Array<{ samples: Array<number | null | undefined>; maxHr: number; restHr: number }> = [];
         let used = 0;
 
         // Terra hr_samples already loaded
         for (const a of weekActivities) {
-          const maxHr = estimateMaxHr(age, profileMaxHr);
           if (Array.isArray(a.hr_samples) && a.hr_samples.length > 10) {
-            parts.push({ samples: a.hr_samples.map((s: any) => s.bpm), maxHr });
+            parts.push({ samples: a.hr_samples.map((s: any) => s.bpm), maxHr, restHr });
             used++;
           }
         }
@@ -57,7 +59,7 @@ const HrZonesWeekCard = ({ lang }: Props) => {
                 if (error || !data?.streams) return null;
                 const hrStream = data.streams.find((s: any) => s.type === "heartrate");
                 if (!hrStream?.data?.length) return null;
-                return { samples: hrStream.data, maxHr: estimateMaxHr(age, profileMaxHr) };
+                return { samples: hrStream.data, maxHr, restHr };
               } catch {
                 return null;
               }
@@ -82,7 +84,7 @@ const HrZonesWeekCard = ({ lang }: Props) => {
     return () => {
       cancelled = true;
     };
-  }, [isPremium, weekActivities, age, profileMaxHr]);
+  }, [isPremium, weekActivities, age, profileMaxHr, profileRestingHr]);
 
   if (!isPremium) {
     return (
@@ -131,8 +133,8 @@ const HrZonesWeekCard = ({ lang }: Props) => {
         <>
           <p className="text-[11px] text-slate-500 mb-3">
             {lang === "zh"
-              ? `基於 ${activityCount} 次活動 · 最大心率 ${estimateMaxHr(age, profileMaxHr)} bpm`
-              : `Based on ${activityCount} activities · max HR ${estimateMaxHr(age, profileMaxHr)} bpm`}
+              ? `Karvonen %HRR · 基於 ${activityCount} 次活動 · 最大 ${estimateMaxHr(age, profileMaxHr)} / 靜息 ${estimateRestingHr(profileRestingHr)} bpm`
+              : `Karvonen %HRR · ${activityCount} activities · max ${estimateMaxHr(age, profileMaxHr)} / rest ${estimateRestingHr(profileRestingHr)} bpm`}
           </p>
           <div className="space-y-2">
             {ZONE_LABELS.map((z) => {

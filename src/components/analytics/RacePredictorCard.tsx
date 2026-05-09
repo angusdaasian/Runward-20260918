@@ -38,7 +38,7 @@ interface WeatherSnapshot {
 
 const RacePredictorCard = ({ lang }: Props) => {
   const { user } = useAuth();
-  const { profile } = useActivities();
+  const { profile, activities } = useActivities();
   const { isPremium } = usePremium();
   const [pbs, setPbs] = useState<PB[]>([]);
   const [weather, setWeather] = useState<WeatherSnapshot | null>(null);

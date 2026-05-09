@@ -76,6 +76,7 @@ interface Props {
   trainingScore?: number;
   profileAge?: number | null;
   profileMaxHr?: number | null;
+  profileRestingHr?: number | null;
 }
 
 function formatDuration(seconds: number): string {

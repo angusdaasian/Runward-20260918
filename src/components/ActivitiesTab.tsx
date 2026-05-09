@@ -551,6 +551,7 @@ const ActivitiesTab = ({ lang }: Props) => {
         onDeleted={invalidateAll}
         isPremium={isPremium}
         trainingScore={profile?.training_score ?? undefined}
+        profileAge={(profile as any)?.age ?? null}
       />
     );
   }

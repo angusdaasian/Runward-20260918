@@ -27,7 +27,7 @@ const PlanComparisonDialog = ({ open, onOpenChange, lang }: Props) => {
     { label: tx("Training load charts", "訓練負荷圖表"), free: true, premium: true },
     { label: tx("AI activity share posters", "AI 活動分享海報"), free: false, premium: true },
     { label: tx("Suggested next workout", "建議下一個訓練"), free: true, premium: true },
-    { label: tx("Weekly plan reviews", "每週計劃回顧"), free: tx("Coming soon", "即將推出"), premium: tx("Coming soon", "即將推出") },
+    { label: tx("Weekly plan reviews", "每週計劃回顧"), free: false, premium: tx("Coming soon", "即將推出") },
     { label: tx("Priority support", "優先支援"), free: false, premium: true },
   ];
 

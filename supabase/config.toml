@@ -18,3 +18,6 @@ verify_jwt = false
 
 [functions.weekly-plan-review]
 verify_jwt = false
+
+[functions.generate-share-poster]
+verify_jwt = true

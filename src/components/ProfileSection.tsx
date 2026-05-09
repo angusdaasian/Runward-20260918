@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Input } from "@/components/ui/input";
@@ -392,20 +392,7 @@ const ProfileSection = ({ lang }: { lang: Lang }) => {
       </div>
 
       {/* Heart Rate Zones — separate card */}
-      <div
-        id="hr-zones"
-        ref={(el) => {
-          if (el && typeof window !== "undefined" && window.location.hash === "#hr-zones") {
-            setTimeout(() => {
-              el.scrollIntoView({ behavior: "smooth", block: "start" });
-              el.classList.add("ring-2", "ring-primary");
-              setTimeout(() => el.classList.remove("ring-2", "ring-primary"), 2000);
-              history.replaceState(null, "", window.location.pathname + window.location.search);
-            }, 100);
-          }
-        }}
-        className="rounded-xl transition-all"
-      >
+      <HrZonesScrollTarget>
         <HeartRateZonesCard
           lang={lang}
           initialAge={profile.age}
@@ -420,7 +407,7 @@ const ProfileSection = ({ lang }: { lang: Lang }) => {
             });
           }}
         />
-      </div>
+      </HrZonesScrollTarget>
 
       {/* Running Score */}
       {runningScore && (
@@ -510,6 +497,43 @@ const ProfileSection = ({ lang }: { lang: Lang }) => {
           )}
         </div>
       </div>
+    </div>
+  );
+};
+
+const HrZonesScrollTarget = ({ children }: { children: React.ReactNode }) => {
+  const ref = useRef<HTMLDivElement>(null);
+
+  const focus = () => {
+    const el = ref.current;
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "start" });
+    el.classList.add("ring-2", "ring-primary");
+    setTimeout(() => el.classList.remove("ring-2", "ring-primary"), 2000);
+    if (window.location.hash === "#hr-zones") {
+      history.replaceState(null, "", window.location.pathname + window.location.search);
+    }
+  };
+
+  useEffect(() => {
+    if (window.location.hash === "#hr-zones") {
+      setTimeout(focus, 100);
+    }
+    const onHash = () => {
+      if (window.location.hash === "#hr-zones") focus();
+    };
+    const onCustom = () => focus();
+    window.addEventListener("hashchange", onHash);
+    window.addEventListener("focus-hr-zones", onCustom);
+    return () => {
+      window.removeEventListener("hashchange", onHash);
+      window.removeEventListener("focus-hr-zones", onCustom);
+    };
+  }, []);
+
+  return (
+    <div id="hr-zones" ref={ref} className="rounded-xl transition-all">
+      {children}
     </div>
   );
 };

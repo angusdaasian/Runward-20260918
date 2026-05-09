@@ -1012,8 +1012,8 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
               profileCustomZones && profileCustomZones.length === 5
                 ? (lang === "zh" ? "自訂心率區間" : "Custom HR zones")
                 : (lang === "zh"
-                    ? `Karvonen %HRR · 最大 ${estimateMaxHr(profileAge ?? null, profileMaxHr ?? null)} / 靜息 ${estimateRestingHr(profileRestingHr ?? null)} bpm`
-                    : `Karvonen %HRR · max ${estimateMaxHr(profileAge ?? null, profileMaxHr ?? null)} / rest ${estimateRestingHr(profileRestingHr ?? null)} bpm`)
+                    ? `最大 ${estimateMaxHr(profileAge ?? null, profileMaxHr ?? null)} / 靜息 ${estimateRestingHr(profileRestingHr ?? null)} bpm`
+                    : `Max ${estimateMaxHr(profileAge ?? null, profileMaxHr ?? null)} / rest ${estimateRestingHr(profileRestingHr ?? null)} bpm`)
             }
           />
         </div>

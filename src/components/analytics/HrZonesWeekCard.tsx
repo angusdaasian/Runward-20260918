@@ -139,8 +139,8 @@ const HrZonesWeekCard = ({ lang }: Props) => {
                   ? `自訂心率區間 · 基於 ${activityCount} 次活動`
                   : `Custom HR zones · ${activityCount} activities`)
               : (lang === "zh"
-                  ? `Karvonen %HRR · 基於 ${activityCount} 次活動 · 最大 ${estimateMaxHr(age, profileMaxHr)} / 靜息 ${estimateRestingHr(profileRestingHr)} bpm`
-                  : `Karvonen %HRR · ${activityCount} activities · max ${estimateMaxHr(age, profileMaxHr)} / rest ${estimateRestingHr(profileRestingHr)} bpm`)}
+                  ? `基於 ${activityCount} 次活動 · 最大 ${estimateMaxHr(age, profileMaxHr)} / 靜息 ${estimateRestingHr(profileRestingHr)} bpm`
+                  : `${activityCount} activities · max ${estimateMaxHr(age, profileMaxHr)} / rest ${estimateRestingHr(profileRestingHr)} bpm`)}
           </p>
           <div className="space-y-2">
             {ZONE_LABELS.map((z) => {

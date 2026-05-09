@@ -83,12 +83,11 @@ const RacePredictorCard = ({ lang }: Props) => {
     return () => { cancelled = true; };
   }, [city]);
 
-  const trainingScore = (profile as any)?.training_score ?? null;
   const pbScore = useMemo(() => bestPbScore(pbs), [pbs]);
-  const recentScore = useMemo(() => recentVdot(activities as any, 90), [activities]);
+  const recentScore = useMemo(() => recentVdot(activities as any, 30), [activities]);
   const vdot = useMemo(
-    () => effectiveVdot(recentScore, trainingScore, pbScore),
-    [recentScore, trainingScore, pbScore]
+    () => effectiveVdot(recentScore, pbScore),
+    [recentScore, pbScore]
   );
   const slowdown = useMemo(
     () => weatherSlowdown(weather?.temperature ?? null, weather?.humidity ?? null),

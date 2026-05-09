@@ -104,8 +104,8 @@ const AppGuideDialog = ({ open, onOpenChange, lang }: AppGuideDialogProps) => {
       icon: Users,
       title: tx("Settings & Plans", "設定與方案"),
       desc: tx(
-        "Manage profile, language, connected apps, and compare Free vs Premium features in Settings.",
-        "管理個人資料、語言、連接的應用程式，並在設定中比較免費版與付費版功能。"
+        "Manage profile, language, connected apps, customise heart rate zones, and compare Free vs Premium features in Settings.",
+        "管理個人資料、語言、連接的應用程式、自訂心率區間，並在設定中比較免費版與付費版功能。"
       ),
     },
   ];

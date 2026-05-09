@@ -130,25 +130,25 @@ const HealthStatsCard = ({ lang }: Props) => {
         <Stat
           icon={<Activity size={14} className="text-primary" />}
           label={lang === "zh" ? "最大攝氧量" : "VO₂max"}
-          value={latest?.vo2max != null ? Number(latest.vo2max).toFixed(1) : "—"}
+          value={vo2max != null ? Number(vo2max).toFixed(1) : "—"}
           unit="ml/kg/min"
         />
         <Stat
           icon={<HeartPulse size={14} className="text-rose-500" />}
           label={lang === "zh" ? "靜息心率" : "Resting HR"}
-          value={latest?.resting_hr != null ? String(latest.resting_hr) : "—"}
+          value={restingHr != null ? String(restingHr) : "—"}
           unit="bpm"
         />
         <Stat
           icon={<Moon size={14} className="text-indigo-400" />}
           label={lang === "zh" ? "睡眠時間" : "Sleep"}
-          value={fmtSleep(latest?.sleep_seconds ?? null)}
+          value={fmtSleep(sleepSeconds)}
         />
         <Stat
           icon={<Sparkles size={14} className="text-emerald-500" />}
           label={lang === "zh" ? "睡眠分數" : "Sleep Score"}
-          value={latest?.sleep_score != null ? String(latest.sleep_score) : "—"}
-          valueClass={sleepScoreClass(latest?.sleep_score ?? null)}
+          value={sleepScore != null ? String(sleepScore) : "—"}
+          valueClass={sleepScoreClass(sleepScore)}
         />
       </div>
     </Card>

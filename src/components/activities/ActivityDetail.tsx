@@ -1008,6 +1008,13 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
           <HrZoneBars
             zones={hrZones}
             lang={lang}
+            onEdit={() => {
+              try {
+                window.location.assign("/?tab=more#hr-zones");
+              } catch {
+                window.location.href = "/?tab=more#hr-zones";
+              }
+            }}
             subtitle={
               profileCustomZones && profileCustomZones.length === 5
                 ? (lang === "zh" ? "自訂心率區間" : "Custom HR zones")

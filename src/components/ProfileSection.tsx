@@ -392,20 +392,35 @@ const ProfileSection = ({ lang }: { lang: Lang }) => {
       </div>
 
       {/* Heart Rate Zones — separate card */}
-      <HeartRateZonesCard
-        lang={lang}
-        initialAge={profile.age}
-        initialMaxHr={profile.max_heartrate}
-        initialRestingHr={profile.resting_heartrate}
-        initialCustomZones={profile.custom_hr_zones}
-        onSaved={(maxHr, restingHr, customZones) => {
-          setProfile((p) => {
-            const updated = p ? { ...p, max_heartrate: maxHr, resting_heartrate: restingHr, custom_hr_zones: customZones } : p;
-            _cachedProfile = updated;
-            return updated;
-          });
+      <div
+        id="hr-zones"
+        ref={(el) => {
+          if (el && typeof window !== "undefined" && window.location.hash === "#hr-zones") {
+            setTimeout(() => {
+              el.scrollIntoView({ behavior: "smooth", block: "start" });
+              el.classList.add("ring-2", "ring-primary");
+              setTimeout(() => el.classList.remove("ring-2", "ring-primary"), 2000);
+              history.replaceState(null, "", window.location.pathname + window.location.search);
+            }, 100);
+          }
         }}
-      />
+        className="rounded-xl transition-all"
+      >
+        <HeartRateZonesCard
+          lang={lang}
+          initialAge={profile.age}
+          initialMaxHr={profile.max_heartrate}
+          initialRestingHr={profile.resting_heartrate}
+          initialCustomZones={profile.custom_hr_zones}
+          onSaved={(maxHr, restingHr, customZones) => {
+            setProfile((p) => {
+              const updated = p ? { ...p, max_heartrate: maxHr, resting_heartrate: restingHr, custom_hr_zones: customZones } : p;
+              _cachedProfile = updated;
+              return updated;
+            });
+          }}
+        />
+      </div>
 
       {/* Running Score */}
       {runningScore && (

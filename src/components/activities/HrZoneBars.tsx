@@ -1,14 +1,16 @@
 import { Lang } from "@/lib/i18n";
 import { ZonePct, ZONE_LABELS } from "@/lib/hrZones";
+import { Pencil } from "lucide-react";
 
 interface Props {
   zones: ZonePct;
   lang: Lang;
   title?: string;
   subtitle?: string;
+  onEdit?: () => void;
 }
 
-const HrZoneBars = ({ zones, lang, title, subtitle }: Props) => {
+const HrZoneBars = ({ zones, lang, title, subtitle, onEdit }: Props) => {
   const fmtMin = (totalPct: number, totalSeconds?: number) => {
     if (!totalSeconds) return `${totalPct.toFixed(0)}%`;
     const sec = Math.round((totalPct / 100) * totalSeconds);
@@ -19,11 +21,23 @@ const HrZoneBars = ({ zones, lang, title, subtitle }: Props) => {
 
   return (
     <div className="bg-white rounded-2xl p-5 shadow-[0_4px_20px_-8px_rgba(15,23,42,0.15)] ring-1 ring-slate-200/70">
-      <div className="mb-3">
-        <h3 className="font-display font-bold text-slate-900 text-sm">
-          {title ?? (lang === "zh" ? "心率區間" : "Heart Rate Zones")}
-        </h3>
-        {subtitle && <p className="text-[11px] text-slate-500 mt-0.5">{subtitle}</p>}
+      <div className="mb-3 flex items-start justify-between gap-2">
+        <div>
+          <h3 className="font-display font-bold text-slate-900 text-sm">
+            {title ?? (lang === "zh" ? "心率區間" : "Heart Rate Zones")}
+          </h3>
+          {subtitle && <p className="text-[11px] text-slate-500 mt-0.5">{subtitle}</p>}
+        </div>
+        {onEdit && (
+          <button
+            onClick={onEdit}
+            className="shrink-0 inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-[11px] font-medium text-slate-600 hover:bg-slate-50 transition-colors"
+            aria-label={lang === "zh" ? "編輯心率" : "Edit heart rate"}
+          >
+            <Pencil size={11} />
+            {lang === "zh" ? "編輯" : "Edit"}
+          </button>
+        )}
       </div>
       <div className="space-y-2">
         {ZONE_LABELS.map((z) => {

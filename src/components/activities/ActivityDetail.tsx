@@ -240,6 +240,9 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
       if (Array.isArray(activity.distance_samples) && activity.distance_samples.length > 10) {
         bodyPayload.distanceSamples = activity.distance_samples;
       }
+      if (Array.isArray(activity.elevation_samples) && activity.elevation_samples.length > 10) {
+        bodyPayload.elevationSamples = activity.elevation_samples;
+      }
       const { data, error } = await supabase.functions.invoke("analyze-activity", { body: bodyPayload });
       if (error) {
         const errMsg = typeof error === "object" && error?.message ? error.message : String(error);

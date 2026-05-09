@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { ArrowLeft, Clock, MapPin, Zap, Heart, TrendingUp, Mountain, Timer, Footprints, Trash2, Pencil, Sparkles, Lock, Gauge, AlertTriangle, Flame, Trophy, MessageSquare, RefreshCw, Share2 } from "lucide-react";
 import { shareActivity, shareSplits, shareCharts } from "@/lib/shareActivity";
+import AiPosterDialog from "./AiPosterDialog";
 import {
   DropdownMenu,
   DropdownMenuContent,

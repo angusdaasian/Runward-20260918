@@ -74,6 +74,8 @@ const PerformanceTab = ({ lang }: Props) => {
         profileAge={(profile as any)?.age ?? null}
       />
 
+      <RacePredictorCard lang={lang} />
+
       <TrendsCard lang={lang} activities={loadActivities} />
     </div>
   );

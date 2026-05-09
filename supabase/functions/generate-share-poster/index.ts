@@ -50,6 +50,59 @@ ${styleLine}
 Strict rules: do NOT add any watermark, logo, or extra text other than what is specified above. Do NOT distort the person. Spell every word exactly as written. Output a single finished poster image.`;
 }
 
+async function fetchWithTimeout(url: string, init: RequestInit, ms: number): Promise<Response> {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), ms);
+  try {
+    return await fetch(url, { ...init, signal: ctrl.signal });
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+async function generateQuote(
+  apiKey: string,
+  stats: Stats,
+  lang: "en" | "zh",
+): Promise<string> {
+  const fallback = lang === "zh" ? "每一步都更靠近自己" : "Stronger than my excuses";
+  try {
+    const res = await fetchWithTimeout(
+      "https://ai.gateway.lovable.dev/v1/chat/completions",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "google/gemini-3-flash-preview",
+          messages: [
+            {
+              role: "system",
+              content:
+                lang === "zh"
+                  ? "你是跑步教練。回覆一句不超過12字的繁體中文勵志短句，不加引號或標點裝飾。"
+                  : "You are a running coach. Reply with ONE short motivational quote (max 8 words). No quotes or extra punctuation.",
+            },
+            {
+              role: "user",
+              content: `Just finished a ${stats.distanceKm.toFixed(2)}km run in ${stats.timeStr}.`,
+            },
+          ],
+        }),
+      },
+      15000,
+    );
+    if (!res.ok) return fallback;
+    const j = await res.json();
+    const q = (j.choices?.[0]?.message?.content || "").trim().replace(/^["「『]|["」』]$/g, "");
+    return q || fallback;
+  } catch (_e) {
+    return fallback;
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -67,8 +120,8 @@ Deno.serve(async (req) => {
       { global: { headers: { Authorization: authHeader } } },
     );
     const token = authHeader.replace("Bearer ", "");
-    const { data: claims, error: cErr } = await supabase.auth.getClaims(token);
-    if (cErr || !claims?.claims) {
+    const { data: userData, error: uErr } = await supabase.auth.getUser(token);
+    if (uErr || !userData?.user) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -100,69 +153,52 @@ Deno.serve(async (req) => {
       });
     }
 
-    // 1. Generate quote if not supplied
-    let finalQuote = (quote || "").trim();
-    if (!finalQuote) {
-      const qRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "google/gemini-3-flash-preview",
-          messages: [
-            {
-              role: "system",
-              content:
-                lang === "zh"
-                  ? "你是跑步教練。回覆一句不超過12字的繁體中文勵志短句，不加引號或標點裝飾。"
-                  : "You are a running coach. Reply with ONE short motivational quote (max 8 words). No quotes or extra punctuation.",
-            },
-            {
-              role: "user",
-              content: `Just finished a ${stats.distanceKm.toFixed(2)}km run in ${stats.timeStr}.`,
-            },
-          ],
-        }),
-      });
-      if (qRes.ok) {
-        const qJson = await qRes.json();
-        finalQuote = (qJson.choices?.[0]?.message?.content || "").trim().replace(/^["「『]|["」』]$/g, "");
-      }
-      if (!finalQuote) {
-        finalQuote = lang === "zh" ? "每一步都更靠近自己" : "Stronger than my excuses";
-      }
-    }
+    // Resolve quote (fast path if provided, otherwise async with timeout+fallback).
+    const finalQuote = (quote || "").trim() || (await generateQuote(LOVABLE_API_KEY, stats, lang));
 
-    // 2. Image edit call
     const prompt = buildPrompt(stats, finalQuote, stylePreset || "bold_hype", lang);
     const dataUrl = `data:${mimeType};base64,${imageBase64}`;
 
-    const imgRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-3.1-flash-image-preview",
-        messages: [
-          {
-            role: "user",
-            content: [
-              { type: "text", text: prompt },
-              { type: "image_url", image_url: { url: dataUrl } },
-            ],
+    console.log(`[poster] start gemini image edit, prompt=${prompt.length}c, img=${imageBase64.length}b64`);
+    const t0 = Date.now();
+    let imgRes: Response;
+    try {
+      imgRes = await fetchWithTimeout(
+        "https://ai.gateway.lovable.dev/v1/chat/completions",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${LOVABLE_API_KEY}`,
+            "Content-Type": "application/json",
           },
-        ],
-        modalities: ["image", "text"],
-      }),
-    });
+          body: JSON.stringify({
+            model: "google/gemini-3.1-flash-image-preview",
+            messages: [
+              {
+                role: "user",
+                content: [
+                  { type: "text", text: prompt },
+                  { type: "image_url", image_url: { url: dataUrl } },
+                ],
+              },
+            ],
+            modalities: ["image", "text"],
+          }),
+        },
+        110_000,
+      );
+    } catch (e) {
+      console.error("[poster] gemini call aborted/failed", e);
+      return new Response(
+        JSON.stringify({ error: "Generation timed out, please try again." }),
+        { status: 504, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+    console.log(`[poster] gemini done in ${Date.now() - t0}ms status=${imgRes.status}`);
 
     if (!imgRes.ok) {
       const t = await imgRes.text();
-      console.error("Image gen failed", imgRes.status, t);
+      console.error("Image gen failed", imgRes.status, t.slice(0, 300));
       if (imgRes.status === 429) {
         return new Response(
           JSON.stringify({ error: "Rate limited. Please try again in a moment." }),

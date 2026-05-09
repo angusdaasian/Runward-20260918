@@ -11,6 +11,7 @@ import {
   bestPbScore,
   effectiveVdot,
   predictRace,
+  recentVdot,
   weatherSlowdown,
   type PB,
 } from "@/lib/racePrediction";
@@ -37,7 +38,7 @@ interface WeatherSnapshot {
 
 const RacePredictorCard = ({ lang }: Props) => {
   const { user } = useAuth();
-  const { profile } = useActivities();
+  const { profile, activities } = useActivities();
   const { isPremium } = usePremium();
   const [pbs, setPbs] = useState<PB[]>([]);
   const [weather, setWeather] = useState<WeatherSnapshot | null>(null);
@@ -84,7 +85,11 @@ const RacePredictorCard = ({ lang }: Props) => {
 
   const trainingScore = (profile as any)?.training_score ?? null;
   const pbScore = useMemo(() => bestPbScore(pbs), [pbs]);
-  const vdot = useMemo(() => effectiveVdot(trainingScore, pbScore), [trainingScore, pbScore]);
+  const recentScore = useMemo(() => recentVdot(activities as any, 90), [activities]);
+  const vdot = useMemo(
+    () => effectiveVdot(recentScore, trainingScore, pbScore),
+    [recentScore, trainingScore, pbScore]
+  );
   const slowdown = useMemo(
     () => weatherSlowdown(weather?.temperature ?? null, weather?.humidity ?? null),
     [weather]

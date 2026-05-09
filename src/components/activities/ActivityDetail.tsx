@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { ArrowLeft, Clock, MapPin, Zap, Heart, TrendingUp, Mountain, Timer, Footprints, Trash2, Pencil, Sparkles, Lock, Gauge, AlertTriangle, Flame, Trophy, MessageSquare, RefreshCw, Share2 } from "lucide-react";
 import { shareActivity, shareSplits, shareCharts } from "@/lib/shareActivity";
+import AiPosterDialog from "./AiPosterDialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -147,6 +148,7 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
   const [aiLang, setAiLang] = useState<string>(lang);
   const [rpeInput, setRpeInput] = useState<string>("");
   const [rpeSubmitted, setRpeSubmitted] = useState(false);
+  const [aiPosterOpen, setAiPosterOpen] = useState(false);
   const [analysisAttempted, setAnalysisAttempted] = useState(false);
 
   // Race tagging + comment state
@@ -610,8 +612,31 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
     { hour: "2-digit", minute: "2-digit" }
   );
 
+  // Stats for AI poster
+  const posterStats = useMemo(() => {
+    const distanceKm = (activity.distance || 0) / 1000;
+    const sec = activity.moving_time || 0;
+    const h = Math.floor(sec / 3600);
+    const m = Math.floor((sec % 3600) / 60);
+    const s = Math.floor(sec % 60);
+    const timeStr = h > 0 ? `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}` : `${m}:${String(s).padStart(2, "0")}`;
+    const paceSec = activity.average_speed > 0 ? 1000 / activity.average_speed : 0;
+    const pm = Math.floor(paceSec / 60);
+    const ps = Math.floor(paceSec % 60);
+    const paceStr = paceSec > 0 ? `${pm}:${String(ps).padStart(2, "0")}` : "--";
+    return {
+      distanceKm,
+      timeStr,
+      paceStr,
+      calories: (activity as any).calories ?? null,
+      hr: activity.average_heartrate ?? null,
+      elevation: activity.total_elevation_gain ?? null,
+    };
+  }, [activity]);
+
   return (
     <div className="px-5 pt-4 pb-8 max-w-lg mx-auto">
+      <AiPosterDialog open={aiPosterOpen} onOpenChange={setAiPosterOpen} stats={posterStats} lang={lang} />
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <button onClick={onBack} className="flex items-center gap-1.5 text-sm text-primary hover:text-primary/80 transition-colors">
@@ -692,6 +717,21 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
               >
                 <span className="flex items-center gap-2 w-full">
                   {lang === "zh" ? "分享圖表" : "Share charts"}
+                  {!isPremium && <Lock size={12} className="ml-auto text-muted-foreground" />}
+                </span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => {
+                  if (!isPremium) {
+                    toast.error(lang === "zh" ? "升級 Premium 以解鎖" : "Upgrade to Premium to unlock");
+                    return;
+                  }
+                  setAiPosterOpen(true);
+                }}
+              >
+                <span className="flex items-center gap-2 w-full">
+                  <Sparkles size={12} className="text-primary" />
+                  {lang === "zh" ? "AI 海報（上傳照片）" : "AI poster (upload photo)"}
                   {!isPremium && <Lock size={12} className="ml-auto text-muted-foreground" />}
                 </span>
               </DropdownMenuItem>

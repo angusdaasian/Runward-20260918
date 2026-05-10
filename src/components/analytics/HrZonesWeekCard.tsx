@@ -48,9 +48,16 @@ const HrZonesWeekCard = ({ lang }: Props) => {
         }
 
         // Strava: fetch streams on demand for past-week activities
-        const stravaToFetch = weekActivities.filter(
-          (a) => a.strava_id && (!a.hr_samples || a.hr_samples.length === 0),
-        );
+        // Only attempt if user has a Strava connection (avoids 404s for non-Strava users)
+        const { data: stravaConn } = await supabase
+          .from("strava_connections")
+          .select("id")
+          .maybeSingle();
+        const stravaToFetch = stravaConn
+          ? weekActivities.filter(
+              (a) => a.strava_id && (!a.hr_samples || a.hr_samples.length === 0),
+            )
+          : [];
         if (stravaToFetch.length > 0) {
           const results = await Promise.all(
             stravaToFetch.slice(0, 15).map(async (a) => {

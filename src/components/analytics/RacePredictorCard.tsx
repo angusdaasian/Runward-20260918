@@ -64,6 +64,8 @@ const RacePredictorCard = ({ lang }: Props) => {
     const run = async () => {
       setWeatherLoading(true);
       try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.access_token) return;
         const { data, error } = await supabase.functions.invoke("get-weather", { body: { city } });
         if (!cancelled && !error && data && !(data as any).error) {
           setWeather({

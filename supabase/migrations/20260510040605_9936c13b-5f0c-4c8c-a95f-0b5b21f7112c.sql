@@ -1,0 +1,1 @@
+UPDATE public.strava_activities SET environment = 'prod' WHERE user_id = '0065e18b-bb1a-4942-b9b4-1aa2d68c43c0' AND strava_id BETWEEN 9000000001 AND 9000000005;

@@ -1,0 +1,1 @@
+UPDATE public.profiles SET is_premium = true WHERE user_id = '0065e18b-bb1a-4942-b9b4-1aa2d68c43c0';

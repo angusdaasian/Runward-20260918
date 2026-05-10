@@ -2,7 +2,7 @@ import React from "react";
 import { AbsoluteFill, useCurrentFrame, useVideoConfig, interpolate, spring } from "remotion";
 import { COLORS, FONTS } from "../theme";
 
-const LINES = ["數據散落 3 個 App？", "訓練沒方向？", "練了卻沒進步？"];
+const LINES = ["數據散落各處？", "訓練沒方向？", "練了卻沒進步？"];
 
 export const ScenePainPoint: React.FC = () => {
   const frame = useCurrentFrame();
@@ -20,7 +20,7 @@ export const ScenePainPoint: React.FC = () => {
               fontFamily: FONTS.zh,
               fontWeight: 700,
               color: i === LINES.length - 1 ? COLORS.accent : COLORS.text,
-              fontSize: i === LINES.length - 1 ? 96 : 84,
+              fontSize: i === LINES.length - 1 ? 88 : 76,
               lineHeight: 1.25,
               opacity: s * exitOpacity,
               transform: `translateX(${interpolate(s, [0, 1], [-80, 0])}px)`,

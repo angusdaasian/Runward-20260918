@@ -3,10 +3,10 @@ import { AbsoluteFill, useCurrentFrame, useVideoConfig, interpolate, spring } fr
 import { COLORS, FONTS } from "../theme";
 
 const FEATURES = [
-  { icon: "🤖", title: "AI 跑步教練", desc: "隨時問配速、訓練、恢復" },
-  { icon: "📊", title: "AI 姿勢分析", desc: "拍 10 秒影片，抓出跑姿問題" },
-  { icon: "📅", title: "個人化訓練計畫", desc: "依目標距離與配速自動生成" },
-  { icon: "🏆", title: "獎勵 & 排行榜", desc: "跑步也能升等、領獎勵" },
+  { icon: "AI", title: "AI 跑步教練", desc: "隨時問配速、訓練、恢復" },
+  { icon: "POSE", title: "姿勢分析", desc: "拍 10 秒影片，抓出跑姿問題" },
+  { icon: "PLAN", title: "個人化訓練計畫", desc: "依目標距離與配速生成" },
+  { icon: "XP", title: "獎勵 & 排行榜", desc: "跑步也能升等、領獎勵" },
 ];
 
 export const SceneFeatures: React.FC = () => {
@@ -29,9 +29,9 @@ export const SceneFeatures: React.FC = () => {
         一切，<span style={{ color: COLORS.primary }}>都在這裡。</span>
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
         {FEATURES.map((f, i) => {
-          const delay = 18 + i * 22;
+          const delay = 18 + i * 20;
           const s = spring({ frame: frame - delay, fps, config: { damping: 16, stiffness: 160 } });
           return (
             <div
@@ -39,10 +39,10 @@ export const SceneFeatures: React.FC = () => {
               style={{
                 display: "flex",
                 alignItems: "center",
-                gap: 28,
-                padding: "32px 36px",
+                gap: 26,
+                padding: "26px 32px",
                 background: `linear-gradient(135deg, ${COLORS.surfaceHi} 0%, ${COLORS.surface} 100%)`,
-                borderRadius: 28,
+                borderRadius: 26,
                 border: `1px solid ${COLORS.border}`,
                 opacity: s,
                 transform: `translateX(${interpolate(s, [0, 1], [-120, 0])}px) scale(${interpolate(s, [0, 1], [0.92, 1])})`,
@@ -51,15 +51,19 @@ export const SceneFeatures: React.FC = () => {
             >
               <div
                 style={{
-                  fontSize: 88,
-                  width: 130,
-                  height: 130,
-                  borderRadius: 24,
+                  width: 120,
+                  height: 120,
+                  borderRadius: 22,
                   background: `linear-gradient(135deg, ${COLORS.primaryDeep}, ${COLORS.primary})`,
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
                   flexShrink: 0,
+                  fontFamily: FONTS.display,
+                  fontWeight: 700,
+                  fontSize: f.icon.length > 2 ? 28 : 44,
+                  color: COLORS.bgDeep,
+                  letterSpacing: 1,
                 }}
               >
                 {f.icon}
@@ -70,9 +74,9 @@ export const SceneFeatures: React.FC = () => {
                     fontFamily: FONTS.zh,
                     fontWeight: 900,
                     color: COLORS.text,
-                    fontSize: 56,
+                    fontSize: 50,
                     lineHeight: 1.1,
-                    marginBottom: 8,
+                    marginBottom: 6,
                   }}
                 >
                   {f.title}
@@ -82,7 +86,7 @@ export const SceneFeatures: React.FC = () => {
                     fontFamily: FONTS.zh,
                     fontWeight: 400,
                     color: COLORS.textMuted,
-                    fontSize: 32,
+                    fontSize: 28,
                   }}
                 >
                   {f.desc}

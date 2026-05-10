@@ -1,0 +1,1 @@
+UPDATE public.strava_activities SET environment = 'dev' WHERE user_id = '0065e18b-bb1a-4942-b9b4-1aa2d68c43c0' AND strava_id IN (9000000001, 9000000002, 9000000003, 9000000004, 9000000005);

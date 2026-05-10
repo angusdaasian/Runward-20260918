@@ -189,8 +189,7 @@ const Index = () => {
   return (
     <div className="flex flex-col min-h-screen bg-background">
       <div style={{ height: 'var(--safe-area-top, 0px)' }} className="shrink-0" />
-      {/* Admin entry hidden for demo capture; restore when needed */}
-      {false && isAdmin && (
+      {isAdmin && (
         <div className="flex justify-end p-2">
           <button
             onClick={() => navigate("/admin")}

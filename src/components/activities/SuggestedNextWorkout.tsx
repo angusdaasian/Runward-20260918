@@ -383,6 +383,37 @@ const SuggestedNextWorkout = ({ lang, latestActivityId, latestActivityDate }: Pr
 
   if (view.kind === "hidden") return null;
 
+  // Plan-aware overrides — only after the plan has loaded.
+  const hasActivePlan = !!planRow;
+  const isFreePlan = (planRow?.goal ?? "") === "free";
+  const planTitle = todayPlanned
+    ? (todayPlanned.title || todayPlanned.type || (isZh ? "今日訓練" : "Today's Workout"))
+    : null;
+
+  const persistTodayPlannedEdit = async (next: EditableWorkout) => {
+    if (!planRow || !todayPlanned) return;
+    try {
+      const updated = JSON.parse(JSON.stringify(planRow.plan_data));
+      const day = updated[todayPlanned._weekIdx]?.days?.[todayPlanned._dayIdx];
+      if (!day) throw new Error("day not found");
+      day.distance_km = next.distance_km ?? day.distance_km;
+      day.pace = next.pace ?? day.pace;
+      day.description = next.description ?? day.description;
+      const { error } = await supabase
+        .from("training_plans" as any)
+        .update({ plan_data: updated } as any)
+        .eq("id", planRow.id);
+      if (error) throw error;
+      notifyPlanChanged();
+      await loadPlan();
+      toast.success(isZh ? "已更新今日訓練" : "Today's workout updated");
+    } catch (e) {
+      console.error("[SuggestedNextWorkout] update plan day error:", e);
+      toast.error(isZh ? "更新失敗" : "Update failed");
+      throw e;
+    }
+  };
+
   return (
     <div className="bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/30 rounded-xl p-4 mb-4">
       <div className="flex items-center gap-2 mb-3">
@@ -392,92 +423,172 @@ const SuggestedNextWorkout = ({ lang, latestActivityId, latestActivityDate }: Pr
         </h3>
       </div>
 
-      {view.kind === "loading" && (
-        <div className="flex items-center gap-2 text-muted-foreground text-sm py-2">
-          <Loader2 size={14} className="animate-spin" />
-          {isZh ? "載入中…" : "Loading…"}
-        </div>
-      )}
-
-      {view.kind === "analysis" && (
-        <div className="prose prose-sm dark:prose-invert max-w-none text-foreground text-sm [&_h2]:text-base [&_h2]:font-bold [&_h2]:mt-2 [&_h2]:mb-1 [&_ul]:my-1 [&_li]:my-0.5 [&_strong]:text-primary">
-          <ReactMarkdown>{stripLeadingHeading(view.text)}</ReactMarkdown>
-        </div>
-      )}
-
-      {view.kind === "generated" && (
+      {/* Plan-aware view: when user is on a plan, show today's planned workout. */}
+      {planLoaded && hasActivePlan && todayPlanned && (
         <div className="space-y-3">
-          {translating && (
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <Loader2 size={12} className="animate-spin" />
-              {isZh ? "翻譯中…" : "Translating…"}
+          <div className="flex items-center gap-2">
+            {todayPlanned.color && (
+              <div className="w-3 h-3 rounded-full" style={{ backgroundColor: todayPlanned.color }} />
+            )}
+            <span className="font-medium text-foreground text-sm">{planTitle}</span>
+          </div>
+          <div className="grid grid-cols-2 gap-2 text-sm">
+            {todayPlanned.distance_km != null && (
+              <div className="rounded-md bg-background/60 border border-border px-2 py-1.5">
+                <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                  {isZh ? "距離" : "Distance"}
+                </div>
+                <div className="font-semibold text-foreground">{todayPlanned.distance_km} km</div>
+              </div>
+            )}
+            {todayPlanned.pace && (
+              <div className="rounded-md bg-background/60 border border-border px-2 py-1.5">
+                <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                  {isZh ? "配速" : "Pace"}
+                </div>
+                <div className="font-semibold text-foreground">{todayPlanned.pace}</div>
+              </div>
+            )}
+          </div>
+          {todayPlanned.description && (
+            <p className="text-sm text-foreground/85 leading-relaxed whitespace-pre-wrap">
+              {todayPlanned.description}
+            </p>
+          )}
+          {isFreePlan ? (
+            <p className="text-xs text-muted-foreground italic">
+              {isZh
+                ? "你正在使用免費訓練計劃。請依計劃執行，或取消計劃以獲得每日 AI 建議訓練。"
+                : "You're on a fixed plan — follow the plan, or cancel it to get a daily AI-suggested workout."}
+            </p>
+          ) : (
+            <button
+              onClick={() => setEditOpen(true)}
+              className="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:text-primary/80 underline-offset-2 hover:underline"
+            >
+              <Pencil size={12} />
+              {isZh ? "調整今日訓練" : "Adjust today's workout"}
+            </button>
+          )}
+
+          <EditWorkoutDialog
+            open={editOpen}
+            onOpenChange={setEditOpen}
+            lang={lang}
+            workout={{
+              type: todayPlanned.type,
+              title: todayPlanned.title,
+              distance_km: todayPlanned.distance_km ?? null,
+              pace: todayPlanned.pace ?? null,
+              description: todayPlanned.description ?? null,
+              color: todayPlanned.color ?? null,
+            }}
+            planContext={`Active plan goal=${planRow?.goal}, distance=${planRow?.distance}, target=${planRow?.target_time}. Today's planned workout: ${planTitle}.`}
+            onSave={persistTodayPlannedEdit}
+          />
+        </div>
+      )}
+
+      {/* Plan-aware: on a plan but today is a rest/empty day — show small note and skip AI generation. */}
+      {planLoaded && hasActivePlan && !todayPlanned && (
+        <p className="text-sm text-foreground/85 leading-relaxed">
+          {isZh
+            ? "今天是計劃中的休息日，請好好恢復。"
+            : "Today is a scheduled rest day in your plan — focus on recovery."}
+        </p>
+      )}
+
+      {/* Original analysis / generated / prompt views — only when NOT on an active plan. */}
+      {(!planLoaded || !hasActivePlan) && (
+        <>
+          {view.kind === "loading" && (
+            <div className="flex items-center gap-2 text-muted-foreground text-sm py-2">
+              <Loader2 size={14} className="animate-spin" />
+              {isZh ? "載入中…" : "Loading…"}
             </div>
           )}
-          <div className="prose prose-sm dark:prose-invert max-w-none text-foreground text-sm [&_h2]:text-base [&_h2]:font-bold [&_h2]:mt-2 [&_h2]:mb-1 [&_ul]:my-1 [&_li]:my-0.5 [&_strong]:text-primary">
-            <ReactMarkdown>{stripLeadingHeading(view.text)}</ReactMarkdown>
-          </div>
-          <button
-            onClick={handleRegenerate}
-            className="text-xs font-medium text-primary hover:text-primary/80 underline-offset-2 hover:underline"
-          >
-            {isZh ? "選擇其他訓練類型" : "Pick a different workout"}
-          </button>
-        </div>
-      )}
 
-      {view.kind === "prompt" && !declined && (
-        <div className="space-y-3">
-          <p className="text-sm text-foreground/90 leading-relaxed">
-            {isZh
-              ? "想要今天跑步嗎？選擇一種訓練類型，AI 教練會根據你的訓練計劃（或最近 7 天的表現）給你最適合的距離與配速。"
-              : "Want to run today? Pick a workout type and the AI coach will suggest the best distance and pace based on your plan (or your last 7 days)."}
-          </p>
-          <Select value={workoutType} onValueChange={(v) => setWorkoutType(v as WorkoutType)} disabled={generating}>
-            <SelectTrigger className="w-full bg-background border-border text-sm">
-              <SelectValue placeholder={isZh ? "選擇訓練類型" : "Select workout type"} />
-            </SelectTrigger>
-            <SelectContent>
-              {(Object.keys(WORKOUT_TYPE_LABELS) as WorkoutType[]).map((key) => (
-                <SelectItem key={key} value={key}>
-                  {isZh ? WORKOUT_TYPE_LABELS[key].zh : WORKOUT_TYPE_LABELS[key].en}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <div className="flex gap-2">
-            <button
-              onClick={handleGenerate}
-              disabled={generating}
-              className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium px-4 py-2 hover:bg-primary/90 transition-colors disabled:opacity-60"
-            >
-              {generating && <Loader2 size={14} className="animate-spin" />}
-              {generating
-                ? isZh ? "產生中…" : "Generating…"
-                : isZh ? "產生建議訓練" : "Generate workout"}
-            </button>
-            <button
-              onClick={() => setDeclined(true)}
-              disabled={generating}
-              className="inline-flex items-center justify-center rounded-lg border border-border bg-background text-foreground text-sm font-medium px-4 py-2 hover:bg-accent transition-colors"
-            >
-              {isZh ? "不要" : "No thanks"}
-            </button>
-          </div>
-        </div>
-      )}
+          {view.kind === "analysis" && (
+            <div className="prose prose-sm dark:prose-invert max-w-none text-foreground text-sm [&_h2]:text-base [&_h2]:font-bold [&_h2]:mt-2 [&_h2]:mb-1 [&_ul]:my-1 [&_li]:my-0.5 [&_strong]:text-primary">
+              <ReactMarkdown>{stripLeadingHeading(view.text)}</ReactMarkdown>
+            </div>
+          )}
 
-      {view.kind === "prompt" && declined && (
-        <div className="space-y-2">
-          <p className="text-sm text-muted-foreground italic">
-            {isZh ? "好的，今天好好休息！" : "Got it — enjoy your rest day!"}
-          </p>
-          <button
-            onClick={() => setDeclined(false)}
-            className="text-xs font-medium text-primary hover:text-primary/80 underline-offset-2 hover:underline"
-          >
-            {isZh ? "改變主意？" : "Changed your mind?"}
-          </button>
-        </div>
+          {view.kind === "generated" && (
+            <div className="space-y-3">
+              {translating && (
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <Loader2 size={12} className="animate-spin" />
+                  {isZh ? "翻譯中…" : "Translating…"}
+                </div>
+              )}
+              <div className="prose prose-sm dark:prose-invert max-w-none text-foreground text-sm [&_h2]:text-base [&_h2]:font-bold [&_h2]:mt-2 [&_h2]:mb-1 [&_ul]:my-1 [&_li]:my-0.5 [&_strong]:text-primary">
+                <ReactMarkdown>{stripLeadingHeading(view.text)}</ReactMarkdown>
+              </div>
+              <button
+                onClick={handleRegenerate}
+                className="text-xs font-medium text-primary hover:text-primary/80 underline-offset-2 hover:underline"
+              >
+                {isZh ? "選擇其他訓練類型" : "Pick a different workout"}
+              </button>
+            </div>
+          )}
+
+          {view.kind === "prompt" && !declined && (
+            <div className="space-y-3">
+              <p className="text-sm text-foreground/90 leading-relaxed">
+                {isZh
+                  ? "想要今天跑步嗎？選擇一種訓練類型，AI 教練會根據你的訓練計劃（或最近 7 天的表現）給你最適合的距離與配速。"
+                  : "Want to run today? Pick a workout type and the AI coach will suggest the best distance and pace based on your plan (or your last 7 days)."}
+              </p>
+              <Select value={workoutType} onValueChange={(v) => setWorkoutType(v as WorkoutType)} disabled={generating}>
+                <SelectTrigger className="w-full bg-background border-border text-sm">
+                  <SelectValue placeholder={isZh ? "選擇訓練類型" : "Select workout type"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {(Object.keys(WORKOUT_TYPE_LABELS) as WorkoutType[]).map((key) => (
+                    <SelectItem key={key} value={key}>
+                      {isZh ? WORKOUT_TYPE_LABELS[key].zh : WORKOUT_TYPE_LABELS[key].en}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <div className="flex gap-2">
+                <button
+                  onClick={handleGenerate}
+                  disabled={generating}
+                  className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium px-4 py-2 hover:bg-primary/90 transition-colors disabled:opacity-60"
+                >
+                  {generating && <Loader2 size={14} className="animate-spin" />}
+                  {generating
+                    ? isZh ? "產生中…" : "Generating…"
+                    : isZh ? "產生建議訓練" : "Generate workout"}
+                </button>
+                <button
+                  onClick={() => setDeclined(true)}
+                  disabled={generating}
+                  className="inline-flex items-center justify-center rounded-lg border border-border bg-background text-foreground text-sm font-medium px-4 py-2 hover:bg-accent transition-colors"
+                >
+                  {isZh ? "不要" : "No thanks"}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {view.kind === "prompt" && declined && (
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground italic">
+                {isZh ? "好的，今天好好休息！" : "Got it — enjoy your rest day!"}
+              </p>
+              <button
+                onClick={() => setDeclined(false)}
+                className="text-xs font-medium text-primary hover:text-primary/80 underline-offset-2 hover:underline"
+              >
+                {isZh ? "改變主意？" : "Changed your mind?"}
+              </button>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

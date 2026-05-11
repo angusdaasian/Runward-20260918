@@ -881,6 +881,7 @@ Based on today's performance, the runner's subjective feel, training score, and 
 - **Type**: (Recovery run / Easy aerobic / Tempo / Intervals / Rest)
 - **Distance**: X km
 - **Pace**: X:XX /km
+- **Target HR**: XXX–XXX bpm (derive from today's average/max HR and the prescribed intensity; omit this line only if HR data is unavailable)
 - **Duration**: ~X minutes
 - **Why**: brief reasoning (1-2 sentences)
 

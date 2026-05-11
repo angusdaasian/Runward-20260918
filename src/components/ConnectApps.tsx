@@ -14,6 +14,7 @@ import corosIcon from "@/assets/brands/coros.png";
 import polarIcon from "@/assets/brands/polar.png";
 import garminIcon from "@/assets/brands/garmin.png";
 import suuntoIcon from "@/assets/brands/suunto.png";
+import zeppIcon from "@/assets/brands/zepp.png";
 
 interface Props {
   lang: Lang;
@@ -148,12 +149,13 @@ const ConnectApps = ({ lang, onBack }: Props) => {
     await garmin.syncActivities();
   };
 
-  type TerraProvider = "GARMIN" | "POLAR" | "SUUNTO" | "COROS";
+  type TerraProvider = "GARMIN" | "POLAR" | "SUUNTO" | "COROS" | "ZEPP";
   const TERRA_PROVIDERS: { id: TerraProvider; label: string; icon: string }[] = [
     { id: "GARMIN", label: "Garmin", icon: garminIcon },
     { id: "COROS", label: "COROS", icon: corosIcon },
     { id: "POLAR", label: "Polar", icon: polarIcon },
     { id: "SUUNTO", label: "Suunto", icon: suuntoIcon },
+    { id: "ZEPP", label: "Zepp", icon: zeppIcon },
   ];
   const [terraConns, setTerraConns] = useState<Record<string, { id: string; last_synced_at: string | null }>>({});
   const [terraBusy, setTerraBusy] = useState<string | null>(null);

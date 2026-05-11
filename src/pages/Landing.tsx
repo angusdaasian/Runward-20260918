@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Globe, Smartphone, ChevronRight, CheckCircle2, Check, X, Crown, Sparkles } from "lucide-react";
+import { Globe, Smartphone, ChevronRight, CheckCircle2, Check, X, Crown, Sparkles, Target } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import appStoreBadge from "@/assets/app-store-badge.png";
@@ -221,11 +221,46 @@ const Landing = () => {
             <h2 className="font-display text-3xl md:text-4xl font-bold mb-4">
               {zh ? "簡單透明的訂閱方案" : "Simple, Transparent Pricing"}
             </h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto">
-              {zh
-                ? "6 月 1 日後價格將調整為每月 HK$38 (TWD 150) / 每年 HK$428 (TWD 1490)。在此之前訂閱的用戶可永久享有現價。"
-                : "After June 1, prices rise to HK$38 (TWD 150) / month and HK$428 (TWD 1490) / year. Subscribe before then and keep the current price forever."}
-            </p>
+          </div>
+
+          <div className="max-w-3xl mx-auto mb-10 rounded-2xl border border-warning/30 bg-warning/10 p-5 md:p-6">
+            <div className="flex items-start gap-3">
+              <Target className="text-warning shrink-0 mt-0.5" size={22} />
+              <div className="space-y-1.5 text-sm">
+                <p className="font-bold text-foreground text-base mb-1">
+                  {zh ? "早鳥方案詳情" : "Early Bird Plan Details"}
+                </p>
+                <p>
+                  <span className="font-semibold">{zh ? "優惠期至:" : "Available until:"}</span>{" "}
+                  <span className="text-muted-foreground">{zh ? "2026 年 6 月 1 日" : "June 1, 2026"}</span>
+                </p>
+                <p>
+                  <span className="font-semibold">{zh ? "早鳥價:" : "Early bird price:"}</span>{" "}
+                  <span className="text-muted-foreground">
+                    {zh
+                      ? "每月 HK$28 / 每年 HK$328（原價 HK$38 / HK$428；TWD 120 / TWD 1290，原價 TWD 150 / TWD 1490）"
+                      : "Monthly HK$28 / Yearly HK$328 (standard HK$38 / HK$428; TWD 120 / TWD 1290, standard TWD 150 / TWD 1490)"}
+                  </span>
+                </p>
+                <p>
+                  <span className="font-semibold">{zh ? "免費試用:" : "Free trial:"}</span>{" "}
+                  <span className="text-muted-foreground">
+                    {zh
+                      ? "月費方案 7 天免費試用 — 試用結束後扣款,可隨時取消"
+                      : "7-day free trial on monthly plan — billed after trial, cancel anytime"}
+                  </span>
+                </p>
+                <p>
+                  <span className="font-semibold">{zh ? "早鳥福利:" : "Early bird perk:"}</span>{" "}
+                  <span className="text-muted-foreground">
+                    {zh ? "早鳥訂閱用戶可永久鎖定優惠價," : "Early bird subscribers keep the same low price forever, "}
+                    <span className="font-semibold text-foreground">
+                      {zh ? "不受未來價格調整影響" : "regardless of future price increases"}
+                    </span>
+                  </span>
+                </p>
+              </div>
+            </div>
           </div>
 
           <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">

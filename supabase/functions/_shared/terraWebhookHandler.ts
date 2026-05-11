@@ -458,6 +458,8 @@ function extractCadenceSamples(a: any): Array<{ t: number; rpm: number }> {
   const out = Array.from(bySecond.entries()).sort((a, b) => a[0] - b[0]).map(([t, rpm]) => ({ t, rpm }));
   return out.length > 7200 ? out.slice(0, 7200) : out;
 }
+
+function recomputeLapAvgHr(laps: any[], samples: Array<{ t: number; bpm: number }>, activityStartTime: string | null): any[] {
   if (!samples.length || !laps.length) return laps;
   const startMs = activityStartTime ? new Date(activityStartTime).getTime() : NaN;
   if (!Number.isFinite(startMs)) return laps;

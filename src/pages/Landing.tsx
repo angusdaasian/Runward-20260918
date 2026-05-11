@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Globe, Smartphone, ChevronRight, CheckCircle2 } from "lucide-react";
+import { Globe, Smartphone, ChevronRight, CheckCircle2, Check, X, Crown, Sparkles } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import appStoreBadge from "@/assets/app-store-badge.png";
@@ -100,6 +100,12 @@ const Landing = () => {
             <span className="font-display font-bold text-lg">{zh ? "向前跑" : "Runward"}</span>
           </div>
           <div className="flex items-center gap-3">
+            <a
+              href="#pricing"
+              className="hidden sm:inline-block text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              {zh ? "價格" : "Pricing"}
+            </a>
             <button
               onClick={toggleLang}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-card border border-border text-sm text-muted-foreground hover:text-foreground transition-colors"
@@ -202,6 +208,214 @@ const Landing = () => {
               reverse={i % 2 === 1}
             />
           ))}
+        </div>
+      </section>
+
+      {/* ─── Pricing ─── */}
+      <section id="pricing" className="px-6 py-20 md:py-28 bg-card/30 border-y border-border">
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center mb-12">
+            <span className="inline-block px-3 py-1 rounded-full bg-warning/15 text-warning text-xs font-semibold tracking-wide uppercase mb-4">
+              {zh ? "限時優惠 · 6 月 1 日截止" : "Limited Offer · Ends June 1"}
+            </span>
+            <h2 className="font-display text-3xl md:text-4xl font-bold mb-4">
+              {zh ? "簡單透明的訂閱方案" : "Simple, Transparent Pricing"}
+            </h2>
+            <p className="text-muted-foreground max-w-2xl mx-auto">
+              {zh
+                ? "6 月 1 日後價格將調整為每月 HK$38 (TWD 150) / 每年 HK$428 (TWD 1490)。在此之前訂閱的用戶可永久享有現價。"
+                : "After June 1, prices rise to HK$38 (TWD 150) / month and HK$428 (TWD 1490) / year. Subscribe before then and keep the current price forever."}
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
+            {/* Free */}
+            <div className="rounded-2xl border border-border bg-background p-6 flex flex-col">
+              <div className="mb-4">
+                <h3 className="font-display text-xl font-bold mb-1">{zh ? "免費版" : "Free"}</h3>
+                <p className="text-sm text-muted-foreground">{zh ? "開始你的跑步旅程" : "Start your running journey"}</p>
+              </div>
+              <div className="mb-6">
+                <span className="font-display text-4xl font-bold">{zh ? "免費" : "Free"}</span>
+              </div>
+              <ul className="space-y-2.5 text-sm mb-6 flex-1">
+                {[
+                  zh ? "活動追蹤與同步" : "Activity tracking & sync",
+                  zh ? "社群與排行榜" : "Community & leaderboards",
+                  zh ? "HRV 洞察" : "HRV insights",
+                  zh ? "訓練負荷圖表" : "Training load charts",
+                  zh ? "基本訓練計劃" : "Basic training plans",
+                  zh ? "每日 1 次跑姿分析" : "1 posture analysis / day",
+                ].map((f, i) => (
+                  <li key={i} className="flex items-start gap-2">
+                    <Check size={16} className="text-success shrink-0 mt-0.5" />
+                    <span>{f}</span>
+                  </li>
+                ))}
+              </ul>
+              <a
+                href={APP_STORE_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-full border border-border text-sm font-semibold hover:bg-muted transition-colors"
+              >
+                {zh ? "免費下載" : "Download Free"}
+              </a>
+            </div>
+
+            {/* Monthly */}
+            <div className="rounded-2xl border border-border bg-background p-6 flex flex-col">
+              <div className="mb-4">
+                <h3 className="font-display text-xl font-bold mb-1 flex items-center gap-2">
+                  Premium <span className="text-xs font-normal text-muted-foreground">{zh ? "月費" : "Monthly"}</span>
+                </h3>
+                <p className="text-sm text-muted-foreground">{zh ? "彈性月度訂閱" : "Flexible monthly billing"}</p>
+              </div>
+              <div className="mb-1">
+                <span className="font-display text-4xl font-bold">HK$28</span>
+                <span className="text-muted-foreground">/{zh ? "月" : "mo"}</span>
+              </div>
+              <div className="text-sm text-muted-foreground mb-1">TWD 120/{zh ? "月" : "mo"}</div>
+              <div className="text-xs text-muted-foreground line-through mb-6">
+                {zh ? "原價 HK$38 / TWD 150" : "Regular HK$38 / TWD 150"}
+              </div>
+              <ul className="space-y-2.5 text-sm mb-6 flex-1">
+                {[
+                  zh ? "包含所有免費功能" : "Everything in Free",
+                  zh ? "AI 跑步教練（24/7）" : "AI Running Coach (24/7)",
+                  zh ? "AI 活動分析報告" : "AI activity analysis",
+                  zh ? "AI 個人化訓練計劃" : "AI-personalized training plans",
+                  zh ? "無限跑姿分析" : "Unlimited posture analysis",
+                  zh ? "全距離比賽預測" : "Race predictor (all distances)",
+                ].map((f, i) => (
+                  <li key={i} className="flex items-start gap-2">
+                    <Check size={16} className="text-primary shrink-0 mt-0.5" />
+                    <span>{f}</span>
+                  </li>
+                ))}
+              </ul>
+              <a
+                href={APP_STORE_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-full bg-foreground text-background text-sm font-semibold hover:bg-foreground/90 transition-colors"
+              >
+                {zh ? "立即訂閱" : "Subscribe"}
+              </a>
+            </div>
+
+            {/* Yearly */}
+            <div className="relative rounded-2xl border-2 border-primary bg-gradient-to-br from-primary/10 via-primary/5 to-background p-6 flex flex-col shadow-lg">
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-primary text-primary-foreground text-[11px] font-bold tracking-wide uppercase">
+                {zh ? "最划算" : "Best Value"}
+              </div>
+              <div className="mb-4">
+                <h3 className="font-display text-xl font-bold mb-1 flex items-center gap-2">
+                  Premium <span className="text-xs font-normal text-muted-foreground">{zh ? "年費" : "Yearly"}</span>
+                </h3>
+                <p className="text-sm text-muted-foreground">{zh ? "節省更多，承諾全年" : "Save more, commit to the year"}</p>
+              </div>
+              <div className="mb-1">
+                <span className="font-display text-4xl font-bold">HK$328</span>
+                <span className="text-muted-foreground">/{zh ? "年" : "yr"}</span>
+              </div>
+              <div className="text-sm text-muted-foreground mb-1">TWD 1290/{zh ? "年" : "yr"}</div>
+              <div className="text-xs text-muted-foreground line-through mb-6">
+                {zh ? "原價 HK$428 / TWD 1490" : "Regular HK$428 / TWD 1490"}
+              </div>
+              <ul className="space-y-2.5 text-sm mb-6 flex-1">
+                {[
+                  zh ? "包含所有月費功能" : "Everything in Monthly",
+                  zh ? "相當於每月 HK$27" : "Just HK$27 / month",
+                  zh ? "節省 HK$8/月" : "Save HK$8 / month",
+                  zh ? "AI 活動分享海報" : "AI activity share posters",
+                  zh ? "每週計劃回顧（即將推出）" : "Weekly plan reviews (soon)",
+                  zh ? "優先獲取新功能" : "Priority access to new features",
+                ].map((f, i) => (
+                  <li key={i} className="flex items-start gap-2">
+                    <Sparkles size={16} className="text-warning shrink-0 mt-0.5" />
+                    <span>{f}</span>
+                  </li>
+                ))}
+              </ul>
+              <a
+                href={APP_STORE_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-full bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors"
+              >
+                <Crown size={14} />
+                {zh ? "鎖定優惠價" : "Lock in Offer Price"}
+              </a>
+            </div>
+          </div>
+
+          <p className="text-center text-xs text-muted-foreground mt-8 max-w-2xl mx-auto">
+            {zh
+              ? "★ 在 6 月 1 日前訂閱的用戶將永久享有此優惠價格，只要訂閱保持有效。"
+              : "★ Subscribe before June 1 and keep this special price forever, as long as your subscription stays active."}
+          </p>
+
+          {/* Comparison table */}
+          <div className="mt-16 max-w-3xl mx-auto">
+            <h3 className="font-display text-2xl md:text-3xl font-bold text-center mb-2">
+              {zh ? "免費版 vs Premium" : "Free vs Premium"}
+            </h3>
+            <p className="text-center text-muted-foreground mb-8 text-sm">
+              {zh ? "完整功能對照" : "Full feature comparison"}
+            </p>
+            <div className="bg-background border border-border rounded-2xl overflow-hidden">
+              <div className="grid grid-cols-[1fr_100px_100px] md:grid-cols-[1fr_140px_140px] bg-accent/50 px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                <span>{zh ? "功能" : "Feature"}</span>
+                <span className="text-center">{zh ? "免費" : "Free"}</span>
+                <span className="text-center flex items-center justify-center gap-1">
+                  <Sparkles size={12} className="text-warning" />
+                  Premium
+                </span>
+              </div>
+              {[
+                { label: zh ? "活動追蹤與同步" : "Activity tracking & sync", free: true, premium: true },
+                { label: zh ? "社群與排行榜" : "Community & leaderboards", free: true, premium: true },
+                { label: zh ? "HRV 洞察" : "HRV insights", free: true, premium: true },
+                { label: zh ? "訓練負荷圖表" : "Training load charts", free: true, premium: true },
+                { label: zh ? "AI 跑步教練（全天候）" : "AI Running Coach (24/7 chat)", free: false, premium: true },
+                { label: zh ? "AI 活動分析" : "AI activity analysis", free: false, premium: true },
+                { label: zh ? "活動分享" : "Activity sharing", free: zh ? "基本" : "Basic", premium: zh ? "全部功能" : "All functions" },
+                { label: zh ? "AI 活動分享海報" : "AI activity share posters", free: false, premium: true },
+                { label: zh ? "每週計劃回顧" : "Weekly plan reviews", free: false, premium: zh ? "即將推出" : "Coming soon" },
+                { label: zh ? "訓練計劃" : "Training plans", free: zh ? "基本" : "Basic", premium: zh ? "AI 個人化" : "Personalized AI" },
+                { label: zh ? "比賽預測" : "Race predictor", free: zh ? "僅 5K" : "5K only", premium: zh ? "全距離" : "All distances" },
+                { label: zh ? "跑姿分析" : "Posture analysis", free: zh ? "每日 1 次" : "1 / day", premium: zh ? "無限" : "Unlimited" },
+              ].map((f, i) => (
+                <div
+                  key={i}
+                  className={`grid grid-cols-[1fr_100px_100px] md:grid-cols-[1fr_140px_140px] items-center px-4 py-3 text-sm ${
+                    i % 2 === 0 ? "bg-background" : "bg-accent/20"
+                  }`}
+                >
+                  <span className="text-foreground pr-2">{f.label}</span>
+                  <div className="text-center">
+                    {f.free === true ? (
+                      <Check size={16} className="text-success mx-auto" />
+                    ) : f.free === false ? (
+                      <X size={16} className="text-muted-foreground/50 mx-auto" />
+                    ) : (
+                      <span className="text-xs text-foreground">{f.free}</span>
+                    )}
+                  </div>
+                  <div className="text-center">
+                    {f.premium === true ? (
+                      <Check size={16} className="text-success mx-auto" />
+                    ) : f.premium === false ? (
+                      <X size={16} className="text-muted-foreground/50 mx-auto" />
+                    ) : (
+                      <span className="text-xs text-foreground">{f.premium}</span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </section>
 

@@ -181,6 +181,30 @@ function extractHrSamples(a: any): Array<{ t: number; bpm: number }> {
   return out.length > 7200 ? out.slice(0, 7200) : out;
 }
 
+function extractCadenceSamples(a: any): Array<{ t: number; rpm: number }> {
+  const candidates = [
+    a?.movement_data?.cadence_samples,
+    a?.cadence_data?.detailed?.cadence_samples,
+    a?.cadence_data?.cadence_samples,
+  ];
+  const samples = candidates.find((s) => Array.isArray(s) && s.length > 0);
+  if (!Array.isArray(samples)) return [];
+  const startMs = a?.metadata?.start_time ? new Date(a.metadata.start_time).getTime() : NaN;
+  const bySecond = new Map<number, number>();
+  for (const s of samples as any[]) {
+    const rpm = toFiniteNumber(s?.cadence_rpm ?? s?.cadence ?? s?.value);
+    if (rpm == null || rpm <= 0) continue;
+    let t: number | null = toFiniteNumber(s?.timer_duration_seconds ?? s?.timer_seconds ?? s?.elapsed_seconds);
+    if (t == null && s?.timestamp && Number.isFinite(startMs)) {
+      t = (new Date(s.timestamp).getTime() - startMs) / 1000;
+    }
+    if (t == null || !Number.isFinite(t) || t < 0) continue;
+    bySecond.set(Math.floor(t), Math.round(rpm * 10) / 10);
+  }
+  const out = Array.from(bySecond.entries()).sort((a, b) => a[0] - b[0]).map(([t, rpm]) => ({ t, rpm }));
+  return out.length > 7200 ? out.slice(0, 7200) : out;
+}
+
 function looksLikeHrSample(s: any): boolean {
   return !!s && typeof s === "object" && toFiniteNumber(s?.bpm ?? s?.heart_rate_bpm ?? s?.heart_rate ?? s?.value) != null
     && (s?.timestamp || toFiniteNumber(s?.timer_duration_seconds ?? s?.timer_seconds ?? s?.elapsed_seconds) != null);

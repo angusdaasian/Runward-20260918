@@ -102,6 +102,7 @@ function stripLeadingHeading(md: string): string {
 
 const SuggestedNextWorkout = ({ lang, latestActivityId, latestActivityDate }: Props) => {
   const { user } = useAuth();
+  const { isPremium } = usePremium();
   const isZh = lang === "zh";
 
   const [analysisWorkout, setAnalysisWorkout] = useState<string | null>(null);

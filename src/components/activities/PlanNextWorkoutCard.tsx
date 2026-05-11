@@ -78,6 +78,12 @@ const PlanNextWorkoutCard = ({ lang, activityDate, isPremium, onResolved }: Prop
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, activityDate]);
 
+  useEffect(() => {
+    if (!loaded) return;
+    onResolved?.(!!planRow && !!nextPlanned);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loaded, planRow, nextPlanned]);
+
   if (!loaded || !planRow || !nextPlanned) return null;
 
   const isFreePlan = (planRow?.goal ?? "") === "free";

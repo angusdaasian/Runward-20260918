@@ -18,8 +18,9 @@ Deno.serve(async (req) => {
     const { data: conn } = await admin.from("terra_connections").select("*").eq("user_id", userId).eq("active", true).limit(1).maybeSingle();
     if (!conn) return new Response(JSON.stringify({ error: "no terra connection" }), { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
-    const devId = Deno.env.get("TERRA_DEV_ID")!;
-    const apiKey = Deno.env.get("TERRA_API_KEY")!;
+    const envParam = (url.searchParams.get("env") ?? "test").toLowerCase();
+    const devId = envParam === "prod" ? Deno.env.get("TERRA_DEV_ID")! : Deno.env.get("TERRA_DEV_ID_TEST")!;
+    const apiKey = envParam === "prod" ? Deno.env.get("TERRA_API_KEY")! : Deno.env.get("TERRA_API_KEY_TEST")!;
     const headers = { "dev-id": devId, "x-api-key": apiKey };
 
     const end = new Date(); end.setDate(end.getDate() + 1);

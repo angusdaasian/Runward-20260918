@@ -525,7 +525,7 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
     if ((hrSamples && hrSamples.length > 10) || (distSamples && distSamples.length > 10) || (elevSamples && elevSamples.length > 10) || (cadSamples && cadSamples.length > 10)) {
       const totalDist = activity.distance || 0;
       // Build a unified per-second view keyed by t.
-      const tMap = new Map<number, { heartrate?: number; distM?: number; altitude?: number }>();
+      const tMap = new Map<number, { heartrate?: number; distM?: number; altitude?: number; cadence?: number }>();
       if (hrSamples) {
         for (const s of hrSamples) {
           tMap.set(s.t, { ...(tMap.get(s.t) || {}), heartrate: s.bpm });
@@ -539,6 +539,11 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
       if (elevSamples) {
         for (const s of elevSamples) {
           tMap.set(s.t, { ...(tMap.get(s.t) || {}), altitude: s.e });
+        }
+      }
+      if (cadSamples) {
+        for (const s of cadSamples) {
+          tMap.set(s.t, { ...(tMap.get(s.t) || {}), cadence: s.rpm });
         }
       }
       const ordered = Array.from(tMap.entries()).sort((a, b) => a[0] - b[0]);

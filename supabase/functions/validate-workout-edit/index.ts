@@ -12,27 +12,25 @@ const json = (b: Record<string, unknown>, s = 200) =>
 
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 
-async function callLovableAI(opts: {
+async function callVertex(opts: {
   apiKey: string;
   model: string;
   systemPrompt: string;
   userPrompt: string;
   jsonMode?: boolean;
 }): Promise<Response> {
-  return await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${opts.apiKey}`,
+  const url = `https://aiplatform.googleapis.com/v1/publishers/google/models/${opts.model}:generateContent?key=${opts.apiKey}`;
+  const body: Record<string, unknown> = {
+    systemInstruction: { parts: [{ text: opts.systemPrompt }] },
+    contents: [{ role: "user", parts: [{ text: opts.userPrompt }] }],
+    generationConfig: {
+      ...(opts.jsonMode ? { responseMimeType: "application/json" } : {}),
     },
-    body: JSON.stringify({
-      model: opts.model,
-      messages: [
-        { role: "system", content: opts.systemPrompt },
-        { role: "user", content: opts.userPrompt },
-      ],
-      ...(opts.jsonMode ? { response_format: { type: "json_object" } } : {}),
-    }),
+  };
+  return await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
   });
 }
 
@@ -53,8 +51,8 @@ serve(async (req) => {
 
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
     const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY")!;
-    if (!SUPABASE_URL || !SERVICE_KEY || !LOVABLE_API_KEY) {
+    const VERTEX_API_KEY = Deno.env.get("GOOGLE_VERTEX_API_KEY")!;
+    if (!SUPABASE_URL || !SERVICE_KEY || !VERTEX_API_KEY) {
       return json({ error: "Server not configured" }, 500);
     }
 
@@ -165,9 +163,9 @@ Rules:
 - risky: clear injury/overtraining risk (rest day → long run or hard intervals, easy → near race pace, distance jump ≥2x, pace much faster than recent runs, unrealistic pace like sub-3:00/km).
 - ALWAYS rewrite updatedDescription so the workout description matches the new distance and pace.`);
 
-    const vRes = await callLovableAI({
-      apiKey: LOVABLE_API_KEY,
-      model: "google/gemini-3.1-flash-preview",
+    const vRes = await callVertex({
+      apiKey: VERTEX_API_KEY,
+      model: "gemini-3.1-flash-lite-preview",
       systemPrompt,
       userPrompt,
       jsonMode: true,
@@ -180,7 +178,7 @@ Rules:
       return json({ error: "AI gateway error" }, 500);
     }
     const vData = await vRes.json();
-    const text = vData?.choices?.[0]?.message?.content || "";
+    const text = vData?.candidates?.[0]?.content?.parts?.map((p: { text?: string }) => p.text || "").join("") || "";
     let parsed: { verdict: string; feedback: string; updatedDescription?: string } | null = null;
     try {
       parsed = JSON.parse(text);

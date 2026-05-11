@@ -12,6 +12,8 @@ interface Props {
   /** Date (ISO) of the activity being viewed; we look for the next plan day after this. */
   activityDate: string;
   isPremium?: boolean;
+  /** Notifies the parent whether a plan-driven next workout is being shown. */
+  onResolved?: (hasNext: boolean) => void;
 }
 
 /**

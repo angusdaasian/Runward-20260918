@@ -100,6 +100,12 @@ const Landing = () => {
             <span className="font-display font-bold text-lg">{zh ? "向前跑" : "Runward"}</span>
           </div>
           <div className="flex items-center gap-3">
+            <a
+              href="#pricing"
+              className="hidden sm:inline-block text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              {zh ? "價格" : "Pricing"}
+            </a>
             <button
               onClick={toggleLang}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-card border border-border text-sm text-muted-foreground hover:text-foreground transition-colors"

@@ -383,6 +383,37 @@ const SuggestedNextWorkout = ({ lang, latestActivityId, latestActivityDate }: Pr
 
   if (view.kind === "hidden") return null;
 
+  // Plan-aware overrides — only after the plan has loaded.
+  const hasActivePlan = !!planRow;
+  const isFreePlan = (planRow?.goal ?? "") === "free";
+  const planTitle = todayPlanned
+    ? (todayPlanned.title || todayPlanned.type || (isZh ? "今日訓練" : "Today's Workout"))
+    : null;
+
+  const persistTodayPlannedEdit = async (next: EditableWorkout) => {
+    if (!planRow || !todayPlanned) return;
+    try {
+      const updated = JSON.parse(JSON.stringify(planRow.plan_data));
+      const day = updated[todayPlanned._weekIdx]?.days?.[todayPlanned._dayIdx];
+      if (!day) throw new Error("day not found");
+      day.distance_km = next.distance_km ?? day.distance_km;
+      day.pace = next.pace ?? day.pace;
+      day.description = next.description ?? day.description;
+      const { error } = await supabase
+        .from("training_plans" as any)
+        .update({ plan_data: updated } as any)
+        .eq("id", planRow.id);
+      if (error) throw error;
+      notifyPlanChanged();
+      await loadPlan();
+      toast.success(isZh ? "已更新今日訓練" : "Today's workout updated");
+    } catch (e) {
+      console.error("[SuggestedNextWorkout] update plan day error:", e);
+      toast.error(isZh ? "更新失敗" : "Update failed");
+      throw e;
+    }
+  };
+
   return (
     <div className="bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/30 rounded-xl p-4 mb-4">
       <div className="flex items-center gap-2 mb-3">
@@ -391,6 +422,87 @@ const SuggestedNextWorkout = ({ lang, latestActivityId, latestActivityDate }: Pr
           {isZh ? "今日建議" : "Today's Suggestion"}
         </h3>
       </div>
+
+      {/* Plan-aware view: when user is on a plan, show today's planned workout. */}
+      {planLoaded && hasActivePlan && todayPlanned && (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            {todayPlanned.color && (
+              <div className="w-3 h-3 rounded-full" style={{ backgroundColor: todayPlanned.color }} />
+            )}
+            <span className="font-medium text-foreground text-sm">{planTitle}</span>
+          </div>
+          <div className="grid grid-cols-2 gap-2 text-sm">
+            {todayPlanned.distance_km != null && (
+              <div className="rounded-md bg-background/60 border border-border px-2 py-1.5">
+                <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                  {isZh ? "距離" : "Distance"}
+                </div>
+                <div className="font-semibold text-foreground">{todayPlanned.distance_km} km</div>
+              </div>
+            )}
+            {todayPlanned.pace && (
+              <div className="rounded-md bg-background/60 border border-border px-2 py-1.5">
+                <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                  {isZh ? "配速" : "Pace"}
+                </div>
+                <div className="font-semibold text-foreground">{todayPlanned.pace}</div>
+              </div>
+            )}
+          </div>
+          {todayPlanned.description && (
+            <p className="text-sm text-foreground/85 leading-relaxed whitespace-pre-wrap">
+              {todayPlanned.description}
+            </p>
+          )}
+          {isFreePlan ? (
+            <p className="text-xs text-muted-foreground italic">
+              {isZh
+                ? "你正在使用免費訓練計劃。請依計劃執行，或取消計劃以獲得每日 AI 建議訓練。"
+                : "You're on a fixed plan — follow the plan, or cancel it to get a daily AI-suggested workout."}
+            </p>
+          ) : (
+            <button
+              onClick={() => setEditOpen(true)}
+              className="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:text-primary/80 underline-offset-2 hover:underline"
+            >
+              <Pencil size={12} />
+              {isZh ? "調整今日訓練" : "Adjust today's workout"}
+            </button>
+          )}
+
+          <EditWorkoutDialog
+            open={editOpen}
+            onOpenChange={setEditOpen}
+            lang={lang}
+            workout={{
+              type: todayPlanned.type,
+              title: todayPlanned.title,
+              distance_km: todayPlanned.distance_km ?? null,
+              pace: todayPlanned.pace ?? null,
+              description: todayPlanned.description ?? null,
+              color: todayPlanned.color ?? null,
+            }}
+            planContext={`Active plan goal=${planRow?.goal}, distance=${planRow?.distance}, target=${planRow?.target_time}. Today's planned workout: ${planTitle}.`}
+            onSave={persistTodayPlannedEdit}
+          />
+        </div>
+      )}
+
+      {/* Plan-aware: on a plan but today is a rest/empty day — show small note and skip AI generation. */}
+      {planLoaded && hasActivePlan && !todayPlanned && (
+        <p className="text-sm text-foreground/85 leading-relaxed">
+          {isZh
+            ? "今天是計劃中的休息日，請好好恢復。"
+            : "Today is a scheduled rest day in your plan — focus on recovery."}
+        </p>
+      )}
+
+      {/* Original analysis / generated / prompt views — only when NOT on an active plan. */}
+      {(!planLoaded || !hasActivePlan) && (
+        <>
+        </>
+      )}
 
       {view.kind === "loading" && (
         <div className="flex items-center gap-2 text-muted-foreground text-sm py-2">

@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import ReactMarkdown from "react-markdown";
-import { Footprints, Loader2 } from "lucide-react";
+import { Footprints, Loader2, Pencil } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Lang } from "@/lib/i18n";
 import { toast } from "sonner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import EditWorkoutDialog, { EditableWorkout } from "@/components/training/EditWorkoutDialog";
+import { notifyPlanChanged, subscribePlanChanged } from "@/lib/planEvents";
 
 interface Props {
   lang: Lang;
@@ -110,11 +112,56 @@ const SuggestedNextWorkout = ({ lang, latestActivityId, latestActivityDate }: Pr
   const [declined, setDeclined] = useState(false);
   const [workoutType, setWorkoutType] = useState<WorkoutType>("auto");
 
+  // Active plan + today's planned workout
+  const [planRow, setPlanRow] = useState<any | null>(null);
+  const [todayPlanned, setTodayPlanned] = useState<any | null>(null);
+  const [planLoaded, setPlanLoaded] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+
   // Load cached generated suggestion
   useEffect(() => {
     if (!user) return;
     const cached = readCachedGenerated(user.id);
     setGenerated(cached);
+  }, [user]);
+
+  // Load active plan and find today's planned workout
+  const loadPlan = async () => {
+    if (!user) { setPlanLoaded(true); return; }
+    const { data } = await supabase
+      .from("training_plans" as any)
+      .select("id, goal, distance, target_time, plan_data")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const row: any = data;
+    setPlanRow(row || null);
+    if (row?.plan_data && Array.isArray(row.plan_data)) {
+      const d = new Date();
+      const todayISO = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      let found: any = null;
+      let weekIdx = -1, dayIdx = -1;
+      for (let wi = 0; wi < row.plan_data.length; wi++) {
+        const wk = row.plan_data[wi];
+        for (let di = 0; di < (wk?.days?.length || 0); di++) {
+          if (wk.days[di]?.date === todayISO) { found = wk.days[di]; weekIdx = wi; dayIdx = di; break; }
+        }
+        if (found) break;
+      }
+      setTodayPlanned(found ? { ...found, _weekIdx: weekIdx, _dayIdx: dayIdx } : null);
+    } else {
+      setTodayPlanned(null);
+    }
+    setPlanLoaded(true);
+  };
+
+  useEffect(() => {
+    setPlanLoaded(false);
+    void loadPlan();
+    const unsub = subscribePlanChanged(() => { void loadPlan(); });
+    return () => { unsub(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
   // Fetch the analysis-derived next-workout for the latest activity

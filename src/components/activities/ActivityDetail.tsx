@@ -253,6 +253,12 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
       if (Array.isArray(activity.elevation_samples) && activity.elevation_samples.length > 10) {
         bodyPayload.elevationSamples = activity.elevation_samples;
       }
+      if (Array.isArray((activity as any).cadence_samples) && (activity as any).cadence_samples.length > 10) {
+        bodyPayload.cadenceSamples = (activity as any).cadence_samples;
+      }
+      if ((activity as any).avg_cadence != null) {
+        bodyPayload.avgCadence = (activity as any).avg_cadence;
+      }
       if (hrZones) {
         bodyPayload.hrZones = hrZones;
       }

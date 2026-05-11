@@ -521,7 +521,8 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
     const hrSamples = Array.isArray(activity.hr_samples) ? activity.hr_samples : null;
     const distSamples = Array.isArray(activity.distance_samples) ? activity.distance_samples : null;
     const elevSamples = Array.isArray(activity.elevation_samples) ? activity.elevation_samples : null;
-    if ((hrSamples && hrSamples.length > 10) || (distSamples && distSamples.length > 10) || (elevSamples && elevSamples.length > 10)) {
+    const cadSamples = Array.isArray(activity.cadence_samples) ? activity.cadence_samples : null;
+    if ((hrSamples && hrSamples.length > 10) || (distSamples && distSamples.length > 10) || (elevSamples && elevSamples.length > 10) || (cadSamples && cadSamples.length > 10)) {
       const totalDist = activity.distance || 0;
       // Build a unified per-second view keyed by t.
       const tMap = new Map<number, { heartrate?: number; distM?: number; altitude?: number }>();

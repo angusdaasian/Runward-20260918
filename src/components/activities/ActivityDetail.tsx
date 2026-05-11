@@ -253,6 +253,12 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
       if (Array.isArray(activity.elevation_samples) && activity.elevation_samples.length > 10) {
         bodyPayload.elevationSamples = activity.elevation_samples;
       }
+      if (Array.isArray((activity as any).cadence_samples) && (activity as any).cadence_samples.length > 10) {
+        bodyPayload.cadenceSamples = (activity as any).cadence_samples;
+      }
+      if ((activity as any).avg_cadence != null) {
+        bodyPayload.avgCadence = (activity as any).avg_cadence;
+      }
       if (hrZones) {
         bodyPayload.hrZones = hrZones;
       }
@@ -262,6 +268,7 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
         const hrStream = streams.find((s: any) => s.type === 'heartrate');
         const distStream = streams.find((s: any) => s.type === 'distance');
         const altStream = streams.find((s: any) => s.type === 'altitude');
+        const cadStream = streams.find((s: any) => s.type === 'cadence');
         if (timeStream && Array.isArray(timeStream.data)) {
           const times: number[] = timeStream.data;
           if (!bodyPayload.hrSamples && hrStream && Array.isArray(hrStream.data)) {
@@ -272,6 +279,10 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
           }
           if (!bodyPayload.elevationSamples && altStream && Array.isArray(altStream.data)) {
             bodyPayload.elevationSamples = times.map((t, i) => ({ t, e: altStream.data[i] })).filter(s => s.e != null);
+          }
+          if (!bodyPayload.cadenceSamples && cadStream && Array.isArray(cadStream.data)) {
+            // Strava cadence is one-leg rpm; double for steps-per-minute equivalent for analysis context
+            bodyPayload.cadenceSamples = times.map((t, i) => ({ t, rpm: cadStream.data[i] != null ? cadStream.data[i] * 2 : null })).filter(s => s.rpm != null);
           }
         }
       }

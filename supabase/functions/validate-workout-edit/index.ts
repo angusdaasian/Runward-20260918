@@ -12,26 +12,27 @@ const json = (b: Record<string, unknown>, s = 200) =>
 
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 
-async function callVertex(opts: {
+async function callLovableAI(opts: {
   apiKey: string;
   model: string;
   systemPrompt: string;
   userPrompt: string;
   jsonMode?: boolean;
 }): Promise<Response> {
-  const url = `https://aiplatform.googleapis.com/v1/publishers/google/models/${opts.model}:generateContent?key=${opts.apiKey}`;
-  const body: any = {
-    systemInstruction: { parts: [{ text: opts.systemPrompt }] },
-    contents: [{ role: "user", parts: [{ text: opts.userPrompt }] }],
-    generationConfig: {
-      thinkingConfig: { thinkingLevel: "low" },
-      ...(opts.jsonMode ? { responseMimeType: "application/json" } : {}),
-    },
-  };
-  return await fetch(url, {
+  return await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${opts.apiKey}`,
+    },
+    body: JSON.stringify({
+      model: opts.model,
+      messages: [
+        { role: "system", content: opts.systemPrompt },
+        { role: "user", content: opts.userPrompt },
+      ],
+      ...(opts.jsonMode ? { response_format: { type: "json_object" } } : {}),
+    }),
   });
 }
 

@@ -8,7 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { notifyPlanChanged } from "@/lib/planEvents";
+import { notifyPlanChanged, subscribePlanChanged } from "@/lib/planEvents";
 import EditWorkoutDialog from "@/components/training/EditWorkoutDialog";
 
 type Goal = "race" | "distance" | "first5k" | "parkrun" | "general" | "postnatal" | "fitness" | "injury" | "postrace";
@@ -249,6 +249,8 @@ const ProgramsTab = ({ lang, onLoginRequest }: Props) => {
       }
     };
     load();
+    const unsub = subscribePlanChanged(() => { void load(); });
+    return () => { unsub(); };
   }, [user]);
 
   // Keep restDays valid: never include longRunDay, never exceed 7 - daysPerWeek

@@ -181,6 +181,30 @@ function extractHrSamples(a: any): Array<{ t: number; bpm: number }> {
   return out.length > 7200 ? out.slice(0, 7200) : out;
 }
 
+function extractCadenceSamples(a: any): Array<{ t: number; rpm: number }> {
+  const candidates = [
+    a?.movement_data?.cadence_samples,
+    a?.cadence_data?.detailed?.cadence_samples,
+    a?.cadence_data?.cadence_samples,
+  ];
+  const samples = candidates.find((s) => Array.isArray(s) && s.length > 0);
+  if (!Array.isArray(samples)) return [];
+  const startMs = a?.metadata?.start_time ? new Date(a.metadata.start_time).getTime() : NaN;
+  const bySecond = new Map<number, number>();
+  for (const s of samples as any[]) {
+    const rpm = toFiniteNumber(s?.cadence_rpm ?? s?.cadence ?? s?.value);
+    if (rpm == null || rpm <= 0) continue;
+    let t: number | null = toFiniteNumber(s?.timer_duration_seconds ?? s?.timer_seconds ?? s?.elapsed_seconds);
+    if (t == null && s?.timestamp && Number.isFinite(startMs)) {
+      t = (new Date(s.timestamp).getTime() - startMs) / 1000;
+    }
+    if (t == null || !Number.isFinite(t) || t < 0) continue;
+    bySecond.set(Math.floor(t), Math.round(rpm * 10) / 10);
+  }
+  const out = Array.from(bySecond.entries()).sort((a, b) => a[0] - b[0]).map(([t, rpm]) => ({ t, rpm }));
+  return out.length > 7200 ? out.slice(0, 7200) : out;
+}
+
 function looksLikeHrSample(s: any): boolean {
   return !!s && typeof s === "object" && toFiniteNumber(s?.bpm ?? s?.heart_rate_bpm ?? s?.heart_rate ?? s?.value) != null
     && (s?.timestamp || toFiniteNumber(s?.timer_duration_seconds ?? s?.timer_seconds ?? s?.elapsed_seconds) != null);
@@ -252,9 +276,10 @@ async function upsertTerraActivity(admin: any, c: any, a: any) {
   const laps = hrSamples.length > 0 && rawLaps.length > 0
     ? recomputeLapAvgHr(rawLaps, hrSamples, meta?.start_time ?? null)
     : rawLaps;
+  const cadenceSamples = extractCadenceSamples(a);
   const { data: existing } = await admin
     .from("terra_activities")
-    .select("summary_polyline, laps, has_gps, hr_samples")
+    .select("summary_polyline, laps, has_gps, hr_samples, cadence_samples")
     .eq("user_id", c.user_id)
     .eq("terra_activity_id", aid)
     .maybeSingle();
@@ -263,6 +288,9 @@ async function upsertTerraActivity(admin: any, c: any, a: any) {
   const finalHrSamples = hrSamples.length > 0
     ? hrSamples
     : (Array.isArray(existing?.hr_samples) ? existing!.hr_samples : null);
+  const finalCadenceSamples = cadenceSamples.length > 0
+    ? cadenceSamples
+    : (Array.isArray((existing as any)?.cadence_samples) ? (existing as any).cadence_samples : null);
   await admin.from("terra_activities").upsert({
     user_id: c.user_id,
     provider: c.provider,
@@ -290,6 +318,7 @@ async function upsertTerraActivity(admin: any, c: any, a: any) {
     has_gps: !!finalPolyline || !!existing?.has_gps,
     laps: finalLaps,
     hr_samples: finalHrSamples,
+    cadence_samples: finalCadenceSamples,
     raw_json: null,
   }, { onConflict: "user_id,terra_activity_id" });
   await deleteMatchingGarminDuplicate(admin, c.user_id, meta?.start_time ?? null, distanceMeters);

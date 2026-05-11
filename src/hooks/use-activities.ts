@@ -39,6 +39,8 @@ export interface StravaActivity {
   hr_samples?: Array<{ t: number; bpm: number }> | null;
   distance_samples?: Array<{ t: number; d: number }> | null;
   elevation_samples?: Array<{ t: number; e: number }> | null;
+  cadence_samples?: Array<{ t: number; rpm: number }> | null;
+  avg_cadence?: number | null;
   provenance?: "strava" | "apple_health" | "garmin" | "terra";
 }
 
@@ -139,6 +141,7 @@ async function fetchGarminActivities(userId: string): Promise<StravaActivity[]> 
       weather: a.weather ?? null,
       map_screenshot_url: a.raw_json?.map_screenshot_url ?? null,
       garmin_training_load: a.training_load ?? null,
+      avg_cadence: a.avg_cadence ?? null,
       provenance: "garmin" as const,
     };
   });
@@ -265,6 +268,8 @@ async function fetchTerraActivities(userId: string): Promise<StravaActivity[]> {
       hr_samples: a.hr_samples || null,
       distance_samples: a.distance_samples || null,
       elevation_samples: (a as any).elevation_samples || null,
+      cadence_samples: (a as any).cadence_samples || null,
+      avg_cadence: a.avg_cadence ?? null,
       garmin_training_load: a.training_load ?? null,
       provenance: "terra" as const,
     } as StravaActivity;

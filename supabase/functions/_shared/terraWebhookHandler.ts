@@ -435,6 +435,30 @@ function extractElevationSamplesForChart(a: any): Array<{ t: number; e: number }
   return out.length > 7200 ? out.slice(0, 7200) : out;
 }
 
+function extractCadenceSamples(a: any): Array<{ t: number; rpm: number }> {
+  const candidates = [
+    a?.movement_data?.cadence_samples,
+    a?.cadence_data?.detailed?.cadence_samples,
+    a?.cadence_data?.cadence_samples,
+  ];
+  const samples = candidates.find((s) => Array.isArray(s) && s.length > 0);
+  if (!Array.isArray(samples)) return [];
+  const startMs = a?.metadata?.start_time ? new Date(a.metadata.start_time).getTime() : NaN;
+  const bySecond = new Map<number, number>();
+  for (const s of samples as any[]) {
+    const rpm = toFiniteNumber(s?.cadence_rpm ?? s?.cadence ?? s?.value);
+    if (rpm == null || rpm <= 0) continue;
+    let t: number | null = toFiniteNumber(s?.timer_duration_seconds ?? s?.timer_seconds ?? s?.elapsed_seconds);
+    if (t == null && s?.timestamp && Number.isFinite(startMs)) {
+      t = (new Date(s.timestamp).getTime() - startMs) / 1000;
+    }
+    if (t == null || !Number.isFinite(t) || t < 0) continue;
+    bySecond.set(Math.floor(t), Math.round(rpm * 10) / 10);
+  }
+  const out = Array.from(bySecond.entries()).sort((a, b) => a[0] - b[0]).map(([t, rpm]) => ({ t, rpm }));
+  return out.length > 7200 ? out.slice(0, 7200) : out;
+}
+
 function recomputeLapAvgHr(laps: any[], samples: Array<{ t: number; bpm: number }>, activityStartTime: string | null): any[] {
   if (!samples.length || !laps.length) return laps;
   const startMs = activityStartTime ? new Date(activityStartTime).getTime() : NaN;
@@ -710,13 +734,14 @@ async function processWebhook(
           const hrSamples = extractHrSamples(a);
           const distanceSamples = extractDistanceSamples(a);
           const elevationSamples = extractElevationSamplesForChart(a);
+          const cadenceSamples = extractCadenceSamples(a);
           const laps = hrSamples.length > 0 && rawLaps.length > 0
             ? recomputeLapAvgHr(rawLaps, hrSamples, meta?.start_time ?? null)
             : rawLaps;
           // Read existing row so we don't overwrite good polyline/laps/hr_samples with empty
           const { data: existing } = await supa
             .from("terra_activities")
-            .select("summary_polyline, laps, has_gps, hr_samples, distance_samples, elevation_samples")
+            .select("summary_polyline, laps, has_gps, hr_samples, distance_samples, elevation_samples, cadence_samples")
             .eq("user_id", appUserId)
             .eq("terra_activity_id", aid)
             .maybeSingle();
@@ -735,7 +760,10 @@ async function processWebhook(
           const finalElevationSamples = elevationSamples.length > 0
             ? elevationSamples
             : (Array.isArray((existing as any)?.elevation_samples) ? (existing as any).elevation_samples : null);
-          console.log(`[terra-webhook] activity upsert ${aid} hr_samples=${hrSamples.length} dist_samples=${distanceSamples.length} elev_samples=${elevationSamples.length} laps=${rawLaps.length}`);
+          const finalCadenceSamples = cadenceSamples.length > 0
+            ? cadenceSamples
+            : (Array.isArray((existing as any)?.cadence_samples) ? (existing as any).cadence_samples : null);
+          console.log(`[terra-webhook] activity upsert ${aid} hr_samples=${hrSamples.length} dist_samples=${distanceSamples.length} elev_samples=${elevationSamples.length} cad_samples=${cadenceSamples.length} laps=${rawLaps.length}`);
           await supa.from("terra_activities").upsert({
             user_id: appUserId,
             provider,
@@ -767,6 +795,7 @@ async function processWebhook(
             hr_samples: finalHrSamples,
             distance_samples: finalDistanceSamples,
             elevation_samples: finalElevationSamples,
+            cadence_samples: finalCadenceSamples,
             raw_json: null,
           }, { onConflict: "user_id,terra_activity_id" });
           await deleteMatchingGarminDuplicate(appUserId, meta?.start_time ?? null, distanceMeters);

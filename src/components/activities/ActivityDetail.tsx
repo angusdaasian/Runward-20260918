@@ -54,6 +54,8 @@ interface StravaActivity {
   hr_samples?: Array<{ t: number; bpm: number }> | null;
   distance_samples?: Array<{ t: number; d: number }> | null;
   elevation_samples?: Array<{ t: number; e: number }> | null;
+  cadence_samples?: Array<{ t: number; rpm: number }> | null;
+  avg_cadence?: number | null;
   map_screenshot_url?: string | null;
   provenance?: "strava" | "apple_health" | "garmin" | "terra";
 }
@@ -143,7 +145,7 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
   const [streams, setStreams] = useState<any[]>([]);
   const [splits, setSplits] = useState<Split[] | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeChart, setActiveChart] = useState<"pace" | "heartrate" | "altitude">("pace");
+  const [activeChart, setActiveChart] = useState<"pace" | "heartrate" | "altitude" | "cadence">("pace");
   const [deleting, setDeleting] = useState(false);
   const [activityName, setActivityName] = useState(activity.name);
   const [editingName, setEditingName] = useState(false);
@@ -519,10 +521,11 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
     const hrSamples = Array.isArray(activity.hr_samples) ? activity.hr_samples : null;
     const distSamples = Array.isArray(activity.distance_samples) ? activity.distance_samples : null;
     const elevSamples = Array.isArray(activity.elevation_samples) ? activity.elevation_samples : null;
-    if ((hrSamples && hrSamples.length > 10) || (distSamples && distSamples.length > 10) || (elevSamples && elevSamples.length > 10)) {
+    const cadSamples = Array.isArray(activity.cadence_samples) ? activity.cadence_samples : null;
+    if ((hrSamples && hrSamples.length > 10) || (distSamples && distSamples.length > 10) || (elevSamples && elevSamples.length > 10) || (cadSamples && cadSamples.length > 10)) {
       const totalDist = activity.distance || 0;
       // Build a unified per-second view keyed by t.
-      const tMap = new Map<number, { heartrate?: number; distM?: number; altitude?: number }>();
+      const tMap = new Map<number, { heartrate?: number; distM?: number; altitude?: number; cadence?: number }>();
       if (hrSamples) {
         for (const s of hrSamples) {
           tMap.set(s.t, { ...(tMap.get(s.t) || {}), heartrate: s.bpm });
@@ -536,6 +539,11 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
       if (elevSamples) {
         for (const s of elevSamples) {
           tMap.set(s.t, { ...(tMap.get(s.t) || {}), altitude: s.e });
+        }
+      }
+      if (cadSamples) {
+        for (const s of cadSamples) {
+          tMap.set(s.t, { ...(tMap.get(s.t) || {}), cadence: s.rpm });
         }
       }
       const ordered = Array.from(tMap.entries()).sort((a, b) => a[0] - b[0]);
@@ -553,6 +561,7 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
         const point: any = { distance_km: km.toFixed(2), time: t };
         if (v.heartrate) point.heartrate = v.heartrate;
         if (v.altitude != null) point.altitude = v.altitude;
+        if (v.cadence != null && v.cadence > 0) point.cadence = v.cadence;
         // Pace from distance window
         if (distSamples && v.distM != null) {
           let j = i;

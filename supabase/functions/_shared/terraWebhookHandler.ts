@@ -734,13 +734,14 @@ async function processWebhook(
           const hrSamples = extractHrSamples(a);
           const distanceSamples = extractDistanceSamples(a);
           const elevationSamples = extractElevationSamplesForChart(a);
+          const cadenceSamples = extractCadenceSamples(a);
           const laps = hrSamples.length > 0 && rawLaps.length > 0
             ? recomputeLapAvgHr(rawLaps, hrSamples, meta?.start_time ?? null)
             : rawLaps;
           // Read existing row so we don't overwrite good polyline/laps/hr_samples with empty
           const { data: existing } = await supa
             .from("terra_activities")
-            .select("summary_polyline, laps, has_gps, hr_samples, distance_samples, elevation_samples")
+            .select("summary_polyline, laps, has_gps, hr_samples, distance_samples, elevation_samples, cadence_samples")
             .eq("user_id", appUserId)
             .eq("terra_activity_id", aid)
             .maybeSingle();
@@ -759,7 +760,10 @@ async function processWebhook(
           const finalElevationSamples = elevationSamples.length > 0
             ? elevationSamples
             : (Array.isArray((existing as any)?.elevation_samples) ? (existing as any).elevation_samples : null);
-          console.log(`[terra-webhook] activity upsert ${aid} hr_samples=${hrSamples.length} dist_samples=${distanceSamples.length} elev_samples=${elevationSamples.length} laps=${rawLaps.length}`);
+          const finalCadenceSamples = cadenceSamples.length > 0
+            ? cadenceSamples
+            : (Array.isArray((existing as any)?.cadence_samples) ? (existing as any).cadence_samples : null);
+          console.log(`[terra-webhook] activity upsert ${aid} hr_samples=${hrSamples.length} dist_samples=${distanceSamples.length} elev_samples=${elevationSamples.length} cad_samples=${cadenceSamples.length} laps=${rawLaps.length}`);
           await supa.from("terra_activities").upsert({
             user_id: appUserId,
             provider,
@@ -791,6 +795,7 @@ async function processWebhook(
             hr_samples: finalHrSamples,
             distance_samples: finalDistanceSamples,
             elevation_samples: finalElevationSamples,
+            cadence_samples: finalCadenceSamples,
             raw_json: null,
           }, { onConflict: "user_id,terra_activity_id" });
           await deleteMatchingGarminDuplicate(appUserId, meta?.start_time ?? null, distanceMeters);

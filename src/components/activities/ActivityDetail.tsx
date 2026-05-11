@@ -1055,7 +1055,7 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
                   </defs>
                   <Area type="monotone" dataKey="heartrate" stroke="#EF4444" fill="url(#hrGradient)" strokeWidth={2.5} dot={false} />
                 </AreaChart>
-              ) : (
+              ) : activeChart === "altitude" ? (
                 <AreaChart data={chartData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
                   <XAxis dataKey="distance_km" tick={{ fontSize: 10, fill: "#64748B" }} tickFormatter={(v) => `${Math.round(v)}`} />
@@ -1071,6 +1071,16 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
                   </defs>
                   <Area type="monotone" dataKey="altitude" stroke="#0EA5E9" fill="url(#altGradient)" strokeWidth={2.5} dot={false} />
                 </AreaChart>
+              ) : (
+                <LineChart data={chartData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
+                  <XAxis dataKey="distance_km" tick={{ fontSize: 10, fill: "#64748B" }} tickFormatter={(v) => `${Math.round(v)}`} />
+                  <YAxis tick={{ fontSize: 10, fill: "#64748B" }} domain={['auto', 'auto']} width={42}
+                    label={{ value: "spm", angle: -90, position: "insideLeft", fontSize: 10, fill: "#64748B" }} />
+                  <Tooltip contentStyle={{ backgroundColor: "#FFFFFF", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 12, color: "#0F172A" }}
+                    formatter={(value: number) => [`${Math.round(value)} spm`, lang === "zh" ? "步頻" : "Cadence"]} labelFormatter={(v) => `${v} km`} />
+                  <Line type="monotone" dataKey="cadence" stroke="#8B5CF6" strokeWidth={2.5} dot={false} connectNulls />
+                </LineChart>
               )}
             </ResponsiveContainer>
           </div>

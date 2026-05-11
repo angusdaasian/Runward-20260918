@@ -1437,8 +1437,18 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
       </div>
       )}
 
-      {/* Suggested Next Workout */}
-      {isRunningActivity && isPremium && aiNextWorkout && !aiLoading && (
+      {/* Plan-aware next workout — shown when user is on an active training plan. */}
+      {isRunningActivity && (
+        <PlanNextWorkoutCard
+          lang={lang}
+          activityDate={activity.start_date}
+          isPremium={isPremium}
+          onResolved={setPlanNextShown}
+        />
+      )}
+
+      {/* AI Suggested Next Workout — hidden when a plan-driven next workout is shown. */}
+      {isRunningActivity && isPremium && aiNextWorkout && !aiLoading && !planNextShown && (
         <div className="bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/30 rounded-xl p-4 mt-4">
           <div className="flex items-center gap-2 mb-3">
             <Footprints size={16} className="text-primary" />

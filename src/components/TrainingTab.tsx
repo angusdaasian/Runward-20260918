@@ -2002,41 +2002,46 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
         </DialogContent>
       </Dialog>
 
-      {/* Custom Edit Workout Dialog */}
-      <Dialog open={customEditingDayIdx !== null} onOpenChange={(open) => { if (!open) setCustomEditingDayIdx(null); }}>
-        <DialogContent className="sm:max-w-sm">
-          <DialogHeader><DialogTitle>{lang === "zh" ? "編輯訓練" : "Edit Workout"}</DialogTitle></DialogHeader>
-          {customEditingDayIdx !== null && customPlan[customWeekIdx]?.days[customEditingDayIdx] && (() => {
-            const day = customPlan[customWeekIdx].days[customEditingDayIdx];
-            return (
-              <div className="space-y-4">
-                <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full" style={{ backgroundColor: day.color }} /><span className="font-medium text-foreground">{localizeTitle(day.type, lang)}</span></div>
-                <div><label className="text-sm font-medium text-foreground mb-1 block">{lang === "zh" ? "距離 (公里)" : "Distance (km)"}</label><Input type="number" min="0.5" step="0.5" value={customEditDistance} onChange={(e) => setCustomEditDistance(e.target.value)} className="w-full" /></div>
-                <div><label className="text-sm font-medium text-foreground mb-1 block">{lang === "zh" ? "配速 (例: 5:30/km)" : "Pace (e.g. 5:30/km)"}</label><Input type="text" placeholder="5:30/km" value={customEditPace} onChange={(e) => setCustomEditPace(e.target.value)} className="w-full" /></div>
-                <div><label className="text-sm font-medium text-foreground mb-1 block">{lang === "zh" ? "描述" : "Description"}</label><textarea className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm min-h-[60px] resize-y" value={customEditDescription} onChange={(e) => setCustomEditDescription(e.target.value)} /></div>
-                <Button className="w-full" onClick={() => {
-                  if (customEditingDayIdx === null) return;
-                  const updatedPlan = [...customPlan]; const week = { ...updatedPlan[customWeekIdx] }; const days = [...week.days];
-                  days[customEditingDayIdx] = { ...days[customEditingDayIdx], distance_km: customEditDistance ? Number(customEditDistance) : days[customEditingDayIdx].distance_km, pace: customEditPace || days[customEditingDayIdx].pace, description: customEditDescription };
-                  week.days = days; updatedPlan[customWeekIdx] = week; setCustomPlan(updatedPlan);
-                  if (user && customExistingPlan) supabase.from("training_plans" as any).update({ plan_data: updatedPlan } as any).eq("id", customExistingPlan.id).then(() => { notifyPlanChanged(); });
-                  setCustomEditingDayIdx(null);
-                  toast({ title: lang === "zh" ? "已更新訓練" : "Workout Updated" });
-                }}>{lang === "zh" ? "儲存變更" : "Save Changes"}</Button>
-                <Button variant="destructive" className="w-full" onClick={() => {
-                  if (customEditingDayIdx === null) return;
-                  const updatedPlan = [...customPlan]; const week = { ...updatedPlan[customWeekIdx] }; const days = [...week.days];
-                  days[customEditingDayIdx] = { ...days[customEditingDayIdx], type: "Rest", title: lang === "zh" ? "休息" : "Rest Day", description: "", distance_km: null, pace: null, color: "#607D8B" };
-                  week.days = days; updatedPlan[customWeekIdx] = week; setCustomPlan(updatedPlan);
-                  if (user && customExistingPlan) supabase.from("training_plans" as any).update({ plan_data: updatedPlan } as any).eq("id", customExistingPlan.id).then(() => { notifyPlanChanged(); });
-                  setCustomEditingDayIdx(null);
-                  toast({ title: lang === "zh" ? "已刪除訓練" : "Workout Deleted" });
-                }}>{lang === "zh" ? "刪除訓練" : "Delete Workout"}</Button>
-              </div>
-            );
-          })()}
-        </DialogContent>
-      </Dialog>
+      {/* Custom Edit Workout Dialog (validated) */}
+      {customEditingDayIdx !== null && customPlan[customWeekIdx]?.days[customEditingDayIdx] && (
+        <EditWorkoutDialog
+          open={customEditingDayIdx !== null}
+          onOpenChange={(o) => { if (!o) setCustomEditingDayIdx(null); }}
+          lang={lang}
+          workout={{
+            type: customPlan[customWeekIdx].days[customEditingDayIdx].type,
+            title: localizeTitle(customPlan[customWeekIdx].days[customEditingDayIdx].type, lang),
+            distance_km: customPlan[customWeekIdx].days[customEditingDayIdx].distance_km ?? null,
+            pace: customPlan[customWeekIdx].days[customEditingDayIdx].pace ?? "",
+            description: customPlan[customWeekIdx].days[customEditingDayIdx].description ?? "",
+            color: customPlan[customWeekIdx].days[customEditingDayIdx].color,
+          }}
+          planContext={customExistingPlan ? `Custom plan, week ${customWeekIdx + 1}` : null}
+          onSave={async (next) => {
+            if (customEditingDayIdx === null) return;
+            const updatedPlan = [...customPlan]; const week = { ...updatedPlan[customWeekIdx] }; const days = [...week.days];
+            days[customEditingDayIdx] = {
+              ...days[customEditingDayIdx],
+              distance_km: next.distance_km ?? days[customEditingDayIdx].distance_km,
+              pace: next.pace || days[customEditingDayIdx].pace,
+              description: next.description ?? days[customEditingDayIdx].description,
+            };
+            week.days = days; updatedPlan[customWeekIdx] = week; setCustomPlan(updatedPlan);
+            if (user && customExistingPlan) await supabase.from("training_plans" as any).update({ plan_data: updatedPlan } as any).eq("id", customExistingPlan.id);
+            notifyPlanChanged();
+            toast({ title: lang === "zh" ? "已更新訓練" : "Workout Updated" });
+          }}
+          onDelete={async () => {
+            if (customEditingDayIdx === null) return;
+            const updatedPlan = [...customPlan]; const week = { ...updatedPlan[customWeekIdx] }; const days = [...week.days];
+            days[customEditingDayIdx] = { ...days[customEditingDayIdx], type: "Rest", title: lang === "zh" ? "休息" : "Rest Day", description: "", distance_km: null, pace: null, color: "#607D8B" };
+            week.days = days; updatedPlan[customWeekIdx] = week; setCustomPlan(updatedPlan);
+            if (user && customExistingPlan) await supabase.from("training_plans" as any).update({ plan_data: updatedPlan } as any).eq("id", customExistingPlan.id);
+            notifyPlanChanged();
+            toast({ title: lang === "zh" ? "已刪除訓練" : "Workout Deleted" });
+          }}
+        />
+      )}
 
       <WeeklyReviewModal
         open={showWeeklyReview}

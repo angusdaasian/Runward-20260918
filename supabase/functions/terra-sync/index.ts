@@ -276,9 +276,10 @@ async function upsertTerraActivity(admin: any, c: any, a: any) {
   const laps = hrSamples.length > 0 && rawLaps.length > 0
     ? recomputeLapAvgHr(rawLaps, hrSamples, meta?.start_time ?? null)
     : rawLaps;
+  const cadenceSamples = extractCadenceSamples(a);
   const { data: existing } = await admin
     .from("terra_activities")
-    .select("summary_polyline, laps, has_gps, hr_samples")
+    .select("summary_polyline, laps, has_gps, hr_samples, cadence_samples")
     .eq("user_id", c.user_id)
     .eq("terra_activity_id", aid)
     .maybeSingle();
@@ -287,6 +288,9 @@ async function upsertTerraActivity(admin: any, c: any, a: any) {
   const finalHrSamples = hrSamples.length > 0
     ? hrSamples
     : (Array.isArray(existing?.hr_samples) ? existing!.hr_samples : null);
+  const finalCadenceSamples = cadenceSamples.length > 0
+    ? cadenceSamples
+    : (Array.isArray((existing as any)?.cadence_samples) ? (existing as any).cadence_samples : null);
   await admin.from("terra_activities").upsert({
     user_id: c.user_id,
     provider: c.provider,
@@ -314,6 +318,7 @@ async function upsertTerraActivity(admin: any, c: any, a: any) {
     has_gps: !!finalPolyline || !!existing?.has_gps,
     laps: finalLaps,
     hr_samples: finalHrSamples,
+    cadence_samples: finalCadenceSamples,
     raw_json: null,
   }, { onConflict: "user_id,terra_activity_id" });
   await deleteMatchingGarminDuplicate(admin, c.user_id, meta?.start_time ?? null, distanceMeters);

@@ -268,6 +268,7 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
         const hrStream = streams.find((s: any) => s.type === 'heartrate');
         const distStream = streams.find((s: any) => s.type === 'distance');
         const altStream = streams.find((s: any) => s.type === 'altitude');
+        const cadStream = streams.find((s: any) => s.type === 'cadence');
         if (timeStream && Array.isArray(timeStream.data)) {
           const times: number[] = timeStream.data;
           if (!bodyPayload.hrSamples && hrStream && Array.isArray(hrStream.data)) {
@@ -278,6 +279,10 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
           }
           if (!bodyPayload.elevationSamples && altStream && Array.isArray(altStream.data)) {
             bodyPayload.elevationSamples = times.map((t, i) => ({ t, e: altStream.data[i] })).filter(s => s.e != null);
+          }
+          if (!bodyPayload.cadenceSamples && cadStream && Array.isArray(cadStream.data)) {
+            // Strava cadence is one-leg rpm; double for steps-per-minute equivalent for analysis context
+            bodyPayload.cadenceSamples = times.map((t, i) => ({ t, rpm: cadStream.data[i] != null ? cadStream.data[i] * 2 : null })).filter(s => s.rpm != null);
           }
         }
       }

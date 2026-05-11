@@ -561,6 +561,7 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
         const point: any = { distance_km: km.toFixed(2), time: t };
         if (v.heartrate) point.heartrate = v.heartrate;
         if (v.altitude != null) point.altitude = v.altitude;
+        if (v.cadence != null && v.cadence > 0) point.cadence = v.cadence;
         // Pace from distance window
         if (distSamples && v.distM != null) {
           let j = i;

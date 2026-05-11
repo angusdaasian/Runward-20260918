@@ -853,6 +853,7 @@ You MUST:
 - **類型**：（恢復跑 / 輕鬆有氧 / 節奏跑 / 間歇 / 休息）
 - **距離**：X 公里
 - **配速**：X:XX /km
+- **目標心率**：XXX–XXX bpm（根據今天活動的平均/最大心率與建議強度推算；若無法推算就略過此項）
 - **時長**：約 X 分鐘
 - **理由**：簡短說明為什麼這樣安排（1-2 句）
 
@@ -880,6 +881,7 @@ Based on today's performance, the runner's subjective feel, training score, and 
 - **Type**: (Recovery run / Easy aerobic / Tempo / Intervals / Rest)
 - **Distance**: X km
 - **Pace**: X:XX /km
+- **Target HR**: XXX–XXX bpm (derive from today's average/max HR and the prescribed intensity; omit this line only if HR data is unavailable)
 - **Duration**: ~X minutes
 - **Why**: brief reasoning (1-2 sentences)
 

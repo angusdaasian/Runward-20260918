@@ -32,6 +32,7 @@ import { loadForActivity, isRunning } from "@/lib/trainingLoad";
 import { calculateRunningScore } from "@/lib/vdot";
 import { computeZonePct, estimateMaxHr, estimateRestingHr } from "@/lib/hrZones";
 import HrZoneBars from "./HrZoneBars";
+import PlanNextWorkoutCard from "./PlanNextWorkoutCard";
 
 interface StravaActivity {
   id: string;

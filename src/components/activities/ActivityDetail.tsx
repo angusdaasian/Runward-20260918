@@ -969,18 +969,29 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
             <StatBox icon={Heart} label={lang === "zh" ? "平均心率" : "Avg HR"} value={activity.average_heartrate ? Math.round(activity.average_heartrate).toString() : "--"} unit="bpm" iconColor="text-destructive" />
             <StatBox icon={Mountain} label={lang === "zh" ? "爬升" : "Elevation"} value={Math.round(activity.total_elevation_gain).toString()} unit="m" />
           </div>
-          {isPremium && (
+          {(isPremium || (activity.avg_cadence && activity.avg_cadence > 0)) && (
             <div className="grid grid-cols-3 gap-2 mb-4">
-              <StatBox
-                icon={Flame}
-                iconColor="text-orange-500"
-                label={lang === "zh" ? "訓練負荷" : "Training Load"}
-                value={(() => {
-                  const l = loadForActivity({ start_date: activity.start_date, moving_time: activity.moving_time, average_heartrate: activity.average_heartrate, max_heartrate: activity.max_heartrate, sport_type: activity.sport_type, garmin_training_load: (activity as any).training_load ?? null });
-                  return l != null ? l.toString() : "--";
-                })()}
-                unit="TRIMP"
-              />
+              {isPremium && (
+                <StatBox
+                  icon={Flame}
+                  iconColor="text-orange-500"
+                  label={lang === "zh" ? "訓練負荷" : "Training Load"}
+                  value={(() => {
+                    const l = loadForActivity({ start_date: activity.start_date, moving_time: activity.moving_time, average_heartrate: activity.average_heartrate, max_heartrate: activity.max_heartrate, sport_type: activity.sport_type, garmin_training_load: (activity as any).training_load ?? null });
+                    return l != null ? l.toString() : "--";
+                  })()}
+                  unit="TRIMP"
+                />
+              )}
+              {activity.avg_cadence != null && activity.avg_cadence > 0 && (
+                <StatBox
+                  icon={Footprints}
+                  iconColor="text-violet-500"
+                  label={lang === "zh" ? "平均步頻" : "Avg Cadence"}
+                  value={Math.round(activity.avg_cadence).toString()}
+                  unit="spm"
+                />
+              )}
             </div>
           )}
           {/* Map below stats grid: prefer encoded polyline, fall back to Firecrawl screenshot for manual imports */}

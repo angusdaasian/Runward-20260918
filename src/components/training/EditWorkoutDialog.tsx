@@ -96,27 +96,32 @@ const EditWorkoutDialog = ({
       if (error) throw error;
       const v = (data as any)?.verdict as Verdict | undefined;
       const fb = (data as any)?.feedback as string | undefined;
-      setVerdict(v ?? "ok");
+      const newDesc = (data as any)?.updatedDescription as string | undefined;
+      if (newDesc && newDesc.trim()) {
+        setDescription(newDesc.trim());
+      }
+      setVerdict(v ?? "caution");
       setFeedback(fb ?? "");
       if (v === "ok") {
-        // Auto-save on green light
-        await persist();
+        // Auto-save on green light, using AI-rewritten description if provided
+        await persist(newDesc?.trim() || undefined);
       } else {
         // caution / risky → require explicit second click
         setNeedsConfirm(true);
       }
     } catch (e) {
       console.error("[EditWorkoutDialog] validate error:", e);
-      // Fallback: save without blocking on AI failure
-      await persist();
+      toast.error(isZh ? "AI 教練檢查失敗，請再試一次" : "Coach check failed, please try again");
     } finally {
       setValidating(false);
     }
   };
 
-  const persist = async () => {
+  const persist = async (overrideDescription?: string) => {
     try {
-      await onSave(buildEdited());
+      const next = buildEdited();
+      if (overrideDescription) next.description = overrideDescription;
+      await onSave(next);
       onOpenChange(false);
     } catch (e) {
       console.error("[EditWorkoutDialog] save error:", e);

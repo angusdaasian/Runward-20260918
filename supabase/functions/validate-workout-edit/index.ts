@@ -163,9 +163,9 @@ Rules:
 - risky: clear injury/overtraining risk (rest day → long run or hard intervals, easy → near race pace, distance jump ≥2x, pace much faster than recent runs, unrealistic pace like sub-3:00/km).
 - ALWAYS rewrite updatedDescription so the workout description matches the new distance and pace.`);
 
-    const vRes = await callLovableAI({
-      apiKey: LOVABLE_API_KEY,
-      model: "google/gemini-3.1-flash-preview",
+    const vRes = await callVertex({
+      apiKey: VERTEX_API_KEY,
+      model: "gemini-3.1-flash-lite-preview",
       systemPrompt,
       userPrompt,
       jsonMode: true,
@@ -178,7 +178,7 @@ Rules:
       return json({ error: "AI gateway error" }, 500);
     }
     const vData = await vRes.json();
-    const text = vData?.choices?.[0]?.message?.content || "";
+    const text = vData?.candidates?.[0]?.content?.parts?.map((p: { text?: string }) => p.text || "").join("") || "";
     let parsed: { verdict: string; feedback: string; updatedDescription?: string } | null = null;
     try {
       parsed = JSON.parse(text);

@@ -528,7 +528,27 @@ ${plannedWorkout ? `- ${plannedWorkout}` : ""}`;
       statsText += `\n  → Use this distribution to characterise the workout's intensity profile (e.g., mostly Z2 = aerobic base run; heavy Z4-Z5 = quality session).`;
     }
 
-    // --- Lap analysis (interval-aware) — normalises field names across Garmin / Terra / Strava ---
+    // --- Cadence (steps per minute) — running form indicator ---
+    {
+      const cadArr: Array<{ t: number; rpm: number }> = Array.isArray(cadenceSamples) ? cadenceSamples : [];
+      const cadVals = cadArr.map((s) => Number(s?.rpm)).filter((v) => Number.isFinite(v) && v > 0);
+      let avgCad: number | null = typeof avgCadence === "number" && avgCadence > 0 ? avgCadence : null;
+      if (avgCad == null && cadVals.length) {
+        avgCad = cadVals.reduce((a, b) => a + b, 0) / cadVals.length;
+      }
+      if (avgCad != null) {
+        statsText += `\n\n👣 Cadence (steps per minute):`;
+        statsText += `\n  Average: ${Math.round(avgCad)} spm`;
+        if (cadVals.length > 30) {
+          const sorted = [...cadVals].sort((a, b) => a - b);
+          const min = sorted[Math.floor(sorted.length * 0.05)];
+          const max = sorted[Math.floor(sorted.length * 0.95)];
+          statsText += ` | 5–95% range: ${Math.round(min)}–${Math.round(max)} spm (${cadVals.length} samples)`;
+        }
+        statsText += `\n  → Cadence is a key running-form metric. Typical recreational range 160–175 spm; efficient runners often hover 175–185+. Comment on whether cadence is in a healthy range, and whether it suggests over-striding (low cadence) or efficient turnover (high cadence). If it varies widely between fast/slow segments, note that too.`;
+      }
+    }
+
     const garminLapsArr = asArray<any>(garminLaps);
     if (garminLapsArr.length > 0) {
       const normAll = garminLapsArr.map((lap: any, idx: number) => {

@@ -277,6 +277,15 @@ async function upsertTerraActivity(admin: any, c: any, a: any) {
     max_hr: hr?.max_hr_bpm ? Math.round(hr.max_hr_bpm) : null,
     elevation_gain: dist?.elevation?.gain_actual_meters ?? null,
     average_speed: a?.movement_data?.avg_speed_meters_per_second ?? null,
+    avg_cadence: (() => {
+      const c = a?.cadence_data?.summary?.avg_cadence
+        ?? a?.cadence_data?.summary?.avg_cadence_rpm
+        ?? a?.movement_data?.avg_cadence
+        ?? a?.movement_data?.avg_cadence_rpm
+        ?? null;
+      const n = typeof c === "number" ? c : (c != null ? Number(c) : NaN);
+      return Number.isFinite(n) && n > 0 ? n : null;
+    })(),
     summary_polyline: finalPolyline,
     has_gps: !!finalPolyline || !!existing?.has_gps,
     laps: finalLaps,

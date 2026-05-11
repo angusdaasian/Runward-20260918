@@ -155,17 +155,19 @@ ${recent.slice(0, 10).map((r) => `- ${r}`).join("\n") || "(no runs in last 7 day
 Output JSON ONLY:
 {
   "verdict": "ok" | "caution" | "risky",
-  "feedback": "1-2 short coach sentences in plain English"
+  "feedback": "1-2 short coach sentences in plain English",
+  "updatedDescription": "rewritten workout description reflecting the new distance/pace, 1-2 sentences"
 }
 
 Rules:
 - ok: reasonable tweaks (distance ±20%, pace ±15 sec/km, rest day → easy short run).
 - caution: bigger but acceptable change (e.g. rest day → moderate run, easy run lengthened by 50%). Add a heads-up.
-- risky: clear injury/overtraining risk (rest day → long run or hard intervals, easy → near race pace, distance jump ≥2x, pace much faster than recent runs).`);
+- risky: clear injury/overtraining risk (rest day → long run or hard intervals, easy → near race pace, distance jump ≥2x, pace much faster than recent runs, unrealistic pace like sub-3:00/km).
+- ALWAYS rewrite updatedDescription so the workout description matches the new distance and pace.`);
 
-    const vRes = await callVertex({
-      apiKey: VERTEX_API_KEY,
-      model: "gemini-3.1-flash-preview",
+    const vRes = await callLovableAI({
+      apiKey: LOVABLE_API_KEY,
+      model: "google/gemini-3.1-flash-preview",
       systemPrompt,
       userPrompt,
       jsonMode: true,
@@ -178,24 +180,24 @@ Rules:
       return json({ error: "AI gateway error" }, 500);
     }
     const vData = await vRes.json();
-    const text = vData?.candidates?.[0]?.content?.parts?.map((p: any) => p.text || "").join("") || "";
-    let parsed: { verdict: string; feedback: string } | null = null;
+    const text = vData?.choices?.[0]?.message?.content || "";
+    let parsed: { verdict: string; feedback: string; updatedDescription?: string } | null = null;
     try {
       parsed = JSON.parse(text);
     } catch {
-      // try to extract JSON object
       const m = text.match(/\{[\s\S]*\}/);
       if (m) {
         try { parsed = JSON.parse(m[0]); } catch { /* ignore */ }
       }
     }
     if (!parsed || !parsed.verdict) {
-      return json({ verdict: "ok", feedback: lang === "zh" ? "已記錄變更。" : "Change saved." });
+      return json({ error: "AI returned invalid response" }, 500);
     }
-    const verdict = ["ok", "caution", "risky"].includes(parsed.verdict) ? parsed.verdict : "ok";
+    const verdict = ["ok", "caution", "risky"].includes(parsed.verdict) ? parsed.verdict : "caution";
     return json({
       verdict,
       feedback: parsed.feedback || (lang === "zh" ? "已記錄變更。" : "Change saved."),
+      updatedDescription: parsed.updatedDescription || null,
     });
   } catch (e) {
     console.error("validate-workout-edit error:", e);

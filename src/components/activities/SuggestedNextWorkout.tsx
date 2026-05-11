@@ -466,11 +466,11 @@ const SuggestedNextWorkout = ({ lang, latestActivityId, latestActivityDate }: Pr
               {todayPlanned.description}
             </p>
           )}
-          {isFreePlan ? (
+          {isFreePlan && !isPremium ? (
             <p className="text-xs text-muted-foreground italic">
               {isZh
-                ? "你正在使用免費訓練計劃。請依計劃執行，或取消計劃以獲得每日 AI 建議訓練。"
-                : "You're on a fixed plan — follow the plan, or cancel it to get a daily AI-suggested workout."}
+                ? "你正在使用免費訓練計劃。請依計劃執行，或升級為高級會員以調整訓練。"
+                : "You're on a free fixed plan — follow the plan, or upgrade to Premium to adjust workouts."}
             </p>
           ) : (
             <button

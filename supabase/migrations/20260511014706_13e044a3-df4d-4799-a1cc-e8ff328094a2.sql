@@ -1,0 +1,1 @@
+ALTER TABLE public.terra_activities ADD COLUMN IF NOT EXISTS cadence_samples jsonb;

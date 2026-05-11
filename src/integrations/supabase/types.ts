@@ -1111,6 +1111,7 @@ export type Database = {
           average_hr: number | null
           average_speed: number | null
           avg_cadence: number | null
+          cadence_samples: Json | null
           calories: number | null
           created_at: string
           distance_meters: number | null
@@ -1140,6 +1141,7 @@ export type Database = {
           average_hr?: number | null
           average_speed?: number | null
           avg_cadence?: number | null
+          cadence_samples?: Json | null
           calories?: number | null
           created_at?: string
           distance_meters?: number | null
@@ -1169,6 +1171,7 @@ export type Database = {
           average_hr?: number | null
           average_speed?: number | null
           avg_cadence?: number | null
+          cadence_samples?: Json | null
           calories?: number | null
           created_at?: string
           distance_meters?: number | null

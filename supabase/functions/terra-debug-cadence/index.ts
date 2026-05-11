@@ -63,25 +63,6 @@ Deno.serve(async (req) => {
       });
     }
     return new Response(JSON.stringify({ ok: true, results: out }, null, 2), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    const summaries = items.slice(0, 5).map((a) => {
-      const meta = a?.metadata ?? {};
-      return {
-        start_time: meta?.start_time,
-        name: meta?.name,
-        type: meta?.type,
-        cadence_data_keys: a?.cadence_data ? Object.keys(a.cadence_data) : null,
-        cadence_summary: a?.cadence_data?.summary ?? null,
-        cadence_samples_count: Array.isArray(a?.cadence_data?.detailed?.cadence_samples)
-          ? a.cadence_data.detailed.cadence_samples.length
-          : (Array.isArray(a?.cadence_data?.cadence_samples) ? a.cadence_data.cadence_samples.length : 0),
-        cadence_sample_first: a?.cadence_data?.detailed?.cadence_samples?.[0]
-          ?? a?.cadence_data?.cadence_samples?.[0]
-          ?? null,
-        movement_avg_cadence: a?.movement_data?.avg_cadence ?? a?.movement_data?.avg_cadence_rpm ?? null,
-        top_keys: Object.keys(a ?? {}),
-      };
-    });
-    return new Response(JSON.stringify({ ok: true, items_count: items.length, summaries }, null, 2), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (e) {
     return new Response(JSON.stringify({ error: String(e) }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }

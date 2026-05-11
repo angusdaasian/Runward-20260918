@@ -501,95 +501,94 @@ const SuggestedNextWorkout = ({ lang, latestActivityId, latestActivityDate }: Pr
       {/* Original analysis / generated / prompt views — only when NOT on an active plan. */}
       {(!planLoaded || !hasActivePlan) && (
         <>
-        </>
-      )}
-
-      {view.kind === "loading" && (
-        <div className="flex items-center gap-2 text-muted-foreground text-sm py-2">
-          <Loader2 size={14} className="animate-spin" />
-          {isZh ? "載入中…" : "Loading…"}
-        </div>
-      )}
-
-      {view.kind === "analysis" && (
-        <div className="prose prose-sm dark:prose-invert max-w-none text-foreground text-sm [&_h2]:text-base [&_h2]:font-bold [&_h2]:mt-2 [&_h2]:mb-1 [&_ul]:my-1 [&_li]:my-0.5 [&_strong]:text-primary">
-          <ReactMarkdown>{stripLeadingHeading(view.text)}</ReactMarkdown>
-        </div>
-      )}
-
-      {view.kind === "generated" && (
-        <div className="space-y-3">
-          {translating && (
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <Loader2 size={12} className="animate-spin" />
-              {isZh ? "翻譯中…" : "Translating…"}
+          {view.kind === "loading" && (
+            <div className="flex items-center gap-2 text-muted-foreground text-sm py-2">
+              <Loader2 size={14} className="animate-spin" />
+              {isZh ? "載入中…" : "Loading…"}
             </div>
           )}
-          <div className="prose prose-sm dark:prose-invert max-w-none text-foreground text-sm [&_h2]:text-base [&_h2]:font-bold [&_h2]:mt-2 [&_h2]:mb-1 [&_ul]:my-1 [&_li]:my-0.5 [&_strong]:text-primary">
-            <ReactMarkdown>{stripLeadingHeading(view.text)}</ReactMarkdown>
-          </div>
-          <button
-            onClick={handleRegenerate}
-            className="text-xs font-medium text-primary hover:text-primary/80 underline-offset-2 hover:underline"
-          >
-            {isZh ? "選擇其他訓練類型" : "Pick a different workout"}
-          </button>
-        </div>
-      )}
 
-      {view.kind === "prompt" && !declined && (
-        <div className="space-y-3">
-          <p className="text-sm text-foreground/90 leading-relaxed">
-            {isZh
-              ? "想要今天跑步嗎？選擇一種訓練類型，AI 教練會根據你的訓練計劃（或最近 7 天的表現）給你最適合的距離與配速。"
-              : "Want to run today? Pick a workout type and the AI coach will suggest the best distance and pace based on your plan (or your last 7 days)."}
-          </p>
-          <Select value={workoutType} onValueChange={(v) => setWorkoutType(v as WorkoutType)} disabled={generating}>
-            <SelectTrigger className="w-full bg-background border-border text-sm">
-              <SelectValue placeholder={isZh ? "選擇訓練類型" : "Select workout type"} />
-            </SelectTrigger>
-            <SelectContent>
-              {(Object.keys(WORKOUT_TYPE_LABELS) as WorkoutType[]).map((key) => (
-                <SelectItem key={key} value={key}>
-                  {isZh ? WORKOUT_TYPE_LABELS[key].zh : WORKOUT_TYPE_LABELS[key].en}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <div className="flex gap-2">
-            <button
-              onClick={handleGenerate}
-              disabled={generating}
-              className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium px-4 py-2 hover:bg-primary/90 transition-colors disabled:opacity-60"
-            >
-              {generating && <Loader2 size={14} className="animate-spin" />}
-              {generating
-                ? isZh ? "產生中…" : "Generating…"
-                : isZh ? "產生建議訓練" : "Generate workout"}
-            </button>
-            <button
-              onClick={() => setDeclined(true)}
-              disabled={generating}
-              className="inline-flex items-center justify-center rounded-lg border border-border bg-background text-foreground text-sm font-medium px-4 py-2 hover:bg-accent transition-colors"
-            >
-              {isZh ? "不要" : "No thanks"}
-            </button>
-          </div>
-        </div>
-      )}
+          {view.kind === "analysis" && (
+            <div className="prose prose-sm dark:prose-invert max-w-none text-foreground text-sm [&_h2]:text-base [&_h2]:font-bold [&_h2]:mt-2 [&_h2]:mb-1 [&_ul]:my-1 [&_li]:my-0.5 [&_strong]:text-primary">
+              <ReactMarkdown>{stripLeadingHeading(view.text)}</ReactMarkdown>
+            </div>
+          )}
 
-      {view.kind === "prompt" && declined && (
-        <div className="space-y-2">
-          <p className="text-sm text-muted-foreground italic">
-            {isZh ? "好的，今天好好休息！" : "Got it — enjoy your rest day!"}
-          </p>
-          <button
-            onClick={() => setDeclined(false)}
-            className="text-xs font-medium text-primary hover:text-primary/80 underline-offset-2 hover:underline"
-          >
-            {isZh ? "改變主意？" : "Changed your mind?"}
-          </button>
-        </div>
+          {view.kind === "generated" && (
+            <div className="space-y-3">
+              {translating && (
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <Loader2 size={12} className="animate-spin" />
+                  {isZh ? "翻譯中…" : "Translating…"}
+                </div>
+              )}
+              <div className="prose prose-sm dark:prose-invert max-w-none text-foreground text-sm [&_h2]:text-base [&_h2]:font-bold [&_h2]:mt-2 [&_h2]:mb-1 [&_ul]:my-1 [&_li]:my-0.5 [&_strong]:text-primary">
+                <ReactMarkdown>{stripLeadingHeading(view.text)}</ReactMarkdown>
+              </div>
+              <button
+                onClick={handleRegenerate}
+                className="text-xs font-medium text-primary hover:text-primary/80 underline-offset-2 hover:underline"
+              >
+                {isZh ? "選擇其他訓練類型" : "Pick a different workout"}
+              </button>
+            </div>
+          )}
+
+          {view.kind === "prompt" && !declined && (
+            <div className="space-y-3">
+              <p className="text-sm text-foreground/90 leading-relaxed">
+                {isZh
+                  ? "想要今天跑步嗎？選擇一種訓練類型，AI 教練會根據你的訓練計劃（或最近 7 天的表現）給你最適合的距離與配速。"
+                  : "Want to run today? Pick a workout type and the AI coach will suggest the best distance and pace based on your plan (or your last 7 days)."}
+              </p>
+              <Select value={workoutType} onValueChange={(v) => setWorkoutType(v as WorkoutType)} disabled={generating}>
+                <SelectTrigger className="w-full bg-background border-border text-sm">
+                  <SelectValue placeholder={isZh ? "選擇訓練類型" : "Select workout type"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {(Object.keys(WORKOUT_TYPE_LABELS) as WorkoutType[]).map((key) => (
+                    <SelectItem key={key} value={key}>
+                      {isZh ? WORKOUT_TYPE_LABELS[key].zh : WORKOUT_TYPE_LABELS[key].en}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <div className="flex gap-2">
+                <button
+                  onClick={handleGenerate}
+                  disabled={generating}
+                  className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium px-4 py-2 hover:bg-primary/90 transition-colors disabled:opacity-60"
+                >
+                  {generating && <Loader2 size={14} className="animate-spin" />}
+                  {generating
+                    ? isZh ? "產生中…" : "Generating…"
+                    : isZh ? "產生建議訓練" : "Generate workout"}
+                </button>
+                <button
+                  onClick={() => setDeclined(true)}
+                  disabled={generating}
+                  className="inline-flex items-center justify-center rounded-lg border border-border bg-background text-foreground text-sm font-medium px-4 py-2 hover:bg-accent transition-colors"
+                >
+                  {isZh ? "不要" : "No thanks"}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {view.kind === "prompt" && declined && (
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground italic">
+                {isZh ? "好的，今天好好休息！" : "Got it — enjoy your rest day!"}
+              </p>
+              <button
+                onClick={() => setDeclined(false)}
+                className="text-xs font-medium text-primary hover:text-primary/80 underline-offset-2 hover:underline"
+              >
+                {isZh ? "改變主意？" : "Changed your mind?"}
+              </button>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

@@ -25,7 +25,7 @@ interface Props {
  *
  * Returns null when there's no plan or no upcoming planned workout.
  */
-const PlanNextWorkoutCard = ({ lang, activityDate, isPremium }: Props) => {
+const PlanNextWorkoutCard = ({ lang, activityDate, isPremium, onResolved }: Props) => {
   const { user } = useAuth();
   const isZh = lang === "zh";
 

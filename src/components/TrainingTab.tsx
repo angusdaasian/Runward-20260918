@@ -1101,39 +1101,61 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                    <p className="text-xs text-muted-foreground">{lang === "zh" ? "總計" : "Total"}: {totalKm.toFixed(1)} km</p>
                 </div>
 
-                <div className="space-y-1">
-                  {currentWeek.days.map((day: any, i: number) => {
-                    const dateObj = day.date ? new Date(day.date + "T00:00:00") : null;
-                    const dayNum = dateObj ? dateObj.getDate() : "";
-                    const isToday = day.date === new Date().toISOString().split("T")[0];
-                    return (
-                      <div key={i} className="flex items-stretch gap-2">
-                        <div className="w-10 flex-shrink-0 flex flex-col items-center pt-3">
-                          <span className="text-[10px] font-medium text-muted-foreground uppercase">{labelForDay(day, i)}</span>
-                          <span className={`text-sm font-bold ${isToday ? "text-primary" : "text-foreground"}`}>{dayNum}</span>
-                        </div>
-                        {day.type === "Rest" ? (
-                          <div className="flex-1 border-l-2 border-border pl-3 py-3 min-h-[48px] flex items-center">
-                            <span className="text-xs text-muted-foreground">{lang === "zh" ? "休息" : "Rest"}</span>
-                          </div>
+                {isPremium ? (
+                  <>
+                    <CalendarDayList
+                      days={currentWeek.days}
+                      weekIdx={currentWeekIdx}
+                      lang={lang}
+                      onSwap={(from, to) => swapDays(currentWeekIdx, from, to)}
+                      onAddClick={(i) => { setAddingDayIdx(i); setAddRunType(null); setAddDistance(""); }}
+                      onEditClick={(i, day) => { setEditingDayIdx(i); setEditDistance(day.distance_km?.toString() || ""); setEditPace(day.pace || ""); setEditDescription(day.description || ""); }}
+                    />
+                    {planDirty && (
+                      <Button onClick={savePlanEdits} disabled={savingPlan} className="w-full mt-4" size="lg">
+                        {savingPlan ? (
+                          <><Loader2 className="animate-spin mr-2" size={16} />{lang === "zh" ? "儲存中…" : "Saving…"}</>
                         ) : (
-                          <div className="flex-1 border-l-2 pl-3 py-2" style={{ borderColor: day.color || "hsl(var(--border))" }}>
-                            <div className="bg-card border border-border rounded-lg p-3">
-                              <div className="flex items-center justify-between">
-                                <span className="font-medium text-sm text-foreground">{localizeTitle(day.type, lang)}</span>
-                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                  {day.pace && <span>{/\/(km|mi)\b/i.test(day.pace) ? day.pace : `${day.pace}/km`}</span>}
-                                  {day.distance_km && <span>{day.distance_km} km</span>}
-                                </div>
-                              </div>
-                              <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{localizeDescription(day, lang)}</p>
-                            </div>
-                          </div>
+                          <><Save size={16} className="mr-2" />{lang === "zh" ? "儲存變更" : "Save Changes"}</>
                         )}
-                      </div>
-                    );
-                  })}
-                </div>
+                      </Button>
+                    )}
+                  </>
+                ) : (
+                  <div className="space-y-1">
+                    {currentWeek.days.map((day: any, i: number) => {
+                      const dateObj = day.date ? new Date(day.date + "T00:00:00") : null;
+                      const dayNum = dateObj ? dateObj.getDate() : "";
+                      const isToday = day.date === new Date().toISOString().split("T")[0];
+                      return (
+                        <div key={i} className="flex items-stretch gap-2">
+                          <div className="w-10 flex-shrink-0 flex flex-col items-center pt-3">
+                            <span className="text-[10px] font-medium text-muted-foreground uppercase">{labelForDay(day, i)}</span>
+                            <span className={`text-sm font-bold ${isToday ? "text-primary" : "text-foreground"}`}>{dayNum}</span>
+                          </div>
+                          {day.type === "Rest" ? (
+                            <div className="flex-1 border-l-2 border-border pl-3 py-3 min-h-[48px] flex items-center">
+                              <span className="text-xs text-muted-foreground">{lang === "zh" ? "休息" : "Rest"}</span>
+                            </div>
+                          ) : (
+                            <div className="flex-1 border-l-2 pl-3 py-2" style={{ borderColor: day.color || "hsl(var(--border))" }}>
+                              <div className="bg-card border border-border rounded-lg p-3">
+                                <div className="flex items-center justify-between">
+                                  <span className="font-medium text-sm text-foreground">{localizeTitle(day.type, lang)}</span>
+                                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                    {day.pace && <span>{/\/(km|mi)\b/i.test(day.pace) ? day.pace : `${day.pace}/km`}</span>}
+                                    {day.distance_km && <span>{day.distance_km} km</span>}
+                                  </div>
+                                </div>
+                                <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{localizeDescription(day, lang)}</p>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
 
                 <div className="flex items-center justify-center gap-1 mt-6">
                   {plan.map((_: any, i: number) => (

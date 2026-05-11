@@ -396,9 +396,18 @@ const SuggestedNextWorkout = ({ lang, latestActivityId, latestActivityDate }: Pr
       const updated = JSON.parse(JSON.stringify(planRow.plan_data));
       const day = updated[todayPlanned._weekIdx]?.days?.[todayPlanned._dayIdx];
       if (!day) throw new Error("day not found");
-      day.distance_km = next.distance_km ?? day.distance_km;
+      const newDistance = next.distance_km ?? day.distance_km;
+      day.distance_km = newDistance;
       day.pace = next.pace ?? day.pace;
       day.description = next.description ?? day.description;
+      // If the user converts a Rest day into an actual run, promote the type
+      // so the program calendar (TrainingTab) renders it as a workout card,
+      // not the "+ Add" placeholder.
+      if (day.type === "Rest" && typeof newDistance === "number" && newDistance > 0) {
+        day.type = "Easy";
+        day.title = isZh ? "輕鬆跑" : "Easy Run";
+        day.color = day.color || "#22c55e";
+      }
       const { error } = await supabase
         .from("training_plans" as any)
         .update({ plan_data: updated } as any)

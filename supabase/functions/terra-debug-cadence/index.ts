@@ -27,10 +27,42 @@ Deno.serve(async (req) => {
     const startStr = start.toISOString().slice(0, 10);
     const endStr = end.toISOString().slice(0, 10);
 
-    const fetchUrl = `https://api.tryterra.co/v2/activity?user_id=${conn.terra_user_id}&start_date=${startStr}&end_date=${endStr}&to_webhook=false&with_samples=true`;
-    const r = await fetch(fetchUrl, { headers });
-    const j = await r.json();
-    const items: any[] = Array.isArray(j?.data) ? j.data : [];
+    // Get latest activity row for this user/provider, then fetch via per-activity endpoint.
+    const { data: latest } = await admin
+      .from("terra_activities")
+      .select("id, terra_activity_id, start_time")
+      .eq("user_id", userId)
+      .eq("provider", conn.provider)
+      .order("start_time", { ascending: false })
+      .limit(3);
+
+    const out: any[] = [];
+    for (const row of latest ?? []) {
+      const aid = String(row.terra_activity_id || "");
+      const summaryId = aid.includes(":") ? aid.split(":").slice(1).join(":") : aid;
+      const fetchUrl = `https://api.tryterra.co/v2/activity/${encodeURIComponent(summaryId)}?user_id=${conn.terra_user_id}&with_samples=true`;
+      const r = await fetch(fetchUrl, { headers });
+      const j = await r.json();
+      const a = Array.isArray(j?.data) ? j.data[0] : j?.data;
+      if (!a) { out.push({ row, status: r.status, note: "no data" }); continue; }
+      out.push({
+        row_start: row.start_time,
+        terra_activity_id: aid,
+        top_keys: Object.keys(a),
+        cadence_data_keys: a?.cadence_data ? Object.keys(a.cadence_data) : null,
+        cadence_summary: a?.cadence_data?.summary ?? null,
+        cadence_detailed_keys: a?.cadence_data?.detailed ? Object.keys(a.cadence_data.detailed) : null,
+        cadence_sample_first: a?.cadence_data?.detailed?.cadence_samples?.[0]
+          ?? a?.cadence_data?.cadence_samples?.[0]
+          ?? null,
+        cadence_samples_count: Array.isArray(a?.cadence_data?.detailed?.cadence_samples)
+          ? a.cadence_data.detailed.cadence_samples.length
+          : (Array.isArray(a?.cadence_data?.cadence_samples) ? a.cadence_data.cadence_samples.length : 0),
+        movement_keys: a?.movement_data ? Object.keys(a.movement_data) : null,
+        movement_avg_cadence: a?.movement_data?.avg_cadence ?? a?.movement_data?.avg_cadence_rpm ?? null,
+      });
+    }
+    return new Response(JSON.stringify({ ok: true, results: out }, null, 2), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     const summaries = items.slice(0, 5).map((a) => {
       const meta = a?.metadata ?? {};
       return {

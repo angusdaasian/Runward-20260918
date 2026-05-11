@@ -752,6 +752,15 @@ async function processWebhook(
             average_speed: (distanceMeters && durationSeconds && durationSeconds > 0)
               ? distanceMeters / durationSeconds
               : (a?.movement_data?.avg_speed_meters_per_second ?? null),
+            avg_cadence: (() => {
+              const c = a?.cadence_data?.summary?.avg_cadence
+                ?? a?.cadence_data?.summary?.avg_cadence_rpm
+                ?? a?.movement_data?.avg_cadence
+                ?? a?.movement_data?.avg_cadence_rpm
+                ?? null;
+              const n = typeof c === "number" ? c : (c != null ? Number(c) : NaN);
+              return Number.isFinite(n) && n > 0 ? n : null;
+            })(),
             summary_polyline: finalPolyline,
             has_gps: finalHasGps,
             laps: finalLaps,

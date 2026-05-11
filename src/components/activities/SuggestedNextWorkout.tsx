@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import ReactMarkdown from "react-markdown";
-import { Footprints, Loader2 } from "lucide-react";
+import { Footprints, Loader2, Pencil } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Lang } from "@/lib/i18n";
 import { toast } from "sonner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import EditWorkoutDialog, { EditableWorkout } from "@/components/training/EditWorkoutDialog";
+import { notifyPlanChanged, subscribePlanChanged } from "@/lib/planEvents";
 
 interface Props {
   lang: Lang;

@@ -249,6 +249,8 @@ const ProgramsTab = ({ lang, onLoginRequest }: Props) => {
       }
     };
     load();
+    const unsub = subscribePlanChanged(() => { void load(); });
+    return () => { unsub(); };
   }, [user]);
 
   // Keep restDays valid: never include longRunDay, never exceed 7 - daysPerWeek

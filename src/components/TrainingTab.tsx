@@ -22,6 +22,7 @@ import {
 } from "@dnd-kit/core";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
 import WeeklyReviewModal from "@/components/training/WeeklyReviewModal";
+import EditWorkoutDialog from "@/components/training/EditWorkoutDialog";
 const CalculatorTab = lazy(() => import("@/components/CalculatorTab"));
 import freePlan5k from "@/assets/free-plan-5k.jpg";
 import freePlan10k from "@/assets/free-plan-10k.jpg";

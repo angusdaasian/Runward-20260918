@@ -159,6 +159,7 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
   const [rpeInput, setRpeInput] = useState<string>("");
   const [rpeSubmitted, setRpeSubmitted] = useState(false);
   const [aiPosterOpen, setAiPosterOpen] = useState(false);
+  const [planNextShown, setPlanNextShown] = useState(false);
   const [customShareOpen, setCustomShareOpen] = useState(false);
   const [analysisAttempted, setAnalysisAttempted] = useState(false);
 

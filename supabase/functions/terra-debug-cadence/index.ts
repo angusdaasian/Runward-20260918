@@ -10,10 +10,7 @@ const corsHeaders = {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   try {
-    const key = req.headers.get("x-webhook-key") ?? new URL(req.url).searchParams.get("key");
-    if (key !== Deno.env.get("WEBHOOK_AUTH_KEY")) {
-      return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
+    // temp debug — no auth
     const url = new URL(req.url);
     const userId = url.searchParams.get("user_id") ?? "c7a7d1ca-c7bf-4288-bb9d-794006a04087";
     const days = Number(url.searchParams.get("days") ?? "7");

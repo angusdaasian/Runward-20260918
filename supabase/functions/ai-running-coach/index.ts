@@ -430,7 +430,7 @@ serve(async (req) => {
     const sessionId = new_session || !requestedSessionId ? crypto.randomUUID() : requestedSessionId;
 
     // Load context in parallel
-    const [prefsR, historyR, insightsR, garminR, stravaR, appleR, terraR, racesR] =
+    const [prefsR, historyR, insightsR, garminR, stravaR, appleR, terraR, racesR, planR] =
       await Promise.all([
         admin.from("ai_coach_preferences").select("*").eq("user_id", user.id).maybeSingle(),
         admin
@@ -479,6 +479,12 @@ serve(async (req) => {
           .select("race_name, race_date, category, city, country, finish_time_seconds, notes, priority")
           .eq("user_id", user.id)
           .order("race_date", { ascending: true }),
+        admin
+          .from("training_plans")
+          .select("*")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false })
+          .limit(1),
       ]);
 
     const prefs = prefsR.data;
@@ -568,6 +574,56 @@ serve(async (req) => {
       ? `UPCOMING RACES (${upcomingSorted.length}, sorted by priority):\n${upcomingSorted.length ? upcomingSorted.map(fmtRace).join("\n") : "(none)"}\n\nPAST RACES (most recent):\n${pastRaces.length ? pastRaces.map(fmtRace).join("\n") : "(none)"}${priorityLine}`
       : "USER RACE SCHEDULE: (none yet — encourage them to add races to their schedule)";
 
+    // ── Active training plan context ──
+    const plan = (planR.data || [])[0] as any;
+    const asArr = <T,>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : []);
+    let planBlock = "ACTIVE TRAINING PLAN: (none — the runner is not following a structured plan)";
+    if (plan) {
+      const planData = asArr<any>(plan.plan_data);
+      const raceDate = plan.race_date ? new Date(plan.race_date) : null;
+      const planStartSeed = asArr<any>(planData[0]?.days)[0]?.date;
+      const parsedStart = planStartSeed ? new Date(planStartSeed) : null;
+      const fallbackStart = raceDate && Number.isFinite(Number(plan.weeks))
+        ? new Date(raceDate.getTime() - Number(plan.weeks) * 7 * 86400000)
+        : null;
+      const planStart = parsedStart && !isNaN(parsedStart.getTime())
+        ? parsedStart
+        : fallbackStart && !isNaN(fallbackStart.getTime()) ? fallbackStart : null;
+
+      const today = new Date();
+      const todayStr = today.toISOString().slice(0, 10);
+      let weekNumber: number | null = null;
+      if (planStart && today >= planStart) {
+        const diffMs = today.getTime() - planStart.getTime();
+        weekNumber = Math.max(1, Math.floor(diffMs / (7 * 86400000)) + 1);
+      }
+
+      // Collect upcoming planned days (today + next 13 days)
+      const upcomingDays: string[] = [];
+      const horizonEnd = new Date(today.getTime() + 14 * 86400000).toISOString().slice(0, 10);
+      for (const week of planData) {
+        for (const d of asArr<any>(week?.days)) {
+          if (!d?.date) continue;
+          if (d.date >= todayStr && d.date <= horizonEnd) {
+            const dist = d.distance_km ?? d.distance;
+            const workout = d.workout || d.description || d.type || "Rest";
+            upcomingDays.push(`- ${d.date} (W${week.week}): ${workout}${dist ? ` — ${dist} km` : ""}`);
+          }
+        }
+      }
+
+      planBlock = `ACTIVE TRAINING PLAN:
+- Distance/goal: ${plan.distance} (${plan.goal === "custom" ? "Custom" : plan.goal})
+- Target finishing time: ${plan.target_time || "n/a"}
+- Race date: ${plan.race_date || "n/a"}
+- Plan length: ${plan.weeks || "?"} weeks
+- Plan start: ${planStart ? planStart.toISOString().slice(0, 10) : "unknown"}
+- Current week: ${weekNumber ? `Week ${weekNumber}` : "Plan has not started yet"}
+
+PLANNED WORKOUTS (today + next 14 days):
+${upcomingDays.length ? upcomingDays.join("\n") : "(no scheduled workouts in this window)"}`;
+    }
+
     const systemPrompt = `You are an expert AI Running Coach for an athlete named ${profile?.display_name || "the runner"}.
 
 REPLY LANGUAGE: ${userLang}. Always answer in this language regardless of the language of the user's question.
@@ -583,6 +639,14 @@ ${buildActivitySummary(allActs, units)}
 NOTE on activity lines: a trailing "[INTERVAL: …]" tag means the run was an interval/fartlek workout — NOT an easy run. The tag shows work vs rest lap counts, paces, HR, and the per-set structure (e.g. "set1=2000m(2000), set2=1600m(1600)"). When the user asks about that run, treat it as the structured workout shown — never call it an easy/tempo run.
 
 ${racesBlock}
+
+${planBlock}
+
+PLAN ADHERENCE RULES:
+- If an ACTIVE TRAINING PLAN is shown above, the runner is already following it. When recommending workouts for today / tomorrow / this week, your suggestion MUST match the planned workout for that date — do NOT invent a different workout.
+- You may ANALYZE the plan when asked: comment on its structure, weekly load progression, balance of easy/quality/long runs, taper, and how well recent runs are tracking against it. Suggest tweaks if you see issues, but be explicit that it's a suggestion to adjust the plan rather than a replacement workout.
+- If the runner asks for a workout on a date covered by the plan, restate the planned workout (with pace/HR guidance) instead of proposing something new.
+- Only suggest a fully different workout when (a) there is no active plan, (b) the date is outside the plan window, or (c) the runner explicitly asks to deviate / replace the planned session.
 
 COACHING STYLE:
 - Address the runner by name when natural.

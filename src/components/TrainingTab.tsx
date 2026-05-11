@@ -468,6 +468,8 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
       }
     };
     load();
+    const unsub = subscribePlanChanged(() => { void load(); });
+    return () => { unsub(); };
   }, [user, online]);
 
   // Load free plans for selected distance (cache-then-network)

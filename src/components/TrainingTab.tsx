@@ -1270,7 +1270,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                               <div className="flex items-center justify-between">
                                 <span className="font-medium text-sm text-foreground">{localizeTitle(day.type, lang)}</span>
                                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                  {day.pace && <span>{day.pace}</span>}
+                                  {day.pace && <span>{/\/(km|mi)\b/i.test(day.pace) ? day.pace : `${day.pace}/km`}</span>}
                                   {day.distance_km && <span>{day.distance_km} km</span>}
                                 </div>
                               </div>

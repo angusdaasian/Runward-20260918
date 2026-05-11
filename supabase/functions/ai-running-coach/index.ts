@@ -479,6 +479,12 @@ serve(async (req) => {
           .select("race_name, race_date, category, city, country, finish_time_seconds, notes, priority")
           .eq("user_id", user.id)
           .order("race_date", { ascending: true }),
+        admin
+          .from("training_plans")
+          .select("*")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false })
+          .limit(1),
       ]);
 
     const prefs = prefsR.data;

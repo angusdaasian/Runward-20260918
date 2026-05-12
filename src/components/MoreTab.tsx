@@ -158,10 +158,19 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps }: Props
   };
   if (!skeletonDone) return <SettingsSkeleton />;
 
+  // Profile subpage view (HR Zones, Personal Bests) — render full-screen subpage.
+  if (user && profileSubpage !== "main") {
+    return (
+      <div className="px-5 pt-2 max-w-lg mx-auto">
+        <ProfileSection lang={lang} subpage={profileSubpage} onNavigate={setProfileSubpage} />
+      </div>
+    );
+  }
+
   return (
     <div className="px-5 pt-2 max-w-lg mx-auto">
       <div className="space-y-3">
-        {user && <ProfileSection lang={lang} />}
+        {user && <ProfileSection lang={lang} subpage="main" onNavigate={setProfileSubpage} />}
 
         {/* Dark Mode - right after profile/sign-in */}
         <div className="bg-card border border-border rounded-xl p-4">

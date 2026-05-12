@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
-import { Camera, Save, LogOut, Trash2, Mail, Pencil, Zap, Sparkles, Loader2, X } from "lucide-react";
+import { Camera, Save, LogOut, Trash2, Mail, Pencil, Zap, Sparkles, Loader2, X, Heart, Trophy, ChevronRight, ChevronLeft } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Lang, t } from "@/lib/i18n";
 import { calculateRunningScore } from "@/lib/vdot";
@@ -61,7 +61,15 @@ interface PB {
   seconds: number;
 }
 
-const ProfileSection = ({ lang }: { lang: Lang }) => {
+type ProfileSubpage = "main" | "hr-zones" | "personal-bests";
+
+interface ProfileSectionProps {
+  lang: Lang;
+  subpage?: ProfileSubpage;
+  onNavigate?: (sub: ProfileSubpage) => void;
+}
+
+const ProfileSection = ({ lang, subpage = "main", onNavigate }: ProfileSectionProps) => {
   const { user, signOut } = useAuth();
   const { toast } = useToast();
   const { activities } = useActivities();

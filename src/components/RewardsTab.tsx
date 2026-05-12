@@ -94,14 +94,14 @@ const RewardsTab = ({ lang }: Props) => {
       <FadeIn className="px-5 pt-4 max-w-lg mx-auto pb-24 space-y-5">
         {/* Sub-tabs: Rewards | Leaderboards | CityHunter */}
         <Tabs defaultValue="rewards" className="w-full">
-          <TabsList className="w-full grid grid-cols-3">
-            <TabsTrigger value="rewards">
+          <TabsList className={underlineTabsListClass}>
+            <TabsTrigger value="rewards" className={underlineTabsTriggerClass}>
               {lang === "zh" ? "獎勵" : "Rewards"}
             </TabsTrigger>
-            <TabsTrigger value="leaderboards">
+            <TabsTrigger value="leaderboards" className={underlineTabsTriggerClass}>
               {lang === "zh" ? "排行榜" : "Leaderboards"}
             </TabsTrigger>
-            <TabsTrigger value="territory">
+            <TabsTrigger value="territory" className={underlineTabsTriggerClass}>
               {lang === "zh" ? "城市獵人" : "CityHunter"}
             </TabsTrigger>
           </TabsList>

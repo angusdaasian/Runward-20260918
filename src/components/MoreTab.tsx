@@ -66,6 +66,26 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps }: Props
   const [showRedeemDialog, setShowRedeemDialog] = useState(false);
   const [showPlanCompare, setShowPlanCompare] = useState(false);
   const [offerCode, setOfferCode] = useState("");
+  const [profileSubpage, setProfileSubpage] = useState<"main" | "hr-zones" | "personal-bests">("main");
+
+  // Open HR zones subpage when navigated via #hr-zones (e.g. from ActivityDetail).
+  useEffect(() => {
+    const checkHash = () => {
+      if (window.location.hash === "#hr-zones") {
+        setProfileSubpage("hr-zones");
+        history.replaceState(null, "", window.location.pathname + window.location.search);
+      }
+    };
+    checkHash();
+    const onHash = () => checkHash();
+    const onCustom = () => setProfileSubpage("hr-zones");
+    window.addEventListener("hashchange", onHash);
+    window.addEventListener("focus-hr-zones", onCustom);
+    return () => {
+      window.removeEventListener("hashchange", onHash);
+      window.removeEventListener("focus-hr-zones", onCustom);
+    };
+  }, []);
   const [countdown, setCountdown] = useState("");
   const [activityNotifications, setActivityNotifications] = useState(true);
   const [notifLoading, setNotifLoading] = useState(false);

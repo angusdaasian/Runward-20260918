@@ -183,7 +183,11 @@ const AppHeader = ({ lang, onNavigateSettings, onOpenPromoBanner, isGuest }: App
 
   return (
     <div className="flex items-center justify-between px-5 pt-4 pb-2 w-full max-w-lg mx-auto">
-      <div className="flex items-center gap-3">
+      <button
+        onClick={onNavigateSettings}
+        aria-label={lang === "zh" ? "個人檔案" : "Profile"}
+        className="flex items-center gap-3 active:scale-[0.98] transition-transform"
+      >
         {!isGuest && !profile ? (
           <>
             <Skeleton className="h-12 w-12 rounded-full" />
@@ -195,7 +199,7 @@ const AppHeader = ({ lang, onNavigateSettings, onOpenPromoBanner, isGuest }: App
               <AvatarImage src={isGuest ? undefined : (profile?.avatar_url || undefined)} />
               <AvatarFallback className="text-lg font-display bg-primary/10 text-primary">{initials}</AvatarFallback>
             </Avatar>
-            <div className="flex flex-col">
+            <div className="flex flex-col items-start">
               <h1 className="font-display text-lg font-bold text-foreground leading-tight">{name}</h1>
               {!isGuest && profile && (() => {
                 const rankInfo = getRankFromXP(profile.monthly_xp ?? 0);
@@ -219,7 +223,7 @@ const AppHeader = ({ lang, onNavigateSettings, onOpenPromoBanner, isGuest }: App
             </div>
           </>
         )}
-      </div>
+      </button>
       <div className="flex items-center gap-2">
         <button
           aria-label={lang === "zh" ? "應用程式指南" : "App guide"}

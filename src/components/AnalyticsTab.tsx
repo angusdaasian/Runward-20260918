@@ -28,14 +28,9 @@ const AnalyticsTab = ({ lang }: Props) => {
   return (
     <div>
       <div className="px-5 pt-6 max-w-lg mx-auto">
-        <h1 className="font-display text-3xl font-bold text-foreground mb-1">
+        <h1 className="font-display text-3xl font-bold text-foreground mb-3">
           {lang === "zh" ? "分析" : "Analytics"}
         </h1>
-        <p className="text-sm text-muted-foreground mb-4">
-          {lang === "zh"
-            ? "追蹤訓練負荷、趨勢與跑姿"
-            : "Track your training load, trends and running form"}
-        </p>
 
         {/* Sub-tab switcher (underline style) */}
         <div className="flex w-full border-b border-border mb-2">

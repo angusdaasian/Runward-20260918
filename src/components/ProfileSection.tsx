@@ -384,32 +384,107 @@ const ProfileSection = ({ lang, subpage = "main", onNavigate }: ProfileSectionPr
 
   // ── Subpage: Heart Rate Zones ──
   if (subpage === "hr-zones") {
+    const effMax = estimateMaxHr(profile.age, profile.max_heartrate);
+    const effRest = estimateRestingHr(profile.resting_heartrate);
+    const bounds = zoneBoundaries(effMax, effRest, profile.custom_hr_zones);
+    const lowers = [bounds.z1, bounds.z2, bounds.z3, bounds.z4, bounds.z5];
+
     return (
       <div className="space-y-4">
-        <button
-          onClick={() => onNavigate?.("main")}
-          className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-        >
-          <ChevronLeft size={16} />
-          {lang === "zh" ? "返回" : "Back"}
-        </button>
-        <h2 className="font-display text-2xl font-bold text-foreground">
-          {lang === "zh" ? "心率區間" : "Heart Rate Zones"}
-        </h2>
-        <HeartRateZonesCard
-          lang={lang}
-          initialAge={profile.age}
-          initialMaxHr={profile.max_heartrate}
-          initialRestingHr={profile.resting_heartrate}
-          initialCustomZones={profile.custom_hr_zones}
-          onSaved={(maxHr, restingHr, customZones) => {
-            setProfile((p) => {
-              const updated = p ? { ...p, max_heartrate: maxHr, resting_heartrate: restingHr, custom_hr_zones: customZones } : p;
-              _cachedProfile = updated;
-              return updated;
-            });
-          }}
-        />
+        <div className="flex items-center justify-between">
+          <button
+            onClick={() => (hrEditMode ? setHrEditMode(false) : onNavigate?.("main"))}
+            className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+          >
+            <ChevronLeft size={16} />
+            {lang === "zh" ? "返回" : "Back"}
+          </button>
+          <h2 className="font-display text-base font-bold text-foreground">
+            {lang === "zh" ? "心率區間" : "Heart rate zones"}
+          </h2>
+          {!hrEditMode ? (
+            <button
+              onClick={() => setHrEditMode(true)}
+              className="text-sm font-medium text-primary hover:underline"
+            >
+              {lang === "zh" ? "編輯" : "Edit"}
+            </button>
+          ) : (
+            <span className="w-10" />
+          )}
+        </div>
+
+        {hrEditMode ? (
+          <HeartRateZonesCard
+            lang={lang}
+            initialAge={profile.age}
+            initialMaxHr={profile.max_heartrate}
+            initialRestingHr={profile.resting_heartrate}
+            initialCustomZones={profile.custom_hr_zones}
+            onSaved={(maxHr, restingHr, customZones) => {
+              setProfile((p) => {
+                const updated = p ? { ...p, max_heartrate: maxHr, resting_heartrate: restingHr, custom_hr_zones: customZones } : p;
+                _cachedProfile = updated;
+                return updated;
+              });
+              setHrEditMode(false);
+            }}
+          />
+        ) : (
+          <>
+            <p className="text-sm text-foreground/80 leading-relaxed">
+              {lang === "zh"
+                ? "心率（HR）監測是衡量訓練強度最可靠的方式之一。由於最大心率受年齡影響，我們會根據你的資料計算個人化的訓練區間，協助你掌握每次訓練的努力程度。"
+                : "Monitoring your heart rate (HR) is one of the most reliable ways to measure workout intensity. Because maximum heart rate is influenced by age, we use your profile to calculate personalised training zones that guide your effort."}
+            </p>
+
+            <div className="bg-card border border-border rounded-2xl p-4 space-y-4">
+              {ZONE_INFO.map((z, i) => {
+                const color = ZONE_LABELS[i].color;
+                const lower = lowers[i];
+                const isLast = i === ZONE_INFO.length - 1;
+                return (
+                  <div key={z.key}>
+                    <div className="flex gap-3">
+                      <div className="w-1 rounded-full shrink-0" style={{ backgroundColor: color }} />
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-display font-bold text-foreground text-base">
+                          {`${lang === "zh" ? "區間" : "Zone"} ${i + 1}: ${lang === "zh" ? z.nameZh : z.name}`}
+                        </h3>
+                        <p className="text-sm text-muted-foreground mt-1 leading-relaxed">
+                          {lang === "zh" ? z.descZh : z.desc}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3 mt-3">
+                      <div className="flex-1 h-px bg-border" />
+                      {isLast ? (
+                        <div className="text-right">
+                          <span className="text-xs text-muted-foreground mr-1">Max</span>
+                          <span className="font-display font-bold text-xl text-foreground tabular-nums">{effMax}</span>
+                          <span className="text-xs font-semibold text-muted-foreground ml-1">BPM</span>
+                        </div>
+                      ) : (
+                        <div className="text-right">
+                          <span className="font-display font-bold text-xl text-foreground tabular-nums">{lowers[i + 1]}</span>
+                          <span className="text-xs font-semibold text-muted-foreground ml-1">BPM</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <p className="text-[11px] text-muted-foreground text-center">
+              {profile.custom_hr_zones && profile.custom_hr_zones.length === 5
+                ? (lang === "zh" ? "使用自訂區間" : "Using custom zones")
+                : (lang === "zh"
+                    ? `基於 %HRR · 最大 ${effMax} / 靜息 ${effRest} bpm`
+                    : `Based on %HRR · max ${effMax} / rest ${effRest} bpm`)}
+            </p>
+          </>
+        )}
       </div>
     );
   }

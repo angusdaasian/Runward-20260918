@@ -70,7 +70,7 @@ interface PB {
   seconds: number;
 }
 
-type ProfileSubpage = "main" | "hr-zones" | "personal-bests";
+export type ProfileSubpage = "main" | "hr-zones" | "personal-bests" | "edit-profile";
 
 interface ProfileSectionProps {
   lang: Lang;
@@ -593,141 +593,162 @@ const ProfileSection = ({ lang, subpage = "main", onNavigate }: ProfileSectionPr
     );
   }
 
-  return (
-    <div className="space-y-4">
-      {/* Profile Card */}
-      <div className="bg-card border border-border rounded-xl p-4">
-        <div className="flex items-center gap-4 mb-4">
+  // ── Subpage: Edit Profile ──
+  if (subpage === "edit-profile") {
+    const RPW_OPTIONS = [1, 2, 3, 4, 5, 6, 7];
+    return (
+      <div className="space-y-5">
+        <div className="flex items-center justify-between">
+          <button
+            onClick={() => onNavigate?.("main")}
+            className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+          >
+            <ChevronLeft size={16} />
+            {lang === "zh" ? "返回" : "Back"}
+          </button>
+          <h2 className="font-display text-base font-bold text-foreground">
+            {lang === "zh" ? "編輯個人資料" : "Edit Profile"}
+          </h2>
+          <span className="w-10" />
+        </div>
+
+        {/* Avatar */}
+        <div className="flex justify-center">
           <div className="relative">
-            <Avatar className="h-16 w-16">
+            <Avatar className="h-24 w-24">
               <AvatarImage src={profile.avatar_url || undefined} />
-              <AvatarFallback className="text-lg font-display bg-primary/10 text-primary">
+              <AvatarFallback className="text-2xl font-display bg-primary/10 text-primary">
                 {(profile.display_name || "U")[0].toUpperCase()}
               </AvatarFallback>
             </Avatar>
-            <label className="absolute -bottom-1 -right-1 bg-primary text-primary-foreground rounded-full p-1 cursor-pointer">
-              <Camera size={12} />
+            <label className="absolute bottom-0 right-0 bg-foreground text-background rounded-full p-1.5 cursor-pointer shadow">
+              <Pencil size={12} />
               <input type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} disabled={uploading} />
             </label>
           </div>
-          <div className="flex-1">
-            <div className="flex gap-2">
-              <Input
-                value={editName}
-                onChange={(e) => setEditName(e.target.value)}
-                className="h-8 text-sm"
-                placeholder="Display name"
-              />
-              <Button size="sm" variant="outline" onClick={handleSaveName} disabled={saving} className="h-8 px-2">
-                <Save size={14} />
-              </Button>
-            </div>
-            {/* Email display & edit */}
-            <div className="mt-1.5">
-              {editingEmail ? (
-                <div className="flex gap-2">
-                  <Input
-                    type="email"
-                    value={newEmail}
-                    onChange={(e) => setNewEmail(e.target.value)}
-                    className="h-7 text-xs"
-                    placeholder={t("newEmail", lang)}
-                    autoFocus
-                  />
-                  <Button size="sm" variant="outline" onClick={handleUpdateEmail} disabled={savingEmail} className="h-7 px-2 text-xs">
-                    <Save size={12} />
-                  </Button>
-                  <Button size="sm" variant="ghost" onClick={() => setEditingEmail(false)} className="h-7 px-2 text-xs">
-                    ✕
-                  </Button>
-                </div>
-              ) : (
-                <button
-                  onClick={() => { setEditingEmail(true); setNewEmail(user?.email || ""); }}
-                  className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors group"
-                >
-                  <Mail size={11} />
-                  <span>{user?.email}</span>
-                  <Pencil size={10} className="opacity-0 group-hover:opacity-100 transition-opacity" />
-                </button>
-              )}
-            </div>
+        </div>
+
+        {/* Display Name */}
+        <div className="space-y-2">
+          <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground px-1">
+            {lang === "zh" ? "顯示名稱" : "Name"}
+          </label>
+          <div className="flex gap-2">
+            <Input
+              value={editName}
+              onChange={(e) => setEditName(e.target.value)}
+              className="h-12 bg-card border-border"
+              placeholder={lang === "zh" ? "顯示名稱" : "Display name"}
+            />
+            <Button onClick={handleSaveName} disabled={saving} className="h-12 px-4">
+              {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+            </Button>
           </div>
         </div>
-        {editingInfo ? (
-          <div className="space-y-2 pt-1">
-            <div className="grid grid-cols-3 gap-2">
-              <div>
-                <label className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                  {lang === "zh" ? "年齡" : "Age"}
-                </label>
-                <Input
-                  type="number"
-                  min={1}
-                  max={120}
-                  value={editAge}
-                  onChange={(e) => setEditAge(e.target.value)}
-                  className="h-8 text-sm"
-                />
-              </div>
-              <div>
-                <label className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                  {lang === "zh" ? "性別" : "Sex"}
-                </label>
-                <Select value={editSex} onValueChange={setEditSex}>
-                  <SelectTrigger className="h-8 text-sm">
-                    <SelectValue placeholder="—" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="male">{lang === "zh" ? "男" : "Male"}</SelectItem>
-                    <SelectItem value="female">{lang === "zh" ? "女" : "Female"}</SelectItem>
-                    <SelectItem value="other">{lang === "zh" ? "其他" : "Other"}</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <label className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                  {lang === "zh" ? "每週次數" : "Runs/week"}
-                </label>
-                <Input
-                  type="number"
-                  min={0}
-                  max={14}
-                  value={editRpw}
-                  onChange={(e) => setEditRpw(e.target.value)}
-                  className="h-8 text-sm"
-                />
-              </div>
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button size="sm" variant="ghost" onClick={() => setEditingInfo(false)} className="h-7 px-2">
-                <X size={14} />
-              </Button>
-              <Button size="sm" onClick={handleSaveInfo} disabled={savingInfo} className="h-7 px-3 gap-1">
-                {savingInfo ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
-                {lang === "zh" ? "儲存" : "Save"}
-              </Button>
-            </div>
+
+        {/* Email (read-only) */}
+        <div className="space-y-2">
+          <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground px-1">
+            {lang === "zh" ? "電子郵件" : "Email"}
+          </label>
+          <div className="h-12 bg-card border border-border rounded-md px-3 flex items-center text-sm text-muted-foreground">
+            {user?.email}
           </div>
-        ) : (
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
-              {profile.age ? <span>{profile.age} {lang === "zh" ? "歲" : "yrs"}</span> : null}
-              {profile.sex ? <span className="capitalize">{profile.sex}</span> : null}
-              {profile.runs_per_week ? <span>{profile.runs_per_week}{lang === "zh" ? " 次/週" : "x/week"}</span> : null}
-              {!profile.age && !profile.sex && !profile.runs_per_week && (
-                <span className="italic">{lang === "zh" ? "未設定" : "Not set"}</span>
-              )}
-            </div>
-            <button
-              onClick={startEditInfo}
-              className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
-            >
-              <Pencil size={11} />
-              {lang === "zh" ? "編輯" : "Edit"}
-            </button>
-          </div>
-        )}
+        </div>
+
+        {/* Gender */}
+        <div className="space-y-2">
+          <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground px-1">
+            {lang === "zh" ? "性別" : "Gender"}
+          </label>
+          <Select
+            value={profile.sex || ""}
+            onValueChange={async (v) => {
+              if (!user) return;
+              await supabase.from("profiles").update({ sex: v }).eq("user_id", user.id);
+              setProfile((p) => { const u = p ? { ...p, sex: v } : p; _cachedProfile = u; return u; });
+            }}
+          >
+            <SelectTrigger className="h-12 bg-card border-border">
+              <SelectValue placeholder={lang === "zh" ? "選擇" : "Select"} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="male">{lang === "zh" ? "男" : "Male"}</SelectItem>
+              <SelectItem value="female">{lang === "zh" ? "女" : "Female"}</SelectItem>
+              <SelectItem value="other">{lang === "zh" ? "其他" : "Other"}</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Age */}
+        <div className="space-y-2">
+          <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground px-1">
+            {lang === "zh" ? "年齡" : "Age"}
+          </label>
+          <Input
+            type="number"
+            min={1}
+            max={120}
+            defaultValue={profile.age ?? ""}
+            onBlur={async (e) => {
+              if (!user) return;
+              const v = e.target.value ? parseInt(e.target.value) : null;
+              await supabase.from("profiles").update({ age: v }).eq("user_id", user.id);
+              setProfile((p) => { const u = p ? { ...p, age: v } : p; _cachedProfile = u; return u; });
+            }}
+            className="h-12 bg-card border-border"
+          />
+        </div>
+
+        {/* Runs per week */}
+        <div className="space-y-2">
+          <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground px-1">
+            {lang === "zh" ? "每週跑步次數" : "Runs per week"}
+          </label>
+          <Select
+            value={profile.runs_per_week ? String(profile.runs_per_week) : ""}
+            onValueChange={async (v) => {
+              if (!user) return;
+              const n = parseInt(v);
+              await supabase.from("profiles").update({ runs_per_week: n }).eq("user_id", user.id);
+              setProfile((p) => { const u = p ? { ...p, runs_per_week: n } : p; _cachedProfile = u; return u; });
+            }}
+          >
+            <SelectTrigger className="h-12 bg-card border-border">
+              <SelectValue placeholder={lang === "zh" ? "選擇" : "Select"} />
+            </SelectTrigger>
+            <SelectContent>
+              {RPW_OPTIONS.map((n) => (
+                <SelectItem key={n} value={String(n)}>
+                  {n} {lang === "zh" ? "次/週" : `time${n > 1 ? "s" : ""}/week`}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Centered Profile Header */}
+      <div className="flex flex-col items-center pt-2 pb-2">
+        <Avatar className="h-24 w-24 ring-4 ring-primary/30">
+          <AvatarImage src={profile.avatar_url || undefined} />
+          <AvatarFallback className="text-2xl font-display bg-primary/10 text-primary">
+            {(profile.display_name || "U")[0].toUpperCase()}
+          </AvatarFallback>
+        </Avatar>
+        <h2 className="mt-3 font-display text-2xl font-bold text-foreground">
+          {profile.display_name || (lang === "zh" ? "使用者" : "User")}
+        </h2>
+        <button
+          onClick={() => onNavigate?.("edit-profile")}
+          className="mt-3 bg-foreground text-background font-semibold text-xs tracking-wider uppercase rounded-full px-6 py-2.5 hover:opacity-90 transition-opacity"
+        >
+          {lang === "zh" ? "編輯個人資料" : "Edit Profile"}
+        </button>
       </div>
 
       {/* Heart Rate Zones — navigation row */}

@@ -757,11 +757,6 @@ const ProfileSection = ({ lang, subpage = "main", onNavigate }: ProfileSectionPr
             <span className="font-medium text-foreground block">
               {lang === "zh" ? "個人最佳" : "Personal Bests"}
             </span>
-            <span className="text-xs text-muted-foreground">
-              {pbs.length > 0
-                ? (lang === "zh" ? `${pbs.length} 項紀錄${runningScore ? ` · 跑力 ${runningScore}` : ""}` : `${pbs.length} record${pbs.length > 1 ? "s" : ""}${runningScore ? ` · Score ${runningScore}` : ""}`)
-                : (lang === "zh" ? "尚未新增" : "None added yet")}
-            </span>
           </div>
         </div>
         <ChevronRight size={18} className="text-muted-foreground" />

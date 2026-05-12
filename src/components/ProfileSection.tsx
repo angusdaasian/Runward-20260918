@@ -743,6 +743,13 @@ const ProfileSection = ({ lang, subpage = "main", onNavigate }: ProfileSectionPr
         <h2 className="mt-3 font-display text-2xl font-bold text-foreground">
           {profile.display_name || (lang === "zh" ? "使用者" : "User")}
         </h2>
+        {user?.created_at && (
+          <p className="mt-1 text-sm text-muted-foreground">
+            {lang === "zh"
+              ? `加入於 ${new Date(user.created_at).toLocaleDateString("zh-TW", { year: "numeric", month: "long" })}`
+              : `Joined ${new Date(user.created_at).toLocaleDateString("en-US", { year: "numeric", month: "short" })}`}
+          </p>
+        )}
         <button
           onClick={() => onNavigate?.("edit-profile")}
           className="mt-3 bg-foreground text-background font-semibold text-xs tracking-wider uppercase rounded-full px-6 py-2.5 hover:opacity-90 transition-opacity"

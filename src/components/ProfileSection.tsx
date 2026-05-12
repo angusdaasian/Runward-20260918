@@ -741,13 +741,6 @@ const ProfileSection = ({ lang, subpage = "main", onNavigate }: ProfileSectionPr
             <span className="font-medium text-foreground block">
               {lang === "zh" ? "心率區間" : "Heart Rate Zones"}
             </span>
-            <span className="text-xs text-muted-foreground">
-              {profile.max_heartrate
-                ? (lang === "zh"
-                    ? `最大 ${profile.max_heartrate} · 靜息 ${profile.resting_heartrate ?? 60} bpm`
-                    : `Max ${profile.max_heartrate} · Rest ${profile.resting_heartrate ?? 60} bpm`)
-                : (lang === "zh" ? "尚未設定" : "Not set")}
-            </span>
           </div>
         </div>
         <ChevronRight size={18} className="text-muted-foreground" />

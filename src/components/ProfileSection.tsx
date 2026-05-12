@@ -110,6 +110,7 @@ const ProfileSection = ({ lang, subpage = "main", onNavigate }: ProfileSectionPr
   const [newH, setNewH] = useState("");
   const [newM, setNewM] = useState("");
   const [newS, setNewS] = useState("");
+  const [hrEditMode, setHrEditMode] = useState(false);
 
   useEffect(() => {
     if (!user) return;

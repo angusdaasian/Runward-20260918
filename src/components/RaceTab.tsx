@@ -10,6 +10,7 @@ import { useOnlineStatus } from "@/hooks/use-online-status";
 import { getCached, setCached, CacheKeys } from "@/lib/offlineCache";
 import { WifiOff } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { underlineTabsListClass, underlineTabsTriggerClass } from "@/components/ui/underline-tabs";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/hooks/use-toast";
 

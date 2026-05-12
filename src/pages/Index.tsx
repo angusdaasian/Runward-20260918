@@ -187,7 +187,7 @@ const Index = () => {
   ];
 
   return (
-    <div className="flex flex-col min-h-screen bg-background">
+    <div className="flex flex-col h-screen overflow-hidden bg-background">
       <div style={{ height: 'var(--safe-area-top, 0px)' }} className="shrink-0" />
       {isAdmin && (
         <div className="flex justify-end p-2">

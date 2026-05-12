@@ -15,6 +15,7 @@ import RankUpOverlay from "@/components/rewards/RankUpOverlay";
 import XpExplainer from "@/components/rewards/XpExplainer";
 import TerritoryTab from "@/components/rewards/TerritoryTab";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { underlineTabsListClass, underlineTabsTriggerClass } from "@/components/ui/underline-tabs";
 import type { RankTier } from "@/lib/ranks";
 
 interface Props {

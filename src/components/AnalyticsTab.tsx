@@ -37,28 +37,28 @@ const AnalyticsTab = ({ lang }: Props) => {
             : "Track your training load, trends and running form"}
         </p>
 
-        {/* Sub-tab switcher */}
-        <div className="grid grid-cols-2 gap-1 p-1 rounded-xl bg-muted mb-2">
+        {/* Sub-tab switcher (underline style) */}
+        <div className="flex w-full border-b border-border mb-2">
           <button
             onClick={() => setSubTab("performance")}
-            className={`flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-medium transition-colors ${
+            className={`flex-1 flex items-center justify-center gap-1.5 pb-3 pt-2 -mb-px border-b-2 text-base font-semibold transition-colors ${
               sub === "performance"
-                ? "bg-card text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
+                ? "border-foreground text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground"
             }`}
           >
-            <LineChart size={15} />
+            <LineChart size={16} />
             {lang === "zh" ? "表現" : "Performance"}
           </button>
           <button
             onClick={() => setSubTab("posture")}
-            className={`flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-medium transition-colors ${
+            className={`flex-1 flex items-center justify-center gap-1.5 pb-3 pt-2 -mb-px border-b-2 text-base font-semibold transition-colors ${
               sub === "posture"
-                ? "bg-card text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
+                ? "border-foreground text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground"
             }`}
           >
-            <ScanEye size={15} />
+            <ScanEye size={16} />
             {lang === "zh" ? "跑姿" : "Posture"}
           </button>
         </div>

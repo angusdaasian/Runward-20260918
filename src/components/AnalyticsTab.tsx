@@ -28,10 +28,6 @@ const AnalyticsTab = ({ lang }: Props) => {
   return (
     <div>
       <div className="px-5 pt-6 max-w-lg mx-auto">
-        <h1 className="font-display text-3xl font-bold text-foreground mb-3">
-          {lang === "zh" ? "分析" : "Analytics"}
-        </h1>
-
         {/* Sub-tab switcher (underline style) */}
         <div className="flex w-full border-b border-border mb-2">
           <button

@@ -881,15 +881,8 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
 
   return (
     <div className="pb-8 max-w-lg mx-auto">
-      {/* Header */}
-      <div className="flex items-start justify-between mb-4 px-5 pt-6">
-        <h1 className="font-display text-3xl font-bold text-foreground">
-          {t("training", lang)}
-        </h1>
-      </div>
-
       {/* Section toggle (underline style) */}
-      <div className="flex w-full border-b border-border mb-4 px-5">
+      <div className="flex w-full border-b border-border mb-4 px-5 pt-6">
         {([
           { id: "training", label: lang === "zh" ? "配速" : "Paces" },
           { id: "free", label: lang === "zh" ? "免費" : "Free" },

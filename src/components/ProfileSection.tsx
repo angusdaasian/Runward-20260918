@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
-import { Camera, Save, LogOut, Trash2, Mail, Pencil, Zap, Sparkles, Loader2, X } from "lucide-react";
+import { Camera, Save, LogOut, Trash2, Mail, Pencil, Zap, Sparkles, Loader2, X, Heart, Trophy, ChevronRight, ChevronLeft } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Lang, t } from "@/lib/i18n";
 import { calculateRunningScore } from "@/lib/vdot";
@@ -61,7 +61,15 @@ interface PB {
   seconds: number;
 }
 
-const ProfileSection = ({ lang }: { lang: Lang }) => {
+type ProfileSubpage = "main" | "hr-zones" | "personal-bests";
+
+interface ProfileSectionProps {
+  lang: Lang;
+  subpage?: ProfileSubpage;
+  onNavigate?: (sub: ProfileSubpage) => void;
+}
+
+const ProfileSection = ({ lang, subpage = "main", onNavigate }: ProfileSectionProps) => {
   const { user, signOut } = useAuth();
   const { toast } = useToast();
   const { activities } = useActivities();
@@ -364,6 +372,142 @@ const ProfileSection = ({ lang }: { lang: Lang }) => {
     </div>
   );
 
+  // ── Subpage: Heart Rate Zones ──
+  if (subpage === "hr-zones") {
+    return (
+      <div className="space-y-4">
+        <button
+          onClick={() => onNavigate?.("main")}
+          className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+        >
+          <ChevronLeft size={16} />
+          {lang === "zh" ? "返回" : "Back"}
+        </button>
+        <h2 className="font-display text-2xl font-bold text-foreground">
+          {lang === "zh" ? "心率區間" : "Heart Rate Zones"}
+        </h2>
+        <HeartRateZonesCard
+          lang={lang}
+          initialAge={profile.age}
+          initialMaxHr={profile.max_heartrate}
+          initialRestingHr={profile.resting_heartrate}
+          initialCustomZones={profile.custom_hr_zones}
+          onSaved={(maxHr, restingHr, customZones) => {
+            setProfile((p) => {
+              const updated = p ? { ...p, max_heartrate: maxHr, resting_heartrate: restingHr, custom_hr_zones: customZones } : p;
+              _cachedProfile = updated;
+              return updated;
+            });
+          }}
+        />
+      </div>
+    );
+  }
+
+  // ── Subpage: Personal Bests ──
+  if (subpage === "personal-bests") {
+    return (
+      <div className="space-y-4">
+        <button
+          onClick={() => onNavigate?.("main")}
+          className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+        >
+          <ChevronLeft size={16} />
+          {lang === "zh" ? "返回" : "Back"}
+        </button>
+        <h2 className="font-display text-2xl font-bold text-foreground">
+          {lang === "zh" ? "個人最佳" : "Personal Bests"}
+        </h2>
+
+        {runningScore && (
+          <div className="bg-card border border-border rounded-xl p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="bg-primary/10 rounded-lg p-2">
+                  <Zap size={20} className="text-primary" />
+                </div>
+                <div>
+                  <span className="text-sm font-medium text-foreground block">
+                    {lang === "zh" ? "跑力指數" : "Running Score"}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    {lang === "zh" ? "根據你的最佳成績計算" : "Based on your best PB"}
+                  </span>
+                </div>
+              </div>
+              <span className="text-3xl font-display font-bold text-primary">{runningScore}</span>
+            </div>
+          </div>
+        )}
+
+        <div className="bg-card border border-border rounded-xl p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-display font-semibold text-foreground">
+              {lang === "zh" ? "個人最佳" : "Personal Bests"}
+            </h3>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleDetectPBs}
+              disabled={detecting}
+              className="h-7 text-xs gap-1.5"
+            >
+              {detecting ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
+              {lang === "zh" ? "從活動偵測" : "Detect from activities"}
+            </Button>
+          </div>
+
+          {pbs.length > 0 && (
+            <div className="space-y-2 mb-4">
+              {pbs.map((pb) => (
+                <div key={pb.id} className="flex items-center justify-between bg-accent rounded-lg px-3 py-2">
+                  <span className="text-sm font-medium text-foreground">{pb.distance}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground">{formatTime(pb.hours, pb.minutes, pb.seconds)}</span>
+                    <button onClick={() => handleDeletePB(pb.id)} className="text-muted-foreground hover:text-destructive">
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="space-y-2">
+            <div className="flex flex-wrap gap-1.5">
+              {DISTANCES.map((d) => (
+                <button
+                  key={d}
+                  onClick={() => setNewDist(d)}
+                  className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all ${
+                    newDist === d ? "bg-primary text-primary-foreground" : "bg-accent text-foreground"
+                  }`}
+                >
+                  {d}
+                </button>
+              ))}
+            </div>
+            {newDist && (
+              <div className="space-y-2">
+                <div className="flex gap-2">
+                  <Input placeholder="H" type="number" min={0} value={newH} onChange={(e) => setNewH(e.target.value)} className="text-center h-8 text-sm" />
+                  <Input placeholder="M" type="number" min={0} max={59} value={newM} onChange={(e) => setNewM(e.target.value)} className="text-center h-8 text-sm" />
+                  <Input placeholder="S" type="number" min={0} max={59} value={newS} onChange={(e) => setNewS(e.target.value)} className="text-center h-8 text-sm" />
+                  <Button size="sm" onClick={handleAddPB} disabled={isPBFasterThanWR()} className="h-8">Add</Button>
+                </div>
+                {isPBFasterThanWR() && (
+                  <p className="text-xs text-amber-500 font-medium">
+                    {lang === "zh" ? "你比目前的世界紀錄還快！😅" : "You are faster than the current world record! 😅"}
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
       {/* Profile Card */}
@@ -501,112 +645,49 @@ const ProfileSection = ({ lang }: { lang: Lang }) => {
         )}
       </div>
 
-      {/* Heart Rate Zones — separate card */}
-      <HrZonesScrollTarget>
-        <HeartRateZonesCard
-          lang={lang}
-          initialAge={profile.age}
-          initialMaxHr={profile.max_heartrate}
-          initialRestingHr={profile.resting_heartrate}
-          initialCustomZones={profile.custom_hr_zones}
-          onSaved={(maxHr, restingHr, customZones) => {
-            setProfile((p) => {
-              const updated = p ? { ...p, max_heartrate: maxHr, resting_heartrate: restingHr, custom_hr_zones: customZones } : p;
-              _cachedProfile = updated;
-              return updated;
-            });
-          }}
-        />
-      </HrZonesScrollTarget>
-
-      {/* Running Score */}
-      {runningScore && (
-        <div className="bg-card border border-border rounded-xl p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="bg-primary/10 rounded-lg p-2">
-                <Zap size={20} className="text-primary" />
-              </div>
-              <div>
-                <span className="text-sm font-medium text-foreground block">
-                  {lang === "zh" ? "跑力指數" : "Running Score"}
-                </span>
-                <span className="text-xs text-muted-foreground">
-                  {lang === "zh" ? "根據你的最佳成績計算" : "Based on your best PB"}
-                </span>
-              </div>
-            </div>
-            <span className="text-3xl font-display font-bold text-primary">{runningScore}</span>
+      {/* Heart Rate Zones — navigation row */}
+      <button
+        onClick={() => onNavigate?.("hr-zones")}
+        className="w-full bg-card border border-border rounded-xl p-4 flex items-center justify-between"
+      >
+        <div className="flex items-center gap-3">
+          <Heart size={20} className="text-destructive" />
+          <div className="text-left">
+            <span className="font-medium text-foreground block">
+              {lang === "zh" ? "心率區間" : "Heart Rate Zones"}
+            </span>
+            <span className="text-xs text-muted-foreground">
+              {profile.max_heartrate
+                ? (lang === "zh"
+                    ? `最大 ${profile.max_heartrate} · 靜息 ${profile.resting_heartrate ?? 60} bpm`
+                    : `Max ${profile.max_heartrate} · Rest ${profile.resting_heartrate ?? 60} bpm`)
+                : (lang === "zh" ? "尚未設定" : "Not set")}
+            </span>
           </div>
         </div>
-      )}
+        <ChevronRight size={18} className="text-muted-foreground" />
+      </button>
 
-      {/* Personal Bests */}
-      <div className="bg-card border border-border rounded-xl p-4">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="font-display font-semibold text-foreground">
-            {lang === "zh" ? "個人最佳" : "Personal Bests"}
-          </h3>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={handleDetectPBs}
-            disabled={detecting}
-            className="h-7 text-xs gap-1.5"
-          >
-            {detecting ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
-            {lang === "zh" ? "從活動偵測" : "Detect from activities"}
-          </Button>
-        </div>
-
-        {pbs.length > 0 && (
-          <div className="space-y-2 mb-4">
-            {pbs.map((pb) => (
-              <div key={pb.id} className="flex items-center justify-between bg-accent rounded-lg px-3 py-2">
-                <span className="text-sm font-medium text-foreground">{pb.distance}</span>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-muted-foreground">{formatTime(pb.hours, pb.minutes, pb.seconds)}</span>
-                  <button onClick={() => handleDeletePB(pb.id)} className="text-muted-foreground hover:text-destructive">
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-              </div>
-            ))}
+      {/* Personal Bests — navigation row */}
+      <button
+        onClick={() => onNavigate?.("personal-bests")}
+        className="w-full bg-card border border-border rounded-xl p-4 flex items-center justify-between"
+      >
+        <div className="flex items-center gap-3">
+          <Trophy size={20} className="text-primary" />
+          <div className="text-left">
+            <span className="font-medium text-foreground block">
+              {lang === "zh" ? "個人最佳" : "Personal Bests"}
+            </span>
+            <span className="text-xs text-muted-foreground">
+              {pbs.length > 0
+                ? (lang === "zh" ? `${pbs.length} 項紀錄${runningScore ? ` · 跑力 ${runningScore}` : ""}` : `${pbs.length} record${pbs.length > 1 ? "s" : ""}${runningScore ? ` · Score ${runningScore}` : ""}`)
+                : (lang === "zh" ? "尚未新增" : "None added yet")}
+            </span>
           </div>
-        )}
-
-        {/* Add PB Form */}
-        <div className="space-y-2">
-          <div className="flex flex-wrap gap-1.5">
-            {DISTANCES.map((d) => (
-              <button
-                key={d}
-                onClick={() => setNewDist(d)}
-                className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all ${
-                  newDist === d ? "bg-primary text-primary-foreground" : "bg-accent text-foreground"
-                }`}
-              >
-                {d}
-              </button>
-            ))}
-          </div>
-          {newDist && (
-            <div className="space-y-2">
-              <div className="flex gap-2">
-                <Input placeholder="H" type="number" min={0} value={newH} onChange={(e) => setNewH(e.target.value)} className="text-center h-8 text-sm" />
-                <Input placeholder="M" type="number" min={0} max={59} value={newM} onChange={(e) => setNewM(e.target.value)} className="text-center h-8 text-sm" />
-                <Input placeholder="S" type="number" min={0} max={59} value={newS} onChange={(e) => setNewS(e.target.value)} className="text-center h-8 text-sm" />
-                <Button size="sm" onClick={handleAddPB} disabled={isPBFasterThanWR()} className="h-8">Add</Button>
-              </div>
-              {isPBFasterThanWR() && (
-                <p className="text-xs text-amber-500 font-medium">
-                  {lang === "zh" ? "你比目前的世界紀錄還快！😅" : "You are faster than the current world record! 😅"}
-                </p>
-              )}
-            </div>
-          )}
         </div>
-      </div>
+        <ChevronRight size={18} className="text-muted-foreground" />
+      </button>
     </div>
   );
 };

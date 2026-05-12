@@ -520,12 +520,9 @@ const RaceTab = ({ lang }: Props) => {
 
   return (
     <FadeIn className="px-5 pt-6 max-w-lg mx-auto pb-24">
-      <h1 className="font-display text-2xl font-bold text-foreground mb-1">
+      <h1 className="font-display text-2xl font-bold text-foreground mb-3">
         {lang === "zh" ? "賽事" : "Races"}
       </h1>
-      <p className="text-sm text-muted-foreground mb-3">
-        {lang === "zh" ? "探索與管理你的跑步賽事" : "Discover and manage your running events"}
-      </p>
 
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "calendar" | "my")} className="mb-3">
         <TabsList className={underlineTabsListClass}>

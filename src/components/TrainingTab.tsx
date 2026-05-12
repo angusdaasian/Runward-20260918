@@ -888,25 +888,27 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
         </h1>
       </div>
 
-      {/* Section toggle */}
-      <div className="flex gap-1 bg-accent rounded-lg p-1 mb-4 mx-5">
-        <button onClick={() => handleSectionSwitch("training")}
-          className={`flex-1 py-2 rounded-md text-xs font-medium transition-all ${section === "training" ? "bg-primary text-primary-foreground" : "text-foreground"}`}>
-          {lang === "zh" ? "配速" : "Paces"}
-        </button>
-        <button onClick={() => handleSectionSwitch("free")}
-          className={`flex-1 py-2 rounded-md text-xs font-medium transition-all ${section === "free" ? "bg-primary text-primary-foreground" : "text-foreground"}`}>
-          {lang === "zh" ? "免費" : "Free"}
-        </button>
-        <button onClick={() => handleSectionSwitch("program")}
-          className={`flex-1 py-2 rounded-md text-xs font-medium transition-all flex items-center justify-center gap-1 ${section === "program" ? "bg-primary text-primary-foreground" : "text-foreground"}`}>
-          {!isPremium && <Lock size={12} />}
-          {lang === "zh" ? "AI" : "AI"}
-        </button>
-        <button onClick={() => handleSectionSwitch("custom")}
-          className={`flex-1 py-2 rounded-md text-xs font-medium transition-all ${section === "custom" ? "bg-primary text-primary-foreground" : "text-foreground"}`}>
-          {lang === "zh" ? "自訂" : "Custom"}
-        </button>
+      {/* Section toggle (underline style) */}
+      <div className="flex w-full border-b border-border mb-4 px-5">
+        {([
+          { id: "training", label: lang === "zh" ? "配速" : "Paces" },
+          { id: "free", label: lang === "zh" ? "免費" : "Free" },
+          { id: "program", label: "AI", showLock: !isPremium },
+          { id: "custom", label: lang === "zh" ? "自訂" : "Custom" },
+        ] as const).map((s) => (
+          <button
+            key={s.id}
+            onClick={() => handleSectionSwitch(s.id as any)}
+            className={`flex-1 flex items-center justify-center gap-1 pb-3 pt-2 -mb-px border-b-2 text-base font-semibold transition-colors ${
+              section === s.id
+                ? "border-foreground text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {(s as any).showLock && <Lock size={12} />}
+            {s.label}
+          </button>
+        ))}
       </div>
 
       {/* ═══════════ SECTION: PACES (Calculator + Paces) ═══════════ */}

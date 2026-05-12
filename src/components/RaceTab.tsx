@@ -10,6 +10,7 @@ import { useOnlineStatus } from "@/hooks/use-online-status";
 import { getCached, setCached, CacheKeys } from "@/lib/offlineCache";
 import { WifiOff } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { underlineTabsListClass, underlineTabsTriggerClass } from "@/components/ui/underline-tabs";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/hooks/use-toast";
 
@@ -527,9 +528,9 @@ const RaceTab = ({ lang }: Props) => {
       </p>
 
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "calendar" | "my")} className="mb-3">
-        <TabsList className="grid grid-cols-2 w-full">
-          <TabsTrigger value="calendar">{lang === "zh" ? "賽事日曆" : "Race Calendar"}</TabsTrigger>
-          <TabsTrigger value="my">
+        <TabsList className={underlineTabsListClass}>
+          <TabsTrigger value="calendar" className={underlineTabsTriggerClass}>{lang === "zh" ? "賽事日曆" : "Race Calendar"}</TabsTrigger>
+          <TabsTrigger value="my" className={underlineTabsTriggerClass}>
             {lang === "zh" ? "我的賽事" : "My Races"}
             {myRaces.length > 0 && (
               <span className="ml-1.5 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-primary text-primary-foreground text-[10px] font-semibold">

@@ -15,6 +15,7 @@ import RankUpOverlay from "@/components/rewards/RankUpOverlay";
 import XpExplainer from "@/components/rewards/XpExplainer";
 import TerritoryTab from "@/components/rewards/TerritoryTab";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { underlineTabsListClass, underlineTabsTriggerClass } from "@/components/ui/underline-tabs";
 import type { RankTier } from "@/lib/ranks";
 
 interface Props {
@@ -94,14 +95,14 @@ const RewardsTab = ({ lang }: Props) => {
       <FadeIn className="px-5 pt-4 max-w-lg mx-auto pb-24 space-y-5">
         {/* Sub-tabs: Rewards | Leaderboards | CityHunter */}
         <Tabs defaultValue="rewards" className="w-full">
-          <TabsList className="w-full grid grid-cols-3">
-            <TabsTrigger value="rewards">
+          <TabsList className={underlineTabsListClass}>
+            <TabsTrigger value="rewards" className={underlineTabsTriggerClass}>
               {lang === "zh" ? "獎勵" : "Rewards"}
             </TabsTrigger>
-            <TabsTrigger value="leaderboards">
+            <TabsTrigger value="leaderboards" className={underlineTabsTriggerClass}>
               {lang === "zh" ? "排行榜" : "Leaderboards"}
             </TabsTrigger>
-            <TabsTrigger value="territory">
+            <TabsTrigger value="territory" className={underlineTabsTriggerClass}>
               {lang === "zh" ? "城市獵人" : "CityHunter"}
             </TabsTrigger>
           </TabsList>

@@ -13,6 +13,15 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { updateHeaderCache } from "@/components/AppHeader";
 import { useActivities } from "@/hooks/use-activities";
 import HeartRateZonesCard from "@/components/HeartRateZonesCard";
+import { ZONE_LABELS, zoneBoundaries, estimateMaxHr, estimateRestingHr } from "@/lib/hrZones";
+
+const ZONE_INFO: Array<{ key: string; name: string; nameZh: string; desc: string; descZh: string }> = [
+  { key: "z1", name: "Recovery", nameZh: "恢復", desc: "Easy effort for warm-ups, cool-downs, and active recovery.", descZh: "輕鬆配速，適合熱身、緩和及主動恢復。" },
+  { key: "z2", name: "Endurance", nameZh: "耐力", desc: "Comfortable effort that burns fat and builds endurance.", descZh: "舒適配速，燃燒脂肪並建立耐力基礎。" },
+  { key: "z3", name: "Tempo", nameZh: "節奏", desc: "Challenging but sustainable. Improves aerobic fitness and muscle strength.", descZh: "具挑戰但可持續，提升有氧能力與肌力。" },
+  { key: "z4", name: "Threshold", nameZh: "乳酸閾", desc: "Hard effort. Builds speed and power while training your body to tolerate lactic acid.", descZh: "高強度，提升速度與耐乳酸能力。" },
+  { key: "z5", name: "Anaerobic", nameZh: "無氧", desc: "Maximum effort. Pushes your body to its limit — best kept for short bursts.", descZh: "極限強度，僅適合短時間衝刺。" },
+];
 
 interface Profile {
   display_name: string | null;

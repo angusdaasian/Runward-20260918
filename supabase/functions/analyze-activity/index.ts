@@ -464,7 +464,35 @@ serve(async (req) => {
       }
     }
 
-    // --- Plan context (unchanged logic) ---
+    // --- Activity-location historical weather (any activity with GPS) ---
+    // If we don't already have race-day weather, try to fetch the historical
+    // temperature/conditions for the spot the activity actually started at.
+    if (!weatherSummary && activityDateStr) {
+      let coord: { lat: number; lon: number } | null = null;
+      if (typeof startLat === "number" && typeof startLon === "number" &&
+          Math.abs(startLat) <= 90 && Math.abs(startLon) <= 180) {
+        coord = { lat: startLat, lon: startLon };
+      } else {
+        coord = firstPointFromPolyline(summaryPolyline);
+      }
+      if (coord) {
+        try {
+          const w = await fetchHistoricalWeather(coord.lat, coord.lon, activityDateStr);
+          if (w) {
+            const summary = summarizeWeather(w);
+            if (summary) {
+              weatherJson = w;
+              weatherSummary = summary;
+              weatherLocationName = await reverseGeocode(coord.lat, coord.lon);
+              weatherJson._location = weatherLocationName || `${coord.lat.toFixed(2)},${coord.lon.toFixed(2)}`;
+              weatherJson._summary = summary;
+            }
+          }
+        } catch (e) {
+          console.warn("activity-location weather fetch failed:", (e as Error).message);
+        }
+      }
+    }
     const { data: plans } = await serviceClient
       .from("training_plans")
       .select("*")

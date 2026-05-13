@@ -173,6 +173,80 @@ function localizeDescription(day: DayPlan, lang: Lang): string {
   if (paceStr && distStr) return `${distStr} at ${paceStr} pace`;
   if (distStr) return `${distStr} run`;
   return day.description;
+
+// ─── HR zone helpers for plan workouts ───
+type HrBounds = { z1: number; z2: number; z3: number; z4: number; z5: number; max: number };
+
+/** Map a workout type to its target HR zone key (1..5) */
+function zoneForType(type: string): 1 | 2 | 3 | 4 | 5 {
+  switch (type) {
+    case "Recovery":
+    case "Recovery Run":
+      return 1;
+    case "Easy":
+    case "Easy Run":
+    case "Long":
+    case "Long Run":
+    case "Cross Training":
+      return 2;
+    case "Progression":
+    case "Progression Run":
+      return 3;
+    case "Tempo":
+    case "Tempo Run":
+    case "Race Pace":
+      return 4;
+    case "Interval":
+      return 5;
+    default:
+      return 2;
+  }
+}
+
+/** Format an HR range string like "138-152 bpm" for a given zone using bounds. */
+function hrRangeForZone(zone: 1 | 2 | 3 | 4 | 5, b: HrBounds | null): string | null {
+  if (!b) return null;
+  const lows = [b.z1, b.z2, b.z3, b.z4, b.z5];
+  const lo = lows[zone - 1];
+  const hi = zone === 5 ? b.max : lows[zone] - 1;
+  if (!isFinite(lo) || !isFinite(hi) || hi <= lo) return null;
+  return `${lo}-${hi} bpm`;
+}
+
+const ZONE_LABEL: Record<1 | 2 | 3 | 4 | 5, { en: string; zh: string }> = {
+  1: { en: "Z1 Recovery", zh: "Z1 恢復" },
+  2: { en: "Z2 Easy", zh: "Z2 輕鬆" },
+  3: { en: "Z3 Aerobic", zh: "Z3 有氧" },
+  4: { en: "Z4 Threshold", zh: "Z4 乳酸閾" },
+  5: { en: "Z5 Max", zh: "Z5 極限" },
+};
+
+/** Parse "800m x 8" / "5x1km" / "8x400m" rep notation from description. */
+function parseIntervalReps(desc?: string | null): { reps: number; dist: number; unit: "m" | "km" } | null {
+  if (!desc) return null;
+  // 800m x 8  |  8 x 800m  |  5x1km  |  6 × 1.2km
+  const m1 = desc.match(/(\d+(?:\.\d+)?)\s*(m|km)\s*[x×]\s*(\d+)/i);
+  if (m1) return { reps: parseInt(m1[3]), dist: parseFloat(m1[1]), unit: m1[2].toLowerCase() as any };
+  const m2 = desc.match(/(\d+)\s*[x×]\s*(\d+(?:\.\d+)?)\s*(m|km)/i);
+  if (m2) return { reps: parseInt(m2[1]), dist: parseFloat(m2[2]), unit: m2[3].toLowerCase() as any };
+  return null;
+}
+function parseIntervalRest(desc?: string | null): string | null {
+  if (!desc) return null;
+  const m = desc.match(/rest\s*([\d:]+)/i) || desc.match(/休息\s*([\d:]+)/);
+  return m ? m[1] : null;
+}
+
+/** Slow a pace string (e.g. "4:05/km") by a multiplier (>1 → slower). */
+function adjustPace(pace: string | null | undefined, mult: number): string | null {
+  if (!pace) return null;
+  const m = pace.match(/(\d+):(\d+)/);
+  if (!m) return pace;
+  const sec = (parseInt(m[1]) * 60 + parseInt(m[2])) * mult;
+  const mm = Math.floor(sec / 60);
+  const ss = Math.round(sec % 60);
+  const unit = /\/(km|mi)\b/i.exec(pace)?.[1] || "km";
+  return `${mm}:${String(ss).padStart(2, "0")}/${unit}`;
 }
 
 function suggestPace(type: string, targetTime: string, distance: string): { pace: string; description: string; descZh: string } {

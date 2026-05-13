@@ -416,20 +416,41 @@ export function useActivities() {
   });
 
   // Merge Strava + Apple Health + Garmin + Terra activities (prefer Terra over duplicate Garmin imports)
+  // Wait until BOTH garmin and terra queries have completed at least once before
+  // running dedup. Otherwise on refocus one query may briefly return empty/stale
+  // data while the other has fresh data, causing activities to flicker/disappear.
   const mergedActivities = useMemo(() => {
     const strava = activitiesQuery.data || [];
     const ah = appleHealthQuery.data || [];
     const gm = garminQuery.data || [];
     const tr = terraQuery.data || [];
-    const filteredGarmin = gm.filter((g) => !tr.some((t) => {
-      const timeDiff = Math.abs(new Date(g.start_date).getTime() - new Date(t.start_date).getTime());
-      const distanceDiff = Math.abs((g.distance || 0) - (t.distance || 0));
-      return timeDiff < 5 * 60 * 1000 && distanceDiff < 100;
-    }));
+
+    // If either source is still loading for the first time, skip dedup and
+    // show whatever we already have rather than risk dropping rows.
+    const bothLoaded =
+      (!garminQuery.isLoading || garminQuery.isFetched) &&
+      (!terraQuery.isLoading || terraQuery.isFetched);
+
+    const filteredGarmin = bothLoaded
+      ? gm.filter((g) => !tr.some((t) => {
+          const timeDiff = Math.abs(new Date(g.start_date).getTime() - new Date(t.start_date).getTime());
+          const distanceDiff = Math.abs((g.distance || 0) - (t.distance || 0));
+          return timeDiff < 5 * 60 * 1000 && distanceDiff < 100;
+        }))
+      : gm;
     const all = [...strava, ...ah, ...filteredGarmin, ...tr];
     all.sort((a, b) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime());
     return all;
-  }, [activitiesQuery.data, appleHealthQuery.data, garminQuery.data, terraQuery.data]);
+  }, [
+    activitiesQuery.data,
+    appleHealthQuery.data,
+    garminQuery.data,
+    terraQuery.data,
+    garminQuery.isLoading,
+    garminQuery.isFetched,
+    terraQuery.isLoading,
+    terraQuery.isFetched,
+  ]);
 
   // Auto-link races to activities: when an activity exists on a race day and
   // the race has no finish time yet, fill it from the activity's elapsed_time.

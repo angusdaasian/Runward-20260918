@@ -580,6 +580,32 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
   const [editPace, setEditPace] = useState("");
   const [editDescription, setEditDescription] = useState("");
 
+  // User HR profile → zone bounds for showing HR ranges in the plan
+  const [hrBounds, setHrBounds] = useState<HrBounds | null>(null);
+  useEffect(() => {
+    if (!user) { setHrBounds(null); return; }
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await supabase
+          .from("profiles" as any)
+          .select("age, max_heartrate, resting_heartrate, custom_hr_zones")
+          .eq("id", user.id)
+          .maybeSingle();
+        const p: any = data || {};
+        const max = estimateMaxHr(p.age, p.max_heartrate);
+        const rest = estimateRestingHr(p.resting_heartrate);
+        const custom = isValidCustomZones(p.custom_hr_zones) ? (p.custom_hr_zones as number[]) : null;
+        const b = zoneBoundaries(max, rest, custom);
+        if (!cancelled) setHrBounds({ ...b, max });
+      } catch {
+        if (!cancelled) setHrBounds(null);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [user]);
+
+
   // Load existing plan (cache-then-network so it works offline)
   useEffect(() => {
     if (!user) return;

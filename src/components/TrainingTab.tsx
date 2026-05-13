@@ -444,16 +444,16 @@ const DraggableDay = ({
 
 // Calendar day list with long-press drag-to-swap (within a week)
 const CalendarDayList = ({
-  days, weekIdx, lang, onSwap, onAddClick, onEditClick,
+  days, weekIdx, lang, hrBounds, onSwap, onAddClick, onEditClick,
 }: {
   days: DayPlan[];
   weekIdx: number;
   lang: Lang;
+  hrBounds: HrBounds | null;
   onSwap: (fromIdx: number, toIdx: number) => void;
   onAddClick: (idx: number) => void;
   onEditClick: (idx: number, day: DayPlan) => void;
 }) => {
-  // Long-press: 250ms hold before drag begins (mouse + touch)
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { delay: 250, tolerance: 5 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } }),
@@ -486,6 +486,7 @@ const CalendarDayList = ({
               lang={lang}
               isToday={isToday}
               dayNum={dayNum}
+              hrBounds={hrBounds}
               onEditClick={() => onEditClick(i, day)}
               onAddClick={() => onAddClick(i)}
             />

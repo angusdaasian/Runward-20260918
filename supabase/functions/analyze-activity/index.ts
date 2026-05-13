@@ -163,6 +163,48 @@ async function extractCityFromRaceName(raceName: string, apiKey: string): Promis
   }
 }
 
+// Decode an encoded Google polyline (precision 5) and return the first [lat, lon].
+// Returns null if the string is empty or malformed.
+function firstPointFromPolyline(encoded: string | null | undefined): { lat: number; lon: number } | null {
+  if (!encoded || typeof encoded !== "string") return null;
+  try {
+    let index = 0;
+    const decodeOne = (): number => {
+      let result = 0, shift = 0, b = 0;
+      do {
+        if (index >= encoded.length) throw new Error("polyline truncated");
+        b = encoded.charCodeAt(index++) - 63;
+        result |= (b & 0x1f) << shift;
+        shift += 5;
+      } while (b >= 0x20);
+      const dlat = (result & 1) ? ~(result >> 1) : (result >> 1);
+      return dlat;
+    };
+    const lat = decodeOne() * 1e-5;
+    const lon = decodeOne() * 1e-5;
+    if (Math.abs(lat) > 90 || Math.abs(lon) > 180) return null;
+    return { lat, lon };
+  } catch (e) {
+    console.warn("firstPointFromPolyline failed:", (e as Error).message);
+    return null;
+  }
+}
+
+// Reverse-geocode a lat/lon to a human-readable city name via Open-Meteo.
+async function reverseGeocode(lat: number, lon: number): Promise<string | null> {
+  try {
+    const url = `https://geocoding-api.open-meteo.com/v1/reverse?latitude=${lat}&longitude=${lon}&count=1&language=en&format=json`;
+    const resp = await fetch(url);
+    if (!resp.ok) return null;
+    const data = await resp.json();
+    const r = data?.results?.[0];
+    if (!r) return null;
+    return `${r.name}${r.country ? ", " + r.country : ""}`;
+  } catch {
+    return null;
+  }
+}
+
 function summarizeWeather(weather: any): string {
   if (!weather?.daily) return "";
   const d = weather.daily;

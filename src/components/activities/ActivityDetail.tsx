@@ -1411,8 +1411,38 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
             </span>
           </div>
         ) : aiAnalysis ? (
-          <div className="prose prose-sm dark:prose-invert max-w-none text-foreground text-sm [&_h2]:text-base [&_h2]:font-bold [&_h2]:mt-3 [&_h2]:mb-1 [&_ul]:my-1 [&_li]:my-0.5">
-            <ReactMarkdown>{aiAnalysis}</ReactMarkdown>
+          <div className="relative group">
+            <button
+              type="button"
+              onClick={async () => {
+                try {
+                  if (navigator.clipboard?.writeText) {
+                    await navigator.clipboard.writeText(aiAnalysis);
+                  } else {
+                    const ta = document.createElement("textarea");
+                    ta.value = aiAnalysis;
+                    ta.style.position = "fixed";
+                    ta.style.opacity = "0";
+                    document.body.appendChild(ta);
+                    ta.select();
+                    document.execCommand("copy");
+                    document.body.removeChild(ta);
+                  }
+                  setAiCopied(true);
+                  toast.success(lang === "zh" ? "已複製" : "Copied");
+                  setTimeout(() => setAiCopied(false), 1500);
+                } catch {
+                  toast.error(lang === "zh" ? "複製失敗" : "Failed to copy");
+                }
+              }}
+              className="absolute top-0 right-0 flex items-center gap-1 px-2 py-1 rounded-md text-[11px] text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
+              aria-label={lang === "zh" ? "複製分析" : "Copy analysis"}
+            >
+              {aiCopied ? <><Check size={12} /> {lang === "zh" ? "已複製" : "Copied"}</> : <><Copy size={12} /> {lang === "zh" ? "複製" : "Copy"}</>}
+            </button>
+            <div className="prose prose-sm dark:prose-invert max-w-none text-foreground text-sm [&_h2]:text-base [&_h2]:font-bold [&_h2]:mt-3 [&_h2]:mb-1 [&_ul]:my-1 [&_li]:my-0.5 pr-16">
+              <ReactMarkdown>{aiAnalysis}</ReactMarkdown>
+            </div>
           </div>
         ) : !analysisAttempted ? (
           <div className="text-center py-4">

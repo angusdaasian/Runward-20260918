@@ -219,16 +219,16 @@ async function generateReview(admin: any, userId: string, planRow: any, weekInde
   const endDate = week.days[week.days.length - 1]?.date;
   if (!startDate || !endDate) throw new Error("Week has no dates");
 
-  // Refuse to review a week that hasn't started yet
-  const todayStr = new Date().toISOString().slice(0, 10);
-  if (startDate > todayStr) {
-    const err: any = new Error("Week has not started yet");
-    err.code = "WEEK_IN_FUTURE";
-    err.week_start = startDate;
-    err.week_end = endDate;
-    err.week_index = idx;
-    throw err;
-  }
+  // TEMP: WEEK_IN_FUTURE check disabled for testing — re-enable later
+  // const todayStr = new Date().toISOString().slice(0, 10);
+  // if (startDate > todayStr) {
+  //   const err: any = new Error("Week has not started yet");
+  //   err.code = "WEEK_IN_FUTURE";
+  //   err.week_start = startDate;
+  //   err.week_end = endDate;
+  //   err.week_index = idx;
+  //   throw err;
+  // }
 
   const startISO = `${startDate}T00:00:00.000Z`;
   const endDateObj = new Date(endDate);

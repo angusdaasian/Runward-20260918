@@ -244,6 +244,7 @@ serve(async (req) => {
       raceId, raceName, userComment, forceRefresh,
       hrSamples, distanceSamples, elevationSamples, hrZones,
       cadenceSamples, avgCadence,
+      summaryPolyline, startLat, startLon,
     } = body;
     const isZh = lang === "zh";
 

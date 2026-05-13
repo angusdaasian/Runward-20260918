@@ -984,7 +984,8 @@ You MUST:
   • Recommend specific adjustments to the remaining program (e.g., adjust target pace, add more threshold work, ease off long runs) based on the gap between actual and target.` : ""}`;
     }
     if (weatherSummary) {
-      raceContext += `\n\n🌤 RACE-DAY WEATHER (${weatherLocationName || "race location"}, ${fallbackDateStr}): ${weatherSummary}. Factor weather conditions into your assessment of the effort and pace.`;
+      const weatherLabel = resolvedRaceName ? "RACE-DAY WEATHER" : "ACTIVITY-DAY WEATHER";
+      raceContext += `\n\n🌤 ${weatherLabel} (${weatherLocationName || "activity location"}, ${fallbackDateStr}): ${weatherSummary}. Factor environmental conditions (heat, humidity, wind, precipitation) into your assessment of effort, pace, and HR — e.g. hot/humid days inflate HR and slow pace at the same effort; cool dry days favor faster paces.`;
     }
     if (userComment && typeof userComment === "string" && userComment.trim()) {
       raceContext += `\n\n💬 RUNNER'S OWN COMMENT: "${userComment.trim()}". Use this to understand subjective effort, fatigue, mood — and weight your next-workout suggestion accordingly.`;

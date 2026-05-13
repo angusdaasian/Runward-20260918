@@ -1,50 +1,32 @@
-## Goal
+## Add collapsible Program Header above the week card (AI plan)
 
-Stop the AI from saying "no warmup/cooldown" when the runner logged warmup/cooldown as separate activities. Fetch any of the user's other activities that fall within 1 hour before the start time or 1 hour after the end time of the analyzed activity, and include them in the AI prompt as adjacent-session context.
+A new section appears above the existing "WEEK X" card on the AI plan view. By default it shows only the title; tapping it expands to reveal program meta + this week's progress.
 
-## Where
+### Collapsed (default)
+- Title: `{weeks}-week {distance} program` (e.g. "16-week Half Marathon program")
+- Chevron on the right indicates expand/collapse
 
-`supabase/functions/analyze-activity/index.ts` — analysis branch only (skip for `translate` and `checkCacheOnly` modes). Edit happens just before the `systemPrompt` is built (~line 802, where `raceContext` is composed) so the new context can be appended.
+### Expanded
+- **Week progress**: `Week {currentWeekIdx + 1} / {existingPlan.weeks}`
+- **Target time**: `{existingPlan.target_time}` (formatted, e.g. "Target: 1:45:00")
+- **Weekly distance**: `{completedKm} / {plannedKm} km` with a thin progress bar
+- **Weekly time**: `{completedMin} / {plannedMin} min` with a thin progress bar
 
-## Logic
+### Where the numbers come from
+- `weeks`, `distance`, `target_time`, `weeks` (total) → `existingPlan` (already loaded from `training_plans`)
+- `plannedKm` → sum of `currentWeek.days[].distance_km`
+- `plannedMin` → sum of `distance_km × paceMinPerKm` for each day. Pace parsed from `day.pace` (e.g. "5:30") with a sensible fallback per `type` when missing.
+- `completedKm` / `completedMin` → sum of activities whose `start_date / start_time` falls inside `[currentWeek.days[0].date, currentWeek.days[6].date]`. Uses the existing `useActivities()` merged list (Garmin + Terra + Strava + Apple Health) already wired into TrainingTab's neighbouring components.
 
-1. Compute the analyzed activity's window:
-   - `mainStart = new Date(activity.start_date)`
-   - `mainEnd = mainStart + (activity.elapsed_time || activity.moving_time) seconds`
-   - `windowStart = mainStart - 60 min`
-   - `windowEnd = mainEnd + 60 min`
+### Distance label mapping
+`5K` → "5K", `10K` → "10K", `HM` → "Half Marathon" / "半馬拉松", `FM` → "Full Marathon" / "全馬拉松", `custom` → "Custom" — reuse the existing `FREE_PLAN_LABELS` table at the top of `TrainingTab.tsx`.
 
-2. Query the four activity sources for the same `user_id`, restricted to `start_date/start_time` between `windowStart` and `windowEnd`, excluding the current activity (by `activityDbId` for whichever table it came from):
-   - `strava_activities` (start_date, distance, moving_time, average_speed, average_heartrate, name, sport_type)
-   - `garmin_activities` (start_time, distance_meters, duration_seconds, average_speed, average_hr, activity_name, activity_type)
-   - `terra_activities` (start_time, distance_meters, duration_seconds, average_speed, average_hr, activity_name, activity_type, provider)
-   - `apple_health_activities` (start_date, distance, moving_time, average_speed, average_heartrate, name, sport_type)
-   
-   All four queries run in parallel via `Promise.all`.
+### File touched
+- `src/components/TrainingTab.tsx` — add a small `ProgramHeader` component, render it above the existing week card inside the AI-plan calendar block (around line 1793, before the `<div className="bg-card border border-border rounded-xl p-3 mb-4">` block). No backend / schema changes.
 
-3. Normalize each result to `{ start, end, distanceKm, durationSec, pace, avgHr, name, type, position }` where `position` is:
-   - `"before"` if `start < mainStart`
-   - `"after"` if `start >= mainEnd`
-   - `"overlap"` otherwise (rare but possible — still include and label so the AI doesn't double-count)
-   
-   Sort chronologically.
+### Bilingual strings
+EN/ZH for: "{n}-week {distance} program" / "{n} 週 {distance} 計劃", "Week X of Y" / "第 X 週 / 共 Y 週", "Target time" / "目標時間", "This week" / "本週", "km", "min".
 
-4. Append a new section to `raceContext` (or directly to the user message) only if at least one adjacent activity was found:
-
-   ```
-   🔁 ADJACENT ACTIVITIES (logged separately within ±1h of this activity — treat them as part of the same training session, e.g. warmup or cooldown):
-     • [BEFORE, 18 min before] 1.20 km easy 6:30/km, 8 min, HR 128 — likely warmup
-     • [AFTER, 5 min after]    1.50 km 7:10/km, 11 min, HR 118 — likely cooldown
-   → When evaluating warmup/cooldown adequacy and total session volume, include these. Do NOT say the runner skipped warmup/cooldown if a BEFORE/AFTER entry plausibly served that role.
-   ```
-
-   The "likely warmup / likely cooldown" hint is added only based on position; the AI makes the final call.
-
-5. Both system prompts (EN and ZH) already cover warmup/cooldown only implicitly; no prompt edits required — the new context section is self-explanatory and instructs the AI directly.
-
-## Out of scope
-
-- No DB schema changes.
-- No frontend changes — the client already passes `activity` + `activityDbId`; everything else is server-side.
-- The cached-analysis fast path (`existingAnalysis && !forceRefresh`) is unchanged. Users who want the new behavior on an old activity can use the existing "force refresh" path.
-- We do NOT modify warmup/cooldown detection inside the main activity itself (that's a separate concern handled by lap analysis).
+### Out of scope
+- Custom plan section (the request specifies AI plan only). Same component can be reused later if wanted.
+- Persisting expand/collapse state across sessions (will use local component state).

@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { ArrowLeft, Clock, MapPin, Zap, Heart, TrendingUp, Mountain, Timer, Footprints, Trash2, Pencil, Sparkles, Lock, Gauge, AlertTriangle, Flame, Trophy, MessageSquare, RefreshCw, Share2 } from "lucide-react";
+import { ArrowLeft, Clock, MapPin, Zap, Heart, TrendingUp, Mountain, Timer, Footprints, Trash2, Pencil, Sparkles, Lock, Gauge, AlertTriangle, Flame, Trophy, MessageSquare, RefreshCw, Share2, Copy, Check } from "lucide-react";
 import { shareActivity, shareSplits, shareCharts } from "@/lib/shareActivity";
 import AiPosterDialog from "./AiPosterDialog";
 import CustomShareDialog from "./CustomShareDialog";
@@ -153,6 +153,7 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
   const [nameInput, setNameInput] = useState(activity.name);
   const [savingName, setSavingName] = useState(false);
   const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
+  const [aiCopied, setAiCopied] = useState(false);
   const [aiNextWorkout, setAiNextWorkout] = useState<string | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiLang, setAiLang] = useState<string>(lang);
@@ -241,6 +242,7 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
         ...(raceName ? { raceName } : {}),
         ...(userComment.trim() ? { userComment: userComment.trim() } : {}),
         ...(opts?.forceRefresh ? { forceRefresh: true } : {}),
+        ...(activity.summary_polyline ? { summaryPolyline: activity.summary_polyline } : {}),
       };
       if ((isGarmin || isTerraActivity) && activity.laps && Array.isArray(activity.laps) && activity.laps.length > 0) {
         bodyPayload.garminLaps = activity.laps;
@@ -286,6 +288,13 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
             // Strava cadence is one-leg rpm; double for steps-per-minute equivalent for analysis context
             bodyPayload.cadenceSamples = times.map((t, i) => ({ t, rpm: cadStream.data[i] != null ? cadStream.data[i] * 2 : null })).filter(s => s.rpm != null);
           }
+        }
+        // Pull first GPS point from latlng stream for accurate location-based weather
+        const llStream = streams.find((s: any) => s.type === 'latlng');
+        const first = Array.isArray(llStream?.data) ? llStream.data.find((p: any) => Array.isArray(p) && p.length === 2) : null;
+        if (first && typeof first[0] === 'number' && typeof first[1] === 'number') {
+          bodyPayload.startLat = first[0];
+          bodyPayload.startLon = first[1];
         }
       }
       const { data, error } = await supabase.functions.invoke("analyze-activity", { body: bodyPayload });
@@ -1402,8 +1411,38 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
             </span>
           </div>
         ) : aiAnalysis ? (
-          <div className="prose prose-sm dark:prose-invert max-w-none text-foreground text-sm [&_h2]:text-base [&_h2]:font-bold [&_h2]:mt-3 [&_h2]:mb-1 [&_ul]:my-1 [&_li]:my-0.5">
-            <ReactMarkdown>{aiAnalysis}</ReactMarkdown>
+          <div className="relative group">
+            <button
+              type="button"
+              onClick={async () => {
+                try {
+                  if (navigator.clipboard?.writeText) {
+                    await navigator.clipboard.writeText(aiAnalysis);
+                  } else {
+                    const ta = document.createElement("textarea");
+                    ta.value = aiAnalysis;
+                    ta.style.position = "fixed";
+                    ta.style.opacity = "0";
+                    document.body.appendChild(ta);
+                    ta.select();
+                    document.execCommand("copy");
+                    document.body.removeChild(ta);
+                  }
+                  setAiCopied(true);
+                  toast.success(lang === "zh" ? "已複製" : "Copied");
+                  setTimeout(() => setAiCopied(false), 1500);
+                } catch {
+                  toast.error(lang === "zh" ? "複製失敗" : "Failed to copy");
+                }
+              }}
+              className="absolute top-0 right-0 flex items-center gap-1 px-2 py-1 rounded-md text-[11px] text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
+              aria-label={lang === "zh" ? "複製分析" : "Copy analysis"}
+            >
+              {aiCopied ? <><Check size={12} /> {lang === "zh" ? "已複製" : "Copied"}</> : <><Copy size={12} /> {lang === "zh" ? "複製" : "Copy"}</>}
+            </button>
+            <div className="prose prose-sm dark:prose-invert max-w-none text-foreground text-sm [&_h2]:text-base [&_h2]:font-bold [&_h2]:mt-3 [&_h2]:mb-1 [&_ul]:my-1 [&_li]:my-0.5 pr-16">
+              <ReactMarkdown>{aiAnalysis}</ReactMarkdown>
+            </div>
           </div>
         ) : !analysisAttempted ? (
           <div className="text-center py-4">

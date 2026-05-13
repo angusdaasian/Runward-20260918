@@ -163,6 +163,48 @@ async function extractCityFromRaceName(raceName: string, apiKey: string): Promis
   }
 }
 
+// Decode an encoded Google polyline (precision 5) and return the first [lat, lon].
+// Returns null if the string is empty or malformed.
+function firstPointFromPolyline(encoded: string | null | undefined): { lat: number; lon: number } | null {
+  if (!encoded || typeof encoded !== "string") return null;
+  try {
+    let index = 0;
+    const decodeOne = (): number => {
+      let result = 0, shift = 0, b = 0;
+      do {
+        if (index >= encoded.length) throw new Error("polyline truncated");
+        b = encoded.charCodeAt(index++) - 63;
+        result |= (b & 0x1f) << shift;
+        shift += 5;
+      } while (b >= 0x20);
+      const dlat = (result & 1) ? ~(result >> 1) : (result >> 1);
+      return dlat;
+    };
+    const lat = decodeOne() * 1e-5;
+    const lon = decodeOne() * 1e-5;
+    if (Math.abs(lat) > 90 || Math.abs(lon) > 180) return null;
+    return { lat, lon };
+  } catch (e) {
+    console.warn("firstPointFromPolyline failed:", (e as Error).message);
+    return null;
+  }
+}
+
+// Reverse-geocode a lat/lon to a human-readable city name via Open-Meteo.
+async function reverseGeocode(lat: number, lon: number): Promise<string | null> {
+  try {
+    const url = `https://geocoding-api.open-meteo.com/v1/reverse?latitude=${lat}&longitude=${lon}&count=1&language=en&format=json`;
+    const resp = await fetch(url);
+    if (!resp.ok) return null;
+    const data = await resp.json();
+    const r = data?.results?.[0];
+    if (!r) return null;
+    return `${r.name}${r.country ? ", " + r.country : ""}`;
+  } catch {
+    return null;
+  }
+}
+
 function summarizeWeather(weather: any): string {
   if (!weather?.daily) return "";
   const d = weather.daily;
@@ -202,6 +244,7 @@ serve(async (req) => {
       raceId, raceName, userComment, forceRefresh,
       hrSamples, distanceSamples, elevationSamples, hrZones,
       cadenceSamples, avgCadence,
+      summaryPolyline, startLat, startLon,
     } = body;
     const isZh = lang === "zh";
 
@@ -421,7 +464,35 @@ serve(async (req) => {
       }
     }
 
-    // --- Plan context (unchanged logic) ---
+    // --- Activity-location historical weather (any activity with GPS) ---
+    // If we don't already have race-day weather, try to fetch the historical
+    // temperature/conditions for the spot the activity actually started at.
+    if (!weatherSummary && activityDateStr) {
+      let coord: { lat: number; lon: number } | null = null;
+      if (typeof startLat === "number" && typeof startLon === "number" &&
+          Math.abs(startLat) <= 90 && Math.abs(startLon) <= 180) {
+        coord = { lat: startLat, lon: startLon };
+      } else {
+        coord = firstPointFromPolyline(summaryPolyline);
+      }
+      if (coord) {
+        try {
+          const w = await fetchHistoricalWeather(coord.lat, coord.lon, activityDateStr);
+          if (w) {
+            const summary = summarizeWeather(w);
+            if (summary) {
+              weatherJson = w;
+              weatherSummary = summary;
+              weatherLocationName = await reverseGeocode(coord.lat, coord.lon);
+              weatherJson._location = weatherLocationName || `${coord.lat.toFixed(2)},${coord.lon.toFixed(2)}`;
+              weatherJson._summary = summary;
+            }
+          }
+        } catch (e) {
+          console.warn("activity-location weather fetch failed:", (e as Error).message);
+        }
+      }
+    }
     const { data: plans } = await serviceClient
       .from("training_plans")
       .select("*")
@@ -913,7 +984,8 @@ You MUST:
   • Recommend specific adjustments to the remaining program (e.g., adjust target pace, add more threshold work, ease off long runs) based on the gap between actual and target.` : ""}`;
     }
     if (weatherSummary) {
-      raceContext += `\n\n🌤 RACE-DAY WEATHER (${weatherLocationName || "race location"}, ${fallbackDateStr}): ${weatherSummary}. Factor weather conditions into your assessment of the effort and pace.`;
+      const weatherLabel = resolvedRaceName ? "RACE-DAY WEATHER" : "ACTIVITY-DAY WEATHER";
+      raceContext += `\n\n🌤 ${weatherLabel} (${weatherLocationName || "activity location"}, ${fallbackDateStr}): ${weatherSummary}. Factor environmental conditions (heat, humidity, wind, precipitation) into your assessment of effort, pace, and HR — e.g. hot/humid days inflate HR and slow pace at the same effort; cool dry days favor faster paces.`;
     }
     if (userComment && typeof userComment === "string" && userComment.trim()) {
       raceContext += `\n\n💬 RUNNER'S OWN COMMENT: "${userComment.trim()}". Use this to understand subjective effort, fatigue, mood — and weight your next-workout suggestion accordingly.`;

@@ -173,6 +173,7 @@ function localizeDescription(day: DayPlan, lang: Lang): string {
   if (paceStr && distStr) return `${distStr} at ${paceStr} pace`;
   if (distStr) return `${distStr} run`;
   return day.description;
+}
 
 // ─── HR zone helpers for plan workouts ───
 type HrBounds = { z1: number; z2: number; z3: number; z4: number; z5: number; max: number };

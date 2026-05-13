@@ -14,8 +14,10 @@ import { registerUnsavedChecker } from "@/lib/unsavedGuard";
 import { notifyPlanChanged, subscribePlanChanged } from "@/lib/planEvents";
 import {
   Loader2, Lock, ChevronLeft, ChevronRight, Plus, Calendar, Target, Trophy,
-  Repeat, Route, HelpCircle, X, WifiOff, Sparkles, GripVertical, Save
+  Repeat, Route, HelpCircle, X, WifiOff, Sparkles, GripVertical, Save,
+  ChevronDown, Pencil
 } from "lucide-react";
+import { estimateMaxHr, estimateRestingHr, zoneBoundaries, isValidCustomZones, type ZonePct } from "@/lib/hrZones";
 import {
   DndContext, PointerSensor, TouchSensor, useSensor, useSensors,
   closestCenter, type DragEndEvent

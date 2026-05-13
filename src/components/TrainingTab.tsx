@@ -1809,6 +1809,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                       days={currentWeek.days}
                       weekIdx={currentWeekIdx}
                       lang={lang}
+                      hrBounds={hrBounds}
                       onSwap={(from, to) => swapDays(currentWeekIdx, from, to)}
                       onAddClick={(i) => { setAddingDayIdx(i); setAddRunType(null); setAddDistance(""); }}
                       onEditClick={(i, day) => { setEditingDayIdx(i); setEditDistance(day.distance_km?.toString() || ""); setEditPace(day.pace || ""); setEditDescription(day.description || ""); }}

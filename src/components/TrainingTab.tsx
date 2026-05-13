@@ -12,6 +12,7 @@ import { useOnlineStatus, isOnline } from "@/hooks/use-online-status";
 import { getCached, setCached, CacheKeys } from "@/lib/offlineCache";
 import { registerUnsavedChecker } from "@/lib/unsavedGuard";
 import { notifyPlanChanged, subscribePlanChanged } from "@/lib/planEvents";
+import { useActivities } from "@/hooks/use-activities";
 import {
   Loader2, Lock, ChevronLeft, ChevronRight, Plus, Calendar, Target, Trophy,
   Repeat, Route, HelpCircle, X, WifiOff, Sparkles, GripVertical, Save,

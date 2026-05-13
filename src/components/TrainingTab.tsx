@@ -14,8 +14,10 @@ import { registerUnsavedChecker } from "@/lib/unsavedGuard";
 import { notifyPlanChanged, subscribePlanChanged } from "@/lib/planEvents";
 import {
   Loader2, Lock, ChevronLeft, ChevronRight, Plus, Calendar, Target, Trophy,
-  Repeat, Route, HelpCircle, X, WifiOff, Sparkles, GripVertical, Save
+  Repeat, Route, HelpCircle, X, WifiOff, Sparkles, GripVertical, Save,
+  ChevronDown, Pencil
 } from "lucide-react";
+import { estimateMaxHr, estimateRestingHr, zoneBoundaries, isValidCustomZones } from "@/lib/hrZones";
 import {
   DndContext, PointerSensor, TouchSensor, useSensor, useSensors,
   closestCenter, type DragEndEvent
@@ -173,6 +175,81 @@ function localizeDescription(day: DayPlan, lang: Lang): string {
   return day.description;
 }
 
+// ─── HR zone helpers for plan workouts ───
+type HrBounds = { z1: number; z2: number; z3: number; z4: number; z5: number; max: number };
+
+/** Map a workout type to its target HR zone key (1..5) */
+function zoneForType(type: string): 1 | 2 | 3 | 4 | 5 {
+  switch (type) {
+    case "Recovery":
+    case "Recovery Run":
+      return 1;
+    case "Easy":
+    case "Easy Run":
+    case "Long":
+    case "Long Run":
+    case "Cross Training":
+      return 2;
+    case "Progression":
+    case "Progression Run":
+      return 3;
+    case "Tempo":
+    case "Tempo Run":
+    case "Race Pace":
+      return 4;
+    case "Interval":
+      return 5;
+    default:
+      return 2;
+  }
+}
+
+/** Format an HR range string like "138-152 bpm" for a given zone using bounds. */
+function hrRangeForZone(zone: 1 | 2 | 3 | 4 | 5, b: HrBounds | null): string | null {
+  if (!b) return null;
+  const lows = [b.z1, b.z2, b.z3, b.z4, b.z5];
+  const lo = lows[zone - 1];
+  const hi = zone === 5 ? b.max : lows[zone] - 1;
+  if (!isFinite(lo) || !isFinite(hi) || hi <= lo) return null;
+  return `${lo}-${hi} bpm`;
+}
+
+const ZONE_LABEL: Record<1 | 2 | 3 | 4 | 5, { en: string; zh: string }> = {
+  1: { en: "Z1 Recovery", zh: "Z1 恢復" },
+  2: { en: "Z2 Easy", zh: "Z2 輕鬆" },
+  3: { en: "Z3 Aerobic", zh: "Z3 有氧" },
+  4: { en: "Z4 Threshold", zh: "Z4 乳酸閾" },
+  5: { en: "Z5 Max", zh: "Z5 極限" },
+};
+
+/** Parse "800m x 8" / "5x1km" / "8x400m" rep notation from description. */
+function parseIntervalReps(desc?: string | null): { reps: number; dist: number; unit: "m" | "km" } | null {
+  if (!desc) return null;
+  // 800m x 8  |  8 x 800m  |  5x1km  |  6 × 1.2km
+  const m1 = desc.match(/(\d+(?:\.\d+)?)\s*(m|km)\s*[x×]\s*(\d+)/i);
+  if (m1) return { reps: parseInt(m1[3]), dist: parseFloat(m1[1]), unit: m1[2].toLowerCase() as any };
+  const m2 = desc.match(/(\d+)\s*[x×]\s*(\d+(?:\.\d+)?)\s*(m|km)/i);
+  if (m2) return { reps: parseInt(m2[1]), dist: parseFloat(m2[2]), unit: m2[3].toLowerCase() as any };
+  return null;
+}
+function parseIntervalRest(desc?: string | null): string | null {
+  if (!desc) return null;
+  const m = desc.match(/rest\s*([\d:]+)/i) || desc.match(/休息\s*([\d:]+)/);
+  return m ? m[1] : null;
+}
+
+/** Slow a pace string (e.g. "4:05/km") by a multiplier (>1 → slower). */
+function adjustPace(pace: string | null | undefined, mult: number): string | null {
+  if (!pace) return null;
+  const m = pace.match(/(\d+):(\d+)/);
+  if (!m) return pace;
+  const sec = (parseInt(m[1]) * 60 + parseInt(m[2])) * mult;
+  const mm = Math.floor(sec / 60);
+  const ss = Math.round(sec % 60);
+  const unit = /\/(km|mi)\b/i.exec(pace)?.[1] || "km";
+  return `${mm}:${String(ss).padStart(2, "0")}/${unit}`;
+}
+
 function suggestPace(type: string, targetTime: string, distance: string): { pace: string; description: string; descZh: string } {
   const parts = targetTime.split(":").map(Number);
   let totalSec = 0;
@@ -211,9 +288,73 @@ const labelForDay = (day: any, i: number): string => {
   return DAY_LABELS[i] || (day?.day?.substring(0, 3).toUpperCase() ?? "");
 };
 
+// Render the structured details (paces, distance, HR, warmup/cooldown) for a workout
+const WorkoutDetails = ({ day, lang, hrBounds }: { day: DayPlan; lang: Lang; hrBounds: HrBounds | null }) => {
+  const isZh = lang === "zh";
+  const zone = zoneForType(day.type);
+  const hr = hrRangeForZone(zone, hrBounds);
+  const zoneLabel = ZONE_LABEL[zone][isZh ? "zh" : "en"];
+  const paceFmt = (p?: string | null) => p ? (/\/(km|mi)\b/i.test(p) ? p : `${p}/km`) : null;
+
+  const isInterval = day.type === "Interval";
+  const reps = isInterval ? parseIntervalReps(day.description) : null;
+  const restStr = isInterval ? parseIntervalRest(day.description) : null;
+  const easyHr = hrRangeForZone(2, hrBounds);
+  const easyZoneLabel = ZONE_LABEL[2][isZh ? "zh" : "en"];
+  const easyPace = adjustPace(day.pace, 1.4);
+
+  // For intervals, allocate ~1.5km warmup + cooldown when total >= 5km, else 1km each.
+  const wuCdKm = (day.distance_km ?? 0) >= 6 ? 1.5 : 1;
+  const workKm = reps ? (reps.unit === "km" ? reps.dist * reps.reps : (reps.dist * reps.reps) / 1000) : null;
+
+  const Row = ({ label, value }: { label: string; value: React.ReactNode }) => (
+    <div className="flex items-baseline justify-between gap-3 text-xs">
+      <span className="text-muted-foreground shrink-0">{label}</span>
+      <span className="text-foreground font-medium text-right tabular-nums">{value}</span>
+    </div>
+  );
+
+  if (isInterval) {
+    return (
+      <div className="mt-2 space-y-2">
+        <div className="rounded-md bg-muted/40 p-2 space-y-1">
+          <div className="text-[11px] font-semibold text-foreground">{isZh ? "熱身" : "Warm-up"}</div>
+          <Row label={isZh ? "距離" : "Distance"} value={`${wuCdKm} km`} />
+          {easyPace && <Row label={isZh ? "配速" : "Pace"} value={easyPace} />}
+          <Row label={isZh ? "心率" : "HR"} value={easyHr ? `${easyZoneLabel} · ${easyHr}` : easyZoneLabel} />
+        </div>
+        <div className="rounded-md bg-primary/5 border border-primary/20 p-2 space-y-1">
+          <div className="text-[11px] font-semibold text-foreground">{isZh ? "主課表" : "Main Set"}</div>
+          {reps ? (
+            <Row label={isZh ? "組數" : "Reps"} value={`${reps.reps} × ${reps.dist}${reps.unit}${restStr ? ` · ${isZh ? "休息" : "rest"} ${restStr}` : ""}`} />
+          ) : (
+            day.distance_km != null && <Row label={isZh ? "距離" : "Distance"} value={`${day.distance_km} km`} />
+          )}
+          {paceFmt(day.pace) && <Row label={isZh ? "配速" : "Pace"} value={paceFmt(day.pace)!} />}
+          <Row label={isZh ? "心率" : "HR"} value={hr ? `${zoneLabel} · ${hr}` : zoneLabel} />
+        </div>
+        <div className="rounded-md bg-muted/40 p-2 space-y-1">
+          <div className="text-[11px] font-semibold text-foreground">{isZh ? "緩和" : "Cool-down"}</div>
+          <Row label={isZh ? "距離" : "Distance"} value={`${wuCdKm} km`} />
+          {easyPace && <Row label={isZh ? "配速" : "Pace"} value={easyPace} />}
+          <Row label={isZh ? "心率" : "HR"} value={easyHr ? `${easyZoneLabel} · ${easyHr}` : easyZoneLabel} />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-2 space-y-1">
+      {day.distance_km != null && <Row label={isZh ? "距離" : "Distance"} value={`${day.distance_km} km`} />}
+      {paceFmt(day.pace) && <Row label={isZh ? "配速" : "Pace"} value={paceFmt(day.pace)!} />}
+      <Row label={isZh ? "心率" : "HR"} value={hr ? `${zoneLabel} · ${hr}` : zoneLabel} />
+    </div>
+  );
+};
+
 // Draggable + droppable day row for the AI calendar (long-press to swap)
 const DraggableDay = ({
-  id, idx, day, lang, isToday, dayNum,
+  id, idx, day, lang, isToday, dayNum, hrBounds,
   onEditClick, onAddClick,
 }: {
   id: string;
@@ -222,11 +363,13 @@ const DraggableDay = ({
   lang: Lang;
   isToday: boolean;
   dayNum: number | string;
+  hrBounds: HrBounds | null;
   onEditClick: () => void;
   onAddClick: () => void;
 }) => {
   const { attributes, listeners, setNodeRef: setDragRef, isDragging, transform } = useDraggable({ id });
   const { setNodeRef: setDropRef, isOver } = useDroppable({ id });
+  const [expanded, setExpanded] = useState(false);
 
   const setRefs = (node: HTMLDivElement | null) => {
     setDragRef(node);
@@ -262,26 +405,36 @@ const DraggableDay = ({
         </div>
       ) : (
         <div className="flex-1 border-l-2 pl-3 py-2" style={{ borderColor: day.color || "hsl(var(--border))" }}>
-          <div className="bg-card border border-border rounded-lg p-3 hover:border-primary transition-colors flex items-stretch gap-2">
-            <button
-              type="button"
-              {...listeners}
-              {...attributes}
-              className="flex items-center text-muted-foreground/60 hover:text-muted-foreground cursor-grab active:cursor-grabbing touch-none -my-1 -ml-1 px-1"
-              aria-label="Drag to swap"
-            >
-              <GripVertical size={16} />
-            </button>
-            <div className="flex-1 min-w-0 cursor-pointer" onClick={onEditClick}>
-              <div className="flex items-center justify-between">
-                <span className="font-medium text-sm text-foreground">{localizeTitle(day.type, lang)}</span>
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  {day.pace && <span>{/\/(km|mi)\b/i.test(day.pace) ? day.pace : `${day.pace}/km`}</span>}
-                  {day.distance_km && <span>{day.distance_km} km</span>}
-                </div>
-              </div>
-              <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{localizeDescription(day, lang)}</p>
+          <div className="bg-card border border-border rounded-lg p-3 hover:border-primary transition-colors">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                {...listeners}
+                {...attributes}
+                className="flex items-center text-muted-foreground/60 hover:text-muted-foreground cursor-grab active:cursor-grabbing touch-none -my-1 px-0.5"
+                aria-label="Drag to swap"
+              >
+                <GripVertical size={16} />
+              </button>
+              <button
+                type="button"
+                onClick={() => setExpanded((v) => !v)}
+                className="flex-1 min-w-0 flex items-center justify-between gap-2 text-left"
+                aria-expanded={expanded}
+              >
+                <span className="font-medium text-sm text-foreground truncate">{localizeTitle(day.type, lang)}</span>
+                <ChevronDown size={16} className={`text-muted-foreground transition-transform shrink-0 ${expanded ? "rotate-180" : ""}`} />
+              </button>
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onEditClick(); }}
+                className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground"
+                aria-label={lang === "zh" ? "編輯訓練" : "Edit workout"}
+              >
+                <Pencil size={14} />
+              </button>
             </div>
+            {expanded && <WorkoutDetails day={day} lang={lang} hrBounds={hrBounds} />}
           </div>
         </div>
       )}
@@ -291,16 +444,16 @@ const DraggableDay = ({
 
 // Calendar day list with long-press drag-to-swap (within a week)
 const CalendarDayList = ({
-  days, weekIdx, lang, onSwap, onAddClick, onEditClick,
+  days, weekIdx, lang, hrBounds, onSwap, onAddClick, onEditClick,
 }: {
   days: DayPlan[];
   weekIdx: number;
   lang: Lang;
+  hrBounds: HrBounds | null;
   onSwap: (fromIdx: number, toIdx: number) => void;
   onAddClick: (idx: number) => void;
   onEditClick: (idx: number, day: DayPlan) => void;
 }) => {
-  // Long-press: 250ms hold before drag begins (mouse + touch)
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { delay: 250, tolerance: 5 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } }),
@@ -333,6 +486,7 @@ const CalendarDayList = ({
               lang={lang}
               isToday={isToday}
               dayNum={dayNum}
+              hrBounds={hrBounds}
               onEditClick={() => onEditClick(i, day)}
               onAddClick={() => onAddClick(i)}
             />
@@ -425,6 +579,32 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
   const [editDistance, setEditDistance] = useState("");
   const [editPace, setEditPace] = useState("");
   const [editDescription, setEditDescription] = useState("");
+
+  // User HR profile → zone bounds for showing HR ranges in the plan
+  const [hrBounds, setHrBounds] = useState<HrBounds | null>(null);
+  useEffect(() => {
+    if (!user) { setHrBounds(null); return; }
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await supabase
+          .from("profiles" as any)
+          .select("age, max_heartrate, resting_heartrate, custom_hr_zones")
+          .eq("id", user.id)
+          .maybeSingle();
+        const p: any = data || {};
+        const max = estimateMaxHr(p.age, p.max_heartrate);
+        const rest = estimateRestingHr(p.resting_heartrate);
+        const custom = isValidCustomZones(p.custom_hr_zones) ? (p.custom_hr_zones as number[]) : null;
+        const b = zoneBoundaries(max, rest, custom);
+        if (!cancelled) setHrBounds({ ...b, max });
+      } catch {
+        if (!cancelled) setHrBounds(null);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [user]);
+
 
   // Load existing plan (cache-then-network so it works offline)
   useEffect(() => {
@@ -1102,6 +1282,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                       days={currentWeek.days}
                       weekIdx={currentWeekIdx}
                       lang={lang}
+                      hrBounds={hrBounds}
                       onSwap={(from, to) => swapDays(currentWeekIdx, from, to)}
                       onAddClick={(i) => { setAddingDayIdx(i); setAddRunType(null); setAddDistance(""); }}
                       onEditClick={(i, day) => { setEditingDayIdx(i); setEditDistance(day.distance_km?.toString() || ""); setEditPace(day.pace || ""); setEditDescription(day.description || ""); }}
@@ -1628,6 +1809,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                       days={currentWeek.days}
                       weekIdx={currentWeekIdx}
                       lang={lang}
+                      hrBounds={hrBounds}
                       onSwap={(from, to) => swapDays(currentWeekIdx, from, to)}
                       onAddClick={(i) => { setAddingDayIdx(i); setAddRunType(null); setAddDistance(""); }}
                       onEditClick={(i, day) => { setEditingDayIdx(i); setEditDistance(day.distance_km?.toString() || ""); setEditPace(day.pace || ""); setEditDescription(day.description || ""); }}

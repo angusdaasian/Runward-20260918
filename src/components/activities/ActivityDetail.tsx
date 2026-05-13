@@ -288,6 +288,13 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
             bodyPayload.cadenceSamples = times.map((t, i) => ({ t, rpm: cadStream.data[i] != null ? cadStream.data[i] * 2 : null })).filter(s => s.rpm != null);
           }
         }
+        // Pull first GPS point from latlng stream for accurate location-based weather
+        const llStream = streams.find((s: any) => s.type === 'latlng');
+        const first = Array.isArray(llStream?.data) ? llStream.data.find((p: any) => Array.isArray(p) && p.length === 2) : null;
+        if (first && typeof first[0] === 'number' && typeof first[1] === 'number') {
+          bodyPayload.startLat = first[0];
+          bodyPayload.startLon = first[1];
+        }
       }
       const { data, error } = await supabase.functions.invoke("analyze-activity", { body: bodyPayload });
       if (error) {

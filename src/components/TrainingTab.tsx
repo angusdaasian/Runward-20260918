@@ -1927,6 +1927,17 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
 
                 return (
                   <>
+                    {existingPlan && (
+                      <ProgramHeader
+                        lang={lang}
+                        weeks={Number(existingPlan.weeks) || plan.length}
+                        distance={String(existingPlan.distance ?? "")}
+                        targetTime={String(existingPlan.target_time ?? "")}
+                        currentWeekIdx={currentWeekIdx}
+                        weekDays={currentWeek.days}
+                        activities={allActivities as any}
+                      />
+                    )}
                     <div className="bg-card border border-border rounded-xl p-3 mb-4">
                       <div className="flex items-center justify-between mb-1">
                         <div>

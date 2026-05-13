@@ -288,9 +288,73 @@ const labelForDay = (day: any, i: number): string => {
   return DAY_LABELS[i] || (day?.day?.substring(0, 3).toUpperCase() ?? "");
 };
 
+// Render the structured details (paces, distance, HR, warmup/cooldown) for a workout
+const WorkoutDetails = ({ day, lang, hrBounds }: { day: DayPlan; lang: Lang; hrBounds: HrBounds | null }) => {
+  const isZh = lang === "zh";
+  const zone = zoneForType(day.type);
+  const hr = hrRangeForZone(zone, hrBounds);
+  const zoneLabel = ZONE_LABEL[zone][isZh ? "zh" : "en"];
+  const paceFmt = (p?: string | null) => p ? (/\/(km|mi)\b/i.test(p) ? p : `${p}/km`) : null;
+
+  const isInterval = day.type === "Interval";
+  const reps = isInterval ? parseIntervalReps(day.description) : null;
+  const restStr = isInterval ? parseIntervalRest(day.description) : null;
+  const easyHr = hrRangeForZone(2, hrBounds);
+  const easyZoneLabel = ZONE_LABEL[2][isZh ? "zh" : "en"];
+  const easyPace = adjustPace(day.pace, 1.4);
+
+  // For intervals, allocate ~1.5km warmup + cooldown when total >= 5km, else 1km each.
+  const wuCdKm = (day.distance_km ?? 0) >= 6 ? 1.5 : 1;
+  const workKm = reps ? (reps.unit === "km" ? reps.dist * reps.reps : (reps.dist * reps.reps) / 1000) : null;
+
+  const Row = ({ label, value }: { label: string; value: React.ReactNode }) => (
+    <div className="flex items-baseline justify-between gap-3 text-xs">
+      <span className="text-muted-foreground shrink-0">{label}</span>
+      <span className="text-foreground font-medium text-right tabular-nums">{value}</span>
+    </div>
+  );
+
+  if (isInterval) {
+    return (
+      <div className="mt-2 space-y-2">
+        <div className="rounded-md bg-muted/40 p-2 space-y-1">
+          <div className="text-[11px] font-semibold text-foreground">{isZh ? "熱身" : "Warm-up"}</div>
+          <Row label={isZh ? "距離" : "Distance"} value={`${wuCdKm} km`} />
+          {easyPace && <Row label={isZh ? "配速" : "Pace"} value={easyPace} />}
+          <Row label={isZh ? "心率" : "HR"} value={easyHr ? `${easyZoneLabel} · ${easyHr}` : easyZoneLabel} />
+        </div>
+        <div className="rounded-md bg-primary/5 border border-primary/20 p-2 space-y-1">
+          <div className="text-[11px] font-semibold text-foreground">{isZh ? "主課表" : "Main Set"}</div>
+          {reps ? (
+            <Row label={isZh ? "組數" : "Reps"} value={`${reps.reps} × ${reps.dist}${reps.unit}${restStr ? ` · ${isZh ? "休息" : "rest"} ${restStr}` : ""}`} />
+          ) : (
+            day.distance_km != null && <Row label={isZh ? "距離" : "Distance"} value={`${day.distance_km} km`} />
+          )}
+          {paceFmt(day.pace) && <Row label={isZh ? "配速" : "Pace"} value={paceFmt(day.pace)!} />}
+          <Row label={isZh ? "心率" : "HR"} value={hr ? `${zoneLabel} · ${hr}` : zoneLabel} />
+        </div>
+        <div className="rounded-md bg-muted/40 p-2 space-y-1">
+          <div className="text-[11px] font-semibold text-foreground">{isZh ? "緩和" : "Cool-down"}</div>
+          <Row label={isZh ? "距離" : "Distance"} value={`${wuCdKm} km`} />
+          {easyPace && <Row label={isZh ? "配速" : "Pace"} value={easyPace} />}
+          <Row label={isZh ? "心率" : "HR"} value={easyHr ? `${easyZoneLabel} · ${easyHr}` : easyZoneLabel} />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-2 space-y-1">
+      {day.distance_km != null && <Row label={isZh ? "距離" : "Distance"} value={`${day.distance_km} km`} />}
+      {paceFmt(day.pace) && <Row label={isZh ? "配速" : "Pace"} value={paceFmt(day.pace)!} />}
+      <Row label={isZh ? "心率" : "HR"} value={hr ? `${zoneLabel} · ${hr}` : zoneLabel} />
+    </div>
+  );
+};
+
 // Draggable + droppable day row for the AI calendar (long-press to swap)
 const DraggableDay = ({
-  id, idx, day, lang, isToday, dayNum,
+  id, idx, day, lang, isToday, dayNum, hrBounds,
   onEditClick, onAddClick,
 }: {
   id: string;
@@ -299,11 +363,13 @@ const DraggableDay = ({
   lang: Lang;
   isToday: boolean;
   dayNum: number | string;
+  hrBounds: HrBounds | null;
   onEditClick: () => void;
   onAddClick: () => void;
 }) => {
   const { attributes, listeners, setNodeRef: setDragRef, isDragging, transform } = useDraggable({ id });
   const { setNodeRef: setDropRef, isOver } = useDroppable({ id });
+  const [expanded, setExpanded] = useState(false);
 
   const setRefs = (node: HTMLDivElement | null) => {
     setDragRef(node);
@@ -339,26 +405,36 @@ const DraggableDay = ({
         </div>
       ) : (
         <div className="flex-1 border-l-2 pl-3 py-2" style={{ borderColor: day.color || "hsl(var(--border))" }}>
-          <div className="bg-card border border-border rounded-lg p-3 hover:border-primary transition-colors flex items-stretch gap-2">
-            <button
-              type="button"
-              {...listeners}
-              {...attributes}
-              className="flex items-center text-muted-foreground/60 hover:text-muted-foreground cursor-grab active:cursor-grabbing touch-none -my-1 -ml-1 px-1"
-              aria-label="Drag to swap"
-            >
-              <GripVertical size={16} />
-            </button>
-            <div className="flex-1 min-w-0 cursor-pointer" onClick={onEditClick}>
-              <div className="flex items-center justify-between">
-                <span className="font-medium text-sm text-foreground">{localizeTitle(day.type, lang)}</span>
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  {day.pace && <span>{/\/(km|mi)\b/i.test(day.pace) ? day.pace : `${day.pace}/km`}</span>}
-                  {day.distance_km && <span>{day.distance_km} km</span>}
-                </div>
-              </div>
-              <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{localizeDescription(day, lang)}</p>
+          <div className="bg-card border border-border rounded-lg p-3 hover:border-primary transition-colors">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                {...listeners}
+                {...attributes}
+                className="flex items-center text-muted-foreground/60 hover:text-muted-foreground cursor-grab active:cursor-grabbing touch-none -my-1 px-0.5"
+                aria-label="Drag to swap"
+              >
+                <GripVertical size={16} />
+              </button>
+              <button
+                type="button"
+                onClick={() => setExpanded((v) => !v)}
+                className="flex-1 min-w-0 flex items-center justify-between gap-2 text-left"
+                aria-expanded={expanded}
+              >
+                <span className="font-medium text-sm text-foreground truncate">{localizeTitle(day.type, lang)}</span>
+                <ChevronDown size={16} className={`text-muted-foreground transition-transform shrink-0 ${expanded ? "rotate-180" : ""}`} />
+              </button>
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onEditClick(); }}
+                className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground"
+                aria-label={lang === "zh" ? "編輯訓練" : "Edit workout"}
+              >
+                <Pencil size={14} />
+              </button>
             </div>
+            {expanded && <WorkoutDetails day={day} lang={lang} hrBounds={hrBounds} />}
           </div>
         </div>
       )}

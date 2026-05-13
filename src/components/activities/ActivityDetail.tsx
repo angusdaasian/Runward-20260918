@@ -153,6 +153,7 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
   const [nameInput, setNameInput] = useState(activity.name);
   const [savingName, setSavingName] = useState(false);
   const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
+  const [aiCopied, setAiCopied] = useState(false);
   const [aiNextWorkout, setAiNextWorkout] = useState<string | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiLang, setAiLang] = useState<string>(lang);

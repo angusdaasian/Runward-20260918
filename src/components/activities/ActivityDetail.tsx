@@ -1350,12 +1350,44 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
       {/* AI Workout Analysis Section (running activities only) */}
       {isRunningActivity && (
       <div className="bg-card border border-border rounded-xl p-4 mt-4">
-        <div className="flex items-center gap-2 mb-3">
-          <Sparkles size={16} className="text-primary" />
-          <h3 className="font-display font-bold text-foreground text-sm">
-            {lang === "zh" ? "AI 訓練分析" : "AI Workout Analysis"}
-          </h3>
-          {!isPremium && <Lock size={14} className="text-muted-foreground" />}
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <Sparkles size={16} className="text-primary" />
+            <h3 className="font-display font-bold text-foreground text-sm">
+              {lang === "zh" ? "AI 訓練分析" : "AI Workout Analysis"}
+            </h3>
+            {!isPremium && <Lock size={14} className="text-muted-foreground" />}
+          </div>
+          {aiAnalysis && (
+            <button
+              type="button"
+              onClick={async () => {
+                try {
+                  if (navigator.clipboard?.writeText) {
+                    await navigator.clipboard.writeText(aiAnalysis);
+                  } else {
+                    const ta = document.createElement("textarea");
+                    ta.value = aiAnalysis;
+                    ta.style.position = "fixed";
+                    ta.style.opacity = "0";
+                    document.body.appendChild(ta);
+                    ta.select();
+                    document.execCommand("copy");
+                    document.body.removeChild(ta);
+                  }
+                  setAiCopied(true);
+                  toast.success(lang === "zh" ? "已複製" : "Copied");
+                  setTimeout(() => setAiCopied(false), 1500);
+                } catch {
+                  toast.error(lang === "zh" ? "複製失敗" : "Failed to copy");
+                }
+              }}
+              className="flex items-center gap-1 px-2 py-1 rounded-md text-[11px] text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
+              aria-label={lang === "zh" ? "複製分析" : "Copy analysis"}
+            >
+              {aiCopied ? <><Check size={12} /> {lang === "zh" ? "已複製" : "Copied"}</> : <><Copy size={12} /> {lang === "zh" ? "複製" : "Copy"}</>}
+            </button>
+          )}
         </div>
         {!isPremium ? (
           <div className="text-center py-6">

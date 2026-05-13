@@ -497,6 +497,140 @@ const CalendarDayList = ({
   );
 };
 
+// ─── Program Header (collapsible summary above the week card) ───
+function parsePaceMin(p: string | null | undefined): number | null {
+  if (!p) return null;
+  const m = String(p).match(/(\d+):(\d{1,2})/);
+  if (!m) return null;
+  return parseInt(m[1], 10) + parseInt(m[2], 10) / 60;
+}
+const FALLBACK_PACE_MIN: Record<string, number> = {
+  Easy: 6.0, Recovery: 6.5, Long: 6.0, Tempo: 5.0,
+  Interval: 4.5, Progression: 5.5, "Race Pace": 5.0,
+};
+function planDistanceLabel(distance: string, lang: Lang): string {
+  const f = FREE_PLAN_LABELS[distance];
+  if (f) return lang === "zh" ? f.zh : f.en;
+  if (distance === "custom") return lang === "zh" ? "自訂" : "Custom";
+  return distance;
+}
+
+interface ProgramHeaderProps {
+  lang: Lang;
+  weeks: number;
+  distance: string;
+  targetTime: string;
+  currentWeekIdx: number;
+  weekDays: DayPlan[];
+  activities: Array<{ start_date: string; distance: number; moving_time: number }>;
+}
+const ProgramHeader: React.FC<ProgramHeaderProps> = ({
+  lang, weeks, distance, targetTime, currentWeekIdx, weekDays, activities,
+}) => {
+  const [open, setOpen] = useState(false);
+  const distLabel = planDistanceLabel(distance, lang);
+  const title = lang === "zh"
+    ? `${weeks} 週 ${distLabel} 計劃`
+    : `${weeks}-week ${distLabel} program`;
+
+  const plannedKm = weekDays.reduce((s, d) => s + (d.distance_km || 0), 0);
+  const plannedMin = weekDays.reduce((s, d) => {
+    const km = d.distance_km || 0;
+    if (!km) return s;
+    const pace = parsePaceMin(d.pace) ?? FALLBACK_PACE_MIN[d.type] ?? 5.5;
+    return s + km * pace;
+  }, 0);
+
+  const weekStart = weekDays[0]?.date || "";
+  const weekEnd = weekDays[weekDays.length - 1]?.date || "";
+  const inWeek = (iso: string) => {
+    const d = (iso || "").slice(0, 10);
+    return d && d >= weekStart && d <= weekEnd;
+  };
+  let completedKm = 0;
+  let completedMin = 0;
+  for (const a of activities ?? []) {
+    if (!inWeek(a.start_date)) continue;
+    completedKm += (Number(a.distance) || 0) / 1000;
+    completedMin += (Number(a.moving_time) || 0) / 60;
+  }
+
+  const pct = (a: number, b: number) => Math.max(0, Math.min(100, b > 0 ? (a / b) * 100 : 0));
+  const L = (en: string, zh: string) => (lang === "zh" ? zh : en);
+
+  return (
+    <div className="bg-card border border-border rounded-xl mb-3 overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="w-full flex items-center justify-between p-3 text-left hover:bg-accent/40 transition-colors"
+      >
+        <span className="text-sm font-semibold text-foreground">{title}</span>
+        <ChevronDown
+          size={16}
+          className={`text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`}
+        />
+      </button>
+      {open && (
+        <div className="px-3 pb-3 pt-0 space-y-2.5 border-t border-border/60">
+          <div className="grid grid-cols-2 gap-2 pt-2.5">
+            <div className="rounded-lg bg-muted/40 p-2">
+              <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                {L("Week", "週數")}
+              </p>
+              <p className="text-sm font-semibold text-foreground">
+                {currentWeekIdx + 1} / {weeks}
+              </p>
+            </div>
+            <div className="rounded-lg bg-muted/40 p-2">
+              <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                {L("Target time", "目標時間")}
+              </p>
+              <p className="text-sm font-semibold text-foreground">
+                {targetTime || "—"}
+              </p>
+            </div>
+          </div>
+
+          <div>
+            <div className="flex items-baseline justify-between mb-1">
+              <span className="text-xs text-muted-foreground">
+                {L("This week — distance", "本週距離")}
+              </span>
+              <span className="text-xs font-medium text-foreground">
+                {completedKm.toFixed(1)} / {plannedKm.toFixed(1)} km
+              </span>
+            </div>
+            <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+              <div
+                className="h-full bg-primary transition-all"
+                style={{ width: `${pct(completedKm, plannedKm)}%` }}
+              />
+            </div>
+          </div>
+
+          <div>
+            <div className="flex items-baseline justify-between mb-1">
+              <span className="text-xs text-muted-foreground">
+                {L("This week — time", "本週時間")}
+              </span>
+              <span className="text-xs font-medium text-foreground">
+                {Math.round(completedMin)} / {Math.round(plannedMin)} min
+              </span>
+            </div>
+            <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+              <div
+                className="h-full bg-primary transition-all"
+                style={{ width: `${pct(completedMin, plannedMin)}%` }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
   const { isPremium } = usePremium();
   const { user } = useAuth();

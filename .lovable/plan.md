@@ -1,46 +1,50 @@
-## Fix 503 on `generate-share-poster`
+## Goal
 
-Two root causes from the logs:
+Stop the AI from saying "no warmup/cooldown" when the runner logged warmup/cooldown as separate activities. Fetch any of the user's other activities that fall within 1 hour before the start time or 1 hour after the end time of the analyzed activity, and include them in the AI prompt as adjacent-session context.
 
-**A. Auth crash** — `supabase.auth.getClaims is not a function` (server SDK has no such method). The first invocation 500s here.
+## Where
 
-**B. Timeout (160s → 503)** — the Gemini image-edit call exceeds the edge function wall clock. Contributing factors:
-- Large raw upload (843KB image base64) → slow inbound + slow model.
-- No `AbortController` / explicit timeout, so the function just hangs until the platform kills it with an empty 503.
-- Quote pre-call adds another network round-trip on top of the image call.
+`supabase/functions/analyze-activity/index.ts` — analysis branch only (skip for `translate` and `checkCacheOnly` modes). Edit happens just before the `systemPrompt` is built (~line 802, where `raceContext` is composed) so the new context can be appended.
 
-### Fix plan
+## Logic
 
-1. **Auth check** (`supabase/functions/generate-share-poster/index.ts`)
-   - Replace `supabase.auth.getClaims(token)` with `supabase.auth.getUser(token)`.
-   - Keep the same 401 behavior on failure.
+1. Compute the analyzed activity's window:
+   - `mainStart = new Date(activity.start_date)`
+   - `mainEnd = mainStart + (activity.elapsed_time || activity.moving_time) seconds`
+   - `windowStart = mainStart - 60 min`
+   - `windowEnd = mainEnd + 60 min`
 
-2. **Hard timeout on the Gemini image call**
-   - Wrap the `fetch` to `ai.gateway.lovable.dev` in an `AbortController` with a 110s timeout.
-   - On `AbortError`, return a clean 504 JSON `{ error: "Generation timed out, please try again" }` so the client toasts instead of receiving an empty 503.
-   - Same (shorter, ~15s) timeout on the quote call; on failure just fall back to the default quote — never block image gen on it.
+2. Query the four activity sources for the same `user_id`, restricted to `start_date/start_time` between `windowStart` and `windowEnd`, excluding the current activity (by `activityDbId` for whichever table it came from):
+   - `strava_activities` (start_date, distance, moving_time, average_speed, average_heartrate, name, sport_type)
+   - `garmin_activities` (start_time, distance_meters, duration_seconds, average_speed, average_hr, activity_name, activity_type)
+   - `terra_activities` (start_time, distance_meters, duration_seconds, average_speed, average_hr, activity_name, activity_type, provider)
+   - `apple_health_activities` (start_date, distance, moving_time, average_speed, average_heartrate, name, sport_type)
+   
+   All four queries run in parallel via `Promise.all`.
 
-3. **Run quote + image prep in parallel**
-   - Kick off the quote fetch and the prompt assembly concurrently with `Promise.all`, so we don't pay two sequential round-trips.
+3. Normalize each result to `{ start, end, distanceKm, durationSec, pace, avgHr, name, type, position }` where `position` is:
+   - `"before"` if `start < mainStart`
+   - `"after"` if `start >= mainEnd`
+   - `"overlap"` otherwise (rare but possible — still include and label so the AI doesn't double-count)
+   
+   Sort chronologically.
 
-4. **Shrink the inbound payload (client side)** — `src/components/activities/AiPosterDialog.tsx`
-   - Before calling the function, downscale the uploaded photo to max 1280px on the long edge and re-encode as JPEG quality 0.82 via a `<canvas>`. This typically drops 843KB → ~150–250KB, cutting upload + model latency significantly and avoiding the 1MB-ish edge body sweet spot.
-   - Keep the existing 8MB pre-check as a safety net.
-   - Add a small helper `downscaleImage(file, maxEdge, quality): Promise<{ base64, mimeType }>`.
+4. Append a new section to `raceContext` (or directly to the user message) only if at least one adjacent activity was found:
 
-5. **Better client error surfacing**
-   - In `AiPosterDialog.generate`, when `error` is a `FunctionsHttpError`, attempt `error.context.json()` to read the structured `{ error }` from the function and toast that, instead of the generic SDK message. Falls back to `error.message` if parsing fails.
+   ```
+   🔁 ADJACENT ACTIVITIES (logged separately within ±1h of this activity — treat them as part of the same training session, e.g. warmup or cooldown):
+     • [BEFORE, 18 min before] 1.20 km easy 6:30/km, 8 min, HR 128 — likely warmup
+     • [AFTER, 5 min after]    1.50 km 7:10/km, 11 min, HR 118 — likely cooldown
+   → When evaluating warmup/cooldown adequacy and total session volume, include these. Do NOT say the runner skipped warmup/cooldown if a BEFORE/AFTER entry plausibly served that role.
+   ```
 
-6. **Logging**
-   - Add `console.log` markers around the Gemini call (`start`, `done in Xms`) so future timeouts are diagnosable from edge function logs.
+   The "likely warmup / likely cooldown" hint is added only based on position; the AI makes the final call.
 
-### Out of scope
+5. Both system prompts (EN and ZH) already cover warmup/cooldown only implicitly; no prompt edits required — the new context section is self-explanatory and instructs the AI directly.
 
-- No change to the prompt, style presets, dialog UI/layout, or sharing flow.
-- No change to `shareActivity.ts`, `ActivityDetail.tsx`, or `supabase/config.toml`.
-- No model swap — staying on `google/gemini-3.1-flash-image-preview`.
+## Out of scope
 
-### Files touched
-
-- edit: `supabase/functions/generate-share-poster/index.ts` (auth fix, timeouts, parallel quote, logs)
-- edit: `src/components/activities/AiPosterDialog.tsx` (client-side downscale, better error toast)
+- No DB schema changes.
+- No frontend changes — the client already passes `activity` + `activityDbId`; everything else is server-side.
+- The cached-analysis fast path (`existingAnalysis && !forceRefresh`) is unchanged. Users who want the new behavior on an old activity can use the existing "force refresh" path.
+- We do NOT modify warmup/cooldown detection inside the main activity itself (that's a separate concern handled by lap analysis).

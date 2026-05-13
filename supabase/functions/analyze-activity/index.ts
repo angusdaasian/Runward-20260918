@@ -799,8 +799,97 @@ ${plannedWorkout ? `- ${plannedWorkout}` : ""}`;
       console.error("sample analysis failed", e);
     }
 
+    // --- Adjacent activities (±1h) for warmup/cooldown context ---
+    let adjacentContext = "";
+    try {
+      const mainStart = new Date(activity.start_date);
+      const mainDurSec = Number(activity.elapsed_time || activity.moving_time || 0) || 0;
+      const mainEnd = new Date(mainStart.getTime() + mainDurSec * 1000);
+      if (isValidDate(mainStart)) {
+        const winStart = new Date(mainStart.getTime() - 60 * 60 * 1000).toISOString();
+        const winEnd = new Date(mainEnd.getTime() + 60 * 60 * 1000).toISOString();
+
+        const [stravaR, garminR, terraR, appleR] = await Promise.all([
+          serviceClient.from("strava_activities")
+            .select("id, name, sport_type, start_date, distance, moving_time, average_speed, average_heartrate")
+            .eq("user_id", user.id).gte("start_date", winStart).lte("start_date", winEnd),
+          serviceClient.from("garmin_activities")
+            .select("id, activity_name, activity_type, start_time, distance_meters, duration_seconds, average_speed, average_hr")
+            .eq("user_id", user.id).gte("start_time", winStart).lte("start_time", winEnd),
+          serviceClient.from("terra_activities")
+            .select("id, activity_name, activity_type, provider, start_time, distance_meters, duration_seconds, average_speed, average_hr")
+            .eq("user_id", user.id).gte("start_time", winStart).lte("start_time", winEnd),
+          serviceClient.from("apple_health_activities")
+            .select("id, name, sport_type, start_date, distance, moving_time, average_speed, average_heartrate")
+            .eq("user_id", user.id).gte("start_date", winStart).lte("start_date", winEnd),
+        ]);
+
+        type Adj = { start: Date; end: Date; distanceKm: number; durationSec: number; paceStr: string; hr: number | null; name: string; type: string };
+        const adj: Adj[] = [];
+        const push = (row: any, opts: { start: string; distM: number; durSec: number; speed: number; hr: number | null; name: string; type: string }) => {
+          if (String(row.id) === String(activityDbId)) return;
+          const s = new Date(opts.start);
+          if (!isValidDate(s)) return;
+          const e = new Date(s.getTime() + (opts.durSec || 0) * 1000);
+          let sp = opts.speed;
+          if ((!sp || sp <= 0) && opts.distM > 0 && opts.durSec > 0) sp = opts.distM / opts.durSec;
+          const paceSec = sp > 0 ? 1000 / sp : 0;
+          const paceStr = paceSec > 0
+            ? `${Math.floor(paceSec / 60)}:${String(Math.floor(paceSec % 60)).padStart(2, "0")}/km`
+            : "--";
+          adj.push({
+            start: s, end: e,
+            distanceKm: (opts.distM || 0) / 1000,
+            durationSec: opts.durSec || 0,
+            paceStr,
+            hr: opts.hr && opts.hr > 0 ? Math.round(opts.hr) : null,
+            name: opts.name || "Activity",
+            type: opts.type || "Run",
+          });
+        };
+        for (const r of (stravaR.data || [])) push(r, { start: r.start_date, distM: Number(r.distance) || 0, durSec: Number(r.moving_time) || 0, speed: Number(r.average_speed) || 0, hr: r.average_heartrate ? Number(r.average_heartrate) : null, name: r.name, type: r.sport_type });
+        for (const r of (garminR.data || [])) push(r, { start: r.start_time, distM: Number(r.distance_meters) || 0, durSec: Number(r.duration_seconds) || 0, speed: Number(r.average_speed) || 0, hr: r.average_hr ? Number(r.average_hr) : null, name: r.activity_name, type: r.activity_type });
+        for (const r of (terraR.data || [])) push(r, { start: r.start_time, distM: Number(r.distance_meters) || 0, durSec: Number(r.duration_seconds) || 0, speed: Number(r.average_speed) || 0, hr: r.average_hr ? Number(r.average_hr) : null, name: r.activity_name, type: `${r.activity_type || "Run"}${r.provider ? ` (${r.provider})` : ""}` });
+        for (const r of (appleR.data || [])) push(r, { start: r.start_date, distM: Number(r.distance) || 0, durSec: Number(r.moving_time) || 0, speed: Number(r.average_speed) || 0, hr: r.average_heartrate ? Number(r.average_heartrate) : null, name: r.name, type: r.sport_type });
+
+        // Dedup near-duplicates across sources (within 60s start-time)
+        adj.sort((a, b) => a.start.getTime() - b.start.getTime());
+        const deduped: Adj[] = [];
+        for (const a of adj) {
+          if (deduped.some((d) => Math.abs(d.start.getTime() - a.start.getTime()) < 60_000 && Math.abs(d.distanceKm - a.distanceKm) < 0.2)) continue;
+          deduped.push(a);
+        }
+
+        if (deduped.length > 0) {
+          adjacentContext = `\n\n🔁 ADJACENT ACTIVITIES (logged separately within ±1h of this activity — treat them as part of the same training session, e.g. warmup or cooldown):`;
+          for (const a of deduped) {
+            let position: "BEFORE" | "AFTER" | "OVERLAP";
+            let offsetStr: string;
+            if (a.start.getTime() < mainStart.getTime()) {
+              position = "BEFORE";
+              const minBefore = Math.round((mainStart.getTime() - a.end.getTime()) / 60000);
+              offsetStr = `${Math.max(0, minBefore)} min before main start`;
+            } else if (a.start.getTime() >= mainEnd.getTime()) {
+              position = "AFTER";
+              const minAfter = Math.round((a.start.getTime() - mainEnd.getTime()) / 60000);
+              offsetStr = `${Math.max(0, minAfter)} min after main end`;
+            } else {
+              position = "OVERLAP";
+              offsetStr = `overlaps main activity`;
+            }
+            const hint = position === "BEFORE" ? " — likely warmup" : position === "AFTER" ? " — likely cooldown" : "";
+            const durMin = Math.round(a.durationSec / 60);
+            adjacentContext += `\n  • [${position}, ${offsetStr}] "${a.name}" ${a.type} — ${a.distanceKm.toFixed(2)} km, ${durMin} min @ ${a.paceStr}${a.hr ? `, HR ${a.hr}` : ""}${hint}`;
+          }
+          adjacentContext += `\n  → When evaluating warmup/cooldown adequacy and total session volume, INCLUDE these. Do NOT say the runner skipped warmup or cooldown if a BEFORE/AFTER entry plausibly served that role. You may sum distance/time across them when describing the full session.`;
+        }
+      }
+    } catch (e) {
+      console.error("adjacent activity fetch failed", e);
+    }
+
     // --- Race + weather + comment context ---
-    let raceContext = "";
+    let raceContext = adjacentContext;
     if (resolvedRaceName) {
       const hasActivePlan = !!plan;
       raceContext += `\n\n🏁🏁🏁 CRITICAL RACE CONTEXT 🏁🏁🏁

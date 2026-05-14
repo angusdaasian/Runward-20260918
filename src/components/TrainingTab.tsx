@@ -1569,7 +1569,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
       });
       if (!response.ok) { const err = await response.json().catch(() => ({})); throw new Error(err.error || "Failed to generate"); }
       const result = await response.json();
-      const planData = result.plan || [];
+      const planData = ensurePlanMatchesRaceSchedule(result.plan || [], snapshot);
       setPlan(planData);
       setCurrentWeekIdx(0);
       setProgramStep("calendar");
@@ -1704,7 +1704,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
       });
       if (!response.ok) { const err = await response.json().catch(() => ({})); throw new Error(err.error || "Failed to regenerate"); }
       const result = await response.json();
-      const planData = result.plan || [];
+      const planData = ensurePlanMatchesRaceSchedule(result.plan || [], snapshot);
       setPlan(planData);
       setCurrentWeekIdx(0);
       await supabase.from("training_plans" as any).delete().eq("user_id", user.id);

@@ -593,20 +593,59 @@ const ProgramHeader: React.FC<ProgramHeaderProps> = ({
             </div>
           </div>
 
-          <div>
-            <div className="flex items-baseline justify-between mb-1">
-              <span className="text-xs text-muted-foreground">
+          <div className="flex items-center gap-3 rounded-lg bg-muted/40 p-3">
+            {(() => {
+              const size = 76;
+              const stroke = 9;
+              const r = (size - stroke) / 2;
+              const c = 2 * Math.PI * r;
+              const ratio = Math.min(1, plannedKm > 0 ? completedKm / plannedKm : 0);
+              return (
+                <svg width={size} height={size} className="shrink-0 -rotate-90">
+                  <circle
+                    cx={size / 2}
+                    cy={size / 2}
+                    r={r}
+                    stroke="hsl(var(--muted))"
+                    strokeWidth={stroke}
+                    fill="none"
+                  />
+                  <circle
+                    cx={size / 2}
+                    cy={size / 2}
+                    r={r}
+                    stroke="hsl(var(--primary))"
+                    strokeWidth={stroke}
+                    strokeLinecap="round"
+                    strokeDasharray={c}
+                    strokeDashoffset={c * (1 - ratio)}
+                    fill="none"
+                    className="transition-all"
+                  />
+                  <text
+                    x="50%"
+                    y="50%"
+                    textAnchor="middle"
+                    dominantBaseline="central"
+                    transform={`rotate(90 ${size / 2} ${size / 2})`}
+                    className="fill-foreground"
+                    style={{ fontSize: 11, fontWeight: 700 }}
+                  >
+                    {Math.round(ratio * 100)}%
+                  </text>
+                </svg>
+              );
+            })()}
+            <div className="flex-1 min-w-0">
+              <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
                 {L("This week — distance", "本週距離")}
-              </span>
-              <span className="text-xs font-medium text-foreground">
-                {completedKm.toFixed(1)} / {plannedKm.toFixed(1)} km
-              </span>
-            </div>
-            <div className="h-1.5 rounded-full bg-muted overflow-hidden">
-              <div
-                className="h-full bg-primary transition-all"
-                style={{ width: `${pct(completedKm, plannedKm)}%` }}
-              />
+              </p>
+              <p className="text-base font-semibold text-foreground leading-tight">
+                {completedKm.toFixed(1)}
+                <span className="text-xs text-muted-foreground font-normal">
+                  {" "}/ {plannedKm.toFixed(1)} km
+                </span>
+              </p>
             </div>
           </div>
 

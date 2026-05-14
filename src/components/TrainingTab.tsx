@@ -1375,7 +1375,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
     const restDaysCurrent = w0Days.filter((d) => d.type === "Rest").map((d) => d.day).filter((d) => dayLabels.includes(d));
     const longRunDayCurrent = (w0Days.find((d) => d.type === "Long Run")?.day) || "Sun";
     const daysPerWeekCurrent = Math.max(1, 7 - restDaysCurrent.length);
-    const weeklyKmDerived = Math.max(10, Math.round(w0Days.reduce((s, d) => s + (d.distance_km || 0), 0)));
+    const weeklyKmFinal = overrides.weeklyKm ?? weeklyKmDerived;
     const startDateDerived = w0?.startDate || w0Days[0]?.date || new Date().toISOString().slice(0, 10);
     const weeksDerived = Number(existingPlan.weeks) || planArr.length || 8;
     const raceDateDerived = existingPlan.race_date || "";

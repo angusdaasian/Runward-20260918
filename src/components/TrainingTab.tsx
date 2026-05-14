@@ -1496,6 +1496,26 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
 
     setRegeneratingTime(true);
     try {
+      // Pull the freshest race schedule for the plan window from user_races
+      const freshRaces = await (async () => {
+        if (!user) return [] as any[];
+        const { data } = await supabase
+          .from("user_races" as any)
+          .select("id,race_name,race_name_zh,race_date,category,priority")
+          .eq("user_id", user.id)
+          .gte("race_date", startDateDerived)
+          .lte("race_date", raceDateDerived || "9999-12-31")
+          .order("race_date", { ascending: true });
+        return (data as any[]) || [];
+      })();
+      const snapshot: RaceSchedItem[] = freshRaces.map((r: any) => ({
+        user_race_id: r.id,
+        race_name: (lang === "zh" && r.race_name_zh) || r.race_name,
+        race_date: r.race_date,
+        category: r.category || "",
+        priority: r.priority || "none",
+      }));
+
       const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-program`;
       const response = await fetch(url, {
         method: "POST",
@@ -1509,6 +1529,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
           raceDate: raceDateDerived, startDate: startDateDerived, weeks: weeksDerived,
           daysPerWeek: daysPerWeekFinal, weeklyKm: weeklyKmFinal,
           longRunDay: longRunDayFinal, restDays: restDaysFinal, lang,
+          races: racesPayloadFromSnapshot(snapshot),
         }),
       });
       if (!response.ok) { const err = await response.json().catch(() => ({})); throw new Error(err.error || "Failed to regenerate"); }
@@ -1520,6 +1541,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
       const inserted: any = {
         user_id: user.id, goal: goalDerived, distance: distanceDerived, target_time: targetTimeFinal,
         race_date: raceDateDerived, weeks: weeksDerived, plan_data: planData, raw_output: result.raw || "",
+        race_schedule: snapshot,
       };
       const { data: saved } = await (supabase.from("training_plans" as any) as any).insert(inserted).select().single();
       const nextPlan = saved || inserted;

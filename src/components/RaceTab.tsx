@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Search, X, MapPin, Calendar, Filter, ChevronDown, ChevronUp, Plus, Loader2, BookmarkPlus, Trash2, Bookmark, Timer, Pencil, Check } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Lang } from "@/lib/i18n";

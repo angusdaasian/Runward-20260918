@@ -551,12 +551,121 @@ const DAY_LABELS_ALL = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as cons
 const DAY_LABELS_ZH: Record<string, string> = {
   Mon: "一", Tue: "二", Wed: "三", Thu: "四", Fri: "五", Sat: "六", Sun: "日",
 };
+
+interface RaceSchedulePanelProps {
+  lang: Lang;
+  races?: RaceSchedItemUI[];
+  currentRaces?: RaceSchedItemUI[];
+  racesDrift?: boolean;
+  regenerating?: boolean;
+  onUpdateRacePriority?: (raceId: string, priority: string) => Promise<void> | void;
+  onRemoveRace?: (raceId: string) => Promise<void> | void;
+  onRegenerateForRaces?: () => Promise<void> | void;
+}
+const RaceSchedulePanel: React.FC<RaceSchedulePanelProps> = ({
+  lang, races, currentRaces, racesDrift, regenerating,
+  onUpdateRacePriority, onRemoveRace, onRegenerateForRaces,
+}) => {
+  const [racesOpen, setRacesOpen] = useState(true);
+  const L = (en: string, zh: string) => (lang === "zh" ? zh : en);
+  const list = (racesDrift ? currentRaces : races) || [];
+  return (
+    <div className="bg-card border border-border rounded-xl overflow-hidden mb-4">
+      <button
+        type="button"
+        onClick={() => setRacesOpen((v) => !v)}
+        className="w-full flex items-center justify-between px-3 py-2.5 text-left hover:bg-accent/40 transition-colors"
+      >
+        <span className="text-sm font-semibold text-foreground inline-flex items-center gap-2">
+          {L("Race Schedule", "賽事行程")}
+          {racesDrift && (
+            <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-700 dark:text-amber-400 border border-amber-500/30">
+              {L("Updated", "已更新")}
+            </span>
+          )}
+        </span>
+        <ChevronDown size={16} className={`text-muted-foreground transition-transform ${racesOpen ? "rotate-180" : ""}`} />
+      </button>
+      {racesOpen && (
+        <div className="px-3 pb-3 pt-1 space-y-2">
+          {racesDrift && onRegenerateForRaces && (
+            <div className="rounded-md bg-amber-500/10 border border-amber-500/30 p-2 text-[11px] text-foreground space-y-1.5">
+              <p>{L("Your race goals changed in My Races. Regenerate the program to match the updated plan.", "您在「我的賽事」中更改了目標。請重新生成計劃以符合最新安排。")}</p>
+              <button
+                type="button"
+                onClick={() => onRegenerateForRaces()}
+                disabled={regenerating}
+                className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+              >
+                {regenerating ? <Loader2 size={11} className="animate-spin" /> : null}
+                {L("Regenerate program", "重新生成計劃")}
+              </button>
+            </div>
+          )}
+          {list.length ? (
+            list.map((r) => {
+              const isGoal = r.priority === "A";
+              return (
+                <div key={r.user_race_id} className={`flex items-center gap-2 p-2 rounded-md border ${isGoal ? "border-primary bg-primary/5" : "border-border/50 bg-background"}`}>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-xs font-semibold text-foreground truncate">{r.race_name}</span>
+                      {r.category && (
+                        <span className="text-[9px] font-bold px-1 py-0.5 rounded bg-muted text-muted-foreground">{r.category}</span>
+                      )}
+                      {isGoal && (
+                        <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-primary text-primary-foreground">
+                          {L("Goal", "目標")}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">{r.race_date}</p>
+                  </div>
+                  {onUpdateRacePriority && !racesDrift && (
+                    <select
+                      className="h-7 rounded border border-input bg-background px-1 text-[11px] text-foreground"
+                      value={r.priority || "none"}
+                      onChange={(e) => onUpdateRacePriority(r.user_race_id, e.target.value)}
+                      disabled={regenerating}
+                      aria-label={L("Priority", "優先級")}
+                    >
+                      <option value="A">A</option>
+                      <option value="B">B</option>
+                      <option value="C">C</option>
+                      <option value="none">{L("None", "無")}</option>
+                    </select>
+                  )}
+                  {onRemoveRace && !racesDrift && (
+                    <button
+                      type="button"
+                      onClick={() => onRemoveRace(r.user_race_id)}
+                      disabled={regenerating}
+                      className="text-muted-foreground hover:text-destructive disabled:opacity-50 p-1"
+                      aria-label={L("Remove race", "移除賽事")}
+                    >
+                      <X size={12} />
+                    </button>
+                  )}
+                </div>
+              );
+            })
+          ) : (
+            <p className="text-[11px] text-muted-foreground italic px-1 py-2">
+              {L("No races on the calendar within this program window. Add races in My Races.", "計劃期間沒有任何賽事。請在「我的賽事」中加入。")}
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const ProgramHeader: React.FC<ProgramHeaderProps> = ({
   lang, weeks, distance, targetTime, currentWeekIdx, weekDays, activities,
   daysPerWeek, longRunDay, restDays, weeklyKm, onRegenerate, regenerating,
   races, currentRaces, racesDrift, onUpdateRacePriority, onRemoveRace, onRegenerateForRaces,
 }) => {
-  const [racesOpen, setRacesOpen] = useState(false);
+  
   const [editingKm, setEditingKm] = useState(false);
   const [editKm, setEditKm] = useState<number>(weeklyKm);
   useEffect(() => { setEditKm(weeklyKm); }, [weeklyKm]);
@@ -960,96 +1069,7 @@ const ProgramHeader: React.FC<ProgramHeaderProps> = ({
             </div>
           </div>
 
-          {/* Race Schedule */}
-          {(races || currentRaces) && (
-            <div className="rounded-lg border border-border/60 bg-muted/20 overflow-hidden">
-              <button
-                type="button"
-                onClick={() => setRacesOpen((v) => !v)}
-                className="w-full flex items-center justify-between px-2.5 py-2 text-left hover:bg-accent/40 transition-colors"
-              >
-                <span className="text-xs font-semibold text-foreground inline-flex items-center gap-1.5">
-                  {L("Race Schedule", "賽事行程")}
-                  {racesDrift && (
-                    <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-700 dark:text-amber-400 border border-amber-500/30">
-                      {L("Updated", "已更新")}
-                    </span>
-                  )}
-                </span>
-                <ChevronDown size={14} className={`text-muted-foreground transition-transform ${racesOpen ? "rotate-180" : ""}`} />
-              </button>
-              {racesOpen && (
-                <div className="px-2.5 pb-2.5 pt-1 space-y-2">
-                  {racesDrift && onRegenerateForRaces && (
-                    <div className="rounded-md bg-amber-500/10 border border-amber-500/30 p-2 text-[11px] text-foreground space-y-1.5">
-                      <p>{L("Your race goals changed in My Races. Regenerate the program to match the updated plan.", "您在「我的賽事」中更改了目標。請重新生成計劃以符合最新安排。")}</p>
-                      <button
-                        type="button"
-                        onClick={() => onRegenerateForRaces()}
-                        disabled={regenerating}
-                        className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-                      >
-                        {regenerating ? <Loader2 size={11} className="animate-spin" /> : null}
-                        {L("Regenerate program", "重新生成計劃")}
-                      </button>
-                    </div>
-                  )}
-                  {(racesDrift ? currentRaces : races)?.length ? (
-                    (racesDrift ? currentRaces : races)!.map((r) => {
-                      const isGoal = r.priority === "A";
-                      return (
-                        <div key={r.user_race_id} className={`flex items-center gap-2 p-2 rounded-md border ${isGoal ? "border-primary bg-primary/5" : "border-border/50 bg-background"}`}>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              <span className="text-xs font-semibold text-foreground truncate">{r.race_name}</span>
-                              {r.category && (
-                                <span className="text-[9px] font-bold px-1 py-0.5 rounded bg-muted text-muted-foreground">{r.category}</span>
-                              )}
-                              {isGoal && (
-                                <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-primary text-primary-foreground">
-                                  {L("Goal", "目標")}
-                                </span>
-                              )}
-                            </div>
-                            <p className="text-[10px] text-muted-foreground mt-0.5">{r.race_date}</p>
-                          </div>
-                          {onUpdateRacePriority && !racesDrift && (
-                            <select
-                              className="h-7 rounded border border-input bg-background px-1 text-[11px] text-foreground"
-                              value={r.priority || "none"}
-                              onChange={(e) => onUpdateRacePriority(r.user_race_id, e.target.value)}
-                              disabled={regenerating}
-                              aria-label={L("Priority", "優先級")}
-                            >
-                              <option value="A">A</option>
-                              <option value="B">B</option>
-                              <option value="C">C</option>
-                              <option value="none">{L("None", "無")}</option>
-                            </select>
-                          )}
-                          {onRemoveRace && !racesDrift && (
-                            <button
-                              type="button"
-                              onClick={() => onRemoveRace(r.user_race_id)}
-                              disabled={regenerating}
-                              className="text-muted-foreground hover:text-destructive disabled:opacity-50 p-1"
-                              aria-label={L("Remove race", "移除賽事")}
-                            >
-                              <X size={12} />
-                            </button>
-                          )}
-                        </div>
-                      );
-                    })
-                  ) : (
-                    <p className="text-[11px] text-muted-foreground italic px-1 py-2">
-                      {L("No races on the calendar within this program window. Add races in My Races.", "計劃期間沒有任何賽事。請在「我的賽事」中加入。")}
-                    </p>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
+          {/* Race Schedule moved out of ProgramHeader — see <RaceSchedulePanel /> below the header */}
 
           <div>
             <div className="flex items-baseline justify-between mb-1">
@@ -1432,11 +1452,15 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
   const racesPayloadFromSnapshot = (snap: RaceSchedItem[]) =>
     snap.map((r) => ({ name: r.race_name, race_date: r.race_date, category: r.category, priority: r.priority }));
   const racesEqual = (a: RaceSchedItem[], b: RaceSchedItem[]) => {
-    if (a.length !== b.length) return false;
-    for (let i = 0; i < a.length; i++) {
-      const x = a[i], y = b[i];
-      if (x.user_race_id !== y.user_race_id || x.race_date !== y.race_date || x.priority !== y.priority || x.category !== y.category) return false;
-    }
+    // Compare only fields that affect plan generation. Ignore user_race_id (older
+    // snapshots may not have stored it) and race_name (changes with language).
+    const norm = (arr: RaceSchedItem[]) =>
+      [...arr]
+        .map((r) => `${r.race_date}|${(r.category || "").toUpperCase()}|${r.priority || "none"}`)
+        .sort();
+    const na = norm(a), nb = norm(b);
+    if (na.length !== nb.length) return false;
+    for (let i = 0; i < na.length; i++) if (na[i] !== nb[i]) return false;
     return true;
   };
 
@@ -1559,7 +1583,19 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
     const restDaysCurrent = w0Days.filter((d) => d.type === "Rest").map((d) => d.day).filter((d) => dayLabels.includes(d));
     const longRunDayCurrent = (w0Days.find((d) => d.type === "Long Run")?.day) || "Sun";
     const daysPerWeekCurrent = Math.max(1, 7 - restDaysCurrent.length);
-    const weeklyKmDerived = Math.max(10, Math.round(w0Days.reduce((s, d) => s + (d.distance_km || 0), 0)));
+    // Use the PEAK week's mileage as the target weekly volume so regeneration
+    // remembers the user's chosen weekly km (week 1 is usually a low base week).
+    const weeklyKmDerived = Math.max(
+      10,
+      Math.round(
+        Math.max(
+          0,
+          ...planArr.map((w) =>
+            ((w?.days as DayPlan[] | undefined) || []).reduce((s, d) => s + (d.distance_km || 0), 0),
+          ),
+        ),
+      ),
+    );
     const weeklyKmFinal = overrides.weeklyKm ?? weeklyKmDerived;
     const startDateDerived = w0?.startDate || w0Days[0]?.date || new Date().toISOString().slice(0, 10);
     const weeksDerived = Number(existingPlan.weeks) || planArr.length || 8;
@@ -2577,82 +2613,119 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
 
                 return (
                   <>
-                    {existingPlan && (() => {
+                    {(() => {
+                      if (!existingPlan) return null;
                       const planArr = Array.isArray(existingPlan.plan_data) ? existingPlan.plan_data : [];
                       const w0Days = (planArr[0]?.days || []) as DayPlan[];
                       const dl = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
                       const restDaysCur = w0Days.filter((d:any)=>d.type==="Rest").map((d:any)=>d.day).filter((d:string)=>dl.includes(d));
                       const longRunCur = (w0Days.find((d:any)=>d.type==="Long Run") as any)?.day || "Sun";
                       const dpwCur = Math.max(1, 7 - restDaysCur.length);
-                      const weeklyKmCur = Math.max(1, Math.round(w0Days.reduce((s:number,d:any)=>s+(d.distance_km||0),0)));
+                      // Use peak week's mileage so the displayed weekly km matches what regen will use.
+                      const weeklyKmCur = Math.max(
+                        1,
+                        Math.round(
+                          Math.max(
+                            0,
+                            ...planArr.map((w:any) =>
+                              ((w?.days as any[]) || []).reduce((s:number, d:any) => s + (d.distance_km || 0), 0),
+                            ),
+                          ),
+                        ),
+                      );
                       const planStartIso = (planArr[0]?.startDate || w0Days[0]?.date || "") as string;
                       const planEndIso = (existingPlan.race_date as string) || ((planArr[planArr.length-1]?.days as any[])?.slice(-1)?.[0]?.date) || planStartIso;
                       const currentSnap = buildRaceSnapshot(planStartIso, planEndIso);
                       const savedSnap: RaceSchedItem[] = Array.isArray(existingPlan.race_schedule) ? (existingPlan.race_schedule as any) : [];
                       const racesDrift = !racesEqual(currentSnap, savedSnap);
+
+                      // Goal race date = A-priority race in saved snapshot, else existingPlan.race_date.
+                      const goalRaceDate =
+                        (savedSnap.find((r) => r.priority === "A")?.race_date) ||
+                        (existingPlan.race_date as string) || "";
+                      const goalWeekIdx = goalRaceDate
+                        ? plan.findIndex((w:any) => Array.isArray(w.days) && w.days.some((d:any) => d.date === goalRaceDate))
+                        : -1;
+
                       return (
-                        <ProgramHeader
-                          lang={lang}
-                          weeks={Number(existingPlan.weeks) || plan.length}
-                          distance={String(existingPlan.distance ?? "")}
-                          targetTime={String(existingPlan.target_time ?? "")}
-                          currentWeekIdx={currentWeekIdx}
-                          weekDays={currentWeek.days}
-                          activities={allActivities as any}
-                          daysPerWeek={dpwCur}
-                          weeklyKm={weeklyKmCur}
-                          longRunDay={longRunCur}
-                          restDays={restDaysCur}
-                          onRegenerate={handleRegeneratePlan}
-                          regenerating={regeneratingTime}
-                          races={savedSnap}
-                          currentRaces={currentSnap}
-                          racesDrift={racesDrift}
-                          onUpdateRacePriority={async (raceId, priority) => {
-                            if (!user) return;
-                            await (supabase.from("user_races" as any) as any).update({ priority }).eq("id", raceId).eq("user_id", user.id);
-                            await queryClient.invalidateQueries({ queryKey: ["user-races"] });
-                            await handleRegeneratePlan({});
-                          }}
-                          onRemoveRace={async (raceId) => {
-                            if (!user) return;
-                            await supabase.from("user_races" as any).delete().eq("id", raceId).eq("user_id", user.id);
-                            await queryClient.invalidateQueries({ queryKey: ["user-races"] });
-                            await handleRegeneratePlan({});
-                          }}
-                          onRegenerateForRaces={() => handleRegeneratePlan({})}
-                        />
+                        <>
+                          <ProgramHeader
+                            lang={lang}
+                            weeks={Number(existingPlan.weeks) || plan.length}
+                            distance={String(existingPlan.distance ?? "")}
+                            targetTime={String(existingPlan.target_time ?? "")}
+                            currentWeekIdx={currentWeekIdx}
+                            weekDays={currentWeek.days}
+                            activities={allActivities as any}
+                            daysPerWeek={dpwCur}
+                            weeklyKm={weeklyKmCur}
+                            longRunDay={longRunCur}
+                            restDays={restDaysCur}
+                            onRegenerate={handleRegeneratePlan}
+                            regenerating={regeneratingTime}
+                          />
+                          <RaceSchedulePanel
+                            lang={lang}
+                            races={savedSnap as any}
+                            currentRaces={currentSnap as any}
+                            racesDrift={racesDrift}
+                            regenerating={regeneratingTime}
+                            onUpdateRacePriority={async (raceId, priority) => {
+                              if (!user) return;
+                              await (supabase.from("user_races" as any) as any).update({ priority }).eq("id", raceId).eq("user_id", user.id);
+                              await queryClient.invalidateQueries({ queryKey: ["user-races"] });
+                              await handleRegeneratePlan({});
+                            }}
+                            onRemoveRace={async (raceId) => {
+                              if (!user) return;
+                              await supabase.from("user_races" as any).delete().eq("id", raceId).eq("user_id", user.id);
+                              await queryClient.invalidateQueries({ queryKey: ["user-races"] });
+                              await handleRegeneratePlan({});
+                            }}
+                            onRegenerateForRaces={() => handleRegeneratePlan({})}
+                          />
+                          <div className={`bg-card border rounded-xl p-3 mb-4 ${goalWeekIdx === currentWeekIdx ? "border-primary ring-1 ring-primary/40" : "border-border"}`}>
+                            <div className="flex items-center justify-between mb-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-sm font-medium text-foreground">{formatDate(weekStart)} - {formatDate(weekEnd)}</span>
+                                <span className="bg-primary/15 text-primary text-xs font-bold px-2 py-0.5 rounded-full">WEEK {currentWeek.week}</span>
+                                {goalWeekIdx === currentWeekIdx && (
+                                  <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-primary text-primary-foreground">
+                                    {lang === "zh" ? "目標賽事週" : "Goal Race Week"}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <button onClick={() => setCurrentWeekIdx(Math.max(0, currentWeekIdx - 1))} disabled={currentWeekIdx === 0} className="p-1 rounded hover:bg-accent disabled:opacity-30"><ChevronLeft size={16} /></button>
+                                <button onClick={() => setCurrentWeekIdx(Math.min(plan.length - 1, currentWeekIdx + 1))} disabled={currentWeekIdx === plan.length - 1} className="p-1 rounded hover:bg-accent disabled:opacity-30"><ChevronRight size={16} /></button>
+                              </div>
+                            </div>
+                            <p className="text-xs text-muted-foreground">{lang === "zh" ? "總計" : "Total"}: {totalKm.toFixed(1)} km</p>
+                          </div>
+
+                          <CalendarDayList
+                            days={currentWeek.days}
+                            weekIdx={currentWeekIdx}
+                            lang={lang}
+                            hrBounds={hrBounds}
+                            onSwap={(from, to) => swapDays(currentWeekIdx, from, to)}
+                            onAddClick={(i) => { setAddingDayIdx(i); setAddRunType(null); setAddDistance(""); }}
+                            onEditClick={(i, day) => { setEditingDayIdx(i); setEditDistance(day.distance_km?.toString() || ""); setEditPace(day.pace || ""); setEditDescription(day.description || ""); }}
+                          />
+
+                          <div className="flex items-center justify-center gap-1 mt-6">
+                            {plan.map((_, i) => (
+                              <button
+                                key={i}
+                                onClick={() => setCurrentWeekIdx(i)}
+                                className={`rounded-full transition-colors ${i === currentWeekIdx ? "bg-primary w-3 h-3" : i === goalWeekIdx ? "bg-primary/50 w-2 h-2 ring-1 ring-primary" : "bg-border w-2 h-2"}`}
+                                aria-label={i === goalWeekIdx ? (lang === "zh" ? "目標賽事週" : "Goal race week") : undefined}
+                              />
+                            ))}
+                          </div>
+                        </>
                       );
                     })()}
-                    <div className="bg-card border border-border rounded-xl p-3 mb-4">
-                      <div className="flex items-center justify-between mb-1">
-                        <div>
-                          <span className="text-sm font-medium text-foreground">{formatDate(weekStart)} - {formatDate(weekEnd)}</span>
-                          <span className="ml-2 bg-primary/15 text-primary text-xs font-bold px-2 py-0.5 rounded-full">WEEK {currentWeek.week}</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <button onClick={() => setCurrentWeekIdx(Math.max(0, currentWeekIdx - 1))} disabled={currentWeekIdx === 0} className="p-1 rounded hover:bg-accent disabled:opacity-30"><ChevronLeft size={16} /></button>
-                          <button onClick={() => setCurrentWeekIdx(Math.min(plan.length - 1, currentWeekIdx + 1))} disabled={currentWeekIdx === plan.length - 1} className="p-1 rounded hover:bg-accent disabled:opacity-30"><ChevronRight size={16} /></button>
-                        </div>
-                      </div>
-                       <p className="text-xs text-muted-foreground">{lang === "zh" ? "總計" : "Total"}: {totalKm.toFixed(1)} km</p>
-                    </div>
-
-                    <CalendarDayList
-                      days={currentWeek.days}
-                      weekIdx={currentWeekIdx}
-                      lang={lang}
-                      hrBounds={hrBounds}
-                      onSwap={(from, to) => swapDays(currentWeekIdx, from, to)}
-                      onAddClick={(i) => { setAddingDayIdx(i); setAddRunType(null); setAddDistance(""); }}
-                      onEditClick={(i, day) => { setEditingDayIdx(i); setEditDistance(day.distance_km?.toString() || ""); setEditPace(day.pace || ""); setEditDescription(day.description || ""); }}
-                    />
-
-                    <div className="flex items-center justify-center gap-1 mt-6">
-                      {plan.map((_, i) => (
-                        <button key={i} onClick={() => setCurrentWeekIdx(i)} className={`w-2 h-2 rounded-full transition-colors ${i === currentWeekIdx ? "bg-primary" : "bg-border"}`} />
-                      ))}
-                    </div>
 
                     {planDirty && (
                       <Button onClick={savePlanEdits} disabled={savingPlan} className="w-full mt-4" size="lg">

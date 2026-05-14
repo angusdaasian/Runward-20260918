@@ -1,32 +1,48 @@
-## Add collapsible Program Header above the week card (AI plan)
+# Race-aware AI Program with Race Schedule
 
-A new section appears above the existing "WEEK X" card on the AI plan view. By default it shows only the title; tapping it expands to reveal program meta + this week's progress.
+## Goal
+Make the AI program generator consider the user's races from the **My Races** tab. Inside the generated AI program, add a collapsible **Race Schedule** section that lists all races within the plan window, highlights the goal race (priority A) the program is built around, lets the user edit priorities/remove races (synced both ways with My Races), and shows a "Goals changed — regenerate?" banner when My Races changes after generation.
 
-### Collapsed (default)
-- Title: `{weeks}-week {distance} program` (e.g. "16-week Half Marathon program")
-- Chevron on the right indicates expand/collapse
+## Schema change
+Add to `training_plans`:
+- `race_schedule jsonb default '[]'::jsonb` — snapshot of `[{user_race_id, race_name, race_date, category, priority}]` taken at generation time. Used to detect drift vs current `user_races`.
 
-### Expanded
-- **Week progress**: `Week {currentWeekIdx + 1} / {existingPlan.weeks}`
-- **Target time**: `{existingPlan.target_time}` (formatted, e.g. "Target: 1:45:00")
-- **Weekly distance**: `{completedKm} / {plannedKm} km` with a thin progress bar
-- **Weekly time**: `{completedMin} / {plannedMin} min` with a thin progress bar
+## Edge function `generate-program`
+Accept new body field `races: Array<{name, race_date, category, priority}>` (already-filtered to plan window, sorted ascending). Inject a new section into the prompt:
+- List each race with its date, category and priority (A/B/C).
+- The **A race** = goal race the plan must peak for (use this as the existing `raceDate`/taper target).
+- For each **B race** insert a mini-taper (1 reduced week before, easier 2 days post-race) and replace that day with a "Race" workout at race-pace.
+- For each **C race** insert it as a "Race / hard training run" on race day, no special taper, easy day after.
+- Keep existing 10% / 3:1 / final-taper rules; race-related deload weeks are exceptions to the +10% rule (allowed to dip).
+- Mark race day entries with `type: "Race"`, title = race name, distance = category km.
 
-### Where the numbers come from
-- `weeks`, `distance`, `target_time`, `weeks` (total) → `existingPlan` (already loaded from `training_plans`)
-- `plannedKm` → sum of `currentWeek.days[].distance_km`
-- `plannedMin` → sum of `distance_km × paceMinPerKm` for each day. Pace parsed from `day.pace` (e.g. "5:30") with a sensible fallback per `type` when missing.
-- `completedKm` / `completedMin` → sum of activities whose `start_date / start_time` falls inside `[currentWeek.days[0].date, currentWeek.days[6].date]`. Uses the existing `useActivities()` merged list (Garmin + Terra + Strava + Apple Health) already wired into TrainingTab's neighbouring components.
+## Frontend `TrainingTab.tsx`
+1. **Initial generation** (`handleGenerate`): pull `userRaces` from `useActivities`, filter to `[startDate, raceDate]`, sort by date, send as `races`. The race chosen via the existing race picker becomes the implicit A race — set its priority to A in `user_races` if not already, so My Races stays the source of truth. Save snapshot to `race_schedule` column on the inserted plan.
 
-### Distance label mapping
-`5K` → "5K", `10K` → "10K", `HM` → "Half Marathon" / "半馬拉松", `FM` → "Full Marathon" / "全馬拉松", `custom` → "Custom" — reuse the existing `FREE_PLAN_LABELS` table at the top of `TrainingTab.tsx`.
+2. **Regeneration** (`handleRegeneratePlan`): always re-pull current `userRaces` for the plan window, send to edge function, and refresh `race_schedule` snapshot.
 
-### File touched
-- `src/components/TrainingTab.tsx` — add a small `ProgramHeader` component, render it above the existing week card inside the AI-plan calendar block (around line 1793, before the `<div className="bg-card border border-border rounded-xl p-3 mb-4">` block). No backend / schema changes.
+3. **Drift detection** (computed in render): compare current `userRaces` window vs `existingPlan.race_schedule`. Diff considers added/removed race ids and priority changes. When diff is non-empty, show a banner inside the new Race Schedule section: *"Your race goals changed in My Races — regenerate to match"* with a Regenerate button calling `handleRegeneratePlan({})`.
 
-### Bilingual strings
-EN/ZH for: "{n}-week {distance} program" / "{n} 週 {distance} 計劃", "Week X of Y" / "第 X 週 / 共 Y 週", "Target time" / "目標時間", "This week" / "本週", "km", "min".
+## ProgramHeader: new "Race Schedule" sub-panel
+Inside the existing collapsible header, below the existing fields, add a sub-section **Race Schedule** containing:
+- Each race row: date · name · category badge · priority dropdown (A/B/C/none) · remove button.
+- A-priority race row visually highlighted (primary border + "Goal race" tag).
+- Editing priority calls a new prop `onUpdateRacePriority(raceId, priority)` which:
+  - Updates `user_races.priority` in Supabase (same as RaceTab does).
+  - Triggers `handleRegeneratePlan({})` to rebuild with the new priority distribution.
+- Remove calls `onRemoveRace(raceId)` → delete from `user_races` → regenerate.
+- Drift banner appears at the top of the panel when `racesDriftFromSnapshot` is true.
 
-### Out of scope
-- Custom plan section (the request specifies AI plan only). Same component can be reused later if wanted.
-- Persisting expand/collapse state across sessions (will use local component state).
+## Two-way sync with RaceTab
+- Both panels read/write the same `user_races` rows. `useActivities` invalidation already broadcasts.
+- After ProgramHeader edits, invalidate the `userRaces` query so RaceTab updates.
+- After RaceTab edits, the next time TrainingTab renders it picks up the new races; the drift banner appears until user clicks Regenerate.
+
+## Files touched
+- `supabase/migrations/<new>.sql` — add `race_schedule` column.
+- `supabase/functions/generate-program/index.ts` — accept + use `races` in prompt.
+- `src/components/TrainingTab.tsx` — pass races on generation/regeneration, drift compute, ProgramHeader props, RaceSchedulePanel inside ProgramHeader.
+
+## Out of scope
+- Editing race date/distance from inside the AI program (user does that in My Races).
+- Auto-regenerating silently on drift — user always confirms via the banner.

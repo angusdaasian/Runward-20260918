@@ -545,8 +545,16 @@ const DAY_LABELS_ZH: Record<string, string> = {
 };
 const ProgramHeader: React.FC<ProgramHeaderProps> = ({
   lang, weeks, distance, targetTime, currentWeekIdx, weekDays, activities,
-  daysPerWeek, longRunDay, restDays, onRegenerate, regenerating,
+  daysPerWeek, longRunDay, restDays, weeklyKm, onRegenerate, regenerating,
 }) => {
+  const [editingKm, setEditingKm] = useState(false);
+  const [editKm, setEditKm] = useState<number>(weeklyKm);
+  useEffect(() => { setEditKm(weeklyKm); }, [weeklyKm]);
+  const handleSaveKm = async () => {
+    if (editKm === weeklyKm) { setEditingKm(false); return; }
+    if (onRegenerate) await onRegenerate({ weeklyKm: editKm });
+    setEditingKm(false);
+  };
   const [open, setOpen] = useState(false);
   const [editingTime, setEditingTime] = useState(false);
   const [editingRuns, setEditingRuns] = useState(false);

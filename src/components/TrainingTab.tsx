@@ -529,11 +529,13 @@ interface ProgramHeaderProps {
   daysPerWeek: number;
   longRunDay: string;
   restDays: string[];
+  weeklyKm: number;
   onRegenerate?: (overrides: {
     targetTime?: string;
     daysPerWeek?: number;
     longRunDay?: string;
     restDays?: string[];
+    weeklyKm?: number;
   }) => Promise<void> | void;
   regenerating?: boolean;
 }

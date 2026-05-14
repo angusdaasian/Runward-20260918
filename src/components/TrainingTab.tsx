@@ -2323,19 +2323,30 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
 
                 return (
                   <>
-                    {existingPlan && (
-                      <ProgramHeader
-                        lang={lang}
-                        weeks={Number(existingPlan.weeks) || plan.length}
-                        distance={String(existingPlan.distance ?? "")}
-                        targetTime={String(existingPlan.target_time ?? "")}
-                        currentWeekIdx={currentWeekIdx}
-                        weekDays={currentWeek.days}
-                        activities={allActivities as any}
-                        onUpdateTargetTime={handleRegenerateForTargetTime}
-                        regenerating={regeneratingTime}
-                      />
-                    )}
+                    {existingPlan && (() => {
+                      const planArr = Array.isArray(existingPlan.plan_data) ? existingPlan.plan_data : [];
+                      const w0Days = (planArr[0]?.days || []) as DayPlan[];
+                      const dl = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+                      const restDaysCur = w0Days.filter((d:any)=>d.type==="Rest").map((d:any)=>d.day).filter((d:string)=>dl.includes(d));
+                      const longRunCur = (w0Days.find((d:any)=>d.type==="Long Run") as any)?.day || "Sun";
+                      const dpwCur = Math.max(1, 7 - restDaysCur.length);
+                      return (
+                        <ProgramHeader
+                          lang={lang}
+                          weeks={Number(existingPlan.weeks) || plan.length}
+                          distance={String(existingPlan.distance ?? "")}
+                          targetTime={String(existingPlan.target_time ?? "")}
+                          currentWeekIdx={currentWeekIdx}
+                          weekDays={currentWeek.days}
+                          activities={allActivities as any}
+                          daysPerWeek={dpwCur}
+                          longRunDay={longRunCur}
+                          restDays={restDaysCur}
+                          onRegenerate={handleRegeneratePlan}
+                          regenerating={regeneratingTime}
+                        />
+                      );
+                    })()}
                     <div className="bg-card border border-border rounded-xl p-3 mb-4">
                       <div className="flex items-center justify-between mb-1">
                         <div>

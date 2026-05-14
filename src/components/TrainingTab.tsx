@@ -957,8 +957,98 @@ const ProgramHeader: React.FC<ProgramHeaderProps> = ({
                   {" "}/ {plannedKm.toFixed(1)} km
                 </span>
               </p>
-            </div>
           </div>
+
+          {/* Race Schedule */}
+          {(races || currentRaces) && (
+            <div className="rounded-lg border border-border/60 bg-muted/20 overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setRacesOpen((v) => !v)}
+                className="w-full flex items-center justify-between px-2.5 py-2 text-left hover:bg-accent/40 transition-colors"
+              >
+                <span className="text-xs font-semibold text-foreground inline-flex items-center gap-1.5">
+                  {L("Race Schedule", "賽事行程")}
+                  {racesDrift && (
+                    <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-700 dark:text-amber-400 border border-amber-500/30">
+                      {L("Updated", "已更新")}
+                    </span>
+                  )}
+                </span>
+                <ChevronDown size={14} className={`text-muted-foreground transition-transform ${racesOpen ? "rotate-180" : ""}`} />
+              </button>
+              {racesOpen && (
+                <div className="px-2.5 pb-2.5 pt-1 space-y-2">
+                  {racesDrift && onRegenerateForRaces && (
+                    <div className="rounded-md bg-amber-500/10 border border-amber-500/30 p-2 text-[11px] text-foreground space-y-1.5">
+                      <p>{L("Your race goals changed in My Races. Regenerate the program to match the updated plan.", "您在「我的賽事」中更改了目標。請重新生成計劃以符合最新安排。")}</p>
+                      <button
+                        type="button"
+                        onClick={() => onRegenerateForRaces()}
+                        disabled={regenerating}
+                        className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                      >
+                        {regenerating ? <Loader2 size={11} className="animate-spin" /> : null}
+                        {L("Regenerate program", "重新生成計劃")}
+                      </button>
+                    </div>
+                  )}
+                  {(racesDrift ? currentRaces : races)?.length ? (
+                    (racesDrift ? currentRaces : races)!.map((r) => {
+                      const isGoal = r.priority === "A";
+                      return (
+                        <div key={r.user_race_id} className={`flex items-center gap-2 p-2 rounded-md border ${isGoal ? "border-primary bg-primary/5" : "border-border/50 bg-background"}`}>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="text-xs font-semibold text-foreground truncate">{r.race_name}</span>
+                              {r.category && (
+                                <span className="text-[9px] font-bold px-1 py-0.5 rounded bg-muted text-muted-foreground">{r.category}</span>
+                              )}
+                              {isGoal && (
+                                <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-primary text-primary-foreground">
+                                  {L("Goal", "目標")}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-[10px] text-muted-foreground mt-0.5">{r.race_date}</p>
+                          </div>
+                          {onUpdateRacePriority && !racesDrift && (
+                            <select
+                              className="h-7 rounded border border-input bg-background px-1 text-[11px] text-foreground"
+                              value={r.priority || "none"}
+                              onChange={(e) => onUpdateRacePriority(r.user_race_id, e.target.value)}
+                              disabled={regenerating}
+                              aria-label={L("Priority", "優先級")}
+                            >
+                              <option value="A">A</option>
+                              <option value="B">B</option>
+                              <option value="C">C</option>
+                              <option value="none">{L("None", "無")}</option>
+                            </select>
+                          )}
+                          {onRemoveRace && !racesDrift && (
+                            <button
+                              type="button"
+                              onClick={() => onRemoveRace(r.user_race_id)}
+                              disabled={regenerating}
+                              className="text-muted-foreground hover:text-destructive disabled:opacity-50 p-1"
+                              aria-label={L("Remove race", "移除賽事")}
+                            >
+                              <X size={12} />
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <p className="text-[11px] text-muted-foreground italic px-1 py-2">
+                      {L("No races on the calendar within this program window. Add races in My Races.", "計劃期間沒有任何賽事。請在「我的賽事」中加入。")}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           <div>
             <div className="flex items-baseline justify-between mb-1">

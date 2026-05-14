@@ -1107,7 +1107,13 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
   };
 
   const [regeneratingTime, setRegeneratingTime] = useState(false);
-  const handleRegenerateForTargetTime = async (newTargetTime: string) => {
+  type RegenOverrides = {
+    targetTime?: string;
+    daysPerWeek?: number;
+    longRunDay?: string;
+    restDays?: string[];
+  };
+  const handleRegeneratePlan = async (overrides: RegenOverrides = {}) => {
     if (!existingPlan || !user) return;
     if (!isOnline()) {
       toast({
@@ -1121,15 +1127,42 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
     const w0 = planArr[0];
     const w0Days = (w0?.days || []) as DayPlan[];
     const dayLabels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-    const restDaysDerived = w0Days.filter((d) => d.type === "Rest").map((d) => d.day).filter((d) => dayLabels.includes(d));
-    const longRunDayDerived = (w0Days.find((d) => d.type === "Long Run")?.day) || "Sun";
-    const daysPerWeekDerived = Math.max(1, 7 - restDaysDerived.length);
+    const restDaysCurrent = w0Days.filter((d) => d.type === "Rest").map((d) => d.day).filter((d) => dayLabels.includes(d));
+    const longRunDayCurrent = (w0Days.find((d) => d.type === "Long Run")?.day) || "Sun";
+    const daysPerWeekCurrent = Math.max(1, 7 - restDaysCurrent.length);
     const weeklyKmDerived = Math.max(10, Math.round(w0Days.reduce((s, d) => s + (d.distance_km || 0), 0)));
     const startDateDerived = w0?.startDate || w0Days[0]?.date || new Date().toISOString().slice(0, 10);
     const weeksDerived = Number(existingPlan.weeks) || planArr.length || 8;
     const raceDateDerived = existingPlan.race_date || "";
     const distanceDerived = existingPlan.distance || "";
     const goalDerived = existingPlan.goal || "race";
+    const targetTimeFinal = overrides.targetTime ?? String(existingPlan.target_time ?? "");
+
+    let restDaysFinal = overrides.restDays ?? restDaysCurrent;
+    let daysPerWeekFinal = overrides.daysPerWeek ?? daysPerWeekCurrent;
+    // Reconcile runs/week with rest days when one but not both is overridden.
+    if (overrides.daysPerWeek !== undefined && overrides.restDays === undefined) {
+      const desiredRest = 7 - daysPerWeekFinal;
+      if (restDaysFinal.length !== desiredRest) {
+        if (restDaysFinal.length > desiredRest) {
+          restDaysFinal = restDaysFinal.slice(0, desiredRest);
+        } else {
+          const candidates = ["Mon", "Fri", "Wed", "Tue", "Thu", "Sat", "Sun"];
+          for (const d of candidates) {
+            if (restDaysFinal.length >= desiredRest) break;
+            if (!restDaysFinal.includes(d)) restDaysFinal = [...restDaysFinal, d];
+          }
+        }
+      }
+    } else if (overrides.restDays !== undefined && overrides.daysPerWeek === undefined) {
+      daysPerWeekFinal = 7 - restDaysFinal.length;
+    }
+    const longRunDayFinal = overrides.longRunDay ?? longRunDayCurrent;
+    // Long run day must not collide with rest days
+    if (restDaysFinal.includes(longRunDayFinal)) {
+      restDaysFinal = restDaysFinal.filter((d) => d !== longRunDayFinal);
+      daysPerWeekFinal = 7 - restDaysFinal.length;
+    }
 
     setRegeneratingTime(true);
     try {
@@ -1142,10 +1175,10 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
           Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
         },
         body: JSON.stringify({
-          goal: goalDerived, distance: distanceDerived, targetTime: newTargetTime,
+          goal: goalDerived, distance: distanceDerived, targetTime: targetTimeFinal,
           raceDate: raceDateDerived, startDate: startDateDerived, weeks: weeksDerived,
-          daysPerWeek: daysPerWeekDerived, weeklyKm: weeklyKmDerived,
-          longRunDay: longRunDayDerived, restDays: restDaysDerived, lang,
+          daysPerWeek: daysPerWeekFinal, weeklyKm: weeklyKmDerived,
+          longRunDay: longRunDayFinal, restDays: restDaysFinal, lang,
         }),
       });
       if (!response.ok) { const err = await response.json().catch(() => ({})); throw new Error(err.error || "Failed to regenerate"); }
@@ -1155,7 +1188,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
       setCurrentWeekIdx(0);
       await supabase.from("training_plans" as any).delete().eq("user_id", user.id);
       const inserted: any = {
-        user_id: user.id, goal: goalDerived, distance: distanceDerived, target_time: newTargetTime,
+        user_id: user.id, goal: goalDerived, distance: distanceDerived, target_time: targetTimeFinal,
         race_date: raceDateDerived, weeks: weeksDerived, plan_data: planData, raw_output: result.raw || "",
       };
       const { data: saved } = await (supabase.from("training_plans" as any) as any).insert(inserted).select().single();
@@ -1165,7 +1198,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
       notifyPlanChanged();
       toast({
         title: lang === "zh" ? "計劃已更新" : "Plan updated",
-        description: lang === "zh" ? "已根據新目標時間調整訓練" : "Workouts adjusted for the new target time",
+        description: lang === "zh" ? "已根據新設定調整訓練" : "Workouts adjusted for the new settings",
       });
     } catch (err: any) {
       console.error("Error regenerating program:", err);

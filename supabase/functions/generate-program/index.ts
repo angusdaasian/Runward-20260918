@@ -237,6 +237,30 @@ Return ONLY valid JSON, no markdown, no explanation.`;
         week.startDate = week.days[0].date;
         week.week = w + 1;
       }
+
+      const daysFlat = planData.flatMap((week: any) => Array.isArray(week?.days) ? week.days : []);
+      for (let i = 0; i < daysFlat.length; i++) {
+        const race = raceList.find((r) => r.race_date === daysFlat[i]?.date);
+        if (!race) continue;
+        const priority = ["A", "B", "C"].includes(String(race.priority)) ? String(race.priority) : "none";
+        daysFlat[i] = Object.assign(daysFlat[i], {
+          type: "Race",
+          title: race.name,
+          description: isZh
+            ? `${race.name}（${priority === "none" ? "未設定" : priority} 優先級）。此日按賽事行程安排為比賽。`
+            : `${race.name} (${priority === "none" ? "unprioritized" : `${priority}-priority`} race). Scheduled from the runner's race calendar.`,
+          distance_km: distanceForCategory(race.category),
+          color: "#E91E63",
+        });
+        if (daysFlat[i + 1] && !["Rest", "Recovery"].includes(daysFlat[i + 1].type)) {
+          daysFlat[i + 1] = Object.assign(daysFlat[i + 1], {
+            type: "Recovery",
+            title: isZh ? "賽後恢復" : "Post-race Recovery",
+            description: isZh ? "非常輕鬆的賽後恢復跑。" : "Very easy post-race recovery run.",
+            color: "#9C27B0",
+          });
+        }
+      }
     }
 
     return new Response(JSON.stringify({ plan: planData, raw: content }), {

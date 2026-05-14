@@ -4,6 +4,8 @@ import { getMainPaces, predictTime, formatTime, raceDistances } from "@/lib/vdot
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { usePremium } from "@/contexts/PremiumContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -524,30 +526,77 @@ interface ProgramHeaderProps {
   currentWeekIdx: number;
   weekDays: DayPlan[];
   activities: Array<{ start_date: string; distance: number; moving_time: number }>;
-  onUpdateTargetTime?: (newTargetTime: string) => Promise<void> | void;
+  daysPerWeek: number;
+  longRunDay: string;
+  restDays: string[];
+  onRegenerate?: (overrides: {
+    targetTime?: string;
+    daysPerWeek?: number;
+    longRunDay?: string;
+    restDays?: string[];
+  }) => Promise<void> | void;
   regenerating?: boolean;
 }
+const DAY_LABELS_ALL = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
+const DAY_LABELS_ZH: Record<string, string> = {
+  Mon: "一", Tue: "二", Wed: "三", Thu: "四", Fri: "五", Sat: "六", Sun: "日",
+};
 const ProgramHeader: React.FC<ProgramHeaderProps> = ({
   lang, weeks, distance, targetTime, currentWeekIdx, weekDays, activities,
-  onUpdateTargetTime, regenerating,
+  daysPerWeek, longRunDay, restDays, onRegenerate, regenerating,
 }) => {
   const [open, setOpen] = useState(false);
-  const [editing, setEditing] = useState(false);
+  const [editingTime, setEditingTime] = useState(false);
+  const [editingRuns, setEditingRuns] = useState(false);
+  const [editingLong, setEditingLong] = useState(false);
+  const [editingRest, setEditingRest] = useState(false);
+
   const initialParts = (targetTime || "").split(":");
-  const [eh, setEh] = useState(initialParts[0] || "");
-  const [em, setEm] = useState(initialParts[1] || "");
-  const [es, setEs] = useState(initialParts[2] || "");
+  const [eh, setEh] = useState(initialParts[0] || "00");
+  const [em, setEm] = useState(initialParts[1] || "00");
+  const [es, setEs] = useState(initialParts[2] || "00");
   useEffect(() => {
     const p = (targetTime || "").split(":");
-    setEh(p[0] || ""); setEm(p[1] || ""); setEs(p[2] || "");
+    setEh((p[0] || "00").padStart(2, "0"));
+    setEm((p[1] || "00").padStart(2, "0"));
+    setEs((p[2] || "00").padStart(2, "0"));
   }, [targetTime]);
+
+  const [editRuns, setEditRuns] = useState(daysPerWeek);
+  const [editLong, setEditLong] = useState(longRunDay);
+  const [editRest, setEditRest] = useState<string[]>(restDays);
+  useEffect(() => { setEditRuns(daysPerWeek); }, [daysPerWeek]);
+  useEffect(() => { setEditLong(longRunDay); }, [longRunDay]);
+  useEffect(() => { setEditRest(restDays); }, [restDays.join(",")]);
+
   const pad = (v: string) => String(Math.max(0, parseInt(v || "0", 10) || 0)).padStart(2, "0");
+  const L = (en: string, zh: string) => (lang === "zh" ? zh : en);
+  const dayLabel = (d: string) => (lang === "zh" ? DAY_LABELS_ZH[d] || d : d);
+
   const handleSaveTime = async () => {
     const next = `${pad(eh)}:${pad(em)}:${pad(es)}`;
-    if (next === targetTime) { setEditing(false); return; }
-    if (onUpdateTargetTime) await onUpdateTargetTime(next);
-    setEditing(false);
+    if (next === targetTime) { setEditingTime(false); return; }
+    if (onRegenerate) await onRegenerate({ targetTime: next });
+    setEditingTime(false);
   };
+  const handleSaveRuns = async () => {
+    if (editRuns === daysPerWeek) { setEditingRuns(false); return; }
+    if (onRegenerate) await onRegenerate({ daysPerWeek: editRuns });
+    setEditingRuns(false);
+  };
+  const handleSaveLong = async () => {
+    if (editLong === longRunDay) { setEditingLong(false); return; }
+    if (onRegenerate) await onRegenerate({ longRunDay: editLong });
+    setEditingLong(false);
+  };
+  const handleSaveRest = async () => {
+    const sorted = [...editRest].sort((a, b) => DAY_LABELS_ALL.indexOf(a as any) - DAY_LABELS_ALL.indexOf(b as any));
+    const same = sorted.length === restDays.length && sorted.every((d, i) => d === restDays[i]);
+    if (same) { setEditingRest(false); return; }
+    if (onRegenerate) await onRegenerate({ restDays: sorted });
+    setEditingRest(false);
+  };
+
   const distLabel = planDistanceLabel(distance, lang);
   const title = lang === "zh"
     ? `${weeks} 週 ${distLabel} 計劃`
@@ -576,7 +625,14 @@ const ProgramHeader: React.FC<ProgramHeaderProps> = ({
   }
 
   const pct = (a: number, b: number) => Math.max(0, Math.min(100, b > 0 ? (a / b) * 100 : 0));
-  const L = (en: string, zh: string) => (lang === "zh" ? zh : en);
+
+  const selectClass = "h-7 w-full rounded border border-input bg-background px-1 text-xs text-foreground";
+  const Updating = (
+    <span className="inline-flex items-center gap-1 text-muted-foreground">
+      <Loader2 size={12} className="animate-spin" />
+      {L("Updating…", "更新中…")}
+    </span>
+  );
 
   return (
     <div className="bg-card border border-border rounded-xl mb-3 overflow-hidden">
@@ -602,46 +658,188 @@ const ProgramHeader: React.FC<ProgramHeaderProps> = ({
                 {currentWeekIdx + 1} / {weeks}
               </p>
             </div>
+
+            {/* Target time */}
             <div className="rounded-lg bg-muted/40 p-2">
               <div className="flex items-center justify-between gap-1">
                 <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
                   {L("Target time", "目標時間")}
                 </p>
-                {!editing && onUpdateTargetTime && (
-                  <button
-                    type="button"
-                    onClick={() => setEditing(true)}
-                    disabled={regenerating}
+                {!editingTime && onRegenerate && (
+                  <button type="button" onClick={() => setEditingTime(true)} disabled={regenerating}
                     className="text-muted-foreground hover:text-foreground disabled:opacity-50"
-                    aria-label={L("Edit target time", "編輯目標時間")}
-                  >
+                    aria-label={L("Edit target time", "編輯目標時間")}>
                     <Pencil size={11} />
                   </button>
                 )}
               </div>
-              {!editing ? (
+              {!editingTime ? (
                 <p className="text-sm font-semibold text-foreground">
-                  {regenerating ? (
-                    <span className="inline-flex items-center gap-1 text-muted-foreground">
-                      <Loader2 size={12} className="animate-spin" />
-                      {L("Updating…", "更新中…")}
-                    </span>
-                  ) : (targetTime || "—")}
+                  {regenerating ? Updating : (targetTime || "—")}
                 </p>
               ) : (
                 <div className="mt-1 space-y-1.5">
                   <div className="flex items-center gap-1">
-                    <Input value={eh} onChange={(e) => setEh(e.target.value.replace(/\D/g, "").slice(0, 2))} placeholder="HH" inputMode="numeric" className="h-7 px-1 text-xs text-center" />
+                    <select className={selectClass} value={eh} onChange={(e) => setEh(e.target.value)}>
+                      {Array.from({ length: 10 }, (_, i) => String(i).padStart(2, "0")).map((v) => (
+                        <option key={v} value={v}>{v}</option>
+                      ))}
+                    </select>
                     <span className="text-xs">:</span>
-                    <Input value={em} onChange={(e) => setEm(e.target.value.replace(/\D/g, "").slice(0, 2))} placeholder="MM" inputMode="numeric" className="h-7 px-1 text-xs text-center" />
+                    <select className={selectClass} value={em} onChange={(e) => setEm(e.target.value)}>
+                      {Array.from({ length: 60 }, (_, i) => String(i).padStart(2, "0")).map((v) => (
+                        <option key={v} value={v}>{v}</option>
+                      ))}
+                    </select>
                     <span className="text-xs">:</span>
-                    <Input value={es} onChange={(e) => setEs(e.target.value.replace(/\D/g, "").slice(0, 2))} placeholder="SS" inputMode="numeric" className="h-7 px-1 text-xs text-center" />
+                    <select className={selectClass} value={es} onChange={(e) => setEs(e.target.value)}>
+                      {Array.from({ length: 60 }, (_, i) => String(i).padStart(2, "0")).map((v) => (
+                        <option key={v} value={v}>{v}</option>
+                      ))}
+                    </select>
                   </div>
                   <div className="flex gap-1">
                     <Button size="sm" className="h-6 px-2 text-[10px] flex-1" onClick={handleSaveTime} disabled={regenerating}>
                       {L("Regenerate", "重新生成")}
                     </Button>
-                    <Button size="sm" variant="ghost" className="h-6 px-2 text-[10px]" onClick={() => setEditing(false)} disabled={regenerating}>
+                    <Button size="sm" variant="ghost" className="h-6 px-2 text-[10px]" onClick={() => setEditingTime(false)} disabled={regenerating}>
+                      {L("Cancel", "取消")}
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Runs per week */}
+            <div className="rounded-lg bg-muted/40 p-2">
+              <div className="flex items-center justify-between gap-1">
+                <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                  {L("Runs / week", "每週跑步")}
+                </p>
+                {!editingRuns && onRegenerate && (
+                  <button type="button" onClick={() => setEditingRuns(true)} disabled={regenerating}
+                    className="text-muted-foreground hover:text-foreground disabled:opacity-50">
+                    <Pencil size={11} />
+                  </button>
+                )}
+              </div>
+              {!editingRuns ? (
+                <p className="text-sm font-semibold text-foreground">
+                  {regenerating ? Updating : `${daysPerWeek} ${L("days", "天")}`}
+                </p>
+              ) : (
+                <div className="mt-1 space-y-1.5">
+                  <select className={selectClass} value={editRuns} onChange={(e) => setEditRuns(parseInt(e.target.value, 10))}>
+                    {[1, 2, 3, 4, 5, 6, 7].map((n) => (
+                      <option key={n} value={n}>{n} {L("days", "天")}</option>
+                    ))}
+                  </select>
+                  <div className="flex gap-1">
+                    <Button size="sm" className="h-6 px-2 text-[10px] flex-1" onClick={handleSaveRuns} disabled={regenerating}>
+                      {L("Apply", "套用")}
+                    </Button>
+                    <Button size="sm" variant="ghost" className="h-6 px-2 text-[10px]" onClick={() => setEditingRuns(false)} disabled={regenerating}>
+                      {L("Cancel", "取消")}
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Long run day */}
+            <div className="rounded-lg bg-muted/40 p-2">
+              <div className="flex items-center justify-between gap-1">
+                <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                  {L("Long run day", "長跑日")}
+                </p>
+                {!editingLong && onRegenerate && (
+                  <button type="button" onClick={() => setEditingLong(true)} disabled={regenerating}
+                    className="text-muted-foreground hover:text-foreground disabled:opacity-50">
+                    <Pencil size={11} />
+                  </button>
+                )}
+              </div>
+              {!editingLong ? (
+                <p className="text-sm font-semibold text-foreground">
+                  {regenerating ? Updating : dayLabel(longRunDay)}
+                </p>
+              ) : (
+                <div className="mt-1 space-y-1.5">
+                  <select className={selectClass} value={editLong} onChange={(e) => setEditLong(e.target.value)}>
+                    {DAY_LABELS_ALL.map((d) => (
+                      <option key={d} value={d}>{dayLabel(d)}</option>
+                    ))}
+                  </select>
+                  <div className="flex gap-1">
+                    <Button size="sm" className="h-6 px-2 text-[10px] flex-1" onClick={handleSaveLong} disabled={regenerating}>
+                      {L("Apply", "套用")}
+                    </Button>
+                    <Button size="sm" variant="ghost" className="h-6 px-2 text-[10px]" onClick={() => setEditingLong(false)} disabled={regenerating}>
+                      {L("Cancel", "取消")}
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Rest days */}
+            <div className="rounded-lg bg-muted/40 p-2 col-span-2">
+              <div className="flex items-center justify-between gap-1">
+                <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                  {L("Rest days", "休息日")}
+                </p>
+                {!editingRest && onRegenerate && (
+                  <button type="button" onClick={() => setEditingRest(true)} disabled={regenerating}
+                    className="text-muted-foreground hover:text-foreground disabled:opacity-50">
+                    <Pencil size={11} />
+                  </button>
+                )}
+              </div>
+              {!editingRest ? (
+                <p className="text-sm font-semibold text-foreground">
+                  {regenerating ? Updating : (restDays.length ? restDays.map(dayLabel).join(", ") : "—")}
+                </p>
+              ) : (
+                <div className="mt-1 space-y-1.5">
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <button type="button" className={`${selectClass} text-left flex items-center justify-between`}>
+                        <span className="truncate">
+                          {editRest.length
+                            ? editRest
+                                .slice()
+                                .sort((a, b) => DAY_LABELS_ALL.indexOf(a as any) - DAY_LABELS_ALL.indexOf(b as any))
+                                .map(dayLabel)
+                                .join(", ")
+                            : L("Select days", "選擇日期")}
+                        </span>
+                        <ChevronDown size={12} className="text-muted-foreground" />
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-44 p-2">
+                      <div className="space-y-1">
+                        {DAY_LABELS_ALL.map((d) => {
+                          const checked = editRest.includes(d);
+                          return (
+                            <label key={d} className="flex items-center gap-2 text-xs cursor-pointer hover:bg-accent rounded px-1 py-0.5">
+                              <Checkbox
+                                checked={checked}
+                                onCheckedChange={(v) => {
+                                  setEditRest((prev) => (v ? [...prev, d] : prev.filter((x) => x !== d)));
+                                }}
+                              />
+                              <span>{dayLabel(d)}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                  <div className="flex gap-1">
+                    <Button size="sm" className="h-6 px-2 text-[10px] flex-1" onClick={handleSaveRest} disabled={regenerating || editRest.length >= 7}>
+                      {L("Apply", "套用")}
+                    </Button>
+                    <Button size="sm" variant="ghost" className="h-6 px-2 text-[10px]" onClick={() => setEditingRest(false)} disabled={regenerating}>
                       {L("Cancel", "取消")}
                     </Button>
                   </div>
@@ -1107,7 +1305,13 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
   };
 
   const [regeneratingTime, setRegeneratingTime] = useState(false);
-  const handleRegenerateForTargetTime = async (newTargetTime: string) => {
+  type RegenOverrides = {
+    targetTime?: string;
+    daysPerWeek?: number;
+    longRunDay?: string;
+    restDays?: string[];
+  };
+  const handleRegeneratePlan = async (overrides: RegenOverrides = {}) => {
     if (!existingPlan || !user) return;
     if (!isOnline()) {
       toast({
@@ -1121,15 +1325,42 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
     const w0 = planArr[0];
     const w0Days = (w0?.days || []) as DayPlan[];
     const dayLabels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-    const restDaysDerived = w0Days.filter((d) => d.type === "Rest").map((d) => d.day).filter((d) => dayLabels.includes(d));
-    const longRunDayDerived = (w0Days.find((d) => d.type === "Long Run")?.day) || "Sun";
-    const daysPerWeekDerived = Math.max(1, 7 - restDaysDerived.length);
+    const restDaysCurrent = w0Days.filter((d) => d.type === "Rest").map((d) => d.day).filter((d) => dayLabels.includes(d));
+    const longRunDayCurrent = (w0Days.find((d) => d.type === "Long Run")?.day) || "Sun";
+    const daysPerWeekCurrent = Math.max(1, 7 - restDaysCurrent.length);
     const weeklyKmDerived = Math.max(10, Math.round(w0Days.reduce((s, d) => s + (d.distance_km || 0), 0)));
     const startDateDerived = w0?.startDate || w0Days[0]?.date || new Date().toISOString().slice(0, 10);
     const weeksDerived = Number(existingPlan.weeks) || planArr.length || 8;
     const raceDateDerived = existingPlan.race_date || "";
     const distanceDerived = existingPlan.distance || "";
     const goalDerived = existingPlan.goal || "race";
+    const targetTimeFinal = overrides.targetTime ?? String(existingPlan.target_time ?? "");
+
+    let restDaysFinal = overrides.restDays ?? restDaysCurrent;
+    let daysPerWeekFinal = overrides.daysPerWeek ?? daysPerWeekCurrent;
+    // Reconcile runs/week with rest days when one but not both is overridden.
+    if (overrides.daysPerWeek !== undefined && overrides.restDays === undefined) {
+      const desiredRest = 7 - daysPerWeekFinal;
+      if (restDaysFinal.length !== desiredRest) {
+        if (restDaysFinal.length > desiredRest) {
+          restDaysFinal = restDaysFinal.slice(0, desiredRest);
+        } else {
+          const candidates = ["Mon", "Fri", "Wed", "Tue", "Thu", "Sat", "Sun"];
+          for (const d of candidates) {
+            if (restDaysFinal.length >= desiredRest) break;
+            if (!restDaysFinal.includes(d)) restDaysFinal = [...restDaysFinal, d];
+          }
+        }
+      }
+    } else if (overrides.restDays !== undefined && overrides.daysPerWeek === undefined) {
+      daysPerWeekFinal = 7 - restDaysFinal.length;
+    }
+    const longRunDayFinal = overrides.longRunDay ?? longRunDayCurrent;
+    // Long run day must not collide with rest days
+    if (restDaysFinal.includes(longRunDayFinal)) {
+      restDaysFinal = restDaysFinal.filter((d) => d !== longRunDayFinal);
+      daysPerWeekFinal = 7 - restDaysFinal.length;
+    }
 
     setRegeneratingTime(true);
     try {
@@ -1142,10 +1373,10 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
           Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
         },
         body: JSON.stringify({
-          goal: goalDerived, distance: distanceDerived, targetTime: newTargetTime,
+          goal: goalDerived, distance: distanceDerived, targetTime: targetTimeFinal,
           raceDate: raceDateDerived, startDate: startDateDerived, weeks: weeksDerived,
-          daysPerWeek: daysPerWeekDerived, weeklyKm: weeklyKmDerived,
-          longRunDay: longRunDayDerived, restDays: restDaysDerived, lang,
+          daysPerWeek: daysPerWeekFinal, weeklyKm: weeklyKmDerived,
+          longRunDay: longRunDayFinal, restDays: restDaysFinal, lang,
         }),
       });
       if (!response.ok) { const err = await response.json().catch(() => ({})); throw new Error(err.error || "Failed to regenerate"); }
@@ -1155,7 +1386,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
       setCurrentWeekIdx(0);
       await supabase.from("training_plans" as any).delete().eq("user_id", user.id);
       const inserted: any = {
-        user_id: user.id, goal: goalDerived, distance: distanceDerived, target_time: newTargetTime,
+        user_id: user.id, goal: goalDerived, distance: distanceDerived, target_time: targetTimeFinal,
         race_date: raceDateDerived, weeks: weeksDerived, plan_data: planData, raw_output: result.raw || "",
       };
       const { data: saved } = await (supabase.from("training_plans" as any) as any).insert(inserted).select().single();
@@ -1165,7 +1396,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
       notifyPlanChanged();
       toast({
         title: lang === "zh" ? "計劃已更新" : "Plan updated",
-        description: lang === "zh" ? "已根據新目標時間調整訓練" : "Workouts adjusted for the new target time",
+        description: lang === "zh" ? "已根據新設定調整訓練" : "Workouts adjusted for the new settings",
       });
     } catch (err: any) {
       console.error("Error regenerating program:", err);
@@ -2092,19 +2323,30 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
 
                 return (
                   <>
-                    {existingPlan && (
-                      <ProgramHeader
-                        lang={lang}
-                        weeks={Number(existingPlan.weeks) || plan.length}
-                        distance={String(existingPlan.distance ?? "")}
-                        targetTime={String(existingPlan.target_time ?? "")}
-                        currentWeekIdx={currentWeekIdx}
-                        weekDays={currentWeek.days}
-                        activities={allActivities as any}
-                        onUpdateTargetTime={handleRegenerateForTargetTime}
-                        regenerating={regeneratingTime}
-                      />
-                    )}
+                    {existingPlan && (() => {
+                      const planArr = Array.isArray(existingPlan.plan_data) ? existingPlan.plan_data : [];
+                      const w0Days = (planArr[0]?.days || []) as DayPlan[];
+                      const dl = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+                      const restDaysCur = w0Days.filter((d:any)=>d.type==="Rest").map((d:any)=>d.day).filter((d:string)=>dl.includes(d));
+                      const longRunCur = (w0Days.find((d:any)=>d.type==="Long Run") as any)?.day || "Sun";
+                      const dpwCur = Math.max(1, 7 - restDaysCur.length);
+                      return (
+                        <ProgramHeader
+                          lang={lang}
+                          weeks={Number(existingPlan.weeks) || plan.length}
+                          distance={String(existingPlan.distance ?? "")}
+                          targetTime={String(existingPlan.target_time ?? "")}
+                          currentWeekIdx={currentWeekIdx}
+                          weekDays={currentWeek.days}
+                          activities={allActivities as any}
+                          daysPerWeek={dpwCur}
+                          longRunDay={longRunCur}
+                          restDays={restDaysCur}
+                          onRegenerate={handleRegeneratePlan}
+                          regenerating={regeneratingTime}
+                        />
+                      );
+                    })()}
                     <div className="bg-card border border-border rounded-xl p-3 mb-4">
                       <div className="flex items-center justify-between mb-1">
                         <div>

@@ -1304,6 +1304,40 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
     return list.slice(0, 30);
   }, [raceOptions, raceSearch]);
 
+  // ─── Race-aware program helpers ───
+  type RaceSchedItem = { user_race_id: string; race_name: string; race_date: string; category: string; priority: string };
+  const distanceForCategory = (cat: string): number | null => {
+    const c = (cat || "").toUpperCase();
+    if (c === "5K") return 5;
+    if (c === "10K") return 10;
+    if (c === "HM" || c === "HALF" || c === "HALF MARATHON") return 21.1;
+    if (c === "FM" || c === "FULL" || c === "MARATHON") return 42.2;
+    return null;
+  };
+  const buildRaceSnapshot = (windowStart: string, windowEnd: string): RaceSchedItem[] => {
+    if (!Array.isArray(userRaces)) return [];
+    return (userRaces as any[])
+      .filter((r) => r?.race_date && r.race_date >= windowStart && r.race_date <= windowEnd)
+      .map((r) => ({
+        user_race_id: r.id,
+        race_name: (lang === "zh" && r.race_name_zh) || r.race_name,
+        race_date: r.race_date,
+        category: r.category || "",
+        priority: r.priority || "none",
+      }))
+      .sort((a, b) => a.race_date.localeCompare(b.race_date));
+  };
+  const racesPayloadFromSnapshot = (snap: RaceSchedItem[]) =>
+    snap.map((r) => ({ name: r.race_name, race_date: r.race_date, category: r.category, priority: r.priority }));
+  const racesEqual = (a: RaceSchedItem[], b: RaceSchedItem[]) => {
+    if (a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) {
+      const x = a[i], y = b[i];
+      if (x.user_race_id !== y.user_race_id || x.race_date !== y.race_date || x.priority !== y.priority || x.category !== y.category) return false;
+    }
+    return true;
+  };
+
   const handleGenerate = async () => {
     if (!distance || !targetTime || !raceDate || !startDate || !dateValid) return;
     if (!isOnline()) {

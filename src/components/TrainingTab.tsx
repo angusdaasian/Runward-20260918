@@ -1175,7 +1175,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
     }
   };
 
-
+  const handleNewPlan = async () => {
     if (!isOnline()) {
       toast({
         title: lang === "zh" ? "離線中" : "You're offline",

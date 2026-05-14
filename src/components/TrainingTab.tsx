@@ -1432,11 +1432,15 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
   const racesPayloadFromSnapshot = (snap: RaceSchedItem[]) =>
     snap.map((r) => ({ name: r.race_name, race_date: r.race_date, category: r.category, priority: r.priority }));
   const racesEqual = (a: RaceSchedItem[], b: RaceSchedItem[]) => {
-    if (a.length !== b.length) return false;
-    for (let i = 0; i < a.length; i++) {
-      const x = a[i], y = b[i];
-      if (x.user_race_id !== y.user_race_id || x.race_date !== y.race_date || x.priority !== y.priority || x.category !== y.category) return false;
-    }
+    // Compare only fields that affect plan generation. Ignore user_race_id (older
+    // snapshots may not have stored it) and race_name (changes with language).
+    const norm = (arr: RaceSchedItem[]) =>
+      [...arr]
+        .map((r) => `${r.race_date}|${(r.category || "").toUpperCase()}|${r.priority || "none"}`)
+        .sort();
+    const na = norm(a), nb = norm(b);
+    if (na.length !== nb.length) return false;
+    for (let i = 0; i < na.length; i++) if (na[i] !== nb[i]) return false;
     return true;
   };
 

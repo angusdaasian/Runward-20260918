@@ -1475,7 +1475,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
               priority: "A",
             });
           }
-          await queryClient.invalidateQueries({ queryKey: ["userRaces"] });
+          await queryClient.invalidateQueries({ queryKey: ["user-races"] });
         } catch (e) { console.warn("user_races sync failed", e); }
       }
 
@@ -2611,13 +2611,13 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                           onUpdateRacePriority={async (raceId, priority) => {
                             if (!user) return;
                             await (supabase.from("user_races" as any) as any).update({ priority }).eq("id", raceId).eq("user_id", user.id);
-                            await queryClient.invalidateQueries({ queryKey: ["userRaces"] });
+                            await queryClient.invalidateQueries({ queryKey: ["user-races"] });
                             await handleRegeneratePlan({});
                           }}
                           onRemoveRace={async (raceId) => {
                             if (!user) return;
                             await supabase.from("user_races" as any).delete().eq("id", raceId).eq("user_id", user.id);
-                            await queryClient.invalidateQueries({ queryKey: ["userRaces"] });
+                            await queryClient.invalidateQueries({ queryKey: ["user-races"] });
                             await handleRegeneratePlan({});
                           }}
                           onRegenerateForRaces={() => handleRegeneratePlan({})}

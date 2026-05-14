@@ -200,8 +200,8 @@ const WeeklyReviewModal = ({ open, onClose, lang, planId, currentWeekIdx, onUpgr
               </div>
             )}
 
-            {/* Overall + completion + AI Coach insight */}
-            <div className="bg-card border border-border rounded-xl p-4 space-y-4">
+            {/* Overall + completion + insight text */}
+            <div className="bg-card border border-border rounded-xl p-4 space-y-3">
               <div className="flex items-center gap-4">
                 <ScoreRing value={review.overall_score} label={lang === "zh" ? "總分" : "Overall"} />
                 <div className="flex-1">
@@ -213,40 +213,33 @@ const WeeklyReviewModal = ({ open, onClose, lang, planId, currentWeekIdx, onUpgr
                 </div>
               </div>
               {insight && (
-                <div className="bg-primary/5 border border-primary/20 rounded-lg p-3">
-                  <div className="text-xs font-semibold text-primary mb-1.5 flex items-center gap-1">
-                    <Sparkles size={12} /> {lang === "zh" ? "AI 教練分析" : "AI Coach Insight"}
-                  </div>
-                  <p className="text-sm text-foreground whitespace-pre-line leading-relaxed">{insight}</p>
-                </div>
+                <p className="text-sm text-foreground whitespace-pre-line leading-relaxed">{insight}</p>
               )}
             </div>
 
             {/* Per-score breakdown with explanations */}
             <div className="space-y-2">
               {([
-                { key: "distance", label: lang === "zh" ? "里程表現" : "Distance", emoji: "📏", score: review.distance_score, color: "bg-blue-500/5 border-blue-500/20", stat: `${review.stats.actual_km ?? "—"}/${review.stats.planned_km ?? "—"} km` },
-                { key: "pace",     label: lang === "zh" ? "配速表現" : "Pace",     emoji: "⏱️", score: review.pace_score,     color: "bg-emerald-500/5 border-emerald-500/20", stat: fmtPace(review.stats.avg_pace_sec_per_km) },
-                { key: "hr",       label: lang === "zh" ? "心率表現" : "Heart Rate", emoji: "❤️", score: review.hr_score,     color: "bg-rose-500/5 border-rose-500/20", stat: review.stats.avg_hr != null ? `${review.stats.avg_hr} bpm` : "—" },
-                { key: "recovery", label: lang === "zh" ? "恢復表現" : "Recovery", emoji: "🌙", score: review.recovery_score, color: "bg-violet-500/5 border-violet-500/20", stat: review.stats.avg_sleep_score != null ? `${lang === "zh" ? "睡眠" : "sleep"} ${review.stats.avg_sleep_score}` : (review.stats.avg_resting_hr != null ? `RHR ${review.stats.avg_resting_hr}` : "—") },
+                { key: "distance", label: lang === "zh" ? "里程表現" : "Distance",   score: review.distance_score, stat: `${review.stats.actual_km ?? "—"}/${review.stats.planned_km ?? "—"} km` },
+                { key: "pace",     label: lang === "zh" ? "配速表現" : "Pace",       score: review.pace_score,     stat: fmtPace(review.stats.avg_pace_sec_per_km) },
+                { key: "hr",       label: lang === "zh" ? "心率表現" : "Heart Rate", score: review.hr_score,       stat: review.stats.avg_hr != null ? `${review.stats.avg_hr} bpm` : "—" },
+                { key: "recovery", label: lang === "zh" ? "恢復表現" : "Recovery",   score: review.recovery_score, stat: review.stats.avg_sleep_score != null ? `${lang === "zh" ? "睡眠" : "sleep"} ${review.stats.avg_sleep_score}` : (review.stats.avg_resting_hr != null ? `RHR ${review.stats.avg_resting_hr}` : "—") },
               ] as const).map((row) => {
                 const exp = review.stats.explanations?.[row.key];
                 const expText = exp ? (lang === "zh" ? exp.zh : exp.en) || exp.en || exp.zh : null;
                 return (
-                  <div key={row.key} className={`border rounded-xl p-3 ${row.color}`}>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <div className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
-                        <span>{row.emoji}</span>{row.label}
-                      </div>
-                      <div className="text-xs text-muted-foreground">{row.stat} · <span className="text-foreground font-medium">{row.score}/100</span></div>
+                  <div key={row.key} className="bg-card border border-border rounded-xl p-4 flex items-center gap-4">
+                    <ScoreRing value={row.score} label={row.label} />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs text-muted-foreground mb-1">{row.stat}</div>
+                      {expText ? (
+                        <p className="text-sm text-foreground leading-relaxed">{expText}</p>
+                      ) : (
+                        <p className="text-xs text-muted-foreground/70 italic">
+                          {lang === "zh" ? "暫無分析,重新生成可取得詳細解釋。" : "No explanation yet — regenerate for details."}
+                        </p>
+                      )}
                     </div>
-                    {expText ? (
-                      <p className="text-xs text-muted-foreground leading-relaxed">{expText}</p>
-                    ) : (
-                      <p className="text-xs text-muted-foreground/70 italic">
-                        {lang === "zh" ? "暫無分析,重新生成可取得詳細解釋。" : "No explanation yet — regenerate for details."}
-                      </p>
-                    )}
                   </div>
                 );
               })}

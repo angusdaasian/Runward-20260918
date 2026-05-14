@@ -665,7 +665,7 @@ const ProgramHeader: React.FC<ProgramHeaderProps> = ({
   daysPerWeek, longRunDay, restDays, weeklyKm, onRegenerate, regenerating,
   races, currentRaces, racesDrift, onUpdateRacePriority, onRemoveRace, onRegenerateForRaces,
 }) => {
-  const [racesOpen, setRacesOpen] = useState(false);
+  
   const [editingKm, setEditingKm] = useState(false);
   const [editKm, setEditKm] = useState<number>(weeklyKm);
   useEffect(() => { setEditKm(weeklyKm); }, [weeklyKm]);

@@ -1106,7 +1106,76 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
     } finally { setLoading(false); }
   };
 
-  const handleNewPlan = async () => {
+  const [regeneratingTime, setRegeneratingTime] = useState(false);
+  const handleRegenerateForTargetTime = async (newTargetTime: string) => {
+    if (!existingPlan || !user) return;
+    if (!isOnline()) {
+      toast({
+        title: lang === "zh" ? "離線中" : "You're offline",
+        description: lang === "zh" ? "需要連線才能更新計劃" : "Connect to the internet to update your plan",
+        variant: "destructive",
+      });
+      return;
+    }
+    const planArr: WeekPlan[] = Array.isArray(existingPlan.plan_data) ? existingPlan.plan_data : [];
+    const w0 = planArr[0];
+    const w0Days = (w0?.days || []) as DayPlan[];
+    const dayLabels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+    const restDaysDerived = w0Days.filter((d) => d.type === "Rest").map((d) => d.day).filter((d) => dayLabels.includes(d));
+    const longRunDayDerived = (w0Days.find((d) => d.type === "Long Run")?.day) || "Sun";
+    const daysPerWeekDerived = Math.max(1, 7 - restDaysDerived.length);
+    const weeklyKmDerived = Math.max(10, Math.round(w0Days.reduce((s, d) => s + (d.distance_km || 0), 0)));
+    const startDateDerived = w0?.startDate || w0Days[0]?.date || new Date().toISOString().slice(0, 10);
+    const weeksDerived = Number(existingPlan.weeks) || planArr.length || 8;
+    const raceDateDerived = existingPlan.race_date || "";
+    const distanceDerived = existingPlan.distance || "";
+    const goalDerived = existingPlan.goal || "race";
+
+    setRegeneratingTime(true);
+    try {
+      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-program`;
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+        },
+        body: JSON.stringify({
+          goal: goalDerived, distance: distanceDerived, targetTime: newTargetTime,
+          raceDate: raceDateDerived, startDate: startDateDerived, weeks: weeksDerived,
+          daysPerWeek: daysPerWeekDerived, weeklyKm: weeklyKmDerived,
+          longRunDay: longRunDayDerived, restDays: restDaysDerived, lang,
+        }),
+      });
+      if (!response.ok) { const err = await response.json().catch(() => ({})); throw new Error(err.error || "Failed to regenerate"); }
+      const result = await response.json();
+      const planData = result.plan || [];
+      setPlan(planData);
+      setCurrentWeekIdx(0);
+      await supabase.from("training_plans" as any).delete().eq("user_id", user.id);
+      const inserted: any = {
+        user_id: user.id, goal: goalDerived, distance: distanceDerived, target_time: newTargetTime,
+        race_date: raceDateDerived, weeks: weeksDerived, plan_data: planData, raw_output: result.raw || "",
+      };
+      const { data: saved } = await (supabase.from("training_plans" as any) as any).insert(inserted).select().single();
+      const nextPlan = saved || inserted;
+      setExistingPlan(nextPlan);
+      setCached(CacheKeys.trainingPlan(user.id), nextPlan);
+      notifyPlanChanged();
+      toast({
+        title: lang === "zh" ? "計劃已更新" : "Plan updated",
+        description: lang === "zh" ? "已根據新目標時間調整訓練" : "Workouts adjusted for the new target time",
+      });
+    } catch (err: any) {
+      console.error("Error regenerating program:", err);
+      toast({ title: lang === "zh" ? "錯誤" : "Error", description: err.message || (lang === "zh" ? "更新計劃時出錯" : "Failed to update plan"), variant: "destructive" });
+    } finally {
+      setRegeneratingTime(false);
+    }
+  };
+
+
     if (!isOnline()) {
       toast({
         title: lang === "zh" ? "離線中" : "You're offline",

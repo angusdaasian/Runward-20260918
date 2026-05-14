@@ -2485,6 +2485,11 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                       const longRunCur = (w0Days.find((d:any)=>d.type==="Long Run") as any)?.day || "Sun";
                       const dpwCur = Math.max(1, 7 - restDaysCur.length);
                       const weeklyKmCur = Math.max(1, Math.round(w0Days.reduce((s:number,d:any)=>s+(d.distance_km||0),0)));
+                      const planStartIso = (planArr[0]?.startDate || w0Days[0]?.date || "") as string;
+                      const planEndIso = (existingPlan.race_date as string) || ((planArr[planArr.length-1]?.days as any[])?.slice(-1)?.[0]?.date) || planStartIso;
+                      const currentSnap = buildRaceSnapshot(planStartIso, planEndIso);
+                      const savedSnap: RaceSchedItem[] = Array.isArray(existingPlan.race_schedule) ? (existingPlan.race_schedule as any) : [];
+                      const racesDrift = !racesEqual(currentSnap, savedSnap);
                       return (
                         <ProgramHeader
                           lang={lang}
@@ -2500,6 +2505,22 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                           restDays={restDaysCur}
                           onRegenerate={handleRegeneratePlan}
                           regenerating={regeneratingTime}
+                          races={savedSnap}
+                          currentRaces={currentSnap}
+                          racesDrift={racesDrift}
+                          onUpdateRacePriority={async (raceId, priority) => {
+                            if (!user) return;
+                            await (supabase.from("user_races" as any) as any).update({ priority }).eq("id", raceId).eq("user_id", user.id);
+                            await queryClient.invalidateQueries({ queryKey: ["userRaces"] });
+                            await handleRegeneratePlan({});
+                          }}
+                          onRemoveRace={async (raceId) => {
+                            if (!user) return;
+                            await supabase.from("user_races" as any).delete().eq("id", raceId).eq("user_id", user.id);
+                            await queryClient.invalidateQueries({ queryKey: ["userRaces"] });
+                            await handleRegeneratePlan({});
+                          }}
+                          onRegenerateForRaces={() => handleRegeneratePlan({})}
                         />
                       );
                     })()}

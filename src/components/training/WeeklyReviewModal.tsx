@@ -37,6 +37,12 @@ interface Review {
     avg_pace_sec_per_km?: number | null;
     avg_resting_hr?: number | null;
     avg_sleep_score?: number | null;
+    explanations?: {
+      distance?: { en?: string; zh?: string };
+      pace?: { en?: string; zh?: string };
+      hr?: { en?: string; zh?: string };
+      recovery?: { en?: string; zh?: string };
+    };
   };
   insights_en: string | null;
   insights_zh: string | null;

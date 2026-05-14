@@ -50,6 +50,14 @@ serve(async (req) => {
     const raceList: Array<{ name: string; race_date: string; category?: string; priority?: string }> =
       Array.isArray(races) ? races.filter((r: any) => r && r.race_date && r.name) : [];
     raceList.sort((a, b) => a.race_date.localeCompare(b.race_date));
+    const distanceForCategory = (category?: string): number | null => {
+      const c = String(category || "").trim().toUpperCase();
+      if (c === "5K") return 5;
+      if (c === "10K") return 10;
+      if (["HM", "HALF", "HALF MARATHON"].includes(c)) return 21.1;
+      if (["FM", "FULL", "FULL MARATHON", "MARATHON"].includes(c)) return 42.2;
+      return null;
+    };
     const raceScheduleBlock = raceList.length
       ? `\nRACE SCHEDULE (the runner has these races on the calendar — adapt the plan accordingly):\n${raceList
           .map(

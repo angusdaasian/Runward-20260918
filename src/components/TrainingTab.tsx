@@ -519,6 +519,7 @@ function planDistanceLabel(distance: string, lang: Lang): string {
   return distance;
 }
 
+interface RaceSchedItemUI { user_race_id: string; race_name: string; race_date: string; category: string; priority: string }
 interface ProgramHeaderProps {
   lang: Lang;
   weeks: number;
@@ -539,6 +540,12 @@ interface ProgramHeaderProps {
     weeklyKm?: number;
   }) => Promise<void> | void;
   regenerating?: boolean;
+  races?: RaceSchedItemUI[];
+  currentRaces?: RaceSchedItemUI[];
+  racesDrift?: boolean;
+  onUpdateRacePriority?: (raceId: string, priority: string) => Promise<void> | void;
+  onRemoveRace?: (raceId: string) => Promise<void> | void;
+  onRegenerateForRaces?: () => Promise<void> | void;
 }
 const DAY_LABELS_ALL = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
 const DAY_LABELS_ZH: Record<string, string> = {

@@ -50,13 +50,21 @@ serve(async (req) => {
     const raceList: Array<{ name: string; race_date: string; category?: string; priority?: string }> =
       Array.isArray(races) ? races.filter((r: any) => r && r.race_date && r.name) : [];
     raceList.sort((a, b) => a.race_date.localeCompare(b.race_date));
+    const distanceForCategory = (category?: string): number | null => {
+      const c = String(category || "").trim().toUpperCase();
+      if (c === "5K") return 5;
+      if (c === "10K") return 10;
+      if (["HM", "HALF", "HALF MARATHON"].includes(c)) return 21.1;
+      if (["FM", "FULL", "FULL MARATHON", "MARATHON"].includes(c)) return 42.2;
+      return null;
+    };
     const raceScheduleBlock = raceList.length
       ? `\nRACE SCHEDULE (the runner has these races on the calendar — adapt the plan accordingly):\n${raceList
           .map(
             (r) =>
               `- ${r.race_date} · ${r.name}${r.category ? ` (${r.category})` : ""} — priority ${r.priority || "none"}`,
           )
-          .join("\n")}\n\nRACE-AWARE RULES:\n- The "A" priority race is the GOAL race; structure the entire plan to peak for it (use Race Date above).\n- For each "B" race: insert a short mini-taper (1 reduced volume week before, with the 2 days post-race kept easy/recovery). Replace the race day workout with a "Race" type entry titled with the race name and distance from its category.\n- For each "C" race: treat as a hard training run / tune-up. Schedule it as a "Race" type entry on the day; the day after must be Recovery or Rest. No special week-level taper.\n- The +10% weekly mileage rule may be temporarily relaxed during a race week's deload (volume can drop more than 10%). It still applies to all build weeks.\n- For every race in the schedule, the day entry on the race date MUST have type "Race", title equal to the race name, distance_km equal to the race category distance (5K=5, 10K=10, HM=21.1, FM=42.2), color "#E91E63", and a description noting it's a priority ${"{A|B|C}"} race.\n`
+          .join("\n")}\n\nRACE-AWARE RULES:\n- The "A" priority race is the GOAL race; structure the entire plan to peak for it (use Race Date above).\n- For each "B" race: insert a short mini-taper (1 reduced volume week before, with the 2 days post-race kept easy/recovery). Replace the race day workout with a "Race" type entry titled with the race name and distance from its category.\n- For each "C" race: treat as a hard training run / tune-up. Schedule it as a "Race" type entry on the day; the day after must be Recovery or Rest. No special week-level taper.\n- The +10% weekly mileage rule may be temporarily relaxed during a race week's deload (volume can drop more than 10%). It still applies to all build weeks.\n- For every race in the schedule, the day entry on the race date MUST have type "Race", title equal to the race name, distance_km equal to the race category distance (5K=5, 10K=10, HM=21.1, FM=42.2), color "#E91E63", and a description noting it's a priority ${"{A|B|C}"} race. Race dates override the normal long-run/rest-day preference.\n`
       : "";
 
     const isZh = lang === "zh";
@@ -228,6 +236,30 @@ Return ONLY valid JSON, no markdown, no explanation.`;
         }
         week.startDate = week.days[0].date;
         week.week = w + 1;
+      }
+
+      const daysFlat = planData.flatMap((week: any) => Array.isArray(week?.days) ? week.days : []);
+      for (let i = 0; i < daysFlat.length; i++) {
+        const race = raceList.find((r) => r.race_date === daysFlat[i]?.date);
+        if (!race) continue;
+        const priority = ["A", "B", "C"].includes(String(race.priority)) ? String(race.priority) : "none";
+        daysFlat[i] = Object.assign(daysFlat[i], {
+          type: "Race",
+          title: race.name,
+          description: isZh
+            ? `${race.name}（${priority === "none" ? "未設定" : priority} 優先級）。此日按賽事行程安排為比賽。`
+            : `${race.name} (${priority === "none" ? "unprioritized" : `${priority}-priority`} race). Scheduled from the runner's race calendar.`,
+          distance_km: distanceForCategory(race.category),
+          color: "#E91E63",
+        });
+        if (daysFlat[i + 1] && !["Rest", "Recovery"].includes(daysFlat[i + 1].type)) {
+          daysFlat[i + 1] = Object.assign(daysFlat[i + 1], {
+            type: "Recovery",
+            title: isZh ? "賽後恢復" : "Post-race Recovery",
+            description: isZh ? "非常輕鬆的賽後恢復跑。" : "Very easy post-race recovery run.",
+            color: "#9C27B0",
+          });
+        }
       }
     }
 

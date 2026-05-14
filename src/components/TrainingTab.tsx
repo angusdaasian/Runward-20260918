@@ -77,6 +77,7 @@ const TYPE_LABELS: Record<string, { en: string; zh: string }> = {
   "Recovery": { en: "Recovery Run", zh: "恢復跑" }, "Recovery Run": { en: "Recovery Run", zh: "恢復跑" },
   "Rest": { en: "Rest", zh: "休息" }, "Cross Training": { en: "Cross Training", zh: "交叉訓練" },
   "Race Pace": { en: "Race Pace", zh: "比賽配速" },
+  "Race": { en: "Race", zh: "比賽" },
   "Progression Run": { en: "Progression Run", zh: "漸進跑" }, "Progression": { en: "Progression Run", zh: "漸進跑" },
 };
 
@@ -156,6 +157,8 @@ function localizeDescription(day: DayPlan, lang: Lang): string {
         if (distStr && paceStr) return `${distStr}比賽配速跑，配速${paceStr}。以目標比賽配速跑步，建立比賽日信心。`;
         if (distStr) return `${distStr}比賽配速跑。以目標比賽配速跑步，建立比賽日信心。`;
         return "比賽配速跑。以目標比賽配速跑步，建立比賽日信心。";
+      case "Race":
+        return day.description || `${distStr || ""}比賽日。`.trim();
       case "Progression Run":
       case "Progression":
         if (distStr && paceStr) return `${distStr}漸進跑，配速約${paceStr}。由輕鬆開始，逐步加速至節奏或比賽配速。`;
@@ -169,7 +172,7 @@ function localizeDescription(day: DayPlan, lang: Lang): string {
   }
 
   // English: for rich types preserve original description
-  const richTypes = ["Interval", "Cross Training", "Progression Run", "Race Pace", "Tempo Run"];
+  const richTypes = ["Interval", "Cross Training", "Progression Run", "Race Pace", "Tempo Run", "Race"];
   if (richTypes.includes(day.type) && day.description) {
     return day.description;
   }
@@ -1287,7 +1290,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
     if (!raceDate || !startDate) return 0;
     const start = new Date(startDate + "T00:00:00").getTime();
     const end = new Date(raceDate + "T00:00:00").getTime();
-    return Math.max(0, Math.floor((end - start) / (7 * 24 * 60 * 60 * 1000)));
+    return Math.max(0, Math.ceil((end - start + 24 * 60 * 60 * 1000) / (7 * 24 * 60 * 60 * 1000)));
   }, [raceDate, startDate]);
 
   const minWeeks = distance ? MIN_WEEKS[distance] : 4;
@@ -1451,17 +1454,48 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
   };
   const racesPayloadFromSnapshot = (snap: RaceSchedItem[]) =>
     snap.map((r) => ({ name: r.race_name, race_date: r.race_date, category: r.category, priority: r.priority }));
+  const normalizeRacePriority = (priority: unknown) => ["A", "B", "C"].includes(String(priority)) ? String(priority) : "none";
   const racesEqual = (a: RaceSchedItem[], b: RaceSchedItem[]) => {
     // Compare only fields that affect plan generation. Ignore user_race_id (older
     // snapshots may not have stored it) and race_name (changes with language).
     const norm = (arr: RaceSchedItem[]) =>
       [...arr]
-        .map((r) => `${r.race_date}|${(r.category || "").toUpperCase()}|${r.priority || "none"}`)
+        .map((r) => `${r.race_date}|${(r.category || "").toUpperCase()}|${normalizeRacePriority(r.priority)}`)
         .sort();
     const na = norm(a), nb = norm(b);
     if (na.length !== nb.length) return false;
     for (let i = 0; i < na.length; i++) if (na[i] !== nb[i]) return false;
     return true;
+  };
+  const ensurePlanMatchesRaceSchedule = (planData: WeekPlan[], raceSchedule: RaceSchedItem[]): WeekPlan[] => {
+    if (!Array.isArray(planData) || !Array.isArray(raceSchedule) || raceSchedule.length === 0) return planData;
+    let changed = false;
+    const raceByDate = new Map(raceSchedule.filter((r) => r.race_date).map((r) => [r.race_date, r]));
+    const nextPlan = planData.map((week) => ({ ...week, days: (week.days || []).map((day) => ({ ...day })) }));
+
+    for (let wi = 0; wi < nextPlan.length; wi++) {
+      const days = nextPlan[wi].days || [];
+      for (let di = 0; di < days.length; di++) {
+        const race = raceByDate.get(days[di]?.date);
+        if (!race) continue;
+        const distanceKm = distanceForCategory(race.category) ?? days[di].distance_km ?? null;
+        const priority = normalizeRacePriority(race.priority).toUpperCase();
+        const title = race.race_name || (lang === "zh" ? "比賽日" : "Race Day");
+        const description = lang === "zh"
+          ? `${title}（${priority === "NONE" ? "未設定" : priority} 優先級）。此日已按你的賽事行程安排為比賽。`
+          : `${title} (${priority === "NONE" ? "unprioritized" : `${priority}-priority`} race). Scheduled from your race calendar.`;
+        const patchedDay: DayPlan = { ...days[di], type: "Race", title, description, distance_km: distanceKm, color: "#E91E63" };
+        if (JSON.stringify(days[di]) !== JSON.stringify(patchedDay)) {
+          days[di] = patchedDay;
+          changed = true;
+        }
+        if (di + 1 < days.length && days[di + 1]?.type !== "Rest" && days[di + 1]?.type !== "Recovery") {
+          days[di + 1] = { ...days[di + 1], type: "Recovery", title: lang === "zh" ? "賽後恢復" : "Post-race Recovery", description: lang === "zh" ? "非常輕鬆的賽後恢復跑。" : "Very easy post-race recovery run.", color: "#9C27B0" };
+          changed = true;
+        }
+      }
+    }
+    return changed ? nextPlan : planData;
   };
 
   const handleGenerate = async () => {
@@ -1535,7 +1569,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
       });
       if (!response.ok) { const err = await response.json().catch(() => ({})); throw new Error(err.error || "Failed to generate"); }
       const result = await response.json();
-      const planData = result.plan || [];
+      const planData = ensurePlanMatchesRaceSchedule(result.plan || [], snapshot);
       setPlan(planData);
       setCurrentWeekIdx(0);
       setProgramStep("calendar");
@@ -1598,8 +1632,11 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
     );
     const weeklyKmFinal = overrides.weeklyKm ?? weeklyKmDerived;
     const startDateDerived = w0?.startDate || w0Days[0]?.date || new Date().toISOString().slice(0, 10);
-    const weeksDerived = Number(existingPlan.weeks) || planArr.length || 8;
     const raceDateDerived = existingPlan.race_date || "";
+    const inclusiveWeeksToRace = raceDateDerived
+      ? Math.ceil((new Date(raceDateDerived + "T00:00:00").getTime() - new Date(startDateDerived + "T00:00:00").getTime() + 24 * 60 * 60 * 1000) / (7 * 24 * 60 * 60 * 1000))
+      : 0;
+    const weeksDerived = Math.max(Number(existingPlan.weeks) || 0, planArr.length || 0, inclusiveWeeksToRace || 0, 8);
     const distanceDerived = existingPlan.distance || "";
     const goalDerived = existingPlan.goal || "race";
     const targetTimeFinal = overrides.targetTime ?? String(existingPlan.target_time ?? "");
@@ -1670,7 +1707,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
       });
       if (!response.ok) { const err = await response.json().catch(() => ({})); throw new Error(err.error || "Failed to regenerate"); }
       const result = await response.json();
-      const planData = result.plan || [];
+      const planData = ensurePlanMatchesRaceSchedule(result.plan || [], snapshot);
       setPlan(planData);
       setCurrentWeekIdx(0);
       await supabase.from("training_plans" as any).delete().eq("user_id", user.id);

@@ -62,6 +62,7 @@ export interface UserRace {
   city: string | null;
   country: string | null;
   category: string;
+  priority: string;
   source: string;
   website_url: string | null;
   notes: string | null;
@@ -332,6 +333,7 @@ async function fetchUserRaces(userId: string): Promise<UserRace[]> {
     city: r.city,
     country: r.country,
     category: r.category,
+    priority: r.priority || "none",
     source: r.source,
     website_url: r.website_url,
     notes: r.notes,

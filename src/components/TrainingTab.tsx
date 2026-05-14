@@ -2101,6 +2101,8 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                         currentWeekIdx={currentWeekIdx}
                         weekDays={currentWeek.days}
                         activities={allActivities as any}
+                        onUpdateTargetTime={handleRegenerateForTargetTime}
+                        regenerating={regeneratingTime}
                       />
                     )}
                     <div className="bg-card border border-border rounded-xl p-3 mb-4">

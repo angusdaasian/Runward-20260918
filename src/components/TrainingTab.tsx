@@ -524,11 +524,30 @@ interface ProgramHeaderProps {
   currentWeekIdx: number;
   weekDays: DayPlan[];
   activities: Array<{ start_date: string; distance: number; moving_time: number }>;
+  onUpdateTargetTime?: (newTargetTime: string) => Promise<void> | void;
+  regenerating?: boolean;
 }
 const ProgramHeader: React.FC<ProgramHeaderProps> = ({
   lang, weeks, distance, targetTime, currentWeekIdx, weekDays, activities,
+  onUpdateTargetTime, regenerating,
 }) => {
   const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const initialParts = (targetTime || "").split(":");
+  const [eh, setEh] = useState(initialParts[0] || "");
+  const [em, setEm] = useState(initialParts[1] || "");
+  const [es, setEs] = useState(initialParts[2] || "");
+  useEffect(() => {
+    const p = (targetTime || "").split(":");
+    setEh(p[0] || ""); setEm(p[1] || ""); setEs(p[2] || "");
+  }, [targetTime]);
+  const pad = (v: string) => String(Math.max(0, parseInt(v || "0", 10) || 0)).padStart(2, "0");
+  const handleSaveTime = async () => {
+    const next = `${pad(eh)}:${pad(em)}:${pad(es)}`;
+    if (next === targetTime) { setEditing(false); return; }
+    if (onUpdateTargetTime) await onUpdateTargetTime(next);
+    setEditing(false);
+  };
   const distLabel = planDistanceLabel(distance, lang);
   const title = lang === "zh"
     ? `${weeks} 週 ${distLabel} 計劃`
@@ -584,12 +603,50 @@ const ProgramHeader: React.FC<ProgramHeaderProps> = ({
               </p>
             </div>
             <div className="rounded-lg bg-muted/40 p-2">
-              <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                {L("Target time", "目標時間")}
-              </p>
-              <p className="text-sm font-semibold text-foreground">
-                {targetTime || "—"}
-              </p>
+              <div className="flex items-center justify-between gap-1">
+                <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                  {L("Target time", "目標時間")}
+                </p>
+                {!editing && onUpdateTargetTime && (
+                  <button
+                    type="button"
+                    onClick={() => setEditing(true)}
+                    disabled={regenerating}
+                    className="text-muted-foreground hover:text-foreground disabled:opacity-50"
+                    aria-label={L("Edit target time", "編輯目標時間")}
+                  >
+                    <Pencil size={11} />
+                  </button>
+                )}
+              </div>
+              {!editing ? (
+                <p className="text-sm font-semibold text-foreground">
+                  {regenerating ? (
+                    <span className="inline-flex items-center gap-1 text-muted-foreground">
+                      <Loader2 size={12} className="animate-spin" />
+                      {L("Updating…", "更新中…")}
+                    </span>
+                  ) : (targetTime || "—")}
+                </p>
+              ) : (
+                <div className="mt-1 space-y-1.5">
+                  <div className="flex items-center gap-1">
+                    <Input value={eh} onChange={(e) => setEh(e.target.value.replace(/\D/g, "").slice(0, 2))} placeholder="HH" inputMode="numeric" className="h-7 px-1 text-xs text-center" />
+                    <span className="text-xs">:</span>
+                    <Input value={em} onChange={(e) => setEm(e.target.value.replace(/\D/g, "").slice(0, 2))} placeholder="MM" inputMode="numeric" className="h-7 px-1 text-xs text-center" />
+                    <span className="text-xs">:</span>
+                    <Input value={es} onChange={(e) => setEs(e.target.value.replace(/\D/g, "").slice(0, 2))} placeholder="SS" inputMode="numeric" className="h-7 px-1 text-xs text-center" />
+                  </div>
+                  <div className="flex gap-1">
+                    <Button size="sm" className="h-6 px-2 text-[10px] flex-1" onClick={handleSaveTime} disabled={regenerating}>
+                      {L("Regenerate", "重新生成")}
+                    </Button>
+                    <Button size="sm" variant="ghost" className="h-6 px-2 text-[10px]" onClick={() => setEditing(false)} disabled={regenerating}>
+                      {L("Cancel", "取消")}
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -1047,6 +1104,75 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
       console.error("Error generating program:", err);
       toast({ title: lang === "zh" ? "錯誤" : "Error", description: err.message || (lang === "zh" ? "生成訓練計劃時出錯" : "Failed to generate program"), variant: "destructive" });
     } finally { setLoading(false); }
+  };
+
+  const [regeneratingTime, setRegeneratingTime] = useState(false);
+  const handleRegenerateForTargetTime = async (newTargetTime: string) => {
+    if (!existingPlan || !user) return;
+    if (!isOnline()) {
+      toast({
+        title: lang === "zh" ? "離線中" : "You're offline",
+        description: lang === "zh" ? "需要連線才能更新計劃" : "Connect to the internet to update your plan",
+        variant: "destructive",
+      });
+      return;
+    }
+    const planArr: WeekPlan[] = Array.isArray(existingPlan.plan_data) ? existingPlan.plan_data : [];
+    const w0 = planArr[0];
+    const w0Days = (w0?.days || []) as DayPlan[];
+    const dayLabels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+    const restDaysDerived = w0Days.filter((d) => d.type === "Rest").map((d) => d.day).filter((d) => dayLabels.includes(d));
+    const longRunDayDerived = (w0Days.find((d) => d.type === "Long Run")?.day) || "Sun";
+    const daysPerWeekDerived = Math.max(1, 7 - restDaysDerived.length);
+    const weeklyKmDerived = Math.max(10, Math.round(w0Days.reduce((s, d) => s + (d.distance_km || 0), 0)));
+    const startDateDerived = w0?.startDate || w0Days[0]?.date || new Date().toISOString().slice(0, 10);
+    const weeksDerived = Number(existingPlan.weeks) || planArr.length || 8;
+    const raceDateDerived = existingPlan.race_date || "";
+    const distanceDerived = existingPlan.distance || "";
+    const goalDerived = existingPlan.goal || "race";
+
+    setRegeneratingTime(true);
+    try {
+      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-program`;
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+        },
+        body: JSON.stringify({
+          goal: goalDerived, distance: distanceDerived, targetTime: newTargetTime,
+          raceDate: raceDateDerived, startDate: startDateDerived, weeks: weeksDerived,
+          daysPerWeek: daysPerWeekDerived, weeklyKm: weeklyKmDerived,
+          longRunDay: longRunDayDerived, restDays: restDaysDerived, lang,
+        }),
+      });
+      if (!response.ok) { const err = await response.json().catch(() => ({})); throw new Error(err.error || "Failed to regenerate"); }
+      const result = await response.json();
+      const planData = result.plan || [];
+      setPlan(planData);
+      setCurrentWeekIdx(0);
+      await supabase.from("training_plans" as any).delete().eq("user_id", user.id);
+      const inserted: any = {
+        user_id: user.id, goal: goalDerived, distance: distanceDerived, target_time: newTargetTime,
+        race_date: raceDateDerived, weeks: weeksDerived, plan_data: planData, raw_output: result.raw || "",
+      };
+      const { data: saved } = await (supabase.from("training_plans" as any) as any).insert(inserted).select().single();
+      const nextPlan = saved || inserted;
+      setExistingPlan(nextPlan);
+      setCached(CacheKeys.trainingPlan(user.id), nextPlan);
+      notifyPlanChanged();
+      toast({
+        title: lang === "zh" ? "計劃已更新" : "Plan updated",
+        description: lang === "zh" ? "已根據新目標時間調整訓練" : "Workouts adjusted for the new target time",
+      });
+    } catch (err: any) {
+      console.error("Error regenerating program:", err);
+      toast({ title: lang === "zh" ? "錯誤" : "Error", description: err.message || (lang === "zh" ? "更新計劃時出錯" : "Failed to update plan"), variant: "destructive" });
+    } finally {
+      setRegeneratingTime(false);
+    }
   };
 
   const handleNewPlan = async () => {
@@ -1975,6 +2101,8 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                         currentWeekIdx={currentWeekIdx}
                         weekDays={currentWeek.days}
                         activities={allActivities as any}
+                        onUpdateTargetTime={handleRegenerateForTargetTime}
+                        regenerating={regeneratingTime}
                       />
                     )}
                     <div className="bg-card border border-border rounded-xl p-3 mb-4">

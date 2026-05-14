@@ -2613,82 +2613,119 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
 
                 return (
                   <>
-                    {existingPlan && (() => {
+                    {(() => {
+                      if (!existingPlan) return null;
                       const planArr = Array.isArray(existingPlan.plan_data) ? existingPlan.plan_data : [];
                       const w0Days = (planArr[0]?.days || []) as DayPlan[];
                       const dl = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
                       const restDaysCur = w0Days.filter((d:any)=>d.type==="Rest").map((d:any)=>d.day).filter((d:string)=>dl.includes(d));
                       const longRunCur = (w0Days.find((d:any)=>d.type==="Long Run") as any)?.day || "Sun";
                       const dpwCur = Math.max(1, 7 - restDaysCur.length);
-                      const weeklyKmCur = Math.max(1, Math.round(w0Days.reduce((s:number,d:any)=>s+(d.distance_km||0),0)));
+                      // Use peak week's mileage so the displayed weekly km matches what regen will use.
+                      const weeklyKmCur = Math.max(
+                        1,
+                        Math.round(
+                          Math.max(
+                            0,
+                            ...planArr.map((w:any) =>
+                              ((w?.days as any[]) || []).reduce((s:number, d:any) => s + (d.distance_km || 0), 0),
+                            ),
+                          ),
+                        ),
+                      );
                       const planStartIso = (planArr[0]?.startDate || w0Days[0]?.date || "") as string;
                       const planEndIso = (existingPlan.race_date as string) || ((planArr[planArr.length-1]?.days as any[])?.slice(-1)?.[0]?.date) || planStartIso;
                       const currentSnap = buildRaceSnapshot(planStartIso, planEndIso);
                       const savedSnap: RaceSchedItem[] = Array.isArray(existingPlan.race_schedule) ? (existingPlan.race_schedule as any) : [];
                       const racesDrift = !racesEqual(currentSnap, savedSnap);
+
+                      // Goal race date = A-priority race in saved snapshot, else existingPlan.race_date.
+                      const goalRaceDate =
+                        (savedSnap.find((r) => r.priority === "A")?.race_date) ||
+                        (existingPlan.race_date as string) || "";
+                      const goalWeekIdx = goalRaceDate
+                        ? plan.findIndex((w:any) => Array.isArray(w.days) && w.days.some((d:any) => d.date === goalRaceDate))
+                        : -1;
+
                       return (
-                        <ProgramHeader
-                          lang={lang}
-                          weeks={Number(existingPlan.weeks) || plan.length}
-                          distance={String(existingPlan.distance ?? "")}
-                          targetTime={String(existingPlan.target_time ?? "")}
-                          currentWeekIdx={currentWeekIdx}
-                          weekDays={currentWeek.days}
-                          activities={allActivities as any}
-                          daysPerWeek={dpwCur}
-                          weeklyKm={weeklyKmCur}
-                          longRunDay={longRunCur}
-                          restDays={restDaysCur}
-                          onRegenerate={handleRegeneratePlan}
-                          regenerating={regeneratingTime}
-                          races={savedSnap}
-                          currentRaces={currentSnap}
-                          racesDrift={racesDrift}
-                          onUpdateRacePriority={async (raceId, priority) => {
-                            if (!user) return;
-                            await (supabase.from("user_races" as any) as any).update({ priority }).eq("id", raceId).eq("user_id", user.id);
-                            await queryClient.invalidateQueries({ queryKey: ["user-races"] });
-                            await handleRegeneratePlan({});
-                          }}
-                          onRemoveRace={async (raceId) => {
-                            if (!user) return;
-                            await supabase.from("user_races" as any).delete().eq("id", raceId).eq("user_id", user.id);
-                            await queryClient.invalidateQueries({ queryKey: ["user-races"] });
-                            await handleRegeneratePlan({});
-                          }}
-                          onRegenerateForRaces={() => handleRegeneratePlan({})}
-                        />
+                        <>
+                          <ProgramHeader
+                            lang={lang}
+                            weeks={Number(existingPlan.weeks) || plan.length}
+                            distance={String(existingPlan.distance ?? "")}
+                            targetTime={String(existingPlan.target_time ?? "")}
+                            currentWeekIdx={currentWeekIdx}
+                            weekDays={currentWeek.days}
+                            activities={allActivities as any}
+                            daysPerWeek={dpwCur}
+                            weeklyKm={weeklyKmCur}
+                            longRunDay={longRunCur}
+                            restDays={restDaysCur}
+                            onRegenerate={handleRegeneratePlan}
+                            regenerating={regeneratingTime}
+                          />
+                          <RaceSchedulePanel
+                            lang={lang}
+                            races={savedSnap as any}
+                            currentRaces={currentSnap as any}
+                            racesDrift={racesDrift}
+                            regenerating={regeneratingTime}
+                            onUpdateRacePriority={async (raceId, priority) => {
+                              if (!user) return;
+                              await (supabase.from("user_races" as any) as any).update({ priority }).eq("id", raceId).eq("user_id", user.id);
+                              await queryClient.invalidateQueries({ queryKey: ["user-races"] });
+                              await handleRegeneratePlan({});
+                            }}
+                            onRemoveRace={async (raceId) => {
+                              if (!user) return;
+                              await supabase.from("user_races" as any).delete().eq("id", raceId).eq("user_id", user.id);
+                              await queryClient.invalidateQueries({ queryKey: ["user-races"] });
+                              await handleRegeneratePlan({});
+                            }}
+                            onRegenerateForRaces={() => handleRegeneratePlan({})}
+                          />
+                          <div className={`bg-card border rounded-xl p-3 mb-4 ${goalWeekIdx === currentWeekIdx ? "border-primary ring-1 ring-primary/40" : "border-border"}`}>
+                            <div className="flex items-center justify-between mb-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-sm font-medium text-foreground">{formatDate(weekStart)} - {formatDate(weekEnd)}</span>
+                                <span className="bg-primary/15 text-primary text-xs font-bold px-2 py-0.5 rounded-full">WEEK {currentWeek.week}</span>
+                                {goalWeekIdx === currentWeekIdx && (
+                                  <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-primary text-primary-foreground">
+                                    {lang === "zh" ? "目標賽事週" : "Goal Race Week"}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <button onClick={() => setCurrentWeekIdx(Math.max(0, currentWeekIdx - 1))} disabled={currentWeekIdx === 0} className="p-1 rounded hover:bg-accent disabled:opacity-30"><ChevronLeft size={16} /></button>
+                                <button onClick={() => setCurrentWeekIdx(Math.min(plan.length - 1, currentWeekIdx + 1))} disabled={currentWeekIdx === plan.length - 1} className="p-1 rounded hover:bg-accent disabled:opacity-30"><ChevronRight size={16} /></button>
+                              </div>
+                            </div>
+                            <p className="text-xs text-muted-foreground">{lang === "zh" ? "總計" : "Total"}: {totalKm.toFixed(1)} km</p>
+                          </div>
+
+                          <CalendarDayList
+                            days={currentWeek.days}
+                            weekIdx={currentWeekIdx}
+                            lang={lang}
+                            hrBounds={hrBounds}
+                            onSwap={(from, to) => swapDays(currentWeekIdx, from, to)}
+                            onAddClick={(i) => { setAddingDayIdx(i); setAddRunType(null); setAddDistance(""); }}
+                            onEditClick={(i, day) => { setEditingDayIdx(i); setEditDistance(day.distance_km?.toString() || ""); setEditPace(day.pace || ""); setEditDescription(day.description || ""); }}
+                          />
+
+                          <div className="flex items-center justify-center gap-1 mt-6">
+                            {plan.map((_, i) => (
+                              <button
+                                key={i}
+                                onClick={() => setCurrentWeekIdx(i)}
+                                className={`rounded-full transition-colors ${i === currentWeekIdx ? "bg-primary w-3 h-3" : i === goalWeekIdx ? "bg-primary/50 w-2 h-2 ring-1 ring-primary" : "bg-border w-2 h-2"}`}
+                                aria-label={i === goalWeekIdx ? (lang === "zh" ? "目標賽事週" : "Goal race week") : undefined}
+                              />
+                            ))}
+                          </div>
+                        </>
                       );
                     })()}
-                    <div className="bg-card border border-border rounded-xl p-3 mb-4">
-                      <div className="flex items-center justify-between mb-1">
-                        <div>
-                          <span className="text-sm font-medium text-foreground">{formatDate(weekStart)} - {formatDate(weekEnd)}</span>
-                          <span className="ml-2 bg-primary/15 text-primary text-xs font-bold px-2 py-0.5 rounded-full">WEEK {currentWeek.week}</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <button onClick={() => setCurrentWeekIdx(Math.max(0, currentWeekIdx - 1))} disabled={currentWeekIdx === 0} className="p-1 rounded hover:bg-accent disabled:opacity-30"><ChevronLeft size={16} /></button>
-                          <button onClick={() => setCurrentWeekIdx(Math.min(plan.length - 1, currentWeekIdx + 1))} disabled={currentWeekIdx === plan.length - 1} className="p-1 rounded hover:bg-accent disabled:opacity-30"><ChevronRight size={16} /></button>
-                        </div>
-                      </div>
-                       <p className="text-xs text-muted-foreground">{lang === "zh" ? "總計" : "Total"}: {totalKm.toFixed(1)} km</p>
-                    </div>
-
-                    <CalendarDayList
-                      days={currentWeek.days}
-                      weekIdx={currentWeekIdx}
-                      lang={lang}
-                      hrBounds={hrBounds}
-                      onSwap={(from, to) => swapDays(currentWeekIdx, from, to)}
-                      onAddClick={(i) => { setAddingDayIdx(i); setAddRunType(null); setAddDistance(""); }}
-                      onEditClick={(i, day) => { setEditingDayIdx(i); setEditDistance(day.distance_km?.toString() || ""); setEditPace(day.pace || ""); setEditDescription(day.description || ""); }}
-                    />
-
-                    <div className="flex items-center justify-center gap-1 mt-6">
-                      {plan.map((_, i) => (
-                        <button key={i} onClick={() => setCurrentWeekIdx(i)} className={`w-2 h-2 rounded-full transition-colors ${i === currentWeekIdx ? "bg-primary" : "bg-border"}`} />
-                      ))}
-                    </div>
 
                     {planDirty && (
                       <Button onClick={savePlanEdits} disabled={savingPlan} className="w-full mt-4" size="lg">

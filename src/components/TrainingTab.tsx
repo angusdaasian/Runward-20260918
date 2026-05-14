@@ -792,6 +792,42 @@ const ProgramHeader: React.FC<ProgramHeaderProps> = ({
               )}
             </div>
 
+            {/* Weekly mileage */}
+            <div className="rounded-lg bg-muted/40 p-2">
+              <div className="flex items-center justify-between gap-1">
+                <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                  {L("Weekly km", "每週公里")}
+                </p>
+                {!editingKm && onRegenerate && (
+                  <button type="button" onClick={() => setEditingKm(true)} disabled={regenerating}
+                    className="text-muted-foreground hover:text-foreground disabled:opacity-50">
+                    <Pencil size={11} />
+                  </button>
+                )}
+              </div>
+              {!editingKm ? (
+                <p className="text-sm font-semibold text-foreground">
+                  {regenerating ? Updating : `${weeklyKm} km`}
+                </p>
+              ) : (
+                <div className="mt-1 space-y-1.5">
+                  <select className={selectClass} value={editKm} onChange={(e) => setEditKm(parseInt(e.target.value, 10))}>
+                    {Array.from({ length: 28 }, (_, i) => 10 + i * 5).map((n) => (
+                      <option key={n} value={n}>{n} km</option>
+                    ))}
+                  </select>
+                  <div className="flex gap-1">
+                    <Button size="sm" className="h-6 px-2 text-[10px] flex-1" onClick={handleSaveKm} disabled={regenerating}>
+                      {L("Apply", "套用")}
+                    </Button>
+                    <Button size="sm" variant="ghost" className="h-6 px-2 text-[10px]" onClick={() => setEditingKm(false)} disabled={regenerating}>
+                      {L("Cancel", "取消")}
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+
             {/* Rest days */}
             <div className="rounded-lg bg-muted/40 p-2 col-span-2">
               <div className="flex items-center justify-between gap-1">

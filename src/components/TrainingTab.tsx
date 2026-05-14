@@ -1423,7 +1423,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
         body: JSON.stringify({
           goal: goalDerived, distance: distanceDerived, targetTime: targetTimeFinal,
           raceDate: raceDateDerived, startDate: startDateDerived, weeks: weeksDerived,
-          daysPerWeek: daysPerWeekFinal, weeklyKm: weeklyKmDerived,
+          daysPerWeek: daysPerWeekFinal, weeklyKm: weeklyKmFinal,
           longRunDay: longRunDayFinal, restDays: restDaysFinal, lang,
         }),
       });

@@ -529,11 +529,13 @@ interface ProgramHeaderProps {
   daysPerWeek: number;
   longRunDay: string;
   restDays: string[];
+  weeklyKm: number;
   onRegenerate?: (overrides: {
     targetTime?: string;
     daysPerWeek?: number;
     longRunDay?: string;
     restDays?: string[];
+    weeklyKm?: number;
   }) => Promise<void> | void;
   regenerating?: boolean;
 }
@@ -543,8 +545,16 @@ const DAY_LABELS_ZH: Record<string, string> = {
 };
 const ProgramHeader: React.FC<ProgramHeaderProps> = ({
   lang, weeks, distance, targetTime, currentWeekIdx, weekDays, activities,
-  daysPerWeek, longRunDay, restDays, onRegenerate, regenerating,
+  daysPerWeek, longRunDay, restDays, weeklyKm, onRegenerate, regenerating,
 }) => {
+  const [editingKm, setEditingKm] = useState(false);
+  const [editKm, setEditKm] = useState<number>(weeklyKm);
+  useEffect(() => { setEditKm(weeklyKm); }, [weeklyKm]);
+  const handleSaveKm = async () => {
+    if (editKm === weeklyKm) { setEditingKm(false); return; }
+    if (onRegenerate) await onRegenerate({ weeklyKm: editKm });
+    setEditingKm(false);
+  };
   const [open, setOpen] = useState(false);
   const [editingTime, setEditingTime] = useState(false);
   const [editingRuns, setEditingRuns] = useState(false);
@@ -775,6 +785,42 @@ const ProgramHeader: React.FC<ProgramHeaderProps> = ({
                       {L("Apply", "套用")}
                     </Button>
                     <Button size="sm" variant="ghost" className="h-6 px-2 text-[10px]" onClick={() => setEditingLong(false)} disabled={regenerating}>
+                      {L("Cancel", "取消")}
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Weekly mileage */}
+            <div className="rounded-lg bg-muted/40 p-2">
+              <div className="flex items-center justify-between gap-1">
+                <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                  {L("Weekly km", "每週公里")}
+                </p>
+                {!editingKm && onRegenerate && (
+                  <button type="button" onClick={() => setEditingKm(true)} disabled={regenerating}
+                    className="text-muted-foreground hover:text-foreground disabled:opacity-50">
+                    <Pencil size={11} />
+                  </button>
+                )}
+              </div>
+              {!editingKm ? (
+                <p className="text-sm font-semibold text-foreground">
+                  {regenerating ? Updating : `${weeklyKm} km`}
+                </p>
+              ) : (
+                <div className="mt-1 space-y-1.5">
+                  <select className={selectClass} value={editKm} onChange={(e) => setEditKm(parseInt(e.target.value, 10))}>
+                    {Array.from({ length: 28 }, (_, i) => 10 + i * 5).map((n) => (
+                      <option key={n} value={n}>{n} km</option>
+                    ))}
+                  </select>
+                  <div className="flex gap-1">
+                    <Button size="sm" className="h-6 px-2 text-[10px] flex-1" onClick={handleSaveKm} disabled={regenerating}>
+                      {L("Apply", "套用")}
+                    </Button>
+                    <Button size="sm" variant="ghost" className="h-6 px-2 text-[10px]" onClick={() => setEditingKm(false)} disabled={regenerating}>
                       {L("Cancel", "取消")}
                     </Button>
                   </div>
@@ -1310,6 +1356,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
     daysPerWeek?: number;
     longRunDay?: string;
     restDays?: string[];
+    weeklyKm?: number;
   };
   const handleRegeneratePlan = async (overrides: RegenOverrides = {}) => {
     if (!existingPlan || !user) return;
@@ -1329,6 +1376,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
     const longRunDayCurrent = (w0Days.find((d) => d.type === "Long Run")?.day) || "Sun";
     const daysPerWeekCurrent = Math.max(1, 7 - restDaysCurrent.length);
     const weeklyKmDerived = Math.max(10, Math.round(w0Days.reduce((s, d) => s + (d.distance_km || 0), 0)));
+    const weeklyKmFinal = overrides.weeklyKm ?? weeklyKmDerived;
     const startDateDerived = w0?.startDate || w0Days[0]?.date || new Date().toISOString().slice(0, 10);
     const weeksDerived = Number(existingPlan.weeks) || planArr.length || 8;
     const raceDateDerived = existingPlan.race_date || "";
@@ -1375,7 +1423,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
         body: JSON.stringify({
           goal: goalDerived, distance: distanceDerived, targetTime: targetTimeFinal,
           raceDate: raceDateDerived, startDate: startDateDerived, weeks: weeksDerived,
-          daysPerWeek: daysPerWeekFinal, weeklyKm: weeklyKmDerived,
+          daysPerWeek: daysPerWeekFinal, weeklyKm: weeklyKmFinal,
           longRunDay: longRunDayFinal, restDays: restDaysFinal, lang,
         }),
       });
@@ -2330,6 +2378,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                       const restDaysCur = w0Days.filter((d:any)=>d.type==="Rest").map((d:any)=>d.day).filter((d:string)=>dl.includes(d));
                       const longRunCur = (w0Days.find((d:any)=>d.type==="Long Run") as any)?.day || "Sun";
                       const dpwCur = Math.max(1, 7 - restDaysCur.length);
+                      const weeklyKmCur = Math.max(1, Math.round(w0Days.reduce((s:number,d:any)=>s+(d.distance_km||0),0)));
                       return (
                         <ProgramHeader
                           lang={lang}
@@ -2340,6 +2389,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                           weekDays={currentWeek.days}
                           activities={allActivities as any}
                           daysPerWeek={dpwCur}
+                          weeklyKm={weeklyKmCur}
                           longRunDay={longRunCur}
                           restDays={restDaysCur}
                           onRegenerate={handleRegeneratePlan}

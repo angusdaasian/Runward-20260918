@@ -77,6 +77,7 @@ const TYPE_LABELS: Record<string, { en: string; zh: string }> = {
   "Recovery": { en: "Recovery Run", zh: "恢復跑" }, "Recovery Run": { en: "Recovery Run", zh: "恢復跑" },
   "Rest": { en: "Rest", zh: "休息" }, "Cross Training": { en: "Cross Training", zh: "交叉訓練" },
   "Race Pace": { en: "Race Pace", zh: "比賽配速" },
+  "Race": { en: "Race", zh: "比賽" },
   "Progression Run": { en: "Progression Run", zh: "漸進跑" }, "Progression": { en: "Progression Run", zh: "漸進跑" },
 };
 
@@ -156,6 +157,8 @@ function localizeDescription(day: DayPlan, lang: Lang): string {
         if (distStr && paceStr) return `${distStr}比賽配速跑，配速${paceStr}。以目標比賽配速跑步，建立比賽日信心。`;
         if (distStr) return `${distStr}比賽配速跑。以目標比賽配速跑步，建立比賽日信心。`;
         return "比賽配速跑。以目標比賽配速跑步，建立比賽日信心。";
+      case "Race":
+        return day.description || `${distStr || ""}比賽日。`.trim();
       case "Progression Run":
       case "Progression":
         if (distStr && paceStr) return `${distStr}漸進跑，配速約${paceStr}。由輕鬆開始，逐步加速至節奏或比賽配速。`;
@@ -169,7 +172,7 @@ function localizeDescription(day: DayPlan, lang: Lang): string {
   }
 
   // English: for rich types preserve original description
-  const richTypes = ["Interval", "Cross Training", "Progression Run", "Race Pace", "Tempo Run"];
+  const richTypes = ["Interval", "Cross Training", "Progression Run", "Race Pace", "Tempo Run", "Race"];
   if (richTypes.includes(day.type) && day.description) {
     return day.description;
   }

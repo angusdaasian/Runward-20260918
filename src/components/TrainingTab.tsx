@@ -524,30 +524,77 @@ interface ProgramHeaderProps {
   currentWeekIdx: number;
   weekDays: DayPlan[];
   activities: Array<{ start_date: string; distance: number; moving_time: number }>;
-  onUpdateTargetTime?: (newTargetTime: string) => Promise<void> | void;
+  daysPerWeek: number;
+  longRunDay: string;
+  restDays: string[];
+  onRegenerate?: (overrides: {
+    targetTime?: string;
+    daysPerWeek?: number;
+    longRunDay?: string;
+    restDays?: string[];
+  }) => Promise<void> | void;
   regenerating?: boolean;
 }
+const DAY_LABELS_ALL = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
+const DAY_LABELS_ZH: Record<string, string> = {
+  Mon: "一", Tue: "二", Wed: "三", Thu: "四", Fri: "五", Sat: "六", Sun: "日",
+};
 const ProgramHeader: React.FC<ProgramHeaderProps> = ({
   lang, weeks, distance, targetTime, currentWeekIdx, weekDays, activities,
-  onUpdateTargetTime, regenerating,
+  daysPerWeek, longRunDay, restDays, onRegenerate, regenerating,
 }) => {
   const [open, setOpen] = useState(false);
-  const [editing, setEditing] = useState(false);
+  const [editingTime, setEditingTime] = useState(false);
+  const [editingRuns, setEditingRuns] = useState(false);
+  const [editingLong, setEditingLong] = useState(false);
+  const [editingRest, setEditingRest] = useState(false);
+
   const initialParts = (targetTime || "").split(":");
-  const [eh, setEh] = useState(initialParts[0] || "");
-  const [em, setEm] = useState(initialParts[1] || "");
-  const [es, setEs] = useState(initialParts[2] || "");
+  const [eh, setEh] = useState(initialParts[0] || "00");
+  const [em, setEm] = useState(initialParts[1] || "00");
+  const [es, setEs] = useState(initialParts[2] || "00");
   useEffect(() => {
     const p = (targetTime || "").split(":");
-    setEh(p[0] || ""); setEm(p[1] || ""); setEs(p[2] || "");
+    setEh((p[0] || "00").padStart(2, "0"));
+    setEm((p[1] || "00").padStart(2, "0"));
+    setEs((p[2] || "00").padStart(2, "0"));
   }, [targetTime]);
+
+  const [editRuns, setEditRuns] = useState(daysPerWeek);
+  const [editLong, setEditLong] = useState(longRunDay);
+  const [editRest, setEditRest] = useState<string[]>(restDays);
+  useEffect(() => { setEditRuns(daysPerWeek); }, [daysPerWeek]);
+  useEffect(() => { setEditLong(longRunDay); }, [longRunDay]);
+  useEffect(() => { setEditRest(restDays); }, [restDays.join(",")]);
+
   const pad = (v: string) => String(Math.max(0, parseInt(v || "0", 10) || 0)).padStart(2, "0");
+  const L = (en: string, zh: string) => (lang === "zh" ? zh : en);
+  const dayLabel = (d: string) => (lang === "zh" ? DAY_LABELS_ZH[d] || d : d);
+
   const handleSaveTime = async () => {
     const next = `${pad(eh)}:${pad(em)}:${pad(es)}`;
-    if (next === targetTime) { setEditing(false); return; }
-    if (onUpdateTargetTime) await onUpdateTargetTime(next);
-    setEditing(false);
+    if (next === targetTime) { setEditingTime(false); return; }
+    if (onRegenerate) await onRegenerate({ targetTime: next });
+    setEditingTime(false);
   };
+  const handleSaveRuns = async () => {
+    if (editRuns === daysPerWeek) { setEditingRuns(false); return; }
+    if (onRegenerate) await onRegenerate({ daysPerWeek: editRuns });
+    setEditingRuns(false);
+  };
+  const handleSaveLong = async () => {
+    if (editLong === longRunDay) { setEditingLong(false); return; }
+    if (onRegenerate) await onRegenerate({ longRunDay: editLong });
+    setEditingLong(false);
+  };
+  const handleSaveRest = async () => {
+    const sorted = [...editRest].sort((a, b) => DAY_LABELS_ALL.indexOf(a as any) - DAY_LABELS_ALL.indexOf(b as any));
+    const same = sorted.length === restDays.length && sorted.every((d, i) => d === restDays[i]);
+    if (same) { setEditingRest(false); return; }
+    if (onRegenerate) await onRegenerate({ restDays: sorted });
+    setEditingRest(false);
+  };
+
   const distLabel = planDistanceLabel(distance, lang);
   const title = lang === "zh"
     ? `${weeks} 週 ${distLabel} 計劃`
@@ -576,7 +623,14 @@ const ProgramHeader: React.FC<ProgramHeaderProps> = ({
   }
 
   const pct = (a: number, b: number) => Math.max(0, Math.min(100, b > 0 ? (a / b) * 100 : 0));
-  const L = (en: string, zh: string) => (lang === "zh" ? zh : en);
+
+  const selectClass = "h-7 w-full rounded border border-input bg-background px-1 text-xs text-foreground";
+  const Updating = (
+    <span className="inline-flex items-center gap-1 text-muted-foreground">
+      <Loader2 size={12} className="animate-spin" />
+      {L("Updating…", "更新中…")}
+    </span>
+  );
 
   return (
     <div className="bg-card border border-border rounded-xl mb-3 overflow-hidden">
@@ -602,46 +656,188 @@ const ProgramHeader: React.FC<ProgramHeaderProps> = ({
                 {currentWeekIdx + 1} / {weeks}
               </p>
             </div>
+
+            {/* Target time */}
             <div className="rounded-lg bg-muted/40 p-2">
               <div className="flex items-center justify-between gap-1">
                 <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
                   {L("Target time", "目標時間")}
                 </p>
-                {!editing && onUpdateTargetTime && (
-                  <button
-                    type="button"
-                    onClick={() => setEditing(true)}
-                    disabled={regenerating}
+                {!editingTime && onRegenerate && (
+                  <button type="button" onClick={() => setEditingTime(true)} disabled={regenerating}
                     className="text-muted-foreground hover:text-foreground disabled:opacity-50"
-                    aria-label={L("Edit target time", "編輯目標時間")}
-                  >
+                    aria-label={L("Edit target time", "編輯目標時間")}>
                     <Pencil size={11} />
                   </button>
                 )}
               </div>
-              {!editing ? (
+              {!editingTime ? (
                 <p className="text-sm font-semibold text-foreground">
-                  {regenerating ? (
-                    <span className="inline-flex items-center gap-1 text-muted-foreground">
-                      <Loader2 size={12} className="animate-spin" />
-                      {L("Updating…", "更新中…")}
-                    </span>
-                  ) : (targetTime || "—")}
+                  {regenerating ? Updating : (targetTime || "—")}
                 </p>
               ) : (
                 <div className="mt-1 space-y-1.5">
                   <div className="flex items-center gap-1">
-                    <Input value={eh} onChange={(e) => setEh(e.target.value.replace(/\D/g, "").slice(0, 2))} placeholder="HH" inputMode="numeric" className="h-7 px-1 text-xs text-center" />
+                    <select className={selectClass} value={eh} onChange={(e) => setEh(e.target.value)}>
+                      {Array.from({ length: 10 }, (_, i) => String(i).padStart(2, "0")).map((v) => (
+                        <option key={v} value={v}>{v}</option>
+                      ))}
+                    </select>
                     <span className="text-xs">:</span>
-                    <Input value={em} onChange={(e) => setEm(e.target.value.replace(/\D/g, "").slice(0, 2))} placeholder="MM" inputMode="numeric" className="h-7 px-1 text-xs text-center" />
+                    <select className={selectClass} value={em} onChange={(e) => setEm(e.target.value)}>
+                      {Array.from({ length: 60 }, (_, i) => String(i).padStart(2, "0")).map((v) => (
+                        <option key={v} value={v}>{v}</option>
+                      ))}
+                    </select>
                     <span className="text-xs">:</span>
-                    <Input value={es} onChange={(e) => setEs(e.target.value.replace(/\D/g, "").slice(0, 2))} placeholder="SS" inputMode="numeric" className="h-7 px-1 text-xs text-center" />
+                    <select className={selectClass} value={es} onChange={(e) => setEs(e.target.value)}>
+                      {Array.from({ length: 60 }, (_, i) => String(i).padStart(2, "0")).map((v) => (
+                        <option key={v} value={v}>{v}</option>
+                      ))}
+                    </select>
                   </div>
                   <div className="flex gap-1">
                     <Button size="sm" className="h-6 px-2 text-[10px] flex-1" onClick={handleSaveTime} disabled={regenerating}>
                       {L("Regenerate", "重新生成")}
                     </Button>
-                    <Button size="sm" variant="ghost" className="h-6 px-2 text-[10px]" onClick={() => setEditing(false)} disabled={regenerating}>
+                    <Button size="sm" variant="ghost" className="h-6 px-2 text-[10px]" onClick={() => setEditingTime(false)} disabled={regenerating}>
+                      {L("Cancel", "取消")}
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Runs per week */}
+            <div className="rounded-lg bg-muted/40 p-2">
+              <div className="flex items-center justify-between gap-1">
+                <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                  {L("Runs / week", "每週跑步")}
+                </p>
+                {!editingRuns && onRegenerate && (
+                  <button type="button" onClick={() => setEditingRuns(true)} disabled={regenerating}
+                    className="text-muted-foreground hover:text-foreground disabled:opacity-50">
+                    <Pencil size={11} />
+                  </button>
+                )}
+              </div>
+              {!editingRuns ? (
+                <p className="text-sm font-semibold text-foreground">
+                  {regenerating ? Updating : `${daysPerWeek} ${L("days", "天")}`}
+                </p>
+              ) : (
+                <div className="mt-1 space-y-1.5">
+                  <select className={selectClass} value={editRuns} onChange={(e) => setEditRuns(parseInt(e.target.value, 10))}>
+                    {[1, 2, 3, 4, 5, 6, 7].map((n) => (
+                      <option key={n} value={n}>{n} {L("days", "天")}</option>
+                    ))}
+                  </select>
+                  <div className="flex gap-1">
+                    <Button size="sm" className="h-6 px-2 text-[10px] flex-1" onClick={handleSaveRuns} disabled={regenerating}>
+                      {L("Apply", "套用")}
+                    </Button>
+                    <Button size="sm" variant="ghost" className="h-6 px-2 text-[10px]" onClick={() => setEditingRuns(false)} disabled={regenerating}>
+                      {L("Cancel", "取消")}
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Long run day */}
+            <div className="rounded-lg bg-muted/40 p-2">
+              <div className="flex items-center justify-between gap-1">
+                <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                  {L("Long run day", "長跑日")}
+                </p>
+                {!editingLong && onRegenerate && (
+                  <button type="button" onClick={() => setEditingLong(true)} disabled={regenerating}
+                    className="text-muted-foreground hover:text-foreground disabled:opacity-50">
+                    <Pencil size={11} />
+                  </button>
+                )}
+              </div>
+              {!editingLong ? (
+                <p className="text-sm font-semibold text-foreground">
+                  {regenerating ? Updating : dayLabel(longRunDay)}
+                </p>
+              ) : (
+                <div className="mt-1 space-y-1.5">
+                  <select className={selectClass} value={editLong} onChange={(e) => setEditLong(e.target.value)}>
+                    {DAY_LABELS_ALL.map((d) => (
+                      <option key={d} value={d}>{dayLabel(d)}</option>
+                    ))}
+                  </select>
+                  <div className="flex gap-1">
+                    <Button size="sm" className="h-6 px-2 text-[10px] flex-1" onClick={handleSaveLong} disabled={regenerating}>
+                      {L("Apply", "套用")}
+                    </Button>
+                    <Button size="sm" variant="ghost" className="h-6 px-2 text-[10px]" onClick={() => setEditingLong(false)} disabled={regenerating}>
+                      {L("Cancel", "取消")}
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Rest days */}
+            <div className="rounded-lg bg-muted/40 p-2 col-span-2">
+              <div className="flex items-center justify-between gap-1">
+                <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                  {L("Rest days", "休息日")}
+                </p>
+                {!editingRest && onRegenerate && (
+                  <button type="button" onClick={() => setEditingRest(true)} disabled={regenerating}
+                    className="text-muted-foreground hover:text-foreground disabled:opacity-50">
+                    <Pencil size={11} />
+                  </button>
+                )}
+              </div>
+              {!editingRest ? (
+                <p className="text-sm font-semibold text-foreground">
+                  {regenerating ? Updating : (restDays.length ? restDays.map(dayLabel).join(", ") : "—")}
+                </p>
+              ) : (
+                <div className="mt-1 space-y-1.5">
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <button type="button" className={`${selectClass} text-left flex items-center justify-between`}>
+                        <span className="truncate">
+                          {editRest.length
+                            ? editRest
+                                .slice()
+                                .sort((a, b) => DAY_LABELS_ALL.indexOf(a as any) - DAY_LABELS_ALL.indexOf(b as any))
+                                .map(dayLabel)
+                                .join(", ")
+                            : L("Select days", "選擇日期")}
+                        </span>
+                        <ChevronDown size={12} className="text-muted-foreground" />
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-44 p-2">
+                      <div className="space-y-1">
+                        {DAY_LABELS_ALL.map((d) => {
+                          const checked = editRest.includes(d);
+                          return (
+                            <label key={d} className="flex items-center gap-2 text-xs cursor-pointer hover:bg-accent rounded px-1 py-0.5">
+                              <Checkbox
+                                checked={checked}
+                                onCheckedChange={(v) => {
+                                  setEditRest((prev) => (v ? [...prev, d] : prev.filter((x) => x !== d)));
+                                }}
+                              />
+                              <span>{dayLabel(d)}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                  <div className="flex gap-1">
+                    <Button size="sm" className="h-6 px-2 text-[10px] flex-1" onClick={handleSaveRest} disabled={regenerating || editRest.length >= 7}>
+                      {L("Apply", "套用")}
+                    </Button>
+                    <Button size="sm" variant="ghost" className="h-6 px-2 text-[10px]" onClick={() => setEditingRest(false)} disabled={regenerating}>
                       {L("Cancel", "取消")}
                     </Button>
                   </div>

@@ -274,6 +274,7 @@ ${activities.length ? activities.map((a) => `- ${a.date} ${(a.distance_m / 1000)
 
   let insights_en = "";
   let insights_zh = "";
+  let scoreExplanations: any = null;
   try {
     const text = await callGemini(sysPrompt, userPrompt);
     const cleaned = text.replace(/```json\s*|\s*```/g, "").trim();
@@ -282,12 +283,20 @@ ${activities.length ? activities.map((a) => `- ${a.date} ${(a.distance_m / 1000)
       const parsed = JSON.parse(m[0]);
       insights_en = parsed.en || "";
       insights_zh = parsed.zh || "";
+      if (parsed.scores && typeof parsed.scores === "object") {
+        scoreExplanations = parsed.scores;
+      }
     } else {
       insights_en = text;
     }
   } catch (e) {
     console.warn("Gemini insight failed:", e);
   }
+
+  const statsWithExplanations = {
+    ...scored.stats,
+    ...(scoreExplanations ? { explanations: scoreExplanations } : {}),
+  };
 
   const row = {
     user_id: userId,
@@ -301,7 +310,7 @@ ${activities.length ? activities.map((a) => `- ${a.date} ${(a.distance_m / 1000)
     pace_score: scored.pace_score,
     recovery_score: scored.recovery_score,
     overall_score: scored.overall_score,
-    stats: scored.stats,
+    stats: statsWithExplanations,
     insights_en,
     insights_zh,
   };

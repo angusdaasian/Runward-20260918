@@ -603,12 +603,50 @@ const ProgramHeader: React.FC<ProgramHeaderProps> = ({
               </p>
             </div>
             <div className="rounded-lg bg-muted/40 p-2">
-              <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                {L("Target time", "目標時間")}
-              </p>
-              <p className="text-sm font-semibold text-foreground">
-                {targetTime || "—"}
-              </p>
+              <div className="flex items-center justify-between gap-1">
+                <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                  {L("Target time", "目標時間")}
+                </p>
+                {!editing && onUpdateTargetTime && (
+                  <button
+                    type="button"
+                    onClick={() => setEditing(true)}
+                    disabled={regenerating}
+                    className="text-muted-foreground hover:text-foreground disabled:opacity-50"
+                    aria-label={L("Edit target time", "編輯目標時間")}
+                  >
+                    <Pencil size={11} />
+                  </button>
+                )}
+              </div>
+              {!editing ? (
+                <p className="text-sm font-semibold text-foreground">
+                  {regenerating ? (
+                    <span className="inline-flex items-center gap-1 text-muted-foreground">
+                      <Loader2 size={12} className="animate-spin" />
+                      {L("Updating…", "更新中…")}
+                    </span>
+                  ) : (targetTime || "—")}
+                </p>
+              ) : (
+                <div className="mt-1 space-y-1.5">
+                  <div className="flex items-center gap-1">
+                    <Input value={eh} onChange={(e) => setEh(e.target.value.replace(/\D/g, "").slice(0, 2))} placeholder="HH" inputMode="numeric" className="h-7 px-1 text-xs text-center" />
+                    <span className="text-xs">:</span>
+                    <Input value={em} onChange={(e) => setEm(e.target.value.replace(/\D/g, "").slice(0, 2))} placeholder="MM" inputMode="numeric" className="h-7 px-1 text-xs text-center" />
+                    <span className="text-xs">:</span>
+                    <Input value={es} onChange={(e) => setEs(e.target.value.replace(/\D/g, "").slice(0, 2))} placeholder="SS" inputMode="numeric" className="h-7 px-1 text-xs text-center" />
+                  </div>
+                  <div className="flex gap-1">
+                    <Button size="sm" className="h-6 px-2 text-[10px] flex-1" onClick={handleSaveTime} disabled={regenerating}>
+                      {L("Regenerate", "重新生成")}
+                    </Button>
+                    <Button size="sm" variant="ghost" className="h-6 px-2 text-[10px]" onClick={() => setEditing(false)} disabled={regenerating}>
+                      {L("Cancel", "取消")}
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 

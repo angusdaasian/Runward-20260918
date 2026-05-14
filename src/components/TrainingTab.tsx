@@ -1350,6 +1350,53 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
     }
     setLoading(true);
     try {
+      // Make sure the picked target race is the A-priority race in user_races so My Races stays in sync.
+      if (user && resolvedRaceName) {
+        try {
+          const matching = (userRaces as any[] | undefined)?.find(
+            (r) => r?.race_date === raceDate && (r.race_name === resolvedRaceName || r.race_name_zh === resolvedRaceName),
+          );
+          if (matching) {
+            if (matching.priority !== "A") {
+              await (supabase.from("user_races" as any) as any).update({ priority: "A" }).eq("id", matching.id).eq("user_id", user.id);
+            }
+          } else {
+            await (supabase.from("user_races" as any) as any).insert({
+              user_id: user.id,
+              race_name: resolvedRaceName,
+              race_date: raceDate,
+              category: distance,
+              city: selectedRace?.city || null,
+              country: selectedRace?.country || null,
+              source: selectedRace ? "races" : "manual",
+              source_race_id: selectedRace?.id || null,
+              priority: "A",
+            });
+          }
+          await queryClient.invalidateQueries({ queryKey: ["userRaces"] });
+        } catch (e) { console.warn("user_races sync failed", e); }
+      }
+
+      // Refresh races snapshot for the plan window
+      const freshRaces = await (async () => {
+        if (!user) return [] as any[];
+        const { data } = await supabase
+          .from("user_races" as any)
+          .select("id,race_name,race_name_zh,race_date,category,priority")
+          .eq("user_id", user.id)
+          .gte("race_date", startDate)
+          .lte("race_date", raceDate)
+          .order("race_date", { ascending: true });
+        return (data as any[]) || [];
+      })();
+      const snapshot: RaceSchedItem[] = freshRaces.map((r: any) => ({
+        user_race_id: r.id,
+        race_name: (lang === "zh" && r.race_name_zh) || r.race_name,
+        race_date: r.race_date,
+        category: r.category || "",
+        priority: r.priority || "none",
+      }));
+
       const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-program`;
       const response = await fetch(url, {
         method: "POST",
@@ -1358,7 +1405,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
           apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
           Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
         },
-        body: JSON.stringify({ goal, distance, targetTime, raceDate, startDate, weeks: weeksUntilRace, daysPerWeek, weeklyKm, longRunDay, restDays, raceName: resolvedRaceName, raceCity: selectedRace?.city || null, raceCountry: selectedRace?.country || null, lang }),
+        body: JSON.stringify({ goal, distance, targetTime, raceDate, startDate, weeks: weeksUntilRace, daysPerWeek, weeklyKm, longRunDay, restDays, raceName: resolvedRaceName, raceCity: selectedRace?.city || null, raceCountry: selectedRace?.country || null, lang, races: racesPayloadFromSnapshot(snapshot) }),
       });
       if (!response.ok) { const err = await response.json().catch(() => ({})); throw new Error(err.error || "Failed to generate"); }
       const result = await response.json();
@@ -1371,6 +1418,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
         const inserted: any = {
           user_id: user.id, goal: goal || "race", distance, target_time: targetTime,
           race_date: raceDate, weeks: weeksUntilRace, plan_data: planData, raw_output: result.raw || "",
+          race_schedule: snapshot,
         };
         const { data: saved } = await (supabase.from("training_plans" as any) as any).insert(inserted).select().single();
         const nextPlan = saved || inserted;

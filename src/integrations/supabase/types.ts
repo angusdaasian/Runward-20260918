@@ -1552,6 +1552,7 @@ export type Database = {
           id: string
           plan_data: Json
           race_date: string
+          race_schedule: Json
           raw_output: string | null
           target_time: string
           updated_at: string
@@ -1565,6 +1566,7 @@ export type Database = {
           id?: string
           plan_data?: Json
           race_date: string
+          race_schedule?: Json
           raw_output?: string | null
           target_time: string
           updated_at?: string
@@ -1578,6 +1580,7 @@ export type Database = {
           id?: string
           plan_data?: Json
           race_date?: string
+          race_schedule?: Json
           raw_output?: string | null
           target_time?: string
           updated_at?: string

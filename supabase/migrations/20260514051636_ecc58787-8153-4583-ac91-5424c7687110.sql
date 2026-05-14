@@ -1,0 +1,1 @@
+ALTER TABLE public.training_plans ADD COLUMN IF NOT EXISTS race_schedule jsonb NOT NULL DEFAULT '[]'::jsonb;

@@ -44,7 +44,20 @@ serve(async (req) => {
   }
 
   try {
-    const { goal, distance, targetTime, raceDate, startDate, weeks, daysPerWeek, weeklyKm, longRunDay, restDays, raceName, raceCity, raceCountry, lang } = await req.json();
+    const { goal, distance, targetTime, raceDate, startDate, weeks, daysPerWeek, weeklyKm, longRunDay, restDays, raceName, raceCity, raceCountry, lang, races } = await req.json();
+
+    // Normalise race schedule. Expect [{name, race_date, category, priority}]
+    const raceList: Array<{ name: string; race_date: string; category?: string; priority?: string }> =
+      Array.isArray(races) ? races.filter((r: any) => r && r.race_date && r.name) : [];
+    raceList.sort((a, b) => a.race_date.localeCompare(b.race_date));
+    const raceScheduleBlock = raceList.length
+      ? `\nRACE SCHEDULE (the runner has these races on the calendar — adapt the plan accordingly):\n${raceList
+          .map(
+            (r) =>
+              `- ${r.race_date} · ${r.name}${r.category ? ` (${r.category})` : ""} — priority ${r.priority || "none"}`,
+          )
+          .join("\n")}\n\nRACE-AWARE RULES:\n- The "A" priority race is the GOAL race; structure the entire plan to peak for it (use Race Date above).\n- For each "B" race: insert a short mini-taper (1 reduced volume week before, with the 2 days post-race kept easy/recovery). Replace the race day workout with a "Race" type entry titled with the race name and distance from its category.\n- For each "C" race: treat as a hard training run / tune-up. Schedule it as a "Race" type entry on the day; the day after must be Recovery or Rest. No special week-level taper.\n- The +10% weekly mileage rule may be temporarily relaxed during a race week's deload (volume can drop more than 10%). It still applies to all build weeks.\n- For every race in the schedule, the day entry on the race date MUST have type "Race", title equal to the race name, distance_km equal to the race category distance (5K=5, 10K=10, HM=21.1, FM=42.2), color "#E91E63", and a description noting it's a priority ${"{A|B|C}"} race.\n`
+      : "";
 
     const isZh = lang === "zh";
     const distanceFull =
@@ -64,9 +77,10 @@ Running days per week: ${daysPerWeek || 4}
 Preferred weekly volume: approximately ${weeklyKm || 30} km per week (adjust progressively)
 
 ${langInstruction}
+${raceScheduleBlock}
 
 Structure it as a JSON array of weeks. Each week has a "week" number and "days" array (exactly 7 days per week, ordered Monday → Sunday). DO NOT include "date" or "startDate" fields — the system assigns calendar dates after generation. Just give 7 ordered day entries per week.
-Each day has: "day" (Mon/Tue/Wed/Thu/Fri/Sat/Sun, in order), "type" (one of: "Easy Run", "Tempo Run", "Interval", "Long Run", "Recovery", "Rest", "Cross Training", "Race Pace", "Progression Run"), "title" (short workout name), "description" (see format rules below), "distance_km" (number or null for rest), "pace" (target pace per km as string like "5:30/km" or null for rest), "color" (hex color for the workout type: #4CAF50 for Easy, #FF9800 for Tempo, #F44336 for Interval, #2196F3 for Long Run, #9C27B0 for Recovery, #607D8B for Rest, #00BCD4 for Cross Training, #E91E63 for Race Pace, #FF5722 for Progression).
+Each day has: "day" (Mon/Tue/Wed/Thu/Fri/Sat/Sun, in order), "type" (one of: "Easy Run", "Tempo Run", "Interval", "Long Run", "Recovery", "Rest", "Cross Training", "Race Pace", "Progression Run", "Race"), "title" (short workout name), "description" (see format rules below), "distance_km" (number or null for rest), "pace" (target pace per km as string like "5:30/km" or null for rest), "color" (hex color for the workout type: #4CAF50 for Easy, #FF9800 for Tempo, #F44336 for Interval, #2196F3 for Long Run, #9C27B0 for Recovery, #607D8B for Rest, #00BCD4 for Cross Training, #E91E63 for Race Pace, #FF5722 for Progression, #E91E63 for Race).
 
 WORKOUT TYPE DESCRIPTIONS (include a brief note of the type purpose in description):
 - Easy Run: Comfortable conversational pace to build aerobic base.

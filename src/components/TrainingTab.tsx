@@ -15,6 +15,7 @@ import { getCached, setCached, CacheKeys } from "@/lib/offlineCache";
 import { registerUnsavedChecker } from "@/lib/unsavedGuard";
 import { notifyPlanChanged, subscribePlanChanged } from "@/lib/planEvents";
 import { useActivities } from "@/hooks/use-activities";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   Loader2, Lock, ChevronLeft, ChevronRight, Plus, Calendar, Target, Trophy,
   Repeat, Route, HelpCircle, X, WifiOff, Sparkles, GripVertical, Save,
@@ -518,6 +519,7 @@ function planDistanceLabel(distance: string, lang: Lang): string {
   return distance;
 }
 
+interface RaceSchedItemUI { user_race_id: string; race_name: string; race_date: string; category: string; priority: string }
 interface ProgramHeaderProps {
   lang: Lang;
   weeks: number;
@@ -538,6 +540,12 @@ interface ProgramHeaderProps {
     weeklyKm?: number;
   }) => Promise<void> | void;
   regenerating?: boolean;
+  races?: RaceSchedItemUI[];
+  currentRaces?: RaceSchedItemUI[];
+  racesDrift?: boolean;
+  onUpdateRacePriority?: (raceId: string, priority: string) => Promise<void> | void;
+  onRemoveRace?: (raceId: string) => Promise<void> | void;
+  onRegenerateForRaces?: () => Promise<void> | void;
 }
 const DAY_LABELS_ALL = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
 const DAY_LABELS_ZH: Record<string, string> = {
@@ -546,7 +554,9 @@ const DAY_LABELS_ZH: Record<string, string> = {
 const ProgramHeader: React.FC<ProgramHeaderProps> = ({
   lang, weeks, distance, targetTime, currentWeekIdx, weekDays, activities,
   daysPerWeek, longRunDay, restDays, weeklyKm, onRegenerate, regenerating,
+  races, currentRaces, racesDrift, onUpdateRacePriority, onRemoveRace, onRegenerateForRaces,
 }) => {
+  const [racesOpen, setRacesOpen] = useState(false);
   const [editingKm, setEditingKm] = useState(false);
   const [editKm, setEditKm] = useState<number>(weeklyKm);
   useEffect(() => { setEditKm(weeklyKm); }, [weeklyKm]);
@@ -950,6 +960,97 @@ const ProgramHeader: React.FC<ProgramHeaderProps> = ({
             </div>
           </div>
 
+          {/* Race Schedule */}
+          {(races || currentRaces) && (
+            <div className="rounded-lg border border-border/60 bg-muted/20 overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setRacesOpen((v) => !v)}
+                className="w-full flex items-center justify-between px-2.5 py-2 text-left hover:bg-accent/40 transition-colors"
+              >
+                <span className="text-xs font-semibold text-foreground inline-flex items-center gap-1.5">
+                  {L("Race Schedule", "賽事行程")}
+                  {racesDrift && (
+                    <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-700 dark:text-amber-400 border border-amber-500/30">
+                      {L("Updated", "已更新")}
+                    </span>
+                  )}
+                </span>
+                <ChevronDown size={14} className={`text-muted-foreground transition-transform ${racesOpen ? "rotate-180" : ""}`} />
+              </button>
+              {racesOpen && (
+                <div className="px-2.5 pb-2.5 pt-1 space-y-2">
+                  {racesDrift && onRegenerateForRaces && (
+                    <div className="rounded-md bg-amber-500/10 border border-amber-500/30 p-2 text-[11px] text-foreground space-y-1.5">
+                      <p>{L("Your race goals changed in My Races. Regenerate the program to match the updated plan.", "您在「我的賽事」中更改了目標。請重新生成計劃以符合最新安排。")}</p>
+                      <button
+                        type="button"
+                        onClick={() => onRegenerateForRaces()}
+                        disabled={regenerating}
+                        className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                      >
+                        {regenerating ? <Loader2 size={11} className="animate-spin" /> : null}
+                        {L("Regenerate program", "重新生成計劃")}
+                      </button>
+                    </div>
+                  )}
+                  {(racesDrift ? currentRaces : races)?.length ? (
+                    (racesDrift ? currentRaces : races)!.map((r) => {
+                      const isGoal = r.priority === "A";
+                      return (
+                        <div key={r.user_race_id} className={`flex items-center gap-2 p-2 rounded-md border ${isGoal ? "border-primary bg-primary/5" : "border-border/50 bg-background"}`}>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="text-xs font-semibold text-foreground truncate">{r.race_name}</span>
+                              {r.category && (
+                                <span className="text-[9px] font-bold px-1 py-0.5 rounded bg-muted text-muted-foreground">{r.category}</span>
+                              )}
+                              {isGoal && (
+                                <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-primary text-primary-foreground">
+                                  {L("Goal", "目標")}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-[10px] text-muted-foreground mt-0.5">{r.race_date}</p>
+                          </div>
+                          {onUpdateRacePriority && !racesDrift && (
+                            <select
+                              className="h-7 rounded border border-input bg-background px-1 text-[11px] text-foreground"
+                              value={r.priority || "none"}
+                              onChange={(e) => onUpdateRacePriority(r.user_race_id, e.target.value)}
+                              disabled={regenerating}
+                              aria-label={L("Priority", "優先級")}
+                            >
+                              <option value="A">A</option>
+                              <option value="B">B</option>
+                              <option value="C">C</option>
+                              <option value="none">{L("None", "無")}</option>
+                            </select>
+                          )}
+                          {onRemoveRace && !racesDrift && (
+                            <button
+                              type="button"
+                              onClick={() => onRemoveRace(r.user_race_id)}
+                              disabled={regenerating}
+                              className="text-muted-foreground hover:text-destructive disabled:opacity-50 p-1"
+                              aria-label={L("Remove race", "移除賽事")}
+                            >
+                              <X size={12} />
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <p className="text-[11px] text-muted-foreground italic px-1 py-2">
+                      {L("No races on the calendar within this program window. Add races in My Races.", "計劃期間沒有任何賽事。請在「我的賽事」中加入。")}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
           <div>
             <div className="flex items-baseline justify-between mb-1">
               <span className="text-xs text-muted-foreground">
@@ -977,7 +1078,8 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const { online } = useOnlineStatus();
-  const { activities: allActivities } = useActivities();
+  const { activities: allActivities, userRaces } = useActivities();
+  const queryClient = useQueryClient();
 
   // Paces view
   const [view, setView] = useState<"paces" | "equivalent">("paces");
@@ -1304,6 +1406,40 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
     return list.slice(0, 30);
   }, [raceOptions, raceSearch]);
 
+  // ─── Race-aware program helpers ───
+  type RaceSchedItem = { user_race_id: string; race_name: string; race_date: string; category: string; priority: string };
+  const distanceForCategory = (cat: string): number | null => {
+    const c = (cat || "").toUpperCase();
+    if (c === "5K") return 5;
+    if (c === "10K") return 10;
+    if (c === "HM" || c === "HALF" || c === "HALF MARATHON") return 21.1;
+    if (c === "FM" || c === "FULL" || c === "MARATHON") return 42.2;
+    return null;
+  };
+  const buildRaceSnapshot = (windowStart: string, windowEnd: string): RaceSchedItem[] => {
+    if (!Array.isArray(userRaces)) return [];
+    return (userRaces as any[])
+      .filter((r) => r?.race_date && r.race_date >= windowStart && r.race_date <= windowEnd)
+      .map((r) => ({
+        user_race_id: r.id,
+        race_name: (lang === "zh" && r.race_name_zh) || r.race_name,
+        race_date: r.race_date,
+        category: r.category || "",
+        priority: r.priority || "none",
+      }))
+      .sort((a, b) => a.race_date.localeCompare(b.race_date));
+  };
+  const racesPayloadFromSnapshot = (snap: RaceSchedItem[]) =>
+    snap.map((r) => ({ name: r.race_name, race_date: r.race_date, category: r.category, priority: r.priority }));
+  const racesEqual = (a: RaceSchedItem[], b: RaceSchedItem[]) => {
+    if (a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) {
+      const x = a[i], y = b[i];
+      if (x.user_race_id !== y.user_race_id || x.race_date !== y.race_date || x.priority !== y.priority || x.category !== y.category) return false;
+    }
+    return true;
+  };
+
   const handleGenerate = async () => {
     if (!distance || !targetTime || !raceDate || !startDate || !dateValid) return;
     if (!isOnline()) {
@@ -1316,6 +1452,53 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
     }
     setLoading(true);
     try {
+      // Make sure the picked target race is the A-priority race in user_races so My Races stays in sync.
+      if (user && resolvedRaceName) {
+        try {
+          const matching = (userRaces as any[] | undefined)?.find(
+            (r) => r?.race_date === raceDate && (r.race_name === resolvedRaceName || r.race_name_zh === resolvedRaceName),
+          );
+          if (matching) {
+            if (matching.priority !== "A") {
+              await (supabase.from("user_races" as any) as any).update({ priority: "A" }).eq("id", matching.id).eq("user_id", user.id);
+            }
+          } else {
+            await (supabase.from("user_races" as any) as any).insert({
+              user_id: user.id,
+              race_name: resolvedRaceName,
+              race_date: raceDate,
+              category: distance,
+              city: selectedRace?.city || null,
+              country: selectedRace?.country || null,
+              source: selectedRace ? "races" : "manual",
+              source_race_id: selectedRace?.id || null,
+              priority: "A",
+            });
+          }
+          await queryClient.invalidateQueries({ queryKey: ["user-races"] });
+        } catch (e) { console.warn("user_races sync failed", e); }
+      }
+
+      // Refresh races snapshot for the plan window
+      const freshRaces = await (async () => {
+        if (!user) return [] as any[];
+        const { data } = await supabase
+          .from("user_races" as any)
+          .select("id,race_name,race_name_zh,race_date,category,priority")
+          .eq("user_id", user.id)
+          .gte("race_date", startDate)
+          .lte("race_date", raceDate)
+          .order("race_date", { ascending: true });
+        return (data as any[]) || [];
+      })();
+      const snapshot: RaceSchedItem[] = freshRaces.map((r: any) => ({
+        user_race_id: r.id,
+        race_name: (lang === "zh" && r.race_name_zh) || r.race_name,
+        race_date: r.race_date,
+        category: r.category || "",
+        priority: r.priority || "none",
+      }));
+
       const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-program`;
       const response = await fetch(url, {
         method: "POST",
@@ -1324,7 +1507,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
           apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
           Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
         },
-        body: JSON.stringify({ goal, distance, targetTime, raceDate, startDate, weeks: weeksUntilRace, daysPerWeek, weeklyKm, longRunDay, restDays, raceName: resolvedRaceName, raceCity: selectedRace?.city || null, raceCountry: selectedRace?.country || null, lang }),
+        body: JSON.stringify({ goal, distance, targetTime, raceDate, startDate, weeks: weeksUntilRace, daysPerWeek, weeklyKm, longRunDay, restDays, raceName: resolvedRaceName, raceCity: selectedRace?.city || null, raceCountry: selectedRace?.country || null, lang, races: racesPayloadFromSnapshot(snapshot) }),
       });
       if (!response.ok) { const err = await response.json().catch(() => ({})); throw new Error(err.error || "Failed to generate"); }
       const result = await response.json();
@@ -1337,6 +1520,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
         const inserted: any = {
           user_id: user.id, goal: goal || "race", distance, target_time: targetTime,
           race_date: raceDate, weeks: weeksUntilRace, plan_data: planData, raw_output: result.raw || "",
+          race_schedule: snapshot,
         };
         const { data: saved } = await (supabase.from("training_plans" as any) as any).insert(inserted).select().single();
         const nextPlan = saved || inserted;
@@ -1412,6 +1596,26 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
 
     setRegeneratingTime(true);
     try {
+      // Pull the freshest race schedule for the plan window from user_races
+      const freshRaces = await (async () => {
+        if (!user) return [] as any[];
+        const { data } = await supabase
+          .from("user_races" as any)
+          .select("id,race_name,race_name_zh,race_date,category,priority")
+          .eq("user_id", user.id)
+          .gte("race_date", startDateDerived)
+          .lte("race_date", raceDateDerived || "9999-12-31")
+          .order("race_date", { ascending: true });
+        return (data as any[]) || [];
+      })();
+      const snapshot: RaceSchedItem[] = freshRaces.map((r: any) => ({
+        user_race_id: r.id,
+        race_name: (lang === "zh" && r.race_name_zh) || r.race_name,
+        race_date: r.race_date,
+        category: r.category || "",
+        priority: r.priority || "none",
+      }));
+
       const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-program`;
       const response = await fetch(url, {
         method: "POST",
@@ -1425,6 +1629,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
           raceDate: raceDateDerived, startDate: startDateDerived, weeks: weeksDerived,
           daysPerWeek: daysPerWeekFinal, weeklyKm: weeklyKmFinal,
           longRunDay: longRunDayFinal, restDays: restDaysFinal, lang,
+          races: racesPayloadFromSnapshot(snapshot),
         }),
       });
       if (!response.ok) { const err = await response.json().catch(() => ({})); throw new Error(err.error || "Failed to regenerate"); }
@@ -1436,6 +1641,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
       const inserted: any = {
         user_id: user.id, goal: goalDerived, distance: distanceDerived, target_time: targetTimeFinal,
         race_date: raceDateDerived, weeks: weeksDerived, plan_data: planData, raw_output: result.raw || "",
+        race_schedule: snapshot,
       };
       const { data: saved } = await (supabase.from("training_plans" as any) as any).insert(inserted).select().single();
       const nextPlan = saved || inserted;
@@ -2379,6 +2585,11 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                       const longRunCur = (w0Days.find((d:any)=>d.type==="Long Run") as any)?.day || "Sun";
                       const dpwCur = Math.max(1, 7 - restDaysCur.length);
                       const weeklyKmCur = Math.max(1, Math.round(w0Days.reduce((s:number,d:any)=>s+(d.distance_km||0),0)));
+                      const planStartIso = (planArr[0]?.startDate || w0Days[0]?.date || "") as string;
+                      const planEndIso = (existingPlan.race_date as string) || ((planArr[planArr.length-1]?.days as any[])?.slice(-1)?.[0]?.date) || planStartIso;
+                      const currentSnap = buildRaceSnapshot(planStartIso, planEndIso);
+                      const savedSnap: RaceSchedItem[] = Array.isArray(existingPlan.race_schedule) ? (existingPlan.race_schedule as any) : [];
+                      const racesDrift = !racesEqual(currentSnap, savedSnap);
                       return (
                         <ProgramHeader
                           lang={lang}
@@ -2394,6 +2605,22 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                           restDays={restDaysCur}
                           onRegenerate={handleRegeneratePlan}
                           regenerating={regeneratingTime}
+                          races={savedSnap}
+                          currentRaces={currentSnap}
+                          racesDrift={racesDrift}
+                          onUpdateRacePriority={async (raceId, priority) => {
+                            if (!user) return;
+                            await (supabase.from("user_races" as any) as any).update({ priority }).eq("id", raceId).eq("user_id", user.id);
+                            await queryClient.invalidateQueries({ queryKey: ["user-races"] });
+                            await handleRegeneratePlan({});
+                          }}
+                          onRemoveRace={async (raceId) => {
+                            if (!user) return;
+                            await supabase.from("user_races" as any).delete().eq("id", raceId).eq("user_id", user.id);
+                            await queryClient.invalidateQueries({ queryKey: ["user-races"] });
+                            await handleRegeneratePlan({});
+                          }}
+                          onRegenerateForRaces={() => handleRegeneratePlan({})}
                         />
                       );
                     })()}

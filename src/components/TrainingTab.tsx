@@ -1454,6 +1454,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
   };
   const racesPayloadFromSnapshot = (snap: RaceSchedItem[]) =>
     snap.map((r) => ({ name: r.race_name, race_date: r.race_date, category: r.category, priority: r.priority }));
+  const normalizeRacePriority = (priority: unknown) => ["A", "B", "C"].includes(String(priority)) ? String(priority) : "none";
   const racesEqual = (a: RaceSchedItem[], b: RaceSchedItem[]) => {
     // Compare only fields that affect plan generation. Ignore user_race_id (older
     // snapshots may not have stored it) and race_name (changes with language).
@@ -1465,6 +1466,36 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
     if (na.length !== nb.length) return false;
     for (let i = 0; i < na.length; i++) if (na[i] !== nb[i]) return false;
     return true;
+  };
+  const ensurePlanMatchesRaceSchedule = (planData: WeekPlan[], raceSchedule: RaceSchedItem[]): WeekPlan[] => {
+    if (!Array.isArray(planData) || !Array.isArray(raceSchedule) || raceSchedule.length === 0) return planData;
+    let changed = false;
+    const raceByDate = new Map(raceSchedule.filter((r) => r.race_date).map((r) => [r.race_date, r]));
+    const nextPlan = planData.map((week) => ({ ...week, days: (week.days || []).map((day) => ({ ...day })) }));
+
+    for (let wi = 0; wi < nextPlan.length; wi++) {
+      const days = nextPlan[wi].days || [];
+      for (let di = 0; di < days.length; di++) {
+        const race = raceByDate.get(days[di]?.date);
+        if (!race) continue;
+        const distanceKm = distanceForCategory(race.category) ?? days[di].distance_km ?? null;
+        const priority = normalizeRacePriority(race.priority).toUpperCase();
+        const title = race.race_name || (lang === "zh" ? "比賽日" : "Race Day");
+        const description = lang === "zh"
+          ? `${title}（${priority === "NONE" ? "未設定" : priority} 優先級）。此日已按你的賽事行程安排為比賽。`
+          : `${title} (${priority === "NONE" ? "unprioritized" : `${priority}-priority`} race). Scheduled from your race calendar.`;
+        const patchedDay: DayPlan = { ...days[di], type: "Race", title, description, distance_km: distanceKm, color: "#E91E63" };
+        if (JSON.stringify(days[di]) !== JSON.stringify(patchedDay)) {
+          days[di] = patchedDay;
+          changed = true;
+        }
+        if (di + 1 < days.length && days[di + 1]?.type !== "Rest" && days[di + 1]?.type !== "Recovery") {
+          days[di + 1] = { ...days[di + 1], type: "Recovery", title: lang === "zh" ? "賽後恢復" : "Post-race Recovery", description: lang === "zh" ? "非常輕鬆的賽後恢復跑。" : "Very easy post-race recovery run.", color: "#9C27B0" };
+          changed = true;
+        }
+      }
+    }
+    return changed ? nextPlan : planData;
   };
 
   const handleGenerate = async () => {

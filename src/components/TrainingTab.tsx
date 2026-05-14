@@ -1460,7 +1460,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
     // snapshots may not have stored it) and race_name (changes with language).
     const norm = (arr: RaceSchedItem[]) =>
       [...arr]
-        .map((r) => `${r.race_date}|${(r.category || "").toUpperCase()}|${r.priority || "none"}`)
+        .map((r) => `${r.race_date}|${(r.category || "").toUpperCase()}|${normalizeRacePriority(r.priority)}`)
         .sort();
     const na = norm(a), nb = norm(b);
     if (na.length !== nb.length) return false;

@@ -1356,6 +1356,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
     daysPerWeek?: number;
     longRunDay?: string;
     restDays?: string[];
+    weeklyKm?: number;
   };
   const handleRegeneratePlan = async (overrides: RegenOverrides = {}) => {
     if (!existingPlan || !user) return;

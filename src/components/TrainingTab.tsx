@@ -1290,7 +1290,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
     if (!raceDate || !startDate) return 0;
     const start = new Date(startDate + "T00:00:00").getTime();
     const end = new Date(raceDate + "T00:00:00").getTime();
-    return Math.max(0, Math.floor((end - start) / (7 * 24 * 60 * 60 * 1000)));
+    return Math.max(0, Math.ceil((end - start + 24 * 60 * 60 * 1000) / (7 * 24 * 60 * 60 * 1000)));
   }, [raceDate, startDate]);
 
   const minWeeks = distance ? MIN_WEEKS[distance] : 4;

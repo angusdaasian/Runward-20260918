@@ -524,11 +524,30 @@ interface ProgramHeaderProps {
   currentWeekIdx: number;
   weekDays: DayPlan[];
   activities: Array<{ start_date: string; distance: number; moving_time: number }>;
+  onUpdateTargetTime?: (newTargetTime: string) => Promise<void> | void;
+  regenerating?: boolean;
 }
 const ProgramHeader: React.FC<ProgramHeaderProps> = ({
   lang, weeks, distance, targetTime, currentWeekIdx, weekDays, activities,
+  onUpdateTargetTime, regenerating,
 }) => {
   const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const initialParts = (targetTime || "").split(":");
+  const [eh, setEh] = useState(initialParts[0] || "");
+  const [em, setEm] = useState(initialParts[1] || "");
+  const [es, setEs] = useState(initialParts[2] || "");
+  useEffect(() => {
+    const p = (targetTime || "").split(":");
+    setEh(p[0] || ""); setEm(p[1] || ""); setEs(p[2] || "");
+  }, [targetTime]);
+  const pad = (v: string) => String(Math.max(0, parseInt(v || "0", 10) || 0)).padStart(2, "0");
+  const handleSaveTime = async () => {
+    const next = `${pad(eh)}:${pad(em)}:${pad(es)}`;
+    if (next === targetTime) { setEditing(false); return; }
+    if (onUpdateTargetTime) await onUpdateTargetTime(next);
+    setEditing(false);
+  };
   const distLabel = planDistanceLabel(distance, lang);
   const title = lang === "zh"
     ? `${weeks} 週 ${distLabel} 計劃`

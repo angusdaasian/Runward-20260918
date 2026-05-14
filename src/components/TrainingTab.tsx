@@ -979,6 +979,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
   const { toast } = useToast();
   const { online } = useOnlineStatus();
   const { activities: allActivities, userRaces } = useActivities();
+  const queryClient = useQueryClient();
 
   // Paces view
   const [view, setView] = useState<"paces" | "equivalent">("paces");

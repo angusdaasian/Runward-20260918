@@ -2389,6 +2389,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                           weekDays={currentWeek.days}
                           activities={allActivities as any}
                           daysPerWeek={dpwCur}
+                          weeklyKm={weeklyKmCur}
                           longRunDay={longRunCur}
                           restDays={restDaysCur}
                           onRegenerate={handleRegeneratePlan}

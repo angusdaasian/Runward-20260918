@@ -37,6 +37,12 @@ interface Review {
     avg_pace_sec_per_km?: number | null;
     avg_resting_hr?: number | null;
     avg_sleep_score?: number | null;
+    explanations?: {
+      distance?: { en?: string; zh?: string };
+      pace?: { en?: string; zh?: string };
+      hr?: { en?: string; zh?: string };
+      recovery?: { en?: string; zh?: string };
+    };
   };
   insights_en: string | null;
   insights_zh: string | null;
@@ -194,43 +200,57 @@ const WeeklyReviewModal = ({ open, onClose, lang, planId, currentWeekIdx, onUpgr
               </div>
             )}
 
-            {/* Overall + completion */}
-            <div className="bg-card border border-border rounded-xl p-4 flex items-center gap-4">
-              <ScoreRing value={review.overall_score} label={lang === "zh" ? "總分" : "Overall"} />
-              <div className="flex-1">
-                <div className="text-2xl font-bold">{review.completion_pct}%</div>
-                <div className="text-xs text-muted-foreground">{lang === "zh" ? "完成度" : "Completion"}</div>
-                <div className="text-xs text-muted-foreground mt-1">
-                  {review.stats.completed_runs}/{review.stats.planned_runs} {lang === "zh" ? "次訓練" : "runs"} · {review.stats.actual_km}/{review.stats.planned_km} km
+            {/* Overall + completion + AI Coach insight */}
+            <div className="bg-card border border-border rounded-xl p-4 space-y-4">
+              <div className="flex items-center gap-4">
+                <ScoreRing value={review.overall_score} label={lang === "zh" ? "總分" : "Overall"} />
+                <div className="flex-1">
+                  <div className="text-2xl font-bold">{review.completion_pct}%</div>
+                  <div className="text-xs text-muted-foreground">{lang === "zh" ? "完成度" : "Completion"}</div>
+                  <div className="text-xs text-muted-foreground mt-1">
+                    {review.stats.completed_runs}/{review.stats.planned_runs} {lang === "zh" ? "次訓練" : "runs"} · {review.stats.actual_km}/{review.stats.planned_km} km
+                  </div>
                 </div>
               </div>
-            </div>
-
-            {/* Sub-scores */}
-            <div className="bg-card border border-border rounded-xl p-4">
-              <div className="grid grid-cols-4 gap-2">
-                <ScoreRing value={review.distance_score} label={lang === "zh" ? "里程" : "Distance"} />
-                <ScoreRing value={review.pace_score} label={lang === "zh" ? "配速" : "Pace"} />
-                <ScoreRing value={review.hr_score} label={lang === "zh" ? "心率" : "HR"} />
-                <ScoreRing value={review.recovery_score} label={lang === "zh" ? "恢復" : "Recovery"} />
-              </div>
-              <div className="grid grid-cols-2 gap-x-3 gap-y-1 mt-4 text-xs text-muted-foreground">
-                <div>{lang === "zh" ? "平均配速" : "Avg pace"}: <span className="text-foreground font-medium">{fmtPace(review.stats.avg_pace_sec_per_km)}</span></div>
-                <div>{lang === "zh" ? "平均心率" : "Avg HR"}: <span className="text-foreground font-medium">{review.stats.avg_hr ?? "—"}</span></div>
-                <div>{lang === "zh" ? "靜息心率" : "Resting HR"}: <span className="text-foreground font-medium">{review.stats.avg_resting_hr ?? "—"}</span></div>
-                <div>{lang === "zh" ? "睡眠分數" : "Sleep score"}: <span className="text-foreground font-medium">{review.stats.avg_sleep_score ?? "—"}</span></div>
-              </div>
-            </div>
-
-            {/* Insight */}
-            {insight && (
-              <div className="bg-primary/5 border border-primary/20 rounded-xl p-4">
-                <div className="text-xs font-semibold text-primary mb-2 flex items-center gap-1">
-                  <Sparkles size={12} /> {lang === "zh" ? "AI 教練分析" : "AI Coach Insight"}
+              {insight && (
+                <div className="bg-primary/5 border border-primary/20 rounded-lg p-3">
+                  <div className="text-xs font-semibold text-primary mb-1.5 flex items-center gap-1">
+                    <Sparkles size={12} /> {lang === "zh" ? "AI 教練分析" : "AI Coach Insight"}
+                  </div>
+                  <p className="text-sm text-foreground whitespace-pre-line leading-relaxed">{insight}</p>
                 </div>
-                <p className="text-sm text-foreground whitespace-pre-line leading-relaxed">{insight}</p>
-              </div>
-            )}
+              )}
+            </div>
+
+            {/* Per-score breakdown with explanations */}
+            <div className="space-y-2">
+              {([
+                { key: "distance", label: lang === "zh" ? "里程表現" : "Distance", emoji: "📏", score: review.distance_score, color: "bg-blue-500/5 border-blue-500/20", stat: `${review.stats.actual_km ?? "—"}/${review.stats.planned_km ?? "—"} km` },
+                { key: "pace",     label: lang === "zh" ? "配速表現" : "Pace",     emoji: "⏱️", score: review.pace_score,     color: "bg-emerald-500/5 border-emerald-500/20", stat: fmtPace(review.stats.avg_pace_sec_per_km) },
+                { key: "hr",       label: lang === "zh" ? "心率表現" : "Heart Rate", emoji: "❤️", score: review.hr_score,     color: "bg-rose-500/5 border-rose-500/20", stat: review.stats.avg_hr != null ? `${review.stats.avg_hr} bpm` : "—" },
+                { key: "recovery", label: lang === "zh" ? "恢復表現" : "Recovery", emoji: "🌙", score: review.recovery_score, color: "bg-violet-500/5 border-violet-500/20", stat: review.stats.avg_sleep_score != null ? `${lang === "zh" ? "睡眠" : "sleep"} ${review.stats.avg_sleep_score}` : (review.stats.avg_resting_hr != null ? `RHR ${review.stats.avg_resting_hr}` : "—") },
+              ] as const).map((row) => {
+                const exp = review.stats.explanations?.[row.key];
+                const expText = exp ? (lang === "zh" ? exp.zh : exp.en) || exp.en || exp.zh : null;
+                return (
+                  <div key={row.key} className={`border rounded-xl p-3 ${row.color}`}>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
+                        <span>{row.emoji}</span>{row.label}
+                      </div>
+                      <div className="text-xs text-muted-foreground">{row.stat} · <span className="text-foreground font-medium">{row.score}/100</span></div>
+                    </div>
+                    {expText ? (
+                      <p className="text-xs text-muted-foreground leading-relaxed">{expText}</p>
+                    ) : (
+                      <p className="text-xs text-muted-foreground/70 italic">
+                        {lang === "zh" ? "暫無分析,重新生成可取得詳細解釋。" : "No explanation yet — regenerate for details."}
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
 
             <Button variant="outline" size="sm" onClick={() => generate(review.week_index)} disabled={generating} className="w-full">
               {generating

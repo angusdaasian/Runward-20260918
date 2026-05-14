@@ -243,9 +243,18 @@ async function generateReview(admin: any, userId: string, planRow: any, weekInde
   const scored = scoreWeek(week.days, activities, health);
 
   const sysPrompt = `You are a running coach analyzing a user's weekly training plan adherence.
-Return ONLY a JSON object with two keys: "en" (English insight, 3-5 sentences) and "zh" (Traditional Chinese insight, same content).
-Be encouraging but honest. Focus on what they did well, what to improve next week, and one specific, actionable suggestion.
-Do not wrap in markdown code fences.`;
+Return ONLY a JSON object with this exact shape:
+{
+  "en": "overall insight, 3-5 sentences, encouraging but honest, in English",
+  "zh": "same overall insight in Traditional Chinese",
+  "scores": {
+    "distance": { "en": "1-2 sentence reason for the distance score", "zh": "Traditional Chinese version" },
+    "pace":     { "en": "1-2 sentence reason for the pace score",     "zh": "..." },
+    "hr":       { "en": "1-2 sentence reason for the HR score",       "zh": "..." },
+    "recovery": { "en": "1-2 sentence reason for the recovery score", "zh": "..." }
+  }
+}
+Each per-score explanation must reference the actual numbers (e.g. planned vs actual km, avg pace, avg HR, resting HR, sleep) and explain WHY the score is what it is. Do not wrap in markdown code fences.`;
 
   const userPrompt = `Week ${week.week} (${startDate} to ${endDate}) of plan:
 - Planned: ${scored.stats.planned_runs} runs / ${scored.stats.planned_km}km
@@ -265,6 +274,7 @@ ${activities.length ? activities.map((a) => `- ${a.date} ${(a.distance_m / 1000)
 
   let insights_en = "";
   let insights_zh = "";
+  let scoreExplanations: any = null;
   try {
     const text = await callGemini(sysPrompt, userPrompt);
     const cleaned = text.replace(/```json\s*|\s*```/g, "").trim();
@@ -273,12 +283,20 @@ ${activities.length ? activities.map((a) => `- ${a.date} ${(a.distance_m / 1000)
       const parsed = JSON.parse(m[0]);
       insights_en = parsed.en || "";
       insights_zh = parsed.zh || "";
+      if (parsed.scores && typeof parsed.scores === "object") {
+        scoreExplanations = parsed.scores;
+      }
     } else {
       insights_en = text;
     }
   } catch (e) {
     console.warn("Gemini insight failed:", e);
   }
+
+  const statsWithExplanations = {
+    ...scored.stats,
+    ...(scoreExplanations ? { explanations: scoreExplanations } : {}),
+  };
 
   const row = {
     user_id: userId,
@@ -292,7 +310,7 @@ ${activities.length ? activities.map((a) => `- ${a.date} ${(a.distance_m / 1000)
     pace_score: scored.pace_score,
     recovery_score: scored.recovery_score,
     overall_score: scored.overall_score,
-    stats: scored.stats,
+    stats: statsWithExplanations,
     insights_en,
     insights_zh,
   };

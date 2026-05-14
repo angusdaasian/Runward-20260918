@@ -2378,6 +2378,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                       const restDaysCur = w0Days.filter((d:any)=>d.type==="Rest").map((d:any)=>d.day).filter((d:string)=>dl.includes(d));
                       const longRunCur = (w0Days.find((d:any)=>d.type==="Long Run") as any)?.day || "Sun";
                       const dpwCur = Math.max(1, 7 - restDaysCur.length);
+                      const weeklyKmCur = Math.max(1, Math.round(w0Days.reduce((s:number,d:any)=>s+(d.distance_km||0),0)));
                       return (
                         <ProgramHeader
                           lang={lang}

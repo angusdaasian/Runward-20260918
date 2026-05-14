@@ -957,6 +957,7 @@ const ProgramHeader: React.FC<ProgramHeaderProps> = ({
                   {" "}/ {plannedKm.toFixed(1)} km
                 </span>
               </p>
+            </div>
           </div>
 
           {/* Race Schedule */}

@@ -38,11 +38,13 @@ interface Props {
 }
 
 // Keep the offscreen WebGL canvas modest — high-pitch Mapbox + video capture can
-// exhaust mobile GPU memory. 540x960 is still vertical-video friendly but much safer.
-const CANVAS_W = 540;
-const CANVAS_H = 960;
-const MAP_H_FRAC = 0.76;
-const FLYOVER_PITCH = 52;
+// exhaust mobile GPU memory. 480x854 keeps a 9:16 vertical aspect with minimal VRAM.
+const CANVAS_W = 480;
+const CANVAS_H = 854;
+// Map fills the whole canvas; overlay text floats on top with text shadow,
+// so the data fields look transparent (no dark panel underneath).
+const MAP_H_FRAC = 1.0;
+const FLYOVER_PITCH = 48;
 const MAX_BEARING_STEP = 0.9;
 // Dynamic flyover duration: scales with route length, clamped to a sane range.
 function computeDurationMs(distanceMeters: number): number {

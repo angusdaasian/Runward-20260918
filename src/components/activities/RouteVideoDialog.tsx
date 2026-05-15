@@ -37,11 +37,13 @@ interface Props {
   streams?: any[];
 }
 
-// Keep the offscreen WebGL canvas modest — 1080x1920 OOMs Mapbox GL on most
-// mobile devices (page goes blank/green and the PWA reloads to the home route).
-const CANVAS_W = 720;
-const CANVAS_H = 1280;
-const MAP_H_FRAC = 0.78;
+// Keep the offscreen WebGL canvas modest — high-pitch Mapbox + video capture can
+// exhaust mobile GPU memory. 540x960 is still vertical-video friendly but much safer.
+const CANVAS_W = 540;
+const CANVAS_H = 960;
+const MAP_H_FRAC = 0.76;
+const FLYOVER_PITCH = 52;
+const MAX_BEARING_STEP = 0.9;
 // Dynamic flyover duration: scales with route length, clamped to a sane range.
 function computeDurationMs(distanceMeters: number): number {
   const km = Math.max(0, distanceMeters / 1000);
@@ -67,6 +69,12 @@ function bearing([lon1, lat1]: number[], [lon2, lat2]: number[]) {
   const y = Math.sin(Δλ) * Math.cos(φ2);
   const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
   return (toDeg(Math.atan2(y, x)) + 360) % 360;
+}
+
+function isLowGpuDevice() {
+  const mem = (navigator as Navigator & { deviceMemory?: number }).deviceMemory ?? 4;
+  const cores = navigator.hardwareConcurrency ?? 4;
+  return mem <= 4 || cores <= 4;
 }
 
 const RouteVideoDialog = ({
@@ -109,6 +117,8 @@ const RouteVideoDialog = ({
     setProgress(0);
 
     try {
+      const lowGpuMode = isLowGpuDevice();
+      const flyoverPitch = lowGpuMode ? 38 : FLYOVER_PITCH;
       const token = await getMapboxToken();
       mapboxgl.accessToken = token;
 
@@ -177,8 +187,9 @@ const RouteVideoDialog = ({
       for (let i = 1; i < coords.length; i++) cum.push(cum[i - 1] + haversine(coords[i - 1], coords[i]));
       const totalLen = cum[cum.length - 1] || 1;
 
-      // Look ~80m ahead/behind for a stable tangent regardless of polyline density.
-      const LOOK_M = 80;
+      // Look farther ahead/behind so bearing follows the route trend instead of
+      // snapping at every GPS wiggle or sharp corner.
+      const LOOK_M = Math.min(300, Math.max(120, totalLen * 0.04));
       const indexAtDist = (d: number) => {
         let lo = 0, hi = cum.length - 1;
         while (lo < hi) {
@@ -231,7 +242,7 @@ const RouteVideoDialog = ({
       // Initial bounds-fit center/zoom
       const map = new mapboxgl.Map({
         container,
-        style: "mapbox://styles/mapbox/outdoors-v12",
+        style: lowGpuMode ? "mapbox://styles/mapbox/light-v11" : "mapbox://styles/mapbox/outdoors-v12",
         center: [(minLon + maxLon) / 2, (minLat + maxLat) / 2],
         zoom: 13,
         pitch: 0,
@@ -240,6 +251,10 @@ const RouteVideoDialog = ({
         preserveDrawingBuffer: true,
         attributionControl: false,
         antialias: false,
+        maxTileCacheSize: lowGpuMode ? 12 : 24,
+        performanceMetricsCollection: false,
+        collectResourceTiming: false,
+        contextCreateOptions: { extTextureFilterAnisotropicForceOff: true },
       });
       mapRef.current = map;
 
@@ -259,23 +274,26 @@ const RouteVideoDialog = ({
         map.once("error", (e) => reject(e.error || new Error("Map load failed")));
       });
 
-      // 3D terrain + sky
-      map.addSource("mapbox-dem", {
-        type: "raster-dem",
-        url: "mapbox://mapbox.mapbox-terrain-dem-v1",
-        tileSize: 512,
-        maxzoom: 14,
-      });
-      map.setTerrain({ source: "mapbox-dem", exaggeration: 1.5 });
-      map.addLayer({
-        id: "sky",
-        type: "sky",
-        paint: {
-          "sky-type": "atmosphere",
-          "sky-atmosphere-sun": [0, 90],
-          "sky-atmosphere-sun-intensity": 12,
-        },
-      });
+      // 3D terrain + sky. Keep low-memory devices on a flatter map to avoid
+      // WebGL context loss while recording from the canvas.
+      if (!lowGpuMode) {
+        map.addSource("mapbox-dem", {
+          type: "raster-dem",
+          url: "mapbox://mapbox.mapbox-terrain-dem-v1",
+          tileSize: 256,
+          maxzoom: 13,
+        });
+        map.setTerrain({ source: "mapbox-dem", exaggeration: 1.2 });
+        map.addLayer({
+          id: "sky",
+          type: "sky",
+          paint: {
+            "sky-type": "atmosphere",
+            "sky-atmosphere-sun": [0, 90],
+            "sky-atmosphere-sun-intensity": 10,
+          },
+        });
+      }
 
       // Route source/layers (full route faded + progressive route bright)
       map.addSource("route-full", { type: "geojson", data: { type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: coords } } });
@@ -310,18 +328,18 @@ const RouteVideoDialog = ({
       const overviewZoom = cam?.zoom ?? 13;
       // Lower flyover zoom keeps far-tiles on screen so we don't expose grey gutters
       // when the camera pitches/rotates. Was overviewZoom + 2.2 (too tight).
-      const flyoverZoom = Math.min(15.2, Math.max(13, overviewZoom + 0.8));
+      const flyoverZoom = Math.min(14.7, Math.max(12.4, overviewZoom + 0.45));
 
       // Compute dynamic flyover duration from route length
       const DURATION_MS = computeDurationMs(distanceMeters);
 
       // Pre-warm tiles along the entire flight path so frames don't show grey areas.
       // Pre-warm fewer poses so we don't blow tile cache on mobile.
-      const SAMPLES = 5;
+      const SAMPLES = 3;
       for (let i = 0; i <= SAMPLES; i++) {
         const f = i / SAMPLES;
         const p = pointAt(f);
-        map.jumpTo({ center: p.pos, zoom: flyoverZoom, pitch: 65, bearing: p.bear });
+        map.jumpTo({ center: p.pos, zoom: flyoverZoom, pitch: flyoverPitch, bearing: p.bear });
         await new Promise<void>((resolve) => map.once("idle", () => resolve()));
       }
 
@@ -330,7 +348,7 @@ const RouteVideoDialog = ({
       map.jumpTo({
         center: startPoint.pos,
         zoom: flyoverZoom,
-        pitch: 65,
+        pitch: flyoverPitch,
         bearing: startPoint.bear,
       });
       await new Promise<void>((resolve) => map.once("idle", () => resolve()));
@@ -343,7 +361,7 @@ const RouteVideoDialog = ({
       const ctx = composite.getContext("2d")!;
       const mapH = Math.floor(CANVAS_H * MAP_H_FRAC);
 
-      const stream = composite.captureStream(30);
+      const stream = composite.captureStream(24);
       const mimeCandidates = [
         "video/mp4;codecs=h264",
         "video/webm;codecs=vp9",
@@ -351,7 +369,7 @@ const RouteVideoDialog = ({
         "video/webm",
       ];
       const mime = mimeCandidates.find((m) => (window as any).MediaRecorder?.isTypeSupported?.(m)) || "video/webm";
-      const recorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 8_000_000 });
+      const recorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 4_500_000 });
       const chunks: BlobPart[] = [];
       recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
       const stopped = new Promise<void>((resolve) => { recorder.onstop = () => resolve(); });
@@ -431,8 +449,12 @@ const RouteVideoDialog = ({
       // Smoothed bearing state (low-pass filter to kill jitter from polyline noise)
       let smoothBearing = pointAt(0).bear;
       const shortestDelta = (from: number, to: number) => {
-        let d = ((to - from + 540) % 360) - 180;
+        const d = ((to - from + 540) % 360) - 180;
         return d;
+      };
+      const smoothStep = (edge0: number, edge1: number, x: number) => {
+        const v = Math.max(0, Math.min(1, (x - edge0) / (edge1 - edge0)));
+        return v * v * (3 - 2 * v);
       };
 
       const drawFrame = (now: number) => {
@@ -453,7 +475,7 @@ const RouteVideoDialog = ({
           const p = pointAt(k);
           camCenter = p.pos;
           targetBearing = p.bear;
-          camPitch = 65;
+          camPitch = flyoverPitch;
           camZoom = flyoverZoom;
         } else {
           const k = (tEase - 0.92) / 0.08;
@@ -464,13 +486,16 @@ const RouteVideoDialog = ({
             end.pos[1] * (1 - k) + ((minLat + maxLat) / 2) * k,
           ];
           targetBearing = smoothBearing; // hold heading during pull-back, no spin
-          camPitch = 65 * (1 - k) + 30 * k;
+          camPitch = flyoverPitch * (1 - k) + 24 * k;
           camZoom = flyoverZoom * (1 - k) + (overviewZoom + 0.3) * k;
         }
 
-        // Low-pass filter the bearing so the camera no longer whips around.
-        const alpha = 0.08;
-        smoothBearing = (smoothBearing + shortestDelta(smoothBearing, targetBearing) * alpha + 360) % 360;
+        // Low-pass + per-frame clamp so bearing changes glide instead of snapping
+        // when the route polyline has tight turns or noisy GPS points.
+        const delta = shortestDelta(smoothBearing, targetBearing);
+        const slowedDelta = delta * 0.03;
+        const clampedDelta = Math.max(-MAX_BEARING_STEP, Math.min(MAX_BEARING_STEP, slowedDelta));
+        smoothBearing = (smoothBearing + clampedDelta * smoothStep(0.02, 0.12, tRaw) + 360) % 360;
         const camBearing = smoothBearing;
 
         map.jumpTo({ center: camCenter, bearing: camBearing, pitch: camPitch, zoom: camZoom });
@@ -618,6 +643,13 @@ const RouteVideoDialog = ({
             )}
           </div>
 
+          {videoUrl && (
+            <Button variant="default" className="w-full" onClick={handleDownload}>
+              <Download size={14} />
+              {t("Download video", "下載影片")}
+            </Button>
+          )}
+
           <div className="flex gap-2 justify-end flex-wrap">
             {phase !== "done" ? (
               <>
@@ -633,13 +665,9 @@ const RouteVideoDialog = ({
                 </Button>
               </>
             ) : (
-              <div className="grid grid-cols-3 gap-2 w-full">
+              <div className="grid grid-cols-2 gap-2 w-full">
                 <Button variant="outline" size="sm" onClick={() => { setPhase("idle"); setVideoUrl((u) => { if (u) URL.revokeObjectURL(u); return null; }); }}>
                   {t("Regenerate", "重新生成")}
-                </Button>
-                <Button variant="outline" size="sm" onClick={handleDownload}>
-                  <Download size={14} />
-                  {t("Download", "下載")}
                 </Button>
                 <Button size="sm" onClick={handleShare}>
                   <Share2 size={14} />

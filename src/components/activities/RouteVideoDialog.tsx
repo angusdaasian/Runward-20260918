@@ -43,7 +43,7 @@ const CANVAS_W = 540;
 const CANVAS_H = 960;
 const MAP_H_FRAC = 0.76;
 const FLYOVER_PITCH = 52;
-const MAX_BEARING_STEP = 1.8;
+const MAX_BEARING_STEP = 0.9;
 // Dynamic flyover duration: scales with route length, clamped to a sane range.
 function computeDurationMs(distanceMeters: number): number {
   const km = Math.max(0, distanceMeters / 1000);
@@ -360,7 +360,7 @@ const RouteVideoDialog = ({
       const ctx = composite.getContext("2d")!;
       const mapH = Math.floor(CANVAS_H * MAP_H_FRAC);
 
-      const stream = composite.captureStream(30);
+      const stream = composite.captureStream(24);
       const mimeCandidates = [
         "video/mp4;codecs=h264",
         "video/webm;codecs=vp9",
@@ -368,7 +368,7 @@ const RouteVideoDialog = ({
         "video/webm",
       ];
       const mime = mimeCandidates.find((m) => (window as any).MediaRecorder?.isTypeSupported?.(m)) || "video/webm";
-      const recorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 8_000_000 });
+      const recorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 4_500_000 });
       const chunks: BlobPart[] = [];
       recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
       const stopped = new Promise<void>((resolve) => { recorder.onstop = () => resolve(); });
@@ -492,7 +492,7 @@ const RouteVideoDialog = ({
         // Low-pass + per-frame clamp so bearing changes glide instead of snapping
         // when the route polyline has tight turns or noisy GPS points.
         const delta = shortestDelta(smoothBearing, targetBearing);
-        const slowedDelta = delta * 0.045;
+        const slowedDelta = delta * 0.03;
         const clampedDelta = Math.max(-MAX_BEARING_STEP, Math.min(MAX_BEARING_STEP, slowedDelta));
         smoothBearing = (smoothBearing + clampedDelta * smoothStep(0.02, 0.12, tRaw) + 360) % 360;
         const camBearing = smoothBearing;

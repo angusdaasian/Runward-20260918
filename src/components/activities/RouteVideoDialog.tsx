@@ -185,8 +185,9 @@ const RouteVideoDialog = ({
       for (let i = 1; i < coords.length; i++) cum.push(cum[i - 1] + haversine(coords[i - 1], coords[i]));
       const totalLen = cum[cum.length - 1] || 1;
 
-      // Look ~80m ahead/behind for a stable tangent regardless of polyline density.
-      const LOOK_M = 80;
+      // Look farther ahead/behind so bearing follows the route trend instead of
+      // snapping at every GPS wiggle or sharp corner.
+      const LOOK_M = Math.min(300, Math.max(120, totalLen * 0.04));
       const indexAtDist = (d: number) => {
         let lo = 0, hi = cum.length - 1;
         while (lo < hi) {

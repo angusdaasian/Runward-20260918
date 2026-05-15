@@ -48,7 +48,7 @@ const CANVAS_H = 1920;
 // Map fills the whole canvas; overlay text floats on top with text shadow,
 // so the data fields look transparent (no dark panel underneath).
 const MAP_H_FRAC = 1.0;
-const FLYOVER_PITCH = 48;
+const FLYOVER_PITCH = 60;
 const MAX_BEARING_STEP = 0.9;
 // Dynamic flyover duration: scales with route length, clamped to a sane range.
 function computeDurationMs(distanceMeters: number): number {

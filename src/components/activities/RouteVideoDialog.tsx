@@ -40,7 +40,13 @@ interface Props {
 const CANVAS_W = 1080;
 const CANVAS_H = 1920;
 const MAP_H_FRAC = 0.78;
-const DURATION_MS = 12000; // 12s flyover
+// Dynamic flyover duration: scales with route length, clamped to a sane range.
+function computeDurationMs(distanceMeters: number): number {
+  const km = Math.max(0, distanceMeters / 1000);
+  // ~1.2s per km, +6s base, clamp 8s..30s
+  const ms = (6 + km * 1.2) * 1000;
+  return Math.max(8000, Math.min(30000, ms));
+}
 
 let cachedToken: string | null = null;
 async function getMapboxToken(): Promise<string> {

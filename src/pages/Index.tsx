@@ -29,7 +29,6 @@ const ONBOARDING_SIGNUP_IN_PROGRESS_KEY = "onboarding_signup_in_progress";
 
 const Index = () => {
   const { user, loading, isWarmResume } = useAuth();
-  const { isAdmin } = useAdmin();
   const { online } = useOnlineStatus();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();

@@ -42,10 +42,9 @@ interface Props {
   streams?: any[];
 }
 
-// Keep the offscreen WebGL canvas modest — high-pitch Mapbox + video capture can
-// exhaust mobile GPU memory. 480x854 keeps a 9:16 vertical aspect with minimal VRAM.
-const CANVAS_W = 480;
-const CANVAS_H = 854;
+// Full HD vertical for crisp social-ready output.
+const CANVAS_W = 1080;
+const CANVAS_H = 1920;
 // Map fills the whole canvas; overlay text floats on top with text shadow,
 // so the data fields look transparent (no dark panel underneath).
 const MAP_H_FRAC = 1.0;

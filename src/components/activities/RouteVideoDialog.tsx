@@ -251,7 +251,7 @@ const RouteVideoDialog = ({
         maxTileCacheSize: 24,
         performanceMetricsCollection: false,
         collectResourceTiming: false,
-        contextCreateOptions: { powerPreference: "low-power" },
+        contextCreateOptions: { extTextureFilterAnisotropicForceOff: true },
       });
       mapRef.current = map;
 

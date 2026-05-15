@@ -283,12 +283,28 @@ const RouteVideoDialog = ({
       const overviewZoom = cam?.zoom ?? 13;
       const flyoverZoom = Math.min(17, overviewZoom + 2.2);
 
-      // Wait for tiles to settle on initial overview
-      map.jumpTo({ center: cam?.center as any ?? [(minLon + maxLon) / 2, (minLat + maxLat) / 2], zoom: overviewZoom, pitch: 0, bearing: 0 });
-      await new Promise<void>((resolve) => {
-        const check = () => { if (map.areTilesLoaded()) resolve(); else map.once("idle", () => resolve()); };
-        check();
+      // Compute dynamic flyover duration from route length
+      const DURATION_MS = computeDurationMs(distanceMeters);
+
+      // Move camera to the flyover START pose, then wait for tiles+terrain to be fully ready
+      const startPoint = pointAt(0);
+      map.jumpTo({
+        center: startPoint.pos,
+        zoom: flyoverZoom,
+        pitch: 65,
+        bearing: startPoint.bear,
       });
+      await new Promise<void>((resolve) => {
+        const onIdle = () => { resolve(); };
+        if (map.areTilesLoaded() && map.loaded()) {
+          // Still wait one idle for terrain DEM to settle
+          map.once("idle", onIdle);
+        } else {
+          map.once("idle", onIdle);
+        }
+      });
+      // Extra small delay so DEM-shaded terrain finishes shading the first frame
+      await new Promise((r) => setTimeout(r, 250));
 
       // Setup composite canvas + recorder
       composite.width = CANVAS_W;

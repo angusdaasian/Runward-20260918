@@ -419,6 +419,19 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps }: Props
           </div>
         )}
 
+        {!adminLoading && isAdmin && (
+          <button
+            onClick={() => navigate("/admin", { state: { from: currentRoute } })}
+            className="w-full bg-card border border-border rounded-xl p-4 flex items-center justify-between"
+          >
+            <div className="flex items-center gap-3">
+              <Shield size={20} className="text-primary" />
+              <span className="font-medium text-foreground">{lang === "zh" ? "管理員" : "Admin Panel"}</span>
+            </div>
+            <ChevronRight size={18} className="text-muted-foreground" />
+          </button>
+        )}
+
         <button
           onClick={() => navigate("/support", { state: { from: currentRoute } })}
           className="w-full bg-card border border-border rounded-xl p-4 flex items-center justify-between"

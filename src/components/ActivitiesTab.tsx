@@ -73,8 +73,6 @@ function formatSleep(minutes: number): string {
   return `${m}m`;
 }
 
-
-
 const sportTypeIcon: Record<string, string> = {
   Run: "🏃",
   TrailRun: "⛰️",
@@ -179,13 +177,12 @@ const ActivityCard = ({
         <div>
           <h3 className="font-medium text-foreground text-sm">{act.name}</h3>
           <span className="text-xs text-muted-foreground">
-{new Date(act.start_date).toLocaleDateString(lang === "zh" ? "zh-TW" : "en-US", {
+            {new Date(act.start_date).toLocaleDateString(lang === "zh" ? "zh-TW" : "en-US", {
               year: "numeric",
               month: "short",
               day: "numeric",
               weekday: "short",
-            })}
-            {" "}
+            })}{" "}
             {new Date(act.start_date).toLocaleTimeString(lang === "zh" ? "zh-TW" : "en-US", {
               hour: "2-digit",
               minute: "2-digit",
@@ -232,7 +229,9 @@ const ActivityCard = ({
         <div className="grid grid-cols-3 gap-3 mt-2">
           {isPremium && load !== null && (
             <div>
-              <span className="text-xs font-medium text-orange-500 block mb-0.5">{lang === "zh" ? "負荷" : "Load"}</span>
+              <span className="text-xs font-medium text-orange-500 block mb-0.5">
+                {lang === "zh" ? "負荷" : "Load"}
+              </span>
               <div className="flex items-center gap-1">
                 <Flame size={12} className="text-orange-500" />
                 <span className="text-sm font-semibold text-foreground">{load}</span>
@@ -241,7 +240,9 @@ const ActivityCard = ({
           )}
           {score !== null && (
             <div>
-              <span className="text-xs font-medium text-primary block mb-0.5">{lang === "zh" ? "訓練分數" : "Score"}</span>
+              <span className="text-xs font-medium text-primary block mb-0.5">
+                {lang === "zh" ? "訓練分數" : "Score"}
+              </span>
               <div className="flex items-center gap-1">
                 <TrendingUp size={12} className="text-primary" />
                 <span className="text-sm font-semibold text-foreground">{score}</span>
@@ -268,7 +269,9 @@ const ActivityCard = ({
           )}
           {act.calories && act.calories > 0 && (
             <div>
-              <span className="text-xs font-medium text-destructive block mb-0.5">{lang === "zh" ? "卡路里" : "Calories"}</span>
+              <span className="text-xs font-medium text-destructive block mb-0.5">
+                {lang === "zh" ? "卡路里" : "Calories"}
+              </span>
               <div className="flex items-center gap-1">
                 <Flame size={12} className="text-destructive" />
                 <span className="text-sm font-semibold text-foreground">{act.calories} kcal</span>
@@ -307,7 +310,9 @@ const ActivityCard = ({
         <div className="grid grid-cols-3 gap-3 mt-2">
           {isPremium && load !== null && (
             <div>
-              <span className="text-xs font-medium text-orange-500 block mb-0.5">{lang === "zh" ? "負荷" : "Load"}</span>
+              <span className="text-xs font-medium text-orange-500 block mb-0.5">
+                {lang === "zh" ? "負荷" : "Load"}
+              </span>
               <div className="flex items-center gap-1">
                 <Flame size={12} className="text-orange-500" />
                 <span className="text-sm font-semibold text-foreground">{load}</span>
@@ -316,7 +321,9 @@ const ActivityCard = ({
           )}
           {score !== null && (
             <div>
-              <span className="text-xs font-medium text-primary block mb-0.5">{lang === "zh" ? "訓練分數" : "Score"}</span>
+              <span className="text-xs font-medium text-primary block mb-0.5">
+                {lang === "zh" ? "訓練分數" : "Score"}
+              </span>
               <div className="flex items-center gap-1">
                 <TrendingUp size={12} className="text-primary" />
                 <span className="text-sm font-semibold text-foreground">{score}</span>
@@ -355,7 +362,8 @@ const SKELETON_MIN_MS = 400;
 const ActivitiesTab = ({ lang }: Props) => {
   const { user } = useAuth();
   const { isPremium } = usePremium();
-  const { activities, profile, connected, fitnessAppConnected, plannedWorkouts, userRaces, loading, invalidateAll } = useActivities();
+  const { activities, profile, connected, fitnessAppConnected, plannedWorkouts, userRaces, loading, invalidateAll } =
+    useActivities();
   const [selectedActivity, setSelectedActivity] = useState<StravaActivity | null>(null);
   const [showAllActivities, setShowAllActivities] = useState(false);
   const [dateSheet, setDateSheet] = useState<{
@@ -581,7 +589,7 @@ const ActivitiesTab = ({ lang }: Props) => {
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
             >
               <RefreshCw size={14} className={resyncing ? "animate-spin" : ""} />
-              {resyncing ? (lang === "zh" ? "同步中..." : "Syncing...") : (lang === "zh" ? "重新同步" : "Resync")}
+              {resyncing ? (lang === "zh" ? "同步中..." : "Syncing...") : lang === "zh" ? "重新同步" : "Resync"}
             </button>
           )}
         </div>
@@ -650,8 +658,8 @@ const ActivitiesTab = ({ lang }: Props) => {
           <div className="space-y-3">
             <div className="rounded-lg border border-border bg-muted/40 px-3 py-2 text-[11px] leading-relaxed text-muted-foreground">
               {lang === "zh"
-                ? "活動通常會在手錶同步後幾秒內出現。在極少數情況下，我們的資料供應商可能會有些延遲，請耐心等候，並請避免重新連結手錶應用。"
-                : "Activities usually appear within seconds of your watch syncing. In rare occasions our data provider may be delayed — please hang tight and refrain from disconnecting or reconnecting your watch app."}
+                ? "活動通常會在手錶同步後一分鐘內出現。在少數情況下，我們的資料供應商可能會有些延遲，請耐心等候，並請避免重新連結手錶應用。"
+                : "Activities usually appear within a minute of your watch syncing. In rare occasions our data provider may be delayed — please hang tight and refrain from disconnecting or reconnecting your watch app."}
             </div>
             <ActivityCard
               act={latestActivity}
@@ -700,10 +708,7 @@ const ActivitiesTab = ({ lang }: Props) => {
             });
             setDateSheet({
               dateLabel,
-              activities: [
-                ...(activity ? [activity as StravaActivity] : []),
-                ...(extraActivities as StravaActivity[]),
-              ],
+              activities: [...(activity ? [activity as StravaActivity] : []), ...(extraActivities as StravaActivity[])],
               planned: planned
                 ? {
                     type: planned.type,
@@ -743,10 +748,7 @@ const ActivitiesTab = ({ lang }: Props) => {
                   {dateSheet.activities.map((act, idx) => {
                     const score = activityScores[act.id];
                     return (
-                      <div
-                        key={act.id}
-                        className={`space-y-3 ${idx > 0 ? "pt-4 border-t border-border" : ""}`}
-                      >
+                      <div key={act.id} className={`space-y-3 ${idx > 0 ? "pt-4 border-t border-border" : ""}`}>
                         <div className="flex items-center gap-2">
                           <span className="text-lg">{sportTypeIcon[act.sport_type] || "🏃"}</span>
                           <div className="flex-1 min-w-0">
@@ -841,9 +843,7 @@ const ActivitiesTab = ({ lang }: Props) => {
                               </span>
                               <div className="flex items-center gap-1">
                                 <Flame size={12} className="text-destructive" />
-                                <span className="text-sm font-semibold text-foreground">
-                                  {act.calories} kcal
-                                </span>
+                                <span className="text-sm font-semibold text-foreground">{act.calories} kcal</span>
                               </div>
                             </div>
                           )}
@@ -864,7 +864,6 @@ const ActivitiesTab = ({ lang }: Props) => {
                 </div>
               )}
 
-
               {dateSheet.planned && (
                 <div className={`${dateSheet.activities.length > 0 ? "mt-4 pt-4 border-t border-border" : "mt-4"}`}>
                   <div className="flex items-center gap-2">
@@ -881,14 +880,10 @@ const ActivitiesTab = ({ lang }: Props) => {
                       {dateSheet.planned.title || dateSheet.planned.type}
                     </span>
                     {dateSheet.planned.distance_km && (
-                      <span className="text-sm text-muted-foreground">
-                        {dateSheet.planned.distance_km} km
-                      </span>
+                      <span className="text-sm text-muted-foreground">{dateSheet.planned.distance_km} km</span>
                     )}
                     {dateSheet.planned.pace && (
-                      <span className="text-sm text-muted-foreground">
-                        @ {dateSheet.planned.pace}
-                      </span>
+                      <span className="text-sm text-muted-foreground">@ {dateSheet.planned.pace}</span>
                     )}
                   </div>
                   {dateSheet.planned.description && (
@@ -900,7 +895,9 @@ const ActivitiesTab = ({ lang }: Props) => {
               )}
 
               {dateSheet.races && dateSheet.races.length > 0 && (
-                <div className={`${dateSheet.activities.length > 0 || dateSheet.planned ? "mt-4 pt-4 border-t border-border" : "mt-4"}`}>
+                <div
+                  className={`${dateSheet.activities.length > 0 || dateSheet.planned ? "mt-4 pt-4 border-t border-border" : "mt-4"}`}
+                >
                   <div className="flex items-center gap-2 mb-2">
                     <span className="text-base">🏁</span>
                     <span className="text-xs font-semibold text-amber-600 dark:text-amber-400 uppercase tracking-wide">

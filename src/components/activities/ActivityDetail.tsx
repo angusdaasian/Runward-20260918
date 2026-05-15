@@ -766,6 +766,17 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
           chartAlt: chartData.some((d: any) => typeof d.altitude === "number"),
         }}
       />
+      <RouteVideoDialog
+        open={routeVideoOpen}
+        onOpenChange={setRouteVideoOpen}
+        lang={lang}
+        polyline={activity.summary_polyline ?? null}
+        name={activityName}
+        distanceMeters={activity.distance}
+        movingTimeSeconds={activity.moving_time}
+        averageSpeed={activity.average_speed}
+        elevationGainMeters={activity.total_elevation_gain ?? null}
+      />
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <button onClick={onBack} className="flex items-center gap-1.5 text-sm text-primary hover:text-primary/80 transition-colors">

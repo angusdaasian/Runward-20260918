@@ -84,6 +84,11 @@ function isLowGpuDevice() {
   return mem <= 4 || cores <= 4;
 }
 
+function isAppleMobileDevice() {
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+}
+
 const RouteVideoDialog = ({
   open, onOpenChange, lang, polyline, name,
   distanceMeters, movingTimeSeconds, averageSpeed, elevationGainMeters, streams,
@@ -98,6 +103,7 @@ const RouteVideoDialog = ({
   const [phase, setPhase] = useState<"idle" | "loading" | "rendering" | "done" | "error">("idle");
   const [progress, setProgress] = useState(0);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [isSavingVideo, setIsSavingVideo] = useState(false);
   const videoBlobRef = useRef<Blob | null>(null);
 
   useEffect(() => {
@@ -562,29 +568,33 @@ const RouteVideoDialog = ({
   };
 
   const handleDownload = async () => {
-    if (!videoBlobRef.current) return;
+    if (!videoBlobRef.current || isSavingVideo) return;
     const blob = videoBlobRef.current;
     const fname = filename();
     const file = new File([blob], fname, { type: blob.type });
 
-    // iOS Safari ignores <a download> and instead navigates the PWA to the
-    // blob URL (which is what makes it look like "download is broken").
-    // The only reliable way to save on iOS is the share sheet → "Save Video".
+    setIsSavingVideo(true);
     try {
-      // @ts-ignore - canShare with files isn't in older TS lib
-      if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        await navigator.share({ files: [file], title: name });
+      const shareNavigator = navigator as Navigator & {
+        canShare?: (data?: { files?: File[]; title?: string }) => boolean;
+        share?: (data?: { files?: File[]; title?: string }) => Promise<void>;
+      };
+      // iOS Safari/PWA cannot reliably use <a download> for blob videos.
+      // Opening the Share Sheet is the supported path, but it doesn't tell us
+      // whether the user completed "Save Video", so don't show a false success.
+      if (isAppleMobileDevice()) {
+        if (shareNavigator.canShare?.({ files: [file] }) && shareNavigator.share) {
+          await shareNavigator.share({ files: [file], title: name });
+          toast.message(t("If it did not save, tap Share and choose Save Video again.", "如果未儲存，請再次點分享並選擇儲存影片。"));
+          return;
+        }
+
+        toast.error(t("Saving is only available from the iPhone share sheet.", "請使用 iPhone 分享選單儲存影片。"));
         return;
       }
-    } catch (err) {
-      // User cancelled share sheet — that's not an error
-      if ((err as Error)?.name === "AbortError") return;
-      console.warn("Web Share failed, falling back to anchor download", err);
-    }
 
-    // Non-iOS fallback: anchor download
-    const freshUrl = URL.createObjectURL(blob);
-    try {
+      // Non-iOS fallback: anchor download
+      const freshUrl = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = freshUrl;
       a.download = fname;
@@ -593,10 +603,14 @@ const RouteVideoDialog = ({
       a.click();
       a.remove();
       toast.success(t("Video saved", "影片已儲存"));
-    } catch {
+      setTimeout(() => URL.revokeObjectURL(freshUrl), 60_000);
+    } catch (err) {
+      if ((err as Error)?.name === "AbortError") return;
+      console.warn("Video save failed", err);
       toast.error(t("Download failed", "下載失敗"));
+    } finally {
+      setIsSavingVideo(false);
     }
-    setTimeout(() => URL.revokeObjectURL(freshUrl), 60_000);
   };
 
   const handleShare = handleDownload;
@@ -663,9 +677,9 @@ const RouteVideoDialog = ({
           </div>
 
           {videoUrl && (
-            <Button variant="default" className="w-full" onClick={handleDownload}>
-              <Download size={14} />
-              {t("Download video", "下載影片")}
+            <Button variant="default" className="w-full" onClick={handleDownload} disabled={isSavingVideo}>
+              {isSavingVideo ? <Loader2 className="animate-spin" size={14} /> : <Download size={14} />}
+              {isSavingVideo ? t("Opening…", "開啟中…") : t("Download video", "下載影片")}
             </Button>
           )}
 
@@ -688,9 +702,9 @@ const RouteVideoDialog = ({
                 <Button variant="outline" size="sm" onClick={() => { setPhase("idle"); setVideoUrl((u) => { if (u) URL.revokeObjectURL(u); return null; }); }}>
                   {t("Regenerate", "重新生成")}
                 </Button>
-                <Button size="sm" onClick={handleShare}>
-                  <Share2 size={14} />
-                  {t("Share", "分享")}
+                <Button size="sm" onClick={handleShare} disabled={isSavingVideo}>
+                  {isSavingVideo ? <Loader2 className="animate-spin" size={14} /> : <Share2 size={14} />}
+                  {isSavingVideo ? t("Opening…", "開啟中…") : t("Share", "分享")}
                 </Button>
               </div>
             )}

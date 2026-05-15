@@ -2722,8 +2722,16 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                               await handleRegeneratePlan({});
                             }}
                             onRegenerateForRaces={() => handleRegeneratePlan({})}
-                          />
-                          <div className={`bg-card border rounded-xl p-3 mb-4 ${goalWeekIdx === currentWeekIdx ? "border-primary ring-1 ring-primary/40" : "border-border"}`}>
+                           />
+                           <Button
+                             variant="outline"
+                             className="w-full mb-4 border-primary/30 text-primary hover:bg-primary/10"
+                             onClick={() => setShowWeeklyReview(true)}
+                           >
+                             <Sparkles size={14} className="mr-2" />
+                             {lang === "zh" ? "週訓練回顧" : "Weekly Review"}
+                           </Button>
+                           <div className={`bg-card border rounded-xl p-3 mb-4 ${goalWeekIdx === currentWeekIdx ? "border-primary ring-1 ring-primary/40" : "border-border"}`}>
                             <div className="flex items-center justify-between mb-1">
                               <div className="flex items-center gap-2 flex-wrap">
                                 <span className="text-sm font-medium text-foreground">{formatDate(weekStart)} - {formatDate(weekEnd)}</span>

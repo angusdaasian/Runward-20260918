@@ -777,7 +777,7 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
         averageSpeed={activity.average_speed}
         elevationGainMeters={activity.total_elevation_gain ?? null}
         streams={streams}
-        chartData={chartData.map((d: any) => ({
+        chartData={chartData.map((d) => ({
           distance_km: Number(d.distance_km),
           pace: typeof d.pace === "number" ? d.pace : undefined,
           altitude: typeof d.altitude === "number" ? d.altitude : undefined,

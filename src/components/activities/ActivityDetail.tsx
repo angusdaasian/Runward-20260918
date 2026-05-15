@@ -163,6 +163,7 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
   const [aiPosterOpen, setAiPosterOpen] = useState(false);
   const [planNextShown, setPlanNextShown] = useState(false);
   const [customShareOpen, setCustomShareOpen] = useState(false);
+  const [routeVideoOpen, setRouteVideoOpen] = useState(false);
   const [analysisAttempted, setAnalysisAttempted] = useState(false);
 
   // Race tagging + comment state

@@ -386,7 +386,6 @@ const DraggableDay = ({
   const style: React.CSSProperties = {
     transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
     opacity: isDragging ? 0.5 : 1,
-    touchAction: "none",
   };
 
   return (
@@ -423,14 +422,17 @@ const DraggableDay = ({
               >
                 <GripVertical size={16} />
               </button>
+              <div className="flex-1 min-w-0 flex items-center justify-between gap-2 select-none">
+                <span className="font-medium text-sm text-foreground truncate">{localizeTitle(day.type, lang)}</span>
+              </div>
               <button
                 type="button"
-                onClick={() => setExpanded((v) => !v)}
-                className="flex-1 min-w-0 flex items-center justify-between gap-2 text-left"
+                onClick={(e) => { e.stopPropagation(); setExpanded((v) => !v); }}
+                className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground"
                 aria-expanded={expanded}
+                aria-label={lang === "zh" ? "展開" : "Expand"}
               >
-                <span className="font-medium text-sm text-foreground truncate">{localizeTitle(day.type, lang)}</span>
-                <ChevronDown size={16} className={`text-muted-foreground transition-transform shrink-0 ${expanded ? "rotate-180" : ""}`} />
+                <ChevronDown size={16} className={`transition-transform ${expanded ? "rotate-180" : ""}`} />
               </button>
               <button
                 type="button"

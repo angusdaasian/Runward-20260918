@@ -187,6 +187,41 @@ const RouteVideoDialog = ({
         return paceSamples[lo].paceSec;
       };
 
+      // Build cumulative elevation-gain samples (meters gained vs. fraction of route)
+      const elevSamples: { frac: number; gain: number }[] = [];
+      if (streams && streams.length) {
+        const distStream = streams.find((s: any) => s.type === "distance");
+        const altStream = streams.find((s: any) => s.type === "altitude");
+        const distData: number[] | undefined = distStream?.data;
+        const altData: number[] | undefined = altStream?.data;
+        if (distData && altData && distData.length === altData.length && distData.length > 1) {
+          const totalDist = distData[distData.length - 1] || 1;
+          let gain = 0;
+          let prevAlt = altData[0];
+          // Tiny threshold filters GPS jitter
+          const minStep = 1;
+          for (let i = 0; i < distData.length; i++) {
+            const da = altData[i] - prevAlt;
+            if (da >= minStep) { gain += da; prevAlt = altData[i]; }
+            else if (da < 0) { prevAlt = altData[i]; }
+            elevSamples.push({ frac: distData[i] / totalDist, gain });
+          }
+        }
+      }
+      const totalElev = elevationGainMeters ?? (elevSamples.length ? elevSamples[elevSamples.length - 1].gain : 0);
+      const elevAt = (frac: number): number => {
+        if (elevSamples.length === 0) return totalElev * frac;
+        let lo = 0, hi = elevSamples.length - 1;
+        while (lo < hi) {
+          const mid = (lo + hi) >> 1;
+          if (elevSamples[mid].frac < frac) lo = mid + 1; else hi = mid;
+        }
+        // Scale to match the canonical total when available
+        const raw = elevSamples[lo].gain;
+        const finalGain = elevSamples[elevSamples.length - 1].gain || 1;
+        return elevationGainMeters != null ? (raw / finalGain) * elevationGainMeters : raw;
+      };
+
       // Cumulative distances along polyline (in pixel-agnostic meters via haversine)
       const haversine = (a: [number, number], b: [number, number]) => {
         const R = 6371000;

@@ -369,28 +369,39 @@ const RouteVideoDialog = ({
       const px = (n: number) => Math.round(n * S);
 
       const drawOverlay = (tEase: number, animDist: number, animTimeSec: number, curPaceSec: number) => {
-        // Top fade for title legibility
-        const topFade = ctx.createLinearGradient(0, 0, 0, px(240));
-        topFade.addColorStop(0, "rgba(0,0,0,0.6)");
+        // Soft top fade so the title stays readable on bright map tiles.
+        const topFade = ctx.createLinearGradient(0, 0, 0, px(260));
+        topFade.addColorStop(0, "rgba(0,0,0,0.45)");
         topFade.addColorStop(1, "rgba(0,0,0,0)");
         ctx.fillStyle = topFade;
-        ctx.fillRect(0, 0, CANVAS_W, px(240));
+        ctx.fillRect(0, 0, CANVAS_W, px(260));
 
-        // Bottom panel
-        const panelY = mapH;
-        const panelH = CANVAS_H - mapH;
-        const grad = ctx.createLinearGradient(0, panelY - px(60), 0, CANVAS_H);
-        grad.addColorStop(0, "rgba(10,10,10,0)");
-        grad.addColorStop(0.25, "rgba(10,10,10,0.95)");
-        grad.addColorStop(1, "#1a1a1a");
-        ctx.fillStyle = grad;
-        ctx.fillRect(0, panelY - px(60), CANVAS_W, panelH + px(60));
+        // Soft bottom fade so the stats stay readable on bright map tiles.
+        const botFade = ctx.createLinearGradient(0, CANVAS_H - px(440), 0, CANVAS_H);
+        botFade.addColorStop(0, "rgba(0,0,0,0)");
+        botFade.addColorStop(1, "rgba(0,0,0,0.55)");
+        ctx.fillStyle = botFade;
+        ctx.fillRect(0, CANVAS_H - px(440), CANVAS_W, px(440));
+
+        // App logo (top-left) — drawn only once it has decoded
+        if (logoImg.complete && logoImg.naturalWidth > 0) {
+          const logoSize = px(72);
+          ctx.save();
+          ctx.shadowColor = "rgba(0,0,0,0.5)";
+          ctx.shadowBlur = px(8);
+          ctx.drawImage(logoImg, px(40), px(40), logoSize, logoSize);
+          ctx.restore();
+        }
 
         // Title
+        ctx.save();
+        ctx.shadowColor = "rgba(0,0,0,0.65)";
+        ctx.shadowBlur = px(10);
         ctx.fillStyle = "#fff";
-        ctx.font = `700 ${px(56)}px ui-sans-serif, system-ui, -apple-system, 'Segoe UI'`;
+        ctx.font = `700 ${px(50)}px ui-sans-serif, system-ui, -apple-system, 'Segoe UI'`;
         ctx.textAlign = "left";
-        ctx.fillText(name.length > 28 ? name.slice(0, 27) + "…" : name, px(56), px(110));
+        ctx.fillText(name.length > 24 ? name.slice(0, 23) + "…" : name, px(140), px(95));
+        ctx.restore();
 
         // Stats
         const ah = Math.floor(animTimeSec / 3600);
@@ -404,28 +415,37 @@ const RouteVideoDialog = ({
         const curPaceStr = curPaceSec > 0 ? `${cpm}:${String(cps).padStart(2, "0")}/km` : "--";
 
         const drawStat = (label: string, value: string, x: number, y: number) => {
-          ctx.fillStyle = "rgba(255,255,255,0.55)";
-          ctx.font = `500 ${px(28)}px ui-sans-serif, system-ui`;
+          ctx.save();
+          ctx.shadowColor = "rgba(0,0,0,0.7)";
+          ctx.shadowBlur = px(8);
+          ctx.fillStyle = "rgba(255,255,255,0.75)";
+          ctx.font = `500 ${px(26)}px ui-sans-serif, system-ui`;
+          ctx.textAlign = "left";
           ctx.fillText(label, x, y);
           ctx.fillStyle = "#fff";
-          ctx.font = `800 ${px(76)}px ui-sans-serif, system-ui`;
-          ctx.fillText(value, x, y + px(78));
+          ctx.font = `800 ${px(64)}px ui-sans-serif, system-ui`;
+          ctx.fillText(value, x, y + px(72));
+          ctx.restore();
         };
-        const padX = px(64);
-        const baseY = panelY + px(80);
-        const colGap = px(540);
-        drawStat(t("DISTANCE", "距離"), `${animDist.toFixed(2)} km`, padX, baseY);
-        drawStat(t("TIME", "時間"), animTimeStr, padX + colGap, baseY);
-        const row2Y = baseY + px(200);
+        const padX = px(56);
+        const colGap = CANVAS_W / 2 - px(8);
+        const row2Y = CANVAS_H - px(140);
+        const row1Y = row2Y - px(180);
+        drawStat(t("DISTANCE", "距離"), `${animDist.toFixed(2)} km`, padX, row1Y);
+        drawStat(t("TIME", "時間"), animTimeStr, padX + colGap, row1Y);
         drawStat(t("PACE", "配速"), curPaceStr, padX, row2Y);
         if (elevationGainMeters != null) {
           drawStat(t("ELEV", "爬升"), `${Math.round(elevationGainMeters)} m`, padX + colGap, row2Y);
         }
 
-        ctx.fillStyle = "rgba(255,255,255,0.5)";
-        ctx.font = `600 ${px(24)}px ui-sans-serif, system-ui`;
+        ctx.save();
+        ctx.shadowColor = "rgba(0,0,0,0.7)";
+        ctx.shadowBlur = px(6);
+        ctx.fillStyle = "rgba(255,255,255,0.85)";
+        ctx.font = `700 ${px(22)}px ui-sans-serif, system-ui`;
         ctx.textAlign = "right";
-        ctx.fillText("RUNWARD", CANVAS_W - px(56), CANVAS_H - px(48));
+        ctx.fillText("RUNWARD", CANVAS_W - px(40), CANVAS_H - px(36));
+        ctx.restore();
       };
 
       const mapCanvas = map.getCanvas();

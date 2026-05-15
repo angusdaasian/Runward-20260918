@@ -239,9 +239,20 @@ const RouteVideoDialog = ({
         interactive: false,
         preserveDrawingBuffer: true,
         attributionControl: false,
-        antialias: true,
+        antialias: false,
       });
       mapRef.current = map;
+
+      // Surface WebGL context loss as a clean error instead of crashing the PWA shell.
+      const glCanvas = map.getCanvas();
+      glCanvas.addEventListener("webglcontextlost", (e) => {
+        e.preventDefault();
+        console.warn("WebGL context lost during flyover render");
+        try { map.remove(); } catch { /* noop */ }
+        mapRef.current = null;
+        setPhase("error");
+        toast.error(t("Your device ran out of GPU memory. Try again.", "裝置 GPU 記憶體不足，請再試一次。"));
+      });
 
       await new Promise<void>((resolve, reject) => {
         map.once("load", () => resolve());

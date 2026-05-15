@@ -247,9 +247,11 @@ const RouteVideoDialog = ({
       if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; }
 
       // Initial bounds-fit center/zoom
+      // Always use a lightweight style for video capture — terrain/outdoors styles
+      // load far more tiles and are the main cause of GPU OOM during capture.
       const map = new mapboxgl.Map({
         container,
-        style: lowGpuMode ? "mapbox://styles/mapbox/light-v11" : "mapbox://styles/mapbox/outdoors-v12",
+        style: "mapbox://styles/mapbox/light-v11",
         center: [(minLon + maxLon) / 2, (minLat + maxLat) / 2],
         zoom: 13,
         pitch: 0,
@@ -258,7 +260,7 @@ const RouteVideoDialog = ({
         preserveDrawingBuffer: true,
         attributionControl: false,
         antialias: false,
-        maxTileCacheSize: lowGpuMode ? 12 : 24,
+        maxTileCacheSize: 8,
         performanceMetricsCollection: false,
         collectResourceTiming: false,
         contextCreateOptions: { extTextureFilterAnisotropicForceOff: true },

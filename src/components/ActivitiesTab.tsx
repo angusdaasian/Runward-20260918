@@ -650,8 +650,8 @@ const ActivitiesTab = ({ lang }: Props) => {
           <div className="space-y-3">
             <div className="rounded-lg border border-border bg-muted/40 px-3 py-2 text-[11px] leading-relaxed text-muted-foreground">
               {lang === "zh"
-                ? "活動通常會在手錶同步後幾秒內出現。偶爾我們的資料供應商會延遲，請耐心等候，請勿重新連結手錶應用。"
-                : "Activities usually appear within seconds of your watch syncing. Occasionally our data provider is delayed — just hang tight, no need to disconnect or reconnect your watch app."}
+                ? "活動通常會在手錶同步後幾秒內出現。在極少數情況下，我們的資料供應商可能會有些延遲，請耐心等候，並請避免重新連結手錶應用。"
+                : "Activities usually appear within seconds of your watch syncing. In rare occasions our data provider may be delayed — please hang tight and refrain from disconnecting or reconnecting your watch app."}
             </div>
             <ActivityCard
               act={latestActivity}

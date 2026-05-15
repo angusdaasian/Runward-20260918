@@ -6,6 +6,7 @@ import { useOnlineStatus } from "@/hooks/use-online-status";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { confirmLeave } from "@/lib/unsavedGuard";
 import { TabPageSkeleton, SettingsSkeleton, CommunitySkeleton, PostureSkeleton, TrainingSkeleton } from "@/components/ui/PageSkeleton";
+import PullToRefreshContainer from "@/components/ui/PullToRefreshContainer";
 
 // Eagerly load the most common tab
 import ActivitiesTab from "@/components/ActivitiesTab";
@@ -212,7 +213,7 @@ const Index = () => {
           <span>{lang === "zh" ? "離線中 — 顯示已儲存的資料" : "You're offline — showing saved data"}</span>
         </div>
       )}
-      <div className="flex-1 overflow-y-auto relative" style={{ paddingBottom: 'calc(5rem + var(--safe-area-bottom, 0px))' }}>
+      <PullToRefreshContainer>
         {langSwitching && (
           <div className="absolute inset-0 bg-background/80 z-50 flex items-center justify-center">
             <div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="animate-spin" size={16} />{lang === "zh" ? "Switching language..." : "切換語言中..."}</div>
@@ -264,7 +265,7 @@ const Index = () => {
             <RewardsTab lang={lang} />
           </Suspense>
         )}
-      </div>
+      </PullToRefreshContainer>
 
       <div className="fixed bottom-0 left-0 right-0 bg-card border-t border-border" style={{ paddingBottom: 'var(--safe-area-bottom, 0px)' }}>
         <div className="relative flex justify-around items-center h-16 max-w-lg mx-auto">

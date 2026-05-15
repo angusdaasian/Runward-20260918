@@ -94,18 +94,68 @@ const formatFullTime = (totalSeconds: number): string => {
   return `${m}:${s.toString().padStart(2, "0")}`;
 };
 
+const STORAGE_KEY = "runward.calculator.v1";
+type PersistedState = {
+  category: DistanceCategory;
+  selectedMeters: number;
+  customDistance: string;
+  inputMode: InputMode;
+  hours: string;
+  minutes: string;
+  seconds: string;
+  paceMin: string;
+  paceSec: string;
+  paceUnit: PaceUnit;
+};
+const DEFAULTS: PersistedState = {
+  category: "road",
+  selectedMeters: 42195,
+  customDistance: "10",
+  inputMode: "time",
+  hours: "3",
+  minutes: "45",
+  seconds: "0",
+  paceMin: "5",
+  paceSec: "20",
+  paceUnit: "km",
+};
+const loadPersisted = (): PersistedState => {
+  if (typeof window === "undefined") return DEFAULTS;
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    if (!raw) return DEFAULTS;
+    return { ...DEFAULTS, ...JSON.parse(raw) };
+  } catch {
+    return DEFAULTS;
+  }
+};
+
 const CalculatorTab = ({ score, setScore, lang, onCalculated }: Props) => {
-  const [category, setCategory] = useState<DistanceCategory>("road");
-  const [selectedMeters, setSelectedMeters] = useState(42195);
-  const [customDistance, setCustomDistance] = useState("10");
-  const [inputMode, setInputMode] = useState<InputMode>("time");
-  const [hours, setHours] = useState("3");
-  const [minutes, setMinutes] = useState("45");
-  const [seconds, setSeconds] = useState("0");
-  const [paceMin, setPaceMin] = useState("5");
-  const [paceSec, setPaceSec] = useState("20");
-  const [paceUnit, setPaceUnit] = useState<PaceUnit>("km");
+  const initial = useMemo(loadPersisted, []);
+  const [category, setCategory] = useState<DistanceCategory>(initial.category);
+  const [selectedMeters, setSelectedMeters] = useState(initial.selectedMeters);
+  const [customDistance, setCustomDistance] = useState(initial.customDistance);
+  const [inputMode, setInputMode] = useState<InputMode>(initial.inputMode);
+  const [hours, setHours] = useState(initial.hours);
+  const [minutes, setMinutes] = useState(initial.minutes);
+  const [seconds, setSeconds] = useState(initial.seconds);
+  const [paceMin, setPaceMin] = useState(initial.paceMin);
+  const [paceSec, setPaceSec] = useState(initial.paceSec);
+  const [paceUnit, setPaceUnit] = useState<PaceUnit>(initial.paceUnit);
   const [worldRecordError, setWorldRecordError] = useState<string | null>(null);
+
+  // Persist all inputs so the calculator remembers what the user last entered.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const data: PersistedState = {
+        category, selectedMeters, customDistance, inputMode,
+        hours, minutes, seconds, paceMin, paceSec, paceUnit,
+      };
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    } catch { /* ignore quota */ }
+  }, [category, selectedMeters, customDistance, inputMode, hours, minutes, seconds, paceMin, paceSec, paceUnit]);
+
 
   const distancesForCategory = category === "road" ? ROAD_DISTANCES : category === "track" ? TRACK_DISTANCES : [];
 

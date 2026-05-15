@@ -392,8 +392,8 @@ const RouteVideoDialog = ({
 
       // Fit to bounds with padding to estimate target zoom.
       // Use generous padding for the final pull-back so even long routes fit on screen.
-      const bounds = new mapboxgl.LngLatBounds(coords[0] as any, coords[0] as any);
-      coords.forEach((c) => bounds.extend(c as any));
+      const bounds = new mapboxgl.LngLatBounds(coords[0], coords[0]);
+      coords.forEach((c) => bounds.extend(c));
       const cam = map.cameraForBounds(bounds, { padding: 120, pitch: 0, bearing: 0 });
       const overviewZoom = cam?.zoom ?? 13;
       // For the final reveal, fit with extra padding so the entire route is visible
@@ -451,7 +451,7 @@ const RouteVideoDialog = ({
           "video/webm;codecs=vp8",
           "video/webm",
         ];
-      const mime = mimeCandidates.find((m) => (window as any).MediaRecorder?.isTypeSupported?.(m)) || "";
+      const mime = mimeCandidates.find((m) => window.MediaRecorder?.isTypeSupported?.(m)) || "";
       const recorder = new MediaRecorder(stream, { ...(mime ? { mimeType: mime } : {}), videoBitsPerSecond: 5_000_000 });
       const chunks: BlobPart[] = [];
       recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
@@ -603,7 +603,7 @@ const RouteVideoDialog = ({
         const camBearing = smoothBearing;
 
         map.jumpTo({ center: camCenter, bearing: camBearing, pitch: camPitch, zoom: camZoom });
-        progressSrc.setData({ type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: sliceCoords(routeFrac) } } as any);
+        progressSrc.setData({ type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: sliceCoords(routeFrac) } } as GeoJSON.Feature<GeoJSON.LineString>);
 
         // Force a synchronous paint, then composite
         map.triggerRepaint();

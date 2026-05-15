@@ -50,7 +50,7 @@ const DURATION_MS = 10000; // 10 second video
 
 const RouteVideoDialog = ({
   open, onOpenChange, lang, polyline, name,
-  distanceMeters, movingTimeSeconds, averageSpeed, elevationGainMeters,
+  distanceMeters, movingTimeSeconds, averageSpeed, elevationGainMeters, streams,
 }: Props) => {
   const isZh = lang === "zh";
   const t = (en: string, zh: string) => (isZh ? zh : en);

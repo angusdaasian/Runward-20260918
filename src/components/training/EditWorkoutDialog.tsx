@@ -170,12 +170,31 @@ const EditWorkoutDialog = ({
         </DialogHeader>
 
         <div className="space-y-4">
-          {workout.type && (
+          <div>
+            <label className="text-sm font-medium text-foreground mb-1 block">
+              {isZh ? "活動類型" : "Activity Type"}
+            </label>
             <div className="flex items-center gap-2">
-              {workout.color && <div className="w-3 h-3 rounded-full" style={{ backgroundColor: workout.color }} />}
-              <span className="font-medium text-foreground">{workout.title || workout.type}</span>
+              {(() => {
+                const opt = TYPE_OPTIONS.find((o) => o.id === type);
+                return opt ? (
+                  <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: opt.color }} />
+                ) : null;
+              })()}
+              <select
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                value={type}
+                onChange={(e) => { setType(e.target.value); setVerdict(null); setNeedsConfirm(false); }}
+              >
+                {!TYPE_OPTIONS.some((o) => o.id === type) && type && (
+                  <option value={type}>{type}</option>
+                )}
+                {TYPE_OPTIONS.map((o) => (
+                  <option key={o.id} value={o.id}>{isZh ? o.zh : o.en}</option>
+                ))}
+              </select>
             </div>
-          )}
+          </div>
 
           <div>
             <label className="text-sm font-medium text-foreground mb-1 block">

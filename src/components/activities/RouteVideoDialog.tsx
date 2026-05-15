@@ -175,17 +175,31 @@ const RouteVideoDialog = ({
       for (let i = 1; i < coords.length; i++) cum.push(cum[i - 1] + haversine(coords[i - 1], coords[i]));
       const totalLen = cum[cum.length - 1] || 1;
 
+      // Look ~80m ahead/behind for a stable tangent regardless of polyline density.
+      const LOOK_M = 80;
+      const indexAtDist = (d: number) => {
+        let lo = 0, hi = cum.length - 1;
+        while (lo < hi) {
+          const mid = (lo + hi) >> 1;
+          if (cum[mid] < d) lo = mid + 1; else hi = mid;
+        }
+        return lo;
+      };
+      const posAtDist = (d: number): [number, number] => {
+        const dc = Math.max(0, Math.min(totalLen, d));
+        const i = indexAtDist(dc);
+        const i0 = Math.max(0, i - 1);
+        const segLen = Math.max(1, cum[i] - cum[i0]);
+        const segT = (dc - cum[i0]) / segLen;
+        const a = coords[i0], b = coords[i];
+        return [a[0] + (b[0] - a[0]) * segT, a[1] + (b[1] - a[1]) * segT];
+      };
       const pointAt = (frac: number): { pos: [number, number]; bear: number } => {
         const target = totalLen * frac;
-        let i = 0;
-        while (i < cum.length - 1 && cum[i + 1] < target) i++;
-        const segT = i >= cum.length - 1 ? 1 : (target - cum[i]) / Math.max(1, cum[i + 1] - cum[i]);
-        const a = coords[i], b = coords[Math.min(i + 1, coords.length - 1)];
-        const pos: [number, number] = [a[0] + (b[0] - a[0]) * segT, a[1] + (b[1] - a[1]) * segT];
-        // Bearing from slightly behind to slightly ahead for smoothness
-        const lookAhead = Math.min(cum.length - 1, i + 5);
-        const lookBehind = Math.max(0, i - 5);
-        const bear = bearing(coords[lookBehind], coords[lookAhead]);
+        const pos = posAtDist(target);
+        const back = posAtDist(target - LOOK_M);
+        const fwd = posAtDist(target + LOOK_M);
+        const bear = bearing(back, fwd);
         return { pos, bear };
       };
 
@@ -281,10 +295,21 @@ const RouteVideoDialog = ({
       coords.forEach((c) => bounds.extend(c as any));
       const cam = map.cameraForBounds(bounds, { padding: 120, pitch: 0, bearing: 0 });
       const overviewZoom = cam?.zoom ?? 13;
-      const flyoverZoom = Math.min(17, overviewZoom + 2.2);
+      // Lower flyover zoom keeps far-tiles on screen so we don't expose grey gutters
+      // when the camera pitches/rotates. Was overviewZoom + 2.2 (too tight).
+      const flyoverZoom = Math.min(15.2, Math.max(13, overviewZoom + 0.8));
 
       // Compute dynamic flyover duration from route length
       const DURATION_MS = computeDurationMs(distanceMeters);
+
+      // Pre-warm tiles along the entire flight path so frames don't show grey areas.
+      const SAMPLES = 10;
+      for (let i = 0; i <= SAMPLES; i++) {
+        const f = i / SAMPLES;
+        const p = pointAt(f);
+        map.jumpTo({ center: p.pos, zoom: flyoverZoom, pitch: 65, bearing: p.bear });
+        await new Promise<void>((resolve) => map.once("idle", () => resolve()));
+      }
 
       // Move camera to the flyover START pose, then wait for tiles+terrain to be fully ready
       const startPoint = pointAt(0);
@@ -294,15 +319,7 @@ const RouteVideoDialog = ({
         pitch: 65,
         bearing: startPoint.bear,
       });
-      await new Promise<void>((resolve) => {
-        const onIdle = () => { resolve(); };
-        if (map.areTilesLoaded() && map.loaded()) {
-          // Still wait one idle for terrain DEM to settle
-          map.once("idle", onIdle);
-        } else {
-          map.once("idle", onIdle);
-        }
-      });
+      await new Promise<void>((resolve) => map.once("idle", () => resolve()));
       // Extra small delay so DEM-shaded terrain finishes shading the first frame
       await new Promise((r) => setTimeout(r, 250));
 
@@ -392,16 +409,21 @@ const RouteVideoDialog = ({
 
       const mapCanvas = map.getCanvas();
 
+      // Smoothed bearing state (low-pass filter to kill jitter from polyline noise)
+      let smoothBearing = pointAt(0).bear;
+      const shortestDelta = (from: number, to: number) => {
+        let d = ((to - from + 540) % 360) - 180;
+        return d;
+      };
+
       const drawFrame = (now: number) => {
         const elapsed = now - start;
         const tRaw = Math.min(1, elapsed / DURATION_MS);
         const tEase = tRaw < 0.5 ? 2 * tRaw * tRaw : 1 - Math.pow(-2 * tRaw + 2, 2) / 2;
         setProgress(tEase);
 
-        // Phase 1 (0..0.92): camera follows the route from start at flyover pitch/zoom
-        // Phase 2 (0.92..1): pull back to show the full route
         let camCenter: [number, number];
-        let camBearing: number;
+        let targetBearing: number;
         let camPitch: number;
         let camZoom: number;
         let routeFrac: number;
@@ -411,7 +433,7 @@ const RouteVideoDialog = ({
           routeFrac = k;
           const p = pointAt(k);
           camCenter = p.pos;
-          camBearing = p.bear;
+          targetBearing = p.bear;
           camPitch = 65;
           camZoom = flyoverZoom;
         } else {
@@ -422,10 +444,15 @@ const RouteVideoDialog = ({
             end.pos[0] * (1 - k) + ((minLon + maxLon) / 2) * k,
             end.pos[1] * (1 - k) + ((minLat + maxLat) / 2) * k,
           ];
-          camBearing = end.bear * (1 - k);
+          targetBearing = smoothBearing; // hold heading during pull-back, no spin
           camPitch = 65 * (1 - k) + 30 * k;
           camZoom = flyoverZoom * (1 - k) + (overviewZoom + 0.3) * k;
         }
+
+        // Low-pass filter the bearing so the camera no longer whips around.
+        const alpha = 0.08;
+        smoothBearing = (smoothBearing + shortestDelta(smoothBearing, targetBearing) * alpha + 360) % 360;
+        const camBearing = smoothBearing;
 
         map.jumpTo({ center: camCenter, bearing: camBearing, pitch: camPitch, zoom: camZoom });
         progressSrc.setData({ type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: sliceCoords(routeFrac) } } as any);
@@ -480,14 +507,6 @@ const RouteVideoDialog = ({
     if (!videoBlobRef.current) return;
     const blob = videoBlobRef.current;
     const fname = filename();
-    try {
-      const file = new File([blob], fname, { type: blob.type });
-      // @ts-ignore
-      if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        await navigator.share({ files: [file], title: name });
-        return;
-      }
-    } catch {/* fall through */}
 
     const freshUrl = URL.createObjectURL(blob);
     try {
@@ -495,15 +514,15 @@ const RouteVideoDialog = ({
       a.href = freshUrl;
       a.download = fname;
       a.rel = "noopener";
-      a.target = "_blank";
+      // Note: no target="_blank" — in standalone PWAs that navigates the app away.
       document.body.appendChild(a);
       a.click();
       a.remove();
+      toast.success(t("Video saved", "影片已儲存"));
     } catch {
-      window.open(freshUrl, "_blank");
+      toast.error(t("Download failed", "下載失敗"));
     }
     setTimeout(() => URL.revokeObjectURL(freshUrl), 60_000);
-    toast.success(t("Video saved", "影片已儲存"));
   };
 
   const handleShare = async () => {

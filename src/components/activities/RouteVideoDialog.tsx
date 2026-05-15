@@ -575,13 +575,16 @@ const RouteVideoDialog = ({
 
     setIsSavingVideo(true);
     try {
+      const shareNavigator = navigator as Navigator & {
+        canShare?: (data?: { files?: File[]; title?: string }) => boolean;
+        share?: (data?: { files?: File[]; title?: string }) => Promise<void>;
+      };
       // iOS Safari/PWA cannot reliably use <a download> for blob videos.
       // Opening the Share Sheet is the supported path, but it doesn't tell us
       // whether the user completed "Save Video", so don't show a false success.
       if (isAppleMobileDevice()) {
-        // @ts-ignore - canShare with files isn't in older TS lib
-        if (navigator.canShare?.({ files: [file] })) {
-          await navigator.share({ files: [file], title: name });
+        if (shareNavigator.canShare?.({ files: [file] }) && shareNavigator.share) {
+          await shareNavigator.share({ files: [file], title: name });
           toast.message(t("If it did not save, tap Share and choose Save Video again.", "如果未儲存，請再次點分享並選擇儲存影片。"));
           return;
         }

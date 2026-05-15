@@ -124,8 +124,7 @@ const RouteVideoDialog = ({
     setProgress(0);
 
     try {
-      const lowGpuMode = isLowGpuDevice();
-      const flyoverPitch = lowGpuMode ? 38 : FLYOVER_PITCH;
+      const flyoverPitch = FLYOVER_PITCH;
       const token = await getMapboxToken();
       mapboxgl.accessToken = token;
 

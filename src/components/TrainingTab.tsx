@@ -2776,15 +2776,6 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                       </Button>
                     )}
 
-                    <Button
-                      variant="outline"
-                      className="w-full mt-6 border-primary/30 text-primary hover:bg-primary/10"
-                      onClick={() => setShowWeeklyReview(true)}
-                    >
-                      <Sparkles size={14} className="mr-2" />
-                      {lang === "zh" ? "週訓練回顧" : "Weekly Review"}
-                    </Button>
-
                     <Button variant="outline" className="w-full mt-2 text-destructive border-destructive/30 hover:bg-destructive/10" onClick={() => { if (planDirty && !window.confirm(lang === "zh" ? "您有未儲存的變更，仍要取消計劃嗎？" : "You have unsaved changes. Cancel the plan anyway?")) return; setShowCancelConfirm(true); }}>
                       {lang === "zh" ? "取消計劃" : "Cancel Plan"}
                     </Button>

@@ -117,6 +117,7 @@ const RouteVideoDialog = ({
     setProgress(0);
 
     try {
+      const lowGpuMode = isLowGpuDevice();
       const token = await getMapboxToken();
       mapboxgl.accessToken = token;
 
@@ -240,7 +241,7 @@ const RouteVideoDialog = ({
       // Initial bounds-fit center/zoom
       const map = new mapboxgl.Map({
         container,
-        style: isLowGpuDevice() ? "mapbox://styles/mapbox/light-v11" : "mapbox://styles/mapbox/outdoors-v12",
+        style: lowGpuMode ? "mapbox://styles/mapbox/light-v11" : "mapbox://styles/mapbox/outdoors-v12",
         center: [(minLon + maxLon) / 2, (minLat + maxLat) / 2],
         zoom: 13,
         pitch: 0,
@@ -274,7 +275,7 @@ const RouteVideoDialog = ({
 
       // 3D terrain + sky. Keep low-memory devices on a flatter map to avoid
       // WebGL context loss while recording from the canvas.
-      if (!isLowGpuDevice()) {
+      if (!lowGpuMode) {
         map.addSource("mapbox-dem", {
           type: "raster-dem",
           url: "mapbox://mapbox.mapbox-terrain-dem-v1",

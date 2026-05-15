@@ -3,6 +3,7 @@ import { ArrowLeft, Clock, MapPin, Zap, Heart, TrendingUp, Mountain, Timer, Foot
 import { shareActivity, shareSplits, shareCharts } from "@/lib/shareActivity";
 import AiPosterDialog from "./AiPosterDialog";
 import CustomShareDialog from "./CustomShareDialog";
+import RouteVideoDialog from "./RouteVideoDialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -162,6 +163,7 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
   const [aiPosterOpen, setAiPosterOpen] = useState(false);
   const [planNextShown, setPlanNextShown] = useState(false);
   const [customShareOpen, setCustomShareOpen] = useState(false);
+  const [routeVideoOpen, setRouteVideoOpen] = useState(false);
   const [analysisAttempted, setAnalysisAttempted] = useState(false);
 
   // Race tagging + comment state
@@ -764,6 +766,17 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
           chartAlt: chartData.some((d: any) => typeof d.altitude === "number"),
         }}
       />
+      <RouteVideoDialog
+        open={routeVideoOpen}
+        onOpenChange={setRouteVideoOpen}
+        lang={lang}
+        polyline={activity.summary_polyline ?? null}
+        name={activityName}
+        distanceMeters={activity.distance}
+        movingTimeSeconds={activity.moving_time}
+        averageSpeed={activity.average_speed}
+        elevationGainMeters={activity.total_elevation_gain ?? null}
+      />
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <button onClick={onBack} className="flex items-center gap-1.5 text-sm text-primary hover:text-primary/80 transition-colors">
@@ -859,6 +872,25 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
                 <span className="flex items-center gap-2 w-full">
                   <Sparkles size={12} className="text-primary" />
                   {lang === "zh" ? "自訂分享卡片" : "Custom share card"}
+                  {!isPremium && <Lock size={12} className="ml-auto text-muted-foreground" />}
+                </span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => {
+                  if (!isPremium) {
+                    toast.error(lang === "zh" ? "升級 Premium 以解鎖" : "Upgrade to Premium to unlock");
+                    return;
+                  }
+                  if (!activity.summary_polyline) {
+                    toast.error(lang === "zh" ? "沒有路線資料" : "No route data available");
+                    return;
+                  }
+                  setRouteVideoOpen(true);
+                }}
+              >
+                <span className="flex items-center gap-2 w-full">
+                  <Sparkles size={12} className="text-primary" />
+                  {lang === "zh" ? "分享路線影片" : "Share route video"}
                   {!isPremium && <Lock size={12} className="ml-auto text-muted-foreground" />}
                 </span>
               </DropdownMenuItem>

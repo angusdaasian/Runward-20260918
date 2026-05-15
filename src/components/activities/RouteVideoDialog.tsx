@@ -110,6 +110,7 @@ const RouteVideoDialog = ({
     if (!open) {
       if (videoUrl) URL.revokeObjectURL(videoUrl);
       setVideoUrl(null);
+      setIsSavingVideo(false);
       setPhase("idle");
       setProgress(0);
       videoBlobRef.current = null;
@@ -362,14 +363,24 @@ const RouteVideoDialog = ({
       const mapH = Math.floor(CANVAS_H * MAP_H_FRAC);
 
       const stream = composite.captureStream(24);
-      const mimeCandidates = [
-        "video/mp4;codecs=h264",
-        "video/webm;codecs=vp9",
-        "video/webm;codecs=vp8",
-        "video/webm",
-      ];
-      const mime = mimeCandidates.find((m) => (window as any).MediaRecorder?.isTypeSupported?.(m)) || "video/webm";
-      const recorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 5_000_000 });
+      const isAppleMobile = isAppleMobileDevice();
+      const mimeCandidates = isAppleMobile
+        ? [
+          "video/mp4;codecs=avc1.42E01E",
+          "video/mp4;codecs=avc1",
+          "video/mp4",
+          "video/webm;codecs=vp8",
+          "video/webm",
+        ]
+        : [
+          "video/mp4;codecs=avc1.42E01E",
+          "video/mp4;codecs=h264",
+          "video/webm;codecs=vp9",
+          "video/webm;codecs=vp8",
+          "video/webm",
+        ];
+      const mime = mimeCandidates.find((m) => (window as any).MediaRecorder?.isTypeSupported?.(m)) || "";
+      const recorder = new MediaRecorder(stream, { ...(mime ? { mimeType: mime } : {}), videoBitsPerSecond: 5_000_000 });
       const chunks: BlobPart[] = [];
       recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
       const stopped = new Promise<void>((resolve) => { recorder.onstop = () => resolve(); });
@@ -546,7 +557,8 @@ const RouteVideoDialog = ({
       requestAnimationFrame(drawFrame);
 
       await stopped;
-      const blob = new Blob(chunks, { type: mime.startsWith("video/mp4") ? "video/mp4" : "video/webm" });
+      const recordedMime = recorder.mimeType || mime || (isAppleMobile ? "video/mp4" : "video/webm");
+      const blob = new Blob(chunks, { type: recordedMime.includes("mp4") ? "video/mp4" : "video/webm" });
       videoBlobRef.current = blob;
       const url = URL.createObjectURL(blob);
       setVideoUrl(url);
@@ -579,13 +591,24 @@ const RouteVideoDialog = ({
         canShare?: (data?: { files?: File[]; title?: string }) => boolean;
         share?: (data?: { files?: File[]; title?: string }) => Promise<void>;
       };
-      // iOS Safari/PWA cannot reliably use <a download> for blob videos.
-      // Opening the Share Sheet is the supported path, but it doesn't tell us
-      // whether the user completed "Save Video", so don't show a false success.
       if (isAppleMobileDevice()) {
+        if (!blob.type.includes("mp4")) {
+          toast.error(t("iPhone can only save MP4 videos. Please regenerate and try again.", "iPhone 只能儲存 MP4 影片，請重新生成後再試。"));
+          return;
+        }
+
         if (shareNavigator.canShare?.({ files: [file] }) && shareNavigator.share) {
-          await shareNavigator.share({ files: [file], title: name });
-          toast.message(t("If it did not save, tap Share and choose Save Video again.", "如果未儲存，請再次點分享並選擇儲存影片。"));
+          const sharePromise = shareNavigator.share({ files: [file], title: name });
+          const opened = await Promise.race([
+            sharePromise.then(() => true).catch((err) => {
+              if ((err as Error)?.name === "AbortError") return true;
+              throw err;
+            }),
+            new Promise<boolean>((resolve) => setTimeout(() => resolve(true), 1200)),
+          ]);
+          if (opened) {
+            toast.message(t("Share sheet opened. Choose Save Video to store it in Photos.", "分享選單已開啟，請選擇「儲存影片」存到相簿。"));
+          }
           return;
         }
 
@@ -602,7 +625,7 @@ const RouteVideoDialog = ({
       document.body.appendChild(a);
       a.click();
       a.remove();
-      toast.success(t("Video saved", "影片已儲存"));
+      toast.success(t("Download started", "已開始下載"));
       setTimeout(() => URL.revokeObjectURL(freshUrl), 60_000);
     } catch (err) {
       if ((err as Error)?.name === "AbortError") return;

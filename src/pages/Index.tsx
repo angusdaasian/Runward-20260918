@@ -291,7 +291,7 @@ const Index = () => {
 
       <PromoBanner lang={lang} userId={user?.id ?? null} triggerKey={promoTrigger} />
 
-      {!isGuest && user && (
+      {!isGuest && user && !aiChatDisabled && (
         <Suspense fallback={null}>
           <FloatingChatButton lang={lang} />
         </Suspense>

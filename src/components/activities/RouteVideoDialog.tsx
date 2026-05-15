@@ -118,6 +118,7 @@ const RouteVideoDialog = ({
 
     try {
       const lowGpuMode = isLowGpuDevice();
+      const flyoverPitch = lowGpuMode ? 38 : FLYOVER_PITCH;
       const token = await getMapboxToken();
       mapboxgl.accessToken = token;
 
@@ -250,7 +251,7 @@ const RouteVideoDialog = ({
         preserveDrawingBuffer: true,
         attributionControl: false,
         antialias: false,
-        maxTileCacheSize: 24,
+        maxTileCacheSize: lowGpuMode ? 12 : 24,
         performanceMetricsCollection: false,
         collectResourceTiming: false,
         contextCreateOptions: { extTextureFilterAnisotropicForceOff: true },
@@ -338,7 +339,7 @@ const RouteVideoDialog = ({
       for (let i = 0; i <= SAMPLES; i++) {
         const f = i / SAMPLES;
         const p = pointAt(f);
-        map.jumpTo({ center: p.pos, zoom: flyoverZoom, pitch: FLYOVER_PITCH, bearing: p.bear });
+        map.jumpTo({ center: p.pos, zoom: flyoverZoom, pitch: flyoverPitch, bearing: p.bear });
         await new Promise<void>((resolve) => map.once("idle", () => resolve()));
       }
 
@@ -347,7 +348,7 @@ const RouteVideoDialog = ({
       map.jumpTo({
         center: startPoint.pos,
         zoom: flyoverZoom,
-        pitch: FLYOVER_PITCH,
+        pitch: flyoverPitch,
         bearing: startPoint.bear,
       });
       await new Promise<void>((resolve) => map.once("idle", () => resolve()));

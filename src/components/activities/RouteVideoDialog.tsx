@@ -362,7 +362,7 @@ const RouteVideoDialog = ({
         "video/webm",
       ];
       const mime = mimeCandidates.find((m) => (window as any).MediaRecorder?.isTypeSupported?.(m)) || "video/webm";
-      const recorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 2_500_000 });
+      const recorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 8_000_000 });
       const chunks: BlobPart[] = [];
       recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
       const stopped = new Promise<void>((resolve) => { recorder.onstop = () => resolve(); });

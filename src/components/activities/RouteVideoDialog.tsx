@@ -40,6 +40,7 @@ interface Props {
   averageSpeed: number;
   elevationGainMeters: number | null;
   streams?: any[];
+  chartData?: Array<{ distance_km: number | string; pace?: number; altitude?: number; time?: number }>;
 }
 
 // HD vertical keeps the video sharp while avoiding iOS Safari/WebGL memory
@@ -51,13 +52,14 @@ const CANVAS_H = 1280;
 const MAP_H_FRAC = 1.0;
 const FLYOVER_PITCH = 62;
 // Lower max-step + lower smoothing factor below = much gentler rotation.
-const MAX_BEARING_STEP = 0.55;
+const MAX_BEARING_STEP = 0.38;
+const FLYOVER_END_FRAC = 0.94;
 // Dynamic flyover duration: scales with route length, clamped to a sane range.
 function computeDurationMs(distanceMeters: number): number {
   const km = Math.max(0, distanceMeters / 1000);
-  // ~1.8s per km, +9s base, clamp 11s..42s — slower so the camera glides.
-  const ms = (9 + km * 1.8) * 1000;
-  return Math.max(11000, Math.min(42000, ms));
+  // Slower close flyover so the camera can stay near the route without harsh turns.
+  const ms = (12 + km * 2.4) * 1000;
+  return Math.max(14000, Math.min(60000, ms));
 }
 
 let cachedToken: string | null = null;
@@ -92,7 +94,7 @@ function isAppleMobileDevice() {
 
 const RouteVideoDialog = ({
   open, onOpenChange, lang, polyline, name,
-  distanceMeters, movingTimeSeconds, averageSpeed, elevationGainMeters, streams,
+  distanceMeters, movingTimeSeconds, averageSpeed, elevationGainMeters, streams, chartData,
 }: Props) => {
   const isZh = lang === "zh";
   const t = (en: string, zh: string) => (isZh ? zh : en);

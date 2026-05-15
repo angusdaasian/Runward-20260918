@@ -345,7 +345,7 @@ const RouteVideoDialog = ({
       const ctx = composite.getContext("2d")!;
       const mapH = Math.floor(CANVAS_H * MAP_H_FRAC);
 
-      const stream = composite.captureStream(24);
+      const stream = composite.captureStream(20);
       const mimeCandidates = [
         "video/mp4;codecs=h264",
         "video/webm;codecs=vp9",

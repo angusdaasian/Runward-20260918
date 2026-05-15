@@ -402,6 +402,9 @@ const SuggestedNextWorkout = ({ lang, latestActivityId, latestActivityDate }: Pr
       day.distance_km = newDistance;
       day.pace = next.pace ?? day.pace;
       day.description = next.description ?? day.description;
+      if (next.type) day.type = next.type;
+      if (next.title) day.title = next.title;
+      if (next.color) day.color = next.color;
       // If the user converts a Rest day into an actual run, promote the type
       // so the program calendar (TrainingTab) renders it as a workout card,
       // not the "+ Add" placeholder.

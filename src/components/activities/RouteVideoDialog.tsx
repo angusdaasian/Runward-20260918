@@ -108,6 +108,7 @@ const RouteVideoDialog = ({
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [isSavingVideo, setIsSavingVideo] = useState(false);
   const videoBlobRef = useRef<Blob | null>(null);
+  const renderFinishedRef = useRef(false);
 
   useEffect(() => {
     if (!open) {

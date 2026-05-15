@@ -530,7 +530,7 @@ const RouteVideoDialog = ({
         drawStat(t("DISTANCE", "距離"), `${animDist.toFixed(2)} km`, padX, row1Y);
         drawStat(t("TIME", "時間"), animTimeStr, padX + colGap, row1Y);
         drawStat(t("PACE", "配速"), curPaceStr, padX, row2Y);
-        if (totalElev > 0) {
+        if (hasElevationOverlay) {
           drawStat(t("ELEV", "爬升"), `${Math.round(animElev)} m`, padX + colGap, row2Y);
         }
 
@@ -569,8 +569,8 @@ const RouteVideoDialog = ({
         let camZoom: number;
         let routeFrac: number;
 
-        if (tEase < 0.88) {
-          const k = tEase / 0.88;
+        if (tEase < FLYOVER_END_FRAC) {
+          const k = tEase / FLYOVER_END_FRAC;
           routeFrac = k;
           const p = pointAt(k);
           camCenter = p.pos;
@@ -578,7 +578,7 @@ const RouteVideoDialog = ({
           camPitch = flyoverPitch;
           camZoom = flyoverZoom;
         } else {
-          const k = (tEase - 0.88) / 0.12;
+          const k = (tEase - FLYOVER_END_FRAC) / (1 - FLYOVER_END_FRAC);
           const ke = k * k * (3 - 2 * k); // smoothstep for the pull-back
           const end = pointAt(1);
           routeFrac = 1;
@@ -612,10 +612,11 @@ const RouteVideoDialog = ({
           ctx.drawImage(mapCanvas, 0, 0, CANVAS_W, mapH);
         } catch {/* ignore */}
 
-        const animDist = distKm * tEase;
-        const animTime = totalSec * tEase;
-        const curPaceSec = paceAt(tEase);
-        const animElev = elevAt(tEase);
+        const dataFrac = routeFrac;
+        const animDist = distKm * dataFrac;
+        const animTime = totalSec * dataFrac;
+        const curPaceSec = paceAt(dataFrac);
+        const animElev = elevAt(dataFrac);
         drawOverlay(tEase, animDist, animTime, curPaceSec, animElev);
 
         if (tRaw < 1) {

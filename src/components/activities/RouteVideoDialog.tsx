@@ -49,14 +49,15 @@ const CANVAS_H = 1280;
 // Map fills the whole canvas; overlay text floats on top with text shadow,
 // so the data fields look transparent (no dark panel underneath).
 const MAP_H_FRAC = 1.0;
-const FLYOVER_PITCH = 60;
-const MAX_BEARING_STEP = 0.9;
+const FLYOVER_PITCH = 62;
+// Lower max-step + lower smoothing factor below = much gentler rotation.
+const MAX_BEARING_STEP = 0.55;
 // Dynamic flyover duration: scales with route length, clamped to a sane range.
 function computeDurationMs(distanceMeters: number): number {
   const km = Math.max(0, distanceMeters / 1000);
-  // ~1.2s per km, +6s base, clamp 8s..30s
-  const ms = (6 + km * 1.2) * 1000;
-  return Math.max(8000, Math.min(30000, ms));
+  // ~1.8s per km, +9s base, clamp 11s..42s — slower so the camera glides.
+  const ms = (9 + km * 1.8) * 1000;
+  return Math.max(11000, Math.min(42000, ms));
 }
 
 let cachedToken: string | null = null;

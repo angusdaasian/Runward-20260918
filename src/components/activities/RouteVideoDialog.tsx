@@ -585,7 +585,8 @@ const RouteVideoDialog = ({
         const animDist = distKm * tEase;
         const animTime = totalSec * tEase;
         const curPaceSec = paceAt(tEase);
-        drawOverlay(tEase, animDist, animTime, curPaceSec);
+        const animElev = elevAt(tEase);
+        drawOverlay(tEase, animDist, animTime, curPaceSec, animElev);
 
         if (tRaw < 1) {
           requestAnimationFrame(drawFrame);

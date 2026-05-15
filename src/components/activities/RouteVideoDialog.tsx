@@ -324,15 +324,8 @@ const RouteVideoDialog = ({
       // Compute dynamic flyover duration from route length
       const DURATION_MS = computeDurationMs(distanceMeters);
 
-      // Pre-warm tiles along the entire flight path so frames don't show grey areas.
-      // Pre-warm fewer poses so we don't blow tile cache on mobile.
-      const SAMPLES = 3;
-      for (let i = 0; i <= SAMPLES; i++) {
-        const f = i / SAMPLES;
-        const p = pointAt(f);
-        map.jumpTo({ center: p.pos, zoom: flyoverZoom, pitch: flyoverPitch, bearing: p.bear });
-        await new Promise<void>((resolve) => map.once("idle", () => resolve()));
-      }
+      // Skip pre-warm of intermediate poses — each `idle` wait keeps tiles
+      // resident and balloons GPU memory. Tiles will stream in during recording.
 
       // Move camera to the flyover START pose, then wait for tiles+terrain to be fully ready
       const startPoint = pointAt(0);

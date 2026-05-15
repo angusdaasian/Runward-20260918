@@ -640,6 +640,13 @@ const RouteVideoDialog = ({
             )}
           </div>
 
+          {videoUrl && phase !== "done" && (
+            <Button variant="secondary" size="sm" className="w-full" onClick={handleDownload}>
+              <Download size={14} />
+              {t("Download video", "下載影片")}
+            </Button>
+          )}
+
           <div className="flex gap-2 justify-end flex-wrap">
             {phase !== "done" ? (
               <>
@@ -655,11 +662,11 @@ const RouteVideoDialog = ({
                 </Button>
               </>
             ) : (
-              <div className="grid grid-cols-3 gap-2 w-full">
+              <div className="grid grid-cols-2 gap-2 w-full sm:grid-cols-3">
                 <Button variant="outline" size="sm" onClick={() => { setPhase("idle"); setVideoUrl((u) => { if (u) URL.revokeObjectURL(u); return null; }); }}>
                   {t("Regenerate", "重新生成")}
                 </Button>
-                <Button variant="outline" size="sm" onClick={handleDownload}>
+                <Button variant="default" size="sm" onClick={handleDownload} className="order-first sm:order-none">
                   <Download size={14} />
                   {t("Download", "下載")}
                 </Button>

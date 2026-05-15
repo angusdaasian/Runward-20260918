@@ -37,8 +37,10 @@ interface Props {
   streams?: any[];
 }
 
-const CANVAS_W = 1080;
-const CANVAS_H = 1920;
+// Keep the offscreen WebGL canvas modest — 1080x1920 OOMs Mapbox GL on most
+// mobile devices (page goes blank/green and the PWA reloads to the home route).
+const CANVAS_W = 720;
+const CANVAS_H = 1280;
 const MAP_H_FRAC = 0.78;
 // Dynamic flyover duration: scales with route length, clamped to a sane range.
 function computeDurationMs(distanceMeters: number): number {

@@ -202,7 +202,14 @@ const EditWorkoutDialog = ({
               <select
                 className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                 value={type}
-                onChange={(e) => { setType(e.target.value); setVerdict(null); setNeedsConfirm(false); }}
+                onChange={(e) => {
+                  const newType = e.target.value;
+                  setType(newType);
+                  const opt = TYPE_OPTIONS.find((o) => o.id === newType);
+                  if (opt) setDescription(isZh ? opt.descZh : opt.descEn);
+                  setVerdict(null);
+                  setNeedsConfirm(false);
+                }}
               >
                 {!TYPE_OPTIONS.some((o) => o.id === type) && type && (
                   <option value={type}>{type}</option>

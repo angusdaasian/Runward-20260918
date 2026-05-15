@@ -7,6 +7,7 @@ import { SettingsSkeleton } from "@/components/ui/PageSkeleton";
 import { supabase } from "@/integrations/supabase/client";
 import { usePremium } from "@/contexts/PremiumContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { useAdmin } from "@/hooks/use-admin";
 import { useLocation, useNavigate } from "react-router-dom";
 import ProfileSection from "@/components/ProfileSection";
 import { Button } from "@/components/ui/button";

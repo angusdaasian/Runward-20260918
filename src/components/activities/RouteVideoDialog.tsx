@@ -84,6 +84,11 @@ function isLowGpuDevice() {
   return mem <= 4 || cores <= 4;
 }
 
+function isAppleMobileDevice() {
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+}
+
 const RouteVideoDialog = ({
   open, onOpenChange, lang, polyline, name,
   distanceMeters, movingTimeSeconds, averageSpeed, elevationGainMeters, streams,
@@ -98,6 +103,7 @@ const RouteVideoDialog = ({
   const [phase, setPhase] = useState<"idle" | "loading" | "rendering" | "done" | "error">("idle");
   const [progress, setProgress] = useState(0);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [isSavingVideo, setIsSavingVideo] = useState(false);
   const videoBlobRef = useRef<Blob | null>(null);
 
   useEffect(() => {

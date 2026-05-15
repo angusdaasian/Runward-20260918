@@ -394,14 +394,39 @@ const RouteVideoDialog = ({
     return `route-${Date.now()}.${ext}`;
   };
 
-  const handleDownload = () => {
-    if (!videoBlobRef.current || !videoUrl) return;
-    const a = document.createElement("a");
-    a.href = videoUrl;
-    a.download = filename();
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
+  const handleDownload = async () => {
+    if (!videoBlobRef.current) return;
+    const blob = videoBlobRef.current;
+    const fname = filename();
+
+    // Try Web Share with file first (best on iOS/Android in-app webviews)
+    try {
+      const file = new File([blob], fname, { type: blob.type });
+      // @ts-ignore
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: name });
+        return;
+      }
+    } catch {
+      // fall through
+    }
+
+    // Re-create a fresh blob URL each time (some webviews invalidate cached ones)
+    const freshUrl = URL.createObjectURL(blob);
+    try {
+      const a = document.createElement("a");
+      a.href = freshUrl;
+      a.download = fname;
+      a.rel = "noopener";
+      a.target = "_blank";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    } catch {
+      window.open(freshUrl, "_blank");
+    }
+    setTimeout(() => URL.revokeObjectURL(freshUrl), 60_000);
+    toast.success(t("Video saved", "影片已儲存"));
   };
 
   const handleShare = async () => {

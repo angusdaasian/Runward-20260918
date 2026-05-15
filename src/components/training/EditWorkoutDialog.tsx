@@ -33,10 +33,35 @@ interface Props {
 
 type Verdict = "ok" | "caution" | "risky";
 
+const TYPE_OPTIONS: { id: string; en: string; zh: string; color: string }[] = [
+  { id: "Easy Run", en: "Easy Run", zh: "輕鬆跑", color: "#22c55e" },
+  { id: "Tempo Run", en: "Tempo Run", zh: "節奏跑", color: "#eab308" },
+  { id: "Interval", en: "Interval", zh: "間歇跑", color: "#ef4444" },
+  { id: "Long Run", en: "Long Run", zh: "長跑", color: "#3b82f6" },
+  { id: "Recovery Run", en: "Recovery Run", zh: "恢復跑", color: "#94a3b8" },
+  { id: "Progression Run", en: "Progression Run", zh: "漸進跑", color: "#f97316" },
+  { id: "Cross Training", en: "Cross Training", zh: "交叉訓練", color: "#06b6d4" },
+  { id: "Race Pace", en: "Race Pace", zh: "比賽配速", color: "#a855f7" },
+  { id: "Rest", en: "Rest", zh: "休息", color: "#64748b" },
+];
+
+const normalizeType = (t?: string | null): string => {
+  if (!t) return "";
+  const map: Record<string, string> = {
+    Easy: "Easy Run",
+    Tempo: "Tempo Run",
+    Long: "Long Run",
+    Recovery: "Recovery Run",
+    Progression: "Progression Run",
+  };
+  return map[t] || t;
+};
+
 const EditWorkoutDialog = ({
   open, onOpenChange, lang, workout, planContext, onSave, onDelete, title,
 }: Props) => {
   const isZh = lang === "zh";
+  const [type, setType] = useState<string>(normalizeType(workout.type));
   const [distance, setDistance] = useState<string>(workout.distance_km != null ? String(workout.distance_km) : "");
   const [pace, setPace] = useState<string>(workout.pace ?? "");
   const [description, setDescription] = useState<string>(workout.description ?? "");
@@ -47,6 +72,7 @@ const EditWorkoutDialog = ({
 
   useEffect(() => {
     if (open) {
+      setType(normalizeType(workout.type));
       setDistance(workout.distance_km != null ? String(workout.distance_km) : "");
       setPace(workout.pace ?? "");
       setDescription(workout.description ?? "");
@@ -56,16 +82,23 @@ const EditWorkoutDialog = ({
     }
   }, [open, workout]);
 
-  const buildEdited = (): EditableWorkout => ({
-    ...workout,
-    distance_km: distance ? Number(distance) : workout.distance_km,
-    pace: pace || workout.pace,
-    description: description || workout.description,
-  });
+  const buildEdited = (): EditableWorkout => {
+    const opt = TYPE_OPTIONS.find((o) => o.id === type);
+    return {
+      ...workout,
+      type: type || workout.type,
+      title: type || workout.title,
+      color: opt?.color ?? workout.color,
+      distance_km: distance ? Number(distance) : workout.distance_km,
+      pace: pace || workout.pace,
+      description: description || workout.description,
+    };
+  };
 
   const isUnchanged = (): boolean => {
     const next = buildEdited();
     return (
+      (next.type ?? "") === (normalizeType(workout.type) ?? "") &&
       (next.distance_km ?? null) === (workout.distance_km ?? null) &&
       (next.pace ?? "") === (workout.pace ?? "") &&
       (next.description ?? "") === (workout.description ?? "")

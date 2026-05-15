@@ -33,16 +33,34 @@ interface Props {
 
 type Verdict = "ok" | "caution" | "risky";
 
-const TYPE_OPTIONS: { id: string; en: string; zh: string; color: string }[] = [
-  { id: "Easy Run", en: "Easy Run", zh: "輕鬆跑", color: "#22c55e" },
-  { id: "Tempo Run", en: "Tempo Run", zh: "節奏跑", color: "#eab308" },
-  { id: "Interval", en: "Interval", zh: "間歇跑", color: "#ef4444" },
-  { id: "Long Run", en: "Long Run", zh: "長跑", color: "#3b82f6" },
-  { id: "Recovery Run", en: "Recovery Run", zh: "恢復跑", color: "#94a3b8" },
-  { id: "Progression Run", en: "Progression Run", zh: "漸進跑", color: "#f97316" },
-  { id: "Cross Training", en: "Cross Training", zh: "交叉訓練", color: "#06b6d4" },
-  { id: "Race Pace", en: "Race Pace", zh: "比賽配速", color: "#a855f7" },
-  { id: "Rest", en: "Rest", zh: "休息", color: "#64748b" },
+const TYPE_OPTIONS: { id: string; en: string; zh: string; color: string; descEn: string; descZh: string }[] = [
+  { id: "Easy Run", en: "Easy Run", zh: "輕鬆跑", color: "#22c55e",
+    descEn: "Comfortable, conversational pace. Keep it relaxed and aerobic to build endurance without fatigue.",
+    descZh: "輕鬆、可交談的配速，保持放鬆有氧，建立耐力而不過度疲勞。" },
+  { id: "Tempo Run", en: "Tempo Run", zh: "節奏跑", color: "#eab308",
+    descEn: "Sustained effort at a 'comfortably hard' pace to raise lactate threshold.",
+    descZh: "在『稍辛苦但可持續』的配速維持一段時間，提升乳酸閾值。" },
+  { id: "Interval", en: "Interval", zh: "間歇跑", color: "#ef4444",
+    descEn: "Hard repeats with recovery jogs in between. Develops VO2max and speed.",
+    descZh: "高強度重複跑，每組之間慢跑恢復。提升最大攝氧量及速度。" },
+  { id: "Long Run", en: "Long Run", zh: "長跑", color: "#3b82f6",
+    descEn: "Longer distance at an easy pace to build aerobic endurance and mental toughness.",
+    descZh: "以輕鬆配速完成較長距離，建立有氧耐力與意志力。" },
+  { id: "Recovery Run", en: "Recovery Run", zh: "恢復跑", color: "#94a3b8",
+    descEn: "Very easy short run to promote blood flow and aid recovery between hard sessions.",
+    descZh: "極輕鬆的短距離跑，促進血液循環，幫助高強度訓練之間的恢復。" },
+  { id: "Progression Run", en: "Progression Run", zh: "漸進跑", color: "#f97316",
+    descEn: "Start easy and gradually increase pace, finishing the last portion strong.",
+    descZh: "由輕鬆開始，逐漸加快配速，最後段以較快速度完成。" },
+  { id: "Cross Training", en: "Cross Training", zh: "交叉訓練", color: "#06b6d4",
+    descEn: "Non-running aerobic activity (bike, swim, elliptical) to build fitness with low impact.",
+    descZh: "非跑步的有氧活動（單車、游泳、橢圓機等），低衝擊地建立體能。" },
+  { id: "Race Pace", en: "Race Pace", zh: "比賽配速", color: "#a855f7",
+    descEn: "Run at your goal race pace to dial in effort and rhythm.",
+    descZh: "以目標比賽配速跑，熟悉強度與節奏。" },
+  { id: "Rest", en: "Rest", zh: "休息", color: "#64748b",
+    descEn: "Full rest day. Let the body absorb training and rebuild.",
+    descZh: "完全休息日，讓身體吸收訓練並修復。" },
 ];
 
 const normalizeType = (t?: string | null): string => {

@@ -189,17 +189,6 @@ const Index = () => {
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-background">
       <div style={{ height: 'var(--safe-area-top, 0px)' }} className="shrink-0" />
-      {isAdmin && (
-        <div className="flex justify-end p-2">
-          <button
-            onClick={() => navigate("/admin")}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
-          >
-            <Shield size={14} />
-            Admin
-          </button>
-        </div>
-      )}
       {/* Shared header across all tabs */}
       {activeTab !== "more" && (
         <AppHeader

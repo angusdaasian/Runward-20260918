@@ -551,18 +551,38 @@ const RouteVideoDialog = ({
     return `route-${Date.now()}.${ext}`;
   };
 
+  const isIOS = () =>
+    /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === "MacIntel" && (navigator as any).maxTouchPoints > 1);
+
   const handleDownload = async () => {
     if (!videoBlobRef.current) return;
     const blob = videoBlobRef.current;
     const fname = filename();
+    const file = new File([blob], fname, { type: blob.type });
 
+    // iOS Safari ignores <a download> and instead navigates the PWA to the
+    // blob URL (which is what makes it look like "download is broken").
+    // The only reliable way to save on iOS is the share sheet → "Save Video".
+    try {
+      // @ts-ignore - canShare with files isn't in older TS lib
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: name });
+        return;
+      }
+    } catch (err) {
+      // User cancelled share sheet — that's not an error
+      if ((err as Error)?.name === "AbortError") return;
+      console.warn("Web Share failed, falling back to anchor download", err);
+    }
+
+    // Non-iOS fallback: anchor download
     const freshUrl = URL.createObjectURL(blob);
     try {
       const a = document.createElement("a");
       a.href = freshUrl;
       a.download = fname;
       a.rel = "noopener";
-      // Note: no target="_blank" — in standalone PWAs that navigates the app away.
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -573,18 +593,7 @@ const RouteVideoDialog = ({
     setTimeout(() => URL.revokeObjectURL(freshUrl), 60_000);
   };
 
-  const handleShare = async () => {
-    if (!videoBlobRef.current) return;
-    const file = new File([videoBlobRef.current], filename(), { type: videoBlobRef.current.type });
-    try {
-      // @ts-ignore
-      if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        await navigator.share({ files: [file], title: name, text: t("My route on Runward", "我的 Runward 路線") });
-        return;
-      }
-    } catch {/* fall through */}
-    handleDownload();
-  };
+  const handleShare = handleDownload;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

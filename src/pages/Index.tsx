@@ -1,8 +1,7 @@
 import { useState, useEffect, lazy, Suspense } from "react";
-import { Activity, Dumbbell, Loader2, BarChart3, Shield, Award, Trophy, WifiOff } from "lucide-react";
+import { Activity, Dumbbell, Loader2, BarChart3, Award, Trophy, WifiOff } from "lucide-react";
 import { Lang, t } from "@/lib/i18n";
 import { useAuth } from "@/contexts/AuthContext";
-import { useAdmin } from "@/hooks/use-admin";
 import { useOnlineStatus } from "@/hooks/use-online-status";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { confirmLeave } from "@/lib/unsavedGuard";

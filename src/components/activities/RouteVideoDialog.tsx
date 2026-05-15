@@ -41,6 +41,7 @@ interface Props {
   movingTimeSeconds: number;
   averageSpeed: number;
   elevationGainMeters: number | null;
+  streams?: any[];
 }
 
 const CANVAS_W = 1080;

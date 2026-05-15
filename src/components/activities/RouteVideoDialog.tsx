@@ -507,14 +507,6 @@ const RouteVideoDialog = ({
     if (!videoBlobRef.current) return;
     const blob = videoBlobRef.current;
     const fname = filename();
-    try {
-      const file = new File([blob], fname, { type: blob.type });
-      // @ts-ignore
-      if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        await navigator.share({ files: [file], title: name });
-        return;
-      }
-    } catch {/* fall through */}
 
     const freshUrl = URL.createObjectURL(blob);
     try {
@@ -522,15 +514,28 @@ const RouteVideoDialog = ({
       a.href = freshUrl;
       a.download = fname;
       a.rel = "noopener";
-      a.target = "_blank";
+      // Note: no target="_blank" — in standalone PWAs that navigates the app away.
       document.body.appendChild(a);
       a.click();
       a.remove();
+      toast.success(t("Video saved", "影片已儲存"));
     } catch {
-      window.open(freshUrl, "_blank");
+      toast.error(t("Download failed", "下載失敗"));
     }
     setTimeout(() => URL.revokeObjectURL(freshUrl), 60_000);
-    toast.success(t("Video saved", "影片已儲存"));
+  };
+
+  const handleShare = async () => {
+    if (!videoBlobRef.current) return;
+    const file = new File([videoBlobRef.current], filename(), { type: videoBlobRef.current.type });
+    try {
+      // @ts-ignore
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: name, text: t("My route on Runward", "我的 Runward 路線") });
+        return;
+      }
+    } catch {/* fall through */}
+    handleDownload();
   };
 
   const handleShare = async () => {

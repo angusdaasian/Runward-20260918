@@ -271,23 +271,26 @@ const RouteVideoDialog = ({
         map.once("error", (e) => reject(e.error || new Error("Map load failed")));
       });
 
-      // 3D terrain + sky
-      map.addSource("mapbox-dem", {
-        type: "raster-dem",
-        url: "mapbox://mapbox.mapbox-terrain-dem-v1",
-        tileSize: 512,
-        maxzoom: 14,
-      });
-      map.setTerrain({ source: "mapbox-dem", exaggeration: 1.5 });
-      map.addLayer({
-        id: "sky",
-        type: "sky",
-        paint: {
-          "sky-type": "atmosphere",
-          "sky-atmosphere-sun": [0, 90],
-          "sky-atmosphere-sun-intensity": 12,
-        },
-      });
+      // 3D terrain + sky. Keep low-memory devices on a flatter map to avoid
+      // WebGL context loss while recording from the canvas.
+      if (!isLowGpuDevice()) {
+        map.addSource("mapbox-dem", {
+          type: "raster-dem",
+          url: "mapbox://mapbox.mapbox-terrain-dem-v1",
+          tileSize: 256,
+          maxzoom: 13,
+        });
+        map.setTerrain({ source: "mapbox-dem", exaggeration: 1.2 });
+        map.addLayer({
+          id: "sky",
+          type: "sky",
+          paint: {
+            "sky-type": "atmosphere",
+            "sky-atmosphere-sun": [0, 90],
+            "sky-atmosphere-sun-intensity": 10,
+          },
+        });
+      }
 
       // Route source/layers (full route faded + progressive route bright)
       map.addSource("route-full", { type: "geojson", data: { type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: coords } } });

@@ -361,7 +361,7 @@ const RouteVideoDialog = ({
         type: "line",
         source: "route-progress",
         layout: { "line-cap": "round", "line-join": "round" },
-        paint: { "line-color": "#FC4C02", "line-width": 6 },
+        paint: { "line-color": "#14532d", "line-width": 6 },
       });
 
       // Fit to bounds with padding to estimate target zoom

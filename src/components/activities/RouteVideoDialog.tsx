@@ -110,6 +110,7 @@ const RouteVideoDialog = ({
     if (!open) {
       if (videoUrl) URL.revokeObjectURL(videoUrl);
       setVideoUrl(null);
+      setIsSavingVideo(false);
       setPhase("idle");
       setProgress(0);
       videoBlobRef.current = null;
@@ -362,14 +363,24 @@ const RouteVideoDialog = ({
       const mapH = Math.floor(CANVAS_H * MAP_H_FRAC);
 
       const stream = composite.captureStream(24);
-      const mimeCandidates = [
-        "video/mp4;codecs=h264",
-        "video/webm;codecs=vp9",
-        "video/webm;codecs=vp8",
-        "video/webm",
-      ];
-      const mime = mimeCandidates.find((m) => (window as any).MediaRecorder?.isTypeSupported?.(m)) || "video/webm";
-      const recorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 5_000_000 });
+      const isAppleMobile = isAppleMobileDevice();
+      const mimeCandidates = isAppleMobile
+        ? [
+          "video/mp4;codecs=avc1.42E01E",
+          "video/mp4;codecs=avc1",
+          "video/mp4",
+          "video/webm;codecs=vp8",
+          "video/webm",
+        ]
+        : [
+          "video/mp4;codecs=avc1.42E01E",
+          "video/mp4;codecs=h264",
+          "video/webm;codecs=vp9",
+          "video/webm;codecs=vp8",
+          "video/webm",
+        ];
+      const mime = mimeCandidates.find((m) => (window as any).MediaRecorder?.isTypeSupported?.(m)) || "";
+      const recorder = new MediaRecorder(stream, { ...(mime ? { mimeType: mime } : {}), videoBitsPerSecond: 5_000_000 });
       const chunks: BlobPart[] = [];
       recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
       const stopped = new Promise<void>((resolve) => { recorder.onstop = () => resolve(); });
@@ -546,7 +557,8 @@ const RouteVideoDialog = ({
       requestAnimationFrame(drawFrame);
 
       await stopped;
-      const blob = new Blob(chunks, { type: mime.startsWith("video/mp4") ? "video/mp4" : "video/webm" });
+      const recordedMime = recorder.mimeType || mime || (isAppleMobile ? "video/mp4" : "video/webm");
+      const blob = new Blob(chunks, { type: recordedMime.includes("mp4") ? "video/mp4" : "video/webm" });
       videoBlobRef.current = blob;
       const url = URL.createObjectURL(blob);
       setVideoUrl(url);

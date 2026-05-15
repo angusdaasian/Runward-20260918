@@ -1012,6 +1012,9 @@ const ProgramsTab = ({ lang, onLoginRequest }: Props) => {
             const days = [...week.days];
             days[editingDayIdx] = {
               ...days[editingDayIdx],
+              type: next.type ?? days[editingDayIdx].type,
+              title: next.title ?? days[editingDayIdx].title,
+              color: next.color ?? days[editingDayIdx].color,
               distance_km: next.distance_km ?? days[editingDayIdx].distance_km,
               pace: next.pace || days[editingDayIdx].pace,
               description: next.description ?? days[editingDayIdx].description,

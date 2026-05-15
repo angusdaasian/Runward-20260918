@@ -213,7 +213,10 @@ const Index = () => {
           <span>{lang === "zh" ? "離線中 — 顯示已儲存的資料" : "You're offline — showing saved data"}</span>
         </div>
       )}
-      <PullToRefreshContainer>
+      <div
+        className="flex-1 overflow-y-auto relative"
+        style={{ paddingBottom: 'calc(5rem + var(--safe-area-bottom, 0px))', display: activeTab === "activities" ? "none" : "block" }}
+      >
         {langSwitching && (
           <div className="absolute inset-0 bg-background/80 z-50 flex items-center justify-center">
             <div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="animate-spin" size={16} />{lang === "zh" ? "Switching language..." : "切換語言中..."}</div>
@@ -233,9 +236,6 @@ const Index = () => {
             <AnalyticsTab lang={lang} />
           </Suspense>
         </div>
-        {activeTab === "activities" && (
-          <ActivitiesTab lang={lang} />
-        )}
         {activeTab === "more" && !showConnectApps && (
           <Suspense fallback={<SettingsSkeleton />}>
             <MoreTab
@@ -265,7 +265,12 @@ const Index = () => {
             <RewardsTab lang={lang} />
           </Suspense>
         )}
-      </PullToRefreshContainer>
+      </div>
+      {activeTab === "activities" && (
+        <PullToRefreshContainer>
+          <ActivitiesTab lang={lang} />
+        </PullToRefreshContainer>
+      )}
 
       <div className="fixed bottom-0 left-0 right-0 bg-card border-t border-border" style={{ paddingBottom: 'var(--safe-area-bottom, 0px)' }}>
         <div className="relative flex justify-around items-center h-16 max-w-lg mx-auto">

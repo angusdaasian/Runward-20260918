@@ -6,6 +6,8 @@ import { useOnlineStatus } from "@/hooks/use-online-status";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { confirmLeave } from "@/lib/unsavedGuard";
 import { TabPageSkeleton, SettingsSkeleton, CommunitySkeleton, PostureSkeleton, TrainingSkeleton } from "@/components/ui/PageSkeleton";
+import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
+import { RefreshCw } from "lucide-react";
 
 // Eagerly load the most common tab
 import ActivitiesTab from "@/components/ActivitiesTab";

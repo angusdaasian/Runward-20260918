@@ -42,14 +42,13 @@ interface Props {
   streams?: any[];
 }
 
-// Keep the offscreen WebGL canvas modest — high-pitch Mapbox + video capture can
-// exhaust mobile GPU memory. 480x854 keeps a 9:16 vertical aspect with minimal VRAM.
-const CANVAS_W = 480;
-const CANVAS_H = 854;
+// Full HD vertical for crisp social-ready output.
+const CANVAS_W = 1080;
+const CANVAS_H = 1920;
 // Map fills the whole canvas; overlay text floats on top with text shadow,
 // so the data fields look transparent (no dark panel underneath).
 const MAP_H_FRAC = 1.0;
-const FLYOVER_PITCH = 48;
+const FLYOVER_PITCH = 60;
 const MAX_BEARING_STEP = 0.9;
 // Dynamic flyover duration: scales with route length, clamped to a sane range.
 function computeDurationMs(distanceMeters: number): number {
@@ -246,11 +245,10 @@ const RouteVideoDialog = ({
       if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; }
 
       // Initial bounds-fit center/zoom
-      // Always use a lightweight style for video capture — terrain/outdoors styles
-      // load far more tiles and are the main cause of GPU OOM during capture.
+      // Outdoors style + 3D terrain for a richer flyover look.
       const map = new mapboxgl.Map({
         container,
-        style: "mapbox://styles/mapbox/light-v11",
+        style: "mapbox://styles/mapbox/outdoors-v12",
         center: [(minLon + maxLon) / 2, (minLat + maxLat) / 2],
         zoom: 13,
         pitch: 0,
@@ -258,11 +256,8 @@ const RouteVideoDialog = ({
         interactive: false,
         preserveDrawingBuffer: true,
         attributionControl: false,
-        antialias: false,
-        maxTileCacheSize: 8,
-        performanceMetricsCollection: false,
-        collectResourceTiming: false,
-        contextCreateOptions: { extTextureFilterAnisotropicForceOff: true },
+        antialias: true,
+        maxTileCacheSize: 32,
       });
       mapRef.current = map;
 
@@ -282,9 +277,23 @@ const RouteVideoDialog = ({
         map.once("error", (e) => reject(e.error || new Error("Map load failed")));
       });
 
-      // 3D terrain/sky disabled — too expensive during canvas capture, causes
-      // GPU OOM on mobile. The flat lightweight style still looks good with the
-      // tilted route line on top.
+      // 3D terrain + sky for a cinematic flyover
+      map.addSource("mapbox-dem", {
+        type: "raster-dem",
+        url: "mapbox://mapbox.mapbox-terrain-dem-v1",
+        tileSize: 256,
+        maxzoom: 13,
+      });
+      map.setTerrain({ source: "mapbox-dem", exaggeration: 1.2 });
+      map.addLayer({
+        id: "sky",
+        type: "sky",
+        paint: {
+          "sky-type": "atmosphere",
+          "sky-atmosphere-sun": [0, 90],
+          "sky-atmosphere-sun-intensity": 10,
+        },
+      });
 
       // Route source/layers (full route faded + progressive route bright)
       map.addSource("route-full", { type: "geojson", data: { type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: coords } } });
@@ -345,7 +354,7 @@ const RouteVideoDialog = ({
       const ctx = composite.getContext("2d")!;
       const mapH = Math.floor(CANVAS_H * MAP_H_FRAC);
 
-      const stream = composite.captureStream(20);
+      const stream = composite.captureStream(30);
       const mimeCandidates = [
         "video/mp4;codecs=h264",
         "video/webm;codecs=vp9",
@@ -353,7 +362,7 @@ const RouteVideoDialog = ({
         "video/webm",
       ];
       const mime = mimeCandidates.find((m) => (window as any).MediaRecorder?.isTypeSupported?.(m)) || "video/webm";
-      const recorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 2_500_000 });
+      const recorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 8_000_000 });
       const chunks: BlobPart[] = [];
       recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
       const stopped = new Promise<void>((resolve) => { recorder.onstop = () => resolve(); });

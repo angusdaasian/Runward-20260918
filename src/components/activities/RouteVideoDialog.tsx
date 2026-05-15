@@ -71,6 +71,12 @@ function bearing([lon1, lat1]: number[], [lon2, lat2]: number[]) {
   return (toDeg(Math.atan2(y, x)) + 360) % 360;
 }
 
+function isLowGpuDevice() {
+  const mem = (navigator as Navigator & { deviceMemory?: number }).deviceMemory ?? 4;
+  const cores = navigator.hardwareConcurrency ?? 4;
+  return mem <= 4 || cores <= 4;
+}
+
 const RouteVideoDialog = ({
   open, onOpenChange, lang, polyline, name,
   distanceMeters, movingTimeSeconds, averageSpeed, elevationGainMeters, streams,

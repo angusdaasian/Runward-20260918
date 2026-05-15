@@ -494,6 +494,7 @@ const RouteVideoDialog = ({
 
       const start = performance.now();
       const progressSrc = map.getSource("route-progress") as mapboxgl.GeoJSONSource;
+      const currentSrc = map.getSource("route-current") as mapboxgl.GeoJSONSource;
 
       // Overlay coords/fonts were tuned to 1080px wide. Scale to current canvas.
       const S = CANVAS_W / 1080;
@@ -625,7 +626,10 @@ const RouteVideoDialog = ({
         const camBearing = smoothBearing;
 
         map.jumpTo({ center: camCenter, bearing: camBearing, pitch: camPitch, zoom: camZoom });
-        progressSrc.setData({ type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: sliceCoords(routeFrac) } } as GeoJSON.Feature<GeoJSON.LineString>);
+        const sliced = sliceCoords(routeFrac);
+        progressSrc.setData({ type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: sliced } } as GeoJSON.Feature<GeoJSON.LineString>);
+        const head = sliced[sliced.length - 1] ?? coords[0];
+        currentSrc.setData({ type: "Feature", properties: {}, geometry: { type: "Point", coordinates: head } } as GeoJSON.Feature<GeoJSON.Point>);
 
         // Force a synchronous paint, then composite
         map.triggerRepaint();

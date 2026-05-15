@@ -568,29 +568,30 @@ const RouteVideoDialog = ({
   };
 
   const handleDownload = async () => {
-    if (!videoBlobRef.current) return;
+    if (!videoBlobRef.current || isSavingVideo) return;
     const blob = videoBlobRef.current;
     const fname = filename();
     const file = new File([blob], fname, { type: blob.type });
 
-    // iOS Safari ignores <a download> and instead navigates the PWA to the
-    // blob URL (which is what makes it look like "download is broken").
-    // The only reliable way to save on iOS is the share sheet → "Save Video".
+    setIsSavingVideo(true);
     try {
-      // @ts-ignore - canShare with files isn't in older TS lib
-      if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        await navigator.share({ files: [file], title: name });
+      // iOS Safari/PWA cannot reliably use <a download> for blob videos.
+      // Opening the Share Sheet is the supported path, but it doesn't tell us
+      // whether the user completed "Save Video", so don't show a false success.
+      if (isAppleMobileDevice()) {
+        // @ts-ignore - canShare with files isn't in older TS lib
+        if (navigator.canShare?.({ files: [file] })) {
+          await navigator.share({ files: [file], title: name });
+          toast.message(t("If it did not save, tap Share and choose Save Video again.", "如果未儲存，請再次點分享並選擇儲存影片。"));
+          return;
+        }
+
+        toast.error(t("Saving is only available from the iPhone share sheet.", "請使用 iPhone 分享選單儲存影片。"));
         return;
       }
-    } catch (err) {
-      // User cancelled share sheet — that's not an error
-      if ((err as Error)?.name === "AbortError") return;
-      console.warn("Web Share failed, falling back to anchor download", err);
-    }
 
-    // Non-iOS fallback: anchor download
-    const freshUrl = URL.createObjectURL(blob);
-    try {
+      // Non-iOS fallback: anchor download
+      const freshUrl = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = freshUrl;
       a.download = fname;
@@ -599,10 +600,14 @@ const RouteVideoDialog = ({
       a.click();
       a.remove();
       toast.success(t("Video saved", "影片已儲存"));
-    } catch {
+      setTimeout(() => URL.revokeObjectURL(freshUrl), 60_000);
+    } catch (err) {
+      if ((err as Error)?.name === "AbortError") return;
+      console.warn("Video save failed", err);
       toast.error(t("Download failed", "下載失敗"));
+    } finally {
+      setIsSavingVideo(false);
     }
-    setTimeout(() => URL.revokeObjectURL(freshUrl), 60_000);
   };
 
   const handleShare = handleDownload;

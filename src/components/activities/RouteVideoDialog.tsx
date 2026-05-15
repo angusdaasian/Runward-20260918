@@ -435,7 +435,7 @@ const RouteVideoDialog = ({
       const S = CANVAS_W / 1080;
       const px = (n: number) => Math.round(n * S);
 
-      const drawOverlay = (tEase: number, animDist: number, animTimeSec: number, curPaceSec: number) => {
+      const drawOverlay = (tEase: number, animDist: number, animTimeSec: number, curPaceSec: number, animElev: number) => {
         // Soft top fade so the title stays readable on bright map tiles.
         const topFade = ctx.createLinearGradient(0, 0, 0, px(260));
         topFade.addColorStop(0, "rgba(0,0,0,0.45)");

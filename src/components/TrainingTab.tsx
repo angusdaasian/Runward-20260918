@@ -569,7 +569,7 @@ const RaceSchedulePanel: React.FC<RaceSchedulePanelProps> = ({
   lang, races, currentRaces, racesDrift, regenerating,
   onUpdateRacePriority, onRemoveRace, onRegenerateForRaces,
 }) => {
-  const [racesOpen, setRacesOpen] = useState(true);
+  const [racesOpen, setRacesOpen] = useState(false);
   const L = (en: string, zh: string) => (lang === "zh" ? zh : en);
   const list = (racesDrift ? currentRaces : races) || [];
   return (

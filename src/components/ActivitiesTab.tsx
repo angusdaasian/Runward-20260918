@@ -647,7 +647,7 @@ const ActivitiesTab = ({ lang }: Props) => {
             </p>
           </div>
         ) : latestActivity ? (
-          <div className="space-y-3">
+          <div className="space-y-2">
             <ActivityCard
               act={latestActivity}
               lang={lang}
@@ -656,6 +656,11 @@ const ActivitiesTab = ({ lang }: Props) => {
               isPremium={isPremium}
               onClick={() => setSelectedActivity(latestActivity)}
             />
+            <p className="text-[11px] leading-relaxed text-muted-foreground px-1">
+              {lang === "zh"
+                ? "活動通常會在手錶同步後幾秒內出現。偶爾我們的資料供應商會延遲，請耐心等候，請勿重新連結手錶應用。"
+                : "Activities usually appear within seconds of your watch syncing. Occasionally our data provider is delayed — just hang tight, no need to disconnect or reconnect your watch app."}
+            </p>
           </div>
         ) : (
           <div className="text-center py-8">

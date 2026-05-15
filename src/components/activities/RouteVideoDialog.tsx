@@ -108,6 +108,7 @@ const RouteVideoDialog = ({
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [isSavingVideo, setIsSavingVideo] = useState(false);
   const videoBlobRef = useRef<Blob | null>(null);
+  const renderFinishedRef = useRef(false);
 
   useEffect(() => {
     if (!open) {
@@ -132,6 +133,7 @@ const RouteVideoDialog = ({
 
     setPhase("loading");
     setProgress(0);
+    renderFinishedRef.current = false;
 
     try {
       const flyoverPitch = FLYOVER_PITCH;
@@ -334,6 +336,10 @@ const RouteVideoDialog = ({
       const glCanvas = map.getCanvas();
       glCanvas.addEventListener("webglcontextlost", (e) => {
         e.preventDefault();
+        if (renderFinishedRef.current) {
+          // Recording is already complete; context loss during teardown is harmless.
+          return;
+        }
         console.warn("WebGL context lost during flyover render");
         try { map.remove(); } catch { /* noop */ }
         mapRef.current = null;
@@ -663,6 +669,7 @@ const RouteVideoDialog = ({
       videoBlobRef.current = blob;
       const url = URL.createObjectURL(blob);
       setVideoUrl(url);
+      renderFinishedRef.current = true;
       setPhase("done");
 
       // Cleanup map

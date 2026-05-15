@@ -669,6 +669,7 @@ const RouteVideoDialog = ({
       videoBlobRef.current = blob;
       const url = URL.createObjectURL(blob);
       setVideoUrl(url);
+      renderFinishedRef.current = true;
       setPhase("done");
 
       // Cleanup map

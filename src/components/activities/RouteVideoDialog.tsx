@@ -482,15 +482,7 @@ const RouteVideoDialog = ({
         ctx.fillStyle = botFade;
         ctx.fillRect(0, CANVAS_H - px(440), CANVAS_W, px(440));
 
-        // App logo (top-left) — drawn only once it has decoded
-        if (logoImg.complete && logoImg.naturalWidth > 0) {
-          const logoSize = px(72);
-          ctx.save();
-          ctx.shadowColor = "rgba(0,0,0,0.5)";
-          ctx.shadowBlur = px(8);
-          ctx.drawImage(logoImg, px(40), px(40), logoSize, logoSize);
-          ctx.restore();
-        }
+        // App logo moved to bottom-right (above the RUNWARD wordmark) — see below.
 
         // Title
         ctx.save();
@@ -535,6 +527,22 @@ const RouteVideoDialog = ({
         drawStat(t("PACE", "配速"), curPaceStr, padX, row2Y);
         if (hasElevationOverlay) {
           drawStat(t("ELEV", "爬升"), `${Math.round(animElev)} m`, padX + colGap, row2Y);
+        }
+
+        // App logo (bottom-right, above the RUNWARD wordmark)
+        if (logoImg.complete && logoImg.naturalWidth > 0) {
+          const logoSize = px(56);
+          ctx.save();
+          ctx.shadowColor = "rgba(0,0,0,0.5)";
+          ctx.shadowBlur = px(8);
+          ctx.drawImage(
+            logoImg,
+            CANVAS_W - px(40) - logoSize,
+            CANVAS_H - px(36) - px(22) - logoSize - px(6),
+            logoSize,
+            logoSize
+          );
+          ctx.restore();
         }
 
         ctx.save();

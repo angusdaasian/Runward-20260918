@@ -351,7 +351,11 @@ const RouteVideoDialog = ({
         drawStat(t("TIME", "時間"), animTimeStr, panelPadX + 540, baseY);
 
         const row2Y = baseY + 200;
-        drawStat(t("PACE", "配速"), paceStr, panelPadX, row2Y);
+        const curPaceSec = paceAt(tEase);
+        const cpm = Math.floor(curPaceSec / 60);
+        const cps = Math.floor(curPaceSec % 60);
+        const curPaceStr = curPaceSec > 0 ? `${cpm}:${String(cps).padStart(2, "0")}/km` : "--";
+        drawStat(t("PACE", "配速"), curPaceStr, panelPadX, row2Y);
         if (elevationGainMeters != null) {
           drawStat(t("ELEV", "爬升"), `${Math.round(elevationGainMeters)} m`, panelPadX + 540, row2Y);
         }

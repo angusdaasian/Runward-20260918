@@ -175,17 +175,31 @@ const RouteVideoDialog = ({
       for (let i = 1; i < coords.length; i++) cum.push(cum[i - 1] + haversine(coords[i - 1], coords[i]));
       const totalLen = cum[cum.length - 1] || 1;
 
+      // Look ~80m ahead/behind for a stable tangent regardless of polyline density.
+      const LOOK_M = 80;
+      const indexAtDist = (d: number) => {
+        let lo = 0, hi = cum.length - 1;
+        while (lo < hi) {
+          const mid = (lo + hi) >> 1;
+          if (cum[mid] < d) lo = mid + 1; else hi = mid;
+        }
+        return lo;
+      };
+      const posAtDist = (d: number): [number, number] => {
+        const dc = Math.max(0, Math.min(totalLen, d));
+        const i = indexAtDist(dc);
+        const i0 = Math.max(0, i - 1);
+        const segLen = Math.max(1, cum[i] - cum[i0]);
+        const segT = (dc - cum[i0]) / segLen;
+        const a = coords[i0], b = coords[i];
+        return [a[0] + (b[0] - a[0]) * segT, a[1] + (b[1] - a[1]) * segT];
+      };
       const pointAt = (frac: number): { pos: [number, number]; bear: number } => {
         const target = totalLen * frac;
-        let i = 0;
-        while (i < cum.length - 1 && cum[i + 1] < target) i++;
-        const segT = i >= cum.length - 1 ? 1 : (target - cum[i]) / Math.max(1, cum[i + 1] - cum[i]);
-        const a = coords[i], b = coords[Math.min(i + 1, coords.length - 1)];
-        const pos: [number, number] = [a[0] + (b[0] - a[0]) * segT, a[1] + (b[1] - a[1]) * segT];
-        // Bearing from slightly behind to slightly ahead for smoothness
-        const lookAhead = Math.min(cum.length - 1, i + 5);
-        const lookBehind = Math.max(0, i - 5);
-        const bear = bearing(coords[lookBehind], coords[lookAhead]);
+        const pos = posAtDist(target);
+        const back = posAtDist(target - LOOK_M);
+        const fwd = posAtDist(target + LOOK_M);
+        const bear = bearing(back, fwd);
         return { pos, bear };
       };
 

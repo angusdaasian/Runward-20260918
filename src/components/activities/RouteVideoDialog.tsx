@@ -501,8 +501,8 @@ const RouteVideoDialog = ({
         drawStat(t("DISTANCE", "距離"), `${animDist.toFixed(2)} km`, padX, row1Y);
         drawStat(t("TIME", "時間"), animTimeStr, padX + colGap, row1Y);
         drawStat(t("PACE", "配速"), curPaceStr, padX, row2Y);
-        if (elevationGainMeters != null) {
-          drawStat(t("ELEV", "爬升"), `${Math.round(elevationGainMeters)} m`, padX + colGap, row2Y);
+        if (totalElev > 0) {
+          drawStat(t("ELEV", "爬升"), `${Math.round(animElev)} m`, padX + colGap, row2Y);
         }
 
         ctx.save();

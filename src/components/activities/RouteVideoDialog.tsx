@@ -97,6 +97,49 @@ const RouteVideoDialog = ({
       const coords = decodePolyline(polyline);
       if (coords.length < 2) throw new Error("Empty route");
 
+      // Build pace samples (sec/km) keyed by progress fraction along route
+      // Prefer velocity_smooth + distance/time streams. Fallback to averageSpeed.
+      const paceSamples: { frac: number; paceSec: number }[] = [];
+      if (streams && streams.length) {
+        const distStream = streams.find((s: any) => s.type === "distance");
+        const velStream = streams.find((s: any) => s.type === "velocity_smooth");
+        const timeStream = streams.find((s: any) => s.type === "time");
+        const distData: number[] | undefined = distStream?.data;
+        const velData: number[] | undefined = velStream?.data;
+        const timeData: number[] | undefined = timeStream?.data;
+        if (distData && distData.length > 1) {
+          const totalDist = distData[distData.length - 1] || 1;
+          const windowSec = 20; // smoothing window
+          for (let i = 0; i < distData.length; i++) {
+            let paceSec = 0;
+            if (velData && velData[i] != null && velData[i] > 0.3) {
+              paceSec = 1000 / velData[i];
+            } else if (timeData) {
+              // Compute rolling pace from window
+              let j = i;
+              while (j > 0 && (timeData[i] - timeData[j]) < windowSec) j--;
+              const dt = timeData[i] - timeData[j];
+              const dd = distData[i] - distData[j];
+              if (dd > 0 && dt > 0) paceSec = (dt / dd) * 1000;
+            }
+            if (paceSec > 0 && paceSec < 1800) {
+              paceSamples.push({ frac: distData[i] / totalDist, paceSec });
+            }
+          }
+        }
+      }
+      const avgPaceSec = averageSpeed > 0 ? 1000 / averageSpeed : 0;
+      const paceAt = (frac: number): number => {
+        if (paceSamples.length === 0) return avgPaceSec;
+        // Binary-ish linear scan
+        let lo = 0, hi = paceSamples.length - 1;
+        while (lo < hi) {
+          const mid = (lo + hi) >> 1;
+          if (paceSamples[mid].frac < frac) lo = mid + 1; else hi = mid;
+        }
+        return paceSamples[lo].paceSec;
+      };
+
       // Compute bbox
       let minLat = Infinity, maxLat = -Infinity, minLon = Infinity, maxLon = -Infinity;
       for (const [la, lo] of coords) {

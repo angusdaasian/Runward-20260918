@@ -336,6 +336,10 @@ const RouteVideoDialog = ({
       const glCanvas = map.getCanvas();
       glCanvas.addEventListener("webglcontextlost", (e) => {
         e.preventDefault();
+        if (renderFinishedRef.current) {
+          // Recording is already complete; context loss during teardown is harmless.
+          return;
+        }
         console.warn("WebGL context lost during flyover render");
         try { map.remove(); } catch { /* noop */ }
         mapRef.current = null;

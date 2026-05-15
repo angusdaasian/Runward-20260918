@@ -150,46 +150,42 @@ const RouteVideoDialog = ({
         if (lo < minLon) minLon = lo; if (lo > maxLon) maxLon = lo;
       }
 
-      // Build pace samples (sec/km) — match the elevation/pace chart's smoothing.
-      // Use a 30s rolling window over distance/time, then IQR-clip to remove spikes.
+      // Build samples from the exact chart points shown in ActivityDetail.
+      // The chart stores pace as min/km, so convert only for the video text.
+      const chartPoints = (chartData || [])
+        .map((d) => ({
+          km: typeof d.distance_km === "string" ? Number(d.distance_km) : d.distance_km,
+          pace: typeof d.pace === "number" ? d.pace : undefined,
+          altitude: typeof d.altitude === "number" ? d.altitude : undefined,
+        }))
+        .filter((d) => Number.isFinite(d.km) && d.km >= 0)
+        .sort((a, b) => a.km - b.km);
+
       const paceSamples: { frac: number; paceSec: number }[] = [];
-      if (streams && streams.length) {
+      if (chartPoints.length > 1 && distKm > 0) {
+        for (const p of chartPoints) {
+          if (typeof p.pace === "number" && p.pace > 0) {
+            paceSamples.push({ frac: Math.max(0, Math.min(1, p.km / distKm)), paceSec: p.pace * 60 });
+          }
+        }
+      }
+
+      // Fallback mirrors the Strava chart path: velocity_smooth sampled over distance.
+      if (paceSamples.length === 0 && streams && streams.length) {
         const distStream = streams.find((s: any) => s.type === "distance");
         const velStream = streams.find((s: any) => s.type === "velocity_smooth");
-        const timeStream = streams.find((s: any) => s.type === "time");
         const distData: number[] | undefined = distStream?.data;
         const velData: number[] | undefined = velStream?.data;
-        const timeData: number[] | undefined = timeStream?.data;
-        if (distData && distData.length > 1) {
-          const totalDist = distData[distData.length - 1] || 1;
-          const windowSec = 30;
-          const raw: { frac: number; paceSec: number }[] = [];
-          for (let i = 0; i < distData.length; i++) {
-            let paceSec = 0;
-            if (timeData) {
-              let j = i;
-              while (j > 0 && (timeData[i] - timeData[j]) < windowSec) j--;
-              const dt = timeData[i] - timeData[j];
-              const dd = distData[i] - distData[j];
-              if (dd > 0 && dt > 0) paceSec = (dt / dd) * 1000;
-            } else if (velData && velData[i] > 0.3) {
-              paceSec = 1000 / velData[i];
+        if (distData && velData && distData.length > 1) {
+          const totalDist = distData[distData.length - 1] || distanceMeters || 1;
+          const step = Math.max(1, Math.floor(distData.length / 200));
+          for (let i = 0; i < distData.length; i += step) {
+            if (velData[i] > 0) {
+              const paceMin = 1000 / velData[i] / 60;
+              if (paceMin >= 2.5 && paceMin <= 15) {
+                paceSamples.push({ frac: Math.max(0, Math.min(1, distData[i] / totalDist)), paceSec: paceMin * 60 });
+              }
             }
-            // Drop unrealistic paces (slower than 15:00/km, faster than 2:30/km)
-            if (paceSec >= 150 && paceSec <= 900) {
-              raw.push({ frac: distData[i] / totalDist, paceSec });
-            }
-          }
-          // IQR clip
-          if (raw.length > 8) {
-            const sorted = raw.map((r) => r.paceSec).sort((a, b) => a - b);
-            const q = (f: number) => sorted[Math.floor(sorted.length * f)];
-            const q1 = q(0.25), q3 = q(0.75);
-            const iqr = q3 - q1;
-            const lo = q1 - 1.5 * iqr, hi = q3 + 1.5 * iqr;
-            for (const r of raw) if (r.paceSec >= lo && r.paceSec <= hi) paceSamples.push(r);
-          } else {
-            paceSamples.push(...raw);
           }
         }
       }
@@ -210,24 +206,33 @@ const RouteVideoDialog = ({
         return a.paceSec + (b.paceSec - a.paceSec) * t;
       };
 
-      // Build altitude samples — the on-screen "ELEV" should match the
-      // elevation curve (which plots raw altitude in meters), not cumulative gain.
       const elevSamples: { frac: number; alt: number }[] = [];
-      if (streams && streams.length) {
+      if (chartPoints.length > 1 && distKm > 0) {
+        for (const p of chartPoints) {
+          if (typeof p.altitude === "number") {
+            elevSamples.push({ frac: Math.max(0, Math.min(1, p.km / distKm)), alt: p.altitude });
+          }
+        }
+      }
+
+      // Fallback mirrors the Strava chart path: raw altitude sampled by distance.
+      if (elevSamples.length === 0 && streams && streams.length) {
         const distStream = streams.find((s: any) => s.type === "distance");
         const altStream = streams.find((s: any) => s.type === "altitude");
         const distData: number[] | undefined = distStream?.data;
         const altData: number[] | undefined = altStream?.data;
         if (distData && altData && distData.length === altData.length && distData.length > 1) {
-          const totalDist = distData[distData.length - 1] || 1;
-          for (let i = 0; i < distData.length; i++) {
+          const totalDist = distData[distData.length - 1] || distanceMeters || 1;
+          const step = Math.max(1, Math.floor(distData.length / 200));
+          for (let i = 0; i < distData.length; i += step) {
             if (altData[i] != null) {
-              elevSamples.push({ frac: distData[i] / totalDist, alt: altData[i] });
+              elevSamples.push({ frac: Math.max(0, Math.min(1, distData[i] / totalDist)), alt: altData[i] });
             }
           }
         }
       }
       const totalElev = elevationGainMeters ?? 0;
+      const hasElevationOverlay = totalElev > 0 && elevSamples.length > 0;
       const elevAt = (frac: number): number => {
         if (elevSamples.length === 0) return 0;
         let lo = 0, hi = elevSamples.length - 1;

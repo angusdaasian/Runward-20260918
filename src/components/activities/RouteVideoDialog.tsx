@@ -362,29 +362,33 @@ const RouteVideoDialog = ({
       const start = performance.now();
       const progressSrc = map.getSource("route-progress") as mapboxgl.GeoJSONSource;
 
+      // Overlay coords/fonts were tuned to 1080px wide. Scale to current canvas.
+      const S = CANVAS_W / 1080;
+      const px = (n: number) => Math.round(n * S);
+
       const drawOverlay = (tEase: number, animDist: number, animTimeSec: number, curPaceSec: number) => {
         // Top fade for title legibility
-        const topFade = ctx.createLinearGradient(0, 0, 0, 240);
+        const topFade = ctx.createLinearGradient(0, 0, 0, px(240));
         topFade.addColorStop(0, "rgba(0,0,0,0.6)");
         topFade.addColorStop(1, "rgba(0,0,0,0)");
         ctx.fillStyle = topFade;
-        ctx.fillRect(0, 0, CANVAS_W, 240);
+        ctx.fillRect(0, 0, CANVAS_W, px(240));
 
         // Bottom panel
         const panelY = mapH;
         const panelH = CANVAS_H - mapH;
-        const grad = ctx.createLinearGradient(0, panelY - 60, 0, CANVAS_H);
+        const grad = ctx.createLinearGradient(0, panelY - px(60), 0, CANVAS_H);
         grad.addColorStop(0, "rgba(10,10,10,0)");
         grad.addColorStop(0.25, "rgba(10,10,10,0.95)");
         grad.addColorStop(1, "#1a1a1a");
         ctx.fillStyle = grad;
-        ctx.fillRect(0, panelY - 60, CANVAS_W, panelH + 60);
+        ctx.fillRect(0, panelY - px(60), CANVAS_W, panelH + px(60));
 
         // Title
         ctx.fillStyle = "#fff";
-        ctx.font = "700 56px ui-sans-serif, system-ui, -apple-system, 'Segoe UI'";
+        ctx.font = `700 ${px(56)}px ui-sans-serif, system-ui, -apple-system, 'Segoe UI'`;
         ctx.textAlign = "left";
-        ctx.fillText(name.length > 28 ? name.slice(0, 27) + "…" : name, 56, 110);
+        ctx.fillText(name.length > 28 ? name.slice(0, 27) + "…" : name, px(56), px(110));
 
         // Stats
         const ah = Math.floor(animTimeSec / 3600);
@@ -399,26 +403,27 @@ const RouteVideoDialog = ({
 
         const drawStat = (label: string, value: string, x: number, y: number) => {
           ctx.fillStyle = "rgba(255,255,255,0.55)";
-          ctx.font = "500 28px ui-sans-serif, system-ui";
+          ctx.font = `500 ${px(28)}px ui-sans-serif, system-ui`;
           ctx.fillText(label, x, y);
           ctx.fillStyle = "#fff";
-          ctx.font = "800 76px ui-sans-serif, system-ui";
-          ctx.fillText(value, x, y + 78);
+          ctx.font = `800 ${px(76)}px ui-sans-serif, system-ui`;
+          ctx.fillText(value, x, y + px(78));
         };
-        const padX = 64;
-        const baseY = panelY + 80;
+        const padX = px(64);
+        const baseY = panelY + px(80);
+        const colGap = px(540);
         drawStat(t("DISTANCE", "距離"), `${animDist.toFixed(2)} km`, padX, baseY);
-        drawStat(t("TIME", "時間"), animTimeStr, padX + 540, baseY);
-        const row2Y = baseY + 200;
+        drawStat(t("TIME", "時間"), animTimeStr, padX + colGap, baseY);
+        const row2Y = baseY + px(200);
         drawStat(t("PACE", "配速"), curPaceStr, padX, row2Y);
         if (elevationGainMeters != null) {
-          drawStat(t("ELEV", "爬升"), `${Math.round(elevationGainMeters)} m`, padX + 540, row2Y);
+          drawStat(t("ELEV", "爬升"), `${Math.round(elevationGainMeters)} m`, padX + colGap, row2Y);
         }
 
         ctx.fillStyle = "rgba(255,255,255,0.5)";
-        ctx.font = "600 24px ui-sans-serif, system-ui";
+        ctx.font = `600 ${px(24)}px ui-sans-serif, system-ui`;
         ctx.textAlign = "right";
-        ctx.fillText("RUNWARD", CANVAS_W - 56, CANVAS_H - 48);
+        ctx.fillText("RUNWARD", CANVAS_W - px(56), CANVAS_H - px(48));
       };
 
       const mapCanvas = map.getCanvas();
@@ -628,19 +633,19 @@ const RouteVideoDialog = ({
                 </Button>
               </>
             ) : (
-              <>
-                <Button variant="outline" onClick={() => { setPhase("idle"); setVideoUrl((u) => { if (u) URL.revokeObjectURL(u); return null; }); }}>
+              <div className="grid grid-cols-3 gap-2 w-full">
+                <Button variant="outline" size="sm" onClick={() => { setPhase("idle"); setVideoUrl((u) => { if (u) URL.revokeObjectURL(u); return null; }); }}>
                   {t("Regenerate", "重新生成")}
                 </Button>
-                <Button variant="outline" onClick={handleDownload}>
+                <Button variant="outline" size="sm" onClick={handleDownload}>
                   <Download size={14} />
                   {t("Download", "下載")}
                 </Button>
-                <Button onClick={handleShare}>
+                <Button size="sm" onClick={handleShare}>
                   <Share2 size={14} />
                   {t("Share", "分享")}
                 </Button>
-              </>
+              </div>
             )}
           </div>
         </div>

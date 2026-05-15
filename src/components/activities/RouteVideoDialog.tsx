@@ -245,11 +245,10 @@ const RouteVideoDialog = ({
       if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; }
 
       // Initial bounds-fit center/zoom
-      // Always use a lightweight style for video capture — terrain/outdoors styles
-      // load far more tiles and are the main cause of GPU OOM during capture.
+      // Outdoors style + 3D terrain for a richer flyover look.
       const map = new mapboxgl.Map({
         container,
-        style: "mapbox://styles/mapbox/light-v11",
+        style: "mapbox://styles/mapbox/outdoors-v12",
         center: [(minLon + maxLon) / 2, (minLat + maxLat) / 2],
         zoom: 13,
         pitch: 0,
@@ -257,11 +256,8 @@ const RouteVideoDialog = ({
         interactive: false,
         preserveDrawingBuffer: true,
         attributionControl: false,
-        antialias: false,
-        maxTileCacheSize: 8,
-        performanceMetricsCollection: false,
-        collectResourceTiming: false,
-        contextCreateOptions: { extTextureFilterAnisotropicForceOff: true },
+        antialias: true,
+        maxTileCacheSize: 32,
       });
       mapRef.current = map;
 

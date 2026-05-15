@@ -69,6 +69,7 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps }: Props
   const [showPlanCompare, setShowPlanCompare] = useState(false);
   const [offerCode, setOfferCode] = useState("");
   const [profileSubpage, setProfileSubpage] = useState<"main" | "hr-zones" | "personal-bests" | "edit-profile">("main");
+  const [aiChatDisabled, setAiChatDisabled] = useState(() => localStorage.getItem("ai_chat_disabled") === "true");
 
   // Open HR zones subpage when navigated via #hr-zones (e.g. from ActivityDetail).
   useEffect(() => {
@@ -418,6 +419,33 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps }: Props
             </button>
           </div>
         )}
+
+        {/* Disable AI Chat toggle */}
+        <div className="bg-card border border-border rounded-xl p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Bell size={20} className="text-primary" />
+              <span className="font-medium text-foreground">
+                {lang === "zh" ? "停用 AI 聊天" : "Disable AI Chat"}
+              </span>
+            </div>
+            <button
+              onClick={() => {
+                const next = !aiChatDisabled;
+                setAiChatDisabled(next);
+                if (next) localStorage.setItem("ai_chat_disabled", "true");
+                else localStorage.removeItem("ai_chat_disabled");
+                window.dispatchEvent(new Event("ai-chat-toggle"));
+              }}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${aiChatDisabled ? "bg-primary" : "bg-input"}`}
+            >
+              <span className={`inline-block h-5 w-5 rounded-full bg-background shadow-lg transition-transform ${aiChatDisabled ? "translate-x-5" : "translate-x-0.5"}`} />
+            </button>
+          </div>
+          <p className="text-xs text-muted-foreground mt-1 ml-8">
+            {lang === "zh" ? "從畫面隱藏浮動 AI 聊天按鈕" : "Hide the floating AI chat button from the screen"}
+          </p>
+        </div>
 
         {!adminLoading && isAdmin && (
           <button

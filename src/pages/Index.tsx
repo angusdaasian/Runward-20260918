@@ -56,6 +56,16 @@ const Index = () => {
     () => sessionStorage.getItem(ONBOARDING_SIGNUP_IN_PROGRESS_KEY) === "true"
   );
   const [checkingProfile, setCheckingProfile] = useState(false);
+  const [aiChatDisabled, setAiChatDisabled] = useState(() => localStorage.getItem("ai_chat_disabled") === "true");
+  useEffect(() => {
+    const sync = () => setAiChatDisabled(localStorage.getItem("ai_chat_disabled") === "true");
+    window.addEventListener("ai-chat-toggle", sync);
+    window.addEventListener("storage", sync);
+    return () => {
+      window.removeEventListener("ai-chat-toggle", sync);
+      window.removeEventListener("storage", sync);
+    };
+  }, []);
 
   useEffect(() => {
     const tabParam = searchParams.get("tab");
@@ -291,7 +301,7 @@ const Index = () => {
 
       <PromoBanner lang={lang} userId={user?.id ?? null} triggerKey={promoTrigger} />
 
-      {!isGuest && user && (
+      {!isGuest && user && !aiChatDisabled && (
         <Suspense fallback={null}>
           <FloatingChatButton lang={lang} />
         </Suspense>

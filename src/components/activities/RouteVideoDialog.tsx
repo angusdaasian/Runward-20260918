@@ -449,6 +449,10 @@ const RouteVideoDialog = ({
         let d = ((to - from + 540) % 360) - 180;
         return d;
       };
+      const smoothStep = (edge0: number, edge1: number, x: number) => {
+        const v = Math.max(0, Math.min(1, (x - edge0) / (edge1 - edge0)));
+        return v * v * (3 - 2 * v);
+      };
 
       const drawFrame = (now: number) => {
         const elapsed = now - start;
@@ -483,9 +487,12 @@ const RouteVideoDialog = ({
           camZoom = flyoverZoom * (1 - k) + (overviewZoom + 0.3) * k;
         }
 
-        // Low-pass filter the bearing so the camera no longer whips around.
-        const alpha = 0.08;
-        smoothBearing = (smoothBearing + shortestDelta(smoothBearing, targetBearing) * alpha + 360) % 360;
+        // Low-pass + per-frame clamp so bearing changes glide instead of snapping
+        // when the route polyline has tight turns or noisy GPS points.
+        const delta = shortestDelta(smoothBearing, targetBearing);
+        const slowedDelta = delta * 0.045;
+        const clampedDelta = Math.max(-MAX_BEARING_STEP, Math.min(MAX_BEARING_STEP, slowedDelta));
+        smoothBearing = (smoothBearing + clampedDelta * smoothStep(0.02, 0.12, tRaw) + 360) % 360;
         const camBearing = smoothBearing;
 
         map.jumpTo({ center: camCenter, bearing: camBearing, pitch: camPitch, zoom: camZoom });

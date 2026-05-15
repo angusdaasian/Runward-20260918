@@ -3012,7 +3012,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
           onSave={async (next) => {
             if (editingDayIdx === null) return;
             const updatedPlan = [...plan]; const week = { ...updatedPlan[currentWeekIdx] }; const days = [...week.days];
-            days[editingDayIdx] = { ...days[editingDayIdx], distance_km: next.distance_km ?? days[editingDayIdx].distance_km, pace: next.pace || days[editingDayIdx].pace, description: next.description ?? days[editingDayIdx].description };
+            days[editingDayIdx] = { ...days[editingDayIdx], type: next.type ?? days[editingDayIdx].type, title: next.title ?? days[editingDayIdx].title, color: next.color ?? days[editingDayIdx].color, distance_km: next.distance_km ?? days[editingDayIdx].distance_km, pace: next.pace || days[editingDayIdx].pace, description: next.description ?? days[editingDayIdx].description };
             week.days = days; updatedPlan[currentWeekIdx] = week; setPlan(updatedPlan);
             if (user && existingPlan) await supabase.from("training_plans" as any).update({ plan_data: updatedPlan } as any).eq("id", existingPlan.id);
             notifyPlanChanged();

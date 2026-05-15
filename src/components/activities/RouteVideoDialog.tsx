@@ -591,13 +591,24 @@ const RouteVideoDialog = ({
         canShare?: (data?: { files?: File[]; title?: string }) => boolean;
         share?: (data?: { files?: File[]; title?: string }) => Promise<void>;
       };
-      // iOS Safari/PWA cannot reliably use <a download> for blob videos.
-      // Opening the Share Sheet is the supported path, but it doesn't tell us
-      // whether the user completed "Save Video", so don't show a false success.
       if (isAppleMobileDevice()) {
+        if (!blob.type.includes("mp4")) {
+          toast.error(t("iPhone can only save MP4 videos. Please regenerate and try again.", "iPhone 只能儲存 MP4 影片，請重新生成後再試。"));
+          return;
+        }
+
         if (shareNavigator.canShare?.({ files: [file] }) && shareNavigator.share) {
-          await shareNavigator.share({ files: [file], title: name });
-          toast.message(t("If it did not save, tap Share and choose Save Video again.", "如果未儲存，請再次點分享並選擇儲存影片。"));
+          const sharePromise = shareNavigator.share({ files: [file], title: name });
+          const opened = await Promise.race([
+            sharePromise.then(() => true).catch((err) => {
+              if ((err as Error)?.name === "AbortError") return true;
+              throw err;
+            }),
+            new Promise<boolean>((resolve) => setTimeout(() => resolve(true), 1200)),
+          ]);
+          if (opened) {
+            toast.message(t("Share sheet opened. Choose Save Video to store it in Photos.", "分享選單已開啟，請選擇「儲存影片」存到相簿。"));
+          }
           return;
         }
 
@@ -614,7 +625,7 @@ const RouteVideoDialog = ({
       document.body.appendChild(a);
       a.click();
       a.remove();
-      toast.success(t("Video saved", "影片已儲存"));
+      toast.success(t("Download started", "已開始下載"));
       setTimeout(() => URL.revokeObjectURL(freshUrl), 60_000);
     } catch (err) {
       if ((err as Error)?.name === "AbortError") return;

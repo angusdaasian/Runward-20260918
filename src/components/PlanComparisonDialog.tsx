@@ -27,7 +27,7 @@ const PlanComparisonDialog = ({ open, onOpenChange, lang }: Props) => {
     { label: tx("AI activity analysis", "AI 活動分析"), free: false, premium: true },
     { label: tx("Activity sharing", "活動分享"), free: tx("Basic", "基本"), premium: tx("All functions", "全部功能") },
     { label: tx("AI activity share posters", "AI 活動分享海報"), free: false, premium: true },
-    { label: tx("Weekly plan reviews", "每週計劃回顧"), free: false, premium: tx("Coming soon", "即將推出") },
+    { label: tx("Weekly plan reviews", "每週計劃回顧"), free: false, premium: true },
     // Text on both sides
     { label: tx("Training plans", "訓練計劃"), free: tx("Basic", "基本"), premium: tx("Personalized AI", "AI 個人化") },
     { label: tx("Race predictor", "比賽預測"), free: tx("5K only", "僅 5K"), premium: tx("All distances", "全距離") },
@@ -47,9 +47,7 @@ const PlanComparisonDialog = ({ open, onOpenChange, lang }: Props) => {
           <div className="mx-auto w-12 h-12 rounded-full bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center mb-1">
             <Crown className="text-primary-foreground" size={24} />
           </div>
-          <DialogTitle className="text-center text-xl">
-            {tx("Free vs Premium", "免費版 vs Premium")}
-          </DialogTitle>
+          <DialogTitle className="text-center text-xl">{tx("Free vs Premium", "免費版 vs Premium")}</DialogTitle>
           <DialogDescription className="text-center">
             {tx("See what you unlock with Premium", "看看升級 Premium 可解鎖什麼")}
           </DialogDescription>

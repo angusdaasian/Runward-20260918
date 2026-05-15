@@ -4,6 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Lang } from "@/lib/i18n";
 import { Loader2, Download, Share2, Film } from "lucide-react";
 import { toast } from "sonner";
+import mapboxgl from "mapbox-gl";
+import "mapbox-gl/dist/mapbox-gl.css";
+import { supabase } from "@/integrations/supabase/client";
 
 // ---------- Polyline decoder ----------
 function decodePolyline(encoded: string): [number, number][] {
@@ -21,16 +24,6 @@ function decodePolyline(encoded: string): [number, number][] {
   return points;
 }
 
-// ---------- Web mercator tile math ----------
-const TILE_SIZE = 256;
-function lonLatToWorldPx(lon: number, lat: number, zoom: number) {
-  const scale = TILE_SIZE * Math.pow(2, zoom);
-  const x = (lon + 180) / 360 * scale;
-  const sinLat = Math.sin(lat * Math.PI / 180);
-  const y = (0.5 - Math.log((1 + sinLat) / (1 - sinLat)) / (4 * Math.PI)) * scale;
-  return { x, y };
-}
-
 interface Props {
   open: boolean;
   onOpenChange: (v: boolean) => void;
@@ -46,7 +39,27 @@ interface Props {
 
 const CANVAS_W = 1080;
 const CANVAS_H = 1920;
-const DURATION_MS = 10000; // 10 second video
+const MAP_H_FRAC = 0.78;
+const DURATION_MS = 12000; // 12s flyover
+
+let cachedToken: string | null = null;
+async function getMapboxToken(): Promise<string> {
+  if (cachedToken) return cachedToken;
+  const { data, error } = await supabase.functions.invoke("get-mapbox-token");
+  if (error || !data?.token) throw new Error("Mapbox token unavailable");
+  cachedToken = data.token as string;
+  return cachedToken;
+}
+
+function bearing([lon1, lat1]: number[], [lon2, lat2]: number[]) {
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const toDeg = (r: number) => (r * 180) / Math.PI;
+  const φ1 = toRad(lat1), φ2 = toRad(lat2);
+  const Δλ = toRad(lon2 - lon1);
+  const y = Math.sin(Δλ) * Math.cos(φ2);
+  const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
+  return (toDeg(Math.atan2(y, x)) + 360) % 360;
+}
 
 const RouteVideoDialog = ({
   open, onOpenChange, lang, polyline, name,
@@ -54,13 +67,16 @@ const RouteVideoDialog = ({
 }: Props) => {
   const isZh = lang === "zh";
   const t = (en: string, zh: string) => (isZh ? zh : en);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  const compositeCanvasRef = useRef<HTMLCanvasElement>(null);
+  const mapContainerRef = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<mapboxgl.Map | null>(null);
+
   const [phase, setPhase] = useState<"idle" | "loading" | "rendering" | "done" | "error">("idle");
   const [progress, setProgress] = useState(0);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const videoBlobRef = useRef<Blob | null>(null);
 
-  // Reset on close
   useEffect(() => {
     if (!open) {
       if (videoUrl) URL.revokeObjectURL(videoUrl);
@@ -68,37 +84,39 @@ const RouteVideoDialog = ({
       setPhase("idle");
       setProgress(0);
       videoBlobRef.current = null;
+      if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; }
     }
   }, [open]); // eslint-disable-line
 
   const distKm = distanceMeters / 1000;
   const totalSec = movingTimeSeconds;
-  const h = Math.floor(totalSec / 3600);
-  const m = Math.floor((totalSec % 3600) / 60);
-  const s = Math.floor(totalSec % 60);
-  const timeStr = h > 0 ? `${h}:${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}` : `${m}:${String(s).padStart(2,"0")}`;
-  const paceSec = averageSpeed > 0 ? 1000 / averageSpeed : 0;
-  const pm = Math.floor(paceSec / 60);
-  const ps = Math.floor(paceSec % 60);
-  const paceStr = paceSec > 0 ? `${pm}:${String(ps).padStart(2,"0")}/km` : "--";
 
   const handleGenerate = async () => {
-    if (!polyline) {
-      toast.error(t("No route data available", "沒有路線資料"));
-      return;
-    }
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!polyline) { toast.error(t("No route data available", "沒有路線資料")); return; }
+    const composite = compositeCanvasRef.current;
+    const container = mapContainerRef.current;
+    if (!composite || !container) return;
 
     setPhase("loading");
     setProgress(0);
 
     try {
-      const coords = decodePolyline(polyline);
-      if (coords.length < 2) throw new Error("Empty route");
+      const token = await getMapboxToken();
+      mapboxgl.accessToken = token;
 
-      // Build pace samples (sec/km) keyed by progress fraction along route
-      // Prefer velocity_smooth + distance/time streams. Fallback to averageSpeed.
+      const coordsLatLng = decodePolyline(polyline);
+      if (coordsLatLng.length < 2) throw new Error("Empty route");
+      // Mapbox expects [lon, lat]
+      const coords: [number, number][] = coordsLatLng.map(([la, lo]) => [lo, la]);
+
+      // Compute bbox + center
+      let minLat = Infinity, maxLat = -Infinity, minLon = Infinity, maxLon = -Infinity;
+      for (const [lo, la] of coords) {
+        if (la < minLat) minLat = la; if (la > maxLat) maxLat = la;
+        if (lo < minLon) minLon = lo; if (lo > maxLon) maxLon = lo;
+      }
+
+      // Build pace samples (sec/km)
       const paceSamples: { frac: number; paceSec: number }[] = [];
       if (streams && streams.length) {
         const distStream = streams.find((s: any) => s.type === "distance");
@@ -109,13 +127,12 @@ const RouteVideoDialog = ({
         const timeData: number[] | undefined = timeStream?.data;
         if (distData && distData.length > 1) {
           const totalDist = distData[distData.length - 1] || 1;
-          const windowSec = 20; // smoothing window
+          const windowSec = 20;
           for (let i = 0; i < distData.length; i++) {
             let paceSec = 0;
             if (velData && velData[i] != null && velData[i] > 0.3) {
               paceSec = 1000 / velData[i];
             } else if (timeData) {
-              // Compute rolling pace from window
               let j = i;
               while (j > 0 && (timeData[i] - timeData[j]) < windowSec) j--;
               const dt = timeData[i] - timeData[j];
@@ -131,7 +148,6 @@ const RouteVideoDialog = ({
       const avgPaceSec = averageSpeed > 0 ? 1000 / averageSpeed : 0;
       const paceAt = (frac: number): number => {
         if (paceSamples.length === 0) return avgPaceSec;
-        // Binary-ish linear scan
         let lo = 0, hi = paceSamples.length - 1;
         while (lo < hi) {
           const mid = (lo + hi) >> 1;
@@ -140,85 +156,141 @@ const RouteVideoDialog = ({
         return paceSamples[lo].paceSec;
       };
 
-      // Compute bbox
-      let minLat = Infinity, maxLat = -Infinity, minLon = Infinity, maxLon = -Infinity;
-      for (const [la, lo] of coords) {
-        if (la < minLat) minLat = la; if (la > maxLat) maxLat = la;
-        if (lo < minLon) minLon = lo; if (lo > maxLon) maxLon = lo;
-      }
-      // Padding
-      const padFrac = 0.12;
-      const latPad = (maxLat - minLat) * padFrac || 0.001;
-      const lonPad = (maxLon - minLon) * padFrac || 0.001;
-      minLat -= latPad; maxLat += latPad; minLon -= lonPad; maxLon += lonPad;
+      // Cumulative distances along polyline (in pixel-agnostic meters via haversine)
+      const haversine = (a: [number, number], b: [number, number]) => {
+        const R = 6371000;
+        const toRad = (d: number) => (d * Math.PI) / 180;
+        const dLat = toRad(b[1] - a[1]);
+        const dLon = toRad(b[0] - a[0]);
+        const s1 = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(a[1])) * Math.cos(toRad(b[1])) * Math.sin(dLon / 2) ** 2;
+        return 2 * R * Math.asin(Math.sqrt(s1));
+      };
+      const cum: number[] = [0];
+      for (let i = 1; i < coords.length; i++) cum.push(cum[i - 1] + haversine(coords[i - 1], coords[i]));
+      const totalLen = cum[cum.length - 1] || 1;
 
-      // Pick zoom so that bbox fits inside CANVAS_W x (CANVAS_H * 0.65) (leave room for stats)
-      const mapH = Math.floor(CANVAS_H * 0.78);
-      const mapW = CANVAS_W;
-      let zoom = 18;
-      for (; zoom >= 2; zoom--) {
-        const a = lonLatToWorldPx(minLon, maxLat, zoom);
-        const b = lonLatToWorldPx(maxLon, minLat, zoom);
-        if ((b.x - a.x) <= mapW && (b.y - a.y) <= mapH) break;
-      }
+      const pointAt = (frac: number): { pos: [number, number]; bear: number } => {
+        const target = totalLen * frac;
+        let i = 0;
+        while (i < cum.length - 1 && cum[i + 1] < target) i++;
+        const segT = i >= cum.length - 1 ? 1 : (target - cum[i]) / Math.max(1, cum[i + 1] - cum[i]);
+        const a = coords[i], b = coords[Math.min(i + 1, coords.length - 1)];
+        const pos: [number, number] = [a[0] + (b[0] - a[0]) * segT, a[1] + (b[1] - a[1]) * segT];
+        // Bearing from slightly behind to slightly ahead for smoothness
+        const lookAhead = Math.min(cum.length - 1, i + 5);
+        const lookBehind = Math.max(0, i - 5);
+        const bear = bearing(coords[lookBehind], coords[lookAhead]);
+        return { pos, bear };
+      };
 
-      // Tile range
-      const topLeft = lonLatToWorldPx(minLon, maxLat, zoom);
-      const bottomRight = lonLatToWorldPx(maxLon, minLat, zoom);
-      const centerWorld = { x: (topLeft.x + bottomRight.x) / 2, y: (topLeft.y + bottomRight.y) / 2 };
-      const originX = centerWorld.x - mapW / 2;
-      const originY = centerWorld.y - mapH / 2;
-
-      const tileMinX = Math.floor(originX / TILE_SIZE);
-      const tileMaxX = Math.floor((originX + mapW) / TILE_SIZE);
-      const tileMinY = Math.floor(originY / TILE_SIZE);
-      const tileMaxY = Math.floor((originY + mapH) / TILE_SIZE);
-
-      const ctx = canvas.getContext("2d")!;
-      canvas.width = CANVAS_W;
-      canvas.height = CANVAS_H;
-
-      // Background
-      ctx.fillStyle = "#0a0a0a";
-      ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
-
-      // Load all tiles
-      const tilePromises: Promise<{ img: HTMLImageElement; tx: number; ty: number }>[] = [];
-      const subdomains = ["a", "b", "c", "d"];
-      for (let tx = tileMinX; tx <= tileMaxX; tx++) {
-        for (let ty = tileMinY; ty <= tileMaxY; ty++) {
-          const sd = subdomains[(tx + ty) % 4];
-          const url = `https://${sd}.basemaps.cartocdn.com/rastertiles/voyager/${zoom}/${tx}/${ty}.png`;
-          tilePromises.push(new Promise((resolve, reject) => {
-            const img = new Image();
-            img.crossOrigin = "anonymous";
-            img.onload = () => resolve({ img, tx, ty });
-            img.onerror = () => reject(new Error(`tile ${tx},${ty}`));
-            img.src = url;
-          }));
+      const sliceCoords = (frac: number): [number, number][] => {
+        const target = totalLen * frac;
+        const out: [number, number][] = [coords[0]];
+        for (let i = 1; i < coords.length; i++) {
+          if (cum[i] <= target) {
+            out.push(coords[i]);
+          } else {
+            const segT = (target - cum[i - 1]) / Math.max(1, cum[i] - cum[i - 1]);
+            const a = coords[i - 1], b = coords[i];
+            out.push([a[0] + (b[0] - a[0]) * segT, a[1] + (b[1] - a[1]) * segT]);
+            break;
+          }
         }
-      }
+        return out;
+      };
 
-      const tiles = await Promise.all(tilePromises);
+      // Setup map container at full export resolution (offscreen via fixed but invisible)
+      container.style.width = `${CANVAS_W}px`;
+      container.style.height = `${Math.floor(CANVAS_H * MAP_H_FRAC)}px`;
 
-      // Draw tiles into the map area (offset 0..mapH at top)
-      for (const { img, tx, ty } of tiles) {
-        const px = tx * TILE_SIZE - originX;
-        const py = ty * TILE_SIZE - originY;
-        ctx.drawImage(img, px, py);
-      }
+      // Tear down any previous map
+      if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; }
 
-      // Snapshot map background for re-use each frame
-      const mapBg = ctx.getImageData(0, 0, CANVAS_W, mapH);
+      // Initial bounds-fit center/zoom
+      const map = new mapboxgl.Map({
+        container,
+        style: "mapbox://styles/mapbox/outdoors-v12",
+        center: [(minLon + maxLon) / 2, (minLat + maxLat) / 2],
+        zoom: 13,
+        pitch: 0,
+        bearing: 0,
+        interactive: false,
+        preserveDrawingBuffer: true,
+        attributionControl: false,
+        antialias: true,
+      });
+      mapRef.current = map;
 
-      // Project route to canvas pixels
-      const routePx = coords.map(([la, lo]) => {
-        const w = lonLatToWorldPx(lo, la, zoom);
-        return { x: w.x - originX, y: w.y - originY };
+      await new Promise<void>((resolve, reject) => {
+        map.once("load", () => resolve());
+        map.once("error", (e) => reject(e.error || new Error("Map load failed")));
       });
 
-      // Setup MediaRecorder
-      const stream = canvas.captureStream(30);
+      // 3D terrain + sky
+      map.addSource("mapbox-dem", {
+        type: "raster-dem",
+        url: "mapbox://mapbox.mapbox-terrain-dem-v1",
+        tileSize: 512,
+        maxzoom: 14,
+      });
+      map.setTerrain({ source: "mapbox-dem", exaggeration: 1.5 });
+      map.addLayer({
+        id: "sky",
+        type: "sky",
+        paint: {
+          "sky-type": "atmosphere",
+          "sky-atmosphere-sun": [0, 90],
+          "sky-atmosphere-sun-intensity": 12,
+        },
+      });
+
+      // Route source/layers (full route faded + progressive route bright)
+      map.addSource("route-full", { type: "geojson", data: { type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: coords } } });
+      map.addSource("route-progress", { type: "geojson", data: { type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: [coords[0]] } } });
+
+      map.addLayer({
+        id: "route-full-line",
+        type: "line",
+        source: "route-full",
+        layout: { "line-cap": "round", "line-join": "round" },
+        paint: { "line-color": "#ffffff", "line-opacity": 0.35, "line-width": 4 },
+      });
+      map.addLayer({
+        id: "route-progress-halo",
+        type: "line",
+        source: "route-progress",
+        layout: { "line-cap": "round", "line-join": "round" },
+        paint: { "line-color": "#ffffff", "line-width": 10, "line-opacity": 0.9 },
+      });
+      map.addLayer({
+        id: "route-progress-line",
+        type: "line",
+        source: "route-progress",
+        layout: { "line-cap": "round", "line-join": "round" },
+        paint: { "line-color": "#FC4C02", "line-width": 6 },
+      });
+
+      // Fit to bounds with padding to estimate target zoom
+      const bounds = new mapboxgl.LngLatBounds(coords[0] as any, coords[0] as any);
+      coords.forEach((c) => bounds.extend(c as any));
+      const cam = map.cameraForBounds(bounds, { padding: 120, pitch: 0, bearing: 0 });
+      const overviewZoom = cam?.zoom ?? 13;
+      const flyoverZoom = Math.min(17, overviewZoom + 2.2);
+
+      // Wait for tiles to settle on initial overview
+      map.jumpTo({ center: cam?.center as any ?? [(minLon + maxLon) / 2, (minLat + maxLat) / 2], zoom: overviewZoom, pitch: 0, bearing: 0 });
+      await new Promise<void>((resolve) => {
+        const check = () => { if (map.areTilesLoaded()) resolve(); else map.once("idle", () => resolve()); };
+        check();
+      });
+
+      // Setup composite canvas + recorder
+      composite.width = CANVAS_W;
+      composite.height = CANVAS_H;
+      const ctx = composite.getContext("2d")!;
+      const mapH = Math.floor(CANVAS_H * MAP_H_FRAC);
+
+      const stream = composite.captureStream(30);
       const mimeCandidates = [
         "video/mp4;codecs=h264",
         "video/webm;codecs=vp9",
@@ -226,7 +298,7 @@ const RouteVideoDialog = ({
         "video/webm",
       ];
       const mime = mimeCandidates.find((m) => (window as any).MediaRecorder?.isTypeSupported?.(m)) || "video/webm";
-      const recorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 6_000_000 });
+      const recorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 8_000_000 });
       const chunks: BlobPart[] = [];
       recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
       const stopped = new Promise<void>((resolve) => { recorder.onstop = () => resolve(); });
@@ -235,86 +307,25 @@ const RouteVideoDialog = ({
       recorder.start();
 
       const start = performance.now();
+      const progressSrc = map.getSource("route-progress") as mapboxgl.GeoJSONSource;
 
-      // Pre-compute cumulative distances along route for smooth interp
-      const cum: number[] = [0];
-      for (let i = 1; i < routePx.length; i++) {
-        const dx = routePx[i].x - routePx[i - 1].x;
-        const dy = routePx[i].y - routePx[i - 1].y;
-        cum.push(cum[i - 1] + Math.hypot(dx, dy));
-      }
-      const totalLen = cum[cum.length - 1] || 1;
-
-      const drawFrame = (now: number) => {
-        const elapsed = now - start;
-        const tRaw = Math.min(1, elapsed / DURATION_MS);
-        // Ease in-out
-        const tEase = tRaw < 0.5 ? 2 * tRaw * tRaw : 1 - Math.pow(-2 * tRaw + 2, 2) / 2;
-        setProgress(tEase);
-
-        // Clear & redraw map area
-        ctx.putImageData(mapBg, 0, 0);
-
-        // Bottom panel for stats
-        const panelY = mapH;
-        const panelH = CANVAS_H - mapH;
-        const grad = ctx.createLinearGradient(0, panelY, 0, CANVAS_H);
-        grad.addColorStop(0, "#0a0a0a");
-        grad.addColorStop(1, "#1a1a1a");
-        ctx.fillStyle = grad;
-        ctx.fillRect(0, panelY, CANVAS_W, panelH);
-        // Subtle top fade over map for legibility
-        const topFade = ctx.createLinearGradient(0, 0, 0, 220);
-        topFade.addColorStop(0, "rgba(0,0,0,0.55)");
+      const drawOverlay = (tEase: number, animDist: number, animTimeSec: number, curPaceSec: number) => {
+        // Top fade for title legibility
+        const topFade = ctx.createLinearGradient(0, 0, 0, 240);
+        topFade.addColorStop(0, "rgba(0,0,0,0.6)");
         topFade.addColorStop(1, "rgba(0,0,0,0)");
         ctx.fillStyle = topFade;
-        ctx.fillRect(0, 0, CANVAS_W, 220);
+        ctx.fillRect(0, 0, CANVAS_W, 240);
 
-        // Compute progress index along route
-        const targetLen = totalLen * tEase;
-        let segIdx = 0;
-        while (segIdx < cum.length - 1 && cum[segIdx + 1] < targetLen) segIdx++;
-        const segT = segIdx >= cum.length - 1 ? 1 : (targetLen - cum[segIdx]) / Math.max(1, cum[segIdx + 1] - cum[segIdx]);
-        const headX = routePx[segIdx].x + (routePx[Math.min(segIdx + 1, routePx.length - 1)].x - routePx[segIdx].x) * segT;
-        const headY = routePx[segIdx].y + (routePx[Math.min(segIdx + 1, routePx.length - 1)].y - routePx[segIdx].y) * segT;
-
-        // Draw progressive polyline (white halo + orange line)
-        ctx.lineJoin = "round"; ctx.lineCap = "round";
-        ctx.beginPath();
-        ctx.moveTo(routePx[0].x, routePx[0].y);
-        for (let i = 1; i <= segIdx; i++) ctx.lineTo(routePx[i].x, routePx[i].y);
-        ctx.lineTo(headX, headY);
-        ctx.strokeStyle = "rgba(255,255,255,0.95)";
-        ctx.lineWidth = 14;
-        ctx.stroke();
-        ctx.strokeStyle = "#FC4C02";
-        ctx.lineWidth = 8;
-        ctx.stroke();
-
-        // Start dot
-        ctx.beginPath();
-        ctx.arc(routePx[0].x, routePx[0].y, 14, 0, Math.PI * 2);
-        ctx.fillStyle = "#10B981"; ctx.fill();
-        ctx.lineWidth = 4; ctx.strokeStyle = "#fff"; ctx.stroke();
-
-        // Head dot (pulsing)
-        const pulse = 14 + Math.sin(elapsed / 120) * 3;
-        ctx.beginPath();
-        ctx.arc(headX, headY, pulse + 8, 0, Math.PI * 2);
-        ctx.fillStyle = "rgba(252,76,2,0.35)"; ctx.fill();
-        ctx.beginPath();
-        ctx.arc(headX, headY, pulse, 0, Math.PI * 2);
-        ctx.fillStyle = "#FC4C02"; ctx.fill();
-        ctx.lineWidth = 4; ctx.strokeStyle = "#fff"; ctx.stroke();
-
-        // If finished, draw end dot
-        if (tRaw >= 1) {
-          const end = routePx[routePx.length - 1];
-          ctx.beginPath();
-          ctx.arc(end.x, end.y, 16, 0, Math.PI * 2);
-          ctx.fillStyle = "#FC4C02"; ctx.fill();
-          ctx.lineWidth = 5; ctx.strokeStyle = "#fff"; ctx.stroke();
-        }
+        // Bottom panel
+        const panelY = mapH;
+        const panelH = CANVAS_H - mapH;
+        const grad = ctx.createLinearGradient(0, panelY - 60, 0, CANVAS_H);
+        grad.addColorStop(0, "rgba(10,10,10,0)");
+        grad.addColorStop(0.25, "rgba(10,10,10,0.95)");
+        grad.addColorStop(1, "#1a1a1a");
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, panelY - 60, CANVAS_W, panelH + 60);
 
         // Title
         ctx.fillStyle = "#fff";
@@ -322,22 +333,17 @@ const RouteVideoDialog = ({
         ctx.textAlign = "left";
         ctx.fillText(name.length > 28 ? name.slice(0, 27) + "…" : name, 56, 110);
 
-        // Animated distance counter
-        const animDist = distKm * tEase;
-        const animTime = totalSec * tEase;
-        const ah = Math.floor(animTime / 3600);
-        const am = Math.floor((animTime % 3600) / 60);
-        const as = Math.floor(animTime % 60);
+        // Stats
+        const ah = Math.floor(animTimeSec / 3600);
+        const am = Math.floor((animTimeSec % 3600) / 60);
+        const as = Math.floor(animTimeSec % 60);
         const animTimeStr = ah > 0
-          ? `${ah}:${String(am).padStart(2,"0")}:${String(as).padStart(2,"0")}`
-          : `${am}:${String(as).padStart(2,"0")}`;
+          ? `${ah}:${String(am).padStart(2, "0")}:${String(as).padStart(2, "0")}`
+          : `${am}:${String(as).padStart(2, "0")}`;
+        const cpm = Math.floor(curPaceSec / 60);
+        const cps = Math.floor(curPaceSec % 60);
+        const curPaceStr = curPaceSec > 0 ? `${cpm}:${String(cps).padStart(2, "0")}/km` : "--";
 
-        // Stats panel
-        const panelPadX = 64;
-        const baseY = panelY + 80;
-        ctx.textAlign = "left";
-
-        // Label/value pairs
         const drawStat = (label: string, value: string, x: number, y: number) => {
           ctx.fillStyle = "rgba(255,255,255,0.55)";
           ctx.font = "500 28px ui-sans-serif, system-ui";
@@ -346,30 +352,92 @@ const RouteVideoDialog = ({
           ctx.font = "800 76px ui-sans-serif, system-ui";
           ctx.fillText(value, x, y + 78);
         };
-
-        drawStat(t("DISTANCE", "距離"), `${animDist.toFixed(2)} km`, panelPadX, baseY);
-        drawStat(t("TIME", "時間"), animTimeStr, panelPadX + 540, baseY);
-
+        const padX = 64;
+        const baseY = panelY + 80;
+        drawStat(t("DISTANCE", "距離"), `${animDist.toFixed(2)} km`, padX, baseY);
+        drawStat(t("TIME", "時間"), animTimeStr, padX + 540, baseY);
         const row2Y = baseY + 200;
-        const curPaceSec = paceAt(tEase);
-        const cpm = Math.floor(curPaceSec / 60);
-        const cps = Math.floor(curPaceSec % 60);
-        const curPaceStr = curPaceSec > 0 ? `${cpm}:${String(cps).padStart(2, "0")}/km` : "--";
-        drawStat(t("PACE", "配速"), curPaceStr, panelPadX, row2Y);
+        drawStat(t("PACE", "配速"), curPaceStr, padX, row2Y);
         if (elevationGainMeters != null) {
-          drawStat(t("ELEV", "爬升"), `${Math.round(elevationGainMeters)} m`, panelPadX + 540, row2Y);
+          drawStat(t("ELEV", "爬升"), `${Math.round(elevationGainMeters)} m`, padX + 540, row2Y);
         }
 
-        // Branding
         ctx.fillStyle = "rgba(255,255,255,0.5)";
         ctx.font = "600 24px ui-sans-serif, system-ui";
         ctx.textAlign = "right";
         ctx.fillText("RUNWARD", CANVAS_W - 56, CANVAS_H - 48);
+      };
+
+      const mapCanvas = map.getCanvas();
+
+      const drawFrame = (now: number) => {
+        const elapsed = now - start;
+        const tRaw = Math.min(1, elapsed / DURATION_MS);
+        const tEase = tRaw < 0.5 ? 2 * tRaw * tRaw : 1 - Math.pow(-2 * tRaw + 2, 2) / 2;
+        setProgress(tEase);
+
+        // Phase 1 (0..0.15): zoom in & pitch up from overview to start of route
+        // Phase 2 (0.15..0.95): camera follows route
+        // Phase 3 (0.95..1): pull back to show full route
+        let camCenter: [number, number];
+        let camBearing: number;
+        let camPitch: number;
+        let camZoom: number;
+        let routeFrac: number;
+
+        if (tEase < 0.15) {
+          const k = tEase / 0.15;
+          const start = pointAt(0);
+          camCenter = [
+            ((minLon + maxLon) / 2) * (1 - k) + start.pos[0] * k,
+            ((minLat + maxLat) / 2) * (1 - k) + start.pos[1] * k,
+          ];
+          camBearing = start.bear * k;
+          camPitch = 65 * k;
+          camZoom = overviewZoom * (1 - k) + flyoverZoom * k;
+          routeFrac = 0;
+        } else if (tEase < 0.95) {
+          const k = (tEase - 0.15) / 0.8;
+          routeFrac = k;
+          const p = pointAt(k);
+          camCenter = p.pos;
+          camBearing = p.bear;
+          camPitch = 65;
+          camZoom = flyoverZoom;
+        } else {
+          const k = (tEase - 0.95) / 0.05;
+          const end = pointAt(1);
+          routeFrac = 1;
+          camCenter = [
+            end.pos[0] * (1 - k) + ((minLon + maxLon) / 2) * k,
+            end.pos[1] * (1 - k) + ((minLat + maxLat) / 2) * k,
+          ];
+          camBearing = end.bear * (1 - k);
+          camPitch = 65 * (1 - k) + 30 * k;
+          camZoom = flyoverZoom * (1 - k) + (overviewZoom + 0.3) * k;
+        }
+
+        map.jumpTo({ center: camCenter, bearing: camBearing, pitch: camPitch, zoom: camZoom });
+        progressSrc.setData({ type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: sliceCoords(routeFrac) } } as any);
+
+        // Force a synchronous paint, then composite
+        map.triggerRepaint();
+        // Let mapbox paint at least once for this frame
+        // (drawImage from WebGL canvas works because we set preserveDrawingBuffer)
+        ctx.fillStyle = "#000";
+        ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+        try {
+          ctx.drawImage(mapCanvas, 0, 0, CANVAS_W, mapH);
+        } catch {/* ignore */}
+
+        const animDist = distKm * tEase;
+        const animTime = totalSec * tEase;
+        const curPaceSec = paceAt(tEase);
+        drawOverlay(tEase, animDist, animTime, curPaceSec);
 
         if (tRaw < 1) {
           requestAnimationFrame(drawFrame);
         } else {
-          // Hold last frame ~600ms then stop
           setTimeout(() => recorder.stop(), 600);
         }
       };
@@ -382,10 +450,14 @@ const RouteVideoDialog = ({
       const url = URL.createObjectURL(blob);
       setVideoUrl(url);
       setPhase("done");
+
+      // Cleanup map
+      if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; }
     } catch (err) {
       console.error(err);
       toast.error(t("Failed to generate video", "影片生成失敗"));
       setPhase("error");
+      if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; }
     }
   };
 
@@ -398,8 +470,6 @@ const RouteVideoDialog = ({
     if (!videoBlobRef.current) return;
     const blob = videoBlobRef.current;
     const fname = filename();
-
-    // Try Web Share with file first (best on iOS/Android in-app webviews)
     try {
       const file = new File([blob], fname, { type: blob.type });
       // @ts-ignore
@@ -407,11 +477,8 @@ const RouteVideoDialog = ({
         await navigator.share({ files: [file], title: name });
         return;
       }
-    } catch {
-      // fall through
-    }
+    } catch {/* fall through */}
 
-    // Re-create a fresh blob URL each time (some webviews invalidate cached ones)
     const freshUrl = URL.createObjectURL(blob);
     try {
       const a = document.createElement("a");
@@ -438,9 +505,7 @@ const RouteVideoDialog = ({
         await navigator.share({ files: [file], title: name, text: t("My route on Runward", "我的 Runward 路線") });
         return;
       }
-    } catch (e) {
-      // fall through to download
-    }
+    } catch {/* fall through */}
     handleDownload();
   };
 
@@ -454,17 +519,31 @@ const RouteVideoDialog = ({
           </DialogTitle>
           <DialogDescription>
             {t(
-              "Generate an animated video of your route with stats overlay.",
-              "生成你的路線動畫影片，附上統計資料。",
+              "Generate a 3D flyover video of your route with stats overlay.",
+              "生成 3D 路線飛覽影片，附上統計資料。",
             )}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
-          {/* Canvas preview (scaled) */}
+          {/* Hidden offscreen mapbox container at export resolution */}
+          <div
+            ref={mapContainerRef}
+            aria-hidden
+            style={{
+              position: "fixed",
+              left: "-99999px",
+              top: 0,
+              width: `${CANVAS_W}px`,
+              height: `${Math.floor(CANVAS_H * MAP_H_FRAC)}px`,
+              pointerEvents: "none",
+            }}
+          />
+
+          {/* Composite preview */}
           <div className="relative w-full bg-black rounded-lg overflow-hidden" style={{ aspectRatio: `${CANVAS_W}/${CANVAS_H}`, maxHeight: "60vh" }}>
             <canvas
-              ref={canvasRef}
+              ref={compositeCanvasRef}
               className="w-full h-full block"
               style={{ display: phase === "idle" || (phase === "done" && videoUrl) ? "none" : "block" }}
             />
@@ -481,17 +560,17 @@ const RouteVideoDialog = ({
             {phase === "idle" && (
               <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground gap-2 p-6 text-center">
                 <Film size={40} className="opacity-50" />
-                <p className="text-sm">{t("Press Generate to create a 10-second route flyover.", "按下生成製作 10 秒路線動畫。")}</p>
+                <p className="text-sm">{t("Press Generate to create a 3D flyover.", "按下生成製作 3D 路線飛覽。")}</p>
               </div>
             )}
             {(phase === "loading" || phase === "rendering") && (
               <div className="absolute inset-x-0 bottom-0 bg-black/70 text-white text-xs text-center py-2">
-                {phase === "loading" ? t("Loading map…", "載入地圖中…") : `${t("Recording", "錄製中")}: ${Math.round(progress * 100)}%`}
+                {phase === "loading" ? t("Loading 3D map…", "載入 3D 地圖中…") : `${t("Recording", "錄製中")}: ${Math.round(progress * 100)}%`}
               </div>
             )}
           </div>
 
-          <div className="flex gap-2 justify-end">
+          <div className="flex gap-2 justify-end flex-wrap">
             {phase !== "done" ? (
               <>
                 <Button variant="outline" onClick={() => onOpenChange(false)} disabled={phase === "loading" || phase === "rendering"}>

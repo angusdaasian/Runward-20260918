@@ -239,7 +239,7 @@ const RouteVideoDialog = ({
       // Initial bounds-fit center/zoom
       const map = new mapboxgl.Map({
         container,
-        style: "mapbox://styles/mapbox/outdoors-v12",
+        style: isLowGpuDevice() ? "mapbox://styles/mapbox/light-v11" : "mapbox://styles/mapbox/outdoors-v12",
         center: [(minLon + maxLon) / 2, (minLat + maxLat) / 2],
         zoom: 13,
         pitch: 0,
@@ -248,6 +248,10 @@ const RouteVideoDialog = ({
         preserveDrawingBuffer: true,
         attributionControl: false,
         antialias: false,
+        maxTileCacheSize: 24,
+        performanceMetricsCollection: false,
+        collectResourceTiming: false,
+        contextCreateOptions: { powerPreference: "low-power" },
       });
       mapRef.current = map;
 

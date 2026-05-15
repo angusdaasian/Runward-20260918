@@ -448,7 +448,7 @@ const RouteVideoDialog = ({
       // Smoothed bearing state (low-pass filter to kill jitter from polyline noise)
       let smoothBearing = pointAt(0).bear;
       const shortestDelta = (from: number, to: number) => {
-        let d = ((to - from + 540) % 360) - 180;
+        const d = ((to - from + 540) % 360) - 180;
         return d;
       };
       const smoothStep = (edge0: number, edge1: number, x: number) => {

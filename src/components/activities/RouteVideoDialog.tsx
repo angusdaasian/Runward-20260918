@@ -364,11 +364,16 @@ const RouteVideoDialog = ({
         paint: { "line-color": "#14532d", "line-width": 6 },
       });
 
-      // Fit to bounds with padding to estimate target zoom
+      // Fit to bounds with padding to estimate target zoom.
+      // Use generous padding for the final pull-back so even long routes fit on screen.
       const bounds = new mapboxgl.LngLatBounds(coords[0] as any, coords[0] as any);
       coords.forEach((c) => bounds.extend(c as any));
       const cam = map.cameraForBounds(bounds, { padding: 120, pitch: 0, bearing: 0 });
       const overviewZoom = cam?.zoom ?? 13;
+      // For the final reveal, fit with extra padding so the entire route is visible
+      // (especially for long routes where the perspective tilt would otherwise clip it).
+      const finalCam = map.cameraForBounds(bounds, { padding: 200, pitch: 24, bearing: 0 });
+      const finalZoom = Math.min(overviewZoom, (finalCam?.zoom ?? overviewZoom)) - 0.3;
       // Lower flyover zoom keeps far-tiles on screen so we don't expose grey gutters
       // when the camera pitches/rotates. Was overviewZoom + 2.2 (too tight).
       const flyoverZoom = Math.min(14.7, Math.max(12.4, overviewZoom + 0.45));

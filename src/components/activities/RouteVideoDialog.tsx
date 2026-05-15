@@ -402,10 +402,13 @@ const RouteVideoDialog = ({
       const finalCenter: [number, number] = finalCam?.center
         ? [(finalCam.center as mapboxgl.LngLat).lng, (finalCam.center as mapboxgl.LngLat).lat]
         : [(minLon + maxLon) / 2, (minLat + maxLat) / 2];
-      const finalZoom = Math.min(overviewZoom, (finalCam?.zoom ?? overviewZoom)) - 0.5;
+      const finalZoom = Math.max(0, Math.min(overviewZoom, (finalCam?.zoom ?? overviewZoom)) - 0.5);
       // Closer flyover zoom — user wants to see the route up close while
-      // traversing. Clamp so very short routes don't push past terrain detail.
-      const flyoverZoom = Math.min(16.2, Math.max(13.8, overviewZoom + 1.8));
+      // traversing. Use route length to keep long routes close instead of inheriting
+      // a very distant overview zoom; only the ending pull-back uses finalZoom.
+      const routeKm = Math.max(0.1, distanceMeters / 1000);
+      const closeZoomByLength = routeKm < 5 ? 16.4 : routeKm < 12 ? 15.8 : routeKm < 25 ? 15.2 : 14.7;
+      const flyoverZoom = Math.max(14.4, Math.min(16.6, Math.max(overviewZoom + 2.4, closeZoomByLength)));
 
       // Compute dynamic flyover duration from route length
       const DURATION_MS = computeDurationMs(distanceMeters);

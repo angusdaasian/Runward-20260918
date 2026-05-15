@@ -386,7 +386,6 @@ const DraggableDay = ({
   const style: React.CSSProperties = {
     transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
     opacity: isDragging ? 0.5 : 1,
-    touchAction: "none",
   };
 
   return (
@@ -423,14 +422,17 @@ const DraggableDay = ({
               >
                 <GripVertical size={16} />
               </button>
+              <div className="flex-1 min-w-0 flex items-center justify-between gap-2 select-none">
+                <span className="font-medium text-sm text-foreground truncate">{localizeTitle(day.type, lang)}</span>
+              </div>
               <button
                 type="button"
-                onClick={() => setExpanded((v) => !v)}
-                className="flex-1 min-w-0 flex items-center justify-between gap-2 text-left"
+                onClick={(e) => { e.stopPropagation(); setExpanded((v) => !v); }}
+                className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground"
                 aria-expanded={expanded}
+                aria-label={lang === "zh" ? "展開" : "Expand"}
               >
-                <span className="font-medium text-sm text-foreground truncate">{localizeTitle(day.type, lang)}</span>
-                <ChevronDown size={16} className={`text-muted-foreground transition-transform shrink-0 ${expanded ? "rotate-180" : ""}`} />
+                <ChevronDown size={16} className={`transition-transform ${expanded ? "rotate-180" : ""}`} />
               </button>
               <button
                 type="button"
@@ -2720,8 +2722,16 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                               await handleRegeneratePlan({});
                             }}
                             onRegenerateForRaces={() => handleRegeneratePlan({})}
-                          />
-                          <div className={`bg-card border rounded-xl p-3 mb-4 ${goalWeekIdx === currentWeekIdx ? "border-primary ring-1 ring-primary/40" : "border-border"}`}>
+                           />
+                           <Button
+                             variant="outline"
+                             className="w-full mb-4 border-primary/30 text-primary hover:bg-primary/10"
+                             onClick={() => setShowWeeklyReview(true)}
+                           >
+                             <Sparkles size={14} className="mr-2" />
+                             {lang === "zh" ? "週訓練回顧" : "Weekly Review"}
+                           </Button>
+                           <div className={`bg-card border rounded-xl p-3 mb-4 ${goalWeekIdx === currentWeekIdx ? "border-primary ring-1 ring-primary/40" : "border-border"}`}>
                             <div className="flex items-center justify-between mb-1">
                               <div className="flex items-center gap-2 flex-wrap">
                                 <span className="text-sm font-medium text-foreground">{formatDate(weekStart)} - {formatDate(weekEnd)}</span>
@@ -2773,15 +2783,6 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                         )}
                       </Button>
                     )}
-
-                    <Button
-                      variant="outline"
-                      className="w-full mt-6 border-primary/30 text-primary hover:bg-primary/10"
-                      onClick={() => setShowWeeklyReview(true)}
-                    >
-                      <Sparkles size={14} className="mr-2" />
-                      {lang === "zh" ? "週訓練回顧" : "Weekly Review"}
-                    </Button>
 
                     <Button variant="outline" className="w-full mt-2 text-destructive border-destructive/30 hover:bg-destructive/10" onClick={() => { if (planDirty && !window.confirm(lang === "zh" ? "您有未儲存的變更，仍要取消計劃嗎？" : "You have unsaved changes. Cancel the plan anyway?")) return; setShowCancelConfirm(true); }}>
                       {lang === "zh" ? "取消計劃" : "Cancel Plan"}

@@ -42,9 +42,10 @@ interface Props {
   streams?: any[];
 }
 
-// Full HD vertical for crisp social-ready output.
-const CANVAS_W = 1080;
-const CANVAS_H = 1920;
+// HD vertical keeps the video sharp while avoiding iOS Safari/WebGL memory
+// resets that can happen with 1080×1920 + terrain + canvas recording.
+const CANVAS_W = 720;
+const CANVAS_H = 1280;
 // Map fills the whole canvas; overlay text floats on top with text shadow,
 // so the data fields look transparent (no dark panel underneath).
 const MAP_H_FRAC = 1.0;
@@ -256,8 +257,8 @@ const RouteVideoDialog = ({
         interactive: false,
         preserveDrawingBuffer: true,
         attributionControl: false,
-        antialias: true,
-        maxTileCacheSize: 32,
+        antialias: false,
+        maxTileCacheSize: 16,
       });
       mapRef.current = map;
 
@@ -282,9 +283,9 @@ const RouteVideoDialog = ({
         type: "raster-dem",
         url: "mapbox://mapbox.mapbox-terrain-dem-v1",
         tileSize: 256,
-        maxzoom: 13,
+        maxzoom: 12,
       });
-      map.setTerrain({ source: "mapbox-dem", exaggeration: 1.2 });
+      map.setTerrain({ source: "mapbox-dem", exaggeration: 1.0 });
       map.addLayer({
         id: "sky",
         type: "sky",
@@ -354,7 +355,7 @@ const RouteVideoDialog = ({
       const ctx = composite.getContext("2d")!;
       const mapH = Math.floor(CANVAS_H * MAP_H_FRAC);
 
-      const stream = composite.captureStream(30);
+      const stream = composite.captureStream(24);
       const mimeCandidates = [
         "video/mp4;codecs=h264",
         "video/webm;codecs=vp9",
@@ -362,7 +363,7 @@ const RouteVideoDialog = ({
         "video/webm",
       ];
       const mime = mimeCandidates.find((m) => (window as any).MediaRecorder?.isTypeSupported?.(m)) || "video/webm";
-      const recorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 8_000_000 });
+      const recorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 5_000_000 });
       const chunks: BlobPart[] = [];
       recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
       const stopped = new Promise<void>((resolve) => { recorder.onstop = () => resolve(); });

@@ -776,6 +776,7 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
         movingTimeSeconds={activity.moving_time}
         averageSpeed={activity.average_speed}
         elevationGainMeters={activity.total_elevation_gain ?? null}
+        streams={streams}
       />
       {/* Header */}
       <div className="flex items-center justify-between mb-4">

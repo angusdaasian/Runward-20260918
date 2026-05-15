@@ -41,6 +41,7 @@ interface Props {
   movingTimeSeconds: number;
   averageSpeed: number;
   elevationGainMeters: number | null;
+  streams?: any[];
 }
 
 const CANVAS_W = 1080;
@@ -49,7 +50,7 @@ const DURATION_MS = 10000; // 10 second video
 
 const RouteVideoDialog = ({
   open, onOpenChange, lang, polyline, name,
-  distanceMeters, movingTimeSeconds, averageSpeed, elevationGainMeters,
+  distanceMeters, movingTimeSeconds, averageSpeed, elevationGainMeters, streams,
 }: Props) => {
   const isZh = lang === "zh";
   const t = (en: string, zh: string) => (isZh ? zh : en);
@@ -95,6 +96,49 @@ const RouteVideoDialog = ({
     try {
       const coords = decodePolyline(polyline);
       if (coords.length < 2) throw new Error("Empty route");
+
+      // Build pace samples (sec/km) keyed by progress fraction along route
+      // Prefer velocity_smooth + distance/time streams. Fallback to averageSpeed.
+      const paceSamples: { frac: number; paceSec: number }[] = [];
+      if (streams && streams.length) {
+        const distStream = streams.find((s: any) => s.type === "distance");
+        const velStream = streams.find((s: any) => s.type === "velocity_smooth");
+        const timeStream = streams.find((s: any) => s.type === "time");
+        const distData: number[] | undefined = distStream?.data;
+        const velData: number[] | undefined = velStream?.data;
+        const timeData: number[] | undefined = timeStream?.data;
+        if (distData && distData.length > 1) {
+          const totalDist = distData[distData.length - 1] || 1;
+          const windowSec = 20; // smoothing window
+          for (let i = 0; i < distData.length; i++) {
+            let paceSec = 0;
+            if (velData && velData[i] != null && velData[i] > 0.3) {
+              paceSec = 1000 / velData[i];
+            } else if (timeData) {
+              // Compute rolling pace from window
+              let j = i;
+              while (j > 0 && (timeData[i] - timeData[j]) < windowSec) j--;
+              const dt = timeData[i] - timeData[j];
+              const dd = distData[i] - distData[j];
+              if (dd > 0 && dt > 0) paceSec = (dt / dd) * 1000;
+            }
+            if (paceSec > 0 && paceSec < 1800) {
+              paceSamples.push({ frac: distData[i] / totalDist, paceSec });
+            }
+          }
+        }
+      }
+      const avgPaceSec = averageSpeed > 0 ? 1000 / averageSpeed : 0;
+      const paceAt = (frac: number): number => {
+        if (paceSamples.length === 0) return avgPaceSec;
+        // Binary-ish linear scan
+        let lo = 0, hi = paceSamples.length - 1;
+        while (lo < hi) {
+          const mid = (lo + hi) >> 1;
+          if (paceSamples[mid].frac < frac) lo = mid + 1; else hi = mid;
+        }
+        return paceSamples[lo].paceSec;
+      };
 
       // Compute bbox
       let minLat = Infinity, maxLat = -Infinity, minLon = Infinity, maxLon = -Infinity;
@@ -307,7 +351,11 @@ const RouteVideoDialog = ({
         drawStat(t("TIME", "時間"), animTimeStr, panelPadX + 540, baseY);
 
         const row2Y = baseY + 200;
-        drawStat(t("PACE", "配速"), paceStr, panelPadX, row2Y);
+        const curPaceSec = paceAt(tEase);
+        const cpm = Math.floor(curPaceSec / 60);
+        const cps = Math.floor(curPaceSec % 60);
+        const curPaceStr = curPaceSec > 0 ? `${cpm}:${String(cps).padStart(2, "0")}/km` : "--";
+        drawStat(t("PACE", "配速"), curPaceStr, panelPadX, row2Y);
         if (elevationGainMeters != null) {
           drawStat(t("ELEV", "爬升"), `${Math.round(elevationGainMeters)} m`, panelPadX + 540, row2Y);
         }
@@ -346,14 +394,39 @@ const RouteVideoDialog = ({
     return `route-${Date.now()}.${ext}`;
   };
 
-  const handleDownload = () => {
-    if (!videoBlobRef.current || !videoUrl) return;
-    const a = document.createElement("a");
-    a.href = videoUrl;
-    a.download = filename();
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
+  const handleDownload = async () => {
+    if (!videoBlobRef.current) return;
+    const blob = videoBlobRef.current;
+    const fname = filename();
+
+    // Try Web Share with file first (best on iOS/Android in-app webviews)
+    try {
+      const file = new File([blob], fname, { type: blob.type });
+      // @ts-ignore
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: name });
+        return;
+      }
+    } catch {
+      // fall through
+    }
+
+    // Re-create a fresh blob URL each time (some webviews invalidate cached ones)
+    const freshUrl = URL.createObjectURL(blob);
+    try {
+      const a = document.createElement("a");
+      a.href = freshUrl;
+      a.download = fname;
+      a.rel = "noopener";
+      a.target = "_blank";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    } catch {
+      window.open(freshUrl, "_blank");
+    }
+    setTimeout(() => URL.revokeObjectURL(freshUrl), 60_000);
+    toast.success(t("Video saved", "影片已儲存"));
   };
 
   const handleShare = async () => {

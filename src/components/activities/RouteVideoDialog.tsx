@@ -472,7 +472,7 @@ const RouteVideoDialog = ({
           const p = pointAt(k);
           camCenter = p.pos;
           targetBearing = p.bear;
-          camPitch = 65;
+          camPitch = FLYOVER_PITCH;
           camZoom = flyoverZoom;
         } else {
           const k = (tEase - 0.92) / 0.08;
@@ -483,7 +483,7 @@ const RouteVideoDialog = ({
             end.pos[1] * (1 - k) + ((minLat + maxLat) / 2) * k,
           ];
           targetBearing = smoothBearing; // hold heading during pull-back, no spin
-          camPitch = 65 * (1 - k) + 30 * k;
+          camPitch = FLYOVER_PITCH * (1 - k) + 24 * k;
           camZoom = flyoverZoom * (1 - k) + (overviewZoom + 0.3) * k;
         }
 

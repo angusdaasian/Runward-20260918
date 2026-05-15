@@ -187,6 +187,41 @@ const RouteVideoDialog = ({
         return paceSamples[lo].paceSec;
       };
 
+      // Build cumulative elevation-gain samples (meters gained vs. fraction of route)
+      const elevSamples: { frac: number; gain: number }[] = [];
+      if (streams && streams.length) {
+        const distStream = streams.find((s: any) => s.type === "distance");
+        const altStream = streams.find((s: any) => s.type === "altitude");
+        const distData: number[] | undefined = distStream?.data;
+        const altData: number[] | undefined = altStream?.data;
+        if (distData && altData && distData.length === altData.length && distData.length > 1) {
+          const totalDist = distData[distData.length - 1] || 1;
+          let gain = 0;
+          let prevAlt = altData[0];
+          // Tiny threshold filters GPS jitter
+          const minStep = 1;
+          for (let i = 0; i < distData.length; i++) {
+            const da = altData[i] - prevAlt;
+            if (da >= minStep) { gain += da; prevAlt = altData[i]; }
+            else if (da < 0) { prevAlt = altData[i]; }
+            elevSamples.push({ frac: distData[i] / totalDist, gain });
+          }
+        }
+      }
+      const totalElev = elevationGainMeters ?? (elevSamples.length ? elevSamples[elevSamples.length - 1].gain : 0);
+      const elevAt = (frac: number): number => {
+        if (elevSamples.length === 0) return totalElev * frac;
+        let lo = 0, hi = elevSamples.length - 1;
+        while (lo < hi) {
+          const mid = (lo + hi) >> 1;
+          if (elevSamples[mid].frac < frac) lo = mid + 1; else hi = mid;
+        }
+        // Scale to match the canonical total when available
+        const raw = elevSamples[lo].gain;
+        const finalGain = elevSamples[elevSamples.length - 1].gain || 1;
+        return elevationGainMeters != null ? (raw / finalGain) * elevationGainMeters : raw;
+      };
+
       // Cumulative distances along polyline (in pixel-agnostic meters via haversine)
       const haversine = (a: [number, number], b: [number, number]) => {
         const R = 6371000;
@@ -326,14 +361,19 @@ const RouteVideoDialog = ({
         type: "line",
         source: "route-progress",
         layout: { "line-cap": "round", "line-join": "round" },
-        paint: { "line-color": "#FC4C02", "line-width": 6 },
+        paint: { "line-color": "#14532d", "line-width": 6 },
       });
 
-      // Fit to bounds with padding to estimate target zoom
+      // Fit to bounds with padding to estimate target zoom.
+      // Use generous padding for the final pull-back so even long routes fit on screen.
       const bounds = new mapboxgl.LngLatBounds(coords[0] as any, coords[0] as any);
       coords.forEach((c) => bounds.extend(c as any));
       const cam = map.cameraForBounds(bounds, { padding: 120, pitch: 0, bearing: 0 });
       const overviewZoom = cam?.zoom ?? 13;
+      // For the final reveal, fit with extra padding so the entire route is visible
+      // (especially for long routes where the perspective tilt would otherwise clip it).
+      const finalCam = map.cameraForBounds(bounds, { padding: 200, pitch: 24, bearing: 0 });
+      const finalZoom = Math.min(overviewZoom, (finalCam?.zoom ?? overviewZoom)) - 0.3;
       // Lower flyover zoom keeps far-tiles on screen so we don't expose grey gutters
       // when the camera pitches/rotates. Was overviewZoom + 2.2 (too tight).
       const flyoverZoom = Math.min(14.7, Math.max(12.4, overviewZoom + 0.45));
@@ -395,7 +435,7 @@ const RouteVideoDialog = ({
       const S = CANVAS_W / 1080;
       const px = (n: number) => Math.round(n * S);
 
-      const drawOverlay = (tEase: number, animDist: number, animTimeSec: number, curPaceSec: number) => {
+      const drawOverlay = (tEase: number, animDist: number, animTimeSec: number, curPaceSec: number, animElev: number) => {
         // Soft top fade so the title stays readable on bright map tiles.
         const topFade = ctx.createLinearGradient(0, 0, 0, px(260));
         topFade.addColorStop(0, "rgba(0,0,0,0.45)");
@@ -461,8 +501,8 @@ const RouteVideoDialog = ({
         drawStat(t("DISTANCE", "距離"), `${animDist.toFixed(2)} km`, padX, row1Y);
         drawStat(t("TIME", "時間"), animTimeStr, padX + colGap, row1Y);
         drawStat(t("PACE", "配速"), curPaceStr, padX, row2Y);
-        if (elevationGainMeters != null) {
-          drawStat(t("ELEV", "爬升"), `${Math.round(elevationGainMeters)} m`, padX + colGap, row2Y);
+        if (totalElev > 0) {
+          drawStat(t("ELEV", "爬升"), `${Math.round(animElev)} m`, padX + colGap, row2Y);
         }
 
         ctx.save();
@@ -518,7 +558,7 @@ const RouteVideoDialog = ({
           ];
           targetBearing = smoothBearing; // hold heading during pull-back, no spin
           camPitch = flyoverPitch * (1 - k) + 24 * k;
-          camZoom = flyoverZoom * (1 - k) + (overviewZoom + 0.3) * k;
+          camZoom = flyoverZoom * (1 - k) + finalZoom * k;
         }
 
         // Low-pass + per-frame clamp so bearing changes glide instead of snapping
@@ -545,7 +585,8 @@ const RouteVideoDialog = ({
         const animDist = distKm * tEase;
         const animTime = totalSec * tEase;
         const curPaceSec = paceAt(tEase);
-        drawOverlay(tEase, animDist, animTime, curPaceSec);
+        const animElev = elevAt(tEase);
+        drawOverlay(tEase, animDist, animTime, curPaceSec, animElev);
 
         if (tRaw < 1) {
           requestAnimationFrame(drawFrame);

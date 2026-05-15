@@ -551,10 +551,6 @@ const RouteVideoDialog = ({
     return `route-${Date.now()}.${ext}`;
   };
 
-  const isIOS = () =>
-    /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-    (navigator.platform === "MacIntel" && (navigator as any).maxTouchPoints > 1);
-
   const handleDownload = async () => {
     if (!videoBlobRef.current) return;
     const blob = videoBlobRef.current;

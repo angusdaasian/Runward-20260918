@@ -633,19 +633,19 @@ const RouteVideoDialog = ({
                 </Button>
               </>
             ) : (
-              <>
-                <Button variant="outline" onClick={() => { setPhase("idle"); setVideoUrl((u) => { if (u) URL.revokeObjectURL(u); return null; }); }}>
+              <div className="grid grid-cols-3 gap-2 w-full">
+                <Button variant="outline" size="sm" onClick={() => { setPhase("idle"); setVideoUrl((u) => { if (u) URL.revokeObjectURL(u); return null; }); }}>
                   {t("Regenerate", "重新生成")}
                 </Button>
-                <Button variant="outline" onClick={handleDownload}>
+                <Button variant="outline" size="sm" onClick={handleDownload}>
                   <Download size={14} />
                   {t("Download", "下載")}
                 </Button>
-                <Button onClick={handleShare}>
+                <Button size="sm" onClick={handleShare}>
                   <Share2 size={14} />
                   {t("Share", "分享")}
                 </Button>
-              </>
+              </div>
             )}
           </div>
         </div>

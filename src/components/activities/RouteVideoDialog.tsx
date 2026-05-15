@@ -305,7 +305,8 @@ const RouteVideoDialog = ({
       const DURATION_MS = computeDurationMs(distanceMeters);
 
       // Pre-warm tiles along the entire flight path so frames don't show grey areas.
-      const SAMPLES = 10;
+      // Pre-warm fewer poses so we don't blow tile cache on mobile.
+      const SAMPLES = 5;
       for (let i = 0; i <= SAMPLES; i++) {
         const f = i / SAMPLES;
         const p = pointAt(f);

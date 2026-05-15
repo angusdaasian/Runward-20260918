@@ -106,6 +106,9 @@ const PlanNextWorkoutCard = ({ lang, activityDate, isPremium, onResolved }: Prop
       day.distance_km = newDistance;
       day.pace = next.pace ?? day.pace;
       day.description = next.description ?? day.description;
+      if (next.type) day.type = next.type;
+      if (next.title) day.title = next.title;
+      if (next.color) day.color = next.color;
       if (day.type === "Rest" && typeof newDistance === "number" && newDistance > 0) {
         day.type = "Easy";
         day.title = isZh ? "輕鬆跑" : "Easy Run";

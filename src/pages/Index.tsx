@@ -1,8 +1,7 @@
 import { useState, useEffect, lazy, Suspense } from "react";
-import { Activity, Dumbbell, Loader2, BarChart3, Shield, Award, Trophy, WifiOff } from "lucide-react";
+import { Activity, Dumbbell, Loader2, BarChart3, Award, Trophy, WifiOff } from "lucide-react";
 import { Lang, t } from "@/lib/i18n";
 import { useAuth } from "@/contexts/AuthContext";
-import { useAdmin } from "@/hooks/use-admin";
 import { useOnlineStatus } from "@/hooks/use-online-status";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { confirmLeave } from "@/lib/unsavedGuard";
@@ -30,7 +29,6 @@ const ONBOARDING_SIGNUP_IN_PROGRESS_KEY = "onboarding_signup_in_progress";
 
 const Index = () => {
   const { user, loading, isWarmResume } = useAuth();
-  const { isAdmin } = useAdmin();
   const { online } = useOnlineStatus();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -189,17 +187,6 @@ const Index = () => {
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-background">
       <div style={{ height: 'var(--safe-area-top, 0px)' }} className="shrink-0" />
-      {isAdmin && (
-        <div className="flex justify-end p-2">
-          <button
-            onClick={() => navigate("/admin")}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
-          >
-            <Shield size={14} />
-            Admin
-          </button>
-        </div>
-      )}
       {/* Shared header across all tabs */}
       {activeTab !== "more" && (
         <AppHeader

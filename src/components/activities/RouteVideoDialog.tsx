@@ -7,6 +7,11 @@ import { toast } from "sonner";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { supabase } from "@/integrations/supabase/client";
+import appIcon from "@/assets/app-icon.png";
+
+// Preload app logo once for canvas overlay
+const logoImg = new Image();
+logoImg.src = appIcon;
 
 // ---------- Polyline decoder ----------
 function decodePolyline(encoded: string): [number, number][] {
@@ -38,11 +43,13 @@ interface Props {
 }
 
 // Keep the offscreen WebGL canvas modest — high-pitch Mapbox + video capture can
-// exhaust mobile GPU memory. 540x960 is still vertical-video friendly but much safer.
-const CANVAS_W = 540;
-const CANVAS_H = 960;
-const MAP_H_FRAC = 0.76;
-const FLYOVER_PITCH = 52;
+// exhaust mobile GPU memory. 480x854 keeps a 9:16 vertical aspect with minimal VRAM.
+const CANVAS_W = 480;
+const CANVAS_H = 854;
+// Map fills the whole canvas; overlay text floats on top with text shadow,
+// so the data fields look transparent (no dark panel underneath).
+const MAP_H_FRAC = 1.0;
+const FLYOVER_PITCH = 48;
 const MAX_BEARING_STEP = 0.9;
 // Dynamic flyover duration: scales with route length, clamped to a sane range.
 function computeDurationMs(distanceMeters: number): number {
@@ -117,8 +124,7 @@ const RouteVideoDialog = ({
     setProgress(0);
 
     try {
-      const lowGpuMode = isLowGpuDevice();
-      const flyoverPitch = lowGpuMode ? 38 : FLYOVER_PITCH;
+      const flyoverPitch = FLYOVER_PITCH;
       const token = await getMapboxToken();
       mapboxgl.accessToken = token;
 
@@ -240,9 +246,11 @@ const RouteVideoDialog = ({
       if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; }
 
       // Initial bounds-fit center/zoom
+      // Always use a lightweight style for video capture — terrain/outdoors styles
+      // load far more tiles and are the main cause of GPU OOM during capture.
       const map = new mapboxgl.Map({
         container,
-        style: lowGpuMode ? "mapbox://styles/mapbox/light-v11" : "mapbox://styles/mapbox/outdoors-v12",
+        style: "mapbox://styles/mapbox/light-v11",
         center: [(minLon + maxLon) / 2, (minLat + maxLat) / 2],
         zoom: 13,
         pitch: 0,
@@ -251,7 +259,7 @@ const RouteVideoDialog = ({
         preserveDrawingBuffer: true,
         attributionControl: false,
         antialias: false,
-        maxTileCacheSize: lowGpuMode ? 12 : 24,
+        maxTileCacheSize: 8,
         performanceMetricsCollection: false,
         collectResourceTiming: false,
         contextCreateOptions: { extTextureFilterAnisotropicForceOff: true },
@@ -274,26 +282,9 @@ const RouteVideoDialog = ({
         map.once("error", (e) => reject(e.error || new Error("Map load failed")));
       });
 
-      // 3D terrain + sky. Keep low-memory devices on a flatter map to avoid
-      // WebGL context loss while recording from the canvas.
-      if (!lowGpuMode) {
-        map.addSource("mapbox-dem", {
-          type: "raster-dem",
-          url: "mapbox://mapbox.mapbox-terrain-dem-v1",
-          tileSize: 256,
-          maxzoom: 13,
-        });
-        map.setTerrain({ source: "mapbox-dem", exaggeration: 1.2 });
-        map.addLayer({
-          id: "sky",
-          type: "sky",
-          paint: {
-            "sky-type": "atmosphere",
-            "sky-atmosphere-sun": [0, 90],
-            "sky-atmosphere-sun-intensity": 10,
-          },
-        });
-      }
+      // 3D terrain/sky disabled — too expensive during canvas capture, causes
+      // GPU OOM on mobile. The flat lightweight style still looks good with the
+      // tilted route line on top.
 
       // Route source/layers (full route faded + progressive route bright)
       map.addSource("route-full", { type: "geojson", data: { type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: coords } } });
@@ -333,15 +324,8 @@ const RouteVideoDialog = ({
       // Compute dynamic flyover duration from route length
       const DURATION_MS = computeDurationMs(distanceMeters);
 
-      // Pre-warm tiles along the entire flight path so frames don't show grey areas.
-      // Pre-warm fewer poses so we don't blow tile cache on mobile.
-      const SAMPLES = 3;
-      for (let i = 0; i <= SAMPLES; i++) {
-        const f = i / SAMPLES;
-        const p = pointAt(f);
-        map.jumpTo({ center: p.pos, zoom: flyoverZoom, pitch: flyoverPitch, bearing: p.bear });
-        await new Promise<void>((resolve) => map.once("idle", () => resolve()));
-      }
+      // Skip pre-warm of intermediate poses — each `idle` wait keeps tiles
+      // resident and balloons GPU memory. Tiles will stream in during recording.
 
       // Move camera to the flyover START pose, then wait for tiles+terrain to be fully ready
       const startPoint = pointAt(0);
@@ -361,7 +345,7 @@ const RouteVideoDialog = ({
       const ctx = composite.getContext("2d")!;
       const mapH = Math.floor(CANVAS_H * MAP_H_FRAC);
 
-      const stream = composite.captureStream(24);
+      const stream = composite.captureStream(20);
       const mimeCandidates = [
         "video/mp4;codecs=h264",
         "video/webm;codecs=vp9",
@@ -369,7 +353,7 @@ const RouteVideoDialog = ({
         "video/webm",
       ];
       const mime = mimeCandidates.find((m) => (window as any).MediaRecorder?.isTypeSupported?.(m)) || "video/webm";
-      const recorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 4_500_000 });
+      const recorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 2_500_000 });
       const chunks: BlobPart[] = [];
       recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
       const stopped = new Promise<void>((resolve) => { recorder.onstop = () => resolve(); });
@@ -385,28 +369,39 @@ const RouteVideoDialog = ({
       const px = (n: number) => Math.round(n * S);
 
       const drawOverlay = (tEase: number, animDist: number, animTimeSec: number, curPaceSec: number) => {
-        // Top fade for title legibility
-        const topFade = ctx.createLinearGradient(0, 0, 0, px(240));
-        topFade.addColorStop(0, "rgba(0,0,0,0.6)");
+        // Soft top fade so the title stays readable on bright map tiles.
+        const topFade = ctx.createLinearGradient(0, 0, 0, px(260));
+        topFade.addColorStop(0, "rgba(0,0,0,0.45)");
         topFade.addColorStop(1, "rgba(0,0,0,0)");
         ctx.fillStyle = topFade;
-        ctx.fillRect(0, 0, CANVAS_W, px(240));
+        ctx.fillRect(0, 0, CANVAS_W, px(260));
 
-        // Bottom panel
-        const panelY = mapH;
-        const panelH = CANVAS_H - mapH;
-        const grad = ctx.createLinearGradient(0, panelY - px(60), 0, CANVAS_H);
-        grad.addColorStop(0, "rgba(10,10,10,0)");
-        grad.addColorStop(0.25, "rgba(10,10,10,0.95)");
-        grad.addColorStop(1, "#1a1a1a");
-        ctx.fillStyle = grad;
-        ctx.fillRect(0, panelY - px(60), CANVAS_W, panelH + px(60));
+        // Soft bottom fade so the stats stay readable on bright map tiles.
+        const botFade = ctx.createLinearGradient(0, CANVAS_H - px(440), 0, CANVAS_H);
+        botFade.addColorStop(0, "rgba(0,0,0,0)");
+        botFade.addColorStop(1, "rgba(0,0,0,0.55)");
+        ctx.fillStyle = botFade;
+        ctx.fillRect(0, CANVAS_H - px(440), CANVAS_W, px(440));
+
+        // App logo (top-left) — drawn only once it has decoded
+        if (logoImg.complete && logoImg.naturalWidth > 0) {
+          const logoSize = px(72);
+          ctx.save();
+          ctx.shadowColor = "rgba(0,0,0,0.5)";
+          ctx.shadowBlur = px(8);
+          ctx.drawImage(logoImg, px(40), px(40), logoSize, logoSize);
+          ctx.restore();
+        }
 
         // Title
+        ctx.save();
+        ctx.shadowColor = "rgba(0,0,0,0.65)";
+        ctx.shadowBlur = px(10);
         ctx.fillStyle = "#fff";
-        ctx.font = `700 ${px(56)}px ui-sans-serif, system-ui, -apple-system, 'Segoe UI'`;
+        ctx.font = `700 ${px(50)}px ui-sans-serif, system-ui, -apple-system, 'Segoe UI'`;
         ctx.textAlign = "left";
-        ctx.fillText(name.length > 28 ? name.slice(0, 27) + "…" : name, px(56), px(110));
+        ctx.fillText(name.length > 24 ? name.slice(0, 23) + "…" : name, px(140), px(95));
+        ctx.restore();
 
         // Stats
         const ah = Math.floor(animTimeSec / 3600);
@@ -420,28 +415,37 @@ const RouteVideoDialog = ({
         const curPaceStr = curPaceSec > 0 ? `${cpm}:${String(cps).padStart(2, "0")}/km` : "--";
 
         const drawStat = (label: string, value: string, x: number, y: number) => {
-          ctx.fillStyle = "rgba(255,255,255,0.55)";
-          ctx.font = `500 ${px(28)}px ui-sans-serif, system-ui`;
+          ctx.save();
+          ctx.shadowColor = "rgba(0,0,0,0.7)";
+          ctx.shadowBlur = px(8);
+          ctx.fillStyle = "rgba(255,255,255,0.75)";
+          ctx.font = `500 ${px(26)}px ui-sans-serif, system-ui`;
+          ctx.textAlign = "left";
           ctx.fillText(label, x, y);
           ctx.fillStyle = "#fff";
-          ctx.font = `800 ${px(76)}px ui-sans-serif, system-ui`;
-          ctx.fillText(value, x, y + px(78));
+          ctx.font = `800 ${px(64)}px ui-sans-serif, system-ui`;
+          ctx.fillText(value, x, y + px(72));
+          ctx.restore();
         };
-        const padX = px(64);
-        const baseY = panelY + px(80);
-        const colGap = px(540);
-        drawStat(t("DISTANCE", "距離"), `${animDist.toFixed(2)} km`, padX, baseY);
-        drawStat(t("TIME", "時間"), animTimeStr, padX + colGap, baseY);
-        const row2Y = baseY + px(200);
+        const padX = px(56);
+        const colGap = CANVAS_W / 2 - px(8);
+        const row2Y = CANVAS_H - px(140);
+        const row1Y = row2Y - px(180);
+        drawStat(t("DISTANCE", "距離"), `${animDist.toFixed(2)} km`, padX, row1Y);
+        drawStat(t("TIME", "時間"), animTimeStr, padX + colGap, row1Y);
         drawStat(t("PACE", "配速"), curPaceStr, padX, row2Y);
         if (elevationGainMeters != null) {
           drawStat(t("ELEV", "爬升"), `${Math.round(elevationGainMeters)} m`, padX + colGap, row2Y);
         }
 
-        ctx.fillStyle = "rgba(255,255,255,0.5)";
-        ctx.font = `600 ${px(24)}px ui-sans-serif, system-ui`;
+        ctx.save();
+        ctx.shadowColor = "rgba(0,0,0,0.7)";
+        ctx.shadowBlur = px(6);
+        ctx.fillStyle = "rgba(255,255,255,0.85)";
+        ctx.font = `700 ${px(22)}px ui-sans-serif, system-ui`;
         ctx.textAlign = "right";
-        ctx.fillText("RUNWARD", CANVAS_W - px(56), CANVAS_H - px(48));
+        ctx.fillText("RUNWARD", CANVAS_W - px(40), CANVAS_H - px(36));
+        ctx.restore();
       };
 
       const mapCanvas = map.getCanvas();

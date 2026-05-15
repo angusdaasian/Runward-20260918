@@ -7,6 +7,7 @@ import { SettingsSkeleton } from "@/components/ui/PageSkeleton";
 import { supabase } from "@/integrations/supabase/client";
 import { usePremium } from "@/contexts/PremiumContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { useAdmin } from "@/hooks/use-admin";
 import { useLocation, useNavigate } from "react-router-dom";
 import ProfileSection from "@/components/ProfileSection";
 import { Button } from "@/components/ui/button";
@@ -59,6 +60,7 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps }: Props
   const [showDefs, setShowDefs] = useState(false);
   const { isPremium, expiresAt, plan, rcEntitlement } = usePremium();
   const { user, signOut } = useAuth();
+  const { isAdmin, loading: adminLoading } = useAdmin();
   const { toast } = useToast();
   const { launchPaywall, redeemOfferCode } = useDespiaPurchases();
 
@@ -415,6 +417,19 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps }: Props
               {lang === "zh" ? "📲 啟用推送通知" : "📲 Enable Push Notifications"}
             </button>
           </div>
+        )}
+
+        {!adminLoading && isAdmin && (
+          <button
+            onClick={() => navigate("/admin", { state: { from: currentRoute } })}
+            className="w-full bg-card border border-border rounded-xl p-4 flex items-center justify-between"
+          >
+            <div className="flex items-center gap-3">
+              <Shield size={20} className="text-primary" />
+              <span className="font-medium text-foreground">{lang === "zh" ? "管理員" : "Admin Panel"}</span>
+            </div>
+            <ChevronRight size={18} className="text-muted-foreground" />
+          </button>
         )}
 
         <button

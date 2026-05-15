@@ -325,18 +325,18 @@ const RouteVideoDialog = ({
       const overviewZoom = cam?.zoom ?? 13;
       // Lower flyover zoom keeps far-tiles on screen so we don't expose grey gutters
       // when the camera pitches/rotates. Was overviewZoom + 2.2 (too tight).
-      const flyoverZoom = Math.min(15.2, Math.max(13, overviewZoom + 0.8));
+      const flyoverZoom = Math.min(14.7, Math.max(12.4, overviewZoom + 0.45));
 
       // Compute dynamic flyover duration from route length
       const DURATION_MS = computeDurationMs(distanceMeters);
 
       // Pre-warm tiles along the entire flight path so frames don't show grey areas.
       // Pre-warm fewer poses so we don't blow tile cache on mobile.
-      const SAMPLES = 5;
+      const SAMPLES = 3;
       for (let i = 0; i <= SAMPLES; i++) {
         const f = i / SAMPLES;
         const p = pointAt(f);
-        map.jumpTo({ center: p.pos, zoom: flyoverZoom, pitch: 65, bearing: p.bear });
+        map.jumpTo({ center: p.pos, zoom: flyoverZoom, pitch: FLYOVER_PITCH, bearing: p.bear });
         await new Promise<void>((resolve) => map.once("idle", () => resolve()));
       }
 
@@ -345,7 +345,7 @@ const RouteVideoDialog = ({
       map.jumpTo({
         center: startPoint.pos,
         zoom: flyoverZoom,
-        pitch: 65,
+        pitch: FLYOVER_PITCH,
         bearing: startPoint.bear,
       });
       await new Promise<void>((resolve) => map.once("idle", () => resolve()));

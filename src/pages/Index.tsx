@@ -236,9 +236,6 @@ const Index = () => {
             <AnalyticsTab lang={lang} />
           </Suspense>
         </div>
-        {activeTab === "activities" && (
-          <ActivitiesTab lang={lang} />
-        )}
         {activeTab === "more" && !showConnectApps && (
           <Suspense fallback={<SettingsSkeleton />}>
             <MoreTab
@@ -268,7 +265,12 @@ const Index = () => {
             <RewardsTab lang={lang} />
           </Suspense>
         )}
-      </PullToRefreshContainer>
+      </div>
+      {activeTab === "activities" && (
+        <PullToRefreshContainer>
+          <ActivitiesTab lang={lang} />
+        </PullToRefreshContainer>
+      )}
 
       <div className="fixed bottom-0 left-0 right-0 bg-card border-t border-border" style={{ paddingBottom: 'var(--safe-area-bottom, 0px)' }}>
         <div className="relative flex justify-around items-center h-16 max-w-lg mx-auto">

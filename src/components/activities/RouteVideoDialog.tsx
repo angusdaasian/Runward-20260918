@@ -133,6 +133,7 @@ const RouteVideoDialog = ({
 
     setPhase("loading");
     setProgress(0);
+    renderFinishedRef.current = false;
 
     try {
       const flyoverPitch = FLYOVER_PITCH;

@@ -538,19 +538,6 @@ const RouteVideoDialog = ({
     handleDownload();
   };
 
-  const handleShare = async () => {
-    if (!videoBlobRef.current) return;
-    const file = new File([videoBlobRef.current], filename(), { type: videoBlobRef.current.type });
-    try {
-      // @ts-ignore
-      if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        await navigator.share({ files: [file], title: name, text: t("My route on Runward", "我的 Runward 路線") });
-        return;
-      }
-    } catch {/* fall through */}
-    handleDownload();
-  };
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">

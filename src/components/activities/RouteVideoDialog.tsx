@@ -562,8 +562,8 @@ const RouteVideoDialog = ({
         let camZoom: number;
         let routeFrac: number;
 
-        if (tEase < 0.92) {
-          const k = tEase / 0.92;
+        if (tEase < 0.88) {
+          const k = tEase / 0.88;
           routeFrac = k;
           const p = pointAt(k);
           camCenter = p.pos;
@@ -571,24 +571,25 @@ const RouteVideoDialog = ({
           camPitch = flyoverPitch;
           camZoom = flyoverZoom;
         } else {
-          const k = (tEase - 0.92) / 0.08;
+          const k = (tEase - 0.88) / 0.12;
+          const ke = k * k * (3 - 2 * k); // smoothstep for the pull-back
           const end = pointAt(1);
           routeFrac = 1;
           camCenter = [
-            end.pos[0] * (1 - k) + ((minLon + maxLon) / 2) * k,
-            end.pos[1] * (1 - k) + ((minLat + maxLat) / 2) * k,
+            end.pos[0] * (1 - ke) + finalCenter[0] * ke,
+            end.pos[1] * (1 - ke) + finalCenter[1] * ke,
           ];
           targetBearing = smoothBearing; // hold heading during pull-back, no spin
-          camPitch = flyoverPitch * (1 - k) + 24 * k;
-          camZoom = flyoverZoom * (1 - k) + finalZoom * k;
+          camPitch = flyoverPitch * (1 - ke) + 24 * ke;
+          camZoom = flyoverZoom * (1 - ke) + finalZoom * ke;
         }
 
         // Low-pass + per-frame clamp so bearing changes glide instead of snapping
         // when the route polyline has tight turns or noisy GPS points.
         const delta = shortestDelta(smoothBearing, targetBearing);
-        const slowedDelta = delta * 0.03;
+        const slowedDelta = delta * 0.018;
         const clampedDelta = Math.max(-MAX_BEARING_STEP, Math.min(MAX_BEARING_STEP, slowedDelta));
-        smoothBearing = (smoothBearing + clampedDelta * smoothStep(0.02, 0.12, tRaw) + 360) % 360;
+        smoothBearing = (smoothBearing + clampedDelta * smoothStep(0.02, 0.18, tRaw) + 360) % 360;
         const camBearing = smoothBearing;
 
         map.jumpTo({ center: camCenter, bearing: camBearing, pitch: camPitch, zoom: camZoom });

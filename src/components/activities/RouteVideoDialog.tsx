@@ -674,9 +674,9 @@ const RouteVideoDialog = ({
           </div>
 
           {videoUrl && (
-            <Button variant="default" className="w-full" onClick={handleDownload}>
-              <Download size={14} />
-              {t("Download video", "下載影片")}
+            <Button variant="default" className="w-full" onClick={handleDownload} disabled={isSavingVideo}>
+              {isSavingVideo ? <Loader2 className="animate-spin" size={14} /> : <Download size={14} />}
+              {isSavingVideo ? t("Opening…", "開啟中…") : t("Download video", "下載影片")}
             </Button>
           )}
 
@@ -699,9 +699,9 @@ const RouteVideoDialog = ({
                 <Button variant="outline" size="sm" onClick={() => { setPhase("idle"); setVideoUrl((u) => { if (u) URL.revokeObjectURL(u); return null; }); }}>
                   {t("Regenerate", "重新生成")}
                 </Button>
-                <Button size="sm" onClick={handleShare}>
-                  <Share2 size={14} />
-                  {t("Share", "分享")}
+                <Button size="sm" onClick={handleShare} disabled={isSavingVideo}>
+                  {isSavingVideo ? <Loader2 className="animate-spin" size={14} /> : <Share2 size={14} />}
+                  {isSavingVideo ? t("Opening…", "開啟中…") : t("Share", "分享")}
                 </Button>
               </div>
             )}

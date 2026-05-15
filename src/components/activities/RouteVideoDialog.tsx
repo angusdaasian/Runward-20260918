@@ -558,7 +558,7 @@ const RouteVideoDialog = ({
           ];
           targetBearing = smoothBearing; // hold heading during pull-back, no spin
           camPitch = flyoverPitch * (1 - k) + 24 * k;
-          camZoom = flyoverZoom * (1 - k) + (overviewZoom + 0.3) * k;
+          camZoom = flyoverZoom * (1 - k) + finalZoom * k;
         }
 
         // Low-pass + per-frame clamp so bearing changes glide instead of snapping

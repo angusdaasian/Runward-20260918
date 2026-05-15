@@ -148,7 +148,8 @@ const RouteVideoDialog = ({
         if (lo < minLon) minLon = lo; if (lo > maxLon) maxLon = lo;
       }
 
-      // Build pace samples (sec/km)
+      // Build pace samples (sec/km) — match the elevation/pace chart's smoothing.
+      // Use a 30s rolling window over distance/time, then IQR-clip to remove spikes.
       const paceSamples: { frac: number; paceSec: number }[] = [];
       if (streams && streams.length) {
         const distStream = streams.find((s: any) => s.type === "distance");
@@ -159,21 +160,34 @@ const RouteVideoDialog = ({
         const timeData: number[] | undefined = timeStream?.data;
         if (distData && distData.length > 1) {
           const totalDist = distData[distData.length - 1] || 1;
-          const windowSec = 20;
+          const windowSec = 30;
+          const raw: { frac: number; paceSec: number }[] = [];
           for (let i = 0; i < distData.length; i++) {
             let paceSec = 0;
-            if (velData && velData[i] != null && velData[i] > 0.3) {
-              paceSec = 1000 / velData[i];
-            } else if (timeData) {
+            if (timeData) {
               let j = i;
               while (j > 0 && (timeData[i] - timeData[j]) < windowSec) j--;
               const dt = timeData[i] - timeData[j];
               const dd = distData[i] - distData[j];
               if (dd > 0 && dt > 0) paceSec = (dt / dd) * 1000;
+            } else if (velData && velData[i] > 0.3) {
+              paceSec = 1000 / velData[i];
             }
-            if (paceSec > 0 && paceSec < 1800) {
-              paceSamples.push({ frac: distData[i] / totalDist, paceSec });
+            // Drop unrealistic paces (slower than 15:00/km, faster than 2:30/km)
+            if (paceSec >= 150 && paceSec <= 900) {
+              raw.push({ frac: distData[i] / totalDist, paceSec });
             }
+          }
+          // IQR clip
+          if (raw.length > 8) {
+            const sorted = raw.map((r) => r.paceSec).sort((a, b) => a - b);
+            const q = (f: number) => sorted[Math.floor(sorted.length * f)];
+            const q1 = q(0.25), q3 = q(0.75);
+            const iqr = q3 - q1;
+            const lo = q1 - 1.5 * iqr, hi = q3 + 1.5 * iqr;
+            for (const r of raw) if (r.paceSec >= lo && r.paceSec <= hi) paceSamples.push(r);
+          } else {
+            paceSamples.push(...raw);
           }
         }
       }
@@ -185,11 +199,18 @@ const RouteVideoDialog = ({
           const mid = (lo + hi) >> 1;
           if (paceSamples[mid].frac < frac) lo = mid + 1; else hi = mid;
         }
-        return paceSamples[lo].paceSec;
+        // Linear interpolate between neighbors so the readout glides
+        const i = lo;
+        const a = paceSamples[Math.max(0, i - 1)];
+        const b = paceSamples[i];
+        if (a === b || b.frac === a.frac) return b.paceSec;
+        const t = Math.max(0, Math.min(1, (frac - a.frac) / (b.frac - a.frac)));
+        return a.paceSec + (b.paceSec - a.paceSec) * t;
       };
 
-      // Build cumulative elevation-gain samples (meters gained vs. fraction of route)
-      const elevSamples: { frac: number; gain: number }[] = [];
+      // Build altitude samples — the on-screen "ELEV" should match the
+      // elevation curve (which plots raw altitude in meters), not cumulative gain.
+      const elevSamples: { frac: number; alt: number }[] = [];
       if (streams && streams.length) {
         const distStream = streams.find((s: any) => s.type === "distance");
         const altStream = streams.find((s: any) => s.type === "altitude");
@@ -197,30 +218,27 @@ const RouteVideoDialog = ({
         const altData: number[] | undefined = altStream?.data;
         if (distData && altData && distData.length === altData.length && distData.length > 1) {
           const totalDist = distData[distData.length - 1] || 1;
-          let gain = 0;
-          let prevAlt = altData[0];
-          // Tiny threshold filters GPS jitter
-          const minStep = 1;
           for (let i = 0; i < distData.length; i++) {
-            const da = altData[i] - prevAlt;
-            if (da >= minStep) { gain += da; prevAlt = altData[i]; }
-            else if (da < 0) { prevAlt = altData[i]; }
-            elevSamples.push({ frac: distData[i] / totalDist, gain });
+            if (altData[i] != null) {
+              elevSamples.push({ frac: distData[i] / totalDist, alt: altData[i] });
+            }
           }
         }
       }
-      const totalElev = elevationGainMeters ?? (elevSamples.length ? elevSamples[elevSamples.length - 1].gain : 0);
+      const totalElev = elevationGainMeters ?? 0;
       const elevAt = (frac: number): number => {
-        if (elevSamples.length === 0) return totalElev * frac;
+        if (elevSamples.length === 0) return 0;
         let lo = 0, hi = elevSamples.length - 1;
         while (lo < hi) {
           const mid = (lo + hi) >> 1;
           if (elevSamples[mid].frac < frac) lo = mid + 1; else hi = mid;
         }
-        // Scale to match the canonical total when available
-        const raw = elevSamples[lo].gain;
-        const finalGain = elevSamples[elevSamples.length - 1].gain || 1;
-        return elevationGainMeters != null ? (raw / finalGain) * elevationGainMeters : raw;
+        const i = lo;
+        const a = elevSamples[Math.max(0, i - 1)];
+        const b = elevSamples[i];
+        if (a === b || b.frac === a.frac) return b.alt;
+        const t = Math.max(0, Math.min(1, (frac - a.frac) / (b.frac - a.frac)));
+        return a.alt + (b.alt - a.alt) * t;
       };
 
       // Cumulative distances along polyline (in pixel-agnostic meters via haversine)

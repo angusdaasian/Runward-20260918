@@ -39,7 +39,8 @@ interface Props {
   movingTimeSeconds: number;
   averageSpeed: number;
   elevationGainMeters: number | null;
-  streams?: any[];
+  streams?: Array<{ type: string; data: number[] }>;
+  chartData?: Array<{ distance_km: number | string; pace?: number; altitude?: number; time?: number }>;
 }
 
 // HD vertical keeps the video sharp while avoiding iOS Safari/WebGL memory
@@ -51,13 +52,14 @@ const CANVAS_H = 1280;
 const MAP_H_FRAC = 1.0;
 const FLYOVER_PITCH = 62;
 // Lower max-step + lower smoothing factor below = much gentler rotation.
-const MAX_BEARING_STEP = 0.55;
+const MAX_BEARING_STEP = 0.38;
+const FLYOVER_END_FRAC = 0.94;
 // Dynamic flyover duration: scales with route length, clamped to a sane range.
 function computeDurationMs(distanceMeters: number): number {
   const km = Math.max(0, distanceMeters / 1000);
-  // ~1.8s per km, +9s base, clamp 11s..42s — slower so the camera glides.
-  const ms = (9 + km * 1.8) * 1000;
-  return Math.max(11000, Math.min(42000, ms));
+  // Slower close flyover so the camera can stay near the route without harsh turns.
+  const ms = (12 + km * 2.4) * 1000;
+  return Math.max(14000, Math.min(60000, ms));
 }
 
 let cachedToken: string | null = null;
@@ -92,7 +94,7 @@ function isAppleMobileDevice() {
 
 const RouteVideoDialog = ({
   open, onOpenChange, lang, polyline, name,
-  distanceMeters, movingTimeSeconds, averageSpeed, elevationGainMeters, streams,
+  distanceMeters, movingTimeSeconds, averageSpeed, elevationGainMeters, streams, chartData,
 }: Props) => {
   const isZh = lang === "zh";
   const t = (en: string, zh: string) => (isZh ? zh : en);
@@ -148,46 +150,42 @@ const RouteVideoDialog = ({
         if (lo < minLon) minLon = lo; if (lo > maxLon) maxLon = lo;
       }
 
-      // Build pace samples (sec/km) — match the elevation/pace chart's smoothing.
-      // Use a 30s rolling window over distance/time, then IQR-clip to remove spikes.
+      // Build samples from the exact chart points shown in ActivityDetail.
+      // The chart stores pace as min/km, so convert only for the video text.
+      const chartPoints = (chartData || [])
+        .map((d) => ({
+          km: typeof d.distance_km === "string" ? Number(d.distance_km) : d.distance_km,
+          pace: typeof d.pace === "number" ? d.pace : undefined,
+          altitude: typeof d.altitude === "number" ? d.altitude : undefined,
+        }))
+        .filter((d) => Number.isFinite(d.km) && d.km >= 0)
+        .sort((a, b) => a.km - b.km);
+
       const paceSamples: { frac: number; paceSec: number }[] = [];
-      if (streams && streams.length) {
-        const distStream = streams.find((s: any) => s.type === "distance");
-        const velStream = streams.find((s: any) => s.type === "velocity_smooth");
-        const timeStream = streams.find((s: any) => s.type === "time");
+      if (chartPoints.length > 1 && distKm > 0) {
+        for (const p of chartPoints) {
+          if (typeof p.pace === "number" && p.pace > 0) {
+            paceSamples.push({ frac: Math.max(0, Math.min(1, p.km / distKm)), paceSec: p.pace * 60 });
+          }
+        }
+      }
+
+      // Fallback mirrors the Strava chart path: velocity_smooth sampled over distance.
+      if (paceSamples.length === 0 && streams && streams.length) {
+        const distStream = streams.find((s) => s.type === "distance");
+        const velStream = streams.find((s) => s.type === "velocity_smooth");
         const distData: number[] | undefined = distStream?.data;
         const velData: number[] | undefined = velStream?.data;
-        const timeData: number[] | undefined = timeStream?.data;
-        if (distData && distData.length > 1) {
-          const totalDist = distData[distData.length - 1] || 1;
-          const windowSec = 30;
-          const raw: { frac: number; paceSec: number }[] = [];
-          for (let i = 0; i < distData.length; i++) {
-            let paceSec = 0;
-            if (timeData) {
-              let j = i;
-              while (j > 0 && (timeData[i] - timeData[j]) < windowSec) j--;
-              const dt = timeData[i] - timeData[j];
-              const dd = distData[i] - distData[j];
-              if (dd > 0 && dt > 0) paceSec = (dt / dd) * 1000;
-            } else if (velData && velData[i] > 0.3) {
-              paceSec = 1000 / velData[i];
+        if (distData && velData && distData.length > 1) {
+          const totalDist = distData[distData.length - 1] || distanceMeters || 1;
+          const step = Math.max(1, Math.floor(distData.length / 200));
+          for (let i = 0; i < distData.length; i += step) {
+            if (velData[i] > 0) {
+              const paceMin = 1000 / velData[i] / 60;
+              if (paceMin >= 2.5 && paceMin <= 15) {
+                paceSamples.push({ frac: Math.max(0, Math.min(1, distData[i] / totalDist)), paceSec: paceMin * 60 });
+              }
             }
-            // Drop unrealistic paces (slower than 15:00/km, faster than 2:30/km)
-            if (paceSec >= 150 && paceSec <= 900) {
-              raw.push({ frac: distData[i] / totalDist, paceSec });
-            }
-          }
-          // IQR clip
-          if (raw.length > 8) {
-            const sorted = raw.map((r) => r.paceSec).sort((a, b) => a - b);
-            const q = (f: number) => sorted[Math.floor(sorted.length * f)];
-            const q1 = q(0.25), q3 = q(0.75);
-            const iqr = q3 - q1;
-            const lo = q1 - 1.5 * iqr, hi = q3 + 1.5 * iqr;
-            for (const r of raw) if (r.paceSec >= lo && r.paceSec <= hi) paceSamples.push(r);
-          } else {
-            paceSamples.push(...raw);
           }
         }
       }
@@ -208,24 +206,33 @@ const RouteVideoDialog = ({
         return a.paceSec + (b.paceSec - a.paceSec) * t;
       };
 
-      // Build altitude samples — the on-screen "ELEV" should match the
-      // elevation curve (which plots raw altitude in meters), not cumulative gain.
       const elevSamples: { frac: number; alt: number }[] = [];
-      if (streams && streams.length) {
-        const distStream = streams.find((s: any) => s.type === "distance");
-        const altStream = streams.find((s: any) => s.type === "altitude");
+      if (chartPoints.length > 1 && distKm > 0) {
+        for (const p of chartPoints) {
+          if (typeof p.altitude === "number") {
+            elevSamples.push({ frac: Math.max(0, Math.min(1, p.km / distKm)), alt: p.altitude });
+          }
+        }
+      }
+
+      // Fallback mirrors the Strava chart path: raw altitude sampled by distance.
+      if (elevSamples.length === 0 && streams && streams.length) {
+        const distStream = streams.find((s) => s.type === "distance");
+        const altStream = streams.find((s) => s.type === "altitude");
         const distData: number[] | undefined = distStream?.data;
         const altData: number[] | undefined = altStream?.data;
         if (distData && altData && distData.length === altData.length && distData.length > 1) {
-          const totalDist = distData[distData.length - 1] || 1;
-          for (let i = 0; i < distData.length; i++) {
+          const totalDist = distData[distData.length - 1] || distanceMeters || 1;
+          const step = Math.max(1, Math.floor(distData.length / 200));
+          for (let i = 0; i < distData.length; i += step) {
             if (altData[i] != null) {
-              elevSamples.push({ frac: distData[i] / totalDist, alt: altData[i] });
+              elevSamples.push({ frac: Math.max(0, Math.min(1, distData[i] / totalDist)), alt: altData[i] });
             }
           }
         }
       }
       const totalElev = elevationGainMeters ?? 0;
+      const hasElevationOverlay = totalElev > 0 && elevSamples.length > 0;
       const elevAt = (frac: number): number => {
         if (elevSamples.length === 0) return 0;
         let lo = 0, hi = elevSamples.length - 1;
@@ -385,8 +392,8 @@ const RouteVideoDialog = ({
 
       // Fit to bounds with padding to estimate target zoom.
       // Use generous padding for the final pull-back so even long routes fit on screen.
-      const bounds = new mapboxgl.LngLatBounds(coords[0] as any, coords[0] as any);
-      coords.forEach((c) => bounds.extend(c as any));
+      const bounds = new mapboxgl.LngLatBounds(coords[0], coords[0]);
+      coords.forEach((c) => bounds.extend(c));
       const cam = map.cameraForBounds(bounds, { padding: 120, pitch: 0, bearing: 0 });
       const overviewZoom = cam?.zoom ?? 13;
       // For the final reveal, fit with extra padding so the entire route is visible
@@ -395,10 +402,13 @@ const RouteVideoDialog = ({
       const finalCenter: [number, number] = finalCam?.center
         ? [(finalCam.center as mapboxgl.LngLat).lng, (finalCam.center as mapboxgl.LngLat).lat]
         : [(minLon + maxLon) / 2, (minLat + maxLat) / 2];
-      const finalZoom = Math.min(overviewZoom, (finalCam?.zoom ?? overviewZoom)) - 0.5;
+      const finalZoom = Math.max(0, Math.min(overviewZoom, (finalCam?.zoom ?? overviewZoom)) - 0.5);
       // Closer flyover zoom — user wants to see the route up close while
-      // traversing. Clamp so very short routes don't push past terrain detail.
-      const flyoverZoom = Math.min(16.2, Math.max(13.8, overviewZoom + 1.8));
+      // traversing. Use route length to keep long routes close instead of inheriting
+      // a very distant overview zoom; only the ending pull-back uses finalZoom.
+      const routeKm = Math.max(0.1, distanceMeters / 1000);
+      const closeZoomByLength = routeKm < 5 ? 16.4 : routeKm < 12 ? 15.8 : routeKm < 25 ? 15.2 : 14.7;
+      const flyoverZoom = Math.max(14.4, Math.min(16.6, Math.max(overviewZoom + 2.4, closeZoomByLength)));
 
       // Compute dynamic flyover duration from route length
       const DURATION_MS = computeDurationMs(distanceMeters);
@@ -441,7 +451,7 @@ const RouteVideoDialog = ({
           "video/webm;codecs=vp8",
           "video/webm",
         ];
-      const mime = mimeCandidates.find((m) => (window as any).MediaRecorder?.isTypeSupported?.(m)) || "";
+      const mime = mimeCandidates.find((m) => window.MediaRecorder?.isTypeSupported?.(m)) || "";
       const recorder = new MediaRecorder(stream, { ...(mime ? { mimeType: mime } : {}), videoBitsPerSecond: 5_000_000 });
       const chunks: BlobPart[] = [];
       recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
@@ -523,7 +533,7 @@ const RouteVideoDialog = ({
         drawStat(t("DISTANCE", "距離"), `${animDist.toFixed(2)} km`, padX, row1Y);
         drawStat(t("TIME", "時間"), animTimeStr, padX + colGap, row1Y);
         drawStat(t("PACE", "配速"), curPaceStr, padX, row2Y);
-        if (totalElev > 0) {
+        if (hasElevationOverlay) {
           drawStat(t("ELEV", "爬升"), `${Math.round(animElev)} m`, padX + colGap, row2Y);
         }
 
@@ -562,8 +572,8 @@ const RouteVideoDialog = ({
         let camZoom: number;
         let routeFrac: number;
 
-        if (tEase < 0.88) {
-          const k = tEase / 0.88;
+        if (tEase < FLYOVER_END_FRAC) {
+          const k = tEase / FLYOVER_END_FRAC;
           routeFrac = k;
           const p = pointAt(k);
           camCenter = p.pos;
@@ -571,7 +581,7 @@ const RouteVideoDialog = ({
           camPitch = flyoverPitch;
           camZoom = flyoverZoom;
         } else {
-          const k = (tEase - 0.88) / 0.12;
+          const k = (tEase - FLYOVER_END_FRAC) / (1 - FLYOVER_END_FRAC);
           const ke = k * k * (3 - 2 * k); // smoothstep for the pull-back
           const end = pointAt(1);
           routeFrac = 1;
@@ -593,7 +603,7 @@ const RouteVideoDialog = ({
         const camBearing = smoothBearing;
 
         map.jumpTo({ center: camCenter, bearing: camBearing, pitch: camPitch, zoom: camZoom });
-        progressSrc.setData({ type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: sliceCoords(routeFrac) } } as any);
+        progressSrc.setData({ type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: sliceCoords(routeFrac) } } as GeoJSON.Feature<GeoJSON.LineString>);
 
         // Force a synchronous paint, then composite
         map.triggerRepaint();
@@ -605,10 +615,11 @@ const RouteVideoDialog = ({
           ctx.drawImage(mapCanvas, 0, 0, CANVAS_W, mapH);
         } catch {/* ignore */}
 
-        const animDist = distKm * tEase;
-        const animTime = totalSec * tEase;
-        const curPaceSec = paceAt(tEase);
-        const animElev = elevAt(tEase);
+        const dataFrac = routeFrac;
+        const animDist = distKm * dataFrac;
+        const animTime = totalSec * dataFrac;
+        const curPaceSec = paceAt(dataFrac);
+        const animElev = elevAt(dataFrac);
         drawOverlay(tEase, animDist, animTime, curPaceSec, animElev);
 
         if (tRaw < 1) {

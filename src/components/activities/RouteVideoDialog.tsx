@@ -392,10 +392,13 @@ const RouteVideoDialog = ({
       // For the final reveal, fit with extra padding so the entire route is visible
       // (especially for long routes where the perspective tilt would otherwise clip it).
       const finalCam = map.cameraForBounds(bounds, { padding: 200, pitch: 24, bearing: 0 });
-      const finalZoom = Math.min(overviewZoom, (finalCam?.zoom ?? overviewZoom)) - 0.3;
-      // Lower flyover zoom keeps far-tiles on screen so we don't expose grey gutters
-      // when the camera pitches/rotates. Was overviewZoom + 2.2 (too tight).
-      const flyoverZoom = Math.min(14.7, Math.max(12.4, overviewZoom + 0.45));
+      const finalCenter: [number, number] = finalCam?.center
+        ? [(finalCam.center as mapboxgl.LngLat).lng, (finalCam.center as mapboxgl.LngLat).lat]
+        : [(minLon + maxLon) / 2, (minLat + maxLat) / 2];
+      const finalZoom = Math.min(overviewZoom, (finalCam?.zoom ?? overviewZoom)) - 0.5;
+      // Closer flyover zoom — user wants to see the route up close while
+      // traversing. Clamp so very short routes don't push past terrain detail.
+      const flyoverZoom = Math.min(16.2, Math.max(13.8, overviewZoom + 1.8));
 
       // Compute dynamic flyover duration from route length
       const DURATION_MS = computeDurationMs(distanceMeters);

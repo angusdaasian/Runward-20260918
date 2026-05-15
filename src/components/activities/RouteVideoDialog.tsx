@@ -295,10 +295,21 @@ const RouteVideoDialog = ({
       coords.forEach((c) => bounds.extend(c as any));
       const cam = map.cameraForBounds(bounds, { padding: 120, pitch: 0, bearing: 0 });
       const overviewZoom = cam?.zoom ?? 13;
-      const flyoverZoom = Math.min(17, overviewZoom + 2.2);
+      // Lower flyover zoom keeps far-tiles on screen so we don't expose grey gutters
+      // when the camera pitches/rotates. Was overviewZoom + 2.2 (too tight).
+      const flyoverZoom = Math.min(15.2, Math.max(13, overviewZoom + 0.8));
 
       // Compute dynamic flyover duration from route length
       const DURATION_MS = computeDurationMs(distanceMeters);
+
+      // Pre-warm tiles along the entire flight path so frames don't show grey areas.
+      const SAMPLES = 10;
+      for (let i = 0; i <= SAMPLES; i++) {
+        const f = i / SAMPLES;
+        const p = pointAt(f);
+        map.jumpTo({ center: p.pos, zoom: flyoverZoom, pitch: 65, bearing: p.bear });
+        await new Promise<void>((resolve) => map.once("idle", () => resolve()));
+      }
 
       // Move camera to the flyover START pose, then wait for tiles+terrain to be fully ready
       const startPoint = pointAt(0);
@@ -308,15 +319,7 @@ const RouteVideoDialog = ({
         pitch: 65,
         bearing: startPoint.bear,
       });
-      await new Promise<void>((resolve) => {
-        const onIdle = () => { resolve(); };
-        if (map.areTilesLoaded() && map.loaded()) {
-          // Still wait one idle for terrain DEM to settle
-          map.once("idle", onIdle);
-        } else {
-          map.once("idle", onIdle);
-        }
-      });
+      await new Promise<void>((resolve) => map.once("idle", () => resolve()));
       // Extra small delay so DEM-shaded terrain finishes shading the first frame
       await new Promise((r) => setTimeout(r, 250));
 

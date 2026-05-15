@@ -40,7 +40,13 @@ interface Props {
 const CANVAS_W = 1080;
 const CANVAS_H = 1920;
 const MAP_H_FRAC = 0.78;
-const DURATION_MS = 12000; // 12s flyover
+// Dynamic flyover duration: scales with route length, clamped to a sane range.
+function computeDurationMs(distanceMeters: number): number {
+  const km = Math.max(0, distanceMeters / 1000);
+  // ~1.2s per km, +6s base, clamp 8s..30s
+  const ms = (6 + km * 1.2) * 1000;
+  return Math.max(8000, Math.min(30000, ms));
+}
 
 let cachedToken: string | null = null;
 async function getMapboxToken(): Promise<string> {
@@ -277,12 +283,28 @@ const RouteVideoDialog = ({
       const overviewZoom = cam?.zoom ?? 13;
       const flyoverZoom = Math.min(17, overviewZoom + 2.2);
 
-      // Wait for tiles to settle on initial overview
-      map.jumpTo({ center: cam?.center as any ?? [(minLon + maxLon) / 2, (minLat + maxLat) / 2], zoom: overviewZoom, pitch: 0, bearing: 0 });
-      await new Promise<void>((resolve) => {
-        const check = () => { if (map.areTilesLoaded()) resolve(); else map.once("idle", () => resolve()); };
-        check();
+      // Compute dynamic flyover duration from route length
+      const DURATION_MS = computeDurationMs(distanceMeters);
+
+      // Move camera to the flyover START pose, then wait for tiles+terrain to be fully ready
+      const startPoint = pointAt(0);
+      map.jumpTo({
+        center: startPoint.pos,
+        zoom: flyoverZoom,
+        pitch: 65,
+        bearing: startPoint.bear,
       });
+      await new Promise<void>((resolve) => {
+        const onIdle = () => { resolve(); };
+        if (map.areTilesLoaded() && map.loaded()) {
+          // Still wait one idle for terrain DEM to settle
+          map.once("idle", onIdle);
+        } else {
+          map.once("idle", onIdle);
+        }
+      });
+      // Extra small delay so DEM-shaded terrain finishes shading the first frame
+      await new Promise((r) => setTimeout(r, 250));
 
       // Setup composite canvas + recorder
       composite.width = CANVAS_W;
@@ -376,28 +398,16 @@ const RouteVideoDialog = ({
         const tEase = tRaw < 0.5 ? 2 * tRaw * tRaw : 1 - Math.pow(-2 * tRaw + 2, 2) / 2;
         setProgress(tEase);
 
-        // Phase 1 (0..0.15): zoom in & pitch up from overview to start of route
-        // Phase 2 (0.15..0.95): camera follows route
-        // Phase 3 (0.95..1): pull back to show full route
+        // Phase 1 (0..0.92): camera follows the route from start at flyover pitch/zoom
+        // Phase 2 (0.92..1): pull back to show the full route
         let camCenter: [number, number];
         let camBearing: number;
         let camPitch: number;
         let camZoom: number;
         let routeFrac: number;
 
-        if (tEase < 0.15) {
-          const k = tEase / 0.15;
-          const start = pointAt(0);
-          camCenter = [
-            ((minLon + maxLon) / 2) * (1 - k) + start.pos[0] * k,
-            ((minLat + maxLat) / 2) * (1 - k) + start.pos[1] * k,
-          ];
-          camBearing = start.bear * k;
-          camPitch = 65 * k;
-          camZoom = overviewZoom * (1 - k) + flyoverZoom * k;
-          routeFrac = 0;
-        } else if (tEase < 0.95) {
-          const k = (tEase - 0.15) / 0.8;
+        if (tEase < 0.92) {
+          const k = tEase / 0.92;
           routeFrac = k;
           const p = pointAt(k);
           camCenter = p.pos;
@@ -405,7 +415,7 @@ const RouteVideoDialog = ({
           camPitch = 65;
           camZoom = flyoverZoom;
         } else {
-          const k = (tEase - 0.95) / 0.05;
+          const k = (tEase - 0.92) / 0.08;
           const end = pointAt(1);
           routeFrac = 1;
           camCenter = [

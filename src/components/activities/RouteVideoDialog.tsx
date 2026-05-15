@@ -390,6 +390,38 @@ const RouteVideoDialog = ({
         paint: { "line-color": "#14532d", "line-width": 6 },
       });
 
+      // Start point (red) and current position (green) markers
+      map.addSource("route-start", {
+        type: "geojson",
+        data: { type: "Feature", properties: {}, geometry: { type: "Point", coordinates: coords[0] } },
+      });
+      map.addSource("route-current", {
+        type: "geojson",
+        data: { type: "Feature", properties: {}, geometry: { type: "Point", coordinates: coords[0] } },
+      });
+      map.addLayer({
+        id: "route-start-dot",
+        type: "circle",
+        source: "route-start",
+        paint: {
+          "circle-radius": 8,
+          "circle-color": "#ef4444",
+          "circle-stroke-color": "#ffffff",
+          "circle-stroke-width": 2,
+        },
+      });
+      map.addLayer({
+        id: "route-current-dot",
+        type: "circle",
+        source: "route-current",
+        paint: {
+          "circle-radius": 9,
+          "circle-color": "#22c55e",
+          "circle-stroke-color": "#ffffff",
+          "circle-stroke-width": 2,
+        },
+      });
+
       // Fit to bounds with padding to estimate target zoom.
       // Use generous padding for the final pull-back so even long routes fit on screen.
       const bounds = new mapboxgl.LngLatBounds(coords[0], coords[0]);
@@ -462,6 +494,7 @@ const RouteVideoDialog = ({
 
       const start = performance.now();
       const progressSrc = map.getSource("route-progress") as mapboxgl.GeoJSONSource;
+      const currentSrc = map.getSource("route-current") as mapboxgl.GeoJSONSource;
 
       // Overlay coords/fonts were tuned to 1080px wide. Scale to current canvas.
       const S = CANVAS_W / 1080;
@@ -482,16 +515,14 @@ const RouteVideoDialog = ({
         ctx.fillStyle = botFade;
         ctx.fillRect(0, CANVAS_H - px(440), CANVAS_W, px(440));
 
-        // App logo moved to bottom-right (above the RUNWARD wordmark) — see below.
-
-        // Title
+        // Title — aligned with stat columns
         ctx.save();
         ctx.shadowColor = "rgba(0,0,0,0.65)";
         ctx.shadowBlur = px(10);
         ctx.fillStyle = "#fff";
         ctx.font = `700 ${px(50)}px ui-sans-serif, system-ui, -apple-system, 'Segoe UI'`;
         ctx.textAlign = "left";
-        ctx.fillText(name.length > 24 ? name.slice(0, 23) + "…" : name, px(140), px(95));
+        ctx.fillText(name.length > 24 ? name.slice(0, 23) + "…" : name, px(56), px(95));
         ctx.restore();
 
         // Stats
@@ -529,29 +560,13 @@ const RouteVideoDialog = ({
           drawStat(t("ELEV", "爬升"), `${Math.round(animElev)} m`, padX + colGap, row2Y);
         }
 
-        // App logo (bottom-right, above the RUNWARD wordmark)
-        if (logoImg.complete && logoImg.naturalWidth > 0) {
-          const logoSize = px(56);
-          ctx.save();
-          ctx.shadowColor = "rgba(0,0,0,0.5)";
-          ctx.shadowBlur = px(8);
-          ctx.drawImage(
-            logoImg,
-            CANVAS_W - px(40) - logoSize,
-            CANVAS_H - px(36) - px(22) - logoSize - px(6),
-            logoSize,
-            logoSize
-          );
-          ctx.restore();
-        }
-
         ctx.save();
         ctx.shadowColor = "rgba(0,0,0,0.7)";
-        ctx.shadowBlur = px(6);
-        ctx.fillStyle = "rgba(255,255,255,0.85)";
-        ctx.font = `700 ${px(22)}px ui-sans-serif, system-ui`;
+        ctx.shadowBlur = px(8);
+        ctx.fillStyle = "#fff";
+        ctx.font = `800 ${px(38)}px ui-sans-serif, system-ui`;
         ctx.textAlign = "right";
-        ctx.fillText("RUNWARD", CANVAS_W - px(40), CANVAS_H - px(36));
+        ctx.fillText("RUNWARD", CANVAS_W - px(40), CANVAS_H - px(40));
         ctx.restore();
       };
 
@@ -611,7 +626,10 @@ const RouteVideoDialog = ({
         const camBearing = smoothBearing;
 
         map.jumpTo({ center: camCenter, bearing: camBearing, pitch: camPitch, zoom: camZoom });
-        progressSrc.setData({ type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: sliceCoords(routeFrac) } } as GeoJSON.Feature<GeoJSON.LineString>);
+        const sliced = sliceCoords(routeFrac);
+        progressSrc.setData({ type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: sliced } } as GeoJSON.Feature<GeoJSON.LineString>);
+        const head = sliced[sliced.length - 1] ?? coords[0];
+        currentSrc.setData({ type: "Feature", properties: {}, geometry: { type: "Point", coordinates: head } } as GeoJSON.Feature<GeoJSON.Point>);
 
         // Force a synchronous paint, then composite
         map.triggerRepaint();

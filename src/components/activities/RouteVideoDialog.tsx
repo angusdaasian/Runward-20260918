@@ -409,16 +409,21 @@ const RouteVideoDialog = ({
 
       const mapCanvas = map.getCanvas();
 
+      // Smoothed bearing state (low-pass filter to kill jitter from polyline noise)
+      let smoothBearing = pointAt(0).bear;
+      const shortestDelta = (from: number, to: number) => {
+        let d = ((to - from + 540) % 360) - 180;
+        return d;
+      };
+
       const drawFrame = (now: number) => {
         const elapsed = now - start;
         const tRaw = Math.min(1, elapsed / DURATION_MS);
         const tEase = tRaw < 0.5 ? 2 * tRaw * tRaw : 1 - Math.pow(-2 * tRaw + 2, 2) / 2;
         setProgress(tEase);
 
-        // Phase 1 (0..0.92): camera follows the route from start at flyover pitch/zoom
-        // Phase 2 (0.92..1): pull back to show the full route
         let camCenter: [number, number];
-        let camBearing: number;
+        let targetBearing: number;
         let camPitch: number;
         let camZoom: number;
         let routeFrac: number;
@@ -428,7 +433,7 @@ const RouteVideoDialog = ({
           routeFrac = k;
           const p = pointAt(k);
           camCenter = p.pos;
-          camBearing = p.bear;
+          targetBearing = p.bear;
           camPitch = 65;
           camZoom = flyoverZoom;
         } else {
@@ -439,10 +444,15 @@ const RouteVideoDialog = ({
             end.pos[0] * (1 - k) + ((minLon + maxLon) / 2) * k,
             end.pos[1] * (1 - k) + ((minLat + maxLat) / 2) * k,
           ];
-          camBearing = end.bear * (1 - k);
+          targetBearing = smoothBearing; // hold heading during pull-back, no spin
           camPitch = 65 * (1 - k) + 30 * k;
           camZoom = flyoverZoom * (1 - k) + (overviewZoom + 0.3) * k;
         }
+
+        // Low-pass filter the bearing so the camera no longer whips around.
+        const alpha = 0.08;
+        smoothBearing = (smoothBearing + shortestDelta(smoothBearing, targetBearing) * alpha + 360) % 360;
+        const camBearing = smoothBearing;
 
         map.jumpTo({ center: camCenter, bearing: camBearing, pitch: camPitch, zoom: camZoom });
         progressSrc.setData({ type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: sliceCoords(routeFrac) } } as any);

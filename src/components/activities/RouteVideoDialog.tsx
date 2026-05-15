@@ -39,7 +39,7 @@ interface Props {
   movingTimeSeconds: number;
   averageSpeed: number;
   elevationGainMeters: number | null;
-  streams?: any[];
+  streams?: Array<{ type: string; data: number[] }>;
   chartData?: Array<{ distance_km: number | string; pace?: number; altitude?: number; time?: number }>;
 }
 
@@ -172,8 +172,8 @@ const RouteVideoDialog = ({
 
       // Fallback mirrors the Strava chart path: velocity_smooth sampled over distance.
       if (paceSamples.length === 0 && streams && streams.length) {
-        const distStream = streams.find((s: any) => s.type === "distance");
-        const velStream = streams.find((s: any) => s.type === "velocity_smooth");
+        const distStream = streams.find((s) => s.type === "distance");
+        const velStream = streams.find((s) => s.type === "velocity_smooth");
         const distData: number[] | undefined = distStream?.data;
         const velData: number[] | undefined = velStream?.data;
         if (distData && velData && distData.length > 1) {
@@ -217,8 +217,8 @@ const RouteVideoDialog = ({
 
       // Fallback mirrors the Strava chart path: raw altitude sampled by distance.
       if (elevSamples.length === 0 && streams && streams.length) {
-        const distStream = streams.find((s: any) => s.type === "distance");
-        const altStream = streams.find((s: any) => s.type === "altitude");
+        const distStream = streams.find((s) => s.type === "distance");
+        const altStream = streams.find((s) => s.type === "altitude");
         const distData: number[] | undefined = distStream?.data;
         const altData: number[] | undefined = altStream?.data;
         if (distData && altData && distData.length === altData.length && distData.length > 1) {

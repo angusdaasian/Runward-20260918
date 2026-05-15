@@ -3162,6 +3162,9 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
             const updatedPlan = [...customPlan]; const week = { ...updatedPlan[customWeekIdx] }; const days = [...week.days];
             days[customEditingDayIdx] = {
               ...days[customEditingDayIdx],
+              type: next.type ?? days[customEditingDayIdx].type,
+              title: next.title ?? days[customEditingDayIdx].title,
+              color: next.color ?? days[customEditingDayIdx].color,
               distance_km: next.distance_km ?? days[customEditingDayIdx].distance_km,
               pace: next.pace || days[customEditingDayIdx].pace,
               description: next.description ?? days[customEditingDayIdx].description,

@@ -7,6 +7,11 @@ import { toast } from "sonner";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { supabase } from "@/integrations/supabase/client";
+import appIcon from "@/assets/app-icon.png";
+
+// Preload app logo once for canvas overlay
+const logoImg = new Image();
+logoImg.src = appIcon;
 
 // ---------- Polyline decoder ----------
 function decodePolyline(encoded: string): [number, number][] {

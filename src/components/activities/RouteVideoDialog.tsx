@@ -398,28 +398,16 @@ const RouteVideoDialog = ({
         const tEase = tRaw < 0.5 ? 2 * tRaw * tRaw : 1 - Math.pow(-2 * tRaw + 2, 2) / 2;
         setProgress(tEase);
 
-        // Phase 1 (0..0.15): zoom in & pitch up from overview to start of route
-        // Phase 2 (0.15..0.95): camera follows route
-        // Phase 3 (0.95..1): pull back to show full route
+        // Phase 1 (0..0.92): camera follows the route from start at flyover pitch/zoom
+        // Phase 2 (0.92..1): pull back to show the full route
         let camCenter: [number, number];
         let camBearing: number;
         let camPitch: number;
         let camZoom: number;
         let routeFrac: number;
 
-        if (tEase < 0.15) {
-          const k = tEase / 0.15;
-          const start = pointAt(0);
-          camCenter = [
-            ((minLon + maxLon) / 2) * (1 - k) + start.pos[0] * k,
-            ((minLat + maxLat) / 2) * (1 - k) + start.pos[1] * k,
-          ];
-          camBearing = start.bear * k;
-          camPitch = 65 * k;
-          camZoom = overviewZoom * (1 - k) + flyoverZoom * k;
-          routeFrac = 0;
-        } else if (tEase < 0.95) {
-          const k = (tEase - 0.15) / 0.8;
+        if (tEase < 0.92) {
+          const k = tEase / 0.92;
           routeFrac = k;
           const p = pointAt(k);
           camCenter = p.pos;
@@ -427,7 +415,7 @@ const RouteVideoDialog = ({
           camPitch = 65;
           camZoom = flyoverZoom;
         } else {
-          const k = (tEase - 0.95) / 0.05;
+          const k = (tEase - 0.92) / 0.08;
           const end = pointAt(1);
           routeFrac = 1;
           camCenter = [

@@ -764,6 +764,25 @@ const ProfileSection = ({ lang, subpage = "main", onNavigate }: ProfileSectionPr
         </button>
       </div>
 
+      {/* Badges — navigation row */}
+      <button
+        onClick={() => onNavigate?.("badges")}
+        className="w-full bg-card border border-border rounded-xl p-4 flex items-center justify-between"
+      >
+        <div className="flex items-center gap-3">
+          <Award size={20} className="text-amber-500" />
+          <div className="text-left">
+            <span className="font-medium text-foreground block">
+              {lang === "zh" ? "成就徽章" : "Achievement Badges"}
+            </span>
+            <span className="text-[11px] text-muted-foreground">
+              {lang === "zh" ? "查看你解鎖的徽章" : "View badges you've unlocked"}
+            </span>
+          </div>
+        </div>
+        <ChevronRight size={18} className="text-muted-foreground" />
+      </button>
+
       {/* Heart Rate Zones — navigation row */}
       <button
         onClick={() => onNavigate?.("hr-zones")}

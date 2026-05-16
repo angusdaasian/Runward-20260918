@@ -360,8 +360,8 @@ const FuelingGuide = ({ lang, onBack }: Props) => {
         <AlertTriangle size={14} className="text-warning shrink-0 mt-0.5" />
         <p className="text-[11px] text-muted-foreground leading-relaxed">
           {isZh
-            ? "資料參考自 Maurten Fuel Guides，僅作教育用途。請在訓練中試用補給策略，比賽前勿嘗試新產品。如有特殊醫療狀況請諮詢專業人士。"
-            : "Adapted from Maurten Fuel Guides for educational reference. Always test fueling in training — never try anything new on race day. Consult a professional for medical concerns."}
+            ? "本指南整合多項運動營養研究，僅作教育用途。請在訓練中試用補給策略，比賽前勿嘗試新產品。如有特殊醫療狀況請諮詢專業人士。"
+            : "Based on general sports-nutrition research. Educational reference only — always test fueling in training, never try anything new on race day. Consult a professional for medical concerns."}
         </p>
       </div>
     </div>

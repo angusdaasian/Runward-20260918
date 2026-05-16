@@ -71,7 +71,7 @@ interface PB {
   seconds: number;
 }
 
-export type ProfileSubpage = "main" | "hr-zones" | "personal-bests" | "edit-profile";
+export type ProfileSubpage = "main" | "hr-zones" | "personal-bests" | "edit-profile" | "badges";
 
 interface ProfileSectionProps {
   lang: Lang;

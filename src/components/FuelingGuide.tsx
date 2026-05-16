@@ -134,7 +134,7 @@ const races: Race[] = [
     zh: { title: "超級馬拉松", tag: "每小時 30–60g 碳水" },
     carbs: { en: "Rotate gels, sports drink and real food every 3 h to reset taste", zh: "每 3 小時輪替果膠、運動飲料與真食物，避免味覺疲勞" },
     phases: [
-      { label: { en: "Preload", zh: "賽前一日" }, when: { en: "Day before", zh: "賽前一晚" }, what: { en: "High-carb meals throughout the day", zh: "整日高碳水飲食" } },
+      { label: { en: "Carb-load", zh: "碳水充填" }, when: { en: "2–3 days before", zh: "賽前 2–3 天" }, what: { en: "Same as marathon — 8–10 g/kg/day carbs while tapering. Keep meals familiar; rehearse them in long-run blocks.", zh: "同馬拉松 — 每日 8–10g/kg 碳水並減量訓練。維持熟悉的食物，平時長跑時就先演練。" } },
       { label: { en: "Pre-race", zh: "賽前" }, when: { en: "1–4 h before", zh: "1–4 小時前" }, what: { en: "Carb meal (~60–80 g) + electrolyte drink", zh: "碳水餐（約 60–80g）+ 電解質飲" } },
       { label: { en: "During race", zh: "比賽中" }, when: { en: "Per hour", zh: "每小時" }, what: { en: "Mix gels, chews, sports drink, and real food (banana, rice ball, PB&J) to hit 30–60 g", zh: "果膠、軟糖、運動飲料、真食物（香蕉、飯糰、花生果醬三明治）混合，達到 30–60g" } },
     ],

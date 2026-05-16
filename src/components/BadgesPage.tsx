@@ -108,14 +108,17 @@ const BadgesPage = ({ lang, onBack }: Props) => {
                 <button
                   key={b.id}
                   onClick={() => setSelectedId(b.id)}
-                  className={`relative aspect-square rounded-2xl border flex flex-col items-center justify-center p-2 transition-all ${
-                    unlocked
-                      ? "bg-gradient-to-br from-amber-100 to-orange-100 dark:from-amber-500/20 dark:to-orange-500/20 border-amber-300 dark:border-amber-500/40 shadow-sm"
-                      : "bg-muted/40 border-border opacity-60 grayscale"
+                  className={`relative aspect-square rounded-2xl flex flex-col items-center justify-center p-2 transition-all ${
+                    unlocked ? "" : "opacity-50 grayscale"
                   }`}
                 >
-                  <div className="text-3xl mb-1 leading-none">{b.emoji}</div>
-                  <div className={`text-[10px] font-semibold text-center leading-tight ${unlocked ? "text-foreground" : "text-muted-foreground"}`}>
+                  <img
+                    src={b.image}
+                    alt={c.name}
+                    loading="lazy"
+                    className="w-full h-auto max-h-[72%] object-contain drop-shadow-sm"
+                  />
+                  <div className={`mt-1 text-[10px] font-semibold text-center leading-tight ${unlocked ? "text-foreground" : "text-muted-foreground"}`}>
                     {c.name}
                   </div>
                   {!unlocked && (
@@ -142,9 +145,11 @@ const BadgesPage = ({ lang, onBack }: Props) => {
               onClick={(e) => e.stopPropagation()}
               className="bg-card border border-border rounded-2xl p-6 max-w-sm w-full text-center"
             >
-              <div className={`text-6xl mb-3 ${p.unlocked ? "" : "grayscale opacity-60"}`}>
-                {selected.emoji}
-              </div>
+              <img
+                src={selected.image}
+                alt={c.name}
+                className={`w-32 h-32 mx-auto mb-3 object-contain ${p.unlocked ? "" : "grayscale opacity-60"}`}
+              />
               <h3 className="font-display text-xl font-bold mb-1">{c.name}</h3>
               <p className="text-sm text-muted-foreground mb-4">{c.desc}</p>
               {selected.target > 1 ? (

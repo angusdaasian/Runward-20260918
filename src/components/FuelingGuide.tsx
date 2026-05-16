@@ -160,7 +160,7 @@ const FuelingGuide = ({ lang, onBack }: Props) => {
         <div className="relative">
           <div className="inline-flex items-center gap-1.5 bg-white/20 backdrop-blur-sm rounded-full px-2.5 py-1 text-[10px] font-medium uppercase tracking-wider mb-2">
             <Beaker size={11} />
-            {isZh ? "補給指南 · Maurten 參考" : "Fueling Guide · Maurten reference"}
+            {isZh ? "補給指南" : "Fueling Guide"}
           </div>
           <h1 className="font-display text-2xl font-bold leading-tight mb-1.5">
             {isZh ? "跑者補給策略" : "Fuel Like a Pro Runner"}
@@ -173,28 +173,63 @@ const FuelingGuide = ({ lang, onBack }: Props) => {
         </div>
       </div>
 
+      {/* What's in a sports gel */}
+      <div className="mb-6 bg-card border border-border rounded-xl p-4">
+        <h2 className="font-display text-base font-bold mb-2 flex items-center gap-1.5">
+          <Beaker size={16} className="text-primary" />
+          {isZh ? "果膠裡有什麼？" : "What's in a Sports Gel?"}
+        </h2>
+        <p className="text-[11px] text-muted-foreground leading-relaxed mb-3">
+          {isZh
+            ? "市面果膠成分大同小異 — 你可以選任何品牌（SiS、GU、High5、Precision、Maurten、Huma 等）。重點看每包碳水克數，而不是品牌。"
+            : "Most sports gels share the same building blocks — any reputable brand works (SiS, GU, High5, Precision, Maurten, Huma, etc.). What matters is the carbs per sachet, not the logo."}
+        </p>
+        <div className="grid grid-cols-2 gap-2 text-[11px]">
+          <div className="bg-muted/50 rounded-lg p-2">
+            <div className="font-semibold mb-0.5">{isZh ? "雙碳水組合" : "Dual carbs"}</div>
+            <div className="text-muted-foreground">{isZh ? "麥芽糊精 + 果糖（2:1 比例）— 吸收更快、上限更高" : "Maltodextrin + fructose (2:1) — faster uptake, higher ceiling"}</div>
+          </div>
+          <div className="bg-muted/50 rounded-lg p-2">
+            <div className="font-semibold mb-0.5">{isZh ? "電解質" : "Electrolytes"}</div>
+            <div className="text-muted-foreground">{isZh ? "鈉、鉀 — 預防抽筋與低血鈉" : "Sodium, potassium — cramp & hyponatremia defence"}</div>
+          </div>
+          <div className="bg-muted/50 rounded-lg p-2">
+            <div className="font-semibold mb-0.5">{isZh ? "咖啡因（選用）" : "Caffeine (optional)"}</div>
+            <div className="text-muted-foreground">{isZh ? "每包 25–100 mg — 後段衝刺神器" : "25–100 mg per gel — late-race kick"}</div>
+          </div>
+          <div className="bg-muted/50 rounded-lg p-2">
+            <div className="font-semibold mb-0.5">{isZh ? "水分搭配" : "Take with water"}</div>
+            <div className="text-muted-foreground">{isZh ? "每包配 150–200 ml 水，預防腸胃不適" : "150–200 ml water per gel to prevent GI issues"}</div>
+          </div>
+        </div>
+      </div>
+
       {/* Key principles */}
       <div className="mb-6">
         <h2 className="font-display text-base font-bold mb-2 flex items-center gap-1.5">
           <Info size={16} className="text-primary" />
-          {isZh ? "核心原則" : "Core Principles"}
+          {isZh ? "每小時碳水攝取" : "Carbs per Hour"}
         </h2>
         <div className="grid grid-cols-2 gap-2">
           <div className="bg-card border border-border rounded-xl p-3">
             <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-0.5">{isZh ? "短於" : "Under"} 60 min</div>
             <div className="text-sm font-semibold">{isZh ? "只需喝水" : "Water is enough"}</div>
+            <div className="text-[10px] text-muted-foreground mt-0.5">0 {isZh ? "包" : "gels"}</div>
           </div>
           <div className="bg-card border border-border rounded-xl p-3">
             <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-0.5">60–90 min</div>
             <div className="text-sm font-semibold">30–60 g {isZh ? "碳水/小時" : "carbs/h"}</div>
+            <div className="text-[10px] text-muted-foreground mt-0.5">1–2 {isZh ? "包/小時" : "gels/h"}</div>
           </div>
           <div className="bg-card border border-border rounded-xl p-3">
             <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-0.5">{isZh ? "超過" : "Over"} 90 min</div>
             <div className="text-sm font-semibold">60–90 g {isZh ? "碳水/小時" : "carbs/h"}</div>
+            <div className="text-[10px] text-muted-foreground mt-0.5">2–3 {isZh ? "包/小時" : "gels/h"}</div>
           </div>
           <div className="bg-card border border-border rounded-xl p-3">
             <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-0.5">{isZh ? "精英級" : "Elite"}</div>
             <div className="text-sm font-semibold">90–120 g {isZh ? "碳水/小時" : "carbs/h"}</div>
+            <div className="text-[10px] text-muted-foreground mt-0.5">3–4 {isZh ? "包/小時（需訓練）" : "gels/h (train it!)"}</div>
           </div>
         </div>
       </div>

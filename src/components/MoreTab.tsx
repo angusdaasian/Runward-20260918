@@ -1,4 +1,4 @@
-import { ChevronRight, Crown, Globe, BookOpen, Check, ScanEye, Lock, KeyRound, Clock, Shield, Info, LifeBuoy, Mail, ShieldCheck, Smartphone, Moon, Sun, LogOut, Gift, Ticket, Bell } from "lucide-react";
+import { ChevronRight, Crown, Globe, BookOpen, Check, ScanEye, Lock, KeyRound, Clock, Shield, Info, LifeBuoy, Mail, ShieldCheck, Smartphone, Moon, Sun, LogOut, Gift, Ticket, Bell, Footprints } from "lucide-react";
 import { Lang, t } from "@/lib/i18n";
 import { useToast } from "@/hooks/use-toast";
 import despia from "despia-native";
@@ -36,6 +36,49 @@ const definitions = [
   { nameKey: "Repetition" as const, nameZhKey: "重複訓練", defKey: "repetitionDef" as const },
 ];
 
+const startRunningGuide: { en: { title: string; body: string }; zh: { title: string; body: string } }[] = [
+  {
+    en: { title: "1. Get the right shoes", body: "Visit a specialty running store for a gait analysis and pick a neutral or stability shoe that fits your foot shape. Replace shoes every 500–800 km. Good shoes prevent the most common beginner injuries." },
+    zh: { title: "1. 選對跑鞋", body: "到專業跑步店做步態分析，挑選適合腳型的中性或穩定型跑鞋。每跑 500–800 公里就要更換。合腳的鞋是預防新手傷痛最關鍵的一步。" },
+  },
+  {
+    en: { title: "2. Start with run/walk intervals", body: "Don't try to run continuously on day one. A proven beginner pattern: run 1 minute, walk 2 minutes, repeat 8 times — 3 days per week. Each week, add 30 seconds of running and reduce walking. In 8–10 weeks you can comfortably run 30 minutes non-stop." },
+    zh: { title: "2. 跑走交替開始", body: "別第一天就硬跑到底。經典新手節奏：跑 1 分鐘、走 2 分鐘，重複 8 次，每週 3 次。每週多跑 30 秒、少走 30 秒。8–10 週後就能輕鬆連續跑 30 分鐘。" },
+  },
+  {
+    en: { title: "3. Slow down — the talk test", body: "You should be able to hold a full conversation while running. If you can only gasp single words, you're going too fast. 80% of all your runs should feel easy; only 20% should be hard. This is the secret most beginners miss." },
+    zh: { title: "3. 放慢速度 — 對話測試", body: "跑步時要能順暢說整句話。如果只能蹦出單字，就是太快了。80% 的訓練應該輕鬆愉快，只有 20% 才是高強度。這是大多數新手忽略的秘訣。" },
+  },
+  {
+    en: { title: "4. Follow the 10% rule", body: "Never increase your weekly mileage by more than 10% from one week to the next. Bones, tendons and ligaments adapt much slower than your lungs and muscles. Doing too much too soon is the #1 cause of running injuries." },
+    zh: { title: "4. 10% 增量原則", body: "每週總跑量增加不超過 10%。骨骼、肌腱、韌帶適應速度遠慢於心肺與肌肉。過快增量是跑步傷害的頭號原因。" },
+  },
+  {
+    en: { title: "5. Make rest days non-negotiable", body: "Run on alternate days at first. Recovery days are when your body actually gets stronger. Add cross-training (cycling, swimming, easy strength) on rest days to build aerobic base without pounding your joints." },
+    zh: { title: "5. 休息日不可省略", body: "初期請隔天跑一次。休息日才是身體真正變強的時候。可在休息日做交叉訓練（單車、游泳、輕量重訓）來建立有氧基礎，又不傷關節。" },
+  },
+  {
+    en: { title: "6. Build your weekly long run", body: "Once you can run 30 minutes, designate one run per week as your 'long run' and slowly extend it. The long run builds endurance, capillaries and mental toughness — the foundation for any 5K, 10K, half or full marathon." },
+    zh: { title: "6. 每週安排一次長跑", body: "能連續跑 30 分鐘後，每週固定一次「長跑」並逐步加長。長跑建立耐力、微血管與心理韌性，是 5K、10K、半馬、全馬的共同基礎。" },
+  },
+  {
+    en: { title: "7. Warm up, cool down, stretch", body: "Start every run with 5 minutes of brisk walking or dynamic drills (leg swings, high knees). End with 5 minutes of easy walking and gentle stretches for calves, hamstrings, hip flexors and glutes. This dramatically reduces stiffness and injury risk." },
+    zh: { title: "7. 熱身、緩和、伸展", body: "每次跑前 5 分鐘快走或動態熱身（擺腿、高抬腿）。結束後 5 分鐘慢走，並伸展小腿、腿後肌、髖屈肌與臀肌。能大幅減少僵硬與受傷風險。" },
+  },
+  {
+    en: { title: "8. Fuel and hydrate properly", body: "Drink water throughout the day, not just before runs. For runs under 60 minutes, water is enough. Beyond 60 minutes, add electrolytes and easy-to-digest carbs (gels, bananas). Eat a small carb-rich snack 60–90 minutes before running." },
+    zh: { title: "8. 補水與營養", body: "每天規律喝水，不要只在跑前才補。60 分鐘以內的跑步喝水即可；超過 60 分鐘就要補充電解質與好消化的碳水（果膠、香蕉）。跑前 60–90 分鐘吃一點碳水點心。" },
+  },
+  {
+    en: { title: "9. Add strength training", body: "Two short strength sessions per week (squats, lunges, planks, glute bridges, calf raises) make you a faster, more injury-resistant runner. Strong hips and core fix most form problems automatically." },
+    zh: { title: "9. 加入肌力訓練", body: "每週兩次短時間肌力（深蹲、弓步、棒式、臀橋、提踵）能讓你更快、更不易受傷。強壯的髖部與核心會自動修正大部分跑姿問題。" },
+  },
+  {
+    en: { title: "10. Set a goal — sign up for a 5K", body: "Nothing keeps you consistent like a race on the calendar. A local 5K in 8–12 weeks is the perfect first goal. Track your runs, celebrate small wins, and remember: every runner started exactly where you are now." },
+    zh: { title: "10. 設定目標 — 報名 5K", body: "行事曆上有比賽就最能維持規律。8–12 週後的 5K 是完美的第一目標。記錄每次跑步、慶祝小進步，記住：每位跑者都是從你現在這一步開始的。" },
+  },
+];
+
 function formatCountdown(expiresAt: Date): string {
   const now = new Date();
   const diff = expiresAt.getTime() - now.getTime();
@@ -58,6 +101,7 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps }: Props
   const navigate = useNavigate();
   const location = useLocation();
   const [showDefs, setShowDefs] = useState(false);
+  const [showStartGuide, setShowStartGuide] = useState(false);
   const { isPremium, expiresAt, plan, rcEntitlement } = usePremium();
   const { user, signOut } = useAuth();
   const { isAdmin, loading: adminLoading } = useAdmin();
@@ -223,6 +267,46 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps }: Props
                 <p className="text-xs text-muted-foreground leading-relaxed">{t(def.defKey, lang)}</p>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* How to Start Long Distance Running */}
+        <button
+          onClick={() => setShowStartGuide(!showStartGuide)}
+          className="w-full bg-card border border-border rounded-xl p-4 flex items-center justify-between"
+        >
+          <div className="flex items-center gap-3">
+            <Footprints size={20} className="text-primary" />
+            <span className="font-medium text-foreground text-left">
+              {lang === "zh" ? "如何開始長距離跑步" : "How to Start Long Distance Running"}
+            </span>
+          </div>
+          <ChevronRight size={18} className={`text-muted-foreground transition-transform ${showStartGuide ? "rotate-90" : ""}`} />
+        </button>
+
+        {showStartGuide && (
+          <div className="space-y-2 pl-2">
+            <div className="bg-primary/10 border border-primary/20 rounded-lg p-3">
+              <p className="text-xs text-foreground leading-relaxed">
+                {lang === "zh"
+                  ? "10 個讓你從零開始、安全跑到 5K 甚至馬拉松的關鍵步驟。慢慢來、保持規律，比任何捷徑都有效。"
+                  : "10 essential steps to take you from zero to 5K — and beyond — safely. Patience and consistency beat any shortcut."}
+              </p>
+            </div>
+            {startRunningGuide.map((step, i) => {
+              const content = lang === "zh" ? step.zh : step.en;
+              return (
+                <div key={i} className="bg-accent rounded-lg p-3">
+                  <h3 className="font-display font-semibold text-sm text-foreground mb-1">{content.title}</h3>
+                  <p className="text-xs text-muted-foreground leading-relaxed">{content.body}</p>
+                </div>
+              );
+            })}
+            <p className="text-[10px] text-muted-foreground italic px-1 pt-1">
+              {lang === "zh"
+                ? "本指南為一般建議。如有傷病或健康問題，請先諮詢醫師。"
+                : "General guidance only. Consult a doctor before starting if you have any injuries or health concerns."}
+            </p>
           </div>
         )}
 

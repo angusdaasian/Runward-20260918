@@ -272,7 +272,7 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps }: Props
 
         {/* How to Start Long Distance Running */}
         <button
-          onClick={() => setShowStartGuide(!showStartGuide)}
+          onClick={() => setShowStartGuide(true)}
           className="w-full bg-card border border-border rounded-xl p-4 flex items-center justify-between"
         >
           <div className="flex items-center gap-3">
@@ -281,34 +281,8 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps }: Props
               {lang === "zh" ? "如何開始長距離跑步" : "How to Start Long Distance Running"}
             </span>
           </div>
-          <ChevronRight size={18} className={`text-muted-foreground transition-transform ${showStartGuide ? "rotate-90" : ""}`} />
+          <ChevronRight size={18} className="text-muted-foreground" />
         </button>
-
-        {showStartGuide && (
-          <div className="space-y-2 pl-2">
-            <div className="bg-primary/10 border border-primary/20 rounded-lg p-3">
-              <p className="text-xs text-foreground leading-relaxed">
-                {lang === "zh"
-                  ? "10 個讓你從零開始、安全跑到 5K 甚至馬拉松的關鍵步驟。慢慢來、保持規律，比任何捷徑都有效。"
-                  : "10 essential steps to take you from zero to 5K — and beyond — safely. Patience and consistency beat any shortcut."}
-              </p>
-            </div>
-            {startRunningGuide.map((step, i) => {
-              const content = lang === "zh" ? step.zh : step.en;
-              return (
-                <div key={i} className="bg-accent rounded-lg p-3">
-                  <h3 className="font-display font-semibold text-sm text-foreground mb-1">{content.title}</h3>
-                  <p className="text-xs text-muted-foreground leading-relaxed">{content.body}</p>
-                </div>
-              );
-            })}
-            <p className="text-[10px] text-muted-foreground italic px-1 pt-1">
-              {lang === "zh"
-                ? "本指南為一般建議。如有傷病或健康問題，請先諮詢醫師。"
-                : "General guidance only. Consult a doctor before starting if you have any injuries or health concerns."}
-            </p>
-          </div>
-        )}
 
         {/* Premium */}
         <div className="bg-card border border-border rounded-xl p-4">

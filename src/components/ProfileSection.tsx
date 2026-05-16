@@ -594,6 +594,11 @@ const ProfileSection = ({ lang, subpage = "main", onNavigate }: ProfileSectionPr
     );
   }
 
+  // ── Subpage: Badges ──
+  if (subpage === "badges") {
+    return <BadgesPage lang={lang} onBack={() => onNavigate?.("main")} />;
+  }
+
   // ── Subpage: Edit Profile ──
   if (subpage === "edit-profile") {
     const RPW_OPTIONS = [1, 2, 3, 4, 5, 6, 7];

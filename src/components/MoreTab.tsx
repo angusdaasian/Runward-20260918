@@ -58,6 +58,7 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps }: Props
   const navigate = useNavigate();
   const location = useLocation();
   const [showDefs, setShowDefs] = useState(false);
+  const [showStartGuide, setShowStartGuide] = useState(false);
   const { isPremium, expiresAt, plan, rcEntitlement } = usePremium();
   const { user, signOut } = useAuth();
   const { isAdmin, loading: adminLoading } = useAdmin();

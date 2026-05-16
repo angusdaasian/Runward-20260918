@@ -206,6 +206,11 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps }: Props
   };
   if (!skeletonDone) return <SettingsSkeleton />;
 
+  // Start Running Guide subpage
+  if (showStartGuide) {
+    return <StartRunningGuide lang={lang} onBack={() => setShowStartGuide(false)} />;
+  }
+
   // Profile subpage view (HR Zones, Personal Bests) — render full-screen subpage.
   if (user && profileSubpage !== "main") {
     return (

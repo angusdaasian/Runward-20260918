@@ -109,37 +109,25 @@ const StartRunningGuide = ({ lang, onBack }: Props) => {
         </div>
       </div>
 
-      {/* Steps timeline */}
-      <div className="relative">
-        {/* vertical line */}
-        <div className="absolute left-[27px] top-2 bottom-2 w-px bg-border" aria-hidden />
-
-        <div className="space-y-3">
-          {steps.map((step, i) => {
-            const Icon = step.icon;
-            const c = isZh ? step.zh : step.en;
-            return (
-              <div key={i} className="relative flex gap-3 items-start">
-                {/* Number + icon column */}
-                <div className="relative z-10 shrink-0">
-                  <div className={`w-14 h-14 rounded-2xl ${step.bg} flex items-center justify-center border border-border`}>
-                    <Icon size={22} className={step.color} strokeWidth={2} />
-                  </div>
-                  <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-foreground text-background text-[10px] font-bold flex items-center justify-center">
-                    {i + 1}
-                  </div>
-                </div>
-                {/* Content */}
-                <div className="flex-1 bg-card border border-border rounded-xl p-3 mt-0.5">
-                  <h3 className="font-display font-semibold text-sm text-foreground mb-1 leading-tight">
-                    {c.title}
-                  </h3>
-                  <p className="text-xs text-muted-foreground leading-relaxed">{c.body}</p>
-                </div>
+      {/* Steps */}
+      <div className="space-y-3">
+        {steps.map((step, i) => {
+          const Icon = step.icon;
+          const c = isZh ? step.zh : step.en;
+          return (
+            <div key={i} className="flex gap-3 items-start">
+              <div className={`shrink-0 w-12 h-12 rounded-2xl ${step.bg} flex items-center justify-center border border-border`}>
+                <Icon size={22} className={step.color} strokeWidth={2} />
               </div>
-            );
-          })}
-        </div>
+              <div className="flex-1 bg-card border border-border rounded-xl p-3">
+                <h3 className="font-display font-semibold text-sm text-foreground mb-1 leading-tight">
+                  {c.title}
+                </h3>
+                <p className="text-xs text-muted-foreground leading-relaxed">{c.body}</p>
+              </div>
+            </div>
+          );
+        })}
       </div>
 
       {/* Disclaimer */}

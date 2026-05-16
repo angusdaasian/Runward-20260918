@@ -1,4 +1,4 @@
-import { ChevronRight, Crown, Globe, BookOpen, Check, ScanEye, Lock, KeyRound, Clock, Shield, Info, LifeBuoy, Mail, ShieldCheck, Smartphone, Moon, Sun, LogOut, Gift, Ticket, Bell, Footprints } from "lucide-react";
+import { ChevronRight, Crown, Globe, BookOpen, Check, ScanEye, Lock, KeyRound, Clock, Shield, Info, LifeBuoy, Mail, ShieldCheck, Smartphone, Moon, Sun, LogOut, Gift, Ticket, Bell, Footprints, Flame } from "lucide-react";
 import { Lang, t } from "@/lib/i18n";
 import { useToast } from "@/hooks/use-toast";
 import despia from "despia-native";
@@ -21,6 +21,7 @@ import {
 import { useDespiaPurchases } from "@/hooks/use-despia-purchases";
 import PlanComparisonDialog from "@/components/PlanComparisonDialog";
 import StartRunningGuide from "@/components/StartRunningGuide";
+import FuelingGuide from "@/components/FuelingGuide";
 
 interface Props {
   lang: Lang;
@@ -62,6 +63,7 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps }: Props
   const location = useLocation();
   const [showDefs, setShowDefs] = useState(false);
   const [showStartGuide, setShowStartGuide] = useState(false);
+  const [showFuelGuide, setShowFuelGuide] = useState(false);
   const { isPremium, expiresAt, plan, rcEntitlement } = usePremium();
   const { user, signOut } = useAuth();
   const { isAdmin, loading: adminLoading } = useAdmin();
@@ -169,6 +171,9 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps }: Props
   if (showStartGuide) {
     return <StartRunningGuide lang={lang} onBack={() => setShowStartGuide(false)} />;
   }
+  if (showFuelGuide) {
+    return <FuelingGuide lang={lang} onBack={() => setShowFuelGuide(false)} />;
+  }
 
   // Profile subpage view (HR Zones, Personal Bests) — render full-screen subpage.
   if (user && profileSubpage !== "main") {
@@ -244,6 +249,20 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps }: Props
             <Footprints size={20} className="text-primary" />
             <span className="font-medium text-foreground text-left">
               {lang === "zh" ? "如何開始長距離跑步" : "How to Start Long Distance Running"}
+            </span>
+          </div>
+          <ChevronRight size={18} className="text-muted-foreground" />
+        </button>
+
+        {/* Fueling Guide */}
+        <button
+          onClick={() => setShowFuelGuide(true)}
+          className="w-full bg-card border border-border rounded-xl p-4 flex items-center justify-between"
+        >
+          <div className="flex items-center gap-3">
+            <Flame size={20} className="text-orange-500" />
+            <span className="font-medium text-foreground text-left">
+              {lang === "zh" ? "跑者補給指南" : "Runner Fueling Guide"}
             </span>
           </div>
           <ChevronRight size={18} className="text-muted-foreground" />

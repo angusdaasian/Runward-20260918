@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/dialog";
 import { useDespiaPurchases } from "@/hooks/use-despia-purchases";
 import PlanComparisonDialog from "@/components/PlanComparisonDialog";
+import StartRunningGuide from "@/components/StartRunningGuide";
 
 interface Props {
   lang: Lang;

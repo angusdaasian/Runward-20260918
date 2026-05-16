@@ -115,8 +115,8 @@ const races: Race[] = [
     zh: { title: "全程馬拉松", tag: "比賽中約 175–200g 碳水" },
     carbs: { en: "Take 6–8 gels total (every ~5–6 km)", zh: "全程約 6–8 包果膠（每 5–6 公里 1 包）" },
     phases: [
-      { label: { en: "Preload", zh: "賽前一日" }, when: { en: "Day before", zh: "賽前一晚" }, what: { en: "Carb-loading day — pasta, rice, bread (extra 8–10 g/kg carbs)", zh: "碳水充填日 — 義大利麵、米飯、麵包（多攝取 8–10g/kg 碳水）" } },
-      { label: { en: "Pre-race", zh: "賽前" }, when: { en: "1–4 h before", zh: "1–4 小時前" }, what: { en: "Carb meal (~80–100 g): oatmeal, bagel + jam, banana", zh: "碳水餐（約 80–100g）：燕麥、貝果加果醬、香蕉" } },
+      { label: { en: "Carb-load", zh: "碳水充填" }, when: { en: "2–3 days before", zh: "賽前 2–3 天" }, what: { en: "Ramp carbs to 8–10 g/kg bodyweight/day while tapering training — pasta, rice, bread, potatoes. Cut fat/fibre. Modern research shows muscle glycogen needs ~36–48 h to fully saturate — one pasta dinner is not enough.", zh: "每日碳水提升至 8–10g/kg 體重，同時減量訓練 — 義大利麵、米飯、麵包、馬鈴薯。降低脂肪與纖維。研究指出肌肉肝醣需 36–48 小時才能完全充填，光靠賽前一晚絕對不夠。" } },
+      { label: { en: "Pre-race", zh: "賽前" }, when: { en: "1–4 h before", zh: "1–4 小時前" }, what: { en: "Carb meal (~80–100 g): oatmeal, bagel + jam, banana. Low fat/fibre.", zh: "碳水餐（約 80–100g）：燕麥、貝果加果醬、香蕉。低脂低纖。" } },
       { label: { en: "Warm-up", zh: "熱身" }, when: { en: "~15 min before", zh: "起跑前約 15 分鐘" }, what: { en: "1 caffeinated gel", zh: "1 包含咖啡因果膠" } },
       { label: { en: "During race", zh: "比賽中" }, when: { en: "Every ~5–6 km", zh: "每 ~5–6 公里" }, what: { en: "1 gel (~25 g) — mix 2 caffeinated into the second half", zh: "1 包果膠（約 25g）— 後半段加入 2 包含咖啡因" } },
     ],

@@ -37,7 +37,7 @@ const definitions = [
   { nameKey: "Repetition" as const, nameZhKey: "重複訓練", defKey: "repetitionDef" as const },
 ];
 
-const _unused_placeholder_removed = null;
+
 
 function formatCountdown(expiresAt: Date): string {
   const now = new Date();

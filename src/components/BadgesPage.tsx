@@ -4,7 +4,7 @@ import { Lang } from "@/lib/i18n";
 import { useActivities } from "@/hooks/use-activities";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
-import { BADGES, BadgeDef, computeBadgeProgress, BadgeProgress } from "@/lib/badges";
+import { BADGES, BadgeDef, computeBadgeProgress } from "@/lib/badges";
 
 interface Props {
   lang: Lang;
@@ -12,11 +12,16 @@ interface Props {
 }
 
 const CATEGORY_LABELS: Record<string, { en: string; zh: string }> = {
-  distance:  { en: "Distance Milestones", zh: "里程里程碑" },
-  streak:    { en: "Streaks",             zh: "連續紀錄" },
-  pace:      { en: "Pace Achievements",   zh: "配速成就" },
-  elevation: { en: "Elevation",           zh: "爬升" },
-  special:   { en: "Special",             zh: "特別徽章" },
+  distance:   { en: "Distance Milestones", zh: "里程里程碑" },
+  single_run: { en: "Single-Run Challenges", zh: "單次跑步挑戰" },
+  streak:     { en: "Streaks",             zh: "連續紀錄" },
+  pace:       { en: "Pace Achievements",   zh: "配速成就" },
+  volume:     { en: "Volume Goals",        zh: "里程目標" },
+  elevation:  { en: "Elevation",           zh: "爬升" },
+  time:       { en: "Time of Day",         zh: "時段成就" },
+  holiday:    { en: "Holidays",            zh: "節日特輯" },
+  meta:       { en: "Collector",           zh: "收藏進度" },
+  special:    { en: "Special",             zh: "特別徽章" },
 };
 
 const BadgesPage = ({ lang, onBack }: Props) => {

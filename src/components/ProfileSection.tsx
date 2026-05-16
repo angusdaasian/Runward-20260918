@@ -5,7 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
-import { Camera, Save, LogOut, Trash2, Mail, Pencil, Zap, Sparkles, Loader2, X, Heart, Trophy, ChevronRight, ChevronLeft } from "lucide-react";
+import { Camera, Save, LogOut, Trash2, Mail, Pencil, Zap, Sparkles, Loader2, X, Heart, Trophy, ChevronRight, ChevronLeft, Award } from "lucide-react";
+import BadgesPage from "@/components/BadgesPage";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Lang, t } from "@/lib/i18n";
 import { calculateRunningScore } from "@/lib/vdot";
@@ -70,7 +71,7 @@ interface PB {
   seconds: number;
 }
 
-export type ProfileSubpage = "main" | "hr-zones" | "personal-bests" | "edit-profile";
+export type ProfileSubpage = "main" | "hr-zones" | "personal-bests" | "edit-profile" | "badges";
 
 interface ProfileSectionProps {
   lang: Lang;
@@ -593,6 +594,11 @@ const ProfileSection = ({ lang, subpage = "main", onNavigate }: ProfileSectionPr
     );
   }
 
+  // ── Subpage: Badges ──
+  if (subpage === "badges") {
+    return <BadgesPage lang={lang} onBack={() => onNavigate?.("main")} />;
+  }
+
   // ── Subpage: Edit Profile ──
   if (subpage === "edit-profile") {
     const RPW_OPTIONS = [1, 2, 3, 4, 5, 6, 7];
@@ -757,6 +763,25 @@ const ProfileSection = ({ lang, subpage = "main", onNavigate }: ProfileSectionPr
           {lang === "zh" ? "編輯個人資料" : "Edit Profile"}
         </button>
       </div>
+
+      {/* Badges — navigation row */}
+      <button
+        onClick={() => onNavigate?.("badges")}
+        className="w-full bg-card border border-border rounded-xl p-4 flex items-center justify-between"
+      >
+        <div className="flex items-center gap-3">
+          <Award size={20} className="text-amber-500" />
+          <div className="text-left">
+            <span className="font-medium text-foreground block">
+              {lang === "zh" ? "成就徽章" : "Achievement Badges"}
+            </span>
+            <span className="text-[11px] text-muted-foreground">
+              {lang === "zh" ? "查看你解鎖的徽章" : "View badges you've unlocked"}
+            </span>
+          </div>
+        </div>
+        <ChevronRight size={18} className="text-muted-foreground" />
+      </button>
 
       {/* Heart Rate Zones — navigation row */}
       <button

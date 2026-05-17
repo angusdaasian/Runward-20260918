@@ -627,6 +627,7 @@ async function processWebhook(
   provider: string,
   user: any,
   env: TerraEnv = "prod",
+  oldUser: any = null,
 ): Promise<string | null> {
   let processingError: string | null = null;
   try {
@@ -705,6 +706,46 @@ async function processWebhook(
         }
       } else if ((type === "deauth" || type === "access_revoked") && terraUserId) {
         await supa.from("terra_connections").update({ active: false, last_webhook_at: new Date().toISOString() }).eq("terra_user_id", terraUserId);
+      } else if (type === "user_reauth" && terraUserId) {
+        // Per Terra spec: update stored user_id to new_user.user_id, then stop.
+        // Do NOT launch a new auth flow / widget. Do NOT trigger backfill —
+        // Terra continues sending data for the new id automatically.
+        const oldTerraId: string | null = oldUser?.user_id ?? null;
+        const rawScopes = user?.scopes;
+        const scopesArr = Array.isArray(rawScopes)
+          ? rawScopes
+          : typeof rawScopes === "string" && rawScopes.length > 0
+            ? rawScopes.split(",").map((s: string) => s.trim()).filter(Boolean)
+            : undefined;
+        const patch: Record<string, unknown> = {
+          terra_user_id: terraUserId,
+          active: true,
+          last_webhook_at: new Date().toISOString(),
+        };
+        if (referenceId) patch.reference_id = referenceId;
+        if (scopesArr !== undefined) patch.scopes = scopesArr;
+
+        if (oldTerraId) {
+          const { error } = await supa.from("terra_connections")
+            .update(patch)
+            .eq("terra_user_id", oldTerraId);
+          if (error) {
+            console.error("user_reauth update by old terra_user_id failed", error);
+            processingError = `user_reauth update: ${error.message}`;
+          }
+        } else if (referenceId) {
+          // Fallback: match by app user id + provider when old_user is missing.
+          const { error } = await supa.from("terra_connections")
+            .update(patch)
+            .eq("user_id", referenceId)
+            .eq("provider", provider);
+          if (error) {
+            console.error("user_reauth update by reference_id failed", error);
+            processingError = `user_reauth update: ${error.message}`;
+          }
+        } else {
+          processingError = "user_reauth: missing old_user.user_id and reference_id";
+        }
       } else if ((type === "activity" || type === "processed_activity") && appUserId) {
         const acts = Array.isArray(payload?.data) ? payload.data : [payload?.data].filter(Boolean);
         // Empty-payload ping: Garmin/Terra notify us that activities exist
@@ -951,7 +992,10 @@ export async function handleTerraWebhook(req: Request, env: TerraEnv = "prod"): 
   try { payload = JSON.parse(raw); } catch { payload = { _parse_error: true, raw }; }
 
   const type: string = payload?.type ?? "unknown";
-  const user = payload?.user ?? {};
+  // user_reauth payloads use old_user / new_user instead of user.
+  const isReauth = type === "user_reauth";
+  const user = isReauth ? (payload?.new_user ?? {}) : (payload?.user ?? {});
+  const oldUser = isReauth ? (payload?.old_user ?? null) : null;
   const terraUserId: string | null = user?.user_id ?? null;
   const referenceId: string | null = user?.reference_id ?? null;
   const provider: string = mapProvider(user?.provider ?? payload?.resource);
@@ -963,7 +1007,9 @@ export async function handleTerraWebhook(req: Request, env: TerraEnv = "prod"): 
       terra_user_id: terraUserId,
       reference_id: referenceId,
       signature_valid: signatureValid,
-      payload: { type, user: payload?.user, env, count: Array.isArray(payload?.data) ? payload.data.length : (payload?.data ? 1 : 0) },
+      payload: isReauth
+        ? { type, old_user: payload?.old_user, new_user: payload?.new_user, env }
+        : { type, user: payload?.user, env, count: Array.isArray(payload?.data) ? payload.data.length : (payload?.data ? 1 : 0) },
       processing_error: null,
     })
     .select("id")
@@ -971,7 +1017,7 @@ export async function handleTerraWebhook(req: Request, env: TerraEnv = "prod"): 
   if (eventInsertErr) console.error("terra_webhook_events insert failed", eventInsertErr);
 
   const work = (async () => {
-    const err = await processWebhook(payload, signatureValid, secret, type, terraUserId, referenceId, provider, payload?.user ?? {}, env);
+    const err = await processWebhook(payload, signatureValid, secret, type, terraUserId, referenceId, provider, user, env, oldUser);
     if (err && eventRow?.id) {
       await supa.from("terra_webhook_events").update({ processing_error: err }).eq("id", eventRow.id);
     }

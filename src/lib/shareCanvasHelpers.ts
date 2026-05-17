@@ -83,6 +83,21 @@ export function wrapText(
   maxWidth: number,
 ): string[] {
   const lines: string[] = [];
+
+  const pushChars = (token: string, startLine: string): string => {
+    let line = startLine;
+    for (const ch of token) {
+      const test = line + ch;
+      if (ctx.measureText(test).width <= maxWidth) {
+        line = test;
+      } else {
+        if (line) lines.push(line);
+        line = ch;
+      }
+    }
+    return line;
+  };
+
   const paragraphs = text.split(/\n/);
   for (const para of paragraphs) {
     if (!para.trim()) {
@@ -98,23 +113,25 @@ export function wrapText(
         if (ctx.measureText(test).width <= maxWidth) {
           line = test;
         } else {
-          if (line) lines.push(line);
-          line = w;
+          // word doesn't fit on current line
+          if (ctx.measureText(w).width <= maxWidth) {
+            if (line) lines.push(line);
+            line = w;
+          } else {
+            // word itself too long — break per character (handles CJK mixed in)
+            if (line) {
+              lines.push(line);
+              line = "";
+            }
+            line = pushChars(w, "");
+          }
         }
       }
       if (line) lines.push(line);
     } else {
-      // CJK: per-character
-      let line = "";
-      for (const ch of para) {
-        const test = line + ch;
-        if (ctx.measureText(test).width <= maxWidth) line = test;
-        else {
-          if (line) lines.push(line);
-          line = ch;
-        }
-      }
-      if (line) lines.push(line);
+      // pure CJK / no-space text
+      const last = pushChars(para, "");
+      if (last) lines.push(last);
     }
   }
   return lines;

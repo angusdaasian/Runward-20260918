@@ -1,7 +1,8 @@
 import { useEffect, useState, useCallback } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Loader2, Sparkles, Lock, ChevronLeft, ChevronRight } from "lucide-react";
+import { Loader2, Sparkles, Lock, ChevronLeft, ChevronRight, Share2 } from "lucide-react";
+import { shareWeeklyReview } from "@/lib/shareWeeklyReview";
 import { Lang } from "@/lib/i18n";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";

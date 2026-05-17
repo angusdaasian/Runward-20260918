@@ -1,39 +1,71 @@
-## Scope
+## Goal
 
-A project-wide scan for Cantonese particles (`嘅 咗 咋 喺 唔 嚟 拿拿臨 跑左 仲`) only flags one file:
+Add three new "share as image" flows that reuse the existing canvas-based share infrastructure in `src/lib/shareActivity.ts` (which already does native save / Web Share / download via `distributeImageBlob`):
 
-- `supabase/functions/send-daily-morning-push/index.ts` — the `buildMessage()` `lang === "zh"` branch.
+1. Share a week of the AI training plan (Mon–Sun, with each day's workout details).
+2. Share a weekly training review (scores + insight).
+3. Share an activity's AI analysis (per-activity).
 
-The rest of the `zh` strings (i18n.ts UI strings, Terra "新活動已同步 / 你的最新活動已上傳。", RevenueCat admin alerts) are already standard Traditional Chinese.
+All three follow the same pattern: render a portrait PNG on `<canvas>` → call `distributeImageBlob(...)` (already exported) → success toast.
 
-## Changes
+## What to build
 
-Rewrite the three Cantonese strings in `send-daily-morning-push/index.ts` → Traditional Chinese (Taiwan, 書面語):
+### 1. New library: `src/lib/sharePlanWeek.ts`
 
-| Current (Cantonese, HK) | New (Traditional, TW) |
-|---|---|
-| `準備好跑步了嗎?` | `準備好今天的跑步了嗎？` |
-| `距離你今個月嘅 {goal}km 目標仲差 {rem} km 咋！拿拿臨出去跑返轉，向目標再邁進一步！🏃‍♂️🔥` | `距離你這個月 {goal} km 的目標還差 {rem} km！趕快出門跑一趟，朝目標再邁進一步吧！🏃‍♂️🔥` |
-| `你今個月已經跑左 {cur} km，但如果你再跑多 {toNext} km，就可以向下一個里程碑 {nm} km 進發，仲唔突破自己？🏃‍♂️🔥` | `你這個月已經跑了 {cur} km，再跑 {toNext} km 就能挑戰下一個里程碑 {nm} km，何不再突破一下自己？🏃‍♂️🔥` |
+- Export `shareTrainingWeek({ weekIndex, week: WeekPlan, lang, athleteName? })`.
+- Canvas layout (1080×1920, brand styling matching existing share cards):
+  - Header: "Week N · {startDate} → {endDate}" + Runward logo.
+  - 7 day rows (Mon–Sun), each row:
+    - Left: day name + date
+    - Color chip / emoji from RUN_TYPES
+    - Title (localized via `localizeTitle`)
+    - Distance + pace
+    - 1–2 lines of description (use `localizeDescription` — already exported logic in TrainingTab; lift the helper into `src/lib/planFormatting.ts` so it can be reused by both TrainingTab and the share lib).
+  - Footer: app icon + URL.
+- Reorder days so Monday is first (`days` is keyed by date, just sort by weekday Mon→Sun).
 
-Also fix the inline status in `src/pages/Index.tsx` line 222:
-- `切換語言中...` is already standard Mandarin — leave it.
-- (No other zh changes needed.)
+### 2. New library: `src/lib/shareWeeklyReview.ts`
 
-## Future Cantonese variant (not in this change)
+- Export `shareWeeklyReview({ review, lang })` where `review` matches the `Review` interface in `WeeklyReviewModal.tsx`.
+- Canvas layout:
+  - Header: "Weekly Training Review" + week range.
+  - Big overall score ring (reuse drawing math, or render simple circle + number).
+  - 4 sub-score tiles: Distance / Pace / HR / Recovery with numeric values.
+  - Completion %: `completed_runs/planned_runs · actual_km/planned_km`.
+  - Insight paragraph (truncate / wrap to fit, max ~6 lines).
+  - Footer branding.
 
-To make the Cantonese addition easy later, also restructure `buildMessage()` so `lang` can be `"en" | "zh" | "yue"` instead of just `"en" | "zh"`:
+### 3. New library: `src/lib/shareActivityAnalysis.ts`
 
-- Change `buildMessage`'s `lang` param type to `"en" | "zh" | "yue"`.
-- Add a third branch reusing the existing Cantonese strings (kept as `yue`).
-- In the recipient loop, map `profiles.lang` values: `"yue" → yue`, `"zh" → zh`, else `en`. (No DB CHECK constraint change yet — we'll loosen `profiles.lang` to allow `'yue'` only when the Cantonese option ships.)
+- Export `shareActivityAnalysis({ activity, analysis, lang })`.
+- Canvas layout:
+  - Hero strip: activity name, date, distance / time / pace stat row (reuse formatters from `shareActivity.ts` — export the helpers or duplicate).
+  - "AI Coach Analysis" heading.
+  - Analysis paragraph (wrap, multi-page guard: cap at ~700 chars with ellipsis).
+  - Optional "Next workout" block when `next_workout_en/zh` exists.
+  - Footer branding.
+
+### 4. UI hookup (frontend only, no business-logic changes)
+
+- **TrainingTab (`src/components/TrainingTab.tsx`)**: add a small "Share week" button (icon `Share2`) near the current week header (both AI plan and custom plan branches). On click → call `shareTrainingWeek` with the currently displayed `WeekPlan` and `weekIndex`.
+- **WeeklyReviewModal (`src/components/training/WeeklyReviewModal.tsx`)**: add a "Share" outline button next to the existing "Regenerate this week" button. On click → `shareWeeklyReview({ review, lang })`.
+- **ActivityDetail (`src/components/activities/ActivityDetail.tsx`)**: in the AI analysis card, add a "Share analysis" button. On click → `shareActivityAnalysis({ activity, analysis, lang })`. (The existing share menu already shares the activity card; this is a separate analysis-only share.)
+
+### 5. Shared helpers
+
+- Extract `localizeTitle` / `localizeDescription` / `RUN_TYPES` / `TYPE_LABELS` from `TrainingTab.tsx` into a new `src/lib/planFormatting.ts` and re-import in TrainingTab + ProgramsTab + the new share lib. Pure refactor, no behavior change.
+- All three share libs reuse `distributeImageBlob`, `fmtDistance`, `fmtPace`, `fmtTimeShort` from `shareActivity.ts` — export the formatters that are currently file-local.
 
 ## Out of scope
 
-- No DB migration in this change. `profiles.lang` stays `'en' | 'zh'`.
-- No edits to `i18n.ts`, Terra push, RevenueCat admin push — they're already TW-style Traditional Chinese.
-- No new Cantonese option in the language picker yet.
+- No DB / edge-function changes.
+- No new push notifications.
+- No changes to Cantonese / language picker work.
+- No changes to the existing per-activity share card or custom-share dialog.
 
-## Deploy
+## Technical notes
 
-After the edit, redeploy `send-daily-morning-push` so tomorrow's 08:00 HKT run picks it up.
+- Canvas font stack and brand colors should match `shareActivity.ts` (system fonts, dark card with light text, app icon + `pacecalculator.fun` footer).
+- Bilingual labels (`lang === "zh"`) follow the same pattern as existing share code.
+- All text wrapped via a `wrapText(ctx, text, maxWidth)` helper (duplicate the small one from `shareActivity.ts` or export it).
+- Cap canvas height per share to keep image under ~2 MB; truncate long insights/analyses with `…`.

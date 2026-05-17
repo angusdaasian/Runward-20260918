@@ -1,7 +1,8 @@
 import { useEffect, useState, useCallback } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Loader2, Sparkles, Lock, ChevronLeft, ChevronRight } from "lucide-react";
+import { Loader2, Sparkles, Lock, ChevronLeft, ChevronRight, Share2 } from "lucide-react";
+import { shareWeeklyReview } from "@/lib/shareWeeklyReview";
 import { Lang } from "@/lib/i18n";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -245,11 +246,39 @@ const WeeklyReviewModal = ({ open, onClose, lang, planId, currentWeekIdx, onUpgr
               })}
             </div>
 
-            <Button variant="outline" size="sm" onClick={() => generate(review.week_index)} disabled={generating} className="w-full">
-              {generating
-                ? <><Loader2 className="animate-spin mr-2" size={14} />{lang === "zh" ? "重新分析中…" : "Re-analyzing…"}</>
-                : (lang === "zh" ? "重新生成此週" : "Regenerate this week")}
-            </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={() => generate(review.week_index)} disabled={generating} className="flex-1">
+                {generating
+                  ? <><Loader2 className="animate-spin mr-2" size={14} />{lang === "zh" ? "重新分析中…" : "Re-analyzing…"}</>
+                  : (lang === "zh" ? "重新生成此週" : "Regenerate this week")}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => shareWeeklyReview({
+                  weekIndex: review.week_index,
+                  weekStart: review.week_start,
+                  weekEnd: review.week_end,
+                  completionPct: review.completion_pct,
+                  overallScore: review.overall_score,
+                  distanceScore: review.distance_score,
+                  paceScore: review.pace_score,
+                  hrScore: review.hr_score,
+                  recoveryScore: review.recovery_score,
+                  plannedKm: review.stats.planned_km ?? null,
+                  actualKm: review.stats.actual_km ?? null,
+                  plannedRuns: review.stats.planned_runs ?? null,
+                  completedRuns: review.stats.completed_runs ?? null,
+                  avgHr: review.stats.avg_hr ?? null,
+                  avgPaceSecPerKm: review.stats.avg_pace_sec_per_km ?? null,
+                  insight: (lang === "zh" ? review.insights_zh : review.insights_en) || review.insights_en || "",
+                  lang,
+                })}
+              >
+                <Share2 size={14} className="mr-1" />
+                {lang === "zh" ? "分享" : "Share"}
+              </Button>
+            </div>
           </div>
         ) : null}
       </DialogContent>

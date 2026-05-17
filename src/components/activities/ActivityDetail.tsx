@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { ArrowLeft, Clock, MapPin, Zap, Heart, TrendingUp, Mountain, Timer, Footprints, Trash2, Pencil, Sparkles, Lock, Gauge, AlertTriangle, Flame, Trophy, MessageSquare, RefreshCw, Share2, Copy, Check } from "lucide-react";
 import { shareActivity, shareSplits, shareCharts } from "@/lib/shareActivity";
+import { shareActivityAnalysis } from "@/lib/shareActivityAnalysis";
 import AiPosterDialog from "./AiPosterDialog";
 import CustomShareDialog from "./CustomShareDialog";
 import RouteVideoDialog from "./RouteVideoDialog";
@@ -1425,6 +1426,25 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
               aria-label={lang === "zh" ? "複製分析" : "Copy analysis"}
             >
               {aiCopied ? <><Check size={12} /> {lang === "zh" ? "已複製" : "Copied"}</> : <><Copy size={12} /> {lang === "zh" ? "複製" : "Copy"}</>}
+            </button>
+          )}
+          {aiAnalysis && (
+            <button
+              type="button"
+              onClick={() => shareActivityAnalysis({
+                name: activityName,
+                startDate: activity.start_date,
+                distanceMeters: activity.distance,
+                movingTimeSeconds: activity.moving_time,
+                averageSpeed: activity.average_speed,
+                analysis: aiAnalysis,
+                nextWorkout: aiNextWorkout,
+                lang,
+              })}
+              className="flex items-center gap-1 px-2 py-1 rounded-md text-[11px] text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
+              aria-label={lang === "zh" ? "分享分析" : "Share analysis"}
+            >
+              <Share2 size={12} /> {lang === "zh" ? "分享" : "Share"}
             </button>
           )}
         </div>

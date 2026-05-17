@@ -82,7 +82,7 @@ Deno.serve(async (req) => {
     // 1. Fetch all opted-in profiles
     const { data: profiles, error: profilesErr } = await supabase
       .from("profiles")
-      .select("user_id, monthly_goal_km, activity_notifications")
+      .select("user_id, monthly_goal_km, activity_notifications, lang")
       .eq("activity_notifications", true);
     if (profilesErr) throw profilesErr;
     if (!profiles || profiles.length === 0) {

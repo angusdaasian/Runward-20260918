@@ -1,12 +1,16 @@
 /**
  * Shared canvas helpers for "share as image" cards.
- * Reuses distributeImageBlob from shareActivity.ts for the distribution step.
+ * White-card style aligned with shareActivity.ts.
  */
 import { Lang } from "@/lib/i18n";
 import appIcon from "@/assets/app-icon.png";
+import { drawIgHandle } from "@/lib/shareActivity";
 
 export const APP_NAME = "Runward";
-export const APP_URL = "https://pacecalculator.fun";
+export const FONT_DISPLAY =
+  "-apple-system, 'SF Pro Display', 'PingFang TC', 'Helvetica Neue', system-ui, sans-serif";
+export const FONT_TEXT =
+  "-apple-system, 'SF Pro Text', 'PingFang TC', 'Helvetica Neue', system-ui, sans-serif";
 
 export function fmtDistanceKm(meters: number): string {
   return (meters / 1000).toFixed(2);

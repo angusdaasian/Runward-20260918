@@ -223,6 +223,11 @@ Deno.serve(async (req) => {
       console.log(
         `Subscription activated: user=${targetUserId}, plan=${effectiveProductId}, entitlement=${rcEntitlement}, trial=${isTrialPeriod}, event=${eventType}`,
       );
+
+      await notifyAdmin(
+        `RC: ${eventType}${isTrialPeriod ? " (trial)" : ""}`,
+        `User ${targetUserId}\nPlan: ${effectiveProductId}\nPrice: ${formatPrice()}`,
+      );
     } else if (INACTIVE_EVENTS.includes(eventType)) {
       // EXPIRATION and BILLING_ISSUE = access should be revoked
       const { error } = await supabase.from("premium_subscriptions").delete().eq("user_id", targetUserId);

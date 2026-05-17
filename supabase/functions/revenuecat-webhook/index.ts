@@ -105,6 +105,20 @@ Deno.serve(async (req) => {
       periodType === "INTRO";
     const entitlementIds: string[] = event.entitlement_ids || [];
     const newProductId: string | undefined = event.new_product_id;
+    const price: number | undefined = typeof event.price === "number" ? event.price : undefined;
+    const currency: string | undefined = event.currency;
+    const priceInPurchased: number | undefined =
+      typeof event.price_in_purchased_currency === "number" ? event.price_in_purchased_currency : undefined;
+    const purchasedCurrency: string | undefined = event.currency;
+    const formatPrice = () => {
+      if (priceInPurchased !== undefined && purchasedCurrency) {
+        return `${priceInPurchased.toFixed(2)} ${purchasedCurrency}`;
+      }
+      if (price !== undefined && currency) {
+        return `${price.toFixed(2)} ${currency} (USD est.)`;
+      }
+      return "n/a";
+    };
 
     if (!appUserId) {
       return new Response(JSON.stringify({ error: "No app_user_id" }), {

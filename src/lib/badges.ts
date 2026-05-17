@@ -36,16 +36,36 @@ import imgHoarder from "@/assets/badges/badge_hoarder.png";
 import imgCompletionist from "@/assets/badges/completionist.png";
 import imgEarlyAdopter from "@/assets/badges/early_adopter.png";
 import imgFoundingMember from "@/assets/badges/founding_member.png";
+import imgSpeedDemon from "@/assets/badges/speed_demon.png";
+import imgMarathonPace from "@/assets/badges/marathon_pace.png";
+import imgNegativeSplit from "@/assets/badges/negative_split.png";
+import imgThirtyK from "@/assets/badges/thirty_k_club.png";
+import imgHundredK from "@/assets/badges/hundred_k_club.png";
+import imgMayChallenge from "@/assets/badges/may_challenge.png";
+import imgSummerChallenge from "@/assets/badges/summer_challenge.png";
+import imgBackToSchool from "@/assets/badges/back_to_school.png";
+import imgAppBirthday from "@/assets/badges/app_birthday.png";
+import imgOneYearParty from "@/assets/badges/one_year_party.png";
+import imgRainRunner from "@/assets/badges/rain_runner.png";
+import imgHotWeather from "@/assets/badges/hot_weather.png";
+import imgColdWeather from "@/assets/badges/cold_weather.png";
+
+/** App launch / anniversary anchor date — used for App Birthday */
+export const APP_LAUNCH_DATE = "2025-05-01";
 
 export type BadgeCategory =
   | "distance"
   | "single_run"
+  | "performance"
   | "streak"
   | "pace"
   | "volume"
   | "elevation"
   | "time"
+  | "weather"
   | "holiday"
+  | "seasonal"
+  | "anniversary"
   | "meta"
   | "special";
 
@@ -92,6 +112,23 @@ export const BADGES: BadgeDef[] = [
   { id: "ultra_runner", category: "single_run", image: imgUltraRunner, target: 1,
     en: { name: "Ultra Runner",     desc: "Complete a 50 km+ run" },
     zh: { name: "超馬跑者",         desc: "完成單次 50 公里以上" } },
+  { id: "thirty_k_club", category: "single_run", image: imgThirtyK, target: 1,
+    en: { name: "30K Club",         desc: "Complete a 30 km single run" },
+    zh: { name: "30K 俱樂部",       desc: "完成單次 30 公里" } },
+  { id: "hundred_k_club", category: "single_run", image: imgHundredK, target: 1,
+    en: { name: "100K Ultra",       desc: "Complete a 100 km single run" },
+    zh: { name: "百公里超馬",       desc: "完成單次 100 公里" } },
+
+  // ── Performance (pace × distance, PRs) ────────────────────────────
+  { id: "speed_demon", category: "performance", image: imgSpeedDemon, target: 1,
+    en: { name: "Speed Demon",      desc: "Average sub 4:30/km on a run (≥1 km)" },
+    zh: { name: "速度惡魔",         desc: "單次跑步均速破 4:30/km" } },
+  { id: "marathon_pace", category: "performance", image: imgMarathonPace, target: 1,
+    en: { name: "Marathon Pace",    desc: "Average sub 5:00/km on a run of 10 km+" },
+    zh: { name: "馬拉松配速",       desc: "10 公里以上均速破 5:00/km" } },
+  { id: "negative_split", category: "performance", image: imgNegativeSplit, target: 1,
+    en: { name: "Negative Split",   desc: "Second half faster than first on a 10 km+ run" },
+    zh: { name: "後段加速",         desc: "10 公里以上下半段比前半段更快" } },
 
   // ── Streaks (consecutive days) ────────────────────────────────────
   { id: "week_warrior", category: "streak", image: imgWeekWarrior, target: 7, unit: "days",
@@ -168,6 +205,36 @@ export const BADGES: BadgeDef[] = [
     en: { name: "Santa's Helper",   desc: "Run on December 25th" },
     zh: { name: "聖誕小幫手",       desc: "於 12 月 25 日跑步" } },
 
+  // ── Weather ───────────────────────────────────────────────────────
+  { id: "rain_runner", category: "weather", image: imgRainRunner, target: 5, unit: "runs",
+    en: { name: "Rain Runner",      desc: "Complete 5 runs in the rain" },
+    zh: { name: "雨中跑者",         desc: "完成 5 次雨中跑步" } },
+  { id: "hot_weather", category: "weather", image: imgHotWeather, target: 3, unit: "runs",
+    en: { name: "Hot Weather Warrior", desc: "Complete 3 runs at 30°C or hotter" },
+    zh: { name: "高溫戰士",         desc: "完成 3 次 30°C 以上跑步" } },
+  { id: "cold_weather", category: "weather", image: imgColdWeather, target: 3, unit: "runs",
+    en: { name: "Cold Weather Warrior", desc: "Complete 3 runs at 5°C or colder" },
+    zh: { name: "低溫戰士",         desc: "完成 3 次 5°C 以下跑步" } },
+
+  // ── Seasonal monthly challenges ───────────────────────────────────
+  { id: "may_challenge", category: "seasonal", image: imgMayChallenge, target: 100, unit: "km",
+    en: { name: "May Challenge",    desc: "Run 100 km during the month of May" },
+    zh: { name: "五月挑戰",         desc: "於 5 月累積 100 公里" } },
+  { id: "summer_challenge", category: "seasonal", image: imgSummerChallenge, target: 300, unit: "km",
+    en: { name: "Summer Challenge", desc: "Run 300 km across June–August" },
+    zh: { name: "夏季挑戰",         desc: "6–8 月累積 300 公里" } },
+  { id: "back_to_school", category: "seasonal", image: imgBackToSchool, target: 50, unit: "km",
+    en: { name: "Back to School",   desc: "Run 50 km during September" },
+    zh: { name: "開學季",           desc: "於 9 月累積 50 公里" } },
+
+  // ── Anniversary ───────────────────────────────────────────────────
+  { id: "app_birthday", category: "anniversary", image: imgAppBirthday, target: 1,
+    en: { name: "App Birthday",     desc: "Run on the app's anniversary date (May 1)" },
+    zh: { name: "App 生日",         desc: "於 App 週年日跑步（5 月 1 日）" } },
+  { id: "one_year_party", category: "anniversary", image: imgOneYearParty, target: 1,
+    en: { name: "One Year Party",   desc: "Active member for 365+ days" },
+    zh: { name: "一週年派對",       desc: "成為會員滿 365 天" } },
+
   // ── Meta (badge counts — must stay last in array) ─────────────────
   { id: "badge_collector", category: "meta", image: imgCollector, target: 10, unit: "badges",
     en: { name: "Collector",        desc: "Unlock 10 badges" },
@@ -175,7 +242,7 @@ export const BADGES: BadgeDef[] = [
   { id: "badge_hoarder", category: "meta", image: imgHoarder, target: 25, unit: "badges",
     en: { name: "Hoarder",          desc: "Unlock 25 badges" },
     zh: { name: "藏寶者",           desc: "解鎖 25 個徽章" } },
-  { id: "completionist", category: "meta", image: imgCompletionist, target: 35, unit: "badges",
+  { id: "completionist", category: "meta", image: imgCompletionist, target: 45, unit: "badges",
     en: { name: "Completionist",    desc: "Unlock every badge" },
     zh: { name: "全收集",           desc: "解鎖所有徽章" } },
 
@@ -297,12 +364,60 @@ function anyOnMonthDay(activities: StravaActivity[], month: number, day: number)
   return false;
 }
 
+// Helpers for new categories
+function bestPaceSecPerKmOver(activities: StravaActivity[], minMeters: number): number {
+  let best = Infinity;
+  for (const a of activities) {
+    if (!a.average_speed || a.average_speed <= 0) continue;
+    if ((a.distance || 0) < minMeters) continue;
+    const sec = 1000 / a.average_speed;
+    if (sec < best) best = sec;
+  }
+  return best;
+}
+
+function hasNegativeSplit(activities: StravaActivity[]): boolean {
+  for (const a of activities) {
+    if ((a.distance || 0) < 10000 || !a.distance_samples || a.distance_samples.length < 4) continue;
+    const samples = a.distance_samples;
+    const last = samples[samples.length - 1];
+    const halfDist = last.d / 2;
+    // find sample closest to halfDist
+    let midIdx = 0;
+    for (let i = 0; i < samples.length; i++) {
+      if (samples[i].d >= halfDist) { midIdx = i; break; }
+    }
+    const mid = samples[midIdx];
+    if (!mid || mid.t <= 0 || last.t <= mid.t) continue;
+    const firstHalfPace = mid.t / (mid.d / 1000);     // sec/km
+    const secondHalfPace = (last.t - mid.t) / ((last.d - mid.d) / 1000);
+    if (secondHalfPace < firstHalfPace) return true;
+  }
+  return false;
+}
+
+function countWeather(activities: StravaActivity[], pred: (w: NonNullable<StravaActivity["weather"]>) => boolean): number {
+  let n = 0;
+  for (const a of activities) if (a.weather && pred(a.weather)) n++;
+  return n;
+}
+
+function kmInMonthRange(activities: StravaActivity[], months: number[]): number {
+  let km = 0;
+  for (const a of activities) {
+    const d = new Date(a.start_date);
+    if (months.includes(d.getMonth())) km += (a.distance || 0);
+  }
+  return km / 1000;
+}
+
 // ─── main compute ───────────────────────────────────────────────────
 export function computeBadgeProgress(ctx: BadgeContext): Record<string, BadgeProgress> {
   const totalKm = ctx.activities.reduce((s, a) => s + (a.distance || 0), 0) / 1000;
   const totalElev = ctx.activities.reduce((s, a) => s + (a.total_elevation_gain || 0), 0);
   const streak = computeStreak(ctx.activities);
   const bestSec = bestPaceSecPerKm(ctx.activities);
+  const bestSec10k = bestPaceSecPerKmOver(ctx.activities, 10000);
   const longestRunM = maxRunDistance(ctx.activities);
   const steepestM = maxRunElevation(ctx.activities);
   const best7 = bestRollingDistanceKm(ctx.activities, 7);
@@ -312,6 +427,26 @@ export function computeBadgeProgress(ctx: BadgeContext): Record<string, BadgePro
   const midnight = countByHour(ctx.activities, (h, m) => (h === 23 && m >= 30) || h === 0 && m <= 30) > 0 ? 1 : 0;
   const newYear = anyOnMonthDay(ctx.activities, 0, 1) ? 1 : 0;
   const christmas = anyOnMonthDay(ctx.activities, 11, 25) ? 1 : 0;
+  const appBirthday = anyOnMonthDay(ctx.activities, 4, 1) ? 1 : 0; // May 1
+  const negSplit = hasNegativeSplit(ctx.activities) ? 1 : 0;
+
+  // Weather counts
+  const rainRuns = countWeather(ctx.activities, (w) => {
+    const s = `${w.weather_type ?? ""} ${w.condition ?? ""}`.toLowerCase();
+    return /rain|shower|drizzle|storm/.test(s);
+  });
+  const hotRuns = countWeather(ctx.activities, (w) => (w.temp ?? -Infinity) >= 30);
+  const coldRuns = countWeather(ctx.activities, (w) => (w.temp ?? Infinity) <= 5);
+
+  // Seasonal (any year)
+  const mayKm = kmInMonthRange(ctx.activities, [4]);
+  const summerKm = kmInMonthRange(ctx.activities, [5, 6, 7]);
+  const septKm = kmInMonthRange(ctx.activities, [8]);
+
+  // Anniversary: 365+ days as premium member
+  const oneYear = ctx.premiumActivatedAt &&
+    (Date.now() - new Date(ctx.premiumActivatedAt).getTime()) >= 365 * 86_400_000
+    ? 1 : 0;
 
   const out: Record<string, BadgeProgress> = {};
   for (const b of BADGES) {
@@ -329,6 +464,12 @@ export function computeBadgeProgress(ctx: BadgeContext): Record<string, BadgePro
       case "half_marathon_hero":   value = longestRunM >= 21100 ? 1 : 0; break;
       case "marathon_legend":      value = longestRunM >= 42200 ? 1 : 0; break;
       case "ultra_runner":         value = longestRunM >= 50000 ? 1 : 0; break;
+      case "thirty_k_club":        value = longestRunM >= 30000 ? 1 : 0; break;
+      case "hundred_k_club":       value = longestRunM >= 100000 ? 1 : 0; break;
+      // performance
+      case "speed_demon":          value = bestSec <= 270 ? 1 : 0; break;
+      case "marathon_pace":        value = bestSec10k <= 300 ? 1 : 0; break;
+      case "negative_split":       value = negSplit; break;
       // streaks
       case "week_warrior":
       case "monthly_master":
@@ -353,6 +494,17 @@ export function computeBadgeProgress(ctx: BadgeContext): Record<string, BadgePro
       case "early_bird":         value = earlyBirdRuns; break;
       case "night_runner":       value = nightRuns; break;
       case "midnight_runner":    value = midnight; break;
+      // weather
+      case "rain_runner":        value = rainRuns; break;
+      case "hot_weather":        value = hotRuns; break;
+      case "cold_weather":       value = coldRuns; break;
+      // seasonal
+      case "may_challenge":      value = mayKm; break;
+      case "summer_challenge":   value = summerKm; break;
+      case "back_to_school":     value = septKm; break;
+      // anniversary
+      case "app_birthday":       value = appBirthday; break;
+      case "one_year_party":     value = oneYear; break;
       // holiday
       case "new_year_runner":    value = newYear; break;
       case "christmas_runner":   value = christmas; break;

@@ -12,16 +12,20 @@ interface Props {
 }
 
 const CATEGORY_LABELS: Record<string, { en: string; zh: string }> = {
-  distance:   { en: "Distance Milestones", zh: "里程里程碑" },
-  single_run: { en: "Single-Run Challenges", zh: "單次跑步挑戰" },
-  streak:     { en: "Streaks",             zh: "連續紀錄" },
-  pace:       { en: "Pace Achievements",   zh: "配速成就" },
-  volume:     { en: "Volume Goals",        zh: "里程目標" },
-  elevation:  { en: "Elevation",           zh: "爬升" },
-  time:       { en: "Time of Day",         zh: "時段成就" },
-  holiday:    { en: "Holidays",            zh: "節日特輯" },
-  meta:       { en: "Collector",           zh: "收藏進度" },
-  special:    { en: "Special",             zh: "特別徽章" },
+  distance:     { en: "Distance Milestones",   zh: "里程里程碑" },
+  single_run:   { en: "Single-Run Challenges", zh: "單次跑步挑戰" },
+  performance:  { en: "Performance & PRs",     zh: "表現與個人最佳" },
+  streak:       { en: "Streaks",               zh: "連續紀錄" },
+  pace:         { en: "Pace Achievements",     zh: "配速成就" },
+  volume:       { en: "Volume Goals",          zh: "里程目標" },
+  elevation:    { en: "Elevation",             zh: "爬升" },
+  time:         { en: "Time of Day",           zh: "時段成就" },
+  weather:      { en: "Weather Warrior",       zh: "天候戰士" },
+  seasonal:     { en: "Seasonal Challenges",   zh: "季節挑戰" },
+  anniversary:  { en: "Anniversary",           zh: "週年慶" },
+  holiday:      { en: "Holidays",              zh: "節日特輯" },
+  meta:         { en: "Collector",             zh: "收藏進度" },
+  special:      { en: "Special",               zh: "特別徽章" },
 };
 
 const BadgesPage = ({ lang, onBack }: Props) => {

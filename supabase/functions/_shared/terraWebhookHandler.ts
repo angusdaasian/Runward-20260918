@@ -627,6 +627,7 @@ async function processWebhook(
   provider: string,
   user: any,
   env: TerraEnv = "prod",
+  oldUser: any = null,
 ): Promise<string | null> {
   let processingError: string | null = null;
   try {

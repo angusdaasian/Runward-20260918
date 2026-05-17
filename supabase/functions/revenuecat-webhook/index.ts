@@ -244,6 +244,11 @@ Deno.serve(async (req) => {
       await supabase.from("profiles").update({ is_premium: false }).eq("user_id", targetUserId);
 
       console.log(`Subscription removed: user=${targetUserId}, event=${eventType}`);
+
+      await notifyAdmin(
+        `RC: ${eventType}`,
+        `User ${targetUserId} lost access\nPlan: ${productId ?? "unknown"}\nLast price: ${formatPrice()}`,
+      );
     } else if (LOG_ONLY_EVENTS.includes(eventType)) {
       console.log(`Logged event (no action): user=${targetUserId}, event=${eventType}`);
     } else {

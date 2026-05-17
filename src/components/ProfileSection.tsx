@@ -153,6 +153,20 @@ const ProfileSection = ({ lang, subpage = "main", onNavigate }: ProfileSectionPr
     setUploading(false);
   };
 
+  const handlePickPreset = async (url: string) => {
+    if (!user) return;
+    setUploading(true);
+    await supabase.from("profiles").update({ avatar_url: url }).eq("user_id", user.id);
+    setProfile((p) => {
+      const updated = p ? { ...p, avatar_url: url } : p;
+      _cachedProfile = updated;
+      if (updated && user) updateHeaderCache({ display_name: updated.display_name, avatar_url: updated.avatar_url }, user.id);
+      return updated;
+    });
+    setUploading(false);
+  };
+
+
   const handleSaveName = async () => {
     if (!user) return;
     setSaving(true);

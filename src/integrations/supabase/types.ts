@@ -719,6 +719,7 @@ export type Database = {
           division: string
           id: string
           is_premium: boolean
+          lang: string
           last_check_in_date: string | null
           last_login: string | null
           lifetime_xp: number
@@ -746,6 +747,7 @@ export type Database = {
           division?: string
           id?: string
           is_premium?: boolean
+          lang?: string
           last_check_in_date?: string | null
           last_login?: string | null
           lifetime_xp?: number
@@ -773,6 +775,7 @@ export type Database = {
           division?: string
           id?: string
           is_premium?: boolean
+          lang?: string
           last_check_in_date?: string | null
           last_login?: string | null
           lifetime_xp?: number

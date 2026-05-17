@@ -1,14 +1,18 @@
 /**
- * Share a weekly training review as a portrait PNG.
+ * Share a weekly training review as a portrait PNG (white card style).
  */
 import { toast } from "sonner";
 import { Lang } from "@/lib/i18n";
 import { distributeImageBlob } from "@/lib/shareActivity";
 import {
   drawBrandFooter,
+  drawWhiteCardBackground,
+  drawCardHeader,
   canvasToBlob,
   roundedRect,
   wrapText,
+  FONT_DISPLAY,
+  FONT_TEXT,
 } from "@/lib/shareCanvasHelpers";
 
 export interface ShareWeeklyReviewInput {
@@ -32,9 +36,9 @@ export interface ShareWeeklyReviewInput {
 }
 
 function scoreColor(v: number): string {
-  if (v >= 80) return "#10b981";
-  if (v >= 60) return "#f59e0b";
-  return "#f43f5e";
+  if (v >= 80) return "#10B981";
+  if (v >= 60) return "#F59E0B";
+  return "#F43F5E";
 }
 
 function fmtPace(s?: number | null) {
@@ -51,13 +55,11 @@ function drawRing(
   strokeWidth: number,
 ) {
   const pct = Math.max(0, Math.min(100, value)) / 100;
-  // background
-  ctx.strokeStyle = "rgba(255,255,255,0.12)";
+  ctx.strokeStyle = "rgba(15,23,42,0.10)";
   ctx.lineWidth = strokeWidth;
   ctx.beginPath();
   ctx.arc(cx, cy, radius, 0, Math.PI * 2);
   ctx.stroke();
-  // progress
   ctx.strokeStyle = scoreColor(value);
   ctx.lineWidth = strokeWidth;
   ctx.lineCap = "round";
@@ -67,135 +69,139 @@ function drawRing(
 }
 
 export async function shareWeeklyReview(input: ShareWeeklyReviewInput): Promise<void> {
-  const { lang } = input;
-  const isZh = lang === "zh";
+  const isZh = input.lang === "zh";
 
   try {
     const W = 1080;
-    const H = 1700;
-
+    const H = 1500;
     const canvas = document.createElement("canvas");
     canvas.width = W;
     canvas.height = H;
     const ctx = canvas.getContext("2d");
     if (!ctx) throw new Error("no ctx");
 
-    const grad = ctx.createLinearGradient(0, 0, 0, H);
-    grad.addColorStop(0, "#0f172a");
-    grad.addColorStop(1, "#1e293b");
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, W, H);
+    const { cardX, cardY, cardW } = await drawWhiteCardBackground(ctx, W, H);
+    const afterHeader = await drawCardHeader(
+      ctx,
+      cardX,
+      cardY,
+      cardW,
+      isZh ? "週訓練回顧" : "Weekly Training Review",
+      `${input.weekStart} → ${input.weekEnd}`,
+    );
 
-    // Header
-    ctx.fillStyle = "#94a3b8";
+    // Title
+    ctx.fillStyle = "#0F172A";
     ctx.textBaseline = "top";
-    ctx.font = "600 30px -apple-system, BlinkMacSystemFont, system-ui, sans-serif";
-    ctx.fillText(isZh ? "週訓練回顧" : "Weekly Training Review", 60, 60);
-
-    ctx.fillStyle = "#ffffff";
-    ctx.font = "bold 64px -apple-system, BlinkMacSystemFont, system-ui, sans-serif";
-    ctx.fillText(isZh ? `第 ${input.weekIndex + 1} 週` : `Week ${input.weekIndex + 1}`, 60, 100);
-
-    ctx.fillStyle = "#94a3b8";
-    ctx.font = "24px -apple-system, BlinkMacSystemFont, system-ui, sans-serif";
-    ctx.fillText(`${input.weekStart} → ${input.weekEnd}`, 60, 180);
+    ctx.font = `800 52px ${FONT_DISPLAY}`;
+    ctx.fillText(isZh ? `第 ${input.weekIndex + 1} 週` : `Week ${input.weekIndex + 1}`, cardX + 44, afterHeader + 12);
+    ctx.fillStyle = "#FC4C02";
+    ctx.fillRect(cardX + 44, afterHeader + 76, 64, 5);
 
     // Overall card
-    const cardY = 250;
-    ctx.fillStyle = "rgba(255,255,255,0.06)";
-    roundedRect(ctx, 40, cardY, W - 80, 280, 28);
+    const cardTop = afterHeader + 110;
+    ctx.fillStyle = "rgba(15,23,42,0.03)";
+    roundedRect(ctx, cardX + 44, cardTop, cardW - 88, 240, 22);
     ctx.fill();
+    ctx.strokeStyle = "rgba(15,23,42,0.06)";
+    roundedRect(ctx, cardX + 44, cardTop, cardW - 88, 240, 22);
+    ctx.stroke();
 
     // Ring
-    drawRing(ctx, 220, cardY + 140, 90, input.overallScore, 18);
-    ctx.fillStyle = "#ffffff";
-    ctx.font = "bold 56px -apple-system, BlinkMacSystemFont, system-ui, sans-serif";
+    drawRing(ctx, cardX + 170, cardTop + 120, 80, input.overallScore, 16);
+    ctx.fillStyle = "#0F172A";
+    ctx.font = `800 48px ${FONT_DISPLAY}`;
     ctx.textBaseline = "middle";
     ctx.textAlign = "center";
-    ctx.fillText(String(Math.round(input.overallScore)), 220, cardY + 140);
+    ctx.fillText(String(Math.round(input.overallScore)), cardX + 170, cardTop + 120);
     ctx.textAlign = "left";
     ctx.textBaseline = "top";
 
-    // Right of ring
-    ctx.fillStyle = "#cbd5e1";
-    ctx.font = "22px -apple-system, BlinkMacSystemFont, system-ui, sans-serif";
-    ctx.fillText(isZh ? "總分" : "Overall Score", 350, cardY + 60);
+    ctx.fillStyle = "#64748B";
+    ctx.font = `500 20px ${FONT_TEXT}`;
+    ctx.fillText(isZh ? "總分" : "Overall Score", cardX + 300, cardTop + 40);
 
-    ctx.fillStyle = "#ffffff";
-    ctx.font = "bold 80px -apple-system, BlinkMacSystemFont, system-ui, sans-serif";
-    ctx.fillText(`${Math.round(input.completionPct)}%`, 350, cardY + 92);
+    ctx.fillStyle = "#0F172A";
+    ctx.font = `800 64px ${FONT_DISPLAY}`;
+    ctx.fillText(`${Math.round(input.completionPct)}%`, cardX + 300, cardTop + 70);
 
-    ctx.fillStyle = "#94a3b8";
-    ctx.font = "22px -apple-system, BlinkMacSystemFont, system-ui, sans-serif";
-    ctx.fillText(isZh ? "完成度" : "Completion", 350, cardY + 188);
+    ctx.fillStyle = "#64748B";
+    ctx.font = `500 20px ${FONT_TEXT}`;
+    ctx.fillText(isZh ? "完成度" : "Completion", cardX + 300, cardTop + 150);
 
-    ctx.fillStyle = "#cbd5e1";
-    ctx.font = "22px -apple-system, BlinkMacSystemFont, system-ui, sans-serif";
-    const summaryLine = `${input.completedRuns ?? "—"}/${input.plannedRuns ?? "—"} ${isZh ? "次" : "runs"} · ${input.actualKm ?? "—"}/${input.plannedKm ?? "—"} km`;
-    ctx.fillText(summaryLine, 350, cardY + 220);
+    ctx.fillStyle = "#475569";
+    ctx.font = `500 20px ${FONT_TEXT}`;
+    const summary = `${input.completedRuns ?? "—"}/${input.plannedRuns ?? "—"} ${isZh ? "次" : "runs"} · ${input.actualKm ?? "—"}/${input.plannedKm ?? "—"} km`;
+    ctx.fillText(summary, cardX + 300, cardTop + 180);
 
-    // 4 sub-score tiles
-    const tilesY = cardY + 310;
-    const tileW = (W - 80 - 30) / 2;
-    const tileH = 180;
+    // Sub-tiles
+    const tilesY = cardTop + 270;
+    const tileW = (cardW - 88 - 24) / 2;
+    const tileH = 140;
     const tiles = [
-      { label: isZh ? "里程" : "Distance",    score: input.distanceScore, stat: `${input.actualKm ?? "—"}/${input.plannedKm ?? "—"} km` },
-      { label: isZh ? "配速" : "Pace",        score: input.paceScore,     stat: fmtPace(input.avgPaceSecPerKm) },
-      { label: isZh ? "心率" : "Heart Rate",  score: input.hrScore,       stat: input.avgHr != null ? `${input.avgHr} bpm` : "—" },
-      { label: isZh ? "恢復" : "Recovery",    score: input.recoveryScore, stat: "—" },
+      { label: isZh ? "里程" : "Distance",   score: input.distanceScore, stat: `${input.actualKm ?? "—"}/${input.plannedKm ?? "—"} km` },
+      { label: isZh ? "配速" : "Pace",       score: input.paceScore,     stat: fmtPace(input.avgPaceSecPerKm) },
+      { label: isZh ? "心率" : "Heart Rate", score: input.hrScore,       stat: input.avgHr != null ? `${input.avgHr} bpm` : "—" },
+      { label: isZh ? "恢復" : "Recovery",   score: input.recoveryScore, stat: "—" },
     ];
     for (let i = 0; i < tiles.length; i++) {
       const t = tiles[i];
-      const tx = 40 + (i % 2) * (tileW + 30);
-      const ty = tilesY + Math.floor(i / 2) * (tileH + 20);
-      ctx.fillStyle = "rgba(255,255,255,0.06)";
-      roundedRect(ctx, tx, ty, tileW, tileH, 22);
+      const tx = cardX + 44 + (i % 2) * (tileW + 24);
+      const ty = tilesY + Math.floor(i / 2) * (tileH + 18);
+      ctx.fillStyle = "rgba(15,23,42,0.03)";
+      roundedRect(ctx, tx, ty, tileW, tileH, 18);
       ctx.fill();
+      ctx.strokeStyle = "rgba(15,23,42,0.06)";
+      roundedRect(ctx, tx, ty, tileW, tileH, 18);
+      ctx.stroke();
 
-      // Mini ring
-      drawRing(ctx, tx + 70, ty + 90, 50, t.score, 12);
-      ctx.fillStyle = "#ffffff";
-      ctx.font = "bold 30px -apple-system, BlinkMacSystemFont, system-ui, sans-serif";
+      drawRing(ctx, tx + 60, ty + 70, 42, t.score, 10);
+      ctx.fillStyle = "#0F172A";
+      ctx.font = `700 24px ${FONT_DISPLAY}`;
       ctx.textBaseline = "middle";
       ctx.textAlign = "center";
-      ctx.fillText(String(Math.round(t.score)), tx + 70, ty + 90);
+      ctx.fillText(String(Math.round(t.score)), tx + 60, ty + 70);
       ctx.textAlign = "left";
       ctx.textBaseline = "top";
 
-      ctx.fillStyle = "#e2e8f0";
-      ctx.font = "bold 26px -apple-system, BlinkMacSystemFont, system-ui, sans-serif";
-      ctx.fillText(t.label, tx + 140, ty + 50);
-
-      ctx.fillStyle = "#94a3b8";
-      ctx.font = "22px -apple-system, BlinkMacSystemFont, system-ui, sans-serif";
-      ctx.fillText(t.stat, tx + 140, ty + 90);
+      ctx.fillStyle = "#0F172A";
+      ctx.font = `700 24px ${FONT_DISPLAY}`;
+      ctx.fillText(t.label, tx + 124, ty + 38);
+      ctx.fillStyle = "#64748B";
+      ctx.font = `500 20px ${FONT_TEXT}`;
+      ctx.fillText(t.stat, tx + 124, ty + 72);
     }
 
-    // Insight box
-    const insightY = tilesY + 2 * (tileH + 20) + 10;
-    const insightH = H - insightY - 160;
-    ctx.fillStyle = "rgba(255,255,255,0.06)";
-    roundedRect(ctx, 40, insightY, W - 80, insightH, 24);
+    // Insight
+    const insightY = tilesY + 2 * (tileH + 18) + 16;
+    const insightBottom = H - 160;
+    ctx.fillStyle = "rgba(15,23,42,0.03)";
+    roundedRect(ctx, cardX + 44, insightY, cardW - 88, insightBottom - insightY, 22);
     ctx.fill();
+    ctx.strokeStyle = "rgba(15,23,42,0.06)";
+    roundedRect(ctx, cardX + 44, insightY, cardW - 88, insightBottom - insightY, 22);
+    ctx.stroke();
 
-    ctx.fillStyle = "#cbd5e1";
-    ctx.font = "600 24px -apple-system, BlinkMacSystemFont, system-ui, sans-serif";
-    ctx.fillText(isZh ? "教練分析" : "Coach Insight", 70, insightY + 30);
+    ctx.fillStyle = "#64748B";
+    ctx.font = `600 22px ${FONT_TEXT}`;
+    ctx.fillText(isZh ? "教練分析" : "Coach Insight", cardX + 68, insightY + 22);
 
-    ctx.fillStyle = "#e2e8f0";
-    ctx.font = "26px -apple-system, BlinkMacSystemFont, system-ui, sans-serif";
+    ctx.fillStyle = "#1F2937";
+    ctx.font = `500 24px ${FONT_TEXT}`;
+    const lineHeight = 34;
+    const maxLines = Math.floor((insightBottom - insightY - 80) / lineHeight);
     const text = (input.insight || "").trim() || (isZh ? "暫無分析。" : "No insight available.");
-    const lines = wrapText(ctx, text, W - 140).slice(0, 14);
-    let cy = insightY + 80;
+    const lines = wrapText(ctx, text, cardW - 136).slice(0, maxLines);
+    let cy = insightY + 68;
     for (const ln of lines) {
-      ctx.fillText(ln, 70, cy);
-      cy += 36;
+      ctx.fillText(ln, cardX + 68, cy);
+      cy += lineHeight;
     }
 
-    await drawBrandFooter(ctx, W, H, lang);
+    await drawBrandFooter(ctx, W, H, input.lang, { cardX, cardW });
 
     const blob = await canvasToBlob(canvas);
-    await distributeImageBlob(blob, `runward-week-review-${input.weekIndex + 1}.png`, lang);
+    await distributeImageBlob(blob, `runward-week-review-${input.weekIndex + 1}.png`, input.lang);
   } catch (err) {
     console.error("[shareWeeklyReview]", err);
     toast.error(isZh ? "無法生成圖片" : "Unable to generate image");

@@ -112,6 +112,23 @@ export const BADGES: BadgeDef[] = [
   { id: "ultra_runner", category: "single_run", image: imgUltraRunner, target: 1,
     en: { name: "Ultra Runner",     desc: "Complete a 50 km+ run" },
     zh: { name: "超馬跑者",         desc: "完成單次 50 公里以上" } },
+  { id: "thirty_k_club", category: "single_run", image: imgThirtyK, target: 1,
+    en: { name: "30K Club",         desc: "Complete a 30 km single run" },
+    zh: { name: "30K 俱樂部",       desc: "完成單次 30 公里" } },
+  { id: "hundred_k_club", category: "single_run", image: imgHundredK, target: 1,
+    en: { name: "100K Ultra",       desc: "Complete a 100 km single run" },
+    zh: { name: "百公里超馬",       desc: "完成單次 100 公里" } },
+
+  // ── Performance (pace × distance, PRs) ────────────────────────────
+  { id: "speed_demon", category: "performance", image: imgSpeedDemon, target: 1,
+    en: { name: "Speed Demon",      desc: "Average sub 4:30/km on a run (≥1 km)" },
+    zh: { name: "速度惡魔",         desc: "單次跑步均速破 4:30/km" } },
+  { id: "marathon_pace", category: "performance", image: imgMarathonPace, target: 1,
+    en: { name: "Marathon Pace",    desc: "Average sub 5:00/km on a run of 10 km+" },
+    zh: { name: "馬拉松配速",       desc: "10 公里以上均速破 5:00/km" } },
+  { id: "negative_split", category: "performance", image: imgNegativeSplit, target: 1,
+    en: { name: "Negative Split",   desc: "Second half faster than first on a 10 km+ run" },
+    zh: { name: "後段加速",         desc: "10 公里以上下半段比前半段更快" } },
 
   // ── Streaks (consecutive days) ────────────────────────────────────
   { id: "week_warrior", category: "streak", image: imgWeekWarrior, target: 7, unit: "days",

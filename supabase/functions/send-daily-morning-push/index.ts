@@ -32,18 +32,18 @@ function buildMessage(opts: {
   const rem = remaining.toFixed(1);
 
   if (lang === "zh") {
-    const title = "準備好跑步了嗎?";
+    const title = "準備好今天的跑步了嗎？";
     if (goalReached) {
       const nm = nextMilestone(currentKm, goalKm);
       const toNext = Math.max(0, nm - currentKm).toFixed(1);
       return {
         title,
-        message: `你今個月已經跑左 ${cur} km，但如果你再跑多 ${toNext} km，就可以向下一個里程碑 ${nm} km 進發，仲唔突破自己？🏃‍♂️🔥`,
+        message: `你這個月已經跑了 ${cur} km，再跑 ${toNext} km 就能挑戰下一個里程碑 ${nm} km，何不再突破一下自己？🏃‍♂️🔥`,
       };
     }
     return {
       title,
-      message: `距離你今個月嘅 ${goalKm}km 目標仲差 ${rem} km 咋！拿拿臨出去跑返轉，向目標再邁進一步！🏃‍♂️🔥`,
+      message: `距離你這個月 ${goalKm} km 的目標還差 ${rem} km！趕快出門跑一趟，朝目標再邁進一步吧！🏃‍♂️🔥`,
     };
   }
 

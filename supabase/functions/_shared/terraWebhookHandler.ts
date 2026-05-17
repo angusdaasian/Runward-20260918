@@ -706,6 +706,46 @@ async function processWebhook(
         }
       } else if ((type === "deauth" || type === "access_revoked") && terraUserId) {
         await supa.from("terra_connections").update({ active: false, last_webhook_at: new Date().toISOString() }).eq("terra_user_id", terraUserId);
+      } else if (type === "user_reauth" && terraUserId) {
+        // Per Terra spec: update stored user_id to new_user.user_id, then stop.
+        // Do NOT launch a new auth flow / widget. Do NOT trigger backfill —
+        // Terra continues sending data for the new id automatically.
+        const oldTerraId: string | null = oldUser?.user_id ?? null;
+        const rawScopes = user?.scopes;
+        const scopesArr = Array.isArray(rawScopes)
+          ? rawScopes
+          : typeof rawScopes === "string" && rawScopes.length > 0
+            ? rawScopes.split(",").map((s: string) => s.trim()).filter(Boolean)
+            : undefined;
+        const patch: Record<string, unknown> = {
+          terra_user_id: terraUserId,
+          active: true,
+          last_webhook_at: new Date().toISOString(),
+        };
+        if (referenceId) patch.reference_id = referenceId;
+        if (scopesArr !== undefined) patch.scopes = scopesArr;
+
+        if (oldTerraId) {
+          const { error } = await supa.from("terra_connections")
+            .update(patch)
+            .eq("terra_user_id", oldTerraId);
+          if (error) {
+            console.error("user_reauth update by old terra_user_id failed", error);
+            processingError = `user_reauth update: ${error.message}`;
+          }
+        } else if (referenceId) {
+          // Fallback: match by app user id + provider when old_user is missing.
+          const { error } = await supa.from("terra_connections")
+            .update(patch)
+            .eq("user_id", referenceId)
+            .eq("provider", provider);
+          if (error) {
+            console.error("user_reauth update by reference_id failed", error);
+            processingError = `user_reauth update: ${error.message}`;
+          }
+        } else {
+          processingError = "user_reauth: missing old_user.user_id and reference_id";
+        }
       } else if ((type === "activity" || type === "processed_activity") && appUserId) {
         const acts = Array.isArray(payload?.data) ? payload.data : [payload?.data].filter(Boolean);
         // Empty-payload ping: Garmin/Terra notify us that activities exist

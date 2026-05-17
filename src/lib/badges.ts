@@ -364,12 +364,60 @@ function anyOnMonthDay(activities: StravaActivity[], month: number, day: number)
   return false;
 }
 
+// Helpers for new categories
+function bestPaceSecPerKmOver(activities: StravaActivity[], minMeters: number): number {
+  let best = Infinity;
+  for (const a of activities) {
+    if (!a.average_speed || a.average_speed <= 0) continue;
+    if ((a.distance || 0) < minMeters) continue;
+    const sec = 1000 / a.average_speed;
+    if (sec < best) best = sec;
+  }
+  return best;
+}
+
+function hasNegativeSplit(activities: StravaActivity[]): boolean {
+  for (const a of activities) {
+    if ((a.distance || 0) < 10000 || !a.distance_samples || a.distance_samples.length < 4) continue;
+    const samples = a.distance_samples;
+    const last = samples[samples.length - 1];
+    const halfDist = last.d / 2;
+    // find sample closest to halfDist
+    let midIdx = 0;
+    for (let i = 0; i < samples.length; i++) {
+      if (samples[i].d >= halfDist) { midIdx = i; break; }
+    }
+    const mid = samples[midIdx];
+    if (!mid || mid.t <= 0 || last.t <= mid.t) continue;
+    const firstHalfPace = mid.t / (mid.d / 1000);     // sec/km
+    const secondHalfPace = (last.t - mid.t) / ((last.d - mid.d) / 1000);
+    if (secondHalfPace < firstHalfPace) return true;
+  }
+  return false;
+}
+
+function countWeather(activities: StravaActivity[], pred: (w: NonNullable<StravaActivity["weather"]>) => boolean): number {
+  let n = 0;
+  for (const a of activities) if (a.weather && pred(a.weather)) n++;
+  return n;
+}
+
+function kmInMonthRange(activities: StravaActivity[], months: number[]): number {
+  let km = 0;
+  for (const a of activities) {
+    const d = new Date(a.start_date);
+    if (months.includes(d.getMonth())) km += (a.distance || 0);
+  }
+  return km / 1000;
+}
+
 // ─── main compute ───────────────────────────────────────────────────
 export function computeBadgeProgress(ctx: BadgeContext): Record<string, BadgeProgress> {
   const totalKm = ctx.activities.reduce((s, a) => s + (a.distance || 0), 0) / 1000;
   const totalElev = ctx.activities.reduce((s, a) => s + (a.total_elevation_gain || 0), 0);
   const streak = computeStreak(ctx.activities);
   const bestSec = bestPaceSecPerKm(ctx.activities);
+  const bestSec10k = bestPaceSecPerKmOver(ctx.activities, 10000);
   const longestRunM = maxRunDistance(ctx.activities);
   const steepestM = maxRunElevation(ctx.activities);
   const best7 = bestRollingDistanceKm(ctx.activities, 7);
@@ -379,6 +427,26 @@ export function computeBadgeProgress(ctx: BadgeContext): Record<string, BadgePro
   const midnight = countByHour(ctx.activities, (h, m) => (h === 23 && m >= 30) || h === 0 && m <= 30) > 0 ? 1 : 0;
   const newYear = anyOnMonthDay(ctx.activities, 0, 1) ? 1 : 0;
   const christmas = anyOnMonthDay(ctx.activities, 11, 25) ? 1 : 0;
+  const appBirthday = anyOnMonthDay(ctx.activities, 4, 1) ? 1 : 0; // May 1
+  const negSplit = hasNegativeSplit(ctx.activities) ? 1 : 0;
+
+  // Weather counts
+  const rainRuns = countWeather(ctx.activities, (w) => {
+    const s = `${w.weather_type ?? ""} ${w.condition ?? ""}`.toLowerCase();
+    return /rain|shower|drizzle|storm/.test(s);
+  });
+  const hotRuns = countWeather(ctx.activities, (w) => (w.temp ?? -Infinity) >= 30);
+  const coldRuns = countWeather(ctx.activities, (w) => (w.temp ?? Infinity) <= 5);
+
+  // Seasonal (any year)
+  const mayKm = kmInMonthRange(ctx.activities, [4]);
+  const summerKm = kmInMonthRange(ctx.activities, [5, 6, 7]);
+  const septKm = kmInMonthRange(ctx.activities, [8]);
+
+  // Anniversary: 365+ days as premium member
+  const oneYear = ctx.premiumActivatedAt &&
+    (Date.now() - new Date(ctx.premiumActivatedAt).getTime()) >= 365 * 86_400_000
+    ? 1 : 0;
 
   const out: Record<string, BadgeProgress> = {};
   for (const b of BADGES) {
@@ -396,6 +464,12 @@ export function computeBadgeProgress(ctx: BadgeContext): Record<string, BadgePro
       case "half_marathon_hero":   value = longestRunM >= 21100 ? 1 : 0; break;
       case "marathon_legend":      value = longestRunM >= 42200 ? 1 : 0; break;
       case "ultra_runner":         value = longestRunM >= 50000 ? 1 : 0; break;
+      case "thirty_k_club":        value = longestRunM >= 30000 ? 1 : 0; break;
+      case "hundred_k_club":       value = longestRunM >= 100000 ? 1 : 0; break;
+      // performance
+      case "speed_demon":          value = bestSec <= 270 ? 1 : 0; break;
+      case "marathon_pace":        value = bestSec10k <= 300 ? 1 : 0; break;
+      case "negative_split":       value = negSplit; break;
       // streaks
       case "week_warrior":
       case "monthly_master":
@@ -420,6 +494,17 @@ export function computeBadgeProgress(ctx: BadgeContext): Record<string, BadgePro
       case "early_bird":         value = earlyBirdRuns; break;
       case "night_runner":       value = nightRuns; break;
       case "midnight_runner":    value = midnight; break;
+      // weather
+      case "rain_runner":        value = rainRuns; break;
+      case "hot_weather":        value = hotRuns; break;
+      case "cold_weather":       value = coldRuns; break;
+      // seasonal
+      case "may_challenge":      value = mayKm; break;
+      case "summer_challenge":   value = summerKm; break;
+      case "back_to_school":     value = septKm; break;
+      // anniversary
+      case "app_birthday":       value = appBirthday; break;
+      case "one_year_party":     value = oneYear; break;
       // holiday
       case "new_year_runner":    value = newYear; break;
       case "christmas_runner":   value = christmas; break;

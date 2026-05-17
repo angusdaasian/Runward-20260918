@@ -205,6 +205,36 @@ export const BADGES: BadgeDef[] = [
     en: { name: "Santa's Helper",   desc: "Run on December 25th" },
     zh: { name: "聖誕小幫手",       desc: "於 12 月 25 日跑步" } },
 
+  // ── Weather ───────────────────────────────────────────────────────
+  { id: "rain_runner", category: "weather", image: imgRainRunner, target: 5, unit: "runs",
+    en: { name: "Rain Runner",      desc: "Complete 5 runs in the rain" },
+    zh: { name: "雨中跑者",         desc: "完成 5 次雨中跑步" } },
+  { id: "hot_weather", category: "weather", image: imgHotWeather, target: 3, unit: "runs",
+    en: { name: "Hot Weather Warrior", desc: "Complete 3 runs at 30°C or hotter" },
+    zh: { name: "高溫戰士",         desc: "完成 3 次 30°C 以上跑步" } },
+  { id: "cold_weather", category: "weather", image: imgColdWeather, target: 3, unit: "runs",
+    en: { name: "Cold Weather Warrior", desc: "Complete 3 runs at 5°C or colder" },
+    zh: { name: "低溫戰士",         desc: "完成 3 次 5°C 以下跑步" } },
+
+  // ── Seasonal monthly challenges ───────────────────────────────────
+  { id: "may_challenge", category: "seasonal", image: imgMayChallenge, target: 100, unit: "km",
+    en: { name: "May Challenge",    desc: "Run 100 km during the month of May" },
+    zh: { name: "五月挑戰",         desc: "於 5 月累積 100 公里" } },
+  { id: "summer_challenge", category: "seasonal", image: imgSummerChallenge, target: 300, unit: "km",
+    en: { name: "Summer Challenge", desc: "Run 300 km across June–August" },
+    zh: { name: "夏季挑戰",         desc: "6–8 月累積 300 公里" } },
+  { id: "back_to_school", category: "seasonal", image: imgBackToSchool, target: 50, unit: "km",
+    en: { name: "Back to School",   desc: "Run 50 km during September" },
+    zh: { name: "開學季",           desc: "於 9 月累積 50 公里" } },
+
+  // ── Anniversary ───────────────────────────────────────────────────
+  { id: "app_birthday", category: "anniversary", image: imgAppBirthday, target: 1,
+    en: { name: "App Birthday",     desc: "Run on the app's anniversary date (May 1)" },
+    zh: { name: "App 生日",         desc: "於 App 週年日跑步（5 月 1 日）" } },
+  { id: "one_year_party", category: "anniversary", image: imgOneYearParty, target: 1,
+    en: { name: "One Year Party",   desc: "Active member for 365+ days" },
+    zh: { name: "一週年派對",       desc: "成為會員滿 365 天" } },
+
   // ── Meta (badge counts — must stay last in array) ─────────────────
   { id: "badge_collector", category: "meta", image: imgCollector, target: 10, unit: "badges",
     en: { name: "Collector",        desc: "Unlock 10 badges" },
@@ -212,7 +242,7 @@ export const BADGES: BadgeDef[] = [
   { id: "badge_hoarder", category: "meta", image: imgHoarder, target: 25, unit: "badges",
     en: { name: "Hoarder",          desc: "Unlock 25 badges" },
     zh: { name: "藏寶者",           desc: "解鎖 25 個徽章" } },
-  { id: "completionist", category: "meta", image: imgCompletionist, target: 35, unit: "badges",
+  { id: "completionist", category: "meta", image: imgCompletionist, target: 45, unit: "badges",
     en: { name: "Completionist",    desc: "Unlock every badge" },
     zh: { name: "全收集",           desc: "解鎖所有徽章" } },
 

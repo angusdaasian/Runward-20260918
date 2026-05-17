@@ -29,6 +29,37 @@ const LOG_ONLY_EVENTS = [
 
 const WEBHOOK_AUTH_KEY = Deno.env.get("WEBHOOK_AUTH_KEY");
 
+// Admin user to notify on subscription events
+const ADMIN_NOTIFY_USER_ID = "c7a7d1ca-c7bf-4288-bb9d-794006a04087";
+
+async function notifyAdmin(title: string, message: string) {
+  try {
+    const appId = Deno.env.get("ONESIGNAL_APP_ID");
+    const apiKey = Deno.env.get("ONESIGNAL_REST_API_KEY");
+    if (!appId || !apiKey) {
+      console.warn("[notifyAdmin] OneSignal not configured");
+      return;
+    }
+    const res = await fetch("https://onesignal.com/api/v1/notifications", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Basic ${apiKey}`,
+      },
+      body: JSON.stringify({
+        app_id: appId,
+        include_external_user_ids: [ADMIN_NOTIFY_USER_ID],
+        headings: { en: title },
+        contents: { en: message },
+      }),
+    });
+    const json = await res.json().catch(() => ({}));
+    console.log("[notifyAdmin] OneSignal response:", JSON.stringify(json));
+  } catch (e) {
+    console.error("[notifyAdmin] error:", e);
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });

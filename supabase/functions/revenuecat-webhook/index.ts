@@ -29,6 +29,37 @@ const LOG_ONLY_EVENTS = [
 
 const WEBHOOK_AUTH_KEY = Deno.env.get("WEBHOOK_AUTH_KEY");
 
+// Admin user to notify on subscription events
+const ADMIN_NOTIFY_USER_ID = "c7a7d1ca-c7bf-4288-bb9d-794006a04087";
+
+async function notifyAdmin(title: string, message: string) {
+  try {
+    const appId = Deno.env.get("ONESIGNAL_APP_ID");
+    const apiKey = Deno.env.get("ONESIGNAL_REST_API_KEY");
+    if (!appId || !apiKey) {
+      console.warn("[notifyAdmin] OneSignal not configured");
+      return;
+    }
+    const res = await fetch("https://onesignal.com/api/v1/notifications", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Basic ${apiKey}`,
+      },
+      body: JSON.stringify({
+        app_id: appId,
+        include_external_user_ids: [ADMIN_NOTIFY_USER_ID],
+        headings: { en: title },
+        contents: { en: message },
+      }),
+    });
+    const json = await res.json().catch(() => ({}));
+    console.log("[notifyAdmin] OneSignal response:", JSON.stringify(json));
+  } catch (e) {
+    console.error("[notifyAdmin] error:", e);
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -74,6 +105,20 @@ Deno.serve(async (req) => {
       periodType === "INTRO";
     const entitlementIds: string[] = event.entitlement_ids || [];
     const newProductId: string | undefined = event.new_product_id;
+    const price: number | undefined = typeof event.price === "number" ? event.price : undefined;
+    const currency: string | undefined = event.currency;
+    const priceInPurchased: number | undefined =
+      typeof event.price_in_purchased_currency === "number" ? event.price_in_purchased_currency : undefined;
+    const purchasedCurrency: string | undefined = event.currency;
+    const formatPrice = () => {
+      if (priceInPurchased !== undefined && purchasedCurrency) {
+        return `${priceInPurchased.toFixed(2)} ${purchasedCurrency}`;
+      }
+      if (price !== undefined && currency) {
+        return `${price.toFixed(2)} ${currency} (USD est.)`;
+      }
+      return "n/a";
+    };
 
     if (!appUserId) {
       return new Response(JSON.stringify({ error: "No app_user_id" }), {
@@ -178,6 +223,11 @@ Deno.serve(async (req) => {
       console.log(
         `Subscription activated: user=${targetUserId}, plan=${effectiveProductId}, entitlement=${rcEntitlement}, trial=${isTrialPeriod}, event=${eventType}`,
       );
+
+      await notifyAdmin(
+        `RC: ${eventType}${isTrialPeriod ? " (trial)" : ""}`,
+        `User ${targetUserId}\nPlan: ${effectiveProductId}\nPrice: ${formatPrice()}`,
+      );
     } else if (INACTIVE_EVENTS.includes(eventType)) {
       // EXPIRATION and BILLING_ISSUE = access should be revoked
       const { error } = await supabase.from("premium_subscriptions").delete().eq("user_id", targetUserId);
@@ -194,6 +244,11 @@ Deno.serve(async (req) => {
       await supabase.from("profiles").update({ is_premium: false }).eq("user_id", targetUserId);
 
       console.log(`Subscription removed: user=${targetUserId}, event=${eventType}`);
+
+      await notifyAdmin(
+        `RC: ${eventType}`,
+        `User ${targetUserId} lost access\nPlan: ${productId ?? "unknown"}\nLast price: ${formatPrice()}`,
+      );
     } else if (LOG_ONLY_EVENTS.includes(eventType)) {
       console.log(`Logged event (no action): user=${targetUserId}, event=${eventType}`);
     } else {

@@ -1,12 +1,16 @@
 /**
  * Shared canvas helpers for "share as image" cards.
- * Reuses distributeImageBlob from shareActivity.ts for the distribution step.
+ * White-card style aligned with shareActivity.ts.
  */
 import { Lang } from "@/lib/i18n";
 import appIcon from "@/assets/app-icon.png";
+import { drawIgHandle } from "@/lib/shareActivity";
 
 export const APP_NAME = "Runward";
-export const APP_URL = "https://pacecalculator.fun";
+export const FONT_DISPLAY =
+  "-apple-system, 'SF Pro Display', 'PingFang TC', 'Helvetica Neue', system-ui, sans-serif";
+export const FONT_TEXT =
+  "-apple-system, 'SF Pro Text', 'PingFang TC', 'Helvetica Neue', system-ui, sans-serif";
 
 export function fmtDistanceKm(meters: number): string {
   return (meters / 1000).toFixed(2);
@@ -156,25 +160,106 @@ export async function drawBrandFooter(
   ctx: CanvasRenderingContext2D,
   canvasWidth: number,
   canvasHeight: number,
-  lang: Lang,
+  _lang: Lang,
+  opts?: { cardX?: number; cardW?: number },
 ) {
-  const isZh = lang === "zh";
-  const footerY = canvasHeight - 80;
+  const cardX = opts?.cardX ?? 48;
+  const cardW = opts?.cardW ?? canvasWidth - 96;
+  const footerY = canvasHeight - 110;
+
+  ctx.strokeStyle = "rgba(15,23,42,0.08)";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(cardX + 44, footerY - 16);
+  ctx.lineTo(cardX + cardW - 44, footerY - 16);
+  ctx.stroke();
+
   try {
     const icon = await loadImage(appIcon);
-    ctx.drawImage(icon, 60, footerY - 18, 44, 44);
+    ctx.save();
+    roundedRect(ctx, cardX + 44, footerY - 6, 36, 36, 8);
+    ctx.clip();
+    ctx.drawImage(icon, cardX + 44, footerY - 6, 36, 36);
+    ctx.restore();
   } catch {
     /* ignore */
   }
-  ctx.fillStyle = "#0f172a";
-  ctx.font = "bold 28px -apple-system, BlinkMacSystemFont, system-ui, sans-serif";
-  ctx.textBaseline = "middle";
-  ctx.fillText(APP_NAME, 116, footerY + 4);
-  ctx.fillStyle = "#64748b";
-  ctx.font = "20px -apple-system, BlinkMacSystemFont, system-ui, sans-serif";
-  ctx.textAlign = "right";
-  ctx.fillText(isZh ? `由 ${APP_NAME} 製作 · ${APP_URL}` : `Made with ${APP_NAME} · ${APP_URL}`, canvasWidth - 60, footerY + 4);
+
+  ctx.fillStyle = "#0F172A";
+  ctx.textBaseline = "top";
   ctx.textAlign = "left";
+  ctx.font = `700 22px ${FONT_DISPLAY}`;
+  ctx.fillText(APP_NAME, cardX + 92, footerY);
+
+  drawIgHandle(ctx, cardX + cardW - 44, footerY + 12, "#0F172A");
+  ctx.textAlign = "left";
+  ctx.textBaseline = "alphabetic";
+}
+
+export async function drawWhiteCardBackground(
+  ctx: CanvasRenderingContext2D,
+  W: number,
+  H: number,
+): Promise<{ cardX: number; cardY: number; cardW: number; cardH: number; pad: number }> {
+  const bg = ctx.createLinearGradient(0, 0, 0, H);
+  bg.addColorStop(0, "#FFFFFF");
+  bg.addColorStop(1, "#F4F1EC");
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, W, H);
+
+  const M = 48;
+  const cardX = M, cardY = M, cardW = W - M * 2, cardH = H - M * 2, cardR = 40;
+
+  ctx.save();
+  ctx.shadowColor = "rgba(15, 23, 42, 0.10)";
+  ctx.shadowBlur = 40;
+  ctx.shadowOffsetY = 12;
+  ctx.fillStyle = "#FFFFFF";
+  roundedRect(ctx, cardX, cardY, cardW, cardH, cardR);
+  ctx.fill();
+  ctx.restore();
+
+  ctx.strokeStyle = "rgba(15,23,42,0.06)";
+  ctx.lineWidth = 1.5;
+  roundedRect(ctx, cardX + 0.5, cardY + 0.5, cardW - 1, cardH - 1, cardR);
+  ctx.stroke();
+
+  return { cardX, cardY, cardW, cardH, pad: 44 };
+}
+
+export async function drawCardHeader(
+  ctx: CanvasRenderingContext2D,
+  cardX: number,
+  cardY: number,
+  cardW: number,
+  subtitle: string,
+  rightText?: string,
+): Promise<number> {
+  const headerY = cardY + 44;
+  try {
+    const icon = await loadImage(appIcon);
+    ctx.save();
+    roundedRect(ctx, cardX + 44, headerY, 56, 56, 14);
+    ctx.clip();
+    ctx.drawImage(icon, cardX + 44, headerY, 56, 56);
+    ctx.restore();
+  } catch { /* ignore */ }
+  ctx.fillStyle = "#0F172A";
+  ctx.textBaseline = "top";
+  ctx.textAlign = "left";
+  ctx.font = `700 28px ${FONT_DISPLAY}`;
+  ctx.fillText(APP_NAME, cardX + 116, headerY + 4);
+  ctx.fillStyle = "#64748B";
+  ctx.font = `500 18px ${FONT_TEXT}`;
+  ctx.fillText(subtitle, cardX + 116, headerY + 34);
+  if (rightText) {
+    ctx.textAlign = "right";
+    ctx.fillStyle = "#64748B";
+    ctx.font = `600 20px ${FONT_TEXT}`;
+    ctx.fillText(rightText, cardX + cardW - 44, headerY + 18);
+    ctx.textAlign = "left";
+  }
+  return headerY + 80;
 }
 
 export function canvasToBlob(canvas: HTMLCanvasElement, type = "image/png", quality = 0.95): Promise<Blob> {

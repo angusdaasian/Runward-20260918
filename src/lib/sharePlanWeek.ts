@@ -1,20 +1,24 @@
 /**
- * Share a week of an AI/custom training plan as a portrait PNG.
- * Mon → Sun ordering, with workout details for each day.
+ * Share a week of an AI/custom training plan as a portrait PNG (white card style).
+ * Mon → Sun ordering.
  */
 import { toast } from "sonner";
 import { Lang } from "@/lib/i18n";
 import { distributeImageBlob } from "@/lib/shareActivity";
 import {
   drawBrandFooter,
+  drawWhiteCardBackground,
+  drawCardHeader,
   canvasToBlob,
   roundedRect,
   wrapText,
+  FONT_DISPLAY,
+  FONT_TEXT,
 } from "@/lib/shareCanvasHelpers";
 
 export interface SharePlanDay {
-  day: string;        // "Mon", "Tue"...
-  date: string;       // ISO yyyy-mm-dd
+  day: string;
+  date: string;
   type: string;
   title: string;
   description: string;
@@ -24,7 +28,7 @@ export interface SharePlanDay {
 }
 
 export interface SharePlanWeekInput {
-  weekIndex: number;       // 0-based
+  weekIndex: number;
   days: SharePlanDay[];
   lang: Lang;
   raceName?: string | null;
@@ -67,9 +71,7 @@ function localizeDate(iso: string, lang: Lang): string {
       month: "short",
       day: "numeric",
     });
-  } catch {
-    return iso;
-  }
+  } catch { return iso; }
 }
 
 export async function shareTrainingWeek(input: SharePlanWeekInput): Promise<void> {
@@ -77,19 +79,15 @@ export async function shareTrainingWeek(input: SharePlanWeekInput): Promise<void
   const isZh = lang === "zh";
 
   try {
-    // Sort Mon → Sun
-    const sorted = [...days].sort(
-      (a, b) => ORDER.indexOf(a.day) - ORDER.indexOf(b.day),
-    );
-
+    const sorted = [...days].sort((a, b) => ORDER.indexOf(a.day) - ORDER.indexOf(b.day));
     const dates = sorted.map((d) => d.date).filter(Boolean).sort();
     const weekStart = dates[0] ?? "";
     const weekEnd = dates[dates.length - 1] ?? "";
 
     const W = 1080;
-    const ROW_H = 200;
-    const HEADER_H = 260;
-    const FOOTER_H = 140;
+    const ROW_H = 168;
+    const HEADER_H = 220;
+    const FOOTER_H = 180;
     const H = HEADER_H + ROW_H * 7 + FOOTER_H;
 
     const canvas = document.createElement("canvas");
@@ -98,104 +96,98 @@ export async function shareTrainingWeek(input: SharePlanWeekInput): Promise<void
     const ctx = canvas.getContext("2d");
     if (!ctx) throw new Error("no ctx");
 
-    // Background
-    const grad = ctx.createLinearGradient(0, 0, 0, H);
-    grad.addColorStop(0, "#0f172a");
-    grad.addColorStop(1, "#1e293b");
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, W, H);
-
-    // Header
-    ctx.fillStyle = "#ffffff";
-    ctx.textBaseline = "top";
-    ctx.font = "600 36px -apple-system, BlinkMacSystemFont, system-ui, sans-serif";
-    ctx.fillText(isZh ? "訓練計劃" : "Training Plan", 60, 60);
-
-    ctx.font = "bold 72px -apple-system, BlinkMacSystemFont, system-ui, sans-serif";
-    ctx.fillText(
-      isZh ? `第 ${weekIndex + 1} 週` : `Week ${weekIndex + 1}`,
-      60,
-      108,
+    const { cardX, cardY, cardW } = await drawWhiteCardBackground(ctx, W, H);
+    const afterHeader = await drawCardHeader(
+      ctx,
+      cardX,
+      cardY,
+      cardW,
+      isZh ? "訓練計劃" : "Training Plan",
+      weekStart && weekEnd ? `${localizeDate(weekStart, lang)} → ${localizeDate(weekEnd, lang)}` : undefined,
     );
 
-    ctx.fillStyle = "#94a3b8";
-    ctx.font = "26px -apple-system, BlinkMacSystemFont, system-ui, sans-serif";
-    if (weekStart && weekEnd) {
-      ctx.fillText(`${localizeDate(weekStart, lang)} → ${localizeDate(weekEnd, lang)}`, 60, 200);
-    }
+    // Week title
+    ctx.fillStyle = "#0F172A";
+    ctx.textBaseline = "top";
+    ctx.font = `800 56px ${FONT_DISPLAY}`;
+    ctx.fillText(isZh ? `第 ${weekIndex + 1} 週` : `Week ${weekIndex + 1}`, cardX + 44, afterHeader + 12);
+    ctx.fillStyle = "#FC4C02";
+    ctx.fillRect(cardX + 44, afterHeader + 80, 64, 5);
 
-    // Day rows
-    const rowsTopY = HEADER_H;
+    // Rows
+    const rowsTopY = HEADER_H + 20;
+    const rowX = cardX + 44;
+    const rowW = cardW - 88;
     for (let i = 0; i < ORDER.length; i++) {
       const dayName = ORDER[i];
       const day = sorted.find((d) => d.day === dayName);
       const y = rowsTopY + i * ROW_H;
 
-      // Card
-      ctx.fillStyle = "rgba(255,255,255,0.06)";
-      roundedRect(ctx, 40, y + 12, W - 80, ROW_H - 24, 24);
+      ctx.fillStyle = "rgba(15,23,42,0.03)";
+      roundedRect(ctx, rowX, y + 8, rowW, ROW_H - 20, 18);
       ctx.fill();
+      ctx.strokeStyle = "rgba(15,23,42,0.06)";
+      ctx.lineWidth = 1;
+      roundedRect(ctx, rowX, y + 8, rowW, ROW_H - 20, 18);
+      ctx.stroke();
 
-      // Left color chip
-      const chipColor = day?.color || "#475569";
+      // chip
+      const chipColor = day?.color || "#94A3B8";
       ctx.fillStyle = chipColor;
-      roundedRect(ctx, 60, y + 36, 12, ROW_H - 72, 6);
+      roundedRect(ctx, rowX + 16, y + 28, 8, ROW_H - 60, 4);
       ctx.fill();
 
-      // Day name + date
-      ctx.fillStyle = "#e2e8f0";
-      ctx.font = "bold 30px -apple-system, BlinkMacSystemFont, system-ui, sans-serif";
+      // Day + date
+      ctx.fillStyle = "#0F172A";
+      ctx.font = `700 26px ${FONT_DISPLAY}`;
       ctx.textBaseline = "top";
-      ctx.fillText(DAY_LABELS[dayName][isZh ? "zh" : "en"], 100, y + 36);
+      ctx.fillText(DAY_LABELS[dayName][isZh ? "zh" : "en"], rowX + 40, y + 28);
+      ctx.fillStyle = "#64748B";
+      ctx.font = `500 18px ${FONT_TEXT}`;
+      ctx.fillText(day?.date ? localizeDate(day.date, lang) : "—", rowX + 40, y + 62);
 
-      ctx.fillStyle = "#94a3b8";
-      ctx.font = "22px -apple-system, BlinkMacSystemFont, system-ui, sans-serif";
-      ctx.fillText(day?.date ? localizeDate(day.date, lang) : "—", 100, y + 76);
-
-      // Right: title + meta + desc
-      const tx = 240;
-      const innerW = W - 80 - tx - 40;
+      const tx = rowX + 180;
+      const innerW = rowW - 180 - 24;
 
       if (!day || day.type === "Rest" || !day.title) {
-        ctx.fillStyle = "#cbd5e1";
-        ctx.font = "bold 34px -apple-system, BlinkMacSystemFont, system-ui, sans-serif";
-        ctx.fillText(isZh ? "休息日" : "Rest Day", tx, y + 50);
-        ctx.fillStyle = "#64748b";
-        ctx.font = "22px -apple-system, BlinkMacSystemFont, system-ui, sans-serif";
-        ctx.fillText(isZh ? "好好恢復" : "Recover well", tx, y + 100);
+        ctx.fillStyle = "#475569";
+        ctx.font = `700 28px ${FONT_DISPLAY}`;
+        ctx.fillText(isZh ? "休息日" : "Rest Day", tx, y + 40);
+        ctx.fillStyle = "#94A3B8";
+        ctx.font = `500 20px ${FONT_TEXT}`;
+        ctx.fillText(isZh ? "好好恢復" : "Recover well", tx, y + 80);
         continue;
       }
 
       // Title
-      ctx.fillStyle = "#ffffff";
-      ctx.font = "bold 34px -apple-system, BlinkMacSystemFont, system-ui, sans-serif";
+      ctx.fillStyle = "#0F172A";
+      ctx.font = `700 28px ${FONT_DISPLAY}`;
       const titleLines = wrapText(ctx, day.title, innerW);
-      ctx.fillText(titleLines[0] ?? "", tx, y + 36);
+      ctx.fillText(titleLines[0] ?? "", tx, y + 28);
 
-      // Meta line
+      // Meta
       const metaParts: string[] = [];
       metaParts.push(localizeType(day.type, lang));
       if (day.distance_km) metaParts.push(`${day.distance_km} km`);
       if (day.pace) metaParts.push(day.pace);
       ctx.fillStyle = chipColor;
-      ctx.font = "600 22px -apple-system, BlinkMacSystemFont, system-ui, sans-serif";
-      ctx.fillText(metaParts.join(" · "), tx, y + 80);
+      ctx.font = `600 20px ${FONT_TEXT}`;
+      ctx.fillText(metaParts.join(" · "), tx, y + 66);
 
-      // Description (max 2 lines)
+      // Description
       if (day.description) {
-        ctx.fillStyle = "#cbd5e1";
-        ctx.font = "22px -apple-system, BlinkMacSystemFont, system-ui, sans-serif";
+        ctx.fillStyle = "#475569";
+        ctx.font = `500 20px ${FONT_TEXT}`;
         const descLines = wrapText(ctx, day.description, innerW).slice(0, 2);
-        let cy = y + 120;
+        let cy = y + 100;
         for (const ln of descLines) {
           ctx.fillText(ln, tx, cy);
-          cy += 30;
+          cy += 26;
         }
       }
     }
 
-    // Footer
-    await drawBrandFooter(ctx, W, H, lang);
+    await drawBrandFooter(ctx, W, H, lang, { cardX, cardW });
 
     const blob = await canvasToBlob(canvas);
     await distributeImageBlob(blob, `runward-week-${weekIndex + 1}.png`, lang);

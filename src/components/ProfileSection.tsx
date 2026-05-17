@@ -648,6 +648,34 @@ const ProfileSection = ({ lang, subpage = "main", onNavigate }: ProfileSectionPr
           </div>
         </div>
 
+        {/* Preset avatars */}
+        <div className="space-y-2">
+          <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground px-1">
+            {lang === "zh" ? "選擇頭像" : "Pick an avatar"}
+          </label>
+          <div className="grid grid-cols-6 gap-2">
+            {[1, 2, 3, 4, 5, 6].map((n) => {
+              const url = `/avatars/runner-${n}.png`;
+              const selected = profile.avatar_url === url;
+              return (
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() => handlePickPreset(url)}
+                  disabled={uploading}
+                  className={`relative aspect-square rounded-lg overflow-hidden border-2 transition-all ${selected ? "border-primary ring-2 ring-primary/30" : "border-border hover:border-primary/60"} disabled:opacity-50`}
+                >
+                  <img src={url} alt={`Runner ${n}`} loading="lazy" className="w-full h-full object-cover bg-white" />
+                </button>
+              );
+            })}
+          </div>
+          <p className="text-[11px] text-muted-foreground px-1">
+            {lang === "zh" ? "或點擊上方鉛筆圖示上載自訂相片" : "Or tap the pencil above to upload your own"}
+          </p>
+        </div>
+
+
         {/* Display Name */}
         <div className="space-y-2">
           <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground px-1">

@@ -36,16 +36,36 @@ import imgHoarder from "@/assets/badges/badge_hoarder.png";
 import imgCompletionist from "@/assets/badges/completionist.png";
 import imgEarlyAdopter from "@/assets/badges/early_adopter.png";
 import imgFoundingMember from "@/assets/badges/founding_member.png";
+import imgSpeedDemon from "@/assets/badges/speed_demon.png";
+import imgMarathonPace from "@/assets/badges/marathon_pace.png";
+import imgNegativeSplit from "@/assets/badges/negative_split.png";
+import imgThirtyK from "@/assets/badges/thirty_k_club.png";
+import imgHundredK from "@/assets/badges/hundred_k_club.png";
+import imgMayChallenge from "@/assets/badges/may_challenge.png";
+import imgSummerChallenge from "@/assets/badges/summer_challenge.png";
+import imgBackToSchool from "@/assets/badges/back_to_school.png";
+import imgAppBirthday from "@/assets/badges/app_birthday.png";
+import imgOneYearParty from "@/assets/badges/one_year_party.png";
+import imgRainRunner from "@/assets/badges/rain_runner.png";
+import imgHotWeather from "@/assets/badges/hot_weather.png";
+import imgColdWeather from "@/assets/badges/cold_weather.png";
+
+/** App launch / anniversary anchor date — used for App Birthday */
+export const APP_LAUNCH_DATE = "2025-05-01";
 
 export type BadgeCategory =
   | "distance"
   | "single_run"
+  | "performance"
   | "streak"
   | "pace"
   | "volume"
   | "elevation"
   | "time"
+  | "weather"
   | "holiday"
+  | "seasonal"
+  | "anniversary"
   | "meta"
   | "special";
 

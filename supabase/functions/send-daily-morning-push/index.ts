@@ -82,7 +82,7 @@ Deno.serve(async (req) => {
     // 1. Fetch all opted-in profiles
     const { data: profiles, error: profilesErr } = await supabase
       .from("profiles")
-      .select("user_id, monthly_goal_km, activity_notifications")
+      .select("user_id, monthly_goal_km, activity_notifications, lang")
       .eq("activity_notifications", true);
     if (profilesErr) throw profilesErr;
     if (!profiles || profiles.length === 0) {
@@ -133,22 +133,11 @@ Deno.serve(async (req) => {
       pageFetch("terra_activities", "distance_meters", "start_time"),
     ]);
 
-    // 4. Detect each user's preferred language from auth metadata (fallback en)
-    // Bulk fetch via admin API in pages
+    // 4. Build lang map directly from profiles.lang (source of truth)
     const langByUser = new Map<string, "zh" | "en">();
-    let page = 1;
-    while (true) {
-      const { data: authPage, error: authErr } = await supabase.auth.admin.listUsers({ page, perPage: 1000 });
-      if (authErr) { console.error("[daily-push] listUsers err", authErr); break; }
-      const users = authPage?.users ?? [];
-      for (const u of users) {
-        const meta: any = (u as any).user_metadata ?? {};
-        const raw = String(meta.lang ?? meta.language ?? meta.locale ?? "").toLowerCase();
-        langByUser.set(u.id, raw.startsWith("zh") ? "zh" : "en");
-      }
-      if (users.length < 1000) break;
-      page += 1;
-      if (page > 20) break; // safety
+    for (const p of profiles as any[]) {
+      const raw = String(p.lang ?? "").toLowerCase();
+      langByUser.set(p.user_id, raw.startsWith("zh") ? "zh" : "en");
     }
 
     // 5. Group recipients by (lang, title, message) so we can batch OneSignal calls

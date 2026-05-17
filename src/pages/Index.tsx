@@ -51,7 +51,29 @@ const Index = () => {
       setLangState(l);
       setLangSwitching(false);
     }, 4000);
+    // Persist to profile so server-side notifications (e.g. OneSignal) can localize
+    if (user?.id) {
+      import("@/integrations/supabase/client").then(({ supabase }) => {
+        supabase.from("profiles").update({ lang: l }).eq("user_id", user.id).then(({ error }) => {
+          if (error) console.warn("[setLang] failed to persist lang", error);
+        });
+      });
+    }
   };
+  // Hydrate lang from profile on login (profile is source of truth across devices)
+  useEffect(() => {
+    if (!user?.id) return;
+    import("@/integrations/supabase/client").then(({ supabase }) => {
+      supabase.from("profiles").select("lang").eq("user_id", user.id).maybeSingle().then(({ data }) => {
+        const remote = (data as any)?.lang as Lang | undefined;
+        if (remote && (remote === "en" || remote === "zh") && remote !== lang) {
+          localStorage.setItem("app_lang", remote);
+          setLangState(remote);
+        }
+      });
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
   const [isGuest, setIsGuest] = useState(() => localStorage.getItem("guest_mode") === "true");
   const [showOnboarding, setShowOnboarding] = useState(
     () => sessionStorage.getItem(ONBOARDING_SIGNUP_IN_PROGRESS_KEY) === "true"

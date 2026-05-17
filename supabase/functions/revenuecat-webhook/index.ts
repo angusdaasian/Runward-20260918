@@ -32,7 +32,24 @@ const WEBHOOK_AUTH_KEY = Deno.env.get("WEBHOOK_AUTH_KEY");
 // Admin user to notify on subscription events
 const ADMIN_NOTIFY_USER_ID = "c7a7d1ca-c7bf-4288-bb9d-794006a04087";
 
-async function notifyAdmin(title: string, message: string) {
+async function getUserLang(supabase: any, userId: string): Promise<"en" | "zh"> {
+  try {
+    const { data } = await supabase.from("profiles").select("lang").eq("user_id", userId).maybeSingle();
+    const raw = String(data?.lang ?? "").toLowerCase();
+    return raw.startsWith("zh") ? "zh" : "en";
+  } catch {
+    return "en";
+  }
+}
+
+async function notifyAdmin(supabase: any, payload: {
+  eventType: string;
+  isTrial?: boolean;
+  isRemoval?: boolean;
+  targetUserId: string;
+  plan: string;
+  price: string;
+}) {
   try {
     const appId = Deno.env.get("ONESIGNAL_APP_ID");
     const apiKey = Deno.env.get("ONESIGNAL_REST_API_KEY");
@@ -40,6 +57,18 @@ async function notifyAdmin(title: string, message: string) {
       console.warn("[notifyAdmin] OneSignal not configured");
       return;
     }
+    const lang = await getUserLang(supabase, ADMIN_NOTIFY_USER_ID);
+    const { eventType, isTrial, isRemoval, targetUserId, plan, price } = payload;
+    const title = lang === "zh"
+      ? `RC: ${eventType}${isTrial ? "（試用）" : ""}`
+      : `RC: ${eventType}${isTrial ? " (trial)" : ""}`;
+    const message = lang === "zh"
+      ? (isRemoval
+          ? `用戶 ${targetUserId} 已失去訂閱權限\n方案: ${plan}\n最後價格: ${price}`
+          : `用戶 ${targetUserId}\n方案: ${plan}\n價格: ${price}`)
+      : (isRemoval
+          ? `User ${targetUserId} lost access\nPlan: ${plan}\nLast price: ${price}`
+          : `User ${targetUserId}\nPlan: ${plan}\nPrice: ${price}`);
     const res = await fetch("https://onesignal.com/api/v1/notifications", {
       method: "POST",
       headers: {
@@ -224,10 +253,13 @@ Deno.serve(async (req) => {
         `Subscription activated: user=${targetUserId}, plan=${effectiveProductId}, entitlement=${rcEntitlement}, trial=${isTrialPeriod}, event=${eventType}`,
       );
 
-      await notifyAdmin(
-        `RC: ${eventType}${isTrialPeriod ? " (trial)" : ""}`,
-        `User ${targetUserId}\nPlan: ${effectiveProductId}\nPrice: ${formatPrice()}`,
-      );
+      await notifyAdmin(supabase, {
+        eventType,
+        isTrial: isTrialPeriod,
+        targetUserId,
+        plan: effectiveProductId,
+        price: formatPrice(),
+      });
     } else if (INACTIVE_EVENTS.includes(eventType)) {
       // EXPIRATION and BILLING_ISSUE = access should be revoked
       const { error } = await supabase.from("premium_subscriptions").delete().eq("user_id", targetUserId);
@@ -245,10 +277,13 @@ Deno.serve(async (req) => {
 
       console.log(`Subscription removed: user=${targetUserId}, event=${eventType}`);
 
-      await notifyAdmin(
-        `RC: ${eventType}`,
-        `User ${targetUserId} lost access\nPlan: ${productId ?? "unknown"}\nLast price: ${formatPrice()}`,
-      );
+      await notifyAdmin(supabase, {
+        eventType,
+        isRemoval: true,
+        targetUserId,
+        plan: productId ?? "unknown",
+        price: formatPrice(),
+      });
     } else if (LOG_ONLY_EVENTS.includes(eventType)) {
       console.log(`Logged event (no action): user=${targetUserId}, event=${eventType}`);
     } else {

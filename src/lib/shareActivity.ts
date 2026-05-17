@@ -236,7 +236,7 @@ const FONT_HAND =
   "'Bradley Hand', 'Noteworthy', 'Marker Felt', 'Comic Sans MS', 'PingFang TC', cursive";
 
 // Draws an Instagram glyph + @runward.app handle right-aligned, vertically centered at midY.
-function drawIgHandle(
+export function drawIgHandle(
   ctx: CanvasRenderingContext2D,
   rightX: number,
   midY: number,

@@ -69,6 +69,8 @@ const RUN_TYPES = [
   { id: "Recovery", emoji: "⚪", en: "Recovery Run", zh: "恢復跑", color: "#94a3b8" },
   { id: "Progression", emoji: "🟠", en: "Progression Run", zh: "漸進跑", color: "#f97316" },
   { id: "Cross Training", emoji: "🔷", en: "Cross Training", zh: "交叉訓練", color: "#06b6d4" },
+  { id: "Trail Run", emoji: "⛰️", en: "Trail Run", zh: "越野跑", color: "#84cc16" },
+  { id: "Trail Race", emoji: "🏔️", en: "Trail Race", zh: "越野賽", color: "#65a30d" },
 ];
 
 const TYPE_LABELS: Record<string, { en: string; zh: string }> = {
@@ -1192,6 +1194,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
   const [restDays, setRestDays] = useState<string[]>(["Mon"]);
   const [trailDistanceKm, setTrailDistanceKm] = useState<string>("");
   const [trailElevationM, setTrailElevationM] = useState<string>("");
+  const [trailTargetEph, setTrailTargetEph] = useState<string>("");
   const [raceOptions, setRaceOptions] = useState<{ id: string; name: string; name_zh: string | null; race_date: string; city: string; country: string }[]>([]);
   const [selectedRaceId, setSelectedRaceId] = useState<string>("");
   const [customRaceName, setCustomRaceName] = useState<string>("");

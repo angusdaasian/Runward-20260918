@@ -1450,6 +1450,14 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
     () => raceOptions.find((r) => r.id === selectedRaceId) || null,
     [raceOptions, selectedRaceId]
   );
+  const computedTrailRaceEph = useMemo(() => {
+    const km = Number(trailDistanceKm);
+    const ele = Number(trailElevationM);
+    const parts = targetTime.split(":").map(Number);
+    const hours = parts.length === 3 ? (parts[0] || 0) + (parts[1] || 0) / 60 + (parts[2] || 0) / 3600 : 0;
+    if (!km || !isFinite(km) || !isFinite(ele) || hours <= 0) return null;
+    return Math.round(((km + ele / 100) / hours) * 10) / 10;
+  }, [trailDistanceKm, trailElevationM, targetTime]);
   const resolvedRaceName = selectedRace
     ? (lang === "zh" && selectedRace.name_zh ? selectedRace.name_zh : selectedRace.name)
     : (customRaceName.trim() || null);

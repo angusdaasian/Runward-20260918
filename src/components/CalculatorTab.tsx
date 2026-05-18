@@ -59,9 +59,8 @@ function getWorldRecordSeconds(meters: number): number | null {
   return null;
 }
 
-type DistanceCategory = "road" | "track" | "trail" | "trail_race" | "custom";
-const TRAIL_CATEGORIES: DistanceCategory[] = ["trail", "trail_race"];
-const isTrail = (c: DistanceCategory) => c === "trail" || c === "trail_race";
+type DistanceCategory = "road" | "track" | "trail" | "custom";
+const isTrail = (c: DistanceCategory) => c === "trail";
 
 const ROAD_DISTANCES = [
   { label: "5K", labelZh: "5公里", meters: 5000 },

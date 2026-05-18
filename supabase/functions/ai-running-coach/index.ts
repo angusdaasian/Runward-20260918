@@ -638,6 +638,8 @@ ${buildActivitySummary(allActs, units)}
 
 NOTE on activity lines: a trailing "[INTERVAL: …]" tag means the run was an interval/fartlek workout — NOT an easy run. The tag shows work vs rest lap counts, paces, HR, and the per-set structure (e.g. "set1=2000m(2000), set2=1600m(1600)"). When the user asks about that run, treat it as the structured workout shown — never call it an easy/tempo run.
 
+TRAIL AWARENESS: If the user trains for or asks about Trail Run / Trail Race / Ultramarathon, evaluate effort using EpH (Effort per Hour = distance_km + elevation_m/100 per hour) instead of flat pace. Recommend weekly trail/hill long runs, vertical-specific workouts (hill repeats), and progressive elevation buildup. Reference total elevation gain from activity stats when commenting on trail runs.
+
 ${racesBlock}
 
 ${planBlock}

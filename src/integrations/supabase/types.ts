@@ -1634,6 +1634,8 @@ export type Database = {
           city: string | null
           country: string | null
           created_at: string
+          distance_km: number | null
+          elevation_m: number | null
           finish_activity_id: string | null
           finish_time_seconds: number | null
           finish_time_source: string | null
@@ -1654,6 +1656,8 @@ export type Database = {
           city?: string | null
           country?: string | null
           created_at?: string
+          distance_km?: number | null
+          elevation_m?: number | null
           finish_activity_id?: string | null
           finish_time_seconds?: number | null
           finish_time_source?: string | null
@@ -1674,6 +1678,8 @@ export type Database = {
           city?: string | null
           country?: string | null
           created_at?: string
+          distance_km?: number | null
+          elevation_m?: number | null
           finish_activity_id?: string | null
           finish_time_seconds?: number | null
           finish_time_source?: string | null

@@ -44,7 +44,7 @@ interface Props {
   lang: Lang;
 }
 
-const CATEGORIES = ["All", "Full Marathon", "Half Marathon", "Ultramarathon", "10K", "5K", "3K", "1K", "Road Race"];
+const CATEGORIES = ["All", "Full Marathon", "Half Marathon", "Ultramarathon", "Trail Race", "10K", "5K", "3K", "1K", "Road Race"];
 const MONTHS = [
   "All",
   "January",
@@ -80,6 +80,7 @@ const CATEGORY_COLORS: Record<string, string> = {
   "Full Marathon": "bg-red-500",
   "Half Marathon": "bg-amber-500",
   Ultramarathon: "bg-orange-700",
+  "Trail Race": "bg-lime-600",
   "10K": "bg-blue-500",
   "5K": "bg-green-500",
   "3K": "bg-teal-500",
@@ -88,7 +89,7 @@ const CATEGORY_COLORS: Record<string, string> = {
 };
 
 // Priority order for the "main" category color bar
-const CATEGORY_PRIORITY = ["Full Marathon", "Half Marathon", "Ultramarathon", "10K", "5K", "3K", "1K", "Road Race"];
+const CATEGORY_PRIORITY = ["Full Marathon", "Half Marathon", "Ultramarathon", "Trail Race", "10K", "5K", "3K", "1K", "Road Race"];
 
 /* ── Helpers for cross-language race dedup & category merging ── */
 
@@ -246,7 +247,7 @@ const RaceTab = ({ lang }: Props) => {
   const [myRaces, setMyRaces] = useState<UserRaceRow[]>([]);
   const [myRacesLoading, setMyRacesLoading] = useState(true);
   const [myAddOpen, setMyAddOpen] = useState(false);
-  const [myAddForm, setMyAddForm] = useState({ name: "", race_date: "", city: "", country: "", category: "Full Marathon" });
+  const [myAddForm, setMyAddForm] = useState({ name: "", race_date: "", city: "", country: "", category: "Full Marathon", distance_km: "", elevation_m: "" });
   const [savingMy, setSavingMy] = useState(false);
   const [savedKeys, setSavedKeys] = useState<Set<string>>(new Set());
 
@@ -387,6 +388,14 @@ const RaceTab = ({ lang }: Props) => {
       return;
     }
     setSavingMy(true);
+    const needsTrailFields = myAddForm.category === "Ultramarathon" || myAddForm.category === "Trail Race";
+    const distNum = parseFloat(myAddForm.distance_km);
+    const eleNum = parseFloat(myAddForm.elevation_m);
+    if (needsTrailFields && (!isFinite(distNum) || distNum <= 0)) {
+      setSavingMy(false);
+      toast({ title: lang === "zh" ? "請輸入距離 (km)" : "Please enter distance (km)", variant: "destructive" });
+      return;
+    }
     const { error } = await supabase.from("user_races").insert({
       user_id: user.id,
       race_name: myAddForm.name,
@@ -395,7 +404,8 @@ const RaceTab = ({ lang }: Props) => {
       country: myAddForm.country || null,
       category: myAddForm.category,
       source: "manual",
-    });
+      ...(needsTrailFields ? { distance_km: distNum, elevation_m: isFinite(eleNum) ? eleNum : null } : {}),
+    } as any);
     setSavingMy(false);
     if (error) {
       toast({ title: lang === "zh" ? "新增失敗" : "Add failed", description: error.message, variant: "destructive" });
@@ -403,7 +413,7 @@ const RaceTab = ({ lang }: Props) => {
     }
     toast({ title: lang === "zh" ? "已新增到我的賽事" : "Added to My Races" });
     setMyAddOpen(false);
-    setMyAddForm({ name: "", race_date: "", city: "", country: "", category: "Full Marathon" });
+    setMyAddForm({ name: "", race_date: "", city: "", country: "", category: "Full Marathon", distance_km: "", elevation_m: "" });
     await loadMyRaces();
     queryClient.invalidateQueries({ queryKey: ["user-races", user.id] });
   };
@@ -989,7 +999,7 @@ const RaceTab = ({ lang }: Props) => {
               />
             </div>
             <div className="flex flex-wrap gap-2">
-              {["5K", "10K", "Half Marathon", "Full Marathon", "Ultramarathon", "Road Race"].map((c) => (
+              {["5K", "10K", "Half Marathon", "Full Marathon", "Ultramarathon", "Trail Race", "Road Race"].map((c) => (
                 <button
                   key={c}
                   onClick={() => setMyAddForm((f) => ({ ...f, category: c }))}
@@ -1003,6 +1013,28 @@ const RaceTab = ({ lang }: Props) => {
                 </button>
               ))}
             </div>
+            {(myAddForm.category === "Ultramarathon" || myAddForm.category === "Trail Race") && (
+              <div className="grid grid-cols-2 gap-2">
+                <input
+                  type="number"
+                  min="0"
+                  step="0.1"
+                  placeholder={lang === "zh" ? "距離 (公里) *" : "Distance (km) *"}
+                  value={myAddForm.distance_km}
+                  onChange={(e) => setMyAddForm((f) => ({ ...f, distance_km: e.target.value }))}
+                  className="px-3 py-2 rounded-lg border border-border bg-card text-foreground text-sm"
+                />
+                <input
+                  type="number"
+                  min="0"
+                  step="10"
+                  placeholder={lang === "zh" ? "爬升 (米)" : "Elevation (m)"}
+                  value={myAddForm.elevation_m}
+                  onChange={(e) => setMyAddForm((f) => ({ ...f, elevation_m: e.target.value }))}
+                  className="px-3 py-2 rounded-lg border border-border bg-card text-foreground text-sm"
+                />
+              </div>
+            )}
             <div className="flex gap-2">
               <button
                 onClick={addManualMyRace}
@@ -1015,7 +1047,7 @@ const RaceTab = ({ lang }: Props) => {
               <button
                 onClick={() => {
                   setMyAddOpen(false);
-                  setMyAddForm({ name: "", race_date: "", city: "", country: "", category: "Full Marathon" });
+                  setMyAddForm({ name: "", race_date: "", city: "", country: "", category: "Full Marathon", distance_km: "", elevation_m: "" });
                 }}
                 className="px-4 py-2 rounded-lg border border-border text-sm font-medium text-muted-foreground hover:bg-muted transition-colors"
               >

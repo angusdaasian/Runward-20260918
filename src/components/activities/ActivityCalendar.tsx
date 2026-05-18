@@ -63,6 +63,7 @@ const TYPE_SHORT: Record<string, string> = {
   Progression: "P", "Progression Run": "P",
   "Cross Training": "X",
   "Race Pace": "RP",
+  "Trail Run": "TR", "Trail Race": "TRC",
   Rest: "",
 };
 

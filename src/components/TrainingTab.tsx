@@ -51,7 +51,7 @@ const FREE_PLAN_LABELS: Record<string, { en: string; zh: string }> = {
 
 // ─── Types ───
 type Goal = "race" | "distance" | "first5k" | "parkrun" | "general" | "postnatal" | "fitness" | "injury" | "postrace";
-type Distance = "5K" | "10K" | "HM" | "FM";
+type Distance = "5K" | "10K" | "HM" | "FM" | "TR";
 
 interface DayPlan {
   day: string; date: string; type: string; title: string;
@@ -80,6 +80,7 @@ const TYPE_LABELS: Record<string, { en: string; zh: string }> = {
   "Race Pace": { en: "Race Pace", zh: "比賽配速" },
   "Race": { en: "Race", zh: "比賽" },
   "Progression Run": { en: "Progression Run", zh: "漸進跑" }, "Progression": { en: "Progression Run", zh: "漸進跑" },
+  "Trail Run": { en: "Trail Run", zh: "越野跑" }, "Trail Race": { en: "Trail Race", zh: "越野賽" },
 };
 
 const GOALS: { id: Goal; emoji: string; en: string; zh: string; desc_en: string; desc_zh: string }[] = [
@@ -96,10 +97,11 @@ const GOALS: { id: Goal; emoji: string; en: string; zh: string; desc_en: string;
 const DISTANCES: { id: Distance; label: string }[] = [
   { id: "5K", label: "5K" }, { id: "10K", label: "10K" },
   { id: "HM", label: "Half Marathon" }, { id: "FM", label: "Full Marathon" },
+  { id: "TR", label: "Trail Race" },
 ];
 
-const MIN_WEEKS: Record<Distance, number> = { "5K": 4, "10K": 4, HM: 6, FM: 8 };
-const MIN_DAYS: Record<Distance, number> = { "5K": 2, "10K": 2, HM: 3, FM: 4 };
+const MIN_WEEKS: Record<Distance, number> = { "5K": 4, "10K": 4, HM: 6, FM: 8, TR: 10 };
+const MIN_DAYS: Record<Distance, number> = { "5K": 2, "10K": 2, HM: 3, FM: 4, TR: 4 };
 
 function localizeTitle(type: string, lang: Lang): string {
   return TYPE_LABELS[type]?.[lang] || type;
@@ -165,6 +167,18 @@ function localizeDescription(day: DayPlan, lang: Lang): string {
         if (distStr && paceStr) return `${distStr}漸進跑，配速約${paceStr}。由輕鬆開始，逐步加速至節奏或比賽配速。`;
         if (distStr) return `${distStr}漸進跑。由輕鬆開始，逐步加速至節奏或比賽配速。`;
         return "漸進跑。由輕鬆開始，逐步加速至節奏或比賽配速。";
+      case "Trail Run":
+      case "Trail Race": {
+        const ele = (day as any).elevation_m;
+        const eph = (day as any).eph;
+        const label = day.type === "Trail Race" ? "越野賽" : "越野跑";
+        const parts: string[] = [];
+        if (distStr) parts.push(distStr);
+        if (typeof ele === "number" && ele > 0) parts.push(`爬升 ${Math.round(ele)} 米`);
+        if (typeof eph === "number" && eph > 0) parts.push(`目標 EpH ${eph}`);
+        const head = parts.length ? `${parts.join(" · ")} ${label}` : label;
+        return `${head}。以 EpH（每小時努力分數 = 距離公里 + 爬升米/100）控制強度。`;
+      }
       default:
         if (distStr && paceStr) return `${distStr}${typeZh}，配速約${paceStr}。`;
         if (distStr) return `${distStr}${typeZh}。`;
@@ -1160,6 +1174,8 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
   const [weeklyKm, setWeeklyKm] = useState<number>(30);
   const [longRunDay, setLongRunDay] = useState<string>("Sun");
   const [restDays, setRestDays] = useState<string[]>(["Mon"]);
+  const [trailDistanceKm, setTrailDistanceKm] = useState<string>("");
+  const [trailElevationM, setTrailElevationM] = useState<string>("");
   const [raceOptions, setRaceOptions] = useState<{ id: string; name: string; name_zh: string | null; race_date: string; city: string; country: string }[]>([]);
   const [selectedRaceId, setSelectedRaceId] = useState<string>("");
   const [customRaceName, setCustomRaceName] = useState<string>("");
@@ -1568,7 +1584,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
           apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
           Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
         },
-        body: JSON.stringify({ goal, distance, targetTime, raceDate, startDate, weeks: weeksUntilRace, daysPerWeek, weeklyKm, longRunDay, restDays, raceName: resolvedRaceName, raceCity: selectedRace?.city || null, raceCountry: selectedRace?.country || null, lang, races: racesPayloadFromSnapshot(snapshot) }),
+        body: JSON.stringify({ goal, distance, targetTime, raceDate, startDate, weeks: weeksUntilRace, daysPerWeek, weeklyKm, longRunDay, restDays, raceName: resolvedRaceName, raceCity: selectedRace?.city || null, raceCountry: selectedRace?.country || null, lang, races: racesPayloadFromSnapshot(snapshot), trailDistanceKm: distance === "TR" ? Number(trailDistanceKm) || null : null, trailElevationM: distance === "TR" ? Number(trailElevationM) || 0 : null }),
       });
       if (!response.ok) { const err = await response.json().catch(() => ({})); throw new Error(err.error || "Failed to generate"); }
       const result = await response.json();
@@ -1753,7 +1769,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
       clearCached(CacheKeys.trainingPlan(user.id));
       notifyPlanChanged();
     }
-    setProgramStep("details"); setDistance(null); setTargetTime(""); setTargetHours(""); setTargetMinutes(""); setTargetSeconds(""); setRaceDate(""); setStartDate(""); setPlan([]); setExistingPlan(null); setPlanDirty(false);
+    setProgramStep("details"); setDistance(null); setTargetTime(""); setTargetHours(""); setTargetMinutes(""); setTargetSeconds(""); setRaceDate(""); setStartDate(""); setPlan([]); setExistingPlan(null); setPlanDirty(false); setTrailDistanceKm(""); setTrailElevationM("");
   };
 
 
@@ -2413,20 +2429,34 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                     <label className="text-sm font-semibold text-foreground mb-2 block flex items-center gap-2"><Target size={14} />{lang === "zh" ? "比賽距離" : "Race Distance"}</label>
                     <div className="flex flex-wrap gap-2">
                       {DISTANCES.map((d) => (
-                        <button key={d.id} onClick={() => { setDistance(d.id); setTargetTime(""); const md = MIN_DAYS[d.id]; if (daysPerWeek < md) setDaysPerWeek(md); const minKm = d.id === "FM" ? 45 : d.id === "HM" ? 25 : 15; if (weeklyKm < minKm) setWeeklyKm(minKm); }}
+                        <button key={d.id} onClick={() => { setDistance(d.id); setTargetTime(""); const md = MIN_DAYS[d.id]; if (daysPerWeek < md) setDaysPerWeek(md); const minKm = d.id === "FM" ? 45 : d.id === "HM" ? 25 : d.id === "TR" ? 30 : 15; if (weeklyKm < minKm) setWeeklyKm(minKm); }}
                           className={`px-4 py-2 rounded-full text-sm font-medium transition-colors border ${distance === d.id ? "bg-primary text-primary-foreground border-primary" : "bg-card text-foreground border-border hover:bg-accent"}`}>
-                          {d.id === "HM" ? (lang === "zh" ? "半馬" : "HM") : d.id === "FM" ? (lang === "zh" ? "全馬" : "FM") : d.id}
+                          {d.id === "HM" ? (lang === "zh" ? "半馬" : "HM") : d.id === "FM" ? (lang === "zh" ? "全馬" : "FM") : d.id === "TR" ? (lang === "zh" ? "越野賽" : "Trail Race") : d.id}
                         </button>
                       ))}
                     </div>
                   </div>
+
+                  {/* Trail Race custom km + elevation */}
+                  {distance === "TR" && (
+                    <div className="mb-5 grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-sm font-semibold text-foreground mb-2 block">{lang === "zh" ? "賽事距離 (公里)" : "Race Distance (km)"}</label>
+                        <Input type="number" min="5" step="0.1" placeholder="50" value={trailDistanceKm} onChange={(e) => setTrailDistanceKm(e.target.value)} />
+                      </div>
+                      <div>
+                        <label className="text-sm font-semibold text-foreground mb-2 block">{lang === "zh" ? "累計爬升 (米)" : "Total Elevation (m)"}</label>
+                        <Input type="number" min="0" step="50" placeholder="2000" value={trailElevationM} onChange={(e) => setTrailElevationM(e.target.value)} />
+                      </div>
+                    </div>
+                  )}
 
                   {/* Target Time */}
                   {distance && (
                     <div className="mb-5">
                       <label className="text-sm font-semibold text-foreground mb-2 block flex items-center gap-2"><Trophy size={14} />{lang === "zh" ? "目標完成時間" : "Target Finish Time"}</label>
                       <div className="flex items-center gap-2">
-                        {(distance === "HM" || distance === "FM") && (
+                        {(distance === "HM" || distance === "FM" || distance === "TR") && (
                           <>
                             <Input type="number" min="0" max="9" placeholder={lang === "zh" ? "時" : "H"} value={targetHours}
                               onChange={(e) => { setTargetHours(e.target.value); setTargetTime(`${e.target.value || "0"}:${targetMinutes || "00"}:${targetSeconds || "00"}`); }} className="w-16 text-center" />
@@ -2434,10 +2464,10 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                           </>
                         )}
                         <Input type="number" min="0" max="59" placeholder={lang === "zh" ? "分" : "M"} value={targetMinutes}
-                          onChange={(e) => { setTargetMinutes(e.target.value); const h = targetHours || "0"; const m = e.target.value || "00"; setTargetTime(distance === "HM" || distance === "FM" ? `${h}:${m}:${targetSeconds || "00"}` : `${m}:${targetSeconds || "00"}`); }} className="w-16 text-center" />
+                          onChange={(e) => { setTargetMinutes(e.target.value); const h = targetHours || "0"; const m = e.target.value || "00"; setTargetTime(distance === "HM" || distance === "FM" || distance === "TR" ? `${h}:${m}:${targetSeconds || "00"}` : `${m}:${targetSeconds || "00"}`); }} className="w-16 text-center" />
                         <span className="text-muted-foreground">:</span>
                         <Input type="number" min="0" max="59" placeholder={lang === "zh" ? "秒" : "S"} value={targetSeconds}
-                          onChange={(e) => { setTargetSeconds(e.target.value); const h = targetHours || "0"; const m = targetMinutes || "00"; setTargetTime(distance === "HM" || distance === "FM" ? `${h}:${m}:${e.target.value || "00"}` : `${m}:${e.target.value || "00"}`); }} className="w-16 text-center" />
+                          onChange={(e) => { setTargetSeconds(e.target.value); const h = targetHours || "0"; const m = targetMinutes || "00"; setTargetTime(distance === "HM" || distance === "FM" || distance === "TR" ? `${h}:${m}:${e.target.value || "00"}` : `${m}:${e.target.value || "00"}`); }} className="w-16 text-center" />
                       </div>
                       <p className="text-xs text-muted-foreground mt-1">{lang === "zh" ? "輸入你的目標完成時間" : "Enter your target finish time"}</p>
                     </div>
@@ -2471,8 +2501,8 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                         onChange={(e) => setWeeklyKm(Number(e.target.value))}
                         className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm text-foreground"
                       >
-                        {Array.from({ length: Math.floor((200 - (distance === "FM" ? 45 : distance === "HM" ? 25 : 15)) / 5) + 1 }, (_, i) => {
-                          const min = distance === "FM" ? 45 : distance === "HM" ? 25 : 15;
+                        {Array.from({ length: Math.floor((200 - (distance === "FM" ? 45 : distance === "HM" ? 25 : distance === "TR" ? 30 : 15)) / 5) + 1 }, (_, i) => {
+                          const min = distance === "FM" ? 45 : distance === "HM" ? 25 : distance === "TR" ? 30 : 15;
                           const val = min + i * 5;
                           return <option key={val} value={val}>{val} km</option>;
                         })}

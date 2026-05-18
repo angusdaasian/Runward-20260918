@@ -246,14 +246,18 @@ async function generateReview(admin: any, userId: string, planRow: any, weekInde
 Return ONLY a JSON object with this exact shape:
 {
   "en": "overall insight, 3-5 sentences, encouraging but honest, in English",
-  "zh": "same overall insight in Traditional Chinese",
+  "zh": "same overall insight in Traditional Chinese (Hong Kong / Taiwan), 繁體中文 only",
   "scores": {
-    "distance": { "en": "1-2 sentence reason for the distance score", "zh": "Traditional Chinese version" },
+    "distance": { "en": "1-2 sentence reason for the distance score", "zh": "繁體中文 version (Traditional Chinese only)" },
     "pace":     { "en": "1-2 sentence reason for the pace score",     "zh": "..." },
     "hr":       { "en": "1-2 sentence reason for the HR score",       "zh": "..." },
     "recovery": { "en": "1-2 sentence reason for the recovery score", "zh": "..." }
   }
 }
+IMPORTANT LANGUAGE RULES for every "zh" field:
+- Write strictly in Traditional Chinese (繁體中文) as used in Hong Kong / Taiwan.
+- DO NOT use any Simplified Chinese characters (简体字). Examples of forbidden simplified forms: 训练/练 (use 訓練/練), 关于 (use 關於), 这 (use 這), 体 (use 體), 时间 (use 時間), 后 (use 後), 学 (use 學), 应该 (use 應該), 节奏 (use 節奏), 强度 (use 強度), 长 (use 長), 实际 (use 實際), 计划 (use 計劃), 数据 (use 數據), 总 (use 總), 跑步训练 (use 跑步訓練).
+- If unsure whether a character is traditional, choose the traditional form.
 Each per-score explanation must reference the actual numbers (e.g. planned vs actual km, avg pace, avg HR, resting HR, sleep) and explain WHY the score is what it is. Do not wrap in markdown code fences.`;
 
   const userPrompt = `Week ${week.week} (${startDate} to ${endDate}) of plan:

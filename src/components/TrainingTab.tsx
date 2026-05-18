@@ -1617,9 +1617,6 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
           user_id: user.id, goal: goal || "race", distance, target_time: targetTime,
           race_date: raceDate, weeks: weeksUntilRace, plan_data: planData, raw_output: result.raw || "",
           race_schedule: snapshot,
-          trail_distance_km: distance === "TR" ? Number(trailDistanceKm) || null : null,
-          trail_elevation_m: distance === "TR" ? Number(trailElevationM) || null : null,
-          trail_target_eph: distance === "TR" ? Number(trailTargetEph) || null : null,
         };
         const { data: saved } = await (supabase.from("training_plans" as any) as any).insert(inserted).select().single();
         const nextPlan = saved || inserted;

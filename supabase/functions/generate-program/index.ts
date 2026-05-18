@@ -44,7 +44,7 @@ serve(async (req) => {
   }
 
   try {
-    const { goal, distance, targetTime, raceDate, startDate, weeks, daysPerWeek, weeklyKm, longRunDay, restDays, raceName, raceCity, raceCountry, lang, races, trailDistanceKm, trailElevationM } = await req.json();
+    const { goal, distance, targetTime, raceDate, startDate, weeks, daysPerWeek, weeklyKm, longRunDay, restDays, raceName, raceCity, raceCountry, lang, races, trailDistanceKm, trailElevationM, trailTargetEph } = await req.json();
 
     // Normalise race schedule. Expect [{name, race_date, category, priority}]
     const raceList: Array<{ name: string; race_date: string; category?: string; priority?: string }> =
@@ -71,9 +71,99 @@ serve(async (req) => {
     const isTrailRace = distance === "TR" || distance === "Trail Race";
     const trailKm = Number(trailDistanceKm) || 0;
     const trailEle = Number(trailElevationM) || 0;
+    const parseHours = (value?: string): number => {
+      const parts = String(value || "").split(":").map((n) => Number(n));
+      if (parts.length === 3) return Math.max(0.1, parts[0] + parts[1] / 60 + parts[2] / 3600);
+      if (parts.length === 2) return Math.max(0.1, parts[0] / 60 + parts[1] / 3600);
+      return Math.max(0.1, Number(value) || 1);
+    };
+    const targetHours = parseHours(targetTime);
+    const raceEffortPoints = trailKm + trailEle / 100;
+    const raceEph = Number(trailTargetEph) || (targetHours > 0 ? raceEffortPoints / targetHours : 0);
+    const verticalPerKm = trailKm > 0 ? trailEle / trailKm : 0;
     const distanceFull = isTrailRace
       ? (isZh ? `越野賽 ${trailKm}公里 / 爬升 ${trailEle}米` : `Trail Race ${trailKm}km / ${trailEle}m elevation`)
       : (distance === "10K" ? "10K" : distance === "HM" ? (isZh ? "半馬拉松" : "Half Marathon") : (isZh ? "全馬拉松" : "Full Marathon"));
+
+    const repairTrailRacePlan = (planData: any[]): any[] => {
+      if (!isTrailRace || !Array.isArray(planData) || trailKm <= 0) return planData;
+      const totalWeeks = Math.max(planData.length, 1);
+      const prefLongDay = longRunDay || "Sun";
+      const fmtEph = (v: number) => Math.round(v * 10) / 10;
+      const trailTitle = (kind: "long" | "hill" | "race") => {
+        if (isZh) return kind === "race" ? "越野賽日" : kind === "hill" ? "越野爬升課" : "越野長課";
+        return kind === "race" ? "Trail Race Day" : kind === "hill" ? "Trail Hill Session" : "Trail Long Run";
+      };
+      const trailDesc = (km: number, ele: number, eph: number, kind: "long" | "hill" | "race") => {
+        if (isZh) {
+          const purpose = kind === "hill" ? "加入爬坡重複或起伏路段，建立垂直耐力與下坡控制。" : kind === "race" ? "按越野賽努力分配體力，以 EpH 控制強度而非平路配速。" : "在越野路面完成長課，練習補給、上坡步行/跑步切換及下坡技術。";
+          return `${km}km · 爬升 ${Math.round(ele)}m · 目標 EpH ${fmtEph(eph)}。${purpose}`;
+        }
+        const purpose = kind === "hill" ? "Use hill repeats or rolling trail to build vertical endurance and downhill control." : kind === "race" ? "Race by effort using EpH instead of flat road pace." : "Run on trails; practice fueling, climb pacing, power-hike transitions, and descents.";
+        return `${km}km · ${Math.round(ele)}m ascent · target EpH ${fmtEph(eph)}. ${purpose}`;
+      };
+      const isRestDay = (d: any) => !d || d.type === "Rest";
+      const toTrail = (day: any, weekIdx: number, kind: "long" | "hill" | "race") => {
+        const taperFactor = weekIdx >= totalWeeks - 2 ? (weekIdx === totalWeeks - 1 ? 0.45 : 0.7) : 1;
+        const km = kind === "race"
+          ? trailKm
+          : Math.max(4, Number(day?.distance_km) || (kind === "hill" ? Math.min(12, trailKm * 0.18) : Math.min(trailKm * 0.65, Math.max(10, Number(weeklyKm || 30) * 0.35)))) * taperFactor;
+        const roundedKm = Math.round(km * 10) / 10;
+        const eleBase = kind === "race" ? trailEle : roundedKm * verticalPerKm * (kind === "hill" ? 1.35 : 1);
+        const ele = Math.max(kind === "race" ? trailEle : 50, Math.round(eleBase / 10) * 10);
+        const eph = fmtEph(kind === "race" ? raceEph : raceEph * (kind === "hill" ? 0.95 : weekIdx >= totalWeeks - 3 ? 0.9 : 0.78));
+        return {
+          ...day,
+          type: kind === "race" ? "Trail Race" : "Trail Run",
+          title: trailTitle(kind),
+          description: trailDesc(roundedKm, ele, eph, kind),
+          distance_km: roundedKm,
+          pace: null,
+          color: kind === "race" ? "#65A30D" : "#84CC16",
+          elevation_m: ele,
+          eph,
+        };
+      };
+
+      return planData.map((week: any, weekIdx: number) => {
+        const days = Array.isArray(week?.days) ? week.days.map((d: any) => ({ ...d })) : [];
+        const raceIdx = days.findIndex((d: any) => d?.date === raceDate);
+        if (raceIdx >= 0) days[raceIdx] = toTrail(days[raceIdx], weekIdx, "race");
+
+        for (const d of days) {
+          const isTrailDay = d?.type === "Trail Run" || d?.type === "Trail Race";
+          if (!isTrailDay) {
+            if (d) { d.elevation_m = null; d.eph = null; }
+            continue;
+          }
+          if (d.type === "Trail Race") continue;
+          const km = Number(d.distance_km) || 0;
+          if (!(Number(d.elevation_m) > 0)) d.elevation_m = Math.round((km * verticalPerKm) / 10) * 10;
+          if (!(Number(d.eph) > 0)) d.eph = fmtEph(raceEph * 0.78);
+          d.pace = null;
+          d.description = trailDesc(km, Number(d.elevation_m) || 0, Number(d.eph) || 0, "long");
+        }
+
+        const hasTrail = days.some((d: any) => d?.type === "Trail Run" || d?.type === "Trail Race");
+        if (!hasTrail) {
+          const preferredIdx = days.findIndex((d: any) => d?.day === prefLongDay && !isRestDay(d));
+          const longIdx = days.findIndex((d: any) => d?.type === "Long Run" || d?.type === "Long");
+          const fallbackIdx = days.reduce((best: number, d: any, idx: number) => {
+            if (isRestDay(d)) return best;
+            return best < 0 || (Number(d.distance_km) || 0) > (Number(days[best]?.distance_km) || 0) ? idx : best;
+          }, -1);
+          const idx = preferredIdx >= 0 ? preferredIdx : longIdx >= 0 ? longIdx : fallbackIdx;
+          if (idx >= 0) days[idx] = toTrail(days[idx], weekIdx, "long");
+        }
+
+        if (weekIdx % 2 === 1 && weekIdx < totalWeeks - 2) {
+          const hillIdx = days.findIndex((d: any) => !isRestDay(d) && !["Trail Run", "Trail Race", "Race", "Long Run", "Long"].includes(d.type));
+          if (hillIdx >= 0) days[hillIdx] = toTrail(days[hillIdx], weekIdx, "hill");
+        }
+
+        return { ...week, days };
+      });
+    };
 
     const langInstruction = isZh
       ? `All "title" and "description" fields MUST be written in Traditional Chinese (繁體中文, Hong Kong variant). The "type" and "day" fields should remain in English.`

@@ -1584,7 +1584,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
           apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
           Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
         },
-        body: JSON.stringify({ goal, distance, targetTime, raceDate, startDate, weeks: weeksUntilRace, daysPerWeek, weeklyKm, longRunDay, restDays, raceName: resolvedRaceName, raceCity: selectedRace?.city || null, raceCountry: selectedRace?.country || null, lang, races: racesPayloadFromSnapshot(snapshot) }),
+        body: JSON.stringify({ goal, distance, targetTime, raceDate, startDate, weeks: weeksUntilRace, daysPerWeek, weeklyKm, longRunDay, restDays, raceName: resolvedRaceName, raceCity: selectedRace?.city || null, raceCountry: selectedRace?.country || null, lang, races: racesPayloadFromSnapshot(snapshot), trailDistanceKm: distance === "TR" ? Number(trailDistanceKm) || null : null, trailElevationM: distance === "TR" ? Number(trailElevationM) || 0 : null }),
       });
       if (!response.ok) { const err = await response.json().catch(() => ({})); throw new Error(err.error || "Failed to generate"); }
       const result = await response.json();

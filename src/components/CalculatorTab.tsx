@@ -59,9 +59,8 @@ function getWorldRecordSeconds(meters: number): number | null {
   return null;
 }
 
-type DistanceCategory = "road" | "track" | "trail" | "trail_race" | "custom";
-const TRAIL_CATEGORIES: DistanceCategory[] = ["trail", "trail_race"];
-const isTrail = (c: DistanceCategory) => c === "trail" || c === "trail_race";
+type DistanceCategory = "road" | "track" | "trail" | "custom";
+const isTrail = (c: DistanceCategory) => c === "trail";
 
 const ROAD_DISTANCES = [
   { label: "5K", labelZh: "5公里", meters: 5000 },
@@ -81,13 +80,6 @@ const TRACK_DISTANCES = [
   { label: "10K", labelZh: "10公里", meters: 10000 },
 ];
 
-const TRAIL_RACE_DISTANCES = [
-  { label: "21K", labelZh: "21公里", meters: 21000 },
-  { label: "50K", labelZh: "50公里", meters: 50000 },
-  { label: "50 Mile", labelZh: "50英里", meters: 50 * MI_TO_KM * 1000 },
-  { label: "100K", labelZh: "100公里", meters: 100000 },
-  { label: "100 Mile", labelZh: "100英里", meters: 100 * MI_TO_KM * 1000 },
-];
 
 const formatTimeSec = (totalSeconds: number): string => {
   const m = Math.floor(totalSeconds / 60);
@@ -177,7 +169,6 @@ const CalculatorTab = ({ score, setScore, lang, onCalculated }: Props) => {
   const distancesForCategory =
     category === "road" ? ROAD_DISTANCES :
     category === "track" ? TRACK_DISTANCES :
-    category === "trail_race" ? TRAIL_RACE_DISTANCES :
     [];
   const usesCustomDistance = category === "custom" || category === "trail";
   const trail = isTrail(category);
@@ -308,12 +299,11 @@ const CalculatorTab = ({ score, setScore, lang, onCalculated }: Props) => {
     setWorldRecordError(null);
   };
 
-  const CATEGORIES: DistanceCategory[] = ["road", "track", "trail", "trail_race", "custom"];
+  const CATEGORIES: DistanceCategory[] = ["road", "track", "trail", "custom"];
   const categoryLabel = (cat: DistanceCategory) => {
     if (cat === "road") return lang === "zh" ? "公路" : "Road";
     if (cat === "track") return lang === "zh" ? "田徑" : "Track";
     if (cat === "trail") return lang === "zh" ? "越野" : "Trail";
-    if (cat === "trail_race") return lang === "zh" ? "越野賽" : "Trail Race";
     return lang === "zh" ? "自訂" : "Custom";
   };
 

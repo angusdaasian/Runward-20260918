@@ -14,6 +14,8 @@ export interface EditableWorkout {
   pace?: string | null;
   description?: string | null;
   color?: string | null;
+  elevation_m?: number | null;
+  eph?: number | null;
 }
 
 interface Props {
@@ -58,6 +60,12 @@ const TYPE_OPTIONS: { id: string; en: string; zh: string; color: string; descEn:
   { id: "Race Pace", en: "Race Pace", zh: "比賽配速", color: "#a855f7",
     descEn: "Run at your goal race pace to dial in effort and rhythm.",
     descZh: "以目標比賽配速跑，熟悉強度與節奏。" },
+  { id: "Trail Run", en: "Trail Run", zh: "越野跑", color: "#84cc16",
+    descEn: "Off-road run with elevation. Effort guided by EpH (Effort per Hour) instead of flat pace.",
+    descZh: "越野跑，包含爬升。以 EpH（每小時努力分數）替代平路配速。" },
+  { id: "Trail Race", en: "Trail Race", zh: "越野賽", color: "#65a30d",
+    descEn: "Trail race effort. Pace is guided by EpH (distance_km + elevation_m/100 per hour).",
+    descZh: "越野賽，以 EpH（每小時的距離公里 + 爬升米/100）為強度依據。" },
   { id: "Rest", en: "Rest", zh: "休息", color: "#64748b",
     descEn: "Full rest day. Let the body absorb training and rebuild.",
     descZh: "完全休息日，讓身體吸收訓練並修復。" },
@@ -83,10 +91,14 @@ const EditWorkoutDialog = ({
   const [distance, setDistance] = useState<string>(workout.distance_km != null ? String(workout.distance_km) : "");
   const [pace, setPace] = useState<string>(workout.pace ?? "");
   const [description, setDescription] = useState<string>(workout.description ?? "");
+  const [elevation, setElevation] = useState<string>(workout.elevation_m != null ? String(workout.elevation_m) : "");
+  const [eph, setEph] = useState<string>(workout.eph != null ? String(workout.eph) : "");
   const [validating, setValidating] = useState(false);
   const [verdict, setVerdict] = useState<Verdict | null>(null);
   const [feedback, setFeedback] = useState<string>("");
   const [needsConfirm, setNeedsConfirm] = useState(false);
+
+  const isTrailType = type === "Trail Run" || type === "Trail Race";
 
   useEffect(() => {
     if (open) {
@@ -94,6 +106,8 @@ const EditWorkoutDialog = ({
       setDistance(workout.distance_km != null ? String(workout.distance_km) : "");
       setPace(workout.pace ?? "");
       setDescription(workout.description ?? "");
+      setElevation(workout.elevation_m != null ? String(workout.elevation_m) : "");
+      setEph(workout.eph != null ? String(workout.eph) : "");
       setVerdict(null);
       setFeedback("");
       setNeedsConfirm(false);
@@ -108,8 +122,10 @@ const EditWorkoutDialog = ({
       title: type || workout.title,
       color: opt?.color ?? workout.color,
       distance_km: distance ? Number(distance) : workout.distance_km,
-      pace: pace || workout.pace,
+      pace: isTrailType ? null : (pace || workout.pace),
       description: description || workout.description,
+      elevation_m: isTrailType ? (elevation ? Number(elevation) : null) : (workout.elevation_m ?? null),
+      eph: isTrailType ? (eph ? Number(eph) : null) : (workout.eph ?? null),
     };
   };
 
@@ -119,7 +135,9 @@ const EditWorkoutDialog = ({
       (next.type ?? "") === (normalizeType(workout.type) ?? "") &&
       (next.distance_km ?? null) === (workout.distance_km ?? null) &&
       (next.pace ?? "") === (workout.pace ?? "") &&
-      (next.description ?? "") === (workout.description ?? "")
+      (next.description ?? "") === (workout.description ?? "") &&
+      (next.elevation_m ?? null) === (workout.elevation_m ?? null) &&
+      (next.eph ?? null) === (workout.eph ?? null)
     );
   };
 
@@ -232,16 +250,44 @@ const EditWorkoutDialog = ({
             />
           </div>
 
-          <div>
-            <label className="text-sm font-medium text-foreground mb-1 block">
-              {isZh ? "配速 (例: 5:30/km)" : "Pace (e.g. 5:30/km)"}
-            </label>
-            <Input
-              type="text" placeholder="5:30/km"
-              value={pace}
-              onChange={(e) => { setPace(e.target.value); setVerdict(null); setNeedsConfirm(false); }}
-            />
-          </div>
+          {isTrailType ? (
+            <>
+              <div>
+                <label className="text-sm font-medium text-foreground mb-1 block">
+                  {isZh ? "爬升 (米)" : "Elevation Gain (m)"}
+                </label>
+                <Input
+                  type="number" min="0" step="10" placeholder="0"
+                  value={elevation}
+                  onChange={(e) => { setElevation(e.target.value); setVerdict(null); setNeedsConfirm(false); }}
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-foreground mb-1 block">
+                  {isZh ? "EpH (每小時努力分數)" : "EpH (Effort per Hour)"}
+                </label>
+                <Input
+                  type="number" min="0" step="0.1" placeholder="8"
+                  value={eph}
+                  onChange={(e) => { setEph(e.target.value); setVerdict(null); setNeedsConfirm(false); }}
+                />
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  {isZh ? "EpH = 距離(公里) + 爬升(米)/100 每小時" : "EpH = distance(km) + elevation(m)/100 per hour"}
+                </p>
+              </div>
+            </>
+          ) : (
+            <div>
+              <label className="text-sm font-medium text-foreground mb-1 block">
+                {isZh ? "配速 (例: 5:30/km)" : "Pace (e.g. 5:30/km)"}
+              </label>
+              <Input
+                type="text" placeholder="5:30/km"
+                value={pace}
+                onChange={(e) => { setPace(e.target.value); setVerdict(null); setNeedsConfirm(false); }}
+              />
+            </div>
+          )}
 
           <div>
             <label className="text-sm font-medium text-foreground mb-1 block">

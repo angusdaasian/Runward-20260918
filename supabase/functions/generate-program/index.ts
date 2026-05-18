@@ -88,7 +88,7 @@ ${langInstruction}
 ${raceScheduleBlock}
 
 Structure it as a JSON array of weeks. Each week has a "week" number and "days" array (exactly 7 days per week, ordered Monday → Sunday). DO NOT include "date" or "startDate" fields — the system assigns calendar dates after generation. Just give 7 ordered day entries per week.
-Each day has: "day" (Mon/Tue/Wed/Thu/Fri/Sat/Sun, in order), "type" (one of: "Easy Run", "Tempo Run", "Interval", "Long Run", "Recovery", "Rest", "Cross Training", "Race Pace", "Progression Run", "Race"), "title" (short workout name), "description" (see format rules below), "distance_km" (number or null for rest), "pace" (target pace per km as string like "5:30/km" or null for rest), "color" (hex color for the workout type: #4CAF50 for Easy, #FF9800 for Tempo, #F44336 for Interval, #2196F3 for Long Run, #9C27B0 for Recovery, #607D8B for Rest, #00BCD4 for Cross Training, #E91E63 for Race Pace, #FF5722 for Progression, #E91E63 for Race).
+Each day has: "day" (Mon/Tue/Wed/Thu/Fri/Sat/Sun, in order), "type" (one of: "Easy Run", "Tempo Run", "Interval", "Long Run", "Recovery", "Rest", "Cross Training", "Race Pace", "Progression Run", "Trail Run", "Trail Race", "Race"), "title" (short workout name), "description" (see format rules below), "distance_km" (number or null for rest), "pace" (target pace per km as string like "5:30/km" or null for rest/trail), "color" (hex color for the workout type: #4CAF50 for Easy, #FF9800 for Tempo, #F44336 for Interval, #2196F3 for Long Run, #9C27B0 for Recovery, #607D8B for Rest, #00BCD4 for Cross Training, #E91E63 for Race Pace, #FF5722 for Progression, #84CC16 for Trail Run, #65A30D for Trail Race, #E91E63 for Race). For "Trail Run" and "Trail Race" days ALSO include numeric fields "elevation_m" (total ascent in meters) and "eph" (target Effort per Hour, where EpH = distance_km + elevation_m/100 per hour). For all other types, set "elevation_m" and "eph" to null.
 
 WORKOUT TYPE DESCRIPTIONS (include a brief note of the type purpose in description):
 - Easy Run: Comfortable conversational pace to build aerobic base.
@@ -99,6 +99,8 @@ WORKOUT TYPE DESCRIPTIONS (include a brief note of the type purpose in descripti
 - Cross Training: Non-running cardio (cycling, swimming, etc.) for active recovery.
 - Race Pace: Running at your target race pace to build race-day confidence.
 - Progression Run: Start easy and gradually increase pace through the run, finishing at tempo or race pace.
+- Trail Run: Off-road run with elevation. Effort is guided by EpH instead of flat pace. Specify distance_km, elevation_m, and a target eph.
+- Trail Race: Trail race effort. Specify distance_km, elevation_m, and target eph for the race effort.
 - Rest: Full rest day for recovery.
 
 IMPORTANT: The runner wants to train exactly ${daysPerWeek || 4} days per week. The remaining days should be Rest days. Distribute the weekly volume across the running days.

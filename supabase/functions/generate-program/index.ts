@@ -68,12 +68,20 @@ serve(async (req) => {
       : "";
 
     const isZh = lang === "zh";
-    const distanceFull =
-      distance === "10K" ? "10K" : distance === "HM" ? (isZh ? "半馬拉松" : "Half Marathon") : (isZh ? "全馬拉松" : "Full Marathon");
+    const isTrailRace = distance === "TR" || distance === "Trail Race";
+    const trailKm = Number(trailDistanceKm) || 0;
+    const trailEle = Number(trailElevationM) || 0;
+    const distanceFull = isTrailRace
+      ? (isZh ? `越野賽 ${trailKm}公里 / 爬升 ${trailEle}米` : `Trail Race ${trailKm}km / ${trailEle}m elevation`)
+      : (distance === "10K" ? "10K" : distance === "HM" ? (isZh ? "半馬拉松" : "Half Marathon") : (isZh ? "全馬拉松" : "Full Marathon"));
 
     const langInstruction = isZh
       ? `All "title" and "description" fields MUST be written in Traditional Chinese (繁體中文, Hong Kong variant). The "type" and "day" fields should remain in English.`
       : `All "title" and "description" fields should be in English.`;
+
+    const trailBlock = isTrailRace
+      ? `\nTRAIL RACE PROGRAM REQUIREMENTS (STRICT):\n- Target race: ${trailKm} km with ${trailEle} m of total elevation gain.\n- Every week MUST include at least ONE "Trail Run" day (rolling/hill terrain) — ideally the long run is run on trails, especially in build weeks.\n- Every 2nd week MUST include a hill/trail-specific quality session: hill repeats (e.g. 6-10 × 90 sec uphill hard, jog down), or a Trail Run with progressive vertical (target eph close to race eph). Alternate between hill repeats and a tempo on rolling trail.\n- Keep ONE weekly road interval session for VO2max/leg speed (e.g. 5×1km, 6×800m) — written as "Interval" with proper "{dist}m x {reps} at {pace}/km, rest {time} between sets" format.\n- Include "Easy Run" days on road or flat trail for recovery between hard/trail sessions.\n- Long trail runs should progressively build BOTH distance AND elevation week to week (still respecting the +10% volume rule on distance; vertical may grow ~15-20% per build week from a sensible base).\n- For each "Trail Run" and "Trail Race" day include numeric "elevation_m" and "eph" (EpH = distance_km + elevation_m/100 per hour). Target race EpH = ${trailKm + trailEle / 100} effort points over the goal finish time of ${targetTime} (use this to derive workout eph targets).\n- Peak long trail run distance ≈ 60-75% of race distance with proportional elevation; reach this 3-4 weeks before race day, then taper.\n- The final 2 weeks taper: reduce volume AND vertical sharply; keep short race-pace EpH efforts on trail to stay sharp.\n`
+      : "";
 
     const prompt = `Create a ${weeks}-week running training program.
 Goal: ${goal}

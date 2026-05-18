@@ -52,6 +52,8 @@ export interface PlannedWorkout {
   title?: string | null;
   description?: string | null;
   pace?: string | null;
+  elevation_m?: number | null;
+  eph?: number | null;
 }
 
 export interface UserRace {
@@ -312,6 +314,8 @@ async function fetchPlannedWorkouts(userId: string): Promise<PlannedWorkout[]> {
           title: day.title || null,
           description: day.description || null,
           pace: day.pace || null,
+          elevation_m: day.elevation_m ?? null,
+          eph: day.eph ?? null,
         });
       }
     }

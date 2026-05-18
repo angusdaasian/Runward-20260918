@@ -44,7 +44,7 @@ interface Props {
   lang: Lang;
 }
 
-const CATEGORIES = ["All", "Full Marathon", "Half Marathon", "Ultramarathon", "10K", "5K", "3K", "1K", "Road Race"];
+const CATEGORIES = ["All", "Full Marathon", "Half Marathon", "Ultramarathon", "Trail Race", "10K", "5K", "3K", "1K", "Road Race"];
 const MONTHS = [
   "All",
   "January",

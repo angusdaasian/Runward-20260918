@@ -45,6 +45,7 @@ const TYPE_LABELS_ZH: Record<string, string> = {
   "Race Pace": "比賽配速",
   "Race": "比賽",
   "Progression Run": "漸進跑", "Progression": "漸進跑",
+  "Trail Run": "越野跑", "Trail Race": "越野賽",
 };
 
 const DAY_LABELS: Record<string, { en: string; zh: string }> = {

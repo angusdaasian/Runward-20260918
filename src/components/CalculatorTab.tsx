@@ -169,7 +169,6 @@ const CalculatorTab = ({ score, setScore, lang, onCalculated }: Props) => {
   const distancesForCategory =
     category === "road" ? ROAD_DISTANCES :
     category === "track" ? TRACK_DISTANCES :
-    category === "trail_race" ? TRAIL_RACE_DISTANCES :
     [];
   const usesCustomDistance = category === "custom" || category === "trail";
   const trail = isTrail(category);

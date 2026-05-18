@@ -1174,6 +1174,8 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
   const [weeklyKm, setWeeklyKm] = useState<number>(30);
   const [longRunDay, setLongRunDay] = useState<string>("Sun");
   const [restDays, setRestDays] = useState<string[]>(["Mon"]);
+  const [trailDistanceKm, setTrailDistanceKm] = useState<string>("");
+  const [trailElevationM, setTrailElevationM] = useState<string>("");
   const [raceOptions, setRaceOptions] = useState<{ id: string; name: string; name_zh: string | null; race_date: string; city: string; country: string }[]>([]);
   const [selectedRaceId, setSelectedRaceId] = useState<string>("");
   const [customRaceName, setCustomRaceName] = useState<string>("");

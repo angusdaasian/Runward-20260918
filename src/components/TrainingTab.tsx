@@ -166,6 +166,18 @@ function localizeDescription(day: DayPlan, lang: Lang): string {
         if (distStr && paceStr) return `${distStr}漸進跑，配速約${paceStr}。由輕鬆開始，逐步加速至節奏或比賽配速。`;
         if (distStr) return `${distStr}漸進跑。由輕鬆開始，逐步加速至節奏或比賽配速。`;
         return "漸進跑。由輕鬆開始，逐步加速至節奏或比賽配速。";
+      case "Trail Run":
+      case "Trail Race": {
+        const ele = (day as any).elevation_m;
+        const eph = (day as any).eph;
+        const label = day.type === "Trail Race" ? "越野賽" : "越野跑";
+        const parts: string[] = [];
+        if (distStr) parts.push(distStr);
+        if (typeof ele === "number" && ele > 0) parts.push(`爬升 ${Math.round(ele)} 米`);
+        if (typeof eph === "number" && eph > 0) parts.push(`目標 EpH ${eph}`);
+        const head = parts.length ? `${parts.join(" · ")} ${label}` : label;
+        return `${head}。以 EpH（每小時努力分數 = 距離公里 + 爬升米/100）控制強度。`;
+      }
       default:
         if (distStr && paceStr) return `${distStr}${typeZh}，配速約${paceStr}。`;
         if (distStr) return `${distStr}${typeZh}。`;

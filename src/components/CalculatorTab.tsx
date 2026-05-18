@@ -59,7 +59,9 @@ function getWorldRecordSeconds(meters: number): number | null {
   return null;
 }
 
-type DistanceCategory = "road" | "track" | "custom";
+type DistanceCategory = "road" | "track" | "trail" | "trail_race" | "custom";
+const TRAIL_CATEGORIES: DistanceCategory[] = ["trail", "trail_race"];
+const isTrail = (c: DistanceCategory) => c === "trail" || c === "trail_race";
 
 const ROAD_DISTANCES = [
   { label: "5K", labelZh: "5公里", meters: 5000 },
@@ -79,6 +81,14 @@ const TRACK_DISTANCES = [
   { label: "10K", labelZh: "10公里", meters: 10000 },
 ];
 
+const TRAIL_RACE_DISTANCES = [
+  { label: "21K", labelZh: "21公里", meters: 21000 },
+  { label: "50K", labelZh: "50公里", meters: 50000 },
+  { label: "50 Mile", labelZh: "50英里", meters: 50 * MI_TO_KM * 1000 },
+  { label: "100K", labelZh: "100公里", meters: 100000 },
+  { label: "100 Mile", labelZh: "100英里", meters: 100 * MI_TO_KM * 1000 },
+];
+
 const formatTimeSec = (totalSeconds: number): string => {
   const m = Math.floor(totalSeconds / 60);
   const s = Math.round(totalSeconds % 60);
@@ -94,7 +104,7 @@ const formatFullTime = (totalSeconds: number): string => {
   return `${m}:${s.toString().padStart(2, "0")}`;
 };
 
-const STORAGE_KEY = "runward.calculator.v1";
+const STORAGE_KEY = "runward.calculator.v2";
 type PersistedState = {
   category: DistanceCategory;
   selectedMeters: number;
@@ -106,6 +116,8 @@ type PersistedState = {
   paceMin: string;
   paceSec: string;
   paceUnit: PaceUnit;
+  elevationGain: string;
+  ephValue: string;
 };
 const DEFAULTS: PersistedState = {
   category: "road",
@@ -118,6 +130,8 @@ const DEFAULTS: PersistedState = {
   paceMin: "5",
   paceSec: "20",
   paceUnit: "km",
+  elevationGain: "0",
+  ephValue: "8",
 };
 const loadPersisted = (): PersistedState => {
   if (typeof window === "undefined") return DEFAULTS;
@@ -142,6 +156,8 @@ const CalculatorTab = ({ score, setScore, lang, onCalculated }: Props) => {
   const [paceMin, setPaceMin] = useState(initial.paceMin);
   const [paceSec, setPaceSec] = useState(initial.paceSec);
   const [paceUnit, setPaceUnit] = useState<PaceUnit>(initial.paceUnit);
+  const [elevationGain, setElevationGain] = useState(initial.elevationGain);
+  const [ephValue, setEphValue] = useState(initial.ephValue);
   const [worldRecordError, setWorldRecordError] = useState<string | null>(null);
 
   // Persist all inputs so the calculator remembers what the user last entered.
@@ -151,25 +167,48 @@ const CalculatorTab = ({ score, setScore, lang, onCalculated }: Props) => {
       const data: PersistedState = {
         category, selectedMeters, customDistance, inputMode,
         hours, minutes, seconds, paceMin, paceSec, paceUnit,
+        elevationGain, ephValue,
       };
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     } catch { /* ignore quota */ }
-  }, [category, selectedMeters, customDistance, inputMode, hours, minutes, seconds, paceMin, paceSec, paceUnit]);
+  }, [category, selectedMeters, customDistance, inputMode, hours, minutes, seconds, paceMin, paceSec, paceUnit, elevationGain, ephValue]);
 
 
-  const distancesForCategory = category === "road" ? ROAD_DISTANCES : category === "track" ? TRACK_DISTANCES : [];
+  const distancesForCategory =
+    category === "road" ? ROAD_DISTANCES :
+    category === "track" ? TRACK_DISTANCES :
+    category === "trail_race" ? TRAIL_RACE_DISTANCES :
+    [];
+  const usesCustomDistance = category === "custom" || category === "trail";
+  const trail = isTrail(category);
 
   const getDistanceMeters = useCallback((): number => {
-    if (category === "custom") {
+    if (usesCustomDistance) {
       const val = parseFloat(customDistance || "0");
       return paceUnit === "mi" ? val * MI_TO_KM * 1000 : val * 1000;
     }
     return selectedMeters;
-  }, [category, customDistance, paceUnit, selectedMeters]);
+  }, [usesCustomDistance, customDistance, paceUnit, selectedMeters]);
 
-  // Compute total seconds from either time or pace
+  const elevationMeters = useMemo(() => {
+    const v = parseFloat(elevationGain || "0");
+    return isFinite(v) && v > 0 ? v : 0;
+  }, [elevationGain]);
+
+  // Effort Points (ITRA): EP = distance_km + elevation_m/100
+  const effortPoints = useMemo(() => {
+    const distKm = getDistanceMeters() / 1000;
+    return distKm + elevationMeters / 100;
+  }, [getDistanceMeters, elevationMeters]);
+
+  // Compute total seconds from either time, pace, or EPH
   const totalSeconds = useMemo(() => {
     if (inputMode === "pace") {
+      if (trail) {
+        const eph = parseFloat(ephValue || "0");
+        if (eph <= 0 || effortPoints <= 0) return 0;
+        return Math.round((effortPoints / eph) * 3600);
+      }
       const pm = parseInt(paceMin || "0");
       const ps = parseInt(paceSec || "0");
       const pacePerUnit = pm * 60 + ps;
@@ -181,7 +220,7 @@ const CalculatorTab = ({ score, setScore, lang, onCalculated }: Props) => {
     const m = parseInt(minutes || "0");
     const s = parseInt(seconds || "0");
     return h * 3600 + m * 60 + s;
-  }, [inputMode, hours, minutes, seconds, paceMin, paceSec, paceUnit, getDistanceMeters]);
+  }, [inputMode, trail, ephValue, effortPoints, hours, minutes, seconds, paceMin, paceSec, paceUnit, getDistanceMeters]);
 
   const paceDisplay = useMemo(() => {
     const dist = getDistanceMeters();
@@ -190,6 +229,12 @@ const CalculatorTab = ({ score, setScore, lang, onCalculated }: Props) => {
     const pacePerUnit = totalSeconds / (dist / unitDist);
     return formatTimeSec(pacePerUnit);
   }, [getDistanceMeters, totalSeconds, paceUnit]);
+
+  const ephDisplay = useMemo(() => {
+    if (totalSeconds <= 0 || effortPoints <= 0) return "--";
+    const hrs = totalSeconds / 3600;
+    return (effortPoints / hrs).toFixed(2);
+  }, [totalSeconds, effortPoints]);
 
   const distanceDisplay = useMemo(() => {
     const dist = getDistanceMeters();
@@ -209,7 +254,7 @@ const CalculatorTab = ({ score, setScore, lang, onCalculated }: Props) => {
 
   const toggleUnit = () => {
     const newUnit = paceUnit === "km" ? "mi" : "km";
-    if (category === "custom") {
+    if (usesCustomDistance) {
       const val = parseFloat(customDistance || "0");
       setCustomDistance(newUnit === "mi" ? (val * KM_TO_MI).toFixed(2) : (val * MI_TO_KM).toFixed(2));
     }
@@ -220,15 +265,17 @@ const CalculatorTab = ({ score, setScore, lang, onCalculated }: Props) => {
     const dist = getDistanceMeters();
     if (dist <= 0 || totalSeconds <= 0) return;
 
-    const wr = getWorldRecordSeconds(dist);
-    if (wr && totalSeconds < wr) {
-      const wrFormatted = formatFullTime(wr);
-      setWorldRecordError(
-        lang === "zh"
-          ? `此時間快於世界紀錄 (${wrFormatted})，請輸入合理時間。`
-          : `This time is faster than the world record (${wrFormatted}). Please enter a realistic time.`
-      );
-      return;
+    if (!trail) {
+      const wr = getWorldRecordSeconds(dist);
+      if (wr && totalSeconds < wr) {
+        const wrFormatted = formatFullTime(wr);
+        setWorldRecordError(
+          lang === "zh"
+            ? `此時間快於世界紀錄 (${wrFormatted})，請輸入合理時間。`
+            : `This time is faster than the world record (${wrFormatted}). Please enter a realistic time.`
+        );
+        return;
+      }
     }
     setWorldRecordError(null);
 
@@ -250,6 +297,8 @@ const CalculatorTab = ({ score, setScore, lang, onCalculated }: Props) => {
     setPaceMin("5");
     setPaceSec("20");
     setPaceUnit("km");
+    setElevationGain("0");
+    setEphValue("8");
     setScore(null);
     setWorldRecordError(null);
   };
@@ -257,6 +306,15 @@ const CalculatorTab = ({ score, setScore, lang, onCalculated }: Props) => {
   const handleDistanceSelect = (meters: number) => {
     setSelectedMeters(meters);
     setWorldRecordError(null);
+  };
+
+  const CATEGORIES: DistanceCategory[] = ["road", "track", "trail", "trail_race", "custom"];
+  const categoryLabel = (cat: DistanceCategory) => {
+    if (cat === "road") return lang === "zh" ? "公路" : "Road";
+    if (cat === "track") return lang === "zh" ? "田徑" : "Track";
+    if (cat === "trail") return lang === "zh" ? "越野" : "Trail";
+    if (cat === "trail_race") return lang === "zh" ? "越野賽" : "Trail Race";
+    return lang === "zh" ? "自訂" : "Custom";
   };
 
   return (
@@ -274,15 +332,24 @@ const CalculatorTab = ({ score, setScore, lang, onCalculated }: Props) => {
         <p className="text-4xl font-display font-bold text-foreground tracking-tight">
           {totalSeconds > 0 ? formatFullTime(totalSeconds) : "0:00"}
         </p>
-        <p className="text-lg font-semibold text-primary">
-          {paceDisplay} /{paceUnit}
-        </p>
+        {trail ? (
+          <p className="text-lg font-semibold text-primary">
+            {ephDisplay} EP/hr
+          </p>
+        ) : (
+          <p className="text-lg font-semibold text-primary">
+            {paceDisplay} /{paceUnit}
+          </p>
+        )}
         {category === "track" && lap400Display ? (
           <p className="text-sm text-muted-foreground">
             {lang === "zh" ? `400米分段 ${lap400Display}` : `400m split ${lap400Display}`}
           </p>
         ) : (
-          <p className="text-sm text-muted-foreground">{distanceDisplay}</p>
+          <p className="text-sm text-muted-foreground">
+            {distanceDisplay}
+            {trail && elevationMeters > 0 ? ` · ${Math.round(elevationMeters)} m ↑` : ""}
+          </p>
         )}
       </div>
 
@@ -293,31 +360,27 @@ const CalculatorTab = ({ score, setScore, lang, onCalculated }: Props) => {
         </label>
 
         {/* Category Tabs */}
-        <div className="flex gap-1 bg-muted/50 p-1 rounded-lg">
-          {(["road", "track", "custom"] as DistanceCategory[]).map((cat) => (
+        <div className="flex gap-1 bg-muted/50 p-1 rounded-lg overflow-x-auto">
+          {CATEGORIES.map((cat) => (
             <button
               key={cat}
               onClick={() => {
                 setCategory(cat);
                 setWorldRecordError(null);
               }}
-              className={`flex-1 py-2 text-sm font-medium rounded-md transition-colors ${
+              className={`flex-1 py-2 px-2 text-xs sm:text-sm font-medium rounded-md transition-colors whitespace-nowrap ${
                 category === cat
                   ? "bg-card text-foreground shadow-sm"
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              {cat === "road"
-                ? lang === "zh" ? "公路" : "Road"
-                : cat === "track"
-                ? lang === "zh" ? "田徑" : "Track"
-                : lang === "zh" ? "自訂" : "Custom"}
+              {categoryLabel(cat)}
             </button>
           ))}
         </div>
 
         {/* Distance Grid or Custom Input */}
-        {category === "custom" ? (
+        {usesCustomDistance ? (
           <div className="flex items-center border border-border rounded-xl px-4 py-3 bg-card">
             <input
               type="number"
@@ -359,13 +422,41 @@ const CalculatorTab = ({ score, setScore, lang, onCalculated }: Props) => {
         )}
       </div>
 
+      {/* Elevation gain (Trail only) */}
+      {trail && (
+        <div className="space-y-2">
+          <label className="text-sm font-medium text-foreground block">
+            {lang === "zh" ? "爬升 (米)" : "Elevation Gain (m)"}
+          </label>
+          <div className="flex items-center border border-border rounded-xl px-4 py-3 bg-card">
+            <input
+              type="number"
+              value={elevationGain}
+              onChange={(e) => setElevationGain(e.target.value)}
+              className="flex-1 bg-transparent text-foreground text-base focus:outline-none"
+              step="10"
+              min="0"
+              placeholder="0"
+            />
+            <span className="text-sm text-muted-foreground font-medium">m</span>
+          </div>
+          <p className="text-[11px] text-muted-foreground">
+            {lang === "zh"
+              ? `EP = 距離(公里) + 爬升(米)/100 · 目前 ${effortPoints.toFixed(1)} EP`
+              : `EP = distance(km) + elevation(m)/100 · current ${effortPoints.toFixed(1)} EP`}
+          </p>
+        </div>
+      )}
+
       {/* Input Mode Selector */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <label className="text-sm font-medium text-foreground">
             {inputMode === "time"
               ? (lang === "zh" ? "目標時間" : "Goal Time")
-              : (lang === "zh" ? "目標配速" : "Goal Pace")}
+              : trail
+                ? (lang === "zh" ? "目標 EPH" : "Goal EPH")
+                : (lang === "zh" ? "目標配速" : "Goal Pace")}
           </label>
           <Select value={inputMode} onValueChange={(v) => { setInputMode(v as InputMode); setWorldRecordError(null); }}>
             <SelectTrigger className="w-[140px] h-9 text-sm bg-card border-border">
@@ -373,7 +464,11 @@ const CalculatorTab = ({ score, setScore, lang, onCalculated }: Props) => {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="time">{lang === "zh" ? "目標時間" : "Goal Time"}</SelectItem>
-              <SelectItem value="pace">{lang === "zh" ? "目標配速" : "Goal Pace"}</SelectItem>
+              <SelectItem value="pace">
+                {trail
+                  ? (lang === "zh" ? "目標 EPH" : "Goal EPH")
+                  : (lang === "zh" ? "目標配速" : "Goal Pace")}
+              </SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -409,7 +504,7 @@ const CalculatorTab = ({ score, setScore, lang, onCalculated }: Props) => {
             return (
               <div className="flex items-center justify-center gap-2">
                 <div className="flex flex-col items-center">
-                  <NumberSelect value={hours} onChange={setHours} options={range(24)} width="w-20" />
+                  <NumberSelect value={hours} onChange={setHours} options={range(48)} width="w-20" />
                   <span className="text-[11px] text-muted-foreground mt-1">
                     {lang === "zh" ? "時" : "hr"}
                   </span>
@@ -428,6 +523,21 @@ const CalculatorTab = ({ score, setScore, lang, onCalculated }: Props) => {
                     {lang === "zh" ? "秒" : "sec"}
                   </span>
                 </div>
+              </div>
+            );
+          }
+          if (trail) {
+            return (
+              <div className="flex items-center justify-center gap-3">
+                <input
+                  type="number"
+                  value={ephValue}
+                  onChange={(e) => { setEphValue(e.target.value); setWorldRecordError(null); }}
+                  step="0.1"
+                  min="0"
+                  className="w-32 h-14 text-2xl font-display font-bold bg-card border border-border rounded-md text-center focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+                <span className="text-lg text-muted-foreground font-medium">EP/hr</span>
               </div>
             );
           }

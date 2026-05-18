@@ -56,6 +56,7 @@ type Distance = "5K" | "10K" | "HM" | "FM" | "TR";
 interface DayPlan {
   day: string; date: string; type: string; title: string;
   description: string; distance_km: number | null; pace: string | null; color: string;
+  elevation_m?: number | null; eph?: number | null;
 }
 interface WeekPlan { week: number; startDate: string; days: DayPlan[]; }
 
@@ -365,10 +366,25 @@ const WorkoutDetails = ({ day, lang, hrBounds }: { day: DayPlan; lang: Lang; hrB
     );
   }
 
+  const isTrail = day.type === "Trail Run" || day.type === "Trail Race";
+  const ele = (day as any).elevation_m;
+  const eph = (day as any).eph;
+
   return (
     <div className="mt-2 space-y-1">
       {day.distance_km != null && <Row label={isZh ? "距離" : "Distance"} value={`${day.distance_km} km`} />}
-      {paceFmt(day.pace) && <Row label={isZh ? "配速" : "Pace"} value={paceFmt(day.pace)!} />}
+      {isTrail ? (
+        <>
+          {typeof ele === "number" && ele > 0 && (
+            <Row label={isZh ? "爬升" : "Elevation"} value={`${Math.round(ele)} m`} />
+          )}
+          {typeof eph === "number" && eph > 0 && (
+            <Row label="EpH" value={String(eph)} />
+          )}
+        </>
+      ) : (
+        paceFmt(day.pace) && <Row label={isZh ? "配速" : "Pace"} value={paceFmt(day.pace)!} />
+      )}
       <Row label={isZh ? "心率" : "HR"} value={hr ? `${zoneLabel} · ${hr}` : zoneLabel} />
     </div>
   );
@@ -2204,7 +2220,14 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                                 <div className="flex items-center justify-between">
                                   <span className="font-medium text-sm text-foreground">{localizeTitle(day.type, lang)}</span>
                                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                    {day.pace && <span>{/\/(km|mi)\b/i.test(day.pace) ? day.pace : `${day.pace}/km`}</span>}
+                                    {(day.type === "Trail Run" || day.type === "Trail Race") ? (
+                                      <>
+                                        {day.eph > 0 && <span>EpH {day.eph}</span>}
+                                        {day.elevation_m > 0 && <span>+{Math.round(day.elevation_m)}m</span>}
+                                      </>
+                                    ) : (
+                                      day.pace && <span>{/\/(km|mi)\b/i.test(day.pace) ? day.pace : `${day.pace}/km`}</span>
+                                    )}
                                     {day.distance_km && <span>{day.distance_km} km</span>}
                                   </div>
                                 </div>
@@ -2353,7 +2376,14 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                               <div className="flex items-center justify-between">
                                 <span className="font-medium text-sm text-foreground">{localizeTitle(day.type, lang)}</span>
                                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                  {day.pace && <span>{/\/(km|mi)\b/i.test(day.pace) ? day.pace : `${day.pace}/km`}</span>}
+                                  {(day.type === "Trail Run" || day.type === "Trail Race") ? (
+                                    <>
+                                      {day.eph > 0 && <span>EpH {day.eph}</span>}
+                                      {day.elevation_m > 0 && <span>+{Math.round(day.elevation_m)}m</span>}
+                                    </>
+                                  ) : (
+                                    day.pace && <span>{/\/(km|mi)\b/i.test(day.pace) ? day.pace : `${day.pace}/km`}</span>
+                                  )}
                                   {day.distance_km && <span>{day.distance_km} km</span>}
                                 </div>
                               </div>
@@ -2947,7 +2977,14 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                               <div className="flex items-center justify-between">
                                 <span className="font-medium text-sm text-foreground">{localizeTitle(day.type, lang)}</span>
                                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                  {day.pace && <span>{day.pace}</span>}
+                                  {(day.type === "Trail Run" || day.type === "Trail Race") ? (
+                                    <>
+                                      {day.eph > 0 && <span>EpH {day.eph}</span>}
+                                      {day.elevation_m > 0 && <span>+{Math.round(day.elevation_m)}m</span>}
+                                    </>
+                                  ) : (
+                                    day.pace && <span>{day.pace}</span>
+                                  )}
                                   {day.distance_km && <span>{day.distance_km} km</span>}
                                 </div>
                               </div>

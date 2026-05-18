@@ -44,7 +44,7 @@ serve(async (req) => {
   }
 
   try {
-    const { goal, distance, targetTime, raceDate, startDate, weeks, daysPerWeek, weeklyKm, longRunDay, restDays, raceName, raceCity, raceCountry, lang, races } = await req.json();
+    const { goal, distance, targetTime, raceDate, startDate, weeks, daysPerWeek, weeklyKm, longRunDay, restDays, raceName, raceCity, raceCountry, lang, races, trailDistanceKm, trailElevationM } = await req.json();
 
     // Normalise race schedule. Expect [{name, race_date, category, priority}]
     const raceList: Array<{ name: string; race_date: string; category?: string; priority?: string }> =

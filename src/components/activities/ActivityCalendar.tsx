@@ -18,6 +18,8 @@ interface PlannedWorkout {
   title?: string | null;
   description?: string | null;
   pace?: string | null;
+  elevation_m?: number | null;
+  eph?: number | null;
 }
 
 interface UserRaceLite {

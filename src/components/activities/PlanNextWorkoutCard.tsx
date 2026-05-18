@@ -103,9 +103,13 @@ const PlanNextWorkoutCard = ({ lang, activityDate, isPremium, onResolved }: Prop
       const day = updated[nextPlanned._weekIdx]?.days?.[nextPlanned._dayIdx];
       if (!day) throw new Error("day not found");
       const newDistance = next.distance_km ?? day.distance_km;
+      const nextType = next.type ?? day.type;
+      const isTrail = nextType === "Trail Run" || nextType === "Trail Race";
       day.distance_km = newDistance;
-      day.pace = next.pace ?? day.pace;
+      day.pace = isTrail ? null : (next.pace ?? day.pace);
       day.description = next.description ?? day.description;
+      day.elevation_m = isTrail ? (next.elevation_m ?? day.elevation_m ?? null) : null;
+      day.eph = isTrail ? (next.eph ?? day.eph ?? null) : null;
       if (next.type) day.type = next.type;
       if (next.title) day.title = next.title;
       if (next.color) day.color = next.color;
@@ -168,7 +172,21 @@ const PlanNextWorkoutCard = ({ lang, activityDate, isPremium, onResolved }: Prop
               <div className="font-semibold text-foreground">{nextPlanned.distance_km} km</div>
             </div>
           )}
-          {nextPlanned.pace && (
+          {(nextPlanned.type === "Trail Run" || nextPlanned.type === "Trail Race") && nextPlanned.elevation_m != null && (
+            <div className="rounded-md bg-background/60 border border-border px-2 py-1.5">
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                {isZh ? "爬升" : "Elevation"}
+              </div>
+              <div className="font-semibold text-foreground">{Math.round(nextPlanned.elevation_m)} m</div>
+            </div>
+          )}
+          {(nextPlanned.type === "Trail Run" || nextPlanned.type === "Trail Race") && nextPlanned.eph != null && (
+            <div className="rounded-md bg-background/60 border border-border px-2 py-1.5">
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground">EpH</div>
+              <div className="font-semibold text-foreground">{nextPlanned.eph}</div>
+            </div>
+          )}
+          {nextPlanned.pace && nextPlanned.type !== "Trail Run" && nextPlanned.type !== "Trail Race" && (
             <div className="rounded-md bg-background/60 border border-border px-2 py-1.5">
               <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
                 {isZh ? "配速" : "Pace"}
@@ -203,6 +221,8 @@ const PlanNextWorkoutCard = ({ lang, activityDate, isPremium, onResolved }: Prop
           pace: nextPlanned.pace ?? null,
           description: nextPlanned.description ?? null,
           color: nextPlanned.color ?? null,
+          elevation_m: nextPlanned.elevation_m ?? null,
+          eph: nextPlanned.eph ?? null,
         }}
         planContext={planContext}
         onSave={persistEdit}

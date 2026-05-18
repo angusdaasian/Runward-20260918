@@ -44,7 +44,7 @@ serve(async (req) => {
   }
 
   try {
-    const { goal, distance, targetTime, raceDate, startDate, weeks, daysPerWeek, weeklyKm, longRunDay, restDays, raceName, raceCity, raceCountry, lang, races, trailDistanceKm, trailElevationM } = await req.json();
+    const { goal, distance, targetTime, raceDate, startDate, weeks, daysPerWeek, weeklyKm, longRunDay, restDays, raceName, raceCity, raceCountry, lang, races, trailDistanceKm, trailElevationM, trailTargetEph } = await req.json();
 
     // Normalise race schedule. Expect [{name, race_date, category, priority}]
     const raceList: Array<{ name: string; race_date: string; category?: string; priority?: string }> =
@@ -71,9 +71,99 @@ serve(async (req) => {
     const isTrailRace = distance === "TR" || distance === "Trail Race";
     const trailKm = Number(trailDistanceKm) || 0;
     const trailEle = Number(trailElevationM) || 0;
+    const parseHours = (value?: string): number => {
+      const parts = String(value || "").split(":").map((n) => Number(n));
+      if (parts.length === 3) return Math.max(0.1, parts[0] + parts[1] / 60 + parts[2] / 3600);
+      if (parts.length === 2) return Math.max(0.1, parts[0] / 60 + parts[1] / 3600);
+      return Math.max(0.1, Number(value) || 1);
+    };
+    const targetHours = parseHours(targetTime);
+    const raceEffortPoints = trailKm + trailEle / 100;
+    const raceEph = Number(trailTargetEph) || (targetHours > 0 ? raceEffortPoints / targetHours : 0);
+    const verticalPerKm = trailKm > 0 ? trailEle / trailKm : 0;
     const distanceFull = isTrailRace
       ? (isZh ? `越野賽 ${trailKm}公里 / 爬升 ${trailEle}米` : `Trail Race ${trailKm}km / ${trailEle}m elevation`)
       : (distance === "10K" ? "10K" : distance === "HM" ? (isZh ? "半馬拉松" : "Half Marathon") : (isZh ? "全馬拉松" : "Full Marathon"));
+
+    const repairTrailRacePlan = (planData: any[]): any[] => {
+      if (!isTrailRace || !Array.isArray(planData) || trailKm <= 0) return planData;
+      const totalWeeks = Math.max(planData.length, 1);
+      const prefLongDay = longRunDay || "Sun";
+      const fmtEph = (v: number) => Math.round(v * 10) / 10;
+      const trailTitle = (kind: "long" | "hill" | "race") => {
+        if (isZh) return kind === "race" ? "越野賽日" : kind === "hill" ? "越野爬升課" : "越野長課";
+        return kind === "race" ? "Trail Race Day" : kind === "hill" ? "Trail Hill Session" : "Trail Long Run";
+      };
+      const trailDesc = (km: number, ele: number, eph: number, kind: "long" | "hill" | "race") => {
+        if (isZh) {
+          const purpose = kind === "hill" ? "加入爬坡重複或起伏路段，建立垂直耐力與下坡控制。" : kind === "race" ? "按越野賽努力分配體力，以 EpH 控制強度而非平路配速。" : "在越野路面完成長課，練習補給、上坡步行/跑步切換及下坡技術。";
+          return `${km}km · 爬升 ${Math.round(ele)}m · 目標 EpH ${fmtEph(eph)}。${purpose}`;
+        }
+        const purpose = kind === "hill" ? "Use hill repeats or rolling trail to build vertical endurance and downhill control." : kind === "race" ? "Race by effort using EpH instead of flat road pace." : "Run on trails; practice fueling, climb pacing, power-hike transitions, and descents.";
+        return `${km}km · ${Math.round(ele)}m ascent · target EpH ${fmtEph(eph)}. ${purpose}`;
+      };
+      const isRestDay = (d: any) => !d || d.type === "Rest";
+      const toTrail = (day: any, weekIdx: number, kind: "long" | "hill" | "race") => {
+        const taperFactor = weekIdx >= totalWeeks - 2 ? (weekIdx === totalWeeks - 1 ? 0.45 : 0.7) : 1;
+        const km = kind === "race"
+          ? trailKm
+          : Math.max(4, Number(day?.distance_km) || (kind === "hill" ? Math.min(12, trailKm * 0.18) : Math.min(trailKm * 0.65, Math.max(10, Number(weeklyKm || 30) * 0.35)))) * taperFactor;
+        const roundedKm = Math.round(km * 10) / 10;
+        const eleBase = kind === "race" ? trailEle : roundedKm * verticalPerKm * (kind === "hill" ? 1.35 : 1);
+        const ele = Math.max(kind === "race" ? trailEle : 50, Math.round(eleBase / 10) * 10);
+        const eph = fmtEph(kind === "race" ? raceEph : raceEph * (kind === "hill" ? 0.95 : weekIdx >= totalWeeks - 3 ? 0.9 : 0.78));
+        return {
+          ...day,
+          type: kind === "race" ? "Trail Race" : "Trail Run",
+          title: trailTitle(kind),
+          description: trailDesc(roundedKm, ele, eph, kind),
+          distance_km: roundedKm,
+          pace: null,
+          color: kind === "race" ? "#65A30D" : "#84CC16",
+          elevation_m: ele,
+          eph,
+        };
+      };
+
+      return planData.map((week: any, weekIdx: number) => {
+        const days = Array.isArray(week?.days) ? week.days.map((d: any) => ({ ...d })) : [];
+        const raceIdx = days.findIndex((d: any) => d?.date === raceDate);
+        if (raceIdx >= 0) days[raceIdx] = toTrail(days[raceIdx], weekIdx, "race");
+
+        for (const d of days) {
+          const isTrailDay = d?.type === "Trail Run" || d?.type === "Trail Race";
+          if (!isTrailDay) {
+            if (d) { d.elevation_m = null; d.eph = null; }
+            continue;
+          }
+          if (d.type === "Trail Race") continue;
+          const km = Number(d.distance_km) || 0;
+          if (!(Number(d.elevation_m) > 0)) d.elevation_m = Math.round((km * verticalPerKm) / 10) * 10;
+          if (!(Number(d.eph) > 0)) d.eph = fmtEph(raceEph * 0.78);
+          d.pace = null;
+          d.description = trailDesc(km, Number(d.elevation_m) || 0, Number(d.eph) || 0, "long");
+        }
+
+        const hasTrail = days.some((d: any) => d?.type === "Trail Run" || d?.type === "Trail Race");
+        if (!hasTrail) {
+          const preferredIdx = days.findIndex((d: any) => d?.day === prefLongDay && !isRestDay(d));
+          const longIdx = days.findIndex((d: any) => d?.type === "Long Run" || d?.type === "Long");
+          const fallbackIdx = days.reduce((best: number, d: any, idx: number) => {
+            if (isRestDay(d)) return best;
+            return best < 0 || (Number(d.distance_km) || 0) > (Number(days[best]?.distance_km) || 0) ? idx : best;
+          }, -1);
+          const idx = preferredIdx >= 0 ? preferredIdx : longIdx >= 0 ? longIdx : fallbackIdx;
+          if (idx >= 0) days[idx] = toTrail(days[idx], weekIdx, "long");
+        }
+
+        if (weekIdx % 2 === 1 && weekIdx < totalWeeks - 2) {
+          const hillIdx = days.findIndex((d: any) => !isRestDay(d) && !["Trail Run", "Trail Race", "Race", "Long Run", "Long"].includes(d.type));
+          if (hillIdx >= 0) days[hillIdx] = toTrail(days[hillIdx], weekIdx, "hill");
+        }
+
+        return { ...week, days };
+      });
+    };
 
     const langInstruction = isZh
       ? `All "title" and "description" fields MUST be written in Traditional Chinese (繁體中文, Hong Kong variant). The "type" and "day" fields should remain in English.`
@@ -81,6 +171,9 @@ serve(async (req) => {
 
     const trailBlock = isTrailRace
       ? `\nTRAIL RACE PROGRAM REQUIREMENTS (STRICT):\n- Target race: ${trailKm} km with ${trailEle} m of total elevation gain.\n- Every week MUST include at least ONE "Trail Run" day (rolling/hill terrain) — ideally the long run is run on trails, especially in build weeks.\n- Every 2nd week MUST include a hill/trail-specific quality session: hill repeats (e.g. 6-10 × 90 sec uphill hard, jog down), or a Trail Run with progressive vertical (target eph close to race eph). Alternate between hill repeats and a tempo on rolling trail.\n- Keep ONE weekly road interval session for VO2max/leg speed (e.g. 5×1km, 6×800m) — written as "Interval" with proper "{dist}m x {reps} at {pace}/km, rest {time} between sets" format.\n- Include "Easy Run" days on road or flat trail for recovery between hard/trail sessions.\n- Long trail runs should progressively build BOTH distance AND elevation week to week (still respecting the +10% volume rule on distance; vertical may grow ~15-20% per build week from a sensible base).\n- For each "Trail Run" and "Trail Race" day include numeric "elevation_m" and "eph" (EpH = distance_km + elevation_m/100 per hour). Target race EpH = ${trailKm + trailEle / 100} effort points over the goal finish time of ${targetTime} (use this to derive workout eph targets).\n- Peak long trail run distance ≈ 60-75% of race distance with proportional elevation; reach this 3-4 weeks before race day, then taper.\n- The final 2 weeks taper: reduce volume AND vertical sharply; keep short race-pace EpH efforts on trail to stay sharp.\n`
+      : "";
+    const correctedTrailBlock = isTrailRace
+      ? `\nTRAIL RACE PROGRAM REQUIREMENTS (STRICT — MUST FOLLOW):\n- Target race: ${trailKm} km with ${trailEle} m total ascent, target finish ${targetTime}. Race effort = ${raceEffortPoints.toFixed(1)} effort points; race EpH = ${raceEph.toFixed(1)}.\n- DO NOT build this like a road marathon plan. The plan must be trail-specific and vertical-specific.\n- EVERY week must include at least ONE "Trail Run". In normal build weeks, make the preferred long-run day ("${longRunDay || "Sun"}") a Trail Run, not a road Long Run.\n- Trail Run / Trail Race days MUST have pace: null, numeric elevation_m > 0, and numeric eph > 0. Never prescribe trail sessions by flat road pace.\n- Weekly Trail Run long runs must progressively build BOTH km and elevation. Use course specificity: about ${Math.round(verticalPerKm)} m ascent per km as the race ratio, with hill weeks up to ~120-140% of that ratio.\n- Every 2nd week must include a second trail-specific quality workout: hill repeats, uphill tempo, rolling trail progression, downhill technique, or hiking-on-climbs practice. This workout type should also be "Trail Run" with elevation_m and eph.\n- Keep at most ONE road Interval workout per week for speed economy. Intervals should not dominate the plan and should not be based on the trail race finish pace.\n- Include easy/recovery runs, but not as the main stimulus. The key stimuli are: trail long run, vertical gain, hill strength, downhill conditioning, fueling practice.\n- Peak trail long run should reach about 60-75% of race distance (${Math.round(trailKm * 0.6)}-${Math.round(trailKm * 0.75)} km) with proportional elevation 3-4 weeks before race day, then taper.\n- Final 2 weeks: reduce distance and vertical sharply while keeping short trail EpH efforts.\n- The race-day entry must be type "Trail Race", distance_km ${trailKm}, elevation_m ${trailEle}, eph ${raceEph.toFixed(1)}, pace null, color "#65A30D".\n`
       : "";
 
     const prompt = `Create a ${weeks}-week running training program.
@@ -94,7 +187,7 @@ Preferred weekly volume: approximately ${weeklyKm || 30} km per week (adjust pro
 
 ${langInstruction}
 ${raceScheduleBlock}
-${trailBlock}
+${correctedTrailBlock || trailBlock}
 
 Structure it as a JSON array of weeks. Each week has a "week" number and "days" array (exactly 7 days per week, ordered Monday → Sunday). DO NOT include "date" or "startDate" fields — the system assigns calendar dates after generation. Just give 7 ordered day entries per week.
 Each day has: "day" (Mon/Tue/Wed/Thu/Fri/Sat/Sun, in order), "type" (one of: "Easy Run", "Tempo Run", "Interval", "Long Run", "Recovery", "Rest", "Cross Training", "Race Pace", "Progression Run", "Trail Run", "Trail Race", "Race"), "title" (short workout name), "description" (see format rules below), "distance_km" (number or null for rest), "pace" (target pace per km as string like "5:30/km" or null for rest/trail), "color" (hex color for the workout type: #4CAF50 for Easy, #FF9800 for Tempo, #F44336 for Interval, #2196F3 for Long Run, #9C27B0 for Recovery, #607D8B for Rest, #00BCD4 for Cross Training, #E91E63 for Race Pace, #FF5722 for Progression, #84CC16 for Trail Run, #65A30D for Trail Race, #E91E63 for Race). For "Trail Run" and "Trail Race" days ALSO include numeric fields "elevation_m" (total ascent in meters) and "eph" (target Effort per Hour, where EpH = distance_km + elevation_m/100 per hour). For all other types, set "elevation_m" and "eph" to null.
@@ -129,7 +222,7 @@ CRITICAL SCHEDULING CONSTRAINTS (apply to EVERY week of the plan):
 
 IMPORTANT: Use a VARIETY of workout types throughout the plan. Do NOT only use Easy Run, Tempo Run, Interval, Long Run, and Rest. You MUST include Cross Training days (especially for recovery days) and Progression Run sessions (at least once every 2-3 weeks). A good plan uses ALL available workout types across the training cycle.
 
-IMPORTANT: For each non-rest workout, calculate and include the appropriate pace per km based on the target finish time. Include specific paces for easy runs, tempo runs, intervals, long runs, etc.
+IMPORTANT: For road/non-trail workouts, calculate and include appropriate pace per km based on road training effort, not trail race average pace. For Trail Run and Trail Race workouts, set pace to null and use elevation_m + eph instead.
 
 The program will start on ${startDate || "today"} (week 1, day 1 = Monday of that week's training cycle) and end on/around the race date ${raceDate}. Be progressive, practical, include taper in the last 1-2 weeks. Use km for distances.
 
@@ -272,6 +365,7 @@ Return ONLY valid JSON, no markdown, no explanation.`;
           });
         }
       }
+      planData = repairTrailRacePlan(planData);
     }
 
     return new Response(JSON.stringify({ plan: planData, raw: content }), {

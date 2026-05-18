@@ -376,6 +376,8 @@ const ActivitiesTab = ({ lang }: Props) => {
       title?: string | null;
       description?: string | null;
       pace?: string | null;
+      elevation_m?: number | null;
+      eph?: number | null;
     } | null;
     races?: { id: string; race_name: string; race_name_zh?: string | null; category: string }[];
   } | null>(null);
@@ -717,6 +719,8 @@ const ActivitiesTab = ({ lang }: Props) => {
                     title: (planned as any).title ?? null,
                     description: (planned as any).description ?? null,
                     pace: (planned as any).pace ?? null,
+                    elevation_m: (planned as any).elevation_m ?? null,
+                    eph: (planned as any).eph ?? null,
                   }
                 : null,
               races: races || [],
@@ -882,7 +886,13 @@ const ActivitiesTab = ({ lang }: Props) => {
                     {dateSheet.planned.distance_km && (
                       <span className="text-sm text-muted-foreground">{dateSheet.planned.distance_km} km</span>
                     )}
-                    {dateSheet.planned.pace && (
+                    {(dateSheet.planned.type === "Trail Run" || dateSheet.planned.type === "Trail Race") && dateSheet.planned.elevation_m != null && (
+                      <span className="text-sm text-muted-foreground">+{Math.round(dateSheet.planned.elevation_m)} m</span>
+                    )}
+                    {(dateSheet.planned.type === "Trail Run" || dateSheet.planned.type === "Trail Race") && dateSheet.planned.eph != null && (
+                      <span className="text-sm text-muted-foreground">EpH {dateSheet.planned.eph}</span>
+                    )}
+                    {dateSheet.planned.pace && dateSheet.planned.type !== "Trail Run" && dateSheet.planned.type !== "Trail Race" && (
                       <span className="text-sm text-muted-foreground">@ {dateSheet.planned.pace}</span>
                     )}
                   </div>

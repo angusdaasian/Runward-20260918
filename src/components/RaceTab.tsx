@@ -388,6 +388,14 @@ const RaceTab = ({ lang }: Props) => {
       return;
     }
     setSavingMy(true);
+    const needsTrailFields = myAddForm.category === "Ultramarathon" || myAddForm.category === "Trail Race";
+    const distNum = parseFloat(myAddForm.distance_km);
+    const eleNum = parseFloat(myAddForm.elevation_m);
+    if (needsTrailFields && (!isFinite(distNum) || distNum <= 0)) {
+      setSavingMy(false);
+      toast({ title: lang === "zh" ? "請輸入距離 (km)" : "Please enter distance (km)", variant: "destructive" });
+      return;
+    }
     const { error } = await supabase.from("user_races").insert({
       user_id: user.id,
       race_name: myAddForm.name,
@@ -396,7 +404,8 @@ const RaceTab = ({ lang }: Props) => {
       country: myAddForm.country || null,
       category: myAddForm.category,
       source: "manual",
-    });
+      ...(needsTrailFields ? { distance_km: distNum, elevation_m: isFinite(eleNum) ? eleNum : null } : {}),
+    } as any);
     setSavingMy(false);
     if (error) {
       toast({ title: lang === "zh" ? "新增失敗" : "Add failed", description: error.message, variant: "destructive" });

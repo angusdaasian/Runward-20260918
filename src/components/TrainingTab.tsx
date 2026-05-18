@@ -1694,9 +1694,9 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
     const targetTimeFinal = overrides.targetTime ?? String(existingPlan.target_time ?? "");
     const trailRaceDay = planArr.flatMap((w) => w?.days || []).find((d: DayPlan) => d.type === "Trail Race") as DayPlan | undefined;
     const trailRunDay = planArr.flatMap((w) => w?.days || []).find((d: DayPlan) => d.type === "Trail Run") as DayPlan | undefined;
-    const trailDistanceFinal = distanceDerived === "TR" ? (trailRaceDay?.distance_km ?? Number(trailDistanceKm) || null) : null;
-    const trailElevationFinal = distanceDerived === "TR" ? (trailRaceDay?.elevation_m ?? trailRunDay?.elevation_m ?? Number(trailElevationM) || null) : null;
-    const trailEphFinal = distanceDerived === "TR" ? (trailRaceDay?.eph ?? Number(trailTargetEph) || null) : null;
+    const trailDistanceFinal = distanceDerived === "TR" ? (trailRaceDay?.distance_km ?? (Number(trailDistanceKm) || null)) : null;
+    const trailElevationFinal = distanceDerived === "TR" ? (trailRaceDay?.elevation_m ?? trailRunDay?.elevation_m ?? (Number(trailElevationM) || null)) : null;
+    const trailEphFinal = distanceDerived === "TR" ? (trailRaceDay?.eph ?? (Number(trailTargetEph) || null)) : null;
 
     let restDaysFinal = overrides.restDays ?? restDaysCurrent;
     let daysPerWeekFinal = overrides.daysPerWeek ?? daysPerWeekCurrent;

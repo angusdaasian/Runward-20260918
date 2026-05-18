@@ -80,13 +80,6 @@ const TRACK_DISTANCES = [
   { label: "10K", labelZh: "10公里", meters: 10000 },
 ];
 
-const TRAIL_RACE_DISTANCES = [
-  { label: "21K", labelZh: "21公里", meters: 21000 },
-  { label: "50K", labelZh: "50公里", meters: 50000 },
-  { label: "50 Mile", labelZh: "50英里", meters: 50 * MI_TO_KM * 1000 },
-  { label: "100K", labelZh: "100公里", meters: 100000 },
-  { label: "100 Mile", labelZh: "100英里", meters: 100 * MI_TO_KM * 1000 },
-];
 
 const formatTimeSec = (totalSeconds: number): string => {
   const m = Math.floor(totalSeconds / 60);

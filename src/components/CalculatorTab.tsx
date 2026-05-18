@@ -299,12 +299,11 @@ const CalculatorTab = ({ score, setScore, lang, onCalculated }: Props) => {
     setWorldRecordError(null);
   };
 
-  const CATEGORIES: DistanceCategory[] = ["road", "track", "trail", "trail_race", "custom"];
+  const CATEGORIES: DistanceCategory[] = ["road", "track", "trail", "custom"];
   const categoryLabel = (cat: DistanceCategory) => {
     if (cat === "road") return lang === "zh" ? "公路" : "Road";
     if (cat === "track") return lang === "zh" ? "田徑" : "Track";
     if (cat === "trail") return lang === "zh" ? "越野" : "Trail";
-    if (cat === "trail_race") return lang === "zh" ? "越野賽" : "Trail Race";
     return lang === "zh" ? "自訂" : "Custom";
   };
 

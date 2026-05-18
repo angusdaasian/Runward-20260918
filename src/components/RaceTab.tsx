@@ -404,7 +404,7 @@ const RaceTab = ({ lang }: Props) => {
     }
     toast({ title: lang === "zh" ? "已新增到我的賽事" : "Added to My Races" });
     setMyAddOpen(false);
-    setMyAddForm({ name: "", race_date: "", city: "", country: "", category: "Full Marathon" });
+    setMyAddForm({ name: "", race_date: "", city: "", country: "", category: "Full Marathon", distance_km: "", elevation_m: "" });
     await loadMyRaces();
     queryClient.invalidateQueries({ queryKey: ["user-races", user.id] });
   };
@@ -1016,7 +1016,7 @@ const RaceTab = ({ lang }: Props) => {
               <button
                 onClick={() => {
                   setMyAddOpen(false);
-                  setMyAddForm({ name: "", race_date: "", city: "", country: "", category: "Full Marathon" });
+                  setMyAddForm({ name: "", race_date: "", city: "", country: "", category: "Full Marathon", distance_km: "", elevation_m: "" });
                 }}
                 className="px-4 py-2 rounded-lg border border-border text-sm font-medium text-muted-foreground hover:bg-muted transition-colors"
               >

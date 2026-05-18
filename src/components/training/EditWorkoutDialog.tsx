@@ -250,16 +250,44 @@ const EditWorkoutDialog = ({
             />
           </div>
 
-          <div>
-            <label className="text-sm font-medium text-foreground mb-1 block">
-              {isZh ? "配速 (例: 5:30/km)" : "Pace (e.g. 5:30/km)"}
-            </label>
-            <Input
-              type="text" placeholder="5:30/km"
-              value={pace}
-              onChange={(e) => { setPace(e.target.value); setVerdict(null); setNeedsConfirm(false); }}
-            />
-          </div>
+          {isTrailType ? (
+            <>
+              <div>
+                <label className="text-sm font-medium text-foreground mb-1 block">
+                  {isZh ? "爬升 (米)" : "Elevation Gain (m)"}
+                </label>
+                <Input
+                  type="number" min="0" step="10" placeholder="0"
+                  value={elevation}
+                  onChange={(e) => { setElevation(e.target.value); setVerdict(null); setNeedsConfirm(false); }}
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-foreground mb-1 block">
+                  {isZh ? "EpH (每小時努力分數)" : "EpH (Effort per Hour)"}
+                </label>
+                <Input
+                  type="number" min="0" step="0.1" placeholder="8"
+                  value={eph}
+                  onChange={(e) => { setEph(e.target.value); setVerdict(null); setNeedsConfirm(false); }}
+                />
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  {isZh ? "EpH = 距離(公里) + 爬升(米)/100 每小時" : "EpH = distance(km) + elevation(m)/100 per hour"}
+                </p>
+              </div>
+            </>
+          ) : (
+            <div>
+              <label className="text-sm font-medium text-foreground mb-1 block">
+                {isZh ? "配速 (例: 5:30/km)" : "Pace (e.g. 5:30/km)"}
+              </label>
+              <Input
+                type="text" placeholder="5:30/km"
+                value={pace}
+                onChange={(e) => { setPace(e.target.value); setVerdict(null); setNeedsConfirm(false); }}
+              />
+            </div>
+          )}
 
           <div>
             <label className="text-sm font-medium text-foreground mb-1 block">

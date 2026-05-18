@@ -89,7 +89,7 @@ const CATEGORY_COLORS: Record<string, string> = {
 };
 
 // Priority order for the "main" category color bar
-const CATEGORY_PRIORITY = ["Full Marathon", "Half Marathon", "Ultramarathon", "10K", "5K", "3K", "1K", "Road Race"];
+const CATEGORY_PRIORITY = ["Full Marathon", "Half Marathon", "Ultramarathon", "Trail Race", "10K", "5K", "3K", "1K", "Road Race"];
 
 /* ── Helpers for cross-language race dedup & category merging ── */
 

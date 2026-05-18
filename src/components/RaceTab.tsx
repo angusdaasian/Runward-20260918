@@ -999,7 +999,7 @@ const RaceTab = ({ lang }: Props) => {
               />
             </div>
             <div className="flex flex-wrap gap-2">
-              {["5K", "10K", "Half Marathon", "Full Marathon", "Ultramarathon", "Road Race"].map((c) => (
+              {["5K", "10K", "Half Marathon", "Full Marathon", "Ultramarathon", "Trail Race", "Road Race"].map((c) => (
                 <button
                   key={c}
                   onClick={() => setMyAddForm((f) => ({ ...f, category: c }))}
@@ -1013,6 +1013,28 @@ const RaceTab = ({ lang }: Props) => {
                 </button>
               ))}
             </div>
+            {(myAddForm.category === "Ultramarathon" || myAddForm.category === "Trail Race") && (
+              <div className="grid grid-cols-2 gap-2">
+                <input
+                  type="number"
+                  min="0"
+                  step="0.1"
+                  placeholder={lang === "zh" ? "距離 (公里) *" : "Distance (km) *"}
+                  value={myAddForm.distance_km}
+                  onChange={(e) => setMyAddForm((f) => ({ ...f, distance_km: e.target.value }))}
+                  className="px-3 py-2 rounded-lg border border-border bg-card text-foreground text-sm"
+                />
+                <input
+                  type="number"
+                  min="0"
+                  step="10"
+                  placeholder={lang === "zh" ? "爬升 (米)" : "Elevation (m)"}
+                  value={myAddForm.elevation_m}
+                  onChange={(e) => setMyAddForm((f) => ({ ...f, elevation_m: e.target.value }))}
+                  className="px-3 py-2 rounded-lg border border-border bg-card text-foreground text-sm"
+                />
+              </div>
+            )}
             <div className="flex gap-2">
               <button
                 onClick={addManualMyRace}

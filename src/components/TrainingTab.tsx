@@ -2976,7 +2976,14 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                               <div className="flex items-center justify-between">
                                 <span className="font-medium text-sm text-foreground">{localizeTitle(day.type, lang)}</span>
                                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                  {day.pace && <span>{day.pace}</span>}
+                                  {(day.type === "Trail Run" || day.type === "Trail Race") ? (
+                                    <>
+                                      {day.eph > 0 && <span>EpH {day.eph}</span>}
+                                      {day.elevation_m > 0 && <span>+{Math.round(day.elevation_m)}m</span>}
+                                    </>
+                                  ) : (
+                                    day.pace && <span>{day.pace}</span>
+                                  )}
                                   {day.distance_km && <span>{day.distance_km} km</span>}
                                 </div>
                               </div>

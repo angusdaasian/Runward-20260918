@@ -2456,7 +2456,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                     <div className="mb-5">
                       <label className="text-sm font-semibold text-foreground mb-2 block flex items-center gap-2"><Trophy size={14} />{lang === "zh" ? "目標完成時間" : "Target Finish Time"}</label>
                       <div className="flex items-center gap-2">
-                        {(distance === "HM" || distance === "FM") && (
+                        {(distance === "HM" || distance === "FM" || distance === "TR") && (
                           <>
                             <Input type="number" min="0" max="9" placeholder={lang === "zh" ? "時" : "H"} value={targetHours}
                               onChange={(e) => { setTargetHours(e.target.value); setTargetTime(`${e.target.value || "0"}:${targetMinutes || "00"}:${targetSeconds || "00"}`); }} className="w-16 text-center" />
@@ -2464,10 +2464,10 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                           </>
                         )}
                         <Input type="number" min="0" max="59" placeholder={lang === "zh" ? "分" : "M"} value={targetMinutes}
-                          onChange={(e) => { setTargetMinutes(e.target.value); const h = targetHours || "0"; const m = e.target.value || "00"; setTargetTime(distance === "HM" || distance === "FM" ? `${h}:${m}:${targetSeconds || "00"}` : `${m}:${targetSeconds || "00"}`); }} className="w-16 text-center" />
+                          onChange={(e) => { setTargetMinutes(e.target.value); const h = targetHours || "0"; const m = e.target.value || "00"; setTargetTime(distance === "HM" || distance === "FM" || distance === "TR" ? `${h}:${m}:${targetSeconds || "00"}` : `${m}:${targetSeconds || "00"}`); }} className="w-16 text-center" />
                         <span className="text-muted-foreground">:</span>
                         <Input type="number" min="0" max="59" placeholder={lang === "zh" ? "秒" : "S"} value={targetSeconds}
-                          onChange={(e) => { setTargetSeconds(e.target.value); const h = targetHours || "0"; const m = targetMinutes || "00"; setTargetTime(distance === "HM" || distance === "FM" ? `${h}:${m}:${e.target.value || "00"}` : `${m}:${e.target.value || "00"}`); }} className="w-16 text-center" />
+                          onChange={(e) => { setTargetSeconds(e.target.value); const h = targetHours || "0"; const m = targetMinutes || "00"; setTargetTime(distance === "HM" || distance === "FM" || distance === "TR" ? `${h}:${m}:${e.target.value || "00"}` : `${m}:${e.target.value || "00"}`); }} className="w-16 text-center" />
                       </div>
                       <p className="text-xs text-muted-foreground mt-1">{lang === "zh" ? "輸入你的目標完成時間" : "Enter your target finish time"}</p>
                     </div>
@@ -2501,8 +2501,8 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                         onChange={(e) => setWeeklyKm(Number(e.target.value))}
                         className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm text-foreground"
                       >
-                        {Array.from({ length: Math.floor((200 - (distance === "FM" ? 45 : distance === "HM" ? 25 : 15)) / 5) + 1 }, (_, i) => {
-                          const min = distance === "FM" ? 45 : distance === "HM" ? 25 : 15;
+                        {Array.from({ length: Math.floor((200 - (distance === "FM" ? 45 : distance === "HM" ? 25 : distance === "TR" ? 30 : 15)) / 5) + 1 }, (_, i) => {
+                          const min = distance === "FM" ? 45 : distance === "HM" ? 25 : distance === "TR" ? 30 : 15;
                           const val = min + i * 5;
                           return <option key={val} value={val}>{val} km</option>;
                         })}

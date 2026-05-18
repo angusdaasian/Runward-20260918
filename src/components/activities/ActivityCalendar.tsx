@@ -54,7 +54,7 @@ const MONTH_LABELS_ZH = [
   "七月", "八月", "九月", "十月", "十一月", "十二月",
 ];
 
-const TYPE_SHORT: Record<string, string> = {
+const TYPE_SHORT_EN: Record<string, string> = {
   Easy: "E", "Easy Run": "E",
   Tempo: "T", "Tempo Run": "T",
   Interval: "I",
@@ -64,6 +64,19 @@ const TYPE_SHORT: Record<string, string> = {
   "Cross Training": "X",
   "Race Pace": "RP",
   "Trail Run": "TR", "Trail Race": "TRC",
+  Rest: "",
+};
+
+const TYPE_SHORT_ZH: Record<string, string> = {
+  Easy: "輕", "Easy Run": "輕",
+  Tempo: "節", "Tempo Run": "節",
+  Interval: "間",
+  Long: "長", "Long Run": "長",
+  Recovery: "復", "Recovery Run": "復",
+  Progression: "漸", "Progression Run": "漸",
+  "Cross Training": "交",
+  "Race Pace": "賽配",
+  "Trail Run": "越", "Trail Race": "越賽",
   Rest: "",
 };
 

@@ -3077,7 +3077,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                 <span>{RUN_TYPES.find(r => r.id === addRunType)?.emoji}</span>
                 <span className="font-medium text-foreground">{lang === "zh" ? RUN_TYPES.find(r => r.id === addRunType)?.zh : RUN_TYPES.find(r => r.id === addRunType)?.en}</span>
               </div>
-              {existingPlan && (
+              {existingPlan && addRunType !== "Trail Run" && addRunType !== "Trail Race" && (
                 <div className="bg-accent/50 rounded-lg p-3">
                   <p className="text-xs font-medium text-foreground mb-1">{lang === "zh" ? "建議配速" : "Suggested Pace"}</p>
                   <p className="text-sm font-bold text-primary">{suggestPace(addRunType, existingPlan.target_time, existingPlan.distance).pace}</p>
@@ -3088,12 +3088,26 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                 <label className="text-sm font-medium text-foreground mb-1 block">{lang === "zh" ? "距離 (公里)" : "Distance (km)"}</label>
                 <Input type="number" min="0.5" step="0.5" placeholder="e.g. 8" value={addDistance} onChange={(e) => setAddDistance(e.target.value)} className="w-full" />
               </div>
-              <Button className="w-full" disabled={!addDistance || Number(addDistance) <= 0} onClick={() => {
+              {(addRunType === "Trail Run" || addRunType === "Trail Race") && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-sm font-medium text-foreground mb-1 block">{lang === "zh" ? "爬升 (米)" : "Elevation (m)"}</label>
+                    <Input type="number" min="0" step="10" placeholder="e.g. 500" value={addElevation} onChange={(e) => setAddElevation(e.target.value)} className="w-full" />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-foreground mb-1 block">EpH</label>
+                    <Input type="number" min="0" step="0.1" placeholder="e.g. 8" value={addEph} onChange={(e) => setAddEph(e.target.value)} className="w-full" />
+                  </div>
+                </div>
+              )}
+              <Button className="w-full" disabled={!addDistance || Number(addDistance) <= 0 || ((addRunType === "Trail Run" || addRunType === "Trail Race") && (!addElevation || !addEph))} onClick={() => {
                 if (addingDayIdx === null || !addRunType || !addDistance) return;
                 const rt = RUN_TYPES.find(r => r.id === addRunType)!;
                 const paceInfo = existingPlan ? suggestPace(addRunType, existingPlan.target_time, existingPlan.distance) : { pace: "", description: "Custom workout", descZh: "自訂訓練" };
                 const updatedPlan = [...plan]; const week = { ...updatedPlan[currentWeekIdx] }; const days = [...week.days];
-                days[addingDayIdx] = { ...days[addingDayIdx], type: addRunType, title: lang === "zh" ? rt.zh : rt.en, description: lang === "zh" ? paceInfo.descZh : paceInfo.description, distance_km: Number(addDistance), pace: paceInfo.pace, color: rt.color };
+                const isTrail = addRunType === "Trail Run" || addRunType === "Trail Race";
+                const trailDesc = lang === "zh" ? `${addDistance}km · 爬升 ${Math.round(Number(addElevation) || 0)}m · 目標 EpH ${addEph}。以 EpH 控制越野強度。` : `${addDistance}km · ${Math.round(Number(addElevation) || 0)}m ascent · target EpH ${addEph}. Use EpH to control trail effort.`;
+                days[addingDayIdx] = { ...days[addingDayIdx], type: addRunType, title: lang === "zh" ? rt.zh : rt.en, description: isTrail ? trailDesc : (lang === "zh" ? paceInfo.descZh : paceInfo.description), distance_km: Number(addDistance), pace: isTrail ? null : paceInfo.pace, color: rt.color, elevation_m: isTrail ? Number(addElevation) || null : null, eph: isTrail ? Number(addEph) || null : null };
                 week.days = days; updatedPlan[currentWeekIdx] = week; setPlan(updatedPlan);
                 if (user && existingPlan) supabase.from("training_plans" as any).update({ plan_data: updatedPlan } as any).eq("id", existingPlan.id).then(() => { notifyPlanChanged(); });
                 setAddingDayIdx(null);

@@ -365,6 +365,7 @@ Return ONLY valid JSON, no markdown, no explanation.`;
           });
         }
       }
+      planData = repairTrailRacePlan(planData);
     }
 
     return new Response(JSON.stringify({ plan: planData, raw: content }), {

@@ -1692,6 +1692,11 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
     const distanceDerived = existingPlan.distance || "";
     const goalDerived = existingPlan.goal || "race";
     const targetTimeFinal = overrides.targetTime ?? String(existingPlan.target_time ?? "");
+    const trailRaceDay = planArr.flatMap((w) => w?.days || []).find((d: DayPlan) => d.type === "Trail Race") as DayPlan | undefined;
+    const trailRunDay = planArr.flatMap((w) => w?.days || []).find((d: DayPlan) => d.type === "Trail Run") as DayPlan | undefined;
+    const trailDistanceFinal = distanceDerived === "TR" ? (trailRaceDay?.distance_km ?? Number(trailDistanceKm) || null) : null;
+    const trailElevationFinal = distanceDerived === "TR" ? (trailRaceDay?.elevation_m ?? trailRunDay?.elevation_m ?? Number(trailElevationM) || null) : null;
+    const trailEphFinal = distanceDerived === "TR" ? (trailRaceDay?.eph ?? Number(trailTargetEph) || null) : null;
 
     let restDaysFinal = overrides.restDays ?? restDaysCurrent;
     let daysPerWeekFinal = overrides.daysPerWeek ?? daysPerWeekCurrent;
@@ -1755,6 +1760,9 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
           daysPerWeek: daysPerWeekFinal, weeklyKm: weeklyKmFinal,
           longRunDay: longRunDayFinal, restDays: restDaysFinal, lang,
           races: racesPayloadFromSnapshot(snapshot),
+          trailDistanceKm: trailDistanceFinal,
+          trailElevationM: trailElevationFinal,
+          trailTargetEph: trailEphFinal,
         }),
       });
       if (!response.ok) { const err = await response.json().catch(() => ({})); throw new Error(err.error || "Failed to regenerate"); }

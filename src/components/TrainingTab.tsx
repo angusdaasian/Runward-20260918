@@ -1769,7 +1769,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
       clearCached(CacheKeys.trainingPlan(user.id));
       notifyPlanChanged();
     }
-    setProgramStep("details"); setDistance(null); setTargetTime(""); setTargetHours(""); setTargetMinutes(""); setTargetSeconds(""); setRaceDate(""); setStartDate(""); setPlan([]); setExistingPlan(null); setPlanDirty(false);
+    setProgramStep("details"); setDistance(null); setTargetTime(""); setTargetHours(""); setTargetMinutes(""); setTargetSeconds(""); setRaceDate(""); setStartDate(""); setPlan([]); setExistingPlan(null); setPlanDirty(false); setTrailDistanceKm(""); setTrailElevationM("");
   };
 
 

@@ -1162,6 +1162,8 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
   const [customAddingDayIdx, setCustomAddingDayIdx] = useState<number | null>(null);
   const [customAddRunType, setCustomAddRunType] = useState<string | null>(null);
   const [customAddDistance, setCustomAddDistance] = useState("");
+  const [customAddElevation, setCustomAddElevation] = useState("");
+  const [customAddEph, setCustomAddEph] = useState("");
   const [customEditingDayIdx, setCustomEditingDayIdx] = useState<number | null>(null);
   const [customEditDistance, setCustomEditDistance] = useState("");
   const [customEditPace, setCustomEditPace] = useState("");
@@ -1214,6 +1216,8 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
   const [addingDayIdx, setAddingDayIdx] = useState<number | null>(null);
   const [addRunType, setAddRunType] = useState<string | null>(null);
   const [addDistance, setAddDistance] = useState("");
+  const [addElevation, setAddElevation] = useState("");
+  const [addEph, setAddEph] = useState("");
   const [editingDayIdx, setEditingDayIdx] = useState<number | null>(null);
   const [editDistance, setEditDistance] = useState("");
   const [editPace, setEditPace] = useState("");

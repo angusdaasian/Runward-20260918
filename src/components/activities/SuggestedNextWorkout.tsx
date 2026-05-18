@@ -399,9 +399,13 @@ const SuggestedNextWorkout = ({ lang, latestActivityId, latestActivityDate }: Pr
       const day = updated[todayPlanned._weekIdx]?.days?.[todayPlanned._dayIdx];
       if (!day) throw new Error("day not found");
       const newDistance = next.distance_km ?? day.distance_km;
+      const nextType = next.type ?? day.type;
+      const isTrail = nextType === "Trail Run" || nextType === "Trail Race";
       day.distance_km = newDistance;
-      day.pace = next.pace ?? day.pace;
+      day.pace = isTrail ? null : (next.pace ?? day.pace);
       day.description = next.description ?? day.description;
+      day.elevation_m = isTrail ? (next.elevation_m ?? day.elevation_m ?? null) : null;
+      day.eph = isTrail ? (next.eph ?? day.eph ?? null) : null;
       if (next.type) day.type = next.type;
       if (next.title) day.title = next.title;
       if (next.color) day.color = next.color;
@@ -455,7 +459,21 @@ const SuggestedNextWorkout = ({ lang, latestActivityId, latestActivityDate }: Pr
                 <div className="font-semibold text-foreground">{todayPlanned.distance_km} km</div>
               </div>
             )}
-            {todayPlanned.pace && (
+            {(todayPlanned.type === "Trail Run" || todayPlanned.type === "Trail Race") && todayPlanned.elevation_m != null && (
+              <div className="rounded-md bg-background/60 border border-border px-2 py-1.5">
+                <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                  {isZh ? "爬升" : "Elevation"}
+                </div>
+                <div className="font-semibold text-foreground">{Math.round(todayPlanned.elevation_m)} m</div>
+              </div>
+            )}
+            {(todayPlanned.type === "Trail Run" || todayPlanned.type === "Trail Race") && todayPlanned.eph != null && (
+              <div className="rounded-md bg-background/60 border border-border px-2 py-1.5">
+                <div className="text-[10px] uppercase tracking-wide text-muted-foreground">EpH</div>
+                <div className="font-semibold text-foreground">{todayPlanned.eph}</div>
+              </div>
+            )}
+            {todayPlanned.pace && todayPlanned.type !== "Trail Run" && todayPlanned.type !== "Trail Race" && (
               <div className="rounded-md bg-background/60 border border-border px-2 py-1.5">
                 <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
                   {isZh ? "配速" : "Pace"}
@@ -496,6 +514,8 @@ const SuggestedNextWorkout = ({ lang, latestActivityId, latestActivityDate }: Pr
               pace: todayPlanned.pace ?? null,
               description: todayPlanned.description ?? null,
               color: todayPlanned.color ?? null,
+              elevation_m: todayPlanned.elevation_m ?? null,
+              eph: todayPlanned.eph ?? null,
             }}
             planContext={`Active plan goal=${planRow?.goal}, distance=${planRow?.distance}, target=${planRow?.target_time}. Today's planned workout: ${planTitle}.`}
             onSave={persistTodayPlannedEdit}

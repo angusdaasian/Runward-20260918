@@ -365,10 +365,25 @@ const WorkoutDetails = ({ day, lang, hrBounds }: { day: DayPlan; lang: Lang; hrB
     );
   }
 
+  const isTrail = day.type === "Trail Run" || day.type === "Trail Race";
+  const ele = (day as any).elevation_m;
+  const eph = (day as any).eph;
+
   return (
     <div className="mt-2 space-y-1">
       {day.distance_km != null && <Row label={isZh ? "距離" : "Distance"} value={`${day.distance_km} km`} />}
-      {paceFmt(day.pace) && <Row label={isZh ? "配速" : "Pace"} value={paceFmt(day.pace)!} />}
+      {isTrail ? (
+        <>
+          {typeof ele === "number" && ele > 0 && (
+            <Row label={isZh ? "爬升" : "Elevation"} value={`${Math.round(ele)} m`} />
+          )}
+          {typeof eph === "number" && eph > 0 && (
+            <Row label="EpH" value={String(eph)} />
+          )}
+        </>
+      ) : (
+        paceFmt(day.pace) && <Row label={isZh ? "配速" : "Pace"} value={paceFmt(day.pace)!} />
+      )}
       <Row label={isZh ? "心率" : "HR"} value={hr ? `${zoneLabel} · ${hr}` : zoneLabel} />
     </div>
   );

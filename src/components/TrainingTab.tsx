@@ -51,7 +51,7 @@ const FREE_PLAN_LABELS: Record<string, { en: string; zh: string }> = {
 
 // ─── Types ───
 type Goal = "race" | "distance" | "first5k" | "parkrun" | "general" | "postnatal" | "fitness" | "injury" | "postrace";
-type Distance = "5K" | "10K" | "HM" | "FM";
+type Distance = "5K" | "10K" | "HM" | "FM" | "TR";
 
 interface DayPlan {
   day: string; date: string; type: string; title: string;

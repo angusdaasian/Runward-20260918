@@ -271,7 +271,7 @@ const ActivityCalendar = ({ lang, activities, plannedWorkouts, userRaces = [], o
                   className="text-[8px] font-bold leading-none mt-0.5"
                   style={{ color: planned.color || "hsl(var(--muted-foreground))" }}
                 >
-                  {TYPE_SHORT[planned.type] || planned.type.charAt(0)}
+                  {(lang === "zh" ? TYPE_SHORT_ZH : TYPE_SHORT_EN)[planned.type] || planned.type.charAt(0)}
                   {planned.distance_km ? ` ${planned.distance_km}` : ""}
                 </span>
               )}

@@ -2429,13 +2429,27 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                     <label className="text-sm font-semibold text-foreground mb-2 block flex items-center gap-2"><Target size={14} />{lang === "zh" ? "比賽距離" : "Race Distance"}</label>
                     <div className="flex flex-wrap gap-2">
                       {DISTANCES.map((d) => (
-                        <button key={d.id} onClick={() => { setDistance(d.id); setTargetTime(""); const md = MIN_DAYS[d.id]; if (daysPerWeek < md) setDaysPerWeek(md); const minKm = d.id === "FM" ? 45 : d.id === "HM" ? 25 : 15; if (weeklyKm < minKm) setWeeklyKm(minKm); }}
+                        <button key={d.id} onClick={() => { setDistance(d.id); setTargetTime(""); const md = MIN_DAYS[d.id]; if (daysPerWeek < md) setDaysPerWeek(md); const minKm = d.id === "FM" ? 45 : d.id === "HM" ? 25 : d.id === "TR" ? 30 : 15; if (weeklyKm < minKm) setWeeklyKm(minKm); }}
                           className={`px-4 py-2 rounded-full text-sm font-medium transition-colors border ${distance === d.id ? "bg-primary text-primary-foreground border-primary" : "bg-card text-foreground border-border hover:bg-accent"}`}>
-                          {d.id === "HM" ? (lang === "zh" ? "半馬" : "HM") : d.id === "FM" ? (lang === "zh" ? "全馬" : "FM") : d.id}
+                          {d.id === "HM" ? (lang === "zh" ? "半馬" : "HM") : d.id === "FM" ? (lang === "zh" ? "全馬" : "FM") : d.id === "TR" ? (lang === "zh" ? "越野賽" : "Trail Race") : d.id}
                         </button>
                       ))}
                     </div>
                   </div>
+
+                  {/* Trail Race custom km + elevation */}
+                  {distance === "TR" && (
+                    <div className="mb-5 grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-sm font-semibold text-foreground mb-2 block">{lang === "zh" ? "賽事距離 (公里)" : "Race Distance (km)"}</label>
+                        <Input type="number" min="5" step="0.1" placeholder="50" value={trailDistanceKm} onChange={(e) => setTrailDistanceKm(e.target.value)} />
+                      </div>
+                      <div>
+                        <label className="text-sm font-semibold text-foreground mb-2 block">{lang === "zh" ? "累計爬升 (米)" : "Total Elevation (m)"}</label>
+                        <Input type="number" min="0" step="50" placeholder="2000" value={trailElevationM} onChange={(e) => setTrailElevationM(e.target.value)} />
+                      </div>
+                    </div>
+                  )}
 
                   {/* Target Time */}
                   {distance && (

@@ -2202,7 +2202,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                       lang={lang}
                       hrBounds={hrBounds}
                       onSwap={(from, to) => swapDays(currentWeekIdx, from, to)}
-                      onAddClick={(i) => { setAddingDayIdx(i); setAddRunType(null); setAddDistance(""); }}
+                      onAddClick={(i) => { setAddingDayIdx(i); setAddRunType(null); setAddDistance(""); setAddElevation(""); setAddEph(""); }}
                       onEditClick={(i, day) => { setEditingDayIdx(i); setEditDistance(day.distance_km?.toString() || ""); setEditPace(day.pace || ""); setEditDescription(day.description || ""); }}
                     />
                     {planDirty && (
@@ -2857,7 +2857,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                             lang={lang}
                             hrBounds={hrBounds}
                             onSwap={(from, to) => swapDays(currentWeekIdx, from, to)}
-                            onAddClick={(i) => { setAddingDayIdx(i); setAddRunType(null); setAddDistance(""); }}
+                            onAddClick={(i) => { setAddingDayIdx(i); setAddRunType(null); setAddDistance(""); setAddElevation(""); setAddEph(""); }}
                             onEditClick={(i, day) => { setEditingDayIdx(i); setEditDistance(day.distance_km?.toString() || ""); setEditPace(day.pace || ""); setEditDescription(day.description || ""); }}
                           />
 
@@ -2991,7 +2991,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                         </div>
                         {day.type === "Rest" ? (
                           <div className="flex-1 border-l-2 border-border pl-3 py-3 min-h-[48px] flex items-center">
-                            <button onClick={() => { setCustomAddingDayIdx(i); setCustomAddRunType(null); setCustomAddDistance(""); }}
+                            <button onClick={() => { setCustomAddingDayIdx(i); setCustomAddRunType(null); setCustomAddDistance(""); setCustomAddElevation(""); setCustomAddEph(""); }}
                               className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
                               <Plus size={12} />{lang === "zh" ? "新增" : "Add"}
                             </button>

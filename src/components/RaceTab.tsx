@@ -247,7 +247,7 @@ const RaceTab = ({ lang }: Props) => {
   const [myRaces, setMyRaces] = useState<UserRaceRow[]>([]);
   const [myRacesLoading, setMyRacesLoading] = useState(true);
   const [myAddOpen, setMyAddOpen] = useState(false);
-  const [myAddForm, setMyAddForm] = useState({ name: "", race_date: "", city: "", country: "", category: "Full Marathon" });
+  const [myAddForm, setMyAddForm] = useState({ name: "", race_date: "", city: "", country: "", category: "Full Marathon", distance_km: "", elevation_m: "" });
   const [savingMy, setSavingMy] = useState(false);
   const [savedKeys, setSavedKeys] = useState<Set<string>>(new Set());
 

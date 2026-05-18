@@ -56,6 +56,7 @@ type Distance = "5K" | "10K" | "HM" | "FM" | "TR";
 interface DayPlan {
   day: string; date: string; type: string; title: string;
   description: string; distance_km: number | null; pace: string | null; color: string;
+  elevation_m?: number | null; eph?: number | null;
 }
 interface WeekPlan { week: number; startDate: string; days: DayPlan[]; }
 

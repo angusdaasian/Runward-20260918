@@ -91,10 +91,14 @@ const EditWorkoutDialog = ({
   const [distance, setDistance] = useState<string>(workout.distance_km != null ? String(workout.distance_km) : "");
   const [pace, setPace] = useState<string>(workout.pace ?? "");
   const [description, setDescription] = useState<string>(workout.description ?? "");
+  const [elevation, setElevation] = useState<string>(workout.elevation_m != null ? String(workout.elevation_m) : "");
+  const [eph, setEph] = useState<string>(workout.eph != null ? String(workout.eph) : "");
   const [validating, setValidating] = useState(false);
   const [verdict, setVerdict] = useState<Verdict | null>(null);
   const [feedback, setFeedback] = useState<string>("");
   const [needsConfirm, setNeedsConfirm] = useState(false);
+
+  const isTrailType = type === "Trail Run" || type === "Trail Race";
 
   useEffect(() => {
     if (open) {
@@ -102,6 +106,8 @@ const EditWorkoutDialog = ({
       setDistance(workout.distance_km != null ? String(workout.distance_km) : "");
       setPace(workout.pace ?? "");
       setDescription(workout.description ?? "");
+      setElevation(workout.elevation_m != null ? String(workout.elevation_m) : "");
+      setEph(workout.eph != null ? String(workout.eph) : "");
       setVerdict(null);
       setFeedback("");
       setNeedsConfirm(false);
@@ -116,8 +122,10 @@ const EditWorkoutDialog = ({
       title: type || workout.title,
       color: opt?.color ?? workout.color,
       distance_km: distance ? Number(distance) : workout.distance_km,
-      pace: pace || workout.pace,
+      pace: isTrailType ? null : (pace || workout.pace),
       description: description || workout.description,
+      elevation_m: isTrailType ? (elevation ? Number(elevation) : null) : (workout.elevation_m ?? null),
+      eph: isTrailType ? (eph ? Number(eph) : null) : (workout.eph ?? null),
     };
   };
 
@@ -127,7 +135,9 @@ const EditWorkoutDialog = ({
       (next.type ?? "") === (normalizeType(workout.type) ?? "") &&
       (next.distance_km ?? null) === (workout.distance_km ?? null) &&
       (next.pace ?? "") === (workout.pace ?? "") &&
-      (next.description ?? "") === (workout.description ?? "")
+      (next.description ?? "") === (workout.description ?? "") &&
+      (next.elevation_m ?? null) === (workout.elevation_m ?? null) &&
+      (next.eph ?? null) === (workout.eph ?? null)
     );
   };
 

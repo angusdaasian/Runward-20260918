@@ -80,6 +80,7 @@ const CATEGORY_COLORS: Record<string, string> = {
   "Full Marathon": "bg-red-500",
   "Half Marathon": "bg-amber-500",
   Ultramarathon: "bg-orange-700",
+  "Trail Race": "bg-lime-600",
   "10K": "bg-blue-500",
   "5K": "bg-green-500",
   "3K": "bg-teal-500",

@@ -49,6 +49,9 @@ const TYPE_LABELS: Record<string, { en: string; zh: string }> = {
   "Race Pace": { en: "Race Pace", zh: "比賽配速" },
   "Progression Run": { en: "Progression Run", zh: "漸進跑" },
   "Progression": { en: "Progression Run", zh: "漸進跑" },
+  "Trail Run": { en: "Trail Run", zh: "越野跑" },
+  "Trail Race": { en: "Trail Race", zh: "越野賽" },
+  "Race": { en: "Race", zh: "比賽" },
 };
 
 function localizeTitle(type: string, lang: Lang): string {

@@ -3254,11 +3254,25 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                 <label className="text-sm font-medium text-foreground mb-1 block">{lang === "zh" ? "距離 (公里)" : "Distance (km)"}</label>
                 <Input type="number" min="0.5" step="0.5" placeholder="e.g. 8" value={customAddDistance} onChange={(e) => setCustomAddDistance(e.target.value)} className="w-full" />
               </div>
-              <Button className="w-full" disabled={!customAddDistance || Number(customAddDistance) <= 0} onClick={() => {
+              {(customAddRunType === "Trail Run" || customAddRunType === "Trail Race") && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-sm font-medium text-foreground mb-1 block">{lang === "zh" ? "爬升 (米)" : "Elevation (m)"}</label>
+                    <Input type="number" min="0" step="10" placeholder="e.g. 500" value={customAddElevation} onChange={(e) => setCustomAddElevation(e.target.value)} className="w-full" />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-foreground mb-1 block">EpH</label>
+                    <Input type="number" min="0" step="0.1" placeholder="e.g. 8" value={customAddEph} onChange={(e) => setCustomAddEph(e.target.value)} className="w-full" />
+                  </div>
+                </div>
+              )}
+              <Button className="w-full" disabled={!customAddDistance || Number(customAddDistance) <= 0 || ((customAddRunType === "Trail Run" || customAddRunType === "Trail Race") && (!customAddElevation || !customAddEph))} onClick={() => {
                 if (customAddingDayIdx === null || !customAddRunType || !customAddDistance) return;
                 const rt = RUN_TYPES.find(r => r.id === customAddRunType)!;
                 const updatedPlan = [...customPlan]; const week = { ...updatedPlan[customWeekIdx] }; const days = [...week.days];
-                days[customAddingDayIdx] = { ...days[customAddingDayIdx], type: customAddRunType, title: lang === "zh" ? rt.zh : rt.en, description: "", distance_km: Number(customAddDistance), pace: null, color: rt.color };
+                const isTrail = customAddRunType === "Trail Run" || customAddRunType === "Trail Race";
+                const trailDesc = lang === "zh" ? `${customAddDistance}km · 爬升 ${Math.round(Number(customAddElevation) || 0)}m · 目標 EpH ${customAddEph}。以 EpH 控制越野強度。` : `${customAddDistance}km · ${Math.round(Number(customAddElevation) || 0)}m ascent · target EpH ${customAddEph}. Use EpH to control trail effort.`;
+                days[customAddingDayIdx] = { ...days[customAddingDayIdx], type: customAddRunType, title: lang === "zh" ? rt.zh : rt.en, description: isTrail ? trailDesc : "", distance_km: Number(customAddDistance), pace: null, color: rt.color, elevation_m: isTrail ? Number(customAddElevation) || null : null, eph: isTrail ? Number(customAddEph) || null : null };
                 week.days = days; updatedPlan[customWeekIdx] = week; setCustomPlan(updatedPlan);
                 if (user && customExistingPlan) supabase.from("training_plans" as any).update({ plan_data: updatedPlan } as any).eq("id", customExistingPlan.id).then(() => { notifyPlanChanged(); });
                 setCustomAddingDayIdx(null);

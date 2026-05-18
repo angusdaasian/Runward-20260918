@@ -1603,7 +1603,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
           apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
           Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
         },
-        body: JSON.stringify({ goal, distance, targetTime, raceDate, startDate, weeks: weeksUntilRace, daysPerWeek, weeklyKm, longRunDay, restDays, raceName: resolvedRaceName, raceCity: selectedRace?.city || null, raceCountry: selectedRace?.country || null, lang, races: racesPayloadFromSnapshot(snapshot), trailDistanceKm: distance === "TR" ? Number(trailDistanceKm) || null : null, trailElevationM: distance === "TR" ? Number(trailElevationM) || 0 : null }),
+        body: JSON.stringify({ goal, distance, targetTime, raceDate, startDate, weeks: weeksUntilRace, daysPerWeek, weeklyKm, longRunDay, restDays, raceName: resolvedRaceName, raceCity: selectedRace?.city || null, raceCountry: selectedRace?.country || null, lang, races: racesPayloadFromSnapshot(snapshot), trailDistanceKm: distance === "TR" ? Number(trailDistanceKm) || null : null, trailElevationM: distance === "TR" ? Number(trailElevationM) || 0 : null, trailTargetEph: distance === "TR" ? Number(trailTargetEph) || null : null }),
       });
       if (!response.ok) { const err = await response.json().catch(() => ({})); throw new Error(err.error || "Failed to generate"); }
       const result = await response.json();
@@ -1617,6 +1617,9 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
           user_id: user.id, goal: goal || "race", distance, target_time: targetTime,
           race_date: raceDate, weeks: weeksUntilRace, plan_data: planData, raw_output: result.raw || "",
           race_schedule: snapshot,
+          trail_distance_km: distance === "TR" ? Number(trailDistanceKm) || null : null,
+          trail_elevation_m: distance === "TR" ? Number(trailElevationM) || null : null,
+          trail_target_eph: distance === "TR" ? Number(trailTargetEph) || null : null,
         };
         const { data: saved } = await (supabase.from("training_plans" as any) as any).insert(inserted).select().single();
         const nextPlan = saved || inserted;

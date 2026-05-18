@@ -97,10 +97,11 @@ const GOALS: { id: Goal; emoji: string; en: string; zh: string; desc_en: string;
 const DISTANCES: { id: Distance; label: string }[] = [
   { id: "5K", label: "5K" }, { id: "10K", label: "10K" },
   { id: "HM", label: "Half Marathon" }, { id: "FM", label: "Full Marathon" },
+  { id: "TR", label: "Trail Race" },
 ];
 
-const MIN_WEEKS: Record<Distance, number> = { "5K": 4, "10K": 4, HM: 6, FM: 8 };
-const MIN_DAYS: Record<Distance, number> = { "5K": 2, "10K": 2, HM: 3, FM: 4 };
+const MIN_WEEKS: Record<Distance, number> = { "5K": 4, "10K": 4, HM: 6, FM: 8, TR: 10 };
+const MIN_DAYS: Record<Distance, number> = { "5K": 2, "10K": 2, HM: 3, FM: 4, TR: 4 };
 
 function localizeTitle(type: string, lang: Lang): string {
   return TYPE_LABELS[type]?.[lang] || type;

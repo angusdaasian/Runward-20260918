@@ -3268,19 +3268,25 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
             pace: customPlan[customWeekIdx].days[customEditingDayIdx].pace ?? "",
             description: customPlan[customWeekIdx].days[customEditingDayIdx].description ?? "",
             color: customPlan[customWeekIdx].days[customEditingDayIdx].color,
+            elevation_m: customPlan[customWeekIdx].days[customEditingDayIdx].elevation_m ?? null,
+            eph: customPlan[customWeekIdx].days[customEditingDayIdx].eph ?? null,
           }}
           planContext={customExistingPlan ? `Custom plan, week ${customWeekIdx + 1}` : null}
           onSave={async (next) => {
             if (customEditingDayIdx === null) return;
             const updatedPlan = [...customPlan]; const week = { ...updatedPlan[customWeekIdx] }; const days = [...week.days];
+            const nextType = next.type ?? days[customEditingDayIdx].type;
+            const isTrail = nextType === "Trail Run" || nextType === "Trail Race";
             days[customEditingDayIdx] = {
               ...days[customEditingDayIdx],
-              type: next.type ?? days[customEditingDayIdx].type,
+              type: nextType,
               title: next.title ?? days[customEditingDayIdx].title,
               color: next.color ?? days[customEditingDayIdx].color,
               distance_km: next.distance_km ?? days[customEditingDayIdx].distance_km,
-              pace: next.pace || days[customEditingDayIdx].pace,
+              pace: isTrail ? null : (next.pace || days[customEditingDayIdx].pace),
               description: next.description ?? days[customEditingDayIdx].description,
+              elevation_m: isTrail ? (next.elevation_m ?? days[customEditingDayIdx].elevation_m ?? null) : null,
+              eph: isTrail ? (next.eph ?? days[customEditingDayIdx].eph ?? null) : null,
             };
             week.days = days; updatedPlan[customWeekIdx] = week; setCustomPlan(updatedPlan);
             if (user && customExistingPlan) await supabase.from("training_plans" as any).update({ plan_data: updatedPlan } as any).eq("id", customExistingPlan.id);

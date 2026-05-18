@@ -14,6 +14,8 @@ export interface EditableWorkout {
   pace?: string | null;
   description?: string | null;
   color?: string | null;
+  elevation_m?: number | null;
+  eph?: number | null;
 }
 
 interface Props {

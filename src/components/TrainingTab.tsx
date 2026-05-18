@@ -80,6 +80,7 @@ const TYPE_LABELS: Record<string, { en: string; zh: string }> = {
   "Race Pace": { en: "Race Pace", zh: "比賽配速" },
   "Race": { en: "Race", zh: "比賽" },
   "Progression Run": { en: "Progression Run", zh: "漸進跑" }, "Progression": { en: "Progression Run", zh: "漸進跑" },
+  "Trail Run": { en: "Trail Run", zh: "越野跑" }, "Trail Race": { en: "Trail Race", zh: "越野賽" },
 };
 
 const GOALS: { id: Goal; emoji: string; en: string; zh: string; desc_en: string; desc_zh: string }[] = [

@@ -2489,6 +2489,15 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                         <label className="text-sm font-semibold text-foreground mb-2 block">{lang === "zh" ? "累計爬升 (米)" : "Total Elevation (m)"}</label>
                         <Input type="number" min="0" step="50" placeholder="2000" value={trailElevationM} onChange={(e) => setTrailElevationM(e.target.value)} />
                       </div>
+                      <div className="col-span-2">
+                        <label className="text-sm font-semibold text-foreground mb-2 block">{lang === "zh" ? "目標 EpH（選填）" : "Target EpH (optional)"}</label>
+                        <Input type="number" min="0" step="0.1" placeholder={computedTrailRaceEph ? String(computedTrailRaceEph) : "8"} value={trailTargetEph} onChange={(e) => setTrailTargetEph(e.target.value)} />
+                        {computedTrailRaceEph && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {lang === "zh" ? `按距離、爬升及目標時間估算：EpH ${computedTrailRaceEph}` : `Estimated from distance, elevation, and target time: EpH ${computedTrailRaceEph}`}
+                          </p>
+                        )}
+                      </div>
                     </div>
                   )}
 

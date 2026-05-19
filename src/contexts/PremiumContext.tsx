@@ -50,6 +50,7 @@ export const PremiumProvider = ({ children }: { children: ReactNode }) => {
   const fetchSubscription = useCallback(async (): Promise<boolean> => {
     if (!user) {
       setIsPremium(false);
+      setIsTrial(false);
       setExpiresAt(null);
       setPlan(null);
       setRcEntitlement(null);

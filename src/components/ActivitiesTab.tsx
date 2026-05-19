@@ -914,7 +914,7 @@ const ActivitiesTab = ({ lang }: Props) => {
                   </div>
                   <div className="mt-2 flex items-baseline gap-2 flex-wrap">
                     <span className="text-base font-semibold text-foreground">
-                      {dateSheet.planned.title || dateSheet.planned.type}
+                      {localizePlanTitle(dateSheet.planned, lang)}
                     </span>
                     {dateSheet.planned.distance_km && (
                       <span className="text-sm text-muted-foreground">{dateSheet.planned.distance_km} km</span>
@@ -931,7 +931,7 @@ const ActivitiesTab = ({ lang }: Props) => {
                   </div>
                   {dateSheet.planned.description && (
                     <p className="mt-2 text-sm text-muted-foreground leading-relaxed whitespace-pre-line">
-                      {dateSheet.planned.description}
+                      {localizePlanDescription(dateSheet.planned, lang)}
                     </p>
                   )}
                 </div>

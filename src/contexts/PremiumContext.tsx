@@ -67,6 +67,7 @@ export const PremiumProvider = ({ children }: { children: ReactNode }) => {
     if (rcRes.data?.isPremium) {
           const wasNotPremium = !isPremium;
           setIsPremium(true);
+          setIsTrial(!!rcRes.data.isTrial);
           setExpiresAt(new Date(rcRes.data.expiresAt));
           setPlan(rcRes.data.plan);
           setRcEntitlement(rcRes.data.rcEntitlement || "premium");

@@ -74,7 +74,7 @@ serve(async (req) => {
     const parseHours = (value?: string): number => {
       const parts = String(value || "").split(":").map((n) => Number(n));
       if (parts.length === 3) return Math.max(0.1, parts[0] + parts[1] / 60 + parts[2] / 3600);
-      if (parts.length === 2) return Math.max(0.1, parts[0] / 60 + parts[1] / 3600);
+      if (parts.length === 2) return Math.max(0.1, isTrailRace ? parts[0] + parts[1] / 60 : parts[0] / 60 + parts[1] / 3600);
       return Math.max(0.1, Number(value) || 1);
     };
     const targetHours = parseHours(targetTime);

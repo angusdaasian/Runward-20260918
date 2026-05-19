@@ -522,59 +522,8 @@ Return ONLY valid JSON, no markdown, no explanation.`;
       }
     }
 
-    // Post-process: assign deterministic dates from startDate so calendar and plan view always match.
-    // Week 1 starts on the user's chosen startDate; each week is exactly 7 days, days[0]..days[6].
-    const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-    const baseStr = (startDate && /^\d{4}-\d{2}-\d{2}$/.test(startDate))
-      ? startDate
-      : new Date().toISOString().slice(0, 10);
-    const base = new Date(baseStr + "T00:00:00Z");
-    if (Array.isArray(planData) && !isNaN(base.getTime())) {
-      for (let w = 0; w < planData.length; w++) {
-        const week = planData[w];
-        if (!week || !Array.isArray(week.days)) continue;
-        // Pad/truncate to 7 days defensively
-        while (week.days.length < 7) {
-          week.days.push({ day: DAY_LABELS[week.days.length], type: "Rest", title: "Rest", description: "", distance_km: null, pace: null, color: "#607D8B" });
-        }
-        if (week.days.length > 7) week.days.length = 7;
-        for (let d = 0; d < 7; d++) {
-          const dt = new Date(base.getTime() + ((w * 7 + d) * 86400000));
-          const yyyy = dt.getUTCFullYear();
-          const mm = String(dt.getUTCMonth() + 1).padStart(2, "0");
-          const dd = String(dt.getUTCDate()).padStart(2, "0");
-          week.days[d].date = `${yyyy}-${mm}-${dd}`;
-          week.days[d].day = DAY_LABELS[(dt.getUTCDay() + 6) % 7]; // 0=Sun → Sun, shift to Mon=0
-        }
-        week.startDate = week.days[0].date;
-        week.week = w + 1;
-      }
-
-      const daysFlat = planData.flatMap((week: any) => Array.isArray(week?.days) ? week.days : []);
-      for (let i = 0; i < daysFlat.length; i++) {
-        const race = raceList.find((r) => r.race_date === daysFlat[i]?.date);
-        if (!race) continue;
-        const priority = ["A", "B", "C"].includes(String(race.priority)) ? String(race.priority) : "none";
-        daysFlat[i] = Object.assign(daysFlat[i], {
-          type: "Race",
-          title: race.name,
-          description: isZh
-            ? `${race.name}（${priority === "none" ? "未設定" : priority} 優先級）。此日按賽事行程安排為比賽。`
-            : `${race.name} (${priority === "none" ? "unprioritized" : `${priority}-priority`} race). Scheduled from the runner's race calendar.`,
-          distance_km: distanceForCategory(race.category),
-          color: "#E91E63",
-        });
-        if (daysFlat[i + 1] && !["Rest", "Recovery"].includes(daysFlat[i + 1].type)) {
-          daysFlat[i + 1] = Object.assign(daysFlat[i + 1], {
-            type: "Recovery",
-            title: isZh ? "賽後恢復" : "Post-race Recovery",
-            description: isZh ? "非常輕鬆的賽後恢復跑。" : "Very easy post-race recovery run.",
-            color: "#9C27B0",
-          });
-        }
-      }
-      planData = repairTrailRacePlan(planData);
-    }
+    // Post-process: assign dates, reconcile races, and enforce trail metrics.
+    planData = finalizePlanData(planData);
 
     return new Response(JSON.stringify({ plan: planData, raw: content }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

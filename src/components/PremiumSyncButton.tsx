@@ -33,11 +33,11 @@ export default function PremiumSyncButton({ lang }: Props) {
       if (error) throw error;
       if ((data as any)?.error) throw new Error((data as any).message || (data as any).error);
       const results = (data as any)?.results ?? [];
-      const total = results.reduce((s: number, r: any) => s + (r.upserted ?? 0), 0);
+      const providers = results.map((r: any) => r.provider).join(", ");
       toast.success(
         lang === "zh"
-          ? `已同步 ${total} 個活動（自 2026-01-01）`
-          : `Synced ${total} activities since 2026-01-01`,
+          ? `歷史同步已排程（${providers}）。Terra 會在幾分鐘內陸續送回活動。`
+          : `Historical sync queued${providers ? ` for ${providers}` : ""}. Activities will arrive via webhook over the next few minutes.`,
       );
     } catch (e: any) {
       console.error("[premium-terra-sync]", e);

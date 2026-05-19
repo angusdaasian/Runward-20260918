@@ -8,7 +8,7 @@
 //     which is kept fresh by the check-revenuecat-status function / RC webhook)
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-import { getTerraCreds, pickEnvFromRequest } from "../_shared/terraEnv.ts";
+import { getTerraCreds } from "../_shared/terraEnv.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",

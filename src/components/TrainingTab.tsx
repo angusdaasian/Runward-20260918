@@ -1633,6 +1633,9 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
       });
       if (!response.ok) { const err = await response.json().catch(() => ({})); throw new Error(err.error || "Failed to generate"); }
       const result = await response.json();
+      if (!Array.isArray(result.plan) || result.plan.length === 0) {
+        throw new Error(lang === "zh" ? "AI 未能生成有效訓練計劃，請再試一次。" : "AI did not return a valid training plan. Please try again.");
+      }
       const planData = ensurePlanMatchesRaceSchedule(result.plan || [], snapshot);
       setPlan(planData);
       setCurrentWeekIdx(0);
@@ -1779,6 +1782,9 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
       });
       if (!response.ok) { const err = await response.json().catch(() => ({})); throw new Error(err.error || "Failed to regenerate"); }
       const result = await response.json();
+      if (!Array.isArray(result.plan) || result.plan.length === 0) {
+        throw new Error(lang === "zh" ? "AI 未能生成有效訓練計劃，現有計劃已保留。" : "AI did not return a valid training plan. Your existing plan was kept.");
+      }
       const planData = ensurePlanMatchesRaceSchedule(result.plan || [], snapshot);
       setPlan(planData);
       setCurrentWeekIdx(0);

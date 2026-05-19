@@ -223,7 +223,7 @@ Target time: ${targetTime}
 Race date: ${raceDate}
 ${raceName ? `Target race event: "${raceName}"${raceCity ? ` in ${raceCity}${raceCountry ? `, ${raceCountry}` : ""}` : ""}. Tailor the plan to this specific race — consider its typical course profile (hills, flat, elevation), climate/weather for the race date, and any well-known characteristics of this event when shaping long runs, race-pace sessions, and the taper. Briefly mention the race-specific rationale in the description of key workouts (e.g. hill sessions if the course is hilly, heat acclimation if the race is in a hot climate).` : ""}
 Running days per week: ${daysPerWeek || 4}
-Preferred weekly volume: approximately ${weeklyKm || 30} km per week (adjust progressively)
+Preferred weekly volume: approximately ${effectiveWeeklyKm} km per week (adjust progressively; raised from user input when needed for trail-race specificity)
 
 ${langInstruction}
 ${raceScheduleBlock}
@@ -248,7 +248,7 @@ WORKOUT TYPE DESCRIPTIONS (include a brief note of the type purpose in descripti
 IMPORTANT: The runner wants to train exactly ${daysPerWeek || 4} days per week. The remaining days should be Rest days. Distribute the weekly volume across the running days.
 
 WEEKLY MILEAGE PROGRESSION RULES (MUST follow strictly):
-- Peak weekly volume target: approximately ${weeklyKm || 30} km (reach this near the end of the build phase, before the taper).
+- Peak weekly volume target: approximately ${effectiveWeeklyKm} km (reach this near the end of the build phase, before the taper).
 - 10% rule: weekly mileage MUST NOT increase by more than 10% from the previous week. Calculate week N km ≤ 1.10 × week (N-1) km. This is a safety/injury-prevention hard constraint.
 - 3:1 build/taper cycle: structure training in repeating 4-week blocks of 3 build weeks followed by 1 recovery/down week. In each block: weeks 1, 2, 3 progressively increase mileage (each ≤ +10%), and week 4 is a recovery week reduced by ~20-30% from week 3 to allow adaptation.
 - Final taper: the last 2 weeks before race date are a dedicated taper. Week (N-1) ≈ 70-80% of peak; race week ≈ 40-50% of peak with the race itself on race day.

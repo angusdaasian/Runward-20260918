@@ -135,38 +135,62 @@ Deno.serve(async (req) => {
       return json({ error: "no_terra_connection", message: "No active Terra connection found." }, 404);
     }
 
-    const headers = {
-      "x-api-key": apiKey,
-      "dev-id": devId,
-      Accept: "application/json",
-    };
-
-    const results: any[] = [];
-    for (const conn of connections) {
+    const tryFetch = async (creds: { apiKey: string; devId: string }, terraUserId: string) => {
       const qs = new URLSearchParams({
-        user_id: conn.terra_user_id,
+        user_id: terraUserId,
         start_date: START_DATE,
         with_samples: "true",
       });
       const url = `https://api.tryterra.co/v2/activity?${qs.toString()}`;
-      console.log(`[premium-terra-sync] ${conn.provider} url=${url}`);
-
-      const resp = await fetch(url, { headers });
+      const resp = await fetch(url, {
+        headers: {
+          "x-api-key": creds.apiKey,
+          "dev-id": creds.devId,
+          Accept: "application/json",
+        },
+      });
       const terraReference = resp.headers.get("terra-reference");
       const body = await resp.json().catch(() => null);
+      return { url, resp, body, terraReference };
+    };
 
-      if (!resp.ok) {
-        console.error(`[premium-terra-sync] ${conn.provider} status=${resp.status}`, body);
+    const results: any[] = [];
+    for (const conn of connections) {
+      const attempts: Array<{ env: "prod" | "test"; creds: typeof prodCreds }> = [];
+      if (prodCreds.apiKey && prodCreds.devId) attempts.push({ env: "prod", creds: prodCreds });
+      if (testCreds.apiKey && testCreds.devId) attempts.push({ env: "test", creds: testCreds });
+
+      let chosen: { env: "prod" | "test"; resp: Response; body: any; terraReference: string | null } | null = null;
+      let lastError: { env: "prod" | "test"; status: number; body: any; terraReference: string | null } | null = null;
+
+      for (const { env, creds } of attempts) {
+        const { url, resp, body, terraReference } = await tryFetch(creds, conn.terra_user_id);
+        console.log(`[premium-terra-sync] ${conn.provider} try=${env} status=${resp.status} url=${url}`);
+        if (resp.ok) {
+          chosen = { env, resp, body, terraReference };
+          break;
+        }
+        lastError = { env, status: resp.status, body, terraReference };
+        if (resp.status !== 404) {
+          // non-404 error: don't bother retrying with the other env
+          break;
+        }
+        console.log(`[premium-terra-sync] ${conn.provider} try=${env} 404 -> retry other env`);
+      }
+
+      if (!chosen) {
+        console.error(`[premium-terra-sync] ${conn.provider} all envs failed`, lastError);
         results.push({
           provider: conn.provider,
-          status: resp.status,
-          error: body?.message ?? "terra_error",
-          terraReference,
+          env: lastError?.env,
+          status: lastError?.status,
+          error: lastError?.body?.message ?? lastError?.body?.detail ?? "terra_error",
+          terraReference: lastError?.terraReference,
         });
         continue;
       }
 
-      const activities: any[] = Array.isArray(body?.data) ? body.data : [];
+      const activities: any[] = Array.isArray(chosen.body?.data) ? chosen.body.data : [];
       let upserted = 0;
       for (const a of activities) {
         try {
@@ -179,8 +203,9 @@ Deno.serve(async (req) => {
 
       results.push({
         provider: conn.provider,
-        status: resp.status,
-        terraReference,
+        env: chosen.env,
+        status: chosen.resp.status,
+        terraReference: chosen.terraReference,
         fetched: activities.length,
         upserted,
       });

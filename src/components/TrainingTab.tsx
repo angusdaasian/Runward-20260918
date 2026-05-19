@@ -1533,10 +1533,21 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
         const distanceKm = distanceForCategory(race.category) ?? days[di].distance_km ?? null;
         const priority = normalizeRacePriority(race.priority).toUpperCase();
         const title = race.race_name || (lang === "zh" ? "比賽日" : "Race Day");
+        const isTrailPlanRace = String(race.category || "").toUpperCase() === "TR" || days[di]?.type === "Trail Race";
         const description = lang === "zh"
-          ? `${title}（${priority === "NONE" ? "未設定" : priority} 優先級）。此日已按你的賽事行程安排為比賽。`
-          : `${title} (${priority === "NONE" ? "unprioritized" : `${priority}-priority`} race). Scheduled from your race calendar.`;
-        const patchedDay: DayPlan = { ...days[di], type: "Race", title, description, distance_km: distanceKm, color: "#E91E63" };
+          ? `${title}（${priority === "NONE" ? "未設定" : priority} 優先級）。此日已按你的賽事行程安排為${isTrailPlanRace ? "越野賽" : "比賽"}。`
+          : `${title} (${priority === "NONE" ? "unprioritized" : `${priority}-priority`} ${isTrailPlanRace ? "trail race" : "race"}). Scheduled from your race calendar.`;
+        const patchedDay: DayPlan = {
+          ...days[di],
+          type: isTrailPlanRace ? "Trail Race" : "Race",
+          title: isTrailPlanRace ? (lang === "zh" ? "越野賽日" : "Trail Race Day") : title,
+          description,
+          distance_km: distanceKm,
+          pace: isTrailPlanRace ? null : days[di].pace,
+          color: isTrailPlanRace ? "#65A30D" : "#E91E63",
+          elevation_m: isTrailPlanRace ? (days[di].elevation_m ?? null) : null,
+          eph: isTrailPlanRace ? (days[di].eph ?? null) : null,
+        };
         if (JSON.stringify(days[di]) !== JSON.stringify(patchedDay)) {
           days[di] = patchedDay;
           changed = true;

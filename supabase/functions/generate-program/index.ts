@@ -179,20 +179,21 @@ serve(async (req) => {
           d.description = trailDesc(km, Number(d.elevation_m) || 0, Number(d.eph) || 0, "long");
         }
 
-        const preferredIdx = days.findIndex((d: any) => d?.day === prefLongDay && !isRestDay(d));
+        const hasTrailRaceWeek = days.some((d: any) => d?.type === "Trail Race");
+        const preferredIdx = hasTrailRaceWeek ? -1 : days.findIndex((d: any) => d?.day === prefLongDay && !isRestDay(d));
         const longIdx = days.findIndex((d: any) => d?.type === "Long Run" || d?.type === "Long" || d?.type === "Trail Run");
         const fallbackIdx = days.reduce((best: number, d: any, idx: number) => {
           if (isRestDay(d) || d?.type === "Trail Race") return best;
           return best < 0 || (Number(d.distance_km) || 0) > (Number(days[best]?.distance_km) || 0) ? idx : best;
         }, -1);
-        const forcedLongIdx = preferredIdx >= 0 ? preferredIdx : longIdx >= 0 ? longIdx : fallbackIdx;
+        const forcedLongIdx = hasTrailRaceWeek ? -1 : preferredIdx >= 0 ? preferredIdx : longIdx >= 0 ? longIdx : fallbackIdx;
         if (forcedLongIdx >= 0 && days[forcedLongIdx]?.type !== "Trail Race") days[forcedLongIdx] = toTrail(days[forcedLongIdx], weekIdx, "long");
 
-        if (weekIdx % 2 === 1 && weekIdx < totalWeeks - 2) {
+        if (!hasTrailRaceWeek && weekIdx % 2 === 1 && weekIdx < totalWeeks - 2) {
           const hillIdx = days.findIndex((d: any, idx: number) => idx !== forcedLongIdx && !isRestDay(d) && !["Trail Run", "Trail Race", "Race", "Long Run", "Long"].includes(d.type));
           if (hillIdx >= 0) days[hillIdx] = toTrail(days[hillIdx], weekIdx, "hill");
         }
-        if (weekIdx < totalWeeks - 2) {
+        if (!hasTrailRaceWeek && weekIdx < totalWeeks - 2) {
           const intervalIdx = days.findIndex((d: any, idx: number) => idx !== forcedLongIdx && !isRestDay(d) && !["Trail Run", "Trail Race", "Race"].includes(d.type));
           if (intervalIdx >= 0) days[intervalIdx] = toInterval(days[intervalIdx], weekIdx);
         }

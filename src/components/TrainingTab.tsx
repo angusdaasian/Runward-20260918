@@ -1537,12 +1537,13 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
         const description = lang === "zh"
           ? `${title}（${priority === "NONE" ? "未設定" : priority} 優先級）。此日已按你的賽事行程安排為${isTrailPlanRace ? "越野賽" : "比賽"}。`
           : `${title} (${priority === "NONE" ? "unprioritized" : `${priority}-priority`} ${isTrailPlanRace ? "trail race" : "race"}). Scheduled from your race calendar.`;
+        const trailRaceDistance = isTrailPlanRace ? (days[di].distance_km ?? distanceKm) : distanceKm;
         const patchedDay: DayPlan = {
           ...days[di],
           type: isTrailPlanRace ? "Trail Race" : "Race",
           title: isTrailPlanRace ? (lang === "zh" ? "越野賽日" : "Trail Race Day") : title,
           description,
-          distance_km: distanceKm,
+          distance_km: trailRaceDistance,
           pace: isTrailPlanRace ? null : days[di].pace,
           color: isTrailPlanRace ? "#65A30D" : "#E91E63",
           elevation_m: isTrailPlanRace ? (days[di].elevation_m ?? null) : null,

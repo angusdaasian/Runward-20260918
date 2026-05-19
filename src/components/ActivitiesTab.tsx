@@ -57,6 +57,39 @@ function formatDistance(meters: number): string {
   return (meters / 1000).toFixed(2);
 }
 
+const PLAN_TYPE_LABELS: Record<string, { en: string; zh: string }> = {
+  Easy: { en: "Easy Run", zh: "輕鬆跑" }, "Easy Run": { en: "Easy Run", zh: "輕鬆跑" },
+  Tempo: { en: "Tempo Run", zh: "節奏跑" }, "Tempo Run": { en: "Tempo Run", zh: "節奏跑" },
+  Interval: { en: "Interval", zh: "間歇跑" },
+  Long: { en: "Long Run", zh: "長課" }, "Long Run": { en: "Long Run", zh: "長課" },
+  Recovery: { en: "Recovery Run", zh: "恢復跑" }, "Recovery Run": { en: "Recovery Run", zh: "恢復跑" },
+  "Cross Training": { en: "Cross Training", zh: "交叉訓練" },
+  "Race Pace": { en: "Race Pace", zh: "比賽配速" },
+  Race: { en: "Race", zh: "比賽" },
+  Progression: { en: "Progression Run", zh: "漸進跑" }, "Progression Run": { en: "Progression Run", zh: "漸進跑" },
+  "Trail Run": { en: "Trail Run", zh: "越野跑" }, "Trail Race": { en: "Trail Race", zh: "越野賽" },
+  Rest: { en: "Rest", zh: "休息" },
+};
+
+const localizePlanTitle = (planned: { type: string; title?: string | null }, lang: Lang) => {
+  if (lang !== "zh") return planned.title || PLAN_TYPE_LABELS[planned.type]?.en || planned.type;
+  return PLAN_TYPE_LABELS[planned.type]?.zh || planned.title || planned.type;
+};
+
+const localizePlanDescription = (planned: { type: string; distance_km: number | null; pace?: string | null; description?: string | null; elevation_m?: number | null; eph?: number | null }, lang: Lang) => {
+  if (lang !== "zh") return planned.description || "";
+  const km = planned.distance_km ? `${planned.distance_km}km` : "";
+  const pace = planned.pace ? `，配速約${planned.pace}` : "";
+  if (planned.type === "Trail Run" || planned.type === "Trail Race") {
+    const parts = [km, planned.elevation_m != null ? `爬升 ${Math.round(planned.elevation_m)}m` : "", planned.eph != null ? `目標 EpH ${planned.eph}` : ""].filter(Boolean);
+    return `${parts.join(" · ")}${parts.length ? "。" : ""}${planned.type === "Trail Race" ? "越野賽日" : "越野跑訓練"}，以爬升、技術及努力分配為主，不按平路配速執行。`;
+  }
+  const label = PLAN_TYPE_LABELS[planned.type]?.zh || planned.type;
+  if (planned.type === "Rest") return "全日休息恢復。";
+  if (km) return `${km}${label}${pace}。`;
+  return label;
+};
+
 function getActivityScore(distance: number, movingTime: number): number | null {
   if (distance < 400 || movingTime < 60) return null;
   const score = calculateRunningScore(distance, movingTime);

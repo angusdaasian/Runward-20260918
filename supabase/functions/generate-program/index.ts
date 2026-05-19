@@ -206,6 +206,111 @@ serve(async (req) => {
       });
     };
 
+    const buildDeterministicTrailRacePlan = (): any[] => {
+      const totalWeeks = Math.max(1, Number(weeks) || 12);
+      const labels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+      const safeDaysPerWeek = Math.max(2, Math.min(7, Number(daysPerWeek) || 4));
+      const restSet = new Set(Array.isArray(restDays) ? restDays : ["Mon"]);
+      restSet.delete(longRunDay || "Sun");
+      const baseStr = (startDate && /^\d{4}-\d{2}-\d{2}$/.test(startDate)) ? startDate : new Date().toISOString().slice(0, 10);
+      const base = new Date(baseStr + "T00:00:00Z");
+      const dayLabelAt = (offset: number) => labels[(new Date(base.getTime() + offset * 86400000).getUTCDay() + 6) % 7];
+      const fmt = (n: number) => Math.round(n * 10) / 10;
+      const trailTitle = (kind: "long" | "hill" | "race" | "short") => isZh
+        ? (kind === "race" ? "越野賽日" : kind === "hill" ? "越野爬升課" : kind === "short" ? "越野技術跑" : "越野長課")
+        : (kind === "race" ? "Trail Race Day" : kind === "hill" ? "Trail Hill Session" : kind === "short" ? "Trail Skills Run" : "Trail Long Run");
+      const trailDesc = (km: number, ele: number, eph: number, kind: "long" | "hill" | "race" | "short") => {
+        if (isZh) {
+          const purpose = kind === "race"
+            ? "按越野賽努力分配體力，以 EpH 控制強度而非平路配速。"
+            : kind === "hill"
+              ? "在爬坡重複、起伏山徑或上坡節奏中累積垂直爬升，練習下坡控制。"
+              : kind === "short"
+                ? "輕鬆越野，專注步頻、落腳、下坡技術及補給節奏。"
+                : "在越野路面完成長課，練習補給、上坡跑走切換、下坡控制及比賽裝備。";
+          return `${fmt(km)}km · 爬升 ${Math.round(ele)}m · 目標 EpH ${fmt(eph)}。${purpose}`;
+        }
+        const purpose = kind === "race"
+          ? "Race by effort using EpH instead of flat road pace."
+          : kind === "hill"
+            ? "Accumulate vertical on hill repeats, rolling trail, or uphill tempo; practise downhill control."
+            : kind === "short"
+              ? "Easy trail skills run focused on cadence, footing, descending, and fueling rhythm."
+              : "Long run on trails; practise fueling, climb run/hike transitions, descents, and race kit.";
+        return `${fmt(km)}km · ${Math.round(ele)}m ascent · target EpH ${fmt(eph)}. ${purpose}`;
+      };
+      const easyDay = (label: string, kind: "easy" | "recovery" = "easy", km = 6) => ({
+        day: label,
+        type: kind === "recovery" ? "Recovery" : "Easy Run",
+        title: isZh ? (kind === "recovery" ? "恢復跑" : "輕鬆跑") : (kind === "recovery" ? "Recovery Run" : "Easy Run"),
+        description: isZh ? (kind === "recovery" ? "Z1-Z2 非常輕鬆恢復跑，不按越野賽平均配速執行。" : "Z2 輕鬆跑，維持有氧與恢復，不按越野賽平均配速執行。") : (kind === "recovery" ? "Very easy Z1-Z2 recovery run; do not use trail-race average pace." : "Easy Z2 run for aerobic support; do not use trail-race average pace."),
+        distance_km: fmt(km),
+        pace: null,
+        color: kind === "recovery" ? "#9C27B0" : "#4CAF50",
+        elevation_m: null,
+        eph: null,
+      });
+      const restDay = (label: string) => ({ day: label, type: "Rest", title: isZh ? "休息" : "Rest", description: isZh ? "全日休息恢復。" : "Full rest day for recovery.", distance_km: null, pace: null, color: "#607D8B", elevation_m: null, eph: null });
+      const intervalDay = (label: string, weekIdx: number) => {
+        const reps = weekIdx >= totalWeeks - 2 ? 4 : weekIdx % 3 === 0 ? 6 : 5;
+        const dist = weekIdx % 2 === 0 ? "800m" : "1000m";
+        return { day: label, type: "Interval", title: isZh ? "速度間歇" : "Road Speed Intervals", description: isZh ? `${dist} x ${reps} at 5K effort, rest 2:00 between sets。只作跑姿效率與速度維持，不用越野賽平均配速推算。` : `${dist} x ${reps} at 5K effort, rest 2:00 between sets. Leg-speed support only; do not derive pace from trail race average speed.`, distance_km: weekIdx >= totalWeeks - 2 ? 5 : 7, pace: null, color: "#F44336", elevation_m: null, eph: null };
+      };
+      const trailDay = (label: string, weekIdx: number, kind: "long" | "hill" | "race" | "short") => {
+        const peakIdx = Math.max(1, totalWeeks - 4);
+        const buildRatio = Math.min(weekIdx, peakIdx) / peakIdx;
+        const peakLong = Math.min(trailKm * 0.72, effectiveWeeklyKm * 0.6);
+        const baseLong = Math.max(10, Math.min(trailKm * 0.28, peakLong * 0.45));
+        const recovery = weekIdx % 4 === 3 && weekIdx < peakIdx;
+        let km = baseLong + (peakLong - baseLong) * buildRatio;
+        if (recovery) km *= 0.76;
+        if (weekIdx === totalWeeks - 2) km = Math.min(km, trailKm * 0.32);
+        if (weekIdx >= totalWeeks - 1) km = Math.min(km, trailKm * 0.16);
+        if (kind === "hill") km = Math.max(6, Math.min(14, effectiveWeeklyKm * (0.13 + buildRatio * 0.08)));
+        if (kind === "short") km = Math.max(5, Math.min(10, effectiveWeeklyKm * 0.12));
+        if (kind === "race") km = trailKm;
+        const roundedKm = fmt(km);
+        const ratio = kind === "hill" ? verticalPerKm * 1.35 : kind === "short" ? verticalPerKm * 0.75 : verticalPerKm;
+        const ele = kind === "race" ? trailEle : Math.max(80, Math.round((roundedKm * ratio) / 10) * 10);
+        const eph = kind === "race" ? raceEph : raceEph * (kind === "hill" ? 0.93 : kind === "short" ? 0.68 : weekIdx >= totalWeeks - 3 ? 0.86 : 0.76);
+        return { day: label, type: kind === "race" ? "Trail Race" : "Trail Run", title: trailTitle(kind), description: trailDesc(roundedKm, ele, eph, kind), distance_km: roundedKm, pace: null, color: kind === "race" ? "#65A30D" : "#84CC16", elevation_m: ele, eph: fmt(eph) };
+      };
+
+      return Array.from({ length: totalWeeks }, (_, weekIdx) => {
+        const days = labels.map((_, dayIdx) => {
+          const label = dayLabelAt(weekIdx * 7 + dayIdx);
+          return restSet.has(label) ? restDay(label) : easyDay(label, "easy", 6);
+        });
+        const raceIdx = days.findIndex((_, dayIdx) => {
+          const dt = new Date(base.getTime() + ((weekIdx * 7 + dayIdx) * 86400000));
+          return `${dt.getUTCFullYear()}-${String(dt.getUTCMonth() + 1).padStart(2, "0")}-${String(dt.getUTCDate()).padStart(2, "0")}` === raceDate;
+        });
+        const runIdxs = days.map((d, idx) => d.type !== "Rest" ? idx : -1).filter((idx) => idx >= 0);
+        const active = new Set<number>();
+        const longIdx = raceIdx >= 0 ? raceIdx : runIdxs.find((idx) => days[idx].day === (longRunDay || "Sun")) ?? runIdxs[runIdxs.length - 1] ?? 6;
+        active.add(longIdx);
+        const qualityIdx = runIdxs.find((idx) => idx !== longIdx) ?? -1;
+        const hillIdx = runIdxs.find((idx) => idx !== longIdx && idx !== qualityIdx) ?? -1;
+        if (raceIdx >= 0) {
+          days[raceIdx] = trailDay(days[raceIdx].day, weekIdx, "race");
+        } else {
+          days[longIdx] = trailDay(days[longIdx].day, weekIdx, "long");
+          if (weekIdx % 2 === 1 && weekIdx < totalWeeks - 2 && hillIdx >= 0) { days[hillIdx] = trailDay(days[hillIdx].day, weekIdx, "hill"); active.add(hillIdx); }
+          if (weekIdx < totalWeeks - 2 && qualityIdx >= 0) { days[qualityIdx] = intervalDay(days[qualityIdx].day, weekIdx); active.add(qualityIdx); }
+          if (weekIdx % 2 === 0 && hillIdx >= 0 && !active.has(hillIdx)) { days[hillIdx] = trailDay(days[hillIdx].day, weekIdx, "short"); active.add(hillIdx); }
+        }
+        for (const idx of runIdxs) {
+          if (active.size >= safeDaysPerWeek) break;
+          active.add(idx);
+        }
+        for (const idx of runIdxs) {
+          if (!active.has(idx)) days[idx] = restDay(days[idx].day);
+          else if (!["Trail Run", "Trail Race", "Interval"].includes(days[idx].type)) days[idx] = easyDay(days[idx].day, idx > longIdx ? "recovery" : "easy", weekIdx >= totalWeeks - 1 ? 4 : 6 + Math.min(4, weekIdx * 0.3));
+        }
+        return { week: weekIdx + 1, days };
+      });
+    };
+
     const langInstruction = isZh
       ? `All "title" and "description" fields MUST be written in Traditional Chinese (繁體中文, Hong Kong variant). The "type" and "day" fields should remain in English.`
       : `All "title" and "description" fields should be in English.`;

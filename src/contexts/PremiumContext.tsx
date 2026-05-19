@@ -31,6 +31,7 @@ export const usePremium = () => useContext(PremiumContext);
 export const PremiumProvider = ({ children }: { children: ReactNode }) => {
   const { user } = useAuth();
   const [isPremium, setIsPremium] = useState(false);
+  const [isTrial, setIsTrial] = useState(false);
   const [expiresAt, setExpiresAt] = useState<Date | null>(null);
   const [plan, setPlan] = useState<string | null>(null);
   const [rcEntitlement, setRcEntitlement] = useState<string | null>(null);

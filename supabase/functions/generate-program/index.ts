@@ -81,6 +81,8 @@ serve(async (req) => {
     const raceEffortPoints = trailKm + trailEle / 100;
     const raceEph = Number(trailTargetEph) || (targetHours > 0 ? raceEffortPoints / targetHours : 0);
     const verticalPerKm = trailKm > 0 ? trailEle / trailKm : 0;
+    const requestedWeeklyKm = Number(weeklyKm) || 30;
+    const effectiveWeeklyKm = isTrailRace ? Math.max(requestedWeeklyKm, Math.round(trailKm * 1.15), 45) : requestedWeeklyKm;
     const distanceFull = isTrailRace
       ? (isZh ? `越野賽 ${trailKm}公里 / 爬升 ${trailEle}米` : `Trail Race ${trailKm}km / ${trailEle}m elevation`)
       : (distance === "10K" ? "10K" : distance === "HM" ? (isZh ? "半馬拉松" : "Half Marathon") : (isZh ? "全馬拉松" : "Full Marathon"));
@@ -103,11 +105,25 @@ serve(async (req) => {
         return `${km}km · ${Math.round(ele)}m ascent · target EpH ${fmtEph(eph)}. ${purpose}`;
       };
       const isRestDay = (d: any) => !d || d.type === "Rest";
+      const weekFactor = (weekIdx: number) => {
+        if (weekIdx >= totalWeeks - 1) return 0.45;
+        if (weekIdx >= totalWeeks - 2) return 0.62;
+        const peakIdx = Math.max(1, totalWeeks - 4);
+        const build = 0.48 + (Math.min(weekIdx, peakIdx) / peakIdx) * 0.52;
+        return weekIdx % 4 === 3 && weekIdx < peakIdx ? build * 0.72 : build;
+      };
       const toTrail = (day: any, weekIdx: number, kind: "long" | "hill" | "race") => {
-        const taperFactor = weekIdx >= totalWeeks - 2 ? (weekIdx === totalWeeks - 1 ? 0.45 : 0.7) : 1;
+        const factor = weekFactor(weekIdx);
+        const weekTarget = effectiveWeeklyKm * factor;
+        const peakLong = Math.min(trailKm * 0.72, effectiveWeeklyKm * 0.58);
+        const baseLong = Math.max(10, Math.min(trailKm * 0.32, peakLong * 0.55));
+        const peakIdx = Math.max(1, totalWeeks - 4);
+        const longProgress = baseLong + (peakLong - baseLong) * Math.min(weekIdx, peakIdx) / peakIdx;
         const km = kind === "race"
           ? trailKm
-          : Math.max(4, Number(day?.distance_km) || (kind === "hill" ? Math.min(12, trailKm * 0.18) : Math.min(trailKm * 0.65, Math.max(10, Number(weeklyKm || 30) * 0.35)))) * taperFactor;
+          : kind === "hill"
+            ? Math.max(5, Math.min(14, weekTarget * 0.18))
+            : Math.max(8, Math.min(peakLong, longProgress * (weekIdx % 4 === 3 && weekIdx < peakIdx ? 0.75 : 1) * (weekIdx >= totalWeeks - 2 ? factor / 0.62 : 1)));
         const roundedKm = Math.round(km * 10) / 10;
         const eleBase = kind === "race" ? trailEle : roundedKm * verticalPerKm * (kind === "hill" ? 1.35 : 1);
         const ele = Math.max(kind === "race" ? trailEle : 50, Math.round(eleBase / 10) * 10);
@@ -124,6 +140,25 @@ serve(async (req) => {
           eph,
         };
       };
+      const toInterval = (day: any, weekIdx: number) => {
+        const reps = weekIdx >= totalWeeks - 2 ? 4 : weekIdx % 3 === 0 ? 6 : 5;
+        const dist = weekIdx % 2 === 0 ? "800m" : "1000m";
+        const title = isZh ? "速度間歇" : "Road Speed Intervals";
+        const description = isZh
+          ? `${dist} x ${reps}, rest 2:00 between sets。以 Z5 努力跑，保持跑姿效率；配速不用由越野賽平均速度推算。`
+          : `${dist} x ${reps}, rest 2:00 between sets. Run at Z5 effort; do not derive pace from trail race average speed.`;
+        return { ...day, type: "Interval", title, description, distance_km: weekIdx >= totalWeeks - 2 ? 5 : 7, pace: null, color: "#F44336", elevation_m: null, eph: null };
+      };
+      const toEasy = (day: any, kind: "easy" | "recovery" = "easy") => ({
+        ...day,
+        type: kind === "recovery" ? "Recovery" : "Easy Run",
+        title: isZh ? (kind === "recovery" ? "恢復跑" : "輕鬆跑") : (kind === "recovery" ? "Recovery Run" : "Easy Run"),
+        description: isZh ? (kind === "recovery" ? "Z1-Z2 非常輕鬆恢復跑，不按越野賽平均配速執行。" : "Z2 輕鬆跑，專注恢復與跑姿效率，不按越野賽平均配速執行。") : (kind === "recovery" ? "Very easy Z1-Z2 recovery run; do not use trail race average pace." : "Easy Z2 run for aerobic support; do not use trail race average pace."),
+        pace: null,
+        color: kind === "recovery" ? "#9C27B0" : "#4CAF50",
+        elevation_m: null,
+        eph: null,
+      });
 
       return planData.map((week: any, weekIdx: number) => {
         const days = Array.isArray(week?.days) ? week.days.map((d: any) => ({ ...d })) : [];
@@ -144,21 +179,26 @@ serve(async (req) => {
           d.description = trailDesc(km, Number(d.elevation_m) || 0, Number(d.eph) || 0, "long");
         }
 
-        const hasTrail = days.some((d: any) => d?.type === "Trail Run" || d?.type === "Trail Race");
-        if (!hasTrail) {
-          const preferredIdx = days.findIndex((d: any) => d?.day === prefLongDay && !isRestDay(d));
-          const longIdx = days.findIndex((d: any) => d?.type === "Long Run" || d?.type === "Long");
-          const fallbackIdx = days.reduce((best: number, d: any, idx: number) => {
-            if (isRestDay(d)) return best;
-            return best < 0 || (Number(d.distance_km) || 0) > (Number(days[best]?.distance_km) || 0) ? idx : best;
-          }, -1);
-          const idx = preferredIdx >= 0 ? preferredIdx : longIdx >= 0 ? longIdx : fallbackIdx;
-          if (idx >= 0) days[idx] = toTrail(days[idx], weekIdx, "long");
-        }
+        const preferredIdx = days.findIndex((d: any) => d?.day === prefLongDay && !isRestDay(d));
+        const longIdx = days.findIndex((d: any) => d?.type === "Long Run" || d?.type === "Long" || d?.type === "Trail Run");
+        const fallbackIdx = days.reduce((best: number, d: any, idx: number) => {
+          if (isRestDay(d) || d?.type === "Trail Race") return best;
+          return best < 0 || (Number(d.distance_km) || 0) > (Number(days[best]?.distance_km) || 0) ? idx : best;
+        }, -1);
+        const forcedLongIdx = preferredIdx >= 0 ? preferredIdx : longIdx >= 0 ? longIdx : fallbackIdx;
+        if (forcedLongIdx >= 0 && days[forcedLongIdx]?.type !== "Trail Race") days[forcedLongIdx] = toTrail(days[forcedLongIdx], weekIdx, "long");
 
         if (weekIdx % 2 === 1 && weekIdx < totalWeeks - 2) {
-          const hillIdx = days.findIndex((d: any) => !isRestDay(d) && !["Trail Run", "Trail Race", "Race", "Long Run", "Long"].includes(d.type));
+          const hillIdx = days.findIndex((d: any, idx: number) => idx !== forcedLongIdx && !isRestDay(d) && !["Trail Run", "Trail Race", "Race", "Long Run", "Long"].includes(d.type));
           if (hillIdx >= 0) days[hillIdx] = toTrail(days[hillIdx], weekIdx, "hill");
+        }
+        if (weekIdx < totalWeeks - 2) {
+          const intervalIdx = days.findIndex((d: any, idx: number) => idx !== forcedLongIdx && !isRestDay(d) && !["Trail Run", "Trail Race", "Race"].includes(d.type));
+          if (intervalIdx >= 0) days[intervalIdx] = toInterval(days[intervalIdx], weekIdx);
+        }
+        for (let i = 0; i < days.length; i++) {
+          if (!days[i] || ["Rest", "Trail Run", "Trail Race", "Interval", "Cross Training"].includes(days[i].type)) continue;
+          days[i] = toEasy(days[i], days[i].type === "Recovery" || i > forcedLongIdx ? "recovery" : "easy");
         }
 
         return { ...week, days };

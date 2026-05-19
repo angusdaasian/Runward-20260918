@@ -4,6 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 
 interface PremiumContextType {
   isPremium: boolean;
+  isTrial: boolean;
   expiresAt: Date | null;
   plan: string | null;
   rcEntitlement: string | null;
@@ -15,6 +16,7 @@ interface PremiumContextType {
 
 const PremiumContext = createContext<PremiumContextType>({
   isPremium: false,
+  isTrial: false,
   expiresAt: null,
   plan: null,
   rcEntitlement: null,
@@ -29,6 +31,7 @@ export const usePremium = () => useContext(PremiumContext);
 export const PremiumProvider = ({ children }: { children: ReactNode }) => {
   const { user } = useAuth();
   const [isPremium, setIsPremium] = useState(false);
+  const [isTrial, setIsTrial] = useState(false);
   const [expiresAt, setExpiresAt] = useState<Date | null>(null);
   const [plan, setPlan] = useState<string | null>(null);
   const [rcEntitlement, setRcEntitlement] = useState<string | null>(null);
@@ -47,6 +50,7 @@ export const PremiumProvider = ({ children }: { children: ReactNode }) => {
   const fetchSubscription = useCallback(async (): Promise<boolean> => {
     if (!user) {
       setIsPremium(false);
+      setIsTrial(false);
       setExpiresAt(null);
       setPlan(null);
       setRcEntitlement(null);
@@ -64,6 +68,7 @@ export const PremiumProvider = ({ children }: { children: ReactNode }) => {
     if (rcRes.data?.isPremium) {
           const wasNotPremium = !isPremium;
           setIsPremium(true);
+          setIsTrial(!!rcRes.data.isTrial);
           setExpiresAt(new Date(rcRes.data.expiresAt));
           setPlan(rcRes.data.plan);
           setRcEntitlement(rcRes.data.rcEntitlement || "premium");
@@ -91,6 +96,7 @@ export const PremiumProvider = ({ children }: { children: ReactNode }) => {
     if (data && new Date(data.expires_at) > new Date()) {
       const wasNotPremium = !isPremium;
       setIsPremium(true);
+      setIsTrial(!!data.is_trial);
       setExpiresAt(new Date(data.expires_at));
       setPlan(data.plan);
       setRcEntitlement(data.rc_entitlement || "premium");
@@ -101,6 +107,7 @@ export const PremiumProvider = ({ children }: { children: ReactNode }) => {
       return true;
     } else {
       setIsPremium(false);
+      setIsTrial(false);
       setExpiresAt(null);
       setPlan(null);
       setRcEntitlement(null);
@@ -146,7 +153,7 @@ export const PremiumProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <PremiumContext.Provider value={{ isPremium, expiresAt, plan, rcEntitlement, activatePremium, refreshSubscription: fetchSubscription, onPurchaseConfirmed, loading }}>
+    <PremiumContext.Provider value={{ isPremium, isTrial, expiresAt, plan, rcEntitlement, activatePremium, refreshSubscription: fetchSubscription, onPurchaseConfirmed, loading }}>
       {children}
     </PremiumContext.Provider>
   );

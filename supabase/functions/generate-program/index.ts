@@ -262,7 +262,7 @@ CRITICAL SCHEDULING CONSTRAINTS (apply to EVERY week of the plan):
 
 IMPORTANT: Use a VARIETY of workout types throughout the plan. Do NOT only use Easy Run, Tempo Run, Interval, Long Run, and Rest. You MUST include Cross Training days (especially for recovery days) and Progression Run sessions (at least once every 2-3 weeks). A good plan uses ALL available workout types across the training cycle.
 
-IMPORTANT: For road/non-trail workouts, calculate and include appropriate pace per km based on road training effort, not trail race average pace. For Trail Run and Trail Race workouts, set pace to null and use elevation_m + eph instead.
+IMPORTANT: ${isTrailRace ? "For this trail race plan, do NOT calculate easy/recovery paces from the trail race finishing time. Use effort/HR wording for easy/recovery runs. Keep only optional road interval structure for leg speed, and set Trail Run / Trail Race pace to null with elevation_m + eph." : "For road/non-trail workouts, calculate and include appropriate pace per km based on road training effort. For Trail Run and Trail Race workouts, set pace to null and use elevation_m + eph instead."}
 
 The program will start on ${startDate || "today"} (week 1, day 1 = Monday of that week's training cycle) and end on/around the race date ${raceDate}. Be progressive, practical, include taper in the last 1-2 weeks. Use km for distances.
 

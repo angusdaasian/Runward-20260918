@@ -4,6 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 
 interface PremiumContextType {
   isPremium: boolean;
+  isTrial: boolean;
   expiresAt: Date | null;
   plan: string | null;
   rcEntitlement: string | null;
@@ -15,6 +16,7 @@ interface PremiumContextType {
 
 const PremiumContext = createContext<PremiumContextType>({
   isPremium: false,
+  isTrial: false,
   expiresAt: null,
   plan: null,
   rcEntitlement: null,

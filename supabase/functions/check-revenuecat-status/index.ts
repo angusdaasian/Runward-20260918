@@ -174,7 +174,7 @@ Deno.serve(async (req) => {
         console.error("Upsert error:", upsertError);
       }
 
-      await serviceClient.from("profiles").update({ is_premium: true }).eq("user_id", userId);
+      await serviceClient.from("profiles").update({ is_premium: true, is_trial: isTrial }).eq("user_id", userId);
 
       return new Response(
         JSON.stringify({ isPremium: true, plan, expiresAt, rcEntitlement, isTrial, synced: true }),

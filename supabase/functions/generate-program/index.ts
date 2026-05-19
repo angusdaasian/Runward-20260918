@@ -256,7 +256,7 @@ WEEKLY MILEAGE PROGRESSION RULES (MUST follow strictly):
 - Verify your generated plan: for every consecutive non-recovery week pair, (next_week_km / prev_week_km) ≤ 1.10. If a week would violate this, reduce its volume.
 
 CRITICAL SCHEDULING CONSTRAINTS (apply to EVERY week of the plan):
-- The runner's preferred LONG RUN day is "${longRunDay || "Sun"}". Schedule the "Long Run" workout on this day every week (except optional taper/race week adjustments).
+- The runner's preferred LONG RUN day is "${longRunDay || "Sun"}". ${isTrailRace ? 'For this trail race plan, schedule this as a "Trail Run" long run every build week, not a road "Long Run".' : 'Schedule the "Long Run" workout on this day every week (except optional taper/race week adjustments).'}
 - The runner's preferred REST day(s) are: ${Array.isArray(restDays) && restDays.length ? restDays.map((d: string) => `"${d}"`).join(", ") : '"Mon"'}. These days MUST be "Rest" type every week.
 - Place quality sessions (Tempo, Interval, Progression, Race Pace) on non-rest days, ideally with at least one easy/recovery day between hard efforts and before the long run.
 

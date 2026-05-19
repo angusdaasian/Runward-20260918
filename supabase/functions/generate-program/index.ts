@@ -317,7 +317,10 @@ serve(async (req) => {
       const baseStr = (startDate && /^\d{4}-\d{2}-\d{2}$/.test(startDate))
         ? startDate
         : new Date().toISOString().slice(0, 10);
-      const base = new Date(baseStr + "T00:00:00Z");
+      const rawBase = new Date(baseStr + "T00:00:00Z");
+      // Snap to Monday of the week containing the start date so plan weeks always start on Monday.
+      const offsetToMon = (rawBase.getUTCDay() + 6) % 7;
+      const base = new Date(rawBase.getTime() - offsetToMon * 86400000);
       if (!isNaN(base.getTime())) {
         for (let w = 0; w < planData.length; w++) {
           const week = planData[w];

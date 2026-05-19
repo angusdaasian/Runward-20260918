@@ -435,6 +435,14 @@ Return ONLY valid JSON, no markdown, no explanation.`;
       planData = [];
     }
 
+    // Trail race plans are business-critical and the model sometimes returns
+    // malformed/empty JSON for long vertical plans. Never let that erase the
+    // user's active plan; fall back to a deterministic trail-specific build.
+    if (isTrailRace && (!Array.isArray(planData) || planData.length === 0)) {
+      console.warn("AI returned empty trail race plan; using deterministic fallback");
+      planData = buildDeterministicTrailRacePlan();
+    }
+
     // Post-process: validate interval descriptions follow set format
     const intervalPattern = /^\d+m?\s*x\s*\d+/i;
     if (Array.isArray(planData)) {

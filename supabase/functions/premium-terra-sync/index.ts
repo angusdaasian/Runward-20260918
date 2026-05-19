@@ -135,13 +135,31 @@ Deno.serve(async (req) => {
       return json({ error: "no_terra_connection", message: "No active Terra connection found." }, 404);
     }
 
-    const tryFetch = async (creds: { apiKey: string; devId: string }, terraUserId: string) => {
+    // Per Terra docs: ranges > 28 days are always delivered asynchronously via
+    // webhook chunks (max 10MB / 10 items per chunk). Since 2026-01-01 → today
+    // is > 28 days, we MUST use to_webhook=true and let terra-webhook upsert
+    // the chunks as they arrive. A synchronous call without end_date only
+    // returns the single START_DATE day, which is the bug we just observed.
+    const END_DATE = new Date().toISOString().slice(0, 10);
+
+    // Endpoints to backfill. /activity is the headline one for runners, but we
+    // also pull /daily, /sleep, /body so the user gets a full historical
+    // profile when they tap the premium sync button.
+    const ENDPOINTS = ["/activity", "/daily", "/sleep", "/body"] as const;
+
+    const tryFetch = async (
+      creds: { apiKey: string; devId: string },
+      terraUserId: string,
+      endpoint: string,
+    ) => {
       const qs = new URLSearchParams({
         user_id: terraUserId,
         start_date: START_DATE,
+        end_date: END_DATE,
         with_samples: "true",
+        to_webhook: "true",
       });
-      const url = `https://api.tryterra.co/v2/activity?${qs.toString()}`;
+      const url = `https://api.tryterra.co/v2${endpoint}?${qs.toString()}`;
       const resp = await fetch(url, {
         headers: {
           "x-api-key": creds.apiKey,
@@ -160,58 +178,88 @@ Deno.serve(async (req) => {
       if (prodCreds.apiKey && prodCreds.devId) attempts.push({ env: "prod", creds: prodCreds });
       if (testCreds.apiKey && testCreds.devId) attempts.push({ env: "test", creds: testCreds });
 
-      let chosen: { env: "prod" | "test"; resp: Response; body: any; terraReference: string | null } | null = null;
-      let lastError: { env: "prod" | "test"; status: number; body: any; terraReference: string | null } | null = null;
+      // Pick the env that works for this connection (probe with /activity).
+      let chosenEnv: { env: "prod" | "test"; creds: typeof prodCreds } | null = null;
+      let probeRef: string | null = null;
+      let probeStatus = 0;
+      let lastError: { env: "prod" | "test"; status: number; body: any } | null = null;
 
-      for (const { env, creds } of attempts) {
-        const { url, resp, body, terraReference } = await tryFetch(creds, conn.terra_user_id);
-        console.log(`[premium-terra-sync] ${conn.provider} try=${env} status=${resp.status} url=${url}`);
-        if (resp.ok) {
-          chosen = { env, resp, body, terraReference };
+      for (const attempt of attempts) {
+        const { resp, body, terraReference } = await tryFetch(attempt.creds, conn.terra_user_id, "/activity");
+        console.log(`[premium-terra-sync] ${conn.provider} /activity try=${attempt.env} status=${resp.status} ref=${terraReference}`);
+        if (resp.ok || resp.status === 202) {
+          chosenEnv = attempt;
+          probeRef = terraReference;
+          probeStatus = resp.status;
           break;
         }
-        lastError = { env, status: resp.status, body, terraReference };
-        if (resp.status !== 404) {
-          // non-404 error: don't bother retrying with the other env
-          break;
-        }
-        console.log(`[premium-terra-sync] ${conn.provider} try=${env} 404 -> retry other env`);
+        lastError = { env: attempt.env, status: resp.status, body };
+        if (resp.status !== 404) break;
       }
 
-      if (!chosen) {
+      if (!chosenEnv) {
         console.error(`[premium-terra-sync] ${conn.provider} all envs failed`, lastError);
         results.push({
           provider: conn.provider,
           env: lastError?.env,
           status: lastError?.status,
           error: lastError?.body?.message ?? lastError?.body?.detail ?? "terra_error",
-          terraReference: lastError?.terraReference,
         });
         continue;
       }
 
-      const activities: any[] = Array.isArray(chosen.body?.data) ? chosen.body.data : [];
-      let upserted = 0;
-      for (const a of activities) {
+      // Fire off the remaining endpoints on the working env. /activity was
+      // already triggered by the probe above — collect its reference too.
+      const endpointResults: Array<{ endpoint: string; status: number; ref: string | null }> = [
+        { endpoint: "/activity", status: probeStatus, ref: probeRef },
+      ];
+      for (const endpoint of ENDPOINTS) {
+        if (endpoint === "/activity") continue;
         try {
-          await upsertActivity(admin, conn, a);
-          upserted++;
+          const { resp, terraReference } = await tryFetch(chosenEnv.creds, conn.terra_user_id, endpoint);
+          console.log(`[premium-terra-sync] ${conn.provider} ${endpoint} status=${resp.status} ref=${terraReference}`);
+          endpointResults.push({ endpoint, status: resp.status, ref: terraReference });
         } catch (e) {
-          console.error(`[premium-terra-sync] upsert error`, e);
+          console.error(`[premium-terra-sync] ${conn.provider} ${endpoint} error`, e);
+          endpointResults.push({ endpoint, status: 0, ref: null });
         }
       }
 
       results.push({
         provider: conn.provider,
-        env: chosen.env,
-        status: chosen.resp.status,
-        terraReference: chosen.terraReference,
-        fetched: activities.length,
-        upserted,
+        env: chosenEnv.env,
+        mode: "async_webhook",
+        requests: endpointResults,
       });
     }
 
-    return json({ success: true, startDate: START_DATE, results });
+    // If the user also has a Garmin Railway connection, kick off a full
+    // garmin-sync so Railway-imported activities are refreshed too.
+    try {
+      const { data: garminConn } = await admin
+        .from("garmin_connections")
+        .select("user_id")
+        .eq("user_id", userId)
+        .maybeSingle();
+      if (garminConn) {
+        console.log(`[premium-terra-sync] also invoking garmin-sync for user=${userId}`);
+        admin.functions
+          .invoke("garmin-sync", { headers: { Authorization: auth } })
+          .catch((e) => console.error("[premium-terra-sync] garmin-sync invoke failed", e));
+      }
+    } catch (e) {
+      console.error("[premium-terra-sync] garmin-sync trigger error", e);
+    }
+
+    return json({
+      success: true,
+      startDate: START_DATE,
+      endDate: END_DATE,
+      mode: "async_webhook",
+      message:
+        "Historical sync queued. Terra will deliver activities to the webhook in chunks (this can take a few minutes for large ranges).",
+      results,
+    });
   } catch (err) {
     console.error("[premium-terra-sync] fatal", err);
     return json({ error: "internal_error", message: String(err) }, 500);

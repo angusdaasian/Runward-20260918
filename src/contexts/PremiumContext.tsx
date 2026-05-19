@@ -149,7 +149,7 @@ export const PremiumProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <PremiumContext.Provider value={{ isPremium, expiresAt, plan, rcEntitlement, activatePremium, refreshSubscription: fetchSubscription, onPurchaseConfirmed, loading }}>
+    <PremiumContext.Provider value={{ isPremium, isTrial, expiresAt, plan, rcEntitlement, activatePremium, refreshSubscription: fetchSubscription, onPurchaseConfirmed, loading }}>
       {children}
     </PremiumContext.Provider>
   );

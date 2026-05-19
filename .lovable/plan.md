@@ -1,71 +1,57 @@
-## Goal
+## Diagnosis
 
-Add three new "share as image" flows that reuse the existing canvas-based share infrastructure in `src/lib/shareActivity.ts` (which already does native save / Web Share / download via `distributeImageBlob`):
+`premium-terra-sync` failed with Terra `404 invalid user id` for `terra_user_id=157c9880-5221-4877-ba78-23b5ec3d7738` (user `c7a7d1ca…`).
 
-1. Share a week of the AI training plan (Mon–Sun, with each day's workout details).
-2. Share a weekly training review (scores + insight).
-3. Share an activity's AI analysis (per-activity).
+The `terra_user_id` is real — `terra_activities` already has 62 rows for this user from the regular sync. The 404 happens because `pickEnvFromRequest` chose the **test** Terra credentials (the call came from `id-preview--*.lovable.app`), but the Garmin connection was registered in **prod** Terra. Test Terra has never heard of that user id, so it 404s.
 
-All three follow the same pattern: render a portrait PNG on `<canvas>` → call `distributeImageBlob(...)` (already exported) → success toast.
+## Fix
 
-## What to build
+Stop guessing the Terra env from the request host inside `premium-terra-sync`. Instead, resolve it per connection and fall back gracefully.
 
-### 1. New library: `src/lib/sharePlanWeek.ts`
+### Step 1 — Try prod creds first, then test, per connection
 
-- Export `shareTrainingWeek({ weekIndex, week: WeekPlan, lang, athleteName? })`.
-- Canvas layout (1080×1920, brand styling matching existing share cards):
-  - Header: "Week N · {startDate} → {endDate}" + Runward logo.
-  - 7 day rows (Mon–Sun), each row:
-    - Left: day name + date
-    - Color chip / emoji from RUN_TYPES
-    - Title (localized via `localizeTitle`)
-    - Distance + pace
-    - 1–2 lines of description (use `localizeDescription` — already exported logic in TrainingTab; lift the helper into `src/lib/planFormatting.ts` so it can be reused by both TrainingTab and the share lib).
-  - Footer: app icon + URL.
-- Reorder days so Monday is first (`days` is keyed by date, just sort by weekday Mon→Sun).
+In `supabase/functions/premium-terra-sync/index.ts`:
 
-### 2. New library: `src/lib/shareWeeklyReview.ts`
+- Build two credential sets: `getTerraCreds("prod")` and `getTerraCreds("test")`.
+- For each `terra_connection`, call Terra with **prod** creds first.
+  - If response is `404` with `detail: "invalid user id"` (or any 404), retry once with **test** creds.
+  - Use the env that returned 2xx for the rest of that connection.
+- Record the env actually used in the per-connection result returned to the client (`env: "prod" | "test"`), so we can see it in logs/UI.
+- Keep existing upsert + summary logic unchanged.
 
-- Export `shareWeeklyReview({ review, lang })` where `review` matches the `Review` interface in `WeeklyReviewModal.tsx`.
-- Canvas layout:
-  - Header: "Weekly Training Review" + week range.
-  - Big overall score ring (reuse drawing math, or render simple circle + number).
-  - 4 sub-score tiles: Distance / Pace / HR / Recovery with numeric values.
-  - Completion %: `completed_runs/planned_runs · actual_km/planned_km`.
-  - Insight paragraph (truncate / wrap to fit, max ~6 lines).
-  - Footer branding.
+This makes the function robust regardless of which dashboard/preview triggered it, and matches the reality that a single Supabase user can in principle have connections in either env.
 
-### 3. New library: `src/lib/shareActivityAnalysis.ts`
+### Step 2 — Log clearly
 
-- Export `shareActivityAnalysis({ activity, analysis, lang })`.
-- Canvas layout:
-  - Hero strip: activity name, date, distance / time / pace stat row (reuse formatters from `shareActivity.ts` — export the helpers or duplicate).
-  - "AI Coach Analysis" heading.
-  - Analysis paragraph (wrap, multi-page guard: cap at ~700 chars with ellipsis).
-  - Optional "Next workout" block when `next_workout_en/zh` exists.
-  - Footer branding.
+Update the existing `[premium-terra-sync] …` logs to include the env that was tried and the final env that succeeded, e.g.:
 
-### 4. UI hookup (frontend only, no business-logic changes)
+```
+[premium-terra-sync] GARMIN try=prod status=200 fetched=43
+[premium-terra-sync] GARMIN try=prod status=404 -> retry test
+[premium-terra-sync] GARMIN try=test status=200 fetched=43
+```
 
-- **TrainingTab (`src/components/TrainingTab.tsx`)**: add a small "Share week" button (icon `Share2`) near the current week header (both AI plan and custom plan branches). On click → call `shareTrainingWeek` with the currently displayed `WeekPlan` and `weekIndex`.
-- **WeeklyReviewModal (`src/components/training/WeeklyReviewModal.tsx`)**: add a "Share" outline button next to the existing "Regenerate this week" button. On click → `shareWeeklyReview({ review, lang })`.
-- **ActivityDetail (`src/components/activities/ActivityDetail.tsx`)**: in the AI analysis card, add a "Share analysis" button. On click → `shareActivityAnalysis({ activity, analysis, lang })`. (The existing share menu already shares the activity card; this is a separate analysis-only share.)
+### Step 3 — (Optional, follow-up, not in this change)
 
-### 5. Shared helpers
+Longer-term cleanup so we don't rely on trial-and-error:
 
-- Extract `localizeTitle` / `localizeDescription` / `RUN_TYPES` / `TYPE_LABELS` from `TrainingTab.tsx` into a new `src/lib/planFormatting.ts` and re-import in TrainingTab + ProgramsTab + the new share lib. Pure refactor, no behavior change.
-- All three share libs reuse `distributeImageBlob`, `fmtDistance`, `fmtPace`, `fmtTimeShort` from `shareActivity.ts` — export the formatters that are currently file-local.
+- Add a nullable `terra_env text` column to `terra_connections`.
+- Have `terra-auth-init` write the env it used when creating the auth link.
+- Have `terra-webhook` backfill `terra_env` on `auth` / `user_reauth` events.
+- Then `premium-terra-sync` (and `terra-sync`) can read the env straight from the connection row instead of probing.
 
-## Out of scope
+Flag this as a follow-up; not required to unblock the user.
 
-- No DB / edge-function changes.
-- No new push notifications.
-- No changes to Cantonese / language picker work.
-- No changes to the existing per-activity share card or custom-share dialog.
+## Files touched
 
-## Technical notes
+- `supabase/functions/premium-terra-sync/index.ts` — prod-then-test fallback + clearer logs.
 
-- Canvas font stack and brand colors should match `shareActivity.ts` (system fonts, dark card with light text, app icon + `pacecalculator.fun` footer).
-- Bilingual labels (`lang === "zh"`) follow the same pattern as existing share code.
-- All text wrapped via a `wrapText(ctx, text, maxWidth)` helper (duplicate the small one from `shareActivity.ts` or export it).
-- Cap canvas height per share to keep image under ~2 MB; truncate long insights/analyses with `…`.
+No DB migration, no client changes, no changes to `check-revenuecat-status` or `PremiumSyncButton`.
+
+## Verification
+
+After deploy, re-invoke `premium-terra-sync` from the preview as user `c7a7d1ca…`:
+
+- Expect logs to show `try=prod status=200` for GARMIN.
+- Expect response `results: [{ provider: "GARMIN", env: "prod", status: 200, fetched: N, upserted: N }]`.
+- Spot-check `terra_activities` for new rows with `start_time >= 2026-01-01` for this user.

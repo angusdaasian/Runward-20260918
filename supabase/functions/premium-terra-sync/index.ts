@@ -116,10 +116,12 @@ Deno.serve(async (req) => {
       );
     }
 
-    // --- Terra creds ---
-    const env = pickEnvFromRequest(req);
-    const { apiKey, devId } = getTerraCreds(env);
-    if (!apiKey || !devId) return json({ error: "terra_not_configured" }, 500);
+    // --- Terra creds (try prod first, fall back to test) ---
+    const prodCreds = getTerraCreds("prod");
+    const testCreds = getTerraCreds("test");
+    if (!prodCreds.apiKey && !testCreds.apiKey) {
+      return json({ error: "terra_not_configured" }, 500);
+    }
 
     // --- Terra connections ---
     const { data: connections, error: connErr } = await admin

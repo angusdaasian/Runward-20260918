@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { Lang, t } from "@/lib/i18n";
 import { Button } from "@/components/ui/button";
-import { Loader2, Lock, ChevronLeft, ChevronRight, Plus, Calendar, Target, Trophy, Clock, Repeat, Route } from "lucide-react";
+import { Loader2, Lock, ChevronLeft, ChevronRight, Plus, Calendar, Target, Trophy, Clock, Repeat, Route, Sparkles } from "lucide-react";
 import { usePremium } from "@/contexts/PremiumContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { notifyPlanChanged, subscribePlanChanged } from "@/lib/planEvents";
 import EditWorkoutDialog from "@/components/training/EditWorkoutDialog";
+import { useActivities } from "@/hooks/use-activities";
 
 type Goal = "race" | "distance" | "first5k" | "parkrun" | "general" | "postnatal" | "fitness" | "injury" | "postrace";
 type Distance = "5K" | "10K" | "HM" | "FM";
@@ -196,6 +197,9 @@ const ProgramsTab = ({ lang, onLoginRequest }: Props) => {
   const { isPremium } = usePremium();
   const { user } = useAuth();
   const { toast } = useToast();
+  const { activities } = useActivities();
+  const [predicting, setPredicting] = useState(false);
+  const [predictionRationale, setPredictionRationale] = useState<string | null>(null);
 
   // Questionnaire state
   const [step, setStep] = useState<"goal" | "details" | "calendar">("goal");
@@ -284,6 +288,58 @@ const ProgramsTab = ({ lang, onLoginRequest }: Props) => {
       setStep("details");
     }
   };
+
+  const handlePredictTarget = async () => {
+    if (!distance || predicting) return;
+    setPredicting(true);
+    setPredictionRationale(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("predict-race-time", {
+        body: {
+          distance,
+          raceDate: raceDate || null,
+          lang,
+          activities: (activities || []).slice(0, 30).map((a: any) => ({
+            start_date: a.start_date,
+            sport_type: a.sport_type,
+            distance: a.distance,
+            moving_time: a.moving_time,
+            elapsed_time: a.elapsed_time,
+            average_heartrate: a.average_heartrate,
+            total_elevation_gain: a.total_elevation_gain,
+          })),
+        },
+      });
+      if (error) throw error;
+      if ((data as any)?.error === "no_recent_runs") {
+        toast({
+          title: lang === "zh" ? "沒有最近的跑步紀錄" : "No recent runs found",
+          description: lang === "zh" ? "同步跑步活動後再試。" : "Sync some running activities and try again.",
+          variant: "destructive",
+        });
+        return;
+      }
+      if ((data as any)?.error) throw new Error((data as any).error);
+
+      const h = String((data as any).hours ?? 0);
+      const m = String((data as any).minutes ?? 0).padStart(2, "0");
+      const s = String((data as any).seconds ?? 0).padStart(2, "0");
+      setTargetHours(h);
+      setTargetMinutes(m);
+      setTargetSeconds(s);
+      setTargetTime(distance === "HM" || distance === "FM" ? `${h}:${m}:${s}` : `${m}:${s}`);
+      setPredictionRationale((data as any).rationale || null);
+    } catch (e: any) {
+      toast({
+        title: lang === "zh" ? "預測失敗" : "Prediction failed",
+        description: e?.message || (lang === "zh" ? "請稍後再試" : "Please try again later"),
+        variant: "destructive",
+      });
+    } finally {
+      setPredicting(false);
+    }
+  };
+
 
   const handleGenerate = async () => {
     if (!distance || !targetTime || !raceDate || !dateValid) return;
@@ -520,7 +576,30 @@ const ProgramsTab = ({ lang, onLoginRequest }: Props) => {
                 className="w-16 text-center"
               />
             </div>
-            <p className="text-xs text-muted-foreground mt-1">
+            <div className="mt-3 rounded-lg border border-primary/30 bg-primary/5 p-3">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 text-xs font-medium text-foreground">
+                  <Sparkles size={14} className="text-primary" />
+                  {lang === "zh" ? "用 AI 根據近期表現預測" : "Predict from recent performance"}
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={handlePredictTarget}
+                  disabled={predicting || !distance}
+                  className="h-8 px-3 text-xs"
+                >
+                  {predicting ? (
+                    <><Loader2 size={12} className="mr-1 animate-spin" />{lang === "zh" ? "預測中" : "Predicting"}</>
+                  ) : (lang === "zh" ? "預測目標時間" : "Suggest target")}
+                </Button>
+              </div>
+              {predictionRationale && (
+                <p className="text-[11px] text-muted-foreground mt-2 leading-snug">{predictionRationale}</p>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">
               {lang === "zh" ? "輸入你的目標完成時間" : "Enter your target finish time"}
             </p>
           </div>

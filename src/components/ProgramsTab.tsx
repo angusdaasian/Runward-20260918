@@ -902,66 +902,81 @@ const ProgramsTab = ({ lang, onLoginRequest }: Props) => {
         </p>
       </div>
 
-      {/* On-track checker */}
-      {existingPlan?.target_time && ["5K", "10K", "HM", "FM"].includes(existingPlan?.distance) && (
-        <div className="bg-card border border-border rounded-xl p-3 mb-4">
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <Target size={14} className="text-primary" />
+      {/* Current race estimate */}
+      {canPredictRaceTime && (
+        <div className="bg-primary/10 border-2 border-primary rounded-xl p-4 mb-4 shadow-sm">
+          <div className="flex items-start justify-between gap-3 mb-4">
+            <div className="flex items-start gap-3">
+              <div className="h-10 w-10 rounded-lg bg-primary text-primary-foreground flex items-center justify-center flex-shrink-0">
+                <Target size={20} />
+              </div>
               <div>
-                <div className="text-sm font-semibold text-foreground">
-                  {lang === "zh" ? "進度檢查" : "On-track check"}
-                </div>
-                <div className="text-[11px] text-muted-foreground">
-                  {lang === "zh" ? "目標" : "Target"}: {existingPlan.target_time}
-                </div>
+                <h2 className="text-base font-bold text-foreground leading-tight">
+                  {lang === "zh" ? "目前預測比賽時間" : "Current Estimated Race Time"}
+                </h2>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {lang === "zh" ? "根據最近跑步表現自動檢查是否達標" : "Auto-checks if recent performance is on pace for this program"}
+                </p>
               </div>
             </div>
             <Button
               type="button"
               size="sm"
               variant="outline"
-              onClick={handleCheckOnTrack}
-              disabled={trackChecking}
-              className="h-8 px-3 text-xs"
+              onClick={() => handleCheckOnTrack(true)}
+              disabled={trackChecking || activitiesLoading}
+              className="h-9 px-3 text-xs bg-background/80"
             >
               {trackChecking ? (
-                <><Loader2 size={12} className="mr-1 animate-spin" />{lang === "zh" ? "分析中" : "Checking"}</>
+                <><Loader2 size={12} className="mr-1 animate-spin" />{lang === "zh" ? "分析中" : "Analyzing"}</>
               ) : (
-                <><Sparkles size={12} className="mr-1" />{lang === "zh" ? "檢查進度" : "Check progress"}</>
+                <><Sparkles size={12} className="mr-1" />{lang === "zh" ? "更新" : "Refresh"}</>
               )}
             </Button>
           </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded-lg border border-border bg-background/80 p-3">
+              <div className="text-[11px] font-medium uppercase text-muted-foreground">{lang === "zh" ? "計劃目標" : "Program target"}</div>
+              <div className="mt-1 text-xl font-bold text-foreground">{targetSecForDisplay ? fmtSec(targetSecForDisplay) : activeTargetTime}</div>
+              <div className="text-[11px] text-muted-foreground">{activeDistance}</div>
+            </div>
+            <div className="rounded-lg border border-border bg-background/80 p-3">
+              <div className="text-[11px] font-medium uppercase text-muted-foreground">{lang === "zh" ? "目前預測" : "Current estimate"}</div>
+              <div className="mt-1 text-xl font-bold text-primary">
+                {trackChecking || activitiesLoading ? "…" : trackResult?.predictedLabel || "--:--"}
+              </div>
+              <div className="text-[11px] text-muted-foreground">
+                {trackResult ? (lang === "zh" ? "Gemini 預測" : "Gemini prediction") : (lang === "zh" ? "等待分析" : "Waiting for analysis")}
+              </div>
+            </div>
+          </div>
+
           {trackResult && (() => {
             const delta = trackResult.predictedSec - trackResult.targetSec;
-            const onTrack = delta <= 30; // within 30s = on track
+            const onTrack = delta <= 30;
             const ahead = delta < -30;
-            const behindSec = Math.abs(delta);
-            const behindLabel = `${Math.floor(behindSec / 60)}:${String(Math.round(behindSec % 60)).padStart(2, "0")}`;
-            const statusColor = ahead
-              ? "bg-emerald-500/10 border-emerald-500/40 text-emerald-600 dark:text-emerald-400"
-              : onTrack
-              ? "bg-primary/10 border-primary/40 text-primary"
-              : "bg-amber-500/10 border-amber-500/40 text-amber-600 dark:text-amber-400";
+            const diffSec = Math.abs(delta);
+            const diffLabel = `${Math.floor(diffSec / 60)}:${String(Math.round(diffSec % 60)).padStart(2, "0")}`;
+            const statusClass = ahead || onTrack ? "border-primary bg-primary/10 text-primary" : "border-destructive/40 bg-destructive/10 text-destructive";
             const statusText = ahead
-              ? (lang === "zh" ? `領先目標 ${behindLabel}` : `Ahead of target by ${behindLabel}`)
+              ? (lang === "zh" ? `快過目標 ${diffLabel}` : `Ahead of target by ${diffLabel}`)
               : onTrack
-              ? (lang === "zh" ? "進度良好" : "On track")
-              : (lang === "zh" ? `落後目標 ${behindLabel}` : `Behind target by ${behindLabel}`);
+              ? (lang === "zh" ? "進度良好：正在達標" : "On track for the program target")
+              : (lang === "zh" ? `慢過目標 ${diffLabel}` : `Behind target by ${diffLabel}`);
             return (
-              <div className={`mt-3 rounded-lg border p-2.5 ${statusColor}`}>
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold">{statusText}</span>
-                  <span className="text-[11px] opacity-80">
-                    {lang === "zh" ? "目前預測" : "Current prediction"}: {trackResult.predictedLabel}
-                  </span>
-                </div>
-                {trackResult.rationale && (
-                  <p className="text-[11px] mt-1 opacity-90 leading-snug">{trackResult.rationale}</p>
-                )}
+              <div className={`mt-3 rounded-lg border p-3 ${statusClass}`}>
+                <div className="text-sm font-bold">{statusText}</div>
+                {trackResult.rationale && <p className="text-xs mt-1 opacity-90 leading-snug">{trackResult.rationale}</p>}
               </div>
             );
           })()}
+
+          {trackError && (
+            <div className="mt-3 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-xs text-destructive">
+              {trackError}
+            </div>
+          )}
         </div>
       )}
 

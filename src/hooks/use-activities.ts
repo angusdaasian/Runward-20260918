@@ -78,7 +78,7 @@ const appEnv = getAppEnvironment();
 async function fetchActivities(userId: string): Promise<StravaActivity[]> {
   const { data } = await supabase
     .from("strava_activities")
-    .select("*")
+    .select("id,strava_id,name,sport_type,distance,moving_time,elapsed_time,total_elevation_gain,start_date,average_speed,max_speed,average_heartrate,max_heartrate,summary_polyline,calories,weather,garmin_training_load,avg_cadence")
     .eq("user_id", userId)
     .eq("environment", appEnv)
     .order("start_date", { ascending: false });
@@ -88,7 +88,7 @@ async function fetchActivities(userId: string): Promise<StravaActivity[]> {
 async function fetchAppleHealthActivities(userId: string): Promise<StravaActivity[]> {
   const { data } = await supabase
     .from("apple_health_activities")
-    .select("*")
+    .select("id,name,sport_type,distance,moving_time,elapsed_time,total_elevation_gain,start_date,average_speed,max_speed,average_heartrate,max_heartrate,source,calories,weather")
     .eq("user_id", userId)
     .order("start_date", { ascending: false });
   return ((data as any[]) || []).map((a) => ({
@@ -113,7 +113,7 @@ async function fetchProfile(userId: string) {
 async function fetchGarminActivities(userId: string): Promise<StravaActivity[]> {
   const { data } = await supabase
     .from("garmin_activities")
-    .select("*")
+    .select("id,garmin_activity_id,activity_name,activity_type,distance_meters,duration_seconds,elevation_gain,start_time,average_speed,average_pace,average_hr,max_hr,summary_polyline,calories,weather,training_load,avg_cadence")
     .eq("user_id", userId)
     .order("start_time", { ascending: false });
   return ((data as any[]) || []).map((a) => {

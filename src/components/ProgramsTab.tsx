@@ -197,6 +197,9 @@ const ProgramsTab = ({ lang, onLoginRequest }: Props) => {
   const { isPremium } = usePremium();
   const { user } = useAuth();
   const { toast } = useToast();
+  const { activities } = useActivities();
+  const [predicting, setPredicting] = useState(false);
+  const [predictionRationale, setPredictionRationale] = useState<string | null>(null);
 
   // Questionnaire state
   const [step, setStep] = useState<"goal" | "details" | "calendar">("goal");

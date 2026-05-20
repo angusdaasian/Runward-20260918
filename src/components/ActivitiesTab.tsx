@@ -671,6 +671,39 @@ const ActivitiesTab = ({ lang }: Props) => {
     setResyncing(false);
   }, [user, resyncing, appleHealth, invalidateAll, lang]);
 
+  const handleSelectActivity = useCallback(async (act: StravaActivity) => {
+    setSelectedActivity(act);
+    try {
+      const table = act.provenance === "terra"
+        ? "terra_activities"
+        : act.provenance === "garmin"
+          ? "garmin_activities"
+          : act.source === "Apple Health"
+            ? "apple_health_activities"
+            : "strava_activities";
+      const { data } = await supabase.from(table as any).select("*").eq("id", act.id).maybeSingle();
+      if (!data) return;
+      const row: any = data;
+      if (act.provenance === "terra") {
+        setSelectedActivity({
+          ...act,
+          laps: row.laps || [],
+          hr_samples: row.hr_samples || null,
+          distance_samples: row.distance_samples || null,
+          elevation_samples: row.elevation_samples || null,
+          cadence_samples: row.cadence_samples || null,
+          map_screenshot_url: row.raw_json?.map_screenshot_url ?? null,
+        });
+      } else if (act.provenance === "garmin") {
+        setSelectedActivity({ ...act, laps: row.laps || [], map_screenshot_url: row.raw_json?.map_screenshot_url ?? null });
+      } else {
+        setSelectedActivity({ ...act, ...(row as Partial<StravaActivity>) });
+      }
+    } catch {
+      // Keep the already-open summary if detail hydration fails.
+    }
+  }, []);
+
   if (loading) return <ActivityListSkeleton />;
 
   if (selectedActivity) {
@@ -727,7 +760,7 @@ const ActivitiesTab = ({ lang }: Props) => {
           activityScores={activityScores}
           activityLoads={activityLoads}
           isPremium={isPremium}
-          onSelect={setSelectedActivity}
+          onSelect={handleSelectActivity}
         />
       </FadeIn>
     );
@@ -786,7 +819,7 @@ const ActivitiesTab = ({ lang }: Props) => {
               score={activityScores[latestActivity.id]}
               load={activityLoads[latestActivity.id]}
               isPremium={isPremium}
-              onClick={() => setSelectedActivity(latestActivity)}
+              onClick={() => handleSelectActivity(latestActivity)}
             />
           </div>
         ) : (

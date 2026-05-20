@@ -438,11 +438,11 @@ const MonthlyActivityList = ({
   }
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-4">
       {groups.map((g) => {
         const isOpen = open.includes(g.key);
         return (
-          <div key={g.key} className="bg-card border border-border rounded-xl overflow-hidden">
+          <div key={g.key}>
             <button
               type="button"
               onClick={() =>
@@ -450,7 +450,7 @@ const MonthlyActivityList = ({
                   prev.includes(g.key) ? prev.filter((k) => k !== g.key) : [...prev, g.key],
                 )
               }
-              className="w-full flex items-center justify-between px-4 py-3 hover:bg-accent/40 transition-colors"
+              className="w-full flex items-center justify-between py-2 mb-2 border-b border-border"
             >
               <div className="flex flex-col items-start">
                 <span className="font-display text-base font-semibold text-foreground">{g.label}</span>
@@ -464,7 +464,7 @@ const MonthlyActivityList = ({
               />
             </button>
             {isOpen && (
-              <div className="px-3 pb-3 pt-1 space-y-3">
+              <div className="space-y-3">
                 {g.items.map((act) => (
                   <ActivityCard
                     key={act.id}

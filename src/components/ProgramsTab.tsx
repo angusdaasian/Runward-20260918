@@ -857,10 +857,6 @@ const ProgramsTab = ({ lang, onLoginRequest }: Props) => {
   };
 
   const DAY_LABELS = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
-  const activeTargetTime = existingPlan?.target_time || targetTime;
-  const activeDistance = existingPlan?.distance || distance;
-  const targetSecForDisplay = parseTargetToSec(activeTargetTime);
-  const canPredictRaceTime = !!activeTargetTime && typeof activeDistance === "string" && ["5K", "10K", "HM", "FM"].includes(activeDistance);
 
   return (
     <div className="px-5 pt-6 pb-8 max-w-lg mx-auto">

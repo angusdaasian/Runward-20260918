@@ -23,8 +23,6 @@ import { toast } from "sonner";
 import ActivityCalendar from "@/components/activities/ActivityCalendar";
 import MonthlyRoadQuest from "@/components/activities/MonthlyRoadQuest";
 
-// Heavy: pulls in leaflet + leaflet.css. Only needed when an activity card has a polyline.
-const ActivityMap = lazy(() => import("@/components/activities/ActivityMap"));
 // Heavy: pulls in react-markdown + share helpers + dialogs. Only needed after a card is tapped.
 const ActivityDetail = lazy(() => import("@/components/activities/ActivityDetail"));
 
@@ -388,11 +386,6 @@ const ActivityCard = ({
           )}
         </div>
 
-        {act.summary_polyline && (
-          <Suspense fallback={<div className="h-40 rounded-lg bg-muted/30 animate-pulse" />}>
-            <ActivityMap polyline={act.summary_polyline} />
-          </Suspense>
-        )}
       </>
     )}
   </div>

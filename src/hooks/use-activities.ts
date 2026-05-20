@@ -396,6 +396,8 @@ export function useActivities() {
     queryFn: () => fetchConnection(user!.id),
     enabled: !!user,
     staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+    placeholderData: { any: false, fitnessApp: false },
   });
 
   const workoutsQuery = useQuery({
@@ -403,6 +405,8 @@ export function useActivities() {
     queryFn: () => fetchPlannedWorkouts(user!.id),
     enabled: !!user,
     staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+    placeholderData: [],
   });
 
   // Instantly refresh planned workouts whenever the user changes their
@@ -419,6 +423,8 @@ export function useActivities() {
     queryFn: () => fetchUserRaces(user!.id),
     enabled: !!user,
     staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+    placeholderData: [],
   });
 
   // Merge Strava + Apple Health + Garmin + Terra activities (prefer Terra over duplicate Garmin imports)
@@ -525,7 +531,7 @@ export function useActivities() {
     fitnessAppConnected: connectionQuery.data?.fitnessApp ?? false,
     plannedWorkouts: workoutsQuery.data || [],
     userRaces: userRacesQuery.data || [],
-    loading: activitiesQuery.isLoading || appleHealthQuery.isLoading || garminQuery.isLoading || terraQuery.isLoading || profileQuery.isLoading || connectionQuery.isLoading,
+    loading: activitiesQuery.isLoading || appleHealthQuery.isLoading || garminQuery.isLoading || terraQuery.isLoading,
     invalidateAll,
   };
 }

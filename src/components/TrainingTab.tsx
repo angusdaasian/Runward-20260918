@@ -626,6 +626,70 @@ interface RaceSchedulePanelProps {
   onRemoveRace?: (raceId: string) => Promise<void> | void;
   onRegenerateForRaces?: () => Promise<void> | void;
 }
+
+interface RaceTimeEstimateCardProps {
+  lang: Lang;
+  distance: string;
+  targetTime: string;
+  result: TrackResult | null;
+  loading: boolean;
+  error: string | null;
+  onRefresh: () => void;
+}
+
+const RaceTimeEstimateCard: React.FC<RaceTimeEstimateCardProps> = ({ lang, distance, targetTime, result, loading, error, onRefresh }) => {
+  const targetSec = result?.targetSec ?? parseRaceTimeToSec(targetTime);
+  const delta = result && targetSec ? result.predictedSec - targetSec : null;
+  const isOnTrack = delta !== null && delta <= 0;
+  const L = (en: string, zh: string) => (lang === "zh" ? zh : en);
+
+  return (
+    <div className="bg-primary/10 border-2 border-primary rounded-xl p-4 mb-4 shadow-sm">
+      <div className="flex items-start justify-between gap-3 mb-4">
+        <div className="flex items-start gap-3">
+          <div className="h-10 w-10 rounded-lg bg-primary text-primary-foreground flex items-center justify-center flex-shrink-0">
+            <Target size={20} />
+          </div>
+          <div>
+            <h2 className="text-base font-bold text-foreground leading-tight">{L("Current Estimated Race Time", "目前預測比賽時間")}</h2>
+            <p className="text-xs text-muted-foreground mt-1">{L("Checks if this AI program is on track for the target", "檢查此 AI 計劃是否達到目標")}</p>
+          </div>
+        </div>
+        <Button type="button" size="sm" variant="outline" className="h-8 px-2 text-xs bg-background/60" onClick={onRefresh} disabled={loading}>
+          {loading ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />}
+          <span className="ml-1">{L("Refresh", "更新")}</span>
+        </Button>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2 mb-3">
+        <div className="rounded-lg bg-card border border-border p-3">
+          <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{L("Program Target", "計劃目標")}</p>
+          <p className="text-xl font-bold text-foreground mt-1">{targetTime || "--:--"}</p>
+          <p className="text-[11px] text-muted-foreground mt-0.5">{planDistanceLabel(distance, lang)}</p>
+        </div>
+        <div className="rounded-lg bg-card border border-border p-3">
+          <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{L("Gemini Prediction", "Gemini 預測")}</p>
+          <p className="text-xl font-bold text-foreground mt-1">{loading ? "…" : result?.predictedLabel || "--:--"}</p>
+          <p className="text-[11px] text-muted-foreground mt-0.5">{result ? L("Based on recent runs", "根據最近跑步") : L("Waiting for analysis", "等待分析")}</p>
+        </div>
+      </div>
+
+      {result && delta !== null && (
+        <div className={`rounded-lg border p-3 ${isOnTrack ? "bg-primary/10 border-primary/50" : "bg-destructive/10 border-destructive/50"}`}>
+          <p className={`text-sm font-bold ${isOnTrack ? "text-primary" : "text-destructive"}`}>
+            {isOnTrack
+              ? L(`On track — ahead by ${formatRaceTime(Math.abs(delta))}`, `達標中 — 快 ${formatRaceTime(Math.abs(delta))}`)
+              : L(`Behind target by ${formatRaceTime(delta)}`, `落後目標 ${formatRaceTime(delta)}`)}
+          </p>
+          {result.rationale && <p className="text-xs text-muted-foreground mt-1 leading-snug">{result.rationale}</p>}
+        </div>
+      )}
+
+      {error && <p className="text-xs text-destructive mt-2 leading-snug">{error}</p>}
+    </div>
+  );
+};
+
 const RaceSchedulePanel: React.FC<RaceSchedulePanelProps> = ({
   lang, races, currentRaces, racesDrift, regenerating,
   onUpdateRacePriority, onRemoveRace, onRegenerateForRaces,

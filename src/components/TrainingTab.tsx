@@ -585,6 +585,8 @@ const raceDistanceKm = (distance: unknown, planData?: any[]): number | null => {
   if (d === "10K") return 10;
   if (d === "HM") return 21.0975;
   if (d === "FM") return 42.195;
+  if (d.includes("HALF")) return 21.0975;
+  if (d.includes("MARATHON") || d.includes("FULL")) return 42.195;
   if (d === "TR") {
     const raceDay = (planData || []).flatMap((w: any) => w?.days || []).find((day: any) => day?.type === "Trail Race");
     return raceDay?.distance_km ? Number(raceDay.distance_km) : null;
@@ -1498,7 +1500,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
   };
 
   useEffect(() => {
-    if (!existingPlan?.id || !canPredictDistance(existingPlan.distance) || !existingPlan.target_time || activitiesLoading || trackResult || trackError || trackChecking) return;
+    if (!existingPlan?.id || !existingPlan.target_time || activitiesLoading || trackResult || trackError || trackChecking) return;
     void handleCheckOnTrack(false);
   }, [existingPlan?.id, existingPlan?.distance, existingPlan?.target_time, activitiesLoading, allActivities.length, trackResult, trackError, trackChecking]);
 
@@ -2992,7 +2994,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                             onRegenerate={handleRegeneratePlan}
                             regenerating={regeneratingTime}
                           />
-                          {canPredictDistance(existingPlan.distance) && existingPlan.target_time && (
+                          {existingPlan.target_time && (
                             <RaceTimeEstimateCard
                               lang={lang}
                               distance={String(existingPlan.distance ?? "")}

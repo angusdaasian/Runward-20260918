@@ -197,7 +197,7 @@ const ProgramsTab = ({ lang, onLoginRequest }: Props) => {
   const { isPremium } = usePremium();
   const { user } = useAuth();
   const { toast } = useToast();
-  const { activities } = useActivities();
+  const { activities, loading: activitiesLoading } = useActivities();
 
   // On-track checker (for generated plan)
   const [trackChecking, setTrackChecking] = useState(false);
@@ -316,15 +316,17 @@ const ProgramsTab = ({ lang, onLoginRequest }: Props) => {
       : `${m}:${String(s).padStart(2, "0")}`;
   };
 
-  const handleCheckOnTrack = async () => {
+  const handleCheckOnTrack = async (showToast = true) => {
     if (!existingPlan || trackChecking) return;
     const targetSec = parseTargetToSec(existingPlan.target_time);
     if (!targetSec) {
       setTrackError(lang === "zh" ? "此計劃沒有目標時間" : "This plan has no target time");
-      toast({
-        title: lang === "zh" ? "計劃沒有目標時間" : "Plan has no target time",
-        variant: "destructive",
-      });
+      if (showToast) {
+        toast({
+          title: lang === "zh" ? "計劃沒有目標時間" : "Plan has no target time",
+          variant: "destructive",
+        });
+      }
       return;
     }
     setTrackError(null);
@@ -349,11 +351,13 @@ const ProgramsTab = ({ lang, onLoginRequest }: Props) => {
       if (error) throw error;
       if ((data as any)?.error === "no_recent_runs") {
         setTrackError(lang === "zh" ? "沒有最近的跑步紀錄，請先同步活動。" : "No recent runs found. Sync activities first.");
-        toast({
-          title: lang === "zh" ? "沒有最近的跑步紀錄" : "No recent runs found",
-          description: lang === "zh" ? "同步跑步活動後再試。" : "Sync some running activities and try again.",
-          variant: "destructive",
-        });
+        if (showToast) {
+          toast({
+            title: lang === "zh" ? "沒有最近的跑步紀錄" : "No recent runs found",
+            description: lang === "zh" ? "同步跑步活動後再試。" : "Sync some running activities and try again.",
+            variant: "destructive",
+          });
+        }
         return;
       }
       if ((data as any)?.error) throw new Error((data as any).error);
@@ -369,11 +373,13 @@ const ProgramsTab = ({ lang, onLoginRequest }: Props) => {
       });
     } catch (e: any) {
       setTrackError(e?.message || (lang === "zh" ? "請稍後再試" : "Please try again later"));
-      toast({
-        title: lang === "zh" ? "檢查失敗" : "Check failed",
-        description: e?.message || (lang === "zh" ? "請稍後再試" : "Please try again later"),
-        variant: "destructive",
-      });
+      if (showToast) {
+        toast({
+          title: lang === "zh" ? "檢查失敗" : "Check failed",
+          description: e?.message || (lang === "zh" ? "請稍後再試" : "Please try again later"),
+          variant: "destructive",
+        });
+      }
     } finally {
       setTrackChecking(false);
     }

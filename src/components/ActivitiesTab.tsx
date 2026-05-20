@@ -390,7 +390,103 @@ const ActivityCard = ({
   </div>
 );
 
+const MONTH_NAMES_EN = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+const MONTH_NAMES_ZH = ["1月","2月","3月","4月","5月","6月","7月","8月","9月","10月","11月","12月"];
+
+const MonthlyActivityList = ({
+  activities,
+  lang,
+  activityScores,
+  activityLoads,
+  isPremium,
+  onSelect,
+}: {
+  activities: StravaActivity[];
+  lang: Lang;
+  activityScores: Record<string, number | null>;
+  activityLoads: Record<string, number | null>;
+  isPremium: boolean;
+  onSelect: (a: StravaActivity) => void;
+}) => {
+  const groups = useMemo(() => {
+    const map = new Map<string, StravaActivity[]>();
+    for (const a of activities) {
+      const d = new Date(a.start_date);
+      const key = `${d.getFullYear()}-${String(d.getMonth()).padStart(2, "0")}`;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(a);
+    }
+    return Array.from(map.entries()).map(([key, items]) => {
+      const [y, m] = key.split("-").map(Number);
+      const label = lang === "zh"
+        ? `${y}年 ${MONTH_NAMES_ZH[m]}`
+        : `${MONTH_NAMES_EN[m]} ${y}`;
+      const totalKm = items.reduce((s, a) => s + (a.distance || 0), 0) / 1000;
+      return { key, label, items, totalKm };
+    });
+  }, [activities, lang]);
+
+  const [open, setOpen] = useState<string[]>(() => (groups[0] ? [groups[0].key] : []));
+
+  if (activities.length === 0) {
+    return (
+      <div className="text-center py-8">
+        <Activity size={36} className="mx-auto text-muted-foreground mb-2" />
+        <p className="text-muted-foreground text-sm">{lang === "zh" ? "暫無活動" : "No activities yet"}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      {groups.map((g) => {
+        const isOpen = open.includes(g.key);
+        return (
+          <div key={g.key} className="bg-card border border-border rounded-xl overflow-hidden">
+            <button
+              type="button"
+              onClick={() =>
+                setOpen((prev) =>
+                  prev.includes(g.key) ? prev.filter((k) => k !== g.key) : [...prev, g.key],
+                )
+              }
+              className="w-full flex items-center justify-between px-4 py-3 hover:bg-accent/40 transition-colors"
+            >
+              <div className="flex flex-col items-start">
+                <span className="font-display text-base font-semibold text-foreground">{g.label}</span>
+                <span className="text-xs text-muted-foreground">
+                  {g.items.length} {lang === "zh" ? "個活動" : g.items.length === 1 ? "activity" : "activities"} · {g.totalKm.toFixed(1)} km
+                </span>
+              </div>
+              <ChevronDown
+                size={20}
+                className={`text-muted-foreground transition-transform ${isOpen ? "rotate-180" : ""}`}
+              />
+            </button>
+            {isOpen && (
+              <div className="px-3 pb-3 pt-1 space-y-3">
+                {g.items.map((act) => (
+                  <ActivityCard
+                    key={act.id}
+                    act={act}
+                    lang={lang}
+                    score={activityScores[act.id]}
+                    load={activityLoads[act.id]}
+                    isPremium={isPremium}
+                    onClick={() => onSelect(act)}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
 // ---------- Main Component ----------
+
 
 const ActivitiesTab = ({ lang }: Props) => {
   const { user } = useAuth();
@@ -621,25 +717,14 @@ const ActivitiesTab = ({ lang }: Props) => {
             </button>
           )}
         </div>
-        <div className="space-y-3">
-          {activities.map((act) => (
-            <ActivityCard
-              key={act.id}
-              act={act}
-              lang={lang}
-              score={activityScores[act.id]}
-              load={activityLoads[act.id]}
-              isPremium={isPremium}
-              onClick={() => setSelectedActivity(act)}
-            />
-          ))}
-          {activities.length === 0 && (
-            <div className="text-center py-8">
-              <Activity size={36} className="mx-auto text-muted-foreground mb-2" />
-              <p className="text-muted-foreground text-sm">{lang === "zh" ? "暫無活動" : "No activities yet"}</p>
-            </div>
-          )}
-        </div>
+        <MonthlyActivityList
+          activities={activities}
+          lang={lang}
+          activityScores={activityScores}
+          activityLoads={activityLoads}
+          isPremium={isPremium}
+          onSelect={setSelectedActivity}
+        />
       </FadeIn>
     );
   }

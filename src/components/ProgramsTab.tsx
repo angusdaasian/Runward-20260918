@@ -198,8 +198,16 @@ const ProgramsTab = ({ lang, onLoginRequest }: Props) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const { activities } = useActivities();
-  const [predicting, setPredicting] = useState(false);
-  const [predictionRationale, setPredictionRationale] = useState<string | null>(null);
+
+  // On-track checker (for generated plan)
+  const [trackChecking, setTrackChecking] = useState(false);
+  const [trackResult, setTrackResult] = useState<{
+    predictedSec: number;
+    targetSec: number;
+    rationale: string;
+    predictedLabel: string;
+  } | null>(null);
+
 
   // Questionnaire state
   const [step, setStep] = useState<"goal" | "details" | "calendar">("goal");

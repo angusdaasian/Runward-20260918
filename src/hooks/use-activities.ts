@@ -235,7 +235,7 @@ function mapTerraProviderLabel(provider: string): string {
 async function fetchTerraActivities(userId: string): Promise<StravaActivity[]> {
   const { data } = await supabase
     .from("terra_activities")
-    .select("*")
+    .select("id,provider,activity_name,activity_type,distance_meters,duration_seconds,elevation_gain,start_time,average_speed,average_hr,max_hr,summary_polyline,calories,weather,training_load,avg_cadence")
     .eq("user_id", userId)
     .order("start_time", { ascending: false });
   return ((data as any[]) || []).map((a) => {
@@ -267,11 +267,11 @@ async function fetchTerraActivities(userId: string): Promise<StravaActivity[]> {
       summary_polyline: a.summary_polyline ?? null,
       source: sourceLabel,
       calories: a.calories ?? null,
-      laps: a.laps || [],
-      hr_samples: a.hr_samples || null,
-      distance_samples: a.distance_samples || null,
-      elevation_samples: (a as any).elevation_samples || null,
-      cadence_samples: (a as any).cadence_samples || null,
+      laps: [],
+      hr_samples: null,
+      distance_samples: null,
+      elevation_samples: null,
+      cadence_samples: null,
       avg_cadence: a.avg_cadence ?? null,
       garmin_training_load: a.training_load ?? null,
       provenance: "terra" as const,

@@ -197,7 +197,7 @@ const ProgramsTab = ({ lang, onLoginRequest }: Props) => {
   const { isPremium } = usePremium();
   const { user } = useAuth();
   const { toast } = useToast();
-  const { activities } = useActivities();
+  const { activities, loading: activitiesLoading } = useActivities();
 
   // On-track checker (for generated plan)
   const [trackChecking, setTrackChecking] = useState(false);
@@ -207,6 +207,7 @@ const ProgramsTab = ({ lang, onLoginRequest }: Props) => {
     rationale: string;
     predictedLabel: string;
   } | null>(null);
+  const [trackError, setTrackError] = useState<string | null>(null);
 
 
   // Questionnaire state
@@ -315,16 +316,26 @@ const ProgramsTab = ({ lang, onLoginRequest }: Props) => {
       : `${m}:${String(s).padStart(2, "0")}`;
   };
 
-  const handleCheckOnTrack = async () => {
+  const activeTargetTime = existingPlan?.target_time || targetTime;
+  const activeDistance = existingPlan?.distance || distance;
+  const targetSecForDisplay = parseTargetToSec(activeTargetTime);
+  const canPredictRaceTime = !!activeTargetTime && typeof activeDistance === "string" && ["5K", "10K", "HM", "FM"].includes(activeDistance);
+
+  const handleCheckOnTrack = async (showToast = true) => {
     if (!existingPlan || trackChecking) return;
     const targetSec = parseTargetToSec(existingPlan.target_time);
     if (!targetSec) {
-      toast({
-        title: lang === "zh" ? "計劃沒有目標時間" : "Plan has no target time",
-        variant: "destructive",
-      });
+      setTrackError(lang === "zh" ? "此計劃沒有目標時間" : "This plan has no target time");
+      if (showToast) {
+        toast({
+          title: lang === "zh" ? "計劃沒有目標時間" : "Plan has no target time",
+          variant: "destructive",
+        });
+      }
       return;
     }
+    setTrackError(null);
+    setTrackResult(null);
     setTrackChecking(true);
     try {
       const { data, error } = await supabase.functions.invoke("predict-race-time", {
@@ -345,11 +356,14 @@ const ProgramsTab = ({ lang, onLoginRequest }: Props) => {
       });
       if (error) throw error;
       if ((data as any)?.error === "no_recent_runs") {
-        toast({
-          title: lang === "zh" ? "沒有最近的跑步紀錄" : "No recent runs found",
-          description: lang === "zh" ? "同步跑步活動後再試。" : "Sync some running activities and try again.",
-          variant: "destructive",
-        });
+        setTrackError(lang === "zh" ? "沒有最近的跑步紀錄，請先同步活動。" : "No recent runs found. Sync activities first.");
+        if (showToast) {
+          toast({
+            title: lang === "zh" ? "沒有最近的跑步紀錄" : "No recent runs found",
+            description: lang === "zh" ? "同步跑步活動後再試。" : "Sync some running activities and try again.",
+            variant: "destructive",
+          });
+        }
         return;
       }
       if ((data as any)?.error) throw new Error((data as any).error);
@@ -364,15 +378,28 @@ const ProgramsTab = ({ lang, onLoginRequest }: Props) => {
         predictedLabel: fmtSec(predictedSec),
       });
     } catch (e: any) {
-      toast({
-        title: lang === "zh" ? "檢查失敗" : "Check failed",
-        description: e?.message || (lang === "zh" ? "請稍後再試" : "Please try again later"),
-        variant: "destructive",
-      });
+      setTrackError(e?.message || (lang === "zh" ? "請稍後再試" : "Please try again later"));
+      if (showToast) {
+        toast({
+          title: lang === "zh" ? "檢查失敗" : "Check failed",
+          description: e?.message || (lang === "zh" ? "請稍後再試" : "Please try again later"),
+          variant: "destructive",
+        });
+      }
     } finally {
       setTrackChecking(false);
     }
   };
+
+  useEffect(() => {
+    if (!existingPlan?.id || !canPredictRaceTime || activitiesLoading || trackResult || trackError || trackChecking) return;
+    void handleCheckOnTrack(false);
+  }, [existingPlan?.id, canPredictRaceTime, activitiesLoading, activities.length, trackResult, trackError, trackChecking]);
+
+  useEffect(() => {
+    setTrackResult(null);
+    setTrackError(null);
+  }, [existingPlan?.id]);
 
 
 
@@ -875,66 +902,81 @@ const ProgramsTab = ({ lang, onLoginRequest }: Props) => {
         </p>
       </div>
 
-      {/* On-track checker */}
-      {existingPlan?.target_time && ["5K", "10K", "HM", "FM"].includes(existingPlan?.distance) && (
-        <div className="bg-card border border-border rounded-xl p-3 mb-4">
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <Target size={14} className="text-primary" />
+      {/* Current race estimate */}
+      {canPredictRaceTime && (
+        <div className="bg-primary/10 border-2 border-primary rounded-xl p-4 mb-4 shadow-sm">
+          <div className="flex items-start justify-between gap-3 mb-4">
+            <div className="flex items-start gap-3">
+              <div className="h-10 w-10 rounded-lg bg-primary text-primary-foreground flex items-center justify-center flex-shrink-0">
+                <Target size={20} />
+              </div>
               <div>
-                <div className="text-sm font-semibold text-foreground">
-                  {lang === "zh" ? "進度檢查" : "On-track check"}
-                </div>
-                <div className="text-[11px] text-muted-foreground">
-                  {lang === "zh" ? "目標" : "Target"}: {existingPlan.target_time}
-                </div>
+                <h2 className="text-base font-bold text-foreground leading-tight">
+                  {lang === "zh" ? "目前預測比賽時間" : "Current Estimated Race Time"}
+                </h2>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {lang === "zh" ? "根據最近跑步表現自動檢查是否達標" : "Auto-checks if recent performance is on pace for this program"}
+                </p>
               </div>
             </div>
             <Button
               type="button"
               size="sm"
               variant="outline"
-              onClick={handleCheckOnTrack}
-              disabled={trackChecking}
-              className="h-8 px-3 text-xs"
+              onClick={() => handleCheckOnTrack(true)}
+              disabled={trackChecking || activitiesLoading}
+              className="h-9 px-3 text-xs bg-background/80"
             >
               {trackChecking ? (
-                <><Loader2 size={12} className="mr-1 animate-spin" />{lang === "zh" ? "分析中" : "Checking"}</>
+                <><Loader2 size={12} className="mr-1 animate-spin" />{lang === "zh" ? "分析中" : "Analyzing"}</>
               ) : (
-                <><Sparkles size={12} className="mr-1" />{lang === "zh" ? "檢查進度" : "Check progress"}</>
+                <><Sparkles size={12} className="mr-1" />{lang === "zh" ? "更新" : "Refresh"}</>
               )}
             </Button>
           </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded-lg border border-border bg-background/80 p-3">
+              <div className="text-[11px] font-medium uppercase text-muted-foreground">{lang === "zh" ? "計劃目標" : "Program target"}</div>
+              <div className="mt-1 text-xl font-bold text-foreground">{targetSecForDisplay ? fmtSec(targetSecForDisplay) : activeTargetTime}</div>
+              <div className="text-[11px] text-muted-foreground">{activeDistance}</div>
+            </div>
+            <div className="rounded-lg border border-border bg-background/80 p-3">
+              <div className="text-[11px] font-medium uppercase text-muted-foreground">{lang === "zh" ? "目前預測" : "Current estimate"}</div>
+              <div className="mt-1 text-xl font-bold text-primary">
+                {trackChecking || activitiesLoading ? "…" : trackResult?.predictedLabel || "--:--"}
+              </div>
+              <div className="text-[11px] text-muted-foreground">
+                {trackResult ? (lang === "zh" ? "Gemini 預測" : "Gemini prediction") : (lang === "zh" ? "等待分析" : "Waiting for analysis")}
+              </div>
+            </div>
+          </div>
+
           {trackResult && (() => {
             const delta = trackResult.predictedSec - trackResult.targetSec;
-            const onTrack = delta <= 30; // within 30s = on track
+            const onTrack = delta <= 30;
             const ahead = delta < -30;
-            const behindSec = Math.abs(delta);
-            const behindLabel = `${Math.floor(behindSec / 60)}:${String(Math.round(behindSec % 60)).padStart(2, "0")}`;
-            const statusColor = ahead
-              ? "bg-emerald-500/10 border-emerald-500/40 text-emerald-600 dark:text-emerald-400"
-              : onTrack
-              ? "bg-primary/10 border-primary/40 text-primary"
-              : "bg-amber-500/10 border-amber-500/40 text-amber-600 dark:text-amber-400";
+            const diffSec = Math.abs(delta);
+            const diffLabel = `${Math.floor(diffSec / 60)}:${String(Math.round(diffSec % 60)).padStart(2, "0")}`;
+            const statusClass = ahead || onTrack ? "border-primary bg-primary/10 text-primary" : "border-destructive/40 bg-destructive/10 text-destructive";
             const statusText = ahead
-              ? (lang === "zh" ? `領先目標 ${behindLabel}` : `Ahead of target by ${behindLabel}`)
+              ? (lang === "zh" ? `快過目標 ${diffLabel}` : `Ahead of target by ${diffLabel}`)
               : onTrack
-              ? (lang === "zh" ? "進度良好" : "On track")
-              : (lang === "zh" ? `落後目標 ${behindLabel}` : `Behind target by ${behindLabel}`);
+              ? (lang === "zh" ? "進度良好：正在達標" : "On track for the program target")
+              : (lang === "zh" ? `慢過目標 ${diffLabel}` : `Behind target by ${diffLabel}`);
             return (
-              <div className={`mt-3 rounded-lg border p-2.5 ${statusColor}`}>
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold">{statusText}</span>
-                  <span className="text-[11px] opacity-80">
-                    {lang === "zh" ? "目前預測" : "Current prediction"}: {trackResult.predictedLabel}
-                  </span>
-                </div>
-                {trackResult.rationale && (
-                  <p className="text-[11px] mt-1 opacity-90 leading-snug">{trackResult.rationale}</p>
-                )}
+              <div className={`mt-3 rounded-lg border p-3 ${statusClass}`}>
+                <div className="text-sm font-bold">{statusText}</div>
+                {trackResult.rationale && <p className="text-xs mt-1 opacity-90 leading-snug">{trackResult.rationale}</p>}
               </div>
             );
           })()}
+
+          {trackError && (
+            <div className="mt-3 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-xs text-destructive">
+              {trackError}
+            </div>
+          )}
         </div>
       )}
 

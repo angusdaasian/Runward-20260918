@@ -78,7 +78,6 @@ const Index = () => {
   const [showOnboarding, setShowOnboarding] = useState(
     () => sessionStorage.getItem(ONBOARDING_SIGNUP_IN_PROGRESS_KEY) === "true"
   );
-  const [checkingProfile, setCheckingProfile] = useState(false);
   const [aiChatDisabled, setAiChatDisabled] = useState(() => localStorage.getItem("ai_chat_disabled") === "true");
   useEffect(() => {
     const sync = () => setAiChatDisabled(localStorage.getItem("ai_chat_disabled") === "true");
@@ -105,11 +104,11 @@ const Index = () => {
     if (user) preloadHeaderProfile(user.id);
   }, [user?.id]);
 
-  // Key the entry-resolution effect off user.id (stable string) — NOT the
-  // user object reference. Supabase emits new session objects on token refresh
-  // and on app resume; if we depend on `user` directly the effect re-runs
-  // every time, flipping checkingProfile=true and showing the skeleton
-  // (which the user perceives as a "refresh" when returning from home screen).
+  // Resolve onboarding state without blocking first paint.
+  // Optimistically assume returning users are onboarded — cache the flag in
+  // localStorage so subsequent cold starts skip the network round-trip and
+  // render the app immediately. Only force the Onboarding screen if the
+  // remote profile explicitly says onboarding_completed === false.
   const userId = user?.id ?? null;
   useEffect(() => {
     if (loading) return;
@@ -117,66 +116,49 @@ const Index = () => {
     const suppressAppLoading = sessionStorage.getItem(ONBOARDING_SIGNUP_IN_PROGRESS_KEY) === "true";
     if (suppressAppLoading) {
       setShowOnboarding(true);
-      setCheckingProfile(false);
       return;
     }
 
-    let isActive = true;
-    let onboardingTimeout: number | null = null;
+    if (!userId) {
+      // No user and not a guest → show onboarding (login flow)
+      if (!isGuest) setShowOnboarding(true);
+      return;
+    }
 
-    const resolveEntryState = async () => {
-      if (!userId && !isGuest) {
-        setCheckingProfile(true);
-        setShowOnboarding(false);
-        onboardingTimeout = window.setTimeout(() => {
-          if (!isActive) return;
-          setShowOnboarding(true);
-          setCheckingProfile(false);
-        }, ONBOARDING_DELAY_MS);
-        return;
-      }
-
-      if (userId) {
-        setShowOnboarding(false);
-        setCheckingProfile(true);
-
-        try {
-          const { supabase } = await import("@/integrations/supabase/client");
-          const { data } = await supabase
-            .from("profiles")
-            .select("onboarding_completed")
-            .eq("user_id", userId)
-            .single();
-
-          if (!isActive) return;
-
-          setShowOnboarding(!data?.onboarding_completed);
-        } finally {
-          if (isActive) {
-            setCheckingProfile(false);
-          }
-        }
-
-        return;
-      }
-
+    // Trust the cached flag on cold start, then verify in the background.
+    const cacheKey = `onboarding_completed:${userId}`;
+    const cached = localStorage.getItem(cacheKey);
+    if (cached === "true") {
       setShowOnboarding(false);
-      setCheckingProfile(false);
-    };
+    }
 
-    void resolveEntryState();
+    let cancelled = false;
+    (async () => {
+      const { supabase } = await import("@/integrations/supabase/client");
+      const { data } = await supabase
+        .from("profiles")
+        .select("onboarding_completed")
+        .eq("user_id", userId)
+        .single();
+      if (cancelled) return;
+      const completed = !!data?.onboarding_completed;
+      if (completed) {
+        localStorage.setItem(cacheKey, "true");
+        setShowOnboarding(false);
+      } else if (cached !== "true") {
+        // Only flip into onboarding if we never confirmed completion before.
+        setShowOnboarding(true);
+      }
+    })();
 
     return () => {
-      isActive = false;
-      if (onboardingTimeout !== null) {
-        window.clearTimeout(onboardingTimeout);
-      }
+      cancelled = true;
     };
   }, [userId, loading, isGuest]);
 
-  // During loading: warm resume shows skeleton of last page, cold start shows splash
+  // Cold start: brief splash only while auth itself is resolving.
   const suppressAppLoading = sessionStorage.getItem(ONBOARDING_SIGNUP_IN_PROGRESS_KEY) === "true";
-  if ((loading || checkingProfile) && !suppressAppLoading) {
+  if (loading && !suppressAppLoading) {
     if (isWarmResume) {
       return <TabPageSkeleton />;
     }

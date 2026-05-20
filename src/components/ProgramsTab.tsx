@@ -289,6 +289,58 @@ const ProgramsTab = ({ lang, onLoginRequest }: Props) => {
     }
   };
 
+  const handlePredictTarget = async () => {
+    if (!distance || predicting) return;
+    setPredicting(true);
+    setPredictionRationale(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("predict-race-time", {
+        body: {
+          distance,
+          raceDate: raceDate || null,
+          lang,
+          activities: (activities || []).slice(0, 30).map((a: any) => ({
+            start_date: a.start_date,
+            sport_type: a.sport_type,
+            distance: a.distance,
+            moving_time: a.moving_time,
+            elapsed_time: a.elapsed_time,
+            average_heartrate: a.average_heartrate,
+            total_elevation_gain: a.total_elevation_gain,
+          })),
+        },
+      });
+      if (error) throw error;
+      if ((data as any)?.error === "no_recent_runs") {
+        toast({
+          title: lang === "zh" ? "沒有最近的跑步紀錄" : "No recent runs found",
+          description: lang === "zh" ? "同步跑步活動後再試。" : "Sync some running activities and try again.",
+          variant: "destructive",
+        });
+        return;
+      }
+      if ((data as any)?.error) throw new Error((data as any).error);
+
+      const h = String((data as any).hours ?? 0);
+      const m = String((data as any).minutes ?? 0).padStart(2, "0");
+      const s = String((data as any).seconds ?? 0).padStart(2, "0");
+      setTargetHours(h);
+      setTargetMinutes(m);
+      setTargetSeconds(s);
+      setTargetTime(distance === "HM" || distance === "FM" ? `${h}:${m}:${s}` : `${m}:${s}`);
+      setPredictionRationale((data as any).rationale || null);
+    } catch (e: any) {
+      toast({
+        title: lang === "zh" ? "預測失敗" : "Prediction failed",
+        description: e?.message || (lang === "zh" ? "請稍後再試" : "Please try again later"),
+        variant: "destructive",
+      });
+    } finally {
+      setPredicting(false);
+    }
+  };
+
+
   const handleGenerate = async () => {
     if (!distance || !targetTime || !raceDate || !dateValid) return;
     setLoading(true);

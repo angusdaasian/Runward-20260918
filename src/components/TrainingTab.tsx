@@ -2974,6 +2974,17 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                             onRegenerate={handleRegeneratePlan}
                             regenerating={regeneratingTime}
                           />
+                          {canPredictDistance(existingPlan.distance) && existingPlan.target_time && (
+                            <RaceTimeEstimateCard
+                              lang={lang}
+                              distance={String(existingPlan.distance ?? "")}
+                              targetTime={String(existingPlan.target_time ?? "")}
+                              result={trackResult}
+                              loading={trackChecking || activitiesLoading}
+                              error={trackError}
+                              onRefresh={() => handleCheckOnTrack(true)}
+                            />
+                          )}
                           <RaceSchedulePanel
                             lang={lang}
                             races={savedSnap as any}

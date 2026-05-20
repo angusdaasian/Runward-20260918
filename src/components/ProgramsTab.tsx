@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { Lang, t } from "@/lib/i18n";
 import { Button } from "@/components/ui/button";
-import { Loader2, Lock, ChevronLeft, ChevronRight, Plus, Calendar, Target, Trophy, Clock, Repeat, Route } from "lucide-react";
+import { Loader2, Lock, ChevronLeft, ChevronRight, Plus, Calendar, Target, Trophy, Clock, Repeat, Route, Sparkles } from "lucide-react";
 import { usePremium } from "@/contexts/PremiumContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { notifyPlanChanged, subscribePlanChanged } from "@/lib/planEvents";
 import EditWorkoutDialog from "@/components/training/EditWorkoutDialog";
+import { useActivities } from "@/hooks/use-activities";
 
 type Goal = "race" | "distance" | "first5k" | "parkrun" | "general" | "postnatal" | "fitness" | "injury" | "postrace";
 type Distance = "5K" | "10K" | "HM" | "FM";

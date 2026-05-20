@@ -34,14 +34,12 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { distance, distanceKm, raceDate, activities, lang } = await req.json();
+    const { distance, raceDate, activities, lang } = await req.json();
     if (!distance) {
       return new Response(JSON.stringify({ error: "distance required" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    const distLabel = distance === "TR" && distanceKm ? `Trail race (${distanceKm}km)`
-      : distanceKm ? `${distanceKm}km race`
-      : distance === "5K" ? "5K (5km)"
+    const distLabel = distance === "5K" ? "5K (5km)"
       : distance === "10K" ? "10K (10km)"
       : distance === "HM" ? "Half Marathon (21.0975km)"
       : distance === "FM" ? "Full Marathon (42.195km)"
@@ -50,7 +48,7 @@ serve(async (req) => {
     const recentRuns = (Array.isArray(activities) ? activities : [])
       .filter((a: any) => {
         const s = String(a.sport_type || "").toLowerCase();
-        return s.includes("run") || s === "treadmill" || s.includes("trail");
+        return s.includes("run") || s === "treadmill";
       })
       .slice(0, 30)
       .map((a: any) => ({
@@ -85,7 +83,7 @@ ${JSON.stringify(recentRuns)}
 
 Method:
 1. Estimate the runner's current VDOT / fitness from their recent paces, weighting longer and harder efforts more.
-2. Apply standard Daniels/Riegel scaling to the target race distance. For trail races, account for elevation using effort-adjusted pace and recent vertical gain.
+2. Apply standard Daniels/Riegel scaling to the target race distance.
 3. If there are ${weeksToRace ?? 0} weeks of training remaining, assume modest fitness gain (roughly +1–3% pace improvement for 8+ weeks of consistent training, less for shorter horizons, none if <2 weeks).
 4. Return a realistic target finish time the runner can train toward — not a fantasy PR, not a soft cruise.
 

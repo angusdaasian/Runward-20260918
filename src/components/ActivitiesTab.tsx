@@ -23,6 +23,8 @@ import { toast } from "sonner";
 import ActivityCalendar from "@/components/activities/ActivityCalendar";
 import MonthlyRoadQuest from "@/components/activities/MonthlyRoadQuest";
 
+// Heavy: pulls in leaflet + leaflet.css. Only needed when an activity card has a polyline.
+const ActivityMap = lazy(() => import("@/components/activities/ActivityMap"));
 // Heavy: pulls in react-markdown + share helpers + dialogs. Only needed after a card is tapped.
 const ActivityDetail = lazy(() => import("@/components/activities/ActivityDetail"));
 
@@ -386,6 +388,11 @@ const ActivityCard = ({
           )}
         </div>
 
+        {act.summary_polyline && (
+          <Suspense fallback={<div className="h-40 rounded-lg bg-muted/30 animate-pulse" />}>
+            <ActivityMap polyline={act.summary_polyline} />
+          </Suspense>
+        )}
       </>
     )}
   </div>
@@ -671,39 +678,6 @@ const ActivitiesTab = ({ lang }: Props) => {
     setResyncing(false);
   }, [user, resyncing, appleHealth, invalidateAll, lang]);
 
-  const handleSelectActivity = useCallback(async (act: StravaActivity) => {
-    setSelectedActivity(act);
-    try {
-      const table = act.provenance === "terra"
-        ? "terra_activities"
-        : act.provenance === "garmin"
-          ? "garmin_activities"
-          : act.source === "Apple Health"
-            ? "apple_health_activities"
-            : "strava_activities";
-      const { data } = await supabase.from(table as any).select("*").eq("id", act.id).maybeSingle();
-      if (!data) return;
-      const row: any = data;
-      if (act.provenance === "terra") {
-        setSelectedActivity({
-          ...act,
-          laps: row.laps || [],
-          hr_samples: row.hr_samples || null,
-          distance_samples: row.distance_samples || null,
-          elevation_samples: row.elevation_samples || null,
-          cadence_samples: row.cadence_samples || null,
-          map_screenshot_url: row.raw_json?.map_screenshot_url ?? null,
-        });
-      } else if (act.provenance === "garmin") {
-        setSelectedActivity({ ...act, laps: row.laps || [], map_screenshot_url: row.raw_json?.map_screenshot_url ?? null });
-      } else {
-        setSelectedActivity({ ...act, ...(row as Partial<StravaActivity>) });
-      }
-    } catch {
-      // Keep the already-open summary if detail hydration fails.
-    }
-  }, []);
-
   if (loading) return <ActivityListSkeleton />;
 
   if (selectedActivity) {
@@ -760,7 +734,7 @@ const ActivitiesTab = ({ lang }: Props) => {
           activityScores={activityScores}
           activityLoads={activityLoads}
           isPremium={isPremium}
-          onSelect={handleSelectActivity}
+          onSelect={setSelectedActivity}
         />
       </FadeIn>
     );
@@ -819,7 +793,7 @@ const ActivitiesTab = ({ lang }: Props) => {
               score={activityScores[latestActivity.id]}
               load={activityLoads[latestActivity.id]}
               isPremium={isPremium}
-              onClick={() => handleSelectActivity(latestActivity)}
+              onClick={() => setSelectedActivity(latestActivity)}
             />
           </div>
         ) : (

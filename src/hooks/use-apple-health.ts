@@ -1,11 +1,10 @@
 import { useState, useCallback } from "react";
+import despia from "despia-native";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { Lang } from "@/lib/i18n";
 import { remoteLog } from "@/lib/remoteLogger";
-
-const getDespia = async () => (await import("despia-native")).default;
 
 // --- Constants & Types ---
 
@@ -544,7 +543,6 @@ export function useAppleHealth(lang: Lang) {
 
   const readHealthData = useCallback(async (statsDays = 1, workoutDays = 30) => {
     try {
-      const despia = await getDespia();
       // Logger self-test: tiny ping to verify infrastructure works
       const ping = await remoteLog("AppleHealth", "logger_ping", {
         timestamp: new Date().toISOString(),
@@ -760,7 +758,6 @@ export function useAppleHealth(lang: Lang) {
 
   const requestAuthorization = useCallback(async () => {
     try {
-      const despia = await getDespia();
       await despia(`healthkit://read?types=${HEALTHKIT_DAILY_TYPES.join(",")}&days=1`, ["healthkitResponse"]);
       return true;
     } catch {

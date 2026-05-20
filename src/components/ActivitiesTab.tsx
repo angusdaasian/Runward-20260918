@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, lazy, Suspense } from "react";
 import { usePremium } from "@/contexts/PremiumContext";
 import {
   Clock,
@@ -20,10 +20,13 @@ import { Lang, t } from "@/lib/i18n";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import ActivityMap from "@/components/activities/ActivityMap";
 import ActivityCalendar from "@/components/activities/ActivityCalendar";
 import MonthlyRoadQuest from "@/components/activities/MonthlyRoadQuest";
-import ActivityDetail from "@/components/activities/ActivityDetail";
+
+// Heavy: pulls in leaflet + leaflet.css. Only needed when an activity card has a polyline.
+const ActivityMap = lazy(() => import("@/components/activities/ActivityMap"));
+// Heavy: pulls in react-markdown + share helpers + dialogs. Only needed after a card is tapped.
+const ActivityDetail = lazy(() => import("@/components/activities/ActivityDetail"));
 
 import SuggestedNextWorkout from "@/components/activities/SuggestedNextWorkout";
 import { calculateRunningScore } from "@/lib/vdot";
@@ -32,6 +35,7 @@ import { useActivities, type StravaActivity } from "@/hooks/use-activities";
 import FadeIn from "@/components/ui/FadeIn";
 import { ActivityListSkeleton } from "@/components/ui/PageSkeleton";
 import { useAppleHealth, type HealthStats } from "@/hooks/use-apple-health";
+
 
 
 interface Props {

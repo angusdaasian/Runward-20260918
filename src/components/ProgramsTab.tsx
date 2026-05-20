@@ -875,6 +875,71 @@ const ProgramsTab = ({ lang, onLoginRequest }: Props) => {
         </p>
       </div>
 
+      {/* On-track checker */}
+      {existingPlan?.target_time && ["5K", "10K", "HM", "FM"].includes(existingPlan?.distance) && (
+        <div className="bg-card border border-border rounded-xl p-3 mb-4">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Target size={14} className="text-primary" />
+              <div>
+                <div className="text-sm font-semibold text-foreground">
+                  {lang === "zh" ? "進度檢查" : "On-track check"}
+                </div>
+                <div className="text-[11px] text-muted-foreground">
+                  {lang === "zh" ? "目標" : "Target"}: {existingPlan.target_time}
+                </div>
+              </div>
+            </div>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={handleCheckOnTrack}
+              disabled={trackChecking}
+              className="h-8 px-3 text-xs"
+            >
+              {trackChecking ? (
+                <><Loader2 size={12} className="mr-1 animate-spin" />{lang === "zh" ? "分析中" : "Checking"}</>
+              ) : (
+                <><Sparkles size={12} className="mr-1" />{lang === "zh" ? "檢查進度" : "Check progress"}</>
+              )}
+            </Button>
+          </div>
+          {trackResult && (() => {
+            const delta = trackResult.predictedSec - trackResult.targetSec;
+            const onTrack = delta <= 30; // within 30s = on track
+            const ahead = delta < -30;
+            const behindSec = Math.abs(delta);
+            const behindLabel = `${Math.floor(behindSec / 60)}:${String(Math.round(behindSec % 60)).padStart(2, "0")}`;
+            const statusColor = ahead
+              ? "bg-emerald-500/10 border-emerald-500/40 text-emerald-600 dark:text-emerald-400"
+              : onTrack
+              ? "bg-primary/10 border-primary/40 text-primary"
+              : "bg-amber-500/10 border-amber-500/40 text-amber-600 dark:text-amber-400";
+            const statusText = ahead
+              ? (lang === "zh" ? `領先目標 ${behindLabel}` : `Ahead of target by ${behindLabel}`)
+              : onTrack
+              ? (lang === "zh" ? "進度良好" : "On track")
+              : (lang === "zh" ? `落後目標 ${behindLabel}` : `Behind target by ${behindLabel}`);
+            return (
+              <div className={`mt-3 rounded-lg border p-2.5 ${statusColor}`}>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold">{statusText}</span>
+                  <span className="text-[11px] opacity-80">
+                    {lang === "zh" ? "目前預測" : "Current prediction"}: {trackResult.predictedLabel}
+                  </span>
+                </div>
+                {trackResult.rationale && (
+                  <p className="text-[11px] mt-1 opacity-90 leading-snug">{trackResult.rationale}</p>
+                )}
+              </div>
+            );
+          })()}
+        </div>
+      )}
+
+
+
       {/* Day list */}
       <div className="space-y-1">
         {currentWeek.days.map((day, i) => {

@@ -574,7 +574,24 @@ function formatRaceTime(sec: number): string {
   return h > 0 ? `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}` : `${m}:${String(s).padStart(2, "0")}`;
 }
 
-const canPredictDistance = (distance: unknown) => ["5K", "10K", "HM", "FM"].includes(String(distance || ""));
+const canPredictDistance = (distance: unknown) => {
+  const d = String(distance || "").trim().toUpperCase();
+  return ["5K", "10K", "HM", "FM", "TR"].includes(d) || /\d/.test(d);
+};
+
+const raceDistanceKm = (distance: unknown, planData?: any[]): number | null => {
+  const d = String(distance || "").trim().toUpperCase();
+  if (d === "5K") return 5;
+  if (d === "10K") return 10;
+  if (d === "HM") return 21.0975;
+  if (d === "FM") return 42.195;
+  if (d === "TR") {
+    const raceDay = (planData || []).flatMap((w: any) => w?.days || []).find((day: any) => day?.type === "Trail Race");
+    return raceDay?.distance_km ? Number(raceDay.distance_km) : null;
+  }
+  const numeric = Number(String(distance || "").replace(/[^0-9.]/g, ""));
+  return Number.isFinite(numeric) && numeric > 0 ? numeric : null;
+};
 
 type TrackResult = {
   predictedSec: number;

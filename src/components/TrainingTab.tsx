@@ -1463,6 +1463,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
       const { data, error } = await supabase.functions.invoke("predict-race-time", {
         body: {
           distance: existingPlan.distance,
+          distanceKm: raceDistanceKm(existingPlan.distance, Array.isArray(existingPlan.plan_data) ? existingPlan.plan_data : []),
           raceDate: existingPlan.race_date || null,
           lang,
           activities: (allActivities || []).slice(0, 30).map((a: any) => ({

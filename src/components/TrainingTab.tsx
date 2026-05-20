@@ -558,6 +558,50 @@ function planDistanceLabel(distance: string, lang: Lang): string {
   return distance;
 }
 
+function parseRaceTimeToSec(t: string | null | undefined): number | null {
+  if (!t) return null;
+  const parts = String(t).split(":").map((x) => parseInt(x, 10));
+  if (parts.some(Number.isNaN)) return null;
+  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+  if (parts.length === 2) return parts[0] * 60 + parts[1];
+  return null;
+}
+
+function formatRaceTime(sec: number): string {
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  const s = Math.round(sec % 60);
+  return h > 0 ? `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}` : `${m}:${String(s).padStart(2, "0")}`;
+}
+
+const canPredictDistance = (distance: unknown) => {
+  const d = String(distance || "").trim().toUpperCase();
+  return ["5K", "10K", "HM", "FM", "TR"].includes(d) || /\d/.test(d);
+};
+
+const raceDistanceKm = (distance: unknown, planData?: any[]): number | null => {
+  const d = String(distance || "").trim().toUpperCase();
+  if (d === "5K") return 5;
+  if (d === "10K") return 10;
+  if (d === "HM") return 21.0975;
+  if (d === "FM") return 42.195;
+  if (d.includes("HALF")) return 21.0975;
+  if (d.includes("MARATHON") || d.includes("FULL")) return 42.195;
+  if (d === "TR") {
+    const raceDay = (planData || []).flatMap((w: any) => w?.days || []).find((day: any) => day?.type === "Trail Race");
+    return raceDay?.distance_km ? Number(raceDay.distance_km) : null;
+  }
+  const numeric = Number(String(distance || "").replace(/[^0-9.]/g, ""));
+  return Number.isFinite(numeric) && numeric > 0 ? numeric : null;
+};
+
+type TrackResult = {
+  predictedSec: number;
+  targetSec: number;
+  rationale: string;
+  predictedLabel: string;
+};
+
 interface RaceSchedItemUI { user_race_id: string; race_name: string; race_date: string; category: string; priority: string }
 interface ProgramHeaderProps {
   lang: Lang;
@@ -601,6 +645,70 @@ interface RaceSchedulePanelProps {
   onRemoveRace?: (raceId: string) => Promise<void> | void;
   onRegenerateForRaces?: () => Promise<void> | void;
 }
+
+interface RaceTimeEstimateCardProps {
+  lang: Lang;
+  distance: string;
+  targetTime: string;
+  result: TrackResult | null;
+  loading: boolean;
+  error: string | null;
+  onRefresh: () => void;
+}
+
+const RaceTimeEstimateCard: React.FC<RaceTimeEstimateCardProps> = ({ lang, distance, targetTime, result, loading, error, onRefresh }) => {
+  const targetSec = result?.targetSec ?? parseRaceTimeToSec(targetTime);
+  const delta = result && targetSec ? result.predictedSec - targetSec : null;
+  const isOnTrack = delta !== null && delta <= 0;
+  const L = (en: string, zh: string) => (lang === "zh" ? zh : en);
+
+  return (
+    <div className="bg-primary/10 border-2 border-primary rounded-xl p-4 mb-4 shadow-sm">
+      <div className="flex items-start justify-between gap-3 mb-4">
+        <div className="flex items-start gap-3">
+          <div className="h-10 w-10 rounded-lg bg-primary text-primary-foreground flex items-center justify-center flex-shrink-0">
+            <Target size={20} />
+          </div>
+          <div>
+            <h2 className="text-base font-bold text-foreground leading-tight">{L("Current Estimated Race Time", "目前預測比賽時間")}</h2>
+            <p className="text-xs text-muted-foreground mt-1">{L("Checks if this AI program is on track for the target", "檢查此 AI 計劃是否達到目標")}</p>
+          </div>
+        </div>
+        <Button type="button" size="sm" variant="outline" className="h-8 px-2 text-xs bg-background/60" onClick={onRefresh} disabled={loading}>
+          {loading ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />}
+          <span className="ml-1">{L("Refresh", "更新")}</span>
+        </Button>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2 mb-3">
+        <div className="rounded-lg bg-card border border-border p-3">
+          <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{L("Program Target", "計劃目標")}</p>
+          <p className="text-xl font-bold text-foreground mt-1">{targetTime || "--:--"}</p>
+          <p className="text-[11px] text-muted-foreground mt-0.5">{planDistanceLabel(distance, lang)}</p>
+        </div>
+        <div className="rounded-lg bg-card border border-border p-3">
+          <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{L("Gemini Prediction", "Gemini 預測")}</p>
+          <p className="text-xl font-bold text-foreground mt-1">{loading ? "…" : result?.predictedLabel || "--:--"}</p>
+          <p className="text-[11px] text-muted-foreground mt-0.5">{result ? L("Based on recent runs", "根據最近跑步") : L("Waiting for analysis", "等待分析")}</p>
+        </div>
+      </div>
+
+      {result && delta !== null && (
+        <div className={`rounded-lg border p-3 ${isOnTrack ? "bg-primary/10 border-primary/50" : "bg-destructive/10 border-destructive/50"}`}>
+          <p className={`text-sm font-bold ${isOnTrack ? "text-primary" : "text-destructive"}`}>
+            {isOnTrack
+              ? L(`On track — ahead by ${formatRaceTime(Math.abs(delta))}`, `達標中 — 快 ${formatRaceTime(Math.abs(delta))}`)
+              : L(`Behind target by ${formatRaceTime(delta)}`, `落後目標 ${formatRaceTime(delta)}`)}
+          </p>
+          {result.rationale && <p className="text-xs text-muted-foreground mt-1 leading-snug">{result.rationale}</p>}
+        </div>
+      )}
+
+      {error && <p className="text-xs text-destructive mt-2 leading-snug">{error}</p>}
+    </div>
+  );
+};
+
 const RaceSchedulePanel: React.FC<RaceSchedulePanelProps> = ({
   lang, races, currentRaces, racesDrift, regenerating,
   onUpdateRacePriority, onRemoveRace, onRegenerateForRaces,
@@ -1137,8 +1245,12 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const { online } = useOnlineStatus();
-  const { activities: allActivities, userRaces } = useActivities();
+  const { activities: allActivities, userRaces, loading: activitiesLoading } = useActivities();
   const queryClient = useQueryClient();
+
+  const [trackChecking, setTrackChecking] = useState(false);
+  const [trackResult, setTrackResult] = useState<TrackResult | null>(null);
+  const [trackError, setTrackError] = useState<string | null>(null);
 
   // Paces view
   const [view, setView] = useState<"paces" | "equivalent">("paces");
@@ -1338,6 +1450,64 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
 
   const minWeeks = distance ? MIN_WEEKS[distance] : 4;
   const dateValid = weeksUntilRace >= minWeeks;
+
+  const handleCheckOnTrack = async (showToast = true) => {
+    if (!existingPlan || trackChecking) return;
+    const targetSec = parseRaceTimeToSec(existingPlan.target_time);
+    if (!targetSec) {
+      setTrackError(lang === "zh" ? "此計劃沒有目標時間" : "This plan has no target time");
+      return;
+    }
+    setTrackError(null);
+    setTrackResult(null);
+    setTrackChecking(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("predict-race-time", {
+        body: {
+          distance: existingPlan.distance,
+          distanceKm: raceDistanceKm(existingPlan.distance, Array.isArray(existingPlan.plan_data) ? existingPlan.plan_data : []),
+          raceDate: existingPlan.race_date || null,
+          lang,
+          activities: (allActivities || []).slice(0, 30).map((a: any) => ({
+            start_date: a.start_date,
+            sport_type: a.sport_type,
+            distance: a.distance,
+            moving_time: a.moving_time,
+            elapsed_time: a.elapsed_time,
+            average_heartrate: a.average_heartrate,
+            total_elevation_gain: a.total_elevation_gain,
+          })),
+        },
+      });
+      if (error) throw error;
+      if ((data as any)?.error === "no_recent_runs") {
+        setTrackError(lang === "zh" ? "沒有最近的跑步紀錄，請先同步活動。" : "No recent runs found. Sync activities first.");
+        return;
+      }
+      if ((data as any)?.error) throw new Error((data as any).error);
+      const h = parseInt((data as any).hours ?? 0, 10) || 0;
+      const m = parseInt((data as any).minutes ?? 0, 10) || 0;
+      const s = parseInt((data as any).seconds ?? 0, 10) || 0;
+      const predictedSec = h * 3600 + m * 60 + s;
+      setTrackResult({ predictedSec, targetSec, rationale: (data as any).rationale || "", predictedLabel: formatRaceTime(predictedSec) });
+    } catch (e: any) {
+      const message = e?.message || (lang === "zh" ? "請稍後再試" : "Please try again later");
+      setTrackError(message);
+      if (showToast) toast({ title: lang === "zh" ? "檢查失敗" : "Check failed", description: message, variant: "destructive" });
+    } finally {
+      setTrackChecking(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!existingPlan?.id || !existingPlan.target_time || activitiesLoading || trackResult || trackError || trackChecking) return;
+    void handleCheckOnTrack(false);
+  }, [existingPlan?.id, existingPlan?.distance, existingPlan?.target_time, activitiesLoading, allActivities.length, trackResult, trackError, trackChecking]);
+
+  useEffect(() => {
+    setTrackResult(null);
+    setTrackError(null);
+  }, [existingPlan?.id]);
 
   const getPace = (timeSeconds: number, meters: number): string => {
     const pacePerKm = timeSeconds / (meters / 1000);
@@ -2824,6 +2994,17 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                             onRegenerate={handleRegeneratePlan}
                             regenerating={regeneratingTime}
                           />
+                          {existingPlan.target_time && (
+                            <RaceTimeEstimateCard
+                              lang={lang}
+                              distance={String(existingPlan.distance ?? "")}
+                              targetTime={String(existingPlan.target_time ?? "")}
+                              result={trackResult}
+                              loading={trackChecking || activitiesLoading}
+                              error={trackError}
+                              onRefresh={() => handleCheckOnTrack(true)}
+                            />
+                          )}
                           <RaceSchedulePanel
                             lang={lang}
                             races={savedSnap as any}

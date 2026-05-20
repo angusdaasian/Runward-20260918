@@ -5,17 +5,16 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useOnlineStatus } from "@/hooks/use-online-status";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { confirmLeave } from "@/lib/unsavedGuard";
-import { TabPageSkeleton, SettingsSkeleton, CommunitySkeleton, PostureSkeleton, TrainingSkeleton } from "@/components/ui/PageSkeleton";
+import { ActivityListSkeleton, TabPageSkeleton, SettingsSkeleton, CommunitySkeleton, PostureSkeleton, TrainingSkeleton } from "@/components/ui/PageSkeleton";
 import PullToRefreshContainer from "@/components/ui/PullToRefreshContainer";
 
-// Eagerly load the most common tab
-import ActivitiesTab from "@/components/ActivitiesTab";
 import Onboarding from "@/components/Onboarding";
 import AppHeader, { preloadHeaderProfile } from "@/components/AppHeader";
 import PromoBanner from "@/components/PromoBanner";
 
 // Lazy load less-visited tabs
 
+const ActivitiesTab = lazy(() => import("@/components/ActivitiesTab"));
 const TrainingTab = lazy(() => import("@/components/TrainingTab"));
 const MoreTab = lazy(() => import("@/components/MoreTab"));
 const AnalyticsTab = lazy(() => import("@/components/AnalyticsTab"));
@@ -272,7 +271,9 @@ const Index = () => {
       </div>
       {activeTab === "activities" && (
         <PullToRefreshContainer>
-          <ActivitiesTab lang={lang} />
+          <Suspense fallback={<ActivityListSkeleton />}>
+            <ActivitiesTab lang={lang} />
+          </Suspense>
         </PullToRefreshContainer>
       )}
 

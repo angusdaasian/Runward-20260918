@@ -1226,8 +1226,12 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const { online } = useOnlineStatus();
-  const { activities: allActivities, userRaces } = useActivities();
+  const { activities: allActivities, userRaces, loading: activitiesLoading } = useActivities();
   const queryClient = useQueryClient();
+
+  const [trackChecking, setTrackChecking] = useState(false);
+  const [trackResult, setTrackResult] = useState<TrackResult | null>(null);
+  const [trackError, setTrackError] = useState<string | null>(null);
 
   // Paces view
   const [view, setView] = useState<"paces" | "equivalent">("paces");
@@ -1427,6 +1431,63 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
 
   const minWeeks = distance ? MIN_WEEKS[distance] : 4;
   const dateValid = weeksUntilRace >= minWeeks;
+
+  const handleCheckOnTrack = async (showToast = true) => {
+    if (!existingPlan || trackChecking) return;
+    const targetSec = parseRaceTimeToSec(existingPlan.target_time);
+    if (!targetSec) {
+      setTrackError(lang === "zh" ? "此計劃沒有目標時間" : "This plan has no target time");
+      return;
+    }
+    setTrackError(null);
+    setTrackResult(null);
+    setTrackChecking(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("predict-race-time", {
+        body: {
+          distance: existingPlan.distance,
+          raceDate: existingPlan.race_date || null,
+          lang,
+          activities: (allActivities || []).slice(0, 30).map((a: any) => ({
+            start_date: a.start_date,
+            sport_type: a.sport_type,
+            distance: a.distance,
+            moving_time: a.moving_time,
+            elapsed_time: a.elapsed_time,
+            average_heartrate: a.average_heartrate,
+            total_elevation_gain: a.total_elevation_gain,
+          })),
+        },
+      });
+      if (error) throw error;
+      if ((data as any)?.error === "no_recent_runs") {
+        setTrackError(lang === "zh" ? "沒有最近的跑步紀錄，請先同步活動。" : "No recent runs found. Sync activities first.");
+        return;
+      }
+      if ((data as any)?.error) throw new Error((data as any).error);
+      const h = parseInt((data as any).hours ?? 0, 10) || 0;
+      const m = parseInt((data as any).minutes ?? 0, 10) || 0;
+      const s = parseInt((data as any).seconds ?? 0, 10) || 0;
+      const predictedSec = h * 3600 + m * 60 + s;
+      setTrackResult({ predictedSec, targetSec, rationale: (data as any).rationale || "", predictedLabel: formatRaceTime(predictedSec) });
+    } catch (e: any) {
+      const message = e?.message || (lang === "zh" ? "請稍後再試" : "Please try again later");
+      setTrackError(message);
+      if (showToast) toast({ title: lang === "zh" ? "檢查失敗" : "Check failed", description: message, variant: "destructive" });
+    } finally {
+      setTrackChecking(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!existingPlan?.id || !canPredictDistance(existingPlan.distance) || !existingPlan.target_time || activitiesLoading || trackResult || trackError || trackChecking) return;
+    void handleCheckOnTrack(false);
+  }, [existingPlan?.id, existingPlan?.distance, existingPlan?.target_time, activitiesLoading, allActivities.length, trackResult, trackError, trackChecking]);
+
+  useEffect(() => {
+    setTrackResult(null);
+    setTrackError(null);
+  }, [existingPlan?.id]);
 
   const getPace = (timeSeconds: number, meters: number): string => {
     const pacePerKm = timeSeconds / (meters / 1000);

@@ -576,7 +576,30 @@ const ProgramsTab = ({ lang, onLoginRequest }: Props) => {
                 className="w-16 text-center"
               />
             </div>
-            <p className="text-xs text-muted-foreground mt-1">
+            <div className="mt-3 rounded-lg border border-primary/30 bg-primary/5 p-3">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 text-xs font-medium text-foreground">
+                  <Sparkles size={14} className="text-primary" />
+                  {lang === "zh" ? "用 AI 根據近期表現預測" : "Predict from recent performance"}
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={handlePredictTarget}
+                  disabled={predicting || !distance}
+                  className="h-8 px-3 text-xs"
+                >
+                  {predicting ? (
+                    <><Loader2 size={12} className="mr-1 animate-spin" />{lang === "zh" ? "預測中" : "Predicting"}</>
+                  ) : (lang === "zh" ? "預測目標時間" : "Suggest target")}
+                </Button>
+              </div>
+              {predictionRationale && (
+                <p className="text-[11px] text-muted-foreground mt-2 leading-snug">{predictionRationale}</p>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">
               {lang === "zh" ? "輸入你的目標完成時間" : "Enter your target finish time"}
             </p>
           </div>

@@ -316,6 +316,11 @@ const ProgramsTab = ({ lang, onLoginRequest }: Props) => {
       : `${m}:${String(s).padStart(2, "0")}`;
   };
 
+  const activeTargetTime = existingPlan?.target_time || targetTime;
+  const activeDistance = existingPlan?.distance || distance;
+  const targetSecForDisplay = parseTargetToSec(activeTargetTime);
+  const canPredictRaceTime = !!activeTargetTime && typeof activeDistance === "string" && ["5K", "10K", "HM", "FM"].includes(activeDistance);
+
   const handleCheckOnTrack = async (showToast = true) => {
     if (!existingPlan || trackChecking) return;
     const targetSec = parseTargetToSec(existingPlan.target_time);
@@ -384,6 +389,11 @@ const ProgramsTab = ({ lang, onLoginRequest }: Props) => {
       setTrackChecking(false);
     }
   };
+
+  useEffect(() => {
+    if (!existingPlan?.id || !canPredictRaceTime || activitiesLoading || trackResult || trackError || trackChecking) return;
+    void handleCheckOnTrack(false);
+  }, [existingPlan?.id, canPredictRaceTime, activitiesLoading, activities.length, trackResult, trackError, trackChecking]);
 
 
 

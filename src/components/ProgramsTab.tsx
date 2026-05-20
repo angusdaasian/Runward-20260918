@@ -335,6 +335,7 @@ const ProgramsTab = ({ lang, onLoginRequest }: Props) => {
       return;
     }
     setTrackError(null);
+    setTrackResult(null);
     setTrackChecking(true);
     try {
       const { data, error } = await supabase.functions.invoke("predict-race-time", {
@@ -394,6 +395,11 @@ const ProgramsTab = ({ lang, onLoginRequest }: Props) => {
     if (!existingPlan?.id || !canPredictRaceTime || activitiesLoading || trackResult || trackError || trackChecking) return;
     void handleCheckOnTrack(false);
   }, [existingPlan?.id, canPredictRaceTime, activitiesLoading, activities.length, trackResult, trackError, trackChecking]);
+
+  useEffect(() => {
+    setTrackResult(null);
+    setTrackError(null);
+  }, [existingPlan?.id]);
 
 
 

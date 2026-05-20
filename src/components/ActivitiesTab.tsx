@@ -391,7 +391,6 @@ const ActivityCard = ({
 );
 
 // ---------- Main Component ----------
-const SKELETON_MIN_MS = 400;
 
 const ActivitiesTab = ({ lang }: Props) => {
   const { user } = useAuth();
@@ -415,13 +414,6 @@ const ActivitiesTab = ({ lang }: Props) => {
     } | null;
     races?: { id: string; race_name: string; race_name_zh?: string | null; category: string }[];
   } | null>(null);
-
-  // Mandatory skeleton on every mount
-  const [skeletonDone, setSkeletonDone] = useState(false);
-  useEffect(() => {
-    const timer = setTimeout(() => setSkeletonDone(true), SKELETON_MIN_MS);
-    return () => clearTimeout(timer);
-  }, []);
 
   // Start fetching Apple Health stats immediately (even during skeleton loading)
   const appleHealth = useAppleHealth(lang);
@@ -582,7 +574,7 @@ const ActivitiesTab = ({ lang }: Props) => {
     setResyncing(false);
   }, [user, resyncing, appleHealth, invalidateAll, lang]);
 
-  if (loading || !skeletonDone) return <ActivityListSkeleton />;
+  if (loading) return <ActivityListSkeleton />;
 
   if (selectedActivity) {
     return (

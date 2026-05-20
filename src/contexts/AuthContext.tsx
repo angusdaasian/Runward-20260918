@@ -106,13 +106,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           console.warn("[Push] Failed to set OneSignal player ID:", e);
         }
       }
-      // For warm resumes, resolve immediately since user was just here
-      // For cold starts, add small delay for auth state to settle
-      if (isWarmResume) {
-        setLoading(false);
-      } else {
-        setTimeout(() => setLoading(false), 400);
-      }
+      // Resolve immediately — getSession() has already restored from storage.
+      setLoading(false);
     });
 
     return () => {

@@ -371,7 +371,7 @@ export function useActivities() {
     queryKey: ["garmin-activities", user?.id],
     queryFn: () => fetchGarminActivities(user!.id),
     enabled: !!user,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 30 * 1000,
     gcTime: 10 * 60 * 1000,
   });
 

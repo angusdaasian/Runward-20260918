@@ -558,6 +558,31 @@ function planDistanceLabel(distance: string, lang: Lang): string {
   return distance;
 }
 
+function parseRaceTimeToSec(t: string | null | undefined): number | null {
+  if (!t) return null;
+  const parts = String(t).split(":").map((x) => parseInt(x, 10));
+  if (parts.some(Number.isNaN)) return null;
+  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+  if (parts.length === 2) return parts[0] * 60 + parts[1];
+  return null;
+}
+
+function formatRaceTime(sec: number): string {
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  const s = Math.round(sec % 60);
+  return h > 0 ? `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}` : `${m}:${String(s).padStart(2, "0")}`;
+}
+
+const canPredictDistance = (distance: unknown) => ["5K", "10K", "HM", "FM"].includes(String(distance || ""));
+
+type TrackResult = {
+  predictedSec: number;
+  targetSec: number;
+  rationale: string;
+  predictedLabel: string;
+};
+
 interface RaceSchedItemUI { user_race_id: string; race_name: string; race_date: string; category: string; priority: string }
 interface ProgramHeaderProps {
   lang: Lang;

@@ -198,8 +198,16 @@ const ProgramsTab = ({ lang, onLoginRequest }: Props) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const { activities } = useActivities();
-  const [predicting, setPredicting] = useState(false);
-  const [predictionRationale, setPredictionRationale] = useState<string | null>(null);
+
+  // On-track checker (for generated plan)
+  const [trackChecking, setTrackChecking] = useState(false);
+  const [trackResult, setTrackResult] = useState<{
+    predictedSec: number;
+    targetSec: number;
+    rationale: string;
+    predictedLabel: string;
+  } | null>(null);
+
 
   // Questionnaire state
   const [step, setStep] = useState<"goal" | "details" | "calendar">("goal");
@@ -289,15 +297,40 @@ const ProgramsTab = ({ lang, onLoginRequest }: Props) => {
     }
   };
 
-  const handlePredictTarget = async () => {
-    if (!distance || predicting) return;
-    setPredicting(true);
-    setPredictionRationale(null);
+  const parseTargetToSec = (t: string | null | undefined): number | null => {
+    if (!t) return null;
+    const parts = t.split(":").map((x) => parseInt(x, 10));
+    if (parts.some(isNaN)) return null;
+    if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+    if (parts.length === 2) return parts[0] * 60 + parts[1];
+    return null;
+  };
+
+  const fmtSec = (sec: number) => {
+    const h = Math.floor(sec / 3600);
+    const m = Math.floor((sec % 3600) / 60);
+    const s = Math.round(sec % 60);
+    return h > 0
+      ? `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`
+      : `${m}:${String(s).padStart(2, "0")}`;
+  };
+
+  const handleCheckOnTrack = async () => {
+    if (!existingPlan || trackChecking) return;
+    const targetSec = parseTargetToSec(existingPlan.target_time);
+    if (!targetSec) {
+      toast({
+        title: lang === "zh" ? "計劃沒有目標時間" : "Plan has no target time",
+        variant: "destructive",
+      });
+      return;
+    }
+    setTrackChecking(true);
     try {
       const { data, error } = await supabase.functions.invoke("predict-race-time", {
         body: {
-          distance,
-          raceDate: raceDate || null,
+          distance: existingPlan.distance,
+          raceDate: existingPlan.race_date || null,
           lang,
           activities: (activities || []).slice(0, 30).map((a: any) => ({
             start_date: a.start_date,
@@ -320,25 +353,28 @@ const ProgramsTab = ({ lang, onLoginRequest }: Props) => {
         return;
       }
       if ((data as any)?.error) throw new Error((data as any).error);
-
-      const h = String((data as any).hours ?? 0);
-      const m = String((data as any).minutes ?? 0).padStart(2, "0");
-      const s = String((data as any).seconds ?? 0).padStart(2, "0");
-      setTargetHours(h);
-      setTargetMinutes(m);
-      setTargetSeconds(s);
-      setTargetTime(distance === "HM" || distance === "FM" ? `${h}:${m}:${s}` : `${m}:${s}`);
-      setPredictionRationale((data as any).rationale || null);
+      const h = parseInt((data as any).hours ?? 0, 10) || 0;
+      const m = parseInt((data as any).minutes ?? 0, 10) || 0;
+      const s = parseInt((data as any).seconds ?? 0, 10) || 0;
+      const predictedSec = h * 3600 + m * 60 + s;
+      setTrackResult({
+        predictedSec,
+        targetSec,
+        rationale: (data as any).rationale || "",
+        predictedLabel: fmtSec(predictedSec),
+      });
     } catch (e: any) {
       toast({
-        title: lang === "zh" ? "預測失敗" : "Prediction failed",
+        title: lang === "zh" ? "檢查失敗" : "Check failed",
         description: e?.message || (lang === "zh" ? "請稍後再試" : "Please try again later"),
         variant: "destructive",
       });
     } finally {
-      setPredicting(false);
+      setTrackChecking(false);
     }
   };
+
+
 
 
   const handleGenerate = async () => {
@@ -575,29 +611,6 @@ const ProgramsTab = ({ lang, onLoginRequest }: Props) => {
                 }}
                 className="w-16 text-center"
               />
-            </div>
-            <div className="mt-3 rounded-lg border border-primary/30 bg-primary/5 p-3">
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2 text-xs font-medium text-foreground">
-                  <Sparkles size={14} className="text-primary" />
-                  {lang === "zh" ? "用 AI 根據近期表現預測" : "Predict from recent performance"}
-                </div>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  onClick={handlePredictTarget}
-                  disabled={predicting || !distance}
-                  className="h-8 px-3 text-xs"
-                >
-                  {predicting ? (
-                    <><Loader2 size={12} className="mr-1 animate-spin" />{lang === "zh" ? "預測中" : "Predicting"}</>
-                  ) : (lang === "zh" ? "預測目標時間" : "Suggest target")}
-                </Button>
-              </div>
-              {predictionRationale && (
-                <p className="text-[11px] text-muted-foreground mt-2 leading-snug">{predictionRationale}</p>
-              )}
             </div>
             <p className="text-xs text-muted-foreground mt-2">
               {lang === "zh" ? "輸入你的目標完成時間" : "Enter your target finish time"}
@@ -861,6 +874,71 @@ const ProgramsTab = ({ lang, onLoginRequest }: Props) => {
           Total: {totalKm.toFixed(1)} km
         </p>
       </div>
+
+      {/* On-track checker */}
+      {existingPlan?.target_time && ["5K", "10K", "HM", "FM"].includes(existingPlan?.distance) && (
+        <div className="bg-card border border-border rounded-xl p-3 mb-4">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Target size={14} className="text-primary" />
+              <div>
+                <div className="text-sm font-semibold text-foreground">
+                  {lang === "zh" ? "進度檢查" : "On-track check"}
+                </div>
+                <div className="text-[11px] text-muted-foreground">
+                  {lang === "zh" ? "目標" : "Target"}: {existingPlan.target_time}
+                </div>
+              </div>
+            </div>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={handleCheckOnTrack}
+              disabled={trackChecking}
+              className="h-8 px-3 text-xs"
+            >
+              {trackChecking ? (
+                <><Loader2 size={12} className="mr-1 animate-spin" />{lang === "zh" ? "分析中" : "Checking"}</>
+              ) : (
+                <><Sparkles size={12} className="mr-1" />{lang === "zh" ? "檢查進度" : "Check progress"}</>
+              )}
+            </Button>
+          </div>
+          {trackResult && (() => {
+            const delta = trackResult.predictedSec - trackResult.targetSec;
+            const onTrack = delta <= 30; // within 30s = on track
+            const ahead = delta < -30;
+            const behindSec = Math.abs(delta);
+            const behindLabel = `${Math.floor(behindSec / 60)}:${String(Math.round(behindSec % 60)).padStart(2, "0")}`;
+            const statusColor = ahead
+              ? "bg-emerald-500/10 border-emerald-500/40 text-emerald-600 dark:text-emerald-400"
+              : onTrack
+              ? "bg-primary/10 border-primary/40 text-primary"
+              : "bg-amber-500/10 border-amber-500/40 text-amber-600 dark:text-amber-400";
+            const statusText = ahead
+              ? (lang === "zh" ? `領先目標 ${behindLabel}` : `Ahead of target by ${behindLabel}`)
+              : onTrack
+              ? (lang === "zh" ? "進度良好" : "On track")
+              : (lang === "zh" ? `落後目標 ${behindLabel}` : `Behind target by ${behindLabel}`);
+            return (
+              <div className={`mt-3 rounded-lg border p-2.5 ${statusColor}`}>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold">{statusText}</span>
+                  <span className="text-[11px] opacity-80">
+                    {lang === "zh" ? "目前預測" : "Current prediction"}: {trackResult.predictedLabel}
+                  </span>
+                </div>
+                {trackResult.rationale && (
+                  <p className="text-[11px] mt-1 opacity-90 leading-snug">{trackResult.rationale}</p>
+                )}
+              </div>
+            );
+          })()}
+        </div>
+      )}
+
+
 
       {/* Day list */}
       <div className="space-y-1">

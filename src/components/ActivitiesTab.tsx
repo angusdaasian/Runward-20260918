@@ -32,7 +32,7 @@ import { useActivities, type StravaActivity } from "@/hooks/use-activities";
 import FadeIn from "@/components/ui/FadeIn";
 import { ActivityListSkeleton } from "@/components/ui/PageSkeleton";
 import { useAppleHealth, type HealthStats } from "@/hooks/use-apple-health";
-import PremiumSyncButton from "@/components/PremiumSyncButton";
+
 
 interface Props {
   lang: Lang;
@@ -659,8 +659,6 @@ const ActivitiesTab = ({ lang }: Props) => {
       {/* Today Stats from Apple HealthKit */}
       <TodayStats lang={lang} healthStats={ahConnected ? appleHealth.healthStats : null} />
 
-      {/* Premium-only Terra historical sync */}
-      <PremiumSyncButton lang={lang} />
 
 
       {/* Recent Activity */}

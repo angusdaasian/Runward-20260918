@@ -621,25 +621,14 @@ const ActivitiesTab = ({ lang }: Props) => {
             </button>
           )}
         </div>
-        <div className="space-y-3">
-          {activities.map((act) => (
-            <ActivityCard
-              key={act.id}
-              act={act}
-              lang={lang}
-              score={activityScores[act.id]}
-              load={activityLoads[act.id]}
-              isPremium={isPremium}
-              onClick={() => setSelectedActivity(act)}
-            />
-          ))}
-          {activities.length === 0 && (
-            <div className="text-center py-8">
-              <Activity size={36} className="mx-auto text-muted-foreground mb-2" />
-              <p className="text-muted-foreground text-sm">{lang === "zh" ? "暫無活動" : "No activities yet"}</p>
-            </div>
-          )}
-        </div>
+        <MonthlyActivityList
+          activities={activities}
+          lang={lang}
+          activityScores={activityScores}
+          activityLoads={activityLoads}
+          isPremium={isPremium}
+          onSelect={setSelectedActivity}
+        />
       </FadeIn>
     );
   }

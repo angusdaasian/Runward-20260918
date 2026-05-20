@@ -297,15 +297,40 @@ const ProgramsTab = ({ lang, onLoginRequest }: Props) => {
     }
   };
 
-  const handlePredictTarget = async () => {
-    if (!distance || predicting) return;
-    setPredicting(true);
-    setPredictionRationale(null);
+  const parseTargetToSec = (t: string | null | undefined): number | null => {
+    if (!t) return null;
+    const parts = t.split(":").map((x) => parseInt(x, 10));
+    if (parts.some(isNaN)) return null;
+    if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+    if (parts.length === 2) return parts[0] * 60 + parts[1];
+    return null;
+  };
+
+  const fmtSec = (sec: number) => {
+    const h = Math.floor(sec / 3600);
+    const m = Math.floor((sec % 3600) / 60);
+    const s = Math.round(sec % 60);
+    return h > 0
+      ? `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`
+      : `${m}:${String(s).padStart(2, "0")}`;
+  };
+
+  const handleCheckOnTrack = async () => {
+    if (!existingPlan || trackChecking) return;
+    const targetSec = parseTargetToSec(existingPlan.target_time);
+    if (!targetSec) {
+      toast({
+        title: lang === "zh" ? "計劃沒有目標時間" : "Plan has no target time",
+        variant: "destructive",
+      });
+      return;
+    }
+    setTrackChecking(true);
     try {
       const { data, error } = await supabase.functions.invoke("predict-race-time", {
         body: {
-          distance,
-          raceDate: raceDate || null,
+          distance: existingPlan.distance,
+          raceDate: existingPlan.race_date || null,
           lang,
           activities: (activities || []).slice(0, 30).map((a: any) => ({
             start_date: a.start_date,
@@ -328,25 +353,28 @@ const ProgramsTab = ({ lang, onLoginRequest }: Props) => {
         return;
       }
       if ((data as any)?.error) throw new Error((data as any).error);
-
-      const h = String((data as any).hours ?? 0);
-      const m = String((data as any).minutes ?? 0).padStart(2, "0");
-      const s = String((data as any).seconds ?? 0).padStart(2, "0");
-      setTargetHours(h);
-      setTargetMinutes(m);
-      setTargetSeconds(s);
-      setTargetTime(distance === "HM" || distance === "FM" ? `${h}:${m}:${s}` : `${m}:${s}`);
-      setPredictionRationale((data as any).rationale || null);
+      const h = parseInt((data as any).hours ?? 0, 10) || 0;
+      const m = parseInt((data as any).minutes ?? 0, 10) || 0;
+      const s = parseInt((data as any).seconds ?? 0, 10) || 0;
+      const predictedSec = h * 3600 + m * 60 + s;
+      setTrackResult({
+        predictedSec,
+        targetSec,
+        rationale: (data as any).rationale || "",
+        predictedLabel: fmtSec(predictedSec),
+      });
     } catch (e: any) {
       toast({
-        title: lang === "zh" ? "預測失敗" : "Prediction failed",
+        title: lang === "zh" ? "檢查失敗" : "Check failed",
         description: e?.message || (lang === "zh" ? "請稍後再試" : "Please try again later"),
         variant: "destructive",
       });
     } finally {
-      setPredicting(false);
+      setTrackChecking(false);
     }
   };
+
+
 
 
   const handleGenerate = async () => {

@@ -388,7 +388,11 @@ const ActivityCard = ({
           )}
         </div>
 
-        {act.summary_polyline && <ActivityMap polyline={act.summary_polyline} />}
+        {act.summary_polyline && (
+          <Suspense fallback={<div className="h-40 rounded-lg bg-muted/30 animate-pulse" />}>
+            <ActivityMap polyline={act.summary_polyline} />
+          </Suspense>
+        )}
       </>
     )}
   </div>

@@ -682,22 +682,25 @@ const ActivitiesTab = ({ lang }: Props) => {
 
   if (selectedActivity) {
     return (
-      <ActivityDetail
-        activity={selectedActivity}
-        lang={lang}
-        onBack={() => {
-          setSelectedActivity(null);
-        }}
-        onDeleted={invalidateAll}
-        isPremium={isPremium}
-        trainingScore={profile?.training_score ?? undefined}
-        profileAge={(profile as any)?.age ?? null}
-        profileMaxHr={(profile as any)?.max_heartrate ?? null}
-        profileRestingHr={(profile as any)?.resting_heartrate ?? null}
-        profileCustomZones={(profile as any)?.custom_hr_zones ?? null}
-      />
+      <Suspense fallback={<ActivityListSkeleton />}>
+        <ActivityDetail
+          activity={selectedActivity}
+          lang={lang}
+          onBack={() => {
+            setSelectedActivity(null);
+          }}
+          onDeleted={invalidateAll}
+          isPremium={isPremium}
+          trainingScore={profile?.training_score ?? undefined}
+          profileAge={(profile as any)?.age ?? null}
+          profileMaxHr={(profile as any)?.max_heartrate ?? null}
+          profileRestingHr={(profile as any)?.resting_heartrate ?? null}
+          profileCustomZones={(profile as any)?.custom_hr_zones ?? null}
+        />
+      </Suspense>
     );
   }
+
 
   if (showAllActivities) {
     return (

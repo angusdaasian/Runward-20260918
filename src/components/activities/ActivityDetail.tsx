@@ -583,7 +583,7 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
         const km = v.distM != null
           ? v.distM / 1000
           : (totalDist > 0 ? (totalDist * (t / lastT)) / 1000 : t / 60);
-        const point: any = { distance_km: km.toFixed(2), time: t };
+        const point: any = { distance_km: Number(km.toFixed(2)), time: t };
         if (v.heartrate) point.heartrate = v.heartrate;
         if (v.altitude != null) point.altitude = v.altitude;
         if (v.cadence != null && v.cadence > 0) point.cadence = v.cadence;
@@ -625,7 +625,7 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
       let cum = 0;
       for (const s of splits) {
         cum += (s.distance || 0);
-        const point: any = { distance_km: (cum / 1000).toFixed(2) };
+        const point: any = { distance_km: Number((cum / 1000).toFixed(2)) };
         if (s.average_heartrate) point.heartrate = s.average_heartrate;
         if (s.average_speed > 0) point.pace = speedToPace(s.average_speed);
         data.push(point);
@@ -642,7 +642,7 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
     const data: any[] = [];
     const step = Math.max(1, Math.floor(distStream.data.length / 200));
     for (let i = 0; i < distStream.data.length; i += step) {
-      const point: any = { distance_km: (distStream.data[i] / 1000).toFixed(2) };
+      const point: any = { distance_km: Number((distStream.data[i] / 1000).toFixed(2)) };
       if (timeStream) point.time = timeStream.data[i];
       if (hrStream) point.heartrate = hrStream.data[i];
       if (altStream) point.altitude = altStream.data[i];

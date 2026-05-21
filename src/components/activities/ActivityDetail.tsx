@@ -114,6 +114,27 @@ function formatPaceFromMinutes(minutes: number): string {
   return `${min}:${String(sec).padStart(2, '0')}`;
 }
 
+function appendSplitTail(data: any[], splits: Split[] | null, activityDistance: number): any[] {
+  if (!splits?.length || data.length === 0 || activityDistance <= 0) return data;
+  const lastKm = Number(data[data.length - 1]?.distance_km) || 0;
+  const totalKm = activityDistance / 1000;
+  if (lastKm >= totalKm * 0.9) return data;
+  let cum = 0;
+  const tail: any[] = [];
+  for (const s of splits) {
+    cum += s.distance || 0;
+    const km = Number((cum / 1000).toFixed(2));
+    if (km <= lastKm + 0.05) continue;
+    const point: any = { distance_km: km };
+    if (s.average_heartrate) point.heartrate = s.average_heartrate;
+    if (s.average_speed > 0) point.pace = speedToPace(s.average_speed);
+    if (s.elevation_difference != null) point.altitude = (data[data.length - 1]?.altitude ?? 0) + tail.reduce((sum, p) => sum + (p.elevationDelta || 0), 0) + s.elevation_difference;
+    if (point.altitude !== undefined) point.elevationDelta = s.elevation_difference || 0;
+    tail.push(point);
+  }
+  return [...data, ...tail].map(({ elevationDelta, ...point }) => point);
+}
+
 const StatBox = ({ icon: Icon, label, value, unit, iconColor }: {
   icon: any; label: string; value: string; unit?: string; iconColor?: string;
 }) => (
@@ -617,7 +638,7 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
           if (typeof d.pace === "number" && (d.pace < lo || d.pace > hi)) delete d.pace;
         }
       }
-      return data;
+      return appendSplitTail(data, splits, activity.distance || 0);
     }
     // per-lap chart from splits so HR + Pace charts still render.
     if ((!streams || streams.length === 0) && splits && splits.length > 0) {
@@ -649,7 +670,7 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
       if (velStream && velStream.data[i] > 0) point.pace = speedToPace(velStream.data[i]);
       data.push(point);
     }
-    return data;
+    return appendSplitTail(data, splits, activity.distance || 0);
   }, [streams, splits, activity.hr_samples, activity.distance_samples, activity.elevation_samples, activity.distance]);
 
   const hasHeartrate = chartData.some(d => d.heartrate);

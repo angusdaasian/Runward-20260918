@@ -178,7 +178,46 @@ function extractHrSamples(a: any): Array<{ t: number; bpm: number }> {
   const out = Array.from(bySecond.entries())
     .sort((a, b) => a[0] - b[0])
     .map(([t, bpm]) => ({ t, bpm }));
-  return out.length > 7200 ? out.slice(0, 7200) : out;
+  return out;
+}
+
+function extractDistanceSamples(a: any): Array<{ t: number; d: number }> {
+  const sources: any[] = [
+    a?.distance_data?.detailed?.distance_samples,
+    a?.distance_data?.distance_samples,
+    a?.distance_data?.detailed?.samples,
+  ];
+  const samples = sources.find((s) => Array.isArray(s) && s.length > 0);
+  if (!samples) return [];
+  const startMs = a?.metadata?.start_time ? new Date(a.metadata.start_time).getTime() : NaN;
+  const bySecond = new Map<number, number>();
+  for (const s of samples as any[]) {
+    const d = toFiniteNumber(s?.distance_meters ?? s?.distance);
+    if (d == null || d < 0) continue;
+    let t: number | null = toFiniteNumber(s?.timer_duration_seconds ?? s?.timer_seconds ?? s?.elapsed_seconds);
+    if (t == null && s?.timestamp && Number.isFinite(startMs)) {
+      t = (new Date(s.timestamp).getTime() - startMs) / 1000;
+    }
+    if (t == null || !Number.isFinite(t) || t < 0) continue;
+    bySecond.set(Math.floor(t), Math.round(d * 100) / 100);
+  }
+  return Array.from(bySecond.entries()).sort((a, b) => a[0] - b[0]).map(([t, d]) => ({ t, d }));
+}
+
+function extractElevationSamplesForChart(a: any): Array<{ t: number; e: number }> {
+  const raw = extractElevationSamples(a);
+  if (!raw.length) return [];
+  const startMs = a?.metadata?.start_time ? new Date(a.metadata.start_time).getTime() : NaN;
+  const bySecond = new Map<number, number>();
+  for (const s of raw) {
+    let t: number | null = s.timerSeconds;
+    if (t == null && s.timestampMs != null && Number.isFinite(startMs)) {
+      t = (s.timestampMs - startMs) / 1000;
+    }
+    if (t == null || !Number.isFinite(t) || t < 0) continue;
+    bySecond.set(Math.floor(t), Math.round(s.elevMeters * 10) / 10);
+  }
+  return Array.from(bySecond.entries()).sort((a, b) => a[0] - b[0]).map(([t, e]) => ({ t, e }));
 }
 
 function extractCadenceSamples(a: any): Array<{ t: number; rpm: number }> {
@@ -201,8 +240,7 @@ function extractCadenceSamples(a: any): Array<{ t: number; rpm: number }> {
     if (t == null || !Number.isFinite(t) || t < 0) continue;
     bySecond.set(Math.floor(t), Math.round(rpm * 10) / 10);
   }
-  const out = Array.from(bySecond.entries()).sort((a, b) => a[0] - b[0]).map(([t, rpm]) => ({ t, rpm }));
-  return out.length > 7200 ? out.slice(0, 7200) : out;
+  return Array.from(bySecond.entries()).sort((a, b) => a[0] - b[0]).map(([t, rpm]) => ({ t, rpm }));
 }
 
 function looksLikeHrSample(s: any): boolean {
@@ -273,13 +311,15 @@ async function upsertTerraActivity(admin: any, c: any, a: any) {
   const polyline = extractPolyline(a);
   const rawLaps = extractLaps(a);
   const hrSamples = extractHrSamples(a);
+  const distanceSamples = extractDistanceSamples(a);
+  const elevationSamples = extractElevationSamplesForChart(a);
   const laps = hrSamples.length > 0 && rawLaps.length > 0
     ? recomputeLapAvgHr(rawLaps, hrSamples, meta?.start_time ?? null)
     : rawLaps;
   const cadenceSamples = extractCadenceSamples(a);
   const { data: existing } = await admin
     .from("terra_activities")
-    .select("summary_polyline, laps, has_gps, hr_samples, cadence_samples")
+    .select("summary_polyline, laps, has_gps, hr_samples, distance_samples, elevation_samples, cadence_samples")
     .eq("user_id", c.user_id)
     .eq("terra_activity_id", aid)
     .maybeSingle();
@@ -288,6 +328,12 @@ async function upsertTerraActivity(admin: any, c: any, a: any) {
   const finalHrSamples = hrSamples.length > 0
     ? hrSamples
     : (Array.isArray(existing?.hr_samples) ? existing!.hr_samples : null);
+  const finalDistanceSamples = distanceSamples.length > 0
+    ? distanceSamples
+    : (Array.isArray((existing as any)?.distance_samples) ? (existing as any).distance_samples : null);
+  const finalElevationSamples = elevationSamples.length > 0
+    ? elevationSamples
+    : (Array.isArray((existing as any)?.elevation_samples) ? (existing as any).elevation_samples : null);
   const finalCadenceSamples = cadenceSamples.length > 0
     ? cadenceSamples
     : (Array.isArray((existing as any)?.cadence_samples) ? (existing as any).cadence_samples : null);
@@ -318,6 +364,8 @@ async function upsertTerraActivity(admin: any, c: any, a: any) {
     has_gps: !!finalPolyline || !!existing?.has_gps,
     laps: finalLaps,
     hr_samples: finalHrSamples,
+    distance_samples: finalDistanceSamples,
+    elevation_samples: finalElevationSamples,
     cadence_samples: finalCadenceSamples,
     raw_json: null,
   }, { onConflict: "user_id,terra_activity_id" });

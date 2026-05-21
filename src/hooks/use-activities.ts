@@ -355,41 +355,43 @@ async function fetchUserRaces(userId: string): Promise<UserRace[]> {
   }));
 }
 
-export function useActivities() {
+export function useActivities(options?: { limit?: number }) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const limit = options?.limit;
 
   const activitiesQuery = useQuery({
-    queryKey: ["strava-activities", user?.id],
-    queryFn: () => fetchActivities(user!.id),
+    queryKey: ["strava-activities", user?.id, limit ?? "all"],
+    queryFn: () => fetchActivities(user!.id, limit),
     enabled: !!user,
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
   });
 
   const appleHealthQuery = useQuery({
-    queryKey: ["apple-health-activities", user?.id],
-    queryFn: () => fetchAppleHealthActivities(user!.id),
+    queryKey: ["apple-health-activities", user?.id, limit ?? "all"],
+    queryFn: () => fetchAppleHealthActivities(user!.id, limit),
     enabled: !!user,
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
   });
 
   const garminQuery = useQuery({
-    queryKey: ["garmin-activities", user?.id],
-    queryFn: () => fetchGarminActivities(user!.id),
+    queryKey: ["garmin-activities", user?.id, limit ?? "all"],
+    queryFn: () => fetchGarminActivities(user!.id, limit),
     enabled: !!user,
     staleTime: 30 * 1000,
     gcTime: 10 * 60 * 1000,
   });
 
   const terraQuery = useQuery({
-    queryKey: ["terra-activities", user?.id],
-    queryFn: () => fetchTerraActivities(user!.id),
+    queryKey: ["terra-activities", user?.id, limit ?? "all"],
+    queryFn: () => fetchTerraActivities(user!.id, limit),
     enabled: !!user,
     staleTime: 30 * 1000,
     gcTime: 10 * 60 * 1000,
   });
+
 
   const profileQuery = useQuery({
     queryKey: ["user-profile", user?.id],

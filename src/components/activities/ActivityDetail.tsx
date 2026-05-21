@@ -135,6 +135,16 @@ function appendSplitTail(data: any[], splits: Split[] | null, activityDistance: 
   return [...data, ...tail].map(({ elevationDelta, ...point }) => point);
 }
 
+function extendChartToActivityDistance(data: any[], splits: Split[] | null, activityDistance: number): any[] {
+  const withSplitTail = appendSplitTail(data, splits, activityDistance);
+  if (withSplitTail.length === 0 || activityDistance <= 0) return withSplitTail;
+  const totalKm = Number((activityDistance / 1000).toFixed(2));
+  const last = withSplitTail[withSplitTail.length - 1];
+  const lastKm = Number(last?.distance_km) || 0;
+  if (lastKm >= totalKm * 0.98) return withSplitTail;
+  return [...withSplitTail, { ...last, distance_km: totalKm }];
+}
+
 const StatBox = ({ icon: Icon, label, value, unit, iconColor }: {
   icon: any; label: string; value: string; unit?: string; iconColor?: string;
 }) => (

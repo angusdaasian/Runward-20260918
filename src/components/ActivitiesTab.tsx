@@ -499,8 +499,11 @@ const MonthlyActivityList = ({
 const ActivitiesTab = ({ lang }: Props) => {
   const { user } = useAuth();
   const { isPremium } = usePremium();
+  // Cold-start optimization: only fetch the most recent N activities by default.
+  // Press "View all activities" to load the full history.
+  const [showAll, setShowAll] = useState(false);
   const { activities, profile, connected, fitnessAppConnected, plannedWorkouts, userRaces, loading, invalidateAll } =
-    useActivities();
+    useActivities(showAll ? undefined : { limit: 60 });
   const [selectedActivity, setSelectedActivity] = useState<StravaActivity | null>(null);
   const [showAllActivities, setShowAllActivities] = useState(false);
   const [dateSheet, setDateSheet] = useState<{

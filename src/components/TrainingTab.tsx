@@ -1245,6 +1245,22 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
 
   const canPredictRaceTime = !!existingPlan?.target_time && typeof existingPlan?.distance === "string" && ["5K", "10K", "HM", "FM"].includes(existingPlan.distance);
 
+  // Deterministic HR + VDOT race prediction over last 30 days.
+  const racePrediction = useMemo(() => {
+    if (!canPredictRaceTime || !existingPlan) return null;
+    if (!allActivities || allActivities.length === 0) return null;
+    const hrZones = hrBounds
+      ? { z1: hrBounds.z1, z2: hrBounds.z2, z3: hrBounds.z3, z4: hrBounds.z4, z5: hrBounds.z5 }
+      : null;
+    return predictRaceFromActivities(
+      allActivities as any,
+      hrZones,
+      String(existingPlan.distance),
+      30,
+    );
+  }, [canPredictRaceTime, existingPlan, allActivities, hrBounds]);
+
+
 
   // User HR profile → zone bounds for showing HR ranges in the plan
   const [hrBounds, setHrBounds] = useState<HrBounds | null>(null);

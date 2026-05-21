@@ -731,6 +731,12 @@ const ActivitiesTab = ({ lang }: Props) => {
             </button>
           )}
         </div>
+        {loading && (
+          <div className="flex items-center justify-center py-6 text-xs text-muted-foreground gap-2">
+            <RefreshCw size={14} className="animate-spin" />
+            {lang === "zh" ? "載入所有活動中…" : "Loading all activities…"}
+          </div>
+        )}
         <MonthlyActivityList
           activities={activities}
           lang={lang}

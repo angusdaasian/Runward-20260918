@@ -648,7 +648,7 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
           if (typeof d.pace === "number" && (d.pace < lo || d.pace > hi)) delete d.pace;
         }
       }
-      return appendSplitTail(data, splits, activity.distance || 0);
+      return extendChartToActivityDistance(data, splits, activity.distance || 0);
     }
     // per-lap chart from splits so HR + Pace charts still render.
     if ((!streams || streams.length === 0) && splits && splits.length > 0) {
@@ -680,7 +680,7 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
       if (velStream && velStream.data[i] > 0) point.pace = speedToPace(velStream.data[i]);
       data.push(point);
     }
-    return appendSplitTail(data, splits, activity.distance || 0);
+    return extendChartToActivityDistance(data, splits, activity.distance || 0);
   }, [streams, splits, activity.hr_samples, activity.distance_samples, activity.elevation_samples, activity.distance]);
 
   const hasHeartrate = chartData.some(d => d.heartrate);

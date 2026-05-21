@@ -738,47 +738,20 @@ const ActivitiesTab = ({ lang }: Props) => {
 
   if (showAllActivities) {
     return (
-      <FadeIn className="px-5 pt-6 max-w-lg mx-auto pb-24">
-        <div className="flex items-center justify-between mb-5">
-          <div className="flex items-center gap-3">
-            <button onClick={() => setShowAllActivities(false)} className="p-1">
-              <ChevronDown size={24} className="text-foreground rotate-90" />
-            </button>
-            <h1 className="font-display text-xl font-bold text-foreground">
-              {lang === "zh" ? "所有活動" : "All Activities"}
-            </h1>
-          </div>
-          {/* Resync button hidden — slot reserved for upcoming premium
-              "refetch all activities since 2026" feature. handleResync /
-              resyncing state intentionally retained for that future use. */}
-          {false && ahConnected && (
-            <button
-              onClick={handleResync}
-              disabled={resyncing}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
-            >
-              <RefreshCw size={14} className={resyncing ? "animate-spin" : ""} />
-              {resyncing ? (lang === "zh" ? "同步中..." : "Syncing...") : lang === "zh" ? "重新同步" : "Resync"}
-            </button>
-          )}
-        </div>
-        {loading && (
-          <div className="flex items-center justify-center py-6 text-xs text-muted-foreground gap-2">
-            <RefreshCw size={14} className="animate-spin" />
-            {lang === "zh" ? "載入所有活動中…" : "Loading all activities…"}
-          </div>
-        )}
-        <MonthlyActivityList
-          activities={activities}
-          lang={lang}
-          activityScores={activityScores}
-          activityLoads={activityLoads}
-          isPremium={isPremium}
-          onSelect={setSelectedActivity}
-        />
-      </FadeIn>
+      <AllActivitiesView
+        lang={lang}
+        activities={full.activities}
+        loading={fullLoading}
+        activityScores={activityScores}
+        activityLoads={activityLoads}
+        isPremium={isPremium}
+        onBack={() => setShowAllActivities(false)}
+        onSelect={setSelectedActivity}
+      />
     );
   }
+
+
 
   const latestActivity = activities[0] || null;
 

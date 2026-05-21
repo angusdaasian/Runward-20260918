@@ -1104,7 +1104,7 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
               {activeChart === "pace" ? (
                 <LineChart data={chartData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
-                  <XAxis dataKey="distance_km" tick={{ fontSize: 10, fill: "#64748B" }} tickFormatter={(v) => `${Math.round(v)}`}
+                  <XAxis dataKey="distance_km" type="number" domain={[0, 'dataMax']} allowDecimals={false} tick={{ fontSize: 10, fill: "#64748B" }} tickFormatter={(v) => `${Math.round(v)}`}
                     label={{ value: "km", position: "insideBottomRight", offset: -5, fontSize: 10, fill: "#64748B" }} />
                   <YAxis reversed tick={{ fontSize: 10, fill: "#64748B" }} tickFormatter={(v) => formatPaceFromMinutes(v)} domain={['auto', 'auto']} width={52}
                     label={{ value: "min/km", angle: -90, position: "insideLeft", fontSize: 10, fill: "#64748B" }} />
@@ -1115,7 +1115,7 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
               ) : activeChart === "heartrate" ? (
                 <AreaChart data={chartData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
-                  <XAxis dataKey="distance_km" tick={{ fontSize: 10, fill: "#64748B" }} tickFormatter={(v) => `${Math.round(v)}`} />
+                  <XAxis dataKey="distance_km" type="number" domain={[0, 'dataMax']} allowDecimals={false} tick={{ fontSize: 10, fill: "#64748B" }} tickFormatter={(v) => `${Math.round(v)}`} />
                   <YAxis tick={{ fontSize: 10, fill: "#64748B" }} domain={['auto', 'auto']}
                     label={{ value: "bpm", angle: -90, position: "insideLeft", fontSize: 10, fill: "#64748B" }} />
                   <Tooltip contentStyle={{ backgroundColor: "#FFFFFF", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 12, color: "#0F172A" }}
@@ -1131,7 +1131,7 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
               ) : activeChart === "altitude" ? (
                 <AreaChart data={chartData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
-                  <XAxis dataKey="distance_km" tick={{ fontSize: 10, fill: "#64748B" }} tickFormatter={(v) => `${Math.round(v)}`} />
+                  <XAxis dataKey="distance_km" type="number" domain={[0, 'dataMax']} allowDecimals={false} tick={{ fontSize: 10, fill: "#64748B" }} tickFormatter={(v) => `${Math.round(v)}`} />
                   <YAxis tick={{ fontSize: 10, fill: "#64748B" }} domain={['auto', 'auto']}
                     label={{ value: "m", angle: -90, position: "insideLeft", fontSize: 10, fill: "#64748B" }} />
                   <Tooltip contentStyle={{ backgroundColor: "#FFFFFF", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 12, color: "#0F172A" }}
@@ -1147,7 +1147,7 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
               ) : (
                 <LineChart data={chartData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
-                  <XAxis dataKey="distance_km" tick={{ fontSize: 10, fill: "#64748B" }} tickFormatter={(v) => `${Math.round(v)}`} />
+                  <XAxis dataKey="distance_km" type="number" domain={[0, 'dataMax']} allowDecimals={false} tick={{ fontSize: 10, fill: "#64748B" }} tickFormatter={(v) => `${Math.round(v)}`} />
                   <YAxis tick={{ fontSize: 10, fill: "#64748B" }} domain={['auto', 'auto']} width={42}
                     label={{ value: "spm", angle: -90, position: "insideLeft", fontSize: 10, fill: "#64748B" }} />
                   <Tooltip contentStyle={{ backgroundColor: "#FFFFFF", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 12, color: "#0F172A" }}

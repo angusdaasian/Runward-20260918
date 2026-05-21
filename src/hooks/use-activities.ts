@@ -373,7 +373,12 @@ export function useActivities(options?: { limit?: number; enabled?: boolean }) {
     gcTime: 10 * 60 * 1000,
   });
 
-  const secondaryEnabled = activityQueriesEnabled && terraQuery.isFetched;
+  // Wait until Terra's CURRENT fetch settles (not just any prior fetch from
+  // cache). On a stale refetch isFetched is already true from the previous
+  // run, which would let Garmin/Railway return first and briefly replace the
+  // Terra row at the top of the list.
+  const secondaryEnabled =
+    activityQueriesEnabled && terraQuery.isFetched && !terraQuery.isFetching;
 
   const activitiesQuery = useQuery({
     queryKey: ["strava-activities", user?.id, limit ?? "all"],

@@ -238,12 +238,14 @@ function mapTerraProviderLabel(provider: string): string {
   return provider.charAt(0).toUpperCase() + provider.slice(1).toLowerCase();
 }
 
-async function fetchTerraActivities(userId: string): Promise<StravaActivity[]> {
-  const { data } = await supabase
+async function fetchTerraActivities(userId: string, limit?: number): Promise<StravaActivity[]> {
+  let q = supabase
     .from("terra_activities")
     .select("*")
     .eq("user_id", userId)
     .order("start_time", { ascending: false });
+  if (limit) q = q.limit(limit);
+  const { data } = await q;
   return ((data as any[]) || []).map((a) => {
     const sourceLabel = mapTerraProviderLabel(a.provider);
     const sportType = mapTerraSportType(a.activity_type);

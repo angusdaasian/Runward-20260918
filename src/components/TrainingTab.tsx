@@ -1274,6 +1274,22 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
     return () => { cancelled = true; };
   }, [user]);
 
+  // Deterministic HR + VDOT race prediction over last 30 days.
+  const racePrediction = useMemo(() => {
+    if (!canPredictRaceTime || !existingPlan) return null;
+    if (!allActivities || allActivities.length === 0) return null;
+    const hrZones = hrBounds
+      ? { z1: hrBounds.z1, z2: hrBounds.z2, z3: hrBounds.z3, z4: hrBounds.z4, z5: hrBounds.z5 }
+      : null;
+    return predictRaceFromActivities(
+      allActivities as any,
+      hrZones,
+      String(existingPlan.distance),
+      30,
+    );
+  }, [canPredictRaceTime, existingPlan, allActivities, hrBounds]);
+
+
 
   // Load existing plan (cache-then-network so it works offline)
   useEffect(() => {

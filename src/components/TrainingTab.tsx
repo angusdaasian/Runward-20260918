@@ -2900,86 +2900,89 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                              const predictedSec = racePrediction?.predictedSec ?? null;
                              const predictedLabel = predictedSec != null ? fmtSec(predictedSec) : "--:--";
                              const typeOrder: RunType[] = ["recovery", "easy", "tempo", "threshold", "interval"];
-                             return (
-                               <div className="bg-card border border-border rounded-xl p-4 mb-4 shadow-sm">
-                                 <div className="flex items-start gap-3 mb-4">
-                                   <div className="h-10 w-10 rounded-lg bg-primary text-primary-foreground flex items-center justify-center flex-shrink-0">
-                                     <Target size={20} />
-                                   </div>
-                                   <div>
-                                     <h2 className="text-base font-bold text-foreground leading-tight">
-                                       {lang === "zh" ? "目前預測比賽時間" : "Current Estimated Race Time"}
-                                     </h2>
-                                     <p className="text-xs text-muted-foreground mt-1">
-                                       {lang === "zh"
-                                         ? "根據過去 30 天跑步的心率區間與配速，以 VDOT 公式估算"
-                                         : "Estimated from your last 30 days of runs using HR-zone classification and VDOT"}
-                                     </p>
-                                   </div>
-                                 </div>
-                                 <div className="grid grid-cols-2 gap-3">
-                                   <div className="rounded-lg border border-border bg-background p-3">
-                                     <div className="text-[11px] font-medium uppercase text-muted-foreground">{lang === "zh" ? "計劃目標" : "Program target"}</div>
-                                     <div className="mt-1 text-xl font-bold text-foreground">{targetSec ? fmtSec(targetSec) : String(existingPlan.target_time)}</div>
-                                     <div className="text-[11px] text-muted-foreground">{String(existingPlan.distance)}</div>
-                                   </div>
-                                   <div className="rounded-lg border border-border bg-background p-3">
-                                     <div className="text-[11px] font-medium uppercase text-muted-foreground">{lang === "zh" ? "目前預測" : "Current estimate"}</div>
-                                     <div className="mt-1 text-xl font-bold text-primary">{predictedLabel}</div>
-                                     <div className="text-[11px] text-muted-foreground">
-                                       {racePrediction
-                                         ? (lang === "zh"
-                                             ? `VDOT ${racePrediction.vdot.toFixed(1)} · ${racePrediction.totalRuns} 次跑步`
-                                             : `VDOT ${racePrediction.vdot.toFixed(1)} · ${racePrediction.totalRuns} runs`)
-                                         : (lang === "zh" ? "需要更多跑步資料" : "Not enough run data yet")}
-                                     </div>
-                                   </div>
-                                 </div>
+                              return (
+                                <details className="bg-card border border-border rounded-xl mb-4 shadow-sm group">
+                                  <summary className="flex items-center gap-3 p-4 cursor-pointer list-none select-none">
+                                    <div className="h-10 w-10 rounded-lg bg-primary text-primary-foreground flex items-center justify-center flex-shrink-0">
+                                      <Target size={20} />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <h2 className="text-base font-bold text-foreground leading-tight">
+                                        {lang === "zh" ? "目前預測比賽時間" : "Current Estimated Race Time"}
+                                      </h2>
+                                      <div className="text-xs text-muted-foreground mt-0.5">
+                                        <span className="font-semibold text-primary">{predictedLabel}</span>
+                                        <span className="mx-1">·</span>
+                                        <span>{lang === "zh" ? "根據過去 30 天跑步估算" : "Based on your last 30 days of running"}</span>
+                                      </div>
+                                    </div>
+                                    <ChevronDown size={18} className="text-muted-foreground transition-transform group-open:rotate-180 flex-shrink-0" />
+                                  </summary>
+                                  <div className="px-4 pb-4">
+                                  <div className="grid grid-cols-2 gap-3">
+                                    <div className="rounded-lg border border-border bg-background p-3">
+                                      <div className="text-[11px] font-medium uppercase text-muted-foreground">{lang === "zh" ? "計劃目標" : "Program target"}</div>
+                                      <div className="mt-1 text-xl font-bold text-foreground">{targetSec ? fmtSec(targetSec) : String(existingPlan.target_time)}</div>
+                                      <div className="text-[11px] text-muted-foreground">{String(existingPlan.distance)}</div>
+                                    </div>
+                                    <div className="rounded-lg border border-border bg-background p-3">
+                                      <div className="text-[11px] font-medium uppercase text-muted-foreground">{lang === "zh" ? "目前預測" : "Current estimate"}</div>
+                                      <div className="mt-1 text-xl font-bold text-primary">{predictedLabel}</div>
+                                      <div className="text-[11px] text-muted-foreground">
+                                        {racePrediction
+                                          ? (lang === "zh"
+                                              ? `${racePrediction.totalRuns} 次跑步`
+                                              : `${racePrediction.totalRuns} runs`)
+                                          : (lang === "zh" ? "需要更多跑步資料" : "Not enough run data yet")}
+                                      </div>
+                                    </div>
+                                  </div>
 
-                                 {racePrediction && (
-                                   <div className="mt-3 rounded-lg border border-border bg-background p-3">
-                                     <div className="text-[11px] font-medium uppercase text-muted-foreground mb-2">
-                                       {lang === "zh" ? "跑步類型分佈（30 天）" : "Run types (30d)"}
-                                     </div>
-                                     <div className="flex flex-wrap gap-2">
-                                       {typeOrder.map((t) => {
-                                         const b = racePrediction.byType[t];
-                                         if (!b) return null;
-                                         const paceMin = Math.floor(b.avgPaceSecPerKm / 60);
-                                         const paceSec = Math.round(b.avgPaceSecPerKm % 60);
-                                         return (
-                                           <span key={t} className="inline-flex items-center gap-1 rounded-md border border-border bg-muted/40 px-2 py-1 text-[11px] text-foreground">
-                                             <span className="font-semibold">{typeLabel(t, lang === "zh" ? "zh" : "en")}</span>
-                                             <span className="text-muted-foreground">×{b.count}</span>
-                                             <span className="text-muted-foreground">{paceMin}:{String(paceSec).padStart(2, "0")}/km</span>
-                                           </span>
-                                         );
-                                       })}
-                                     </div>
-                                   </div>
-                                 )}
+                                  {racePrediction && (
+                                    <div className="mt-3 rounded-lg border border-border bg-background p-3">
+                                      <div className="text-[11px] font-medium uppercase text-muted-foreground mb-2">
+                                        {lang === "zh" ? "跑步類型分佈（30 天）" : "Run types (30d)"}
+                                      </div>
+                                      <div className="flex flex-wrap gap-2">
+                                        {typeOrder.map((t) => {
+                                          const b = racePrediction.byType[t];
+                                          if (!b) return null;
+                                          const paceMin = Math.floor(b.avgPaceSecPerKm / 60);
+                                          const paceSec = Math.round(b.avgPaceSecPerKm % 60);
+                                          return (
+                                            <span key={t} className="inline-flex items-center gap-1 rounded-md border border-border bg-muted/40 px-2 py-1 text-[11px] text-foreground">
+                                              <span className="font-semibold">{typeLabel(t, lang === "zh" ? "zh" : "en")}</span>
+                                              <span className="text-muted-foreground">×{b.count}</span>
+                                              <span className="text-muted-foreground">{paceMin}:{String(paceSec).padStart(2, "0")}/km</span>
+                                            </span>
+                                          );
+                                        })}
+                                      </div>
+                                    </div>
+                                  )}
 
-                                 {racePrediction && targetSec && (() => {
-                                   const delta = racePrediction.predictedSec - targetSec;
-                                   const onTrack = delta <= 30;
-                                   const ahead = delta < -30;
-                                   const diffSec = Math.abs(delta);
-                                   const diffLabel = `${Math.floor(diffSec / 60)}:${String(Math.round(diffSec % 60)).padStart(2, "0")}`;
-                                   const statusClass = ahead || onTrack ? "border-primary bg-primary/10 text-primary" : "border-destructive/40 bg-destructive/10 text-destructive";
-                                   const statusText = ahead
-                                     ? (lang === "zh" ? `快過目標 ${diffLabel}` : `Ahead of target by ${diffLabel}`)
-                                     : onTrack
-                                     ? (lang === "zh" ? "進度良好：正在達標" : "On track for the program target")
-                                     : (lang === "zh" ? `慢過目標 ${diffLabel}` : `Behind target by ${diffLabel}`);
-                                   return (
-                                     <div className={`mt-3 rounded-lg border p-3 ${statusClass}`}>
-                                       <div className="text-sm font-bold">{statusText}</div>
-                                     </div>
-                                   );
-                                 })()}
-                               </div>
-                             );
-                           })()}
+                                  {racePrediction && targetSec && (() => {
+                                    const delta = racePrediction.predictedSec - targetSec;
+                                    const onTrack = delta <= 30;
+                                    const ahead = delta < -30;
+                                    const diffSec = Math.abs(delta);
+                                    const diffLabel = `${Math.floor(diffSec / 60)}:${String(Math.round(diffSec % 60)).padStart(2, "0")}`;
+                                    const statusClass = ahead || onTrack ? "border-primary bg-primary/10 text-primary" : "border-destructive/40 bg-destructive/10 text-destructive";
+                                    const statusText = ahead
+                                      ? (lang === "zh" ? `快過目標 ${diffLabel}` : `Ahead of target by ${diffLabel}`)
+                                      : onTrack
+                                      ? (lang === "zh" ? "進度良好：正在達標" : "On track for the program target")
+                                      : (lang === "zh" ? `慢過目標 ${diffLabel}` : `Behind target by ${diffLabel}`);
+                                    return (
+                                      <div className={`mt-3 rounded-lg border p-3 ${statusClass}`}>
+                                        <div className="text-sm font-bold">{statusText}</div>
+                                      </div>
+                                    );
+                                  })()}
+                                  </div>
+                                </details>
+                              );
+                            })()}
 
 
                            <div className={`bg-card border rounded-xl p-3 mb-4 ${goalWeekIdx === currentWeekIdx ? "border-primary ring-1 ring-primary/40" : "border-border"}`}>

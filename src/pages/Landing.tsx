@@ -238,8 +238,8 @@ const Landing = () => {
                   <span className="font-semibold">{zh ? "早鳥價:" : "Early bird price:"}</span>{" "}
                   <span className="text-muted-foreground">
                     {zh
-                      ? "每月 HK$28 / 每年 HK$328（原價 HK$38 / HK$428；TWD 120 / TWD 1290，原價 TWD 150 / TWD 1490）"
-                      : "Monthly HK$28 / Yearly HK$328 (standard HK$38 / HK$428; TWD 120 / TWD 1290, standard TWD 150 / TWD 1490)"}
+                      ? "每月 HK$28 / 每年 HK$328（6 月 1 日後 HK$48 / HK$488；TWD 120 / TWD 1290，6 月 1 日後 TWD 190 / TWD 1990）"
+                      : "Monthly HK$28 / Yearly HK$328 (after June 1: HK$48 / HK$488; TWD 120 / TWD 1290, after June 1: TWD 190 / TWD 1990)"}
                   </span>
                 </p>
                 <p>
@@ -312,7 +312,7 @@ const Landing = () => {
               </div>
               <div className="text-sm text-muted-foreground mb-1">TWD 120/{zh ? "月" : "mo"}</div>
               <div className="text-xs text-muted-foreground line-through mb-6">
-                {zh ? "原價 HK$38 / TWD 150" : "Regular HK$38 / TWD 150"}
+                {zh ? "6 月 1 日後 HK$48 / TWD 190" : "After June 1 HK$48 / TWD 190"}
               </div>
               <ul className="space-y-2.5 text-sm mb-6 flex-1">
                 {[
@@ -356,7 +356,7 @@ const Landing = () => {
               </div>
               <div className="text-sm text-muted-foreground mb-1">TWD 1290/{zh ? "年" : "yr"}</div>
               <div className="text-xs text-muted-foreground line-through mb-6">
-                {zh ? "原價 HK$428 / TWD 1490" : "Regular HK$428 / TWD 1490"}
+                {zh ? "6 月 1 日後 HK$488 / TWD 1990" : "After June 1 HK$488 / TWD 1990"}
               </div>
               <ul className="space-y-2.5 text-sm mb-6 flex-1">
                 {[

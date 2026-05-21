@@ -377,8 +377,9 @@ export function useActivities(options?: { limit?: number; enabled?: boolean }) {
   // cache). On a stale refetch isFetched is already true from the previous
   // run, which would let Garmin/Railway return first and briefly replace the
   // Terra row at the top of the list.
+  const hasTerraForLatestView = !!limit && (terraQuery.data?.length ?? 0) > 0;
   const secondaryEnabled =
-    activityQueriesEnabled && terraQuery.isFetched && !terraQuery.isFetching;
+    activityQueriesEnabled && terraQuery.isFetched && !terraQuery.isFetching && !hasTerraForLatestView;
 
   const activitiesQuery = useQuery({
     queryKey: ["strava-activities", user?.id, limit ?? "all"],
@@ -448,25 +449,30 @@ export function useActivities(options?: { limit?: number; enabled?: boolean }) {
   // running dedup. Otherwise on refocus one query may briefly return empty/stale
   // data while the other has fresh data, causing activities to flicker/disappear.
   const mergedActivities = useMemo(() => {
-    const strava = activitiesQuery.data || [];
-    const ah = appleHealthQuery.data || [];
-    const gm = garminQuery.data || [];
     const tr = terraQuery.data || [];
+    const terraReady = terraQuery.isFetched && !terraQuery.isFetching;
+    if (!terraReady) {
+      return [...tr].sort((a, b) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime());
+    }
+    const terraOnlyLatestView = !!limit && tr.length > 0;
+    const strava = terraOnlyLatestView ? [] : (activitiesQuery.data || []);
+    const ah = terraOnlyLatestView ? [] : (appleHealthQuery.data || []);
+    const gm = terraOnlyLatestView ? [] : (garminQuery.data || []);
 
     // Wait for BOTH garmin and terra current fetches to settle before
     // running dedup. isFetched alone is true from prior cached runs, so we
     // also require !isFetching to avoid showing a stale garmin row that
     // hasn't yet been deduped against the still-loading terra response.
     const bothSettled =
-      terraQuery.isFetched && !terraQuery.isFetching &&
-      garminQuery.isFetched && !garminQuery.isFetching;
+      terraReady && garminQuery.isFetched && !garminQuery.isFetching;
 
     let filteredGarmin: StravaActivity[];
     if (bothSettled) {
       filteredGarmin = gm.filter((g) => !tr.some((t) => {
         const timeDiff = Math.abs(new Date(g.start_date).getTime() - new Date(t.start_date).getTime());
         const distanceDiff = Math.abs((g.distance || 0) - (t.distance || 0));
-        return timeDiff < 5 * 60 * 1000 && distanceDiff < 100;
+        const distanceTolerance = Math.max(250, Math.min(g.distance || 0, t.distance || 0) * 0.03);
+        return timeDiff < 10 * 60 * 1000 && distanceDiff < distanceTolerance;
       }));
     } else if (terraQuery.isFetching && tr.length > 0) {
       // Terra still loading: hide any garmin row newer-or-equal to the newest
@@ -488,6 +494,7 @@ export function useActivities(options?: { limit?: number; enabled?: boolean }) {
     terraQuery.data,
     garminQuery.isFetching,
     garminQuery.isFetched,
+    limit,
     terraQuery.isFetching,
     terraQuery.isFetched,
   ]);

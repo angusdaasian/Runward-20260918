@@ -366,8 +366,7 @@ function extractHrSamples(a: any): Array<{ t: number; bpm: number }> {
     if (t == null || !Number.isFinite(t) || t < 0) continue;
     bySecond.set(Math.floor(t), Math.round(bpm));
   }
-  const out = Array.from(bySecond.entries()).sort((a, b) => a[0] - b[0]).map(([t, bpm]) => ({ t, bpm }));
-  return out.length > 7200 ? out.slice(0, 7200) : out;
+  return Array.from(bySecond.entries()).sort((a, b) => a[0] - b[0]).map(([t, bpm]) => ({ t, bpm }));
 }
 
 function looksLikeHrSample(s: any): boolean {
@@ -414,8 +413,7 @@ function extractDistanceSamples(a: any): Array<{ t: number; d: number }> {
     if (t == null || !Number.isFinite(t) || t < 0) continue;
     bySecond.set(Math.floor(t), Math.round(d * 100) / 100);
   }
-  const out = Array.from(bySecond.entries()).sort((a, b) => a[0] - b[0]).map(([t, d]) => ({ t, d }));
-  return out.length > 7200 ? out.slice(0, 7200) : out;
+  return Array.from(bySecond.entries()).sort((a, b) => a[0] - b[0]).map(([t, d]) => ({ t, d }));
 }
 
 function extractElevationSamplesForChart(a: any): Array<{ t: number; e: number }> {
@@ -431,8 +429,7 @@ function extractElevationSamplesForChart(a: any): Array<{ t: number; e: number }
     if (t == null || !Number.isFinite(t) || t < 0) continue;
     bySecond.set(Math.floor(t), Math.round(s.elevMeters * 10) / 10);
   }
-  const out = Array.from(bySecond.entries()).sort((a, b) => a[0] - b[0]).map(([t, e]) => ({ t, e }));
-  return out.length > 7200 ? out.slice(0, 7200) : out;
+  return Array.from(bySecond.entries()).sort((a, b) => a[0] - b[0]).map(([t, e]) => ({ t, e }));
 }
 
 function extractCadenceSamples(a: any): Array<{ t: number; rpm: number }> {
@@ -455,8 +452,7 @@ function extractCadenceSamples(a: any): Array<{ t: number; rpm: number }> {
     if (t == null || !Number.isFinite(t) || t < 0) continue;
     bySecond.set(Math.floor(t), Math.round(rpm * 10) / 10);
   }
-  const out = Array.from(bySecond.entries()).sort((a, b) => a[0] - b[0]).map(([t, rpm]) => ({ t, rpm }));
-  return out.length > 7200 ? out.slice(0, 7200) : out;
+  return Array.from(bySecond.entries()).sort((a, b) => a[0] - b[0]).map(([t, rpm]) => ({ t, rpm }));
 }
 
 function recomputeLapAvgHr(laps: any[], samples: Array<{ t: number; bpm: number }>, activityStartTime: string | null): any[] {

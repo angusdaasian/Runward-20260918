@@ -853,7 +853,9 @@ const ActivitiesTab = ({ lang }: Props) => {
 
 
 
-  const latestActivity = activities[0] || null;
+  // Keep the homepage card pinned to the latest-only query. The full-history
+  // background load must never replace it with a secondary-source row.
+  const latestActivity = homepage.activities[0] || activities[0] || null;
 
   return (
     <FadeIn className="px-5 pt-6 max-w-lg mx-auto">
@@ -868,7 +870,7 @@ const ActivitiesTab = ({ lang }: Props) => {
           <h2 className="font-display text-lg font-bold text-foreground">
             {lang === "zh" ? "最近活動" : "Recent Activity"}
           </h2>
-          {activities.length > 0 && (
+          {(latestActivity || activities.length > 0) && (
             <button
               onClick={() => { setWarmupReady(true); setShowAllActivities(true); }}
               className="flex items-center gap-1 text-xs font-medium text-primary hover:text-primary/80 transition-colors"
@@ -879,7 +881,7 @@ const ActivitiesTab = ({ lang }: Props) => {
           )}
         </div>
 
-        {activities.length === 0 ? (
+        {!latestActivity && activities.length === 0 ? (
           <div className="bg-accent/50 border border-border rounded-xl p-5 text-center">
             <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mx-auto mb-3">
               <Activity size={24} className="text-muted-foreground" />

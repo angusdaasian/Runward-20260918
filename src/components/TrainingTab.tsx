@@ -2894,11 +2894,15 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                              {lang === "zh" ? "週訓練回顧" : "Weekly Review"}
                            </Button>
 
-                           {/* ─── Race Time Predictor ─── */}
-                           {canPredictRaceTime && (
-                             <div className="bg-primary/10 border-2 border-primary rounded-xl p-4 mb-4 shadow-sm">
-                               <div className="flex items-start justify-between gap-3 mb-4">
-                                 <div className="flex items-start gap-3">
+                           {/* ─── Race Time Predictor (HR-zone + VDOT, deterministic) ─── */}
+                           {canPredictRaceTime && (() => {
+                             const targetSec = parseTargetToSec(existingPlan.target_time);
+                             const predictedSec = racePrediction?.predictedSec ?? null;
+                             const predictedLabel = predictedSec != null ? fmtSec(predictedSec) : "--:--";
+                             const typeOrder: RunType[] = ["recovery", "easy", "tempo", "threshold", "interval"];
+                             return (
+                               <div className="bg-card border border-border rounded-xl p-4 mb-4 shadow-sm">
+                                 <div className="flex items-start gap-3 mb-4">
                                    <div className="h-10 w-10 rounded-lg bg-primary text-primary-foreground flex items-center justify-center flex-shrink-0">
                                      <Target size={20} />
                                    </div>
@@ -2907,67 +2911,76 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                                        {lang === "zh" ? "目前預測比賽時間" : "Current Estimated Race Time"}
                                      </h2>
                                      <p className="text-xs text-muted-foreground mt-1">
-                                       {lang === "zh" ? "根據最近跑步表現自動檢查是否達標" : "Auto-checks if recent performance is on pace for this program"}
+                                       {lang === "zh"
+                                         ? "根據過去 30 天跑步的心率區間與配速，以 VDOT 公式估算"
+                                         : "Estimated from your last 30 days of runs using HR-zone classification and VDOT"}
                                      </p>
                                    </div>
                                  </div>
-                                 <Button
-                                   type="button"
-                                   size="sm"
-                                   variant="outline"
-                                   onClick={() => handleCheckOnTrack(true)}
-                                   disabled={trackChecking}
-                                   className="h-9 px-3 text-xs bg-background/80"
-                                 >
-                                   {trackChecking ? (
-                                     <><Loader2 size={12} className="mr-1 animate-spin" />{lang === "zh" ? "分析中" : "Analyzing"}</>
-                                   ) : (
-                                     <><Sparkles size={12} className="mr-1" />{lang === "zh" ? "更新" : "Refresh"}</>
-                                   )}
-                                 </Button>
+                                 <div className="grid grid-cols-2 gap-3">
+                                   <div className="rounded-lg border border-border bg-background p-3">
+                                     <div className="text-[11px] font-medium uppercase text-muted-foreground">{lang === "zh" ? "計劃目標" : "Program target"}</div>
+                                     <div className="mt-1 text-xl font-bold text-foreground">{targetSec ? fmtSec(targetSec) : String(existingPlan.target_time)}</div>
+                                     <div className="text-[11px] text-muted-foreground">{String(existingPlan.distance)}</div>
+                                   </div>
+                                   <div className="rounded-lg border border-border bg-background p-3">
+                                     <div className="text-[11px] font-medium uppercase text-muted-foreground">{lang === "zh" ? "目前預測" : "Current estimate"}</div>
+                                     <div className="mt-1 text-xl font-bold text-primary">{predictedLabel}</div>
+                                     <div className="text-[11px] text-muted-foreground">
+                                       {racePrediction
+                                         ? (lang === "zh"
+                                             ? `VDOT ${racePrediction.vdot.toFixed(1)} · ${racePrediction.totalRuns} 次跑步`
+                                             : `VDOT ${racePrediction.vdot.toFixed(1)} · ${racePrediction.totalRuns} runs`)
+                                         : (lang === "zh" ? "需要更多跑步資料" : "Not enough run data yet")}
+                                     </div>
+                                   </div>
+                                 </div>
+
+                                 {racePrediction && (
+                                   <div className="mt-3 rounded-lg border border-border bg-background p-3">
+                                     <div className="text-[11px] font-medium uppercase text-muted-foreground mb-2">
+                                       {lang === "zh" ? "跑步類型分佈（30 天）" : "Run types (30d)"}
+                                     </div>
+                                     <div className="flex flex-wrap gap-2">
+                                       {typeOrder.map((t) => {
+                                         const b = racePrediction.byType[t];
+                                         if (!b) return null;
+                                         const paceMin = Math.floor(b.avgPaceSecPerKm / 60);
+                                         const paceSec = Math.round(b.avgPaceSecPerKm % 60);
+                                         return (
+                                           <span key={t} className="inline-flex items-center gap-1 rounded-md border border-border bg-muted/40 px-2 py-1 text-[11px] text-foreground">
+                                             <span className="font-semibold">{typeLabel(t, lang === "zh" ? "zh" : "en")}</span>
+                                             <span className="text-muted-foreground">×{b.count}</span>
+                                             <span className="text-muted-foreground">{paceMin}:{String(paceSec).padStart(2, "0")}/km</span>
+                                           </span>
+                                         );
+                                       })}
+                                     </div>
+                                   </div>
+                                 )}
+
+                                 {racePrediction && targetSec && (() => {
+                                   const delta = racePrediction.predictedSec - targetSec;
+                                   const onTrack = delta <= 30;
+                                   const ahead = delta < -30;
+                                   const diffSec = Math.abs(delta);
+                                   const diffLabel = `${Math.floor(diffSec / 60)}:${String(Math.round(diffSec % 60)).padStart(2, "0")}`;
+                                   const statusClass = ahead || onTrack ? "border-primary bg-primary/10 text-primary" : "border-destructive/40 bg-destructive/10 text-destructive";
+                                   const statusText = ahead
+                                     ? (lang === "zh" ? `快過目標 ${diffLabel}` : `Ahead of target by ${diffLabel}`)
+                                     : onTrack
+                                     ? (lang === "zh" ? "進度良好：正在達標" : "On track for the program target")
+                                     : (lang === "zh" ? `慢過目標 ${diffLabel}` : `Behind target by ${diffLabel}`);
+                                   return (
+                                     <div className={`mt-3 rounded-lg border p-3 ${statusClass}`}>
+                                       <div className="text-sm font-bold">{statusText}</div>
+                                     </div>
+                                   );
+                                 })()}
                                </div>
-                               <div className="grid grid-cols-2 gap-3">
-                                 <div className="rounded-lg border border-border bg-background/80 p-3">
-                                   <div className="text-[11px] font-medium uppercase text-muted-foreground">{lang === "zh" ? "計劃目標" : "Program target"}</div>
-                                   <div className="mt-1 text-xl font-bold text-foreground">{parseTargetToSec(existingPlan.target_time) ? fmtSec(parseTargetToSec(existingPlan.target_time)!) : String(existingPlan.target_time)}</div>
-                                   <div className="text-[11px] text-muted-foreground">{String(existingPlan.distance)}</div>
-                                 </div>
-                                 <div className="rounded-lg border border-border bg-background/80 p-3">
-                                   <div className="text-[11px] font-medium uppercase text-muted-foreground">{lang === "zh" ? "目前預測" : "Current estimate"}</div>
-                                   <div className="mt-1 text-xl font-bold text-primary">
-                                     {trackChecking ? "…" : trackResult?.predictedLabel || "--:--"}
-                                   </div>
-                                   <div className="text-[11px] text-muted-foreground">
-                                     {trackResult ? (lang === "zh" ? "Gemini 預測" : "Gemini prediction") : (lang === "zh" ? "等待分析" : "Waiting for analysis")}
-                                   </div>
-                                 </div>
-                               </div>
-                               {trackResult && (() => {
-                                 const delta = trackResult.predictedSec - trackResult.targetSec;
-                                 const onTrack = delta <= 30;
-                                 const ahead = delta < -30;
-                                 const diffSec = Math.abs(delta);
-                                 const diffLabel = `${Math.floor(diffSec / 60)}:${String(Math.round(diffSec % 60)).padStart(2, "0")}`;
-                                 const statusClass = ahead || onTrack ? "border-primary bg-primary/10 text-primary" : "border-destructive/40 bg-destructive/10 text-destructive";
-                                 const statusText = ahead
-                                   ? (lang === "zh" ? `快過目標 ${diffLabel}` : `Ahead of target by ${diffLabel}`)
-                                   : onTrack
-                                   ? (lang === "zh" ? "進度良好：正在達標" : "On track for the program target")
-                                   : (lang === "zh" ? `慢過目標 ${diffLabel}` : `Behind target by ${diffLabel}`);
-                                 return (
-                                   <div className={`mt-3 rounded-lg border p-3 ${statusClass}`}>
-                                     <div className="text-sm font-bold">{statusText}</div>
-                                     {trackResult.rationale && <p className="text-xs mt-1 opacity-90 leading-snug">{trackResult.rationale}</p>}
-                                   </div>
-                                 );
-                               })()}
-                               {trackError && (
-                                 <div className="mt-3 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-xs text-destructive">
-                                   {trackError}
-                                 </div>
-                               )}
-                             </div>
-                           )}
+                             );
+                           })()}
+
 
                            <div className={`bg-card border rounded-xl p-3 mb-4 ${goalWeekIdx === currentWeekIdx ? "border-primary ring-1 ring-primary/40" : "border-border"}`}>
                             <div className="flex items-center justify-between mb-1">

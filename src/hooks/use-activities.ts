@@ -114,12 +114,14 @@ async function fetchProfile(userId: string) {
   return data as any;
 }
 
-async function fetchGarminActivities(userId: string): Promise<StravaActivity[]> {
-  const { data } = await supabase
+async function fetchGarminActivities(userId: string, limit?: number): Promise<StravaActivity[]> {
+  let q = supabase
     .from("garmin_activities")
     .select("*")
     .eq("user_id", userId)
     .order("start_time", { ascending: false });
+  if (limit) q = q.limit(limit);
+  const { data } = await q;
   return ((data as any[]) || []).map((a) => {
     const isCoros = typeof a.garmin_activity_id === "string" && a.garmin_activity_id.startsWith("coros-");
     return {

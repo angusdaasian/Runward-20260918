@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback, lazy, Suspense } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef, lazy, Suspense } from "react";
 import { usePremium } from "@/contexts/PremiumContext";
 import {
   Clock,
@@ -493,19 +493,150 @@ const MonthlyActivityList = ({
   );
 };
 
+// ---------- All Activities View (progressive month reveal) ----------
+const AllActivitiesView = ({
+  lang,
+  activities,
+  loading,
+  activityScores,
+  activityLoads,
+  isPremium,
+  onBack,
+  onSelect,
+}: {
+  lang: Lang;
+  activities: StravaActivity[];
+  loading: boolean;
+  activityScores: Record<string, number | null>;
+  activityLoads: Record<string, number | null>;
+  isPremium: boolean;
+  onBack: () => void;
+  onSelect: (a: StravaActivity) => void;
+}) => {
+  // Group activities by year-month to enable progressive reveal.
+  const monthBuckets = useMemo(() => {
+    const map = new Map<string, StravaActivity[]>();
+    for (const a of activities) {
+      const d = new Date(a.start_date);
+      const key = `${d.getFullYear()}-${String(d.getMonth()).padStart(2, "0")}`;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(a);
+    }
+    // Most-recent month first.
+    return Array.from(map.entries()).sort((a, b) => (a[0] < b[0] ? 1 : -1));
+  }, [activities]);
+
+  const [visibleMonths, setVisibleMonths] = useState(1);
+
+  // Reset when activities reload (e.g. background prefetch finishes).
+  useEffect(() => {
+    setVisibleMonths(1);
+  }, [monthBuckets.length === 0]);
+
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (visibleMonths >= monthBuckets.length) return;
+    const node = sentinelRef.current;
+    if (!node || typeof IntersectionObserver === "undefined") return;
+    const obs = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          setVisibleMonths((n) => Math.min(n + 1, monthBuckets.length));
+        }
+      },
+      { rootMargin: "200px" },
+    );
+    obs.observe(node);
+    return () => obs.disconnect();
+  }, [visibleMonths, monthBuckets.length]);
+
+  const visibleActivities = useMemo(
+    () => monthBuckets.slice(0, visibleMonths).flatMap(([, items]) => items),
+    [monthBuckets, visibleMonths],
+  );
+
+  const hasMore = visibleMonths < monthBuckets.length;
+
+  return (
+    <FadeIn className="px-5 pt-6 max-w-lg mx-auto pb-24">
+      <div className="flex items-center justify-between mb-5">
+        <div className="flex items-center gap-3">
+          <button onClick={onBack} className="p-1">
+            <ChevronDown size={24} className="text-foreground rotate-90" />
+          </button>
+          <h1 className="font-display text-xl font-bold text-foreground">
+            {lang === "zh" ? "所有活動" : "All Activities"}
+          </h1>
+        </div>
+      </div>
+      {loading && activities.length === 0 && (
+        <div className="flex items-center justify-center py-6 text-xs text-muted-foreground gap-2">
+          <RefreshCw size={14} className="animate-spin" />
+          {lang === "zh" ? "載入所有活動中…" : "Loading all activities…"}
+        </div>
+      )}
+      <MonthlyActivityList
+        activities={visibleActivities}
+        lang={lang}
+        activityScores={activityScores}
+        activityLoads={activityLoads}
+        isPremium={isPremium}
+        onSelect={onSelect}
+      />
+      {hasMore && (
+        <div ref={sentinelRef} className="flex items-center justify-center py-6 text-xs text-muted-foreground gap-2">
+          <RefreshCw size={14} className="animate-spin" />
+          {lang === "zh" ? "載入較早月份…" : "Loading earlier months…"}
+        </div>
+      )}
+    </FadeIn>
+  );
+};
+
 // ---------- Main Component ----------
 
 
 const ActivitiesTab = ({ lang }: Props) => {
   const { user } = useAuth();
   const { isPremium } = usePremium();
-  // Cold-start optimization: only fetch the most recent N activities by default.
-  // Press "View all activities" to load the full history.
-  const [showAll, setShowAll] = useState(false);
-  const { activities, profile, connected, fitnessAppConnected, plannedWorkouts, userRaces, loading, invalidateAll } =
-    useActivities(showAll ? undefined : { limit: 60 });
-  const [selectedActivity, setSelectedActivity] = useState<StravaActivity | null>(null);
+  // Homepage shows ONLY the latest activity → tiny, fast query.
+  // The full history is loaded in the background and used by the calendar,
+  // monthly road quest, and the "All Activities" page — without ever
+  // changing the latest-activity card on the homepage.
   const [showAllActivities, setShowAllActivities] = useState(false);
+  const [warmupReady, setWarmupReady] = useState(false);
+  useEffect(() => {
+    const w = window as any;
+    let idleId: any;
+    let timeoutId: any;
+    if (typeof w.requestIdleCallback === "function") {
+      idleId = w.requestIdleCallback(() => setWarmupReady(true), { timeout: 4000 });
+    } else {
+      timeoutId = setTimeout(() => setWarmupReady(true), 1500);
+    }
+    return () => {
+      if (idleId && typeof w.cancelIdleCallback === "function") w.cancelIdleCallback(idleId);
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, []);
+
+  const homepage = useActivities({ limit: 1 });
+  const full = useActivities({ enabled: warmupReady });
+
+  const profile = homepage.profile;
+  const connected = homepage.connected;
+  const fitnessAppConnected = homepage.fitnessAppConnected;
+  const plannedWorkouts = homepage.plannedWorkouts;
+  const userRaces = homepage.userRaces;
+  const invalidateAll = homepage.invalidateAll;
+  const loading = homepage.loading;
+  const fullLoading = full.loading;
+
+  // Use the full list as soon as it's ready; otherwise fall back to the
+  // homepage's latest-only list. The latest activity is identical in both,
+  // so the homepage card never swaps mid-render.
+  const activities = full.activities.length > 0 ? full.activities : homepage.activities;
+  const [selectedActivity, setSelectedActivity] = useState<StravaActivity | null>(null);
   const [dateSheet, setDateSheet] = useState<{
     dateLabel: string;
     activities: StravaActivity[];
@@ -707,47 +838,20 @@ const ActivitiesTab = ({ lang }: Props) => {
 
   if (showAllActivities) {
     return (
-      <FadeIn className="px-5 pt-6 max-w-lg mx-auto pb-24">
-        <div className="flex items-center justify-between mb-5">
-          <div className="flex items-center gap-3">
-            <button onClick={() => setShowAllActivities(false)} className="p-1">
-              <ChevronDown size={24} className="text-foreground rotate-90" />
-            </button>
-            <h1 className="font-display text-xl font-bold text-foreground">
-              {lang === "zh" ? "所有活動" : "All Activities"}
-            </h1>
-          </div>
-          {/* Resync button hidden — slot reserved for upcoming premium
-              "refetch all activities since 2026" feature. handleResync /
-              resyncing state intentionally retained for that future use. */}
-          {false && ahConnected && (
-            <button
-              onClick={handleResync}
-              disabled={resyncing}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
-            >
-              <RefreshCw size={14} className={resyncing ? "animate-spin" : ""} />
-              {resyncing ? (lang === "zh" ? "同步中..." : "Syncing...") : lang === "zh" ? "重新同步" : "Resync"}
-            </button>
-          )}
-        </div>
-        {loading && (
-          <div className="flex items-center justify-center py-6 text-xs text-muted-foreground gap-2">
-            <RefreshCw size={14} className="animate-spin" />
-            {lang === "zh" ? "載入所有活動中…" : "Loading all activities…"}
-          </div>
-        )}
-        <MonthlyActivityList
-          activities={activities}
-          lang={lang}
-          activityScores={activityScores}
-          activityLoads={activityLoads}
-          isPremium={isPremium}
-          onSelect={setSelectedActivity}
-        />
-      </FadeIn>
+      <AllActivitiesView
+        lang={lang}
+        activities={full.activities}
+        loading={fullLoading}
+        activityScores={activityScores}
+        activityLoads={activityLoads}
+        isPremium={isPremium}
+        onBack={() => setShowAllActivities(false)}
+        onSelect={setSelectedActivity}
+      />
     );
   }
+
+
 
   const latestActivity = activities[0] || null;
 
@@ -766,7 +870,7 @@ const ActivitiesTab = ({ lang }: Props) => {
           </h2>
           {activities.length > 0 && (
             <button
-              onClick={() => { setShowAll(true); setShowAllActivities(true); }}
+              onClick={() => { setWarmupReady(true); setShowAllActivities(true); }}
               className="flex items-center gap-1 text-xs font-medium text-primary hover:text-primary/80 transition-colors"
             >
               {lang === "zh" ? "查看全部" : "See all"}

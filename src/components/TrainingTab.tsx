@@ -1224,6 +1224,106 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
   const [editPace, setEditPace] = useState("");
   const [editDescription, setEditDescription] = useState("");
 
+  // ─── Race Time Predictor (for generated AI program) ───
+  const [trackChecking, setTrackChecking] = useState(false);
+  const [trackResult, setTrackResult] = useState<{
+    predictedSec: number;
+    targetSec: number;
+    rationale: string;
+    predictedLabel: string;
+  } | null>(null);
+  const [trackError, setTrackError] = useState<string | null>(null);
+
+  const parseTargetToSec = (t: string | null | undefined): number | null => {
+    if (!t) return null;
+    const parts = t.split(":").map((x) => parseInt(x, 10));
+    if (parts.some(isNaN)) return null;
+    if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+    if (parts.length === 2) return parts[0] * 60 + parts[1];
+    return null;
+  };
+  const fmtSec = (sec: number) => {
+    const h = Math.floor(sec / 3600);
+    const m = Math.floor((sec % 3600) / 60);
+    const s = Math.round(sec % 60);
+    return h > 0
+      ? `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`
+      : `${m}:${String(s).padStart(2, "0")}`;
+  };
+
+  const canPredictRaceTime = !!existingPlan?.target_time && typeof existingPlan?.distance === "string" && ["5K", "10K", "HM", "FM"].includes(existingPlan.distance);
+
+  const handleCheckOnTrack = async (showToast = true) => {
+    if (!existingPlan || trackChecking) return;
+    const targetSec = parseTargetToSec(existingPlan.target_time);
+    if (!targetSec) {
+      setTrackError(lang === "zh" ? "此計劃沒有目標時間" : "This plan has no target time");
+      return;
+    }
+    setTrackError(null);
+    setTrackResult(null);
+    setTrackChecking(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("predict-race-time", {
+        body: {
+          distance: existingPlan.distance,
+          raceDate: existingPlan.race_date || null,
+          lang,
+          activities: (allActivities || []).slice(0, 30).map((a: any) => ({
+            start_date: a.start_date,
+            sport_type: a.sport_type,
+            distance: a.distance,
+            moving_time: a.moving_time,
+            elapsed_time: a.elapsed_time,
+            average_heartrate: a.average_heartrate,
+            total_elevation_gain: a.total_elevation_gain,
+          })),
+        },
+      });
+      if (error) throw error;
+      if ((data as any)?.error === "no_recent_runs") {
+        setTrackError(lang === "zh" ? "沒有最近的跑步紀錄，請先同步活動。" : "No recent runs found. Sync activities first.");
+        return;
+      }
+      if ((data as any)?.error) throw new Error((data as any).error);
+      const h = parseInt((data as any).hours ?? 0, 10) || 0;
+      const m = parseInt((data as any).minutes ?? 0, 10) || 0;
+      const s = parseInt((data as any).seconds ?? 0, 10) || 0;
+      const predictedSec = h * 3600 + m * 60 + s;
+      setTrackResult({
+        predictedSec,
+        targetSec,
+        rationale: (data as any).rationale || "",
+        predictedLabel: fmtSec(predictedSec),
+      });
+    } catch (e: any) {
+      setTrackError(e?.message || (lang === "zh" ? "請稍後再試" : "Please try again later"));
+      if (showToast) {
+        toast({
+          title: lang === "zh" ? "檢查失敗" : "Check failed",
+          description: e?.message || (lang === "zh" ? "請稍後再試" : "Please try again later"),
+          variant: "destructive",
+        });
+      }
+    } finally {
+      setTrackChecking(false);
+    }
+  };
+
+  // Auto-run once when a program is loaded and activities are available
+  useEffect(() => {
+    if (!existingPlan?.id || !canPredictRaceTime || trackResult || trackError || trackChecking) return;
+    if (!allActivities || allActivities.length === 0) return;
+    void handleCheckOnTrack(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [existingPlan?.id, canPredictRaceTime, allActivities.length]);
+
+  // Reset predictor when plan changes
+  useEffect(() => {
+    setTrackResult(null);
+    setTrackError(null);
+  }, [existingPlan?.id]);
+
   // User HR profile → zone bounds for showing HR ranges in the plan
   const [hrBounds, setHrBounds] = useState<HrBounds | null>(null);
   useEffect(() => {

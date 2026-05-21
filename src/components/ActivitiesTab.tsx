@@ -536,6 +536,7 @@ const ActivitiesTab = ({ lang }: Props) => {
   // homepage's latest-only list. The latest activity is identical in both,
   // so the homepage card never swaps mid-render.
   const activities = full.activities.length > 0 ? full.activities : homepage.activities;
+  const [selectedActivity, setSelectedActivity] = useState<StravaActivity | null>(null);
   const [dateSheet, setDateSheet] = useState<{
     dateLabel: string;
     activities: StravaActivity[];

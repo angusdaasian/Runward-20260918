@@ -75,22 +75,26 @@ export interface UserRace {
 
 const appEnv = getAppEnvironment();
 
-async function fetchActivities(userId: string): Promise<StravaActivity[]> {
-  const { data } = await supabase
+async function fetchActivities(userId: string, limit?: number): Promise<StravaActivity[]> {
+  let q = supabase
     .from("strava_activities")
     .select("*")
     .eq("user_id", userId)
     .eq("environment", appEnv)
     .order("start_date", { ascending: false });
+  if (limit) q = q.limit(limit);
+  const { data } = await q;
   return ((data as any[]) || []).map((a) => ({ ...a, source: "strava", provenance: "strava" as const }));
 }
 
-async function fetchAppleHealthActivities(userId: string): Promise<StravaActivity[]> {
-  const { data } = await supabase
+async function fetchAppleHealthActivities(userId: string, limit?: number): Promise<StravaActivity[]> {
+  let q = supabase
     .from("apple_health_activities")
     .select("*")
     .eq("user_id", userId)
     .order("start_date", { ascending: false });
+  if (limit) q = q.limit(limit);
+  const { data } = await q;
   return ((data as any[]) || []).map((a) => ({
     ...a,
     strava_id: 0,
@@ -110,12 +114,14 @@ async function fetchProfile(userId: string) {
   return data as any;
 }
 
-async function fetchGarminActivities(userId: string): Promise<StravaActivity[]> {
-  const { data } = await supabase
+async function fetchGarminActivities(userId: string, limit?: number): Promise<StravaActivity[]> {
+  let q = supabase
     .from("garmin_activities")
     .select("*")
     .eq("user_id", userId)
     .order("start_time", { ascending: false });
+  if (limit) q = q.limit(limit);
+  const { data } = await q;
   return ((data as any[]) || []).map((a) => {
     const isCoros = typeof a.garmin_activity_id === "string" && a.garmin_activity_id.startsWith("coros-");
     return {
@@ -232,12 +238,14 @@ function mapTerraProviderLabel(provider: string): string {
   return provider.charAt(0).toUpperCase() + provider.slice(1).toLowerCase();
 }
 
-async function fetchTerraActivities(userId: string): Promise<StravaActivity[]> {
-  const { data } = await supabase
+async function fetchTerraActivities(userId: string, limit?: number): Promise<StravaActivity[]> {
+  let q = supabase
     .from("terra_activities")
     .select("*")
     .eq("user_id", userId)
     .order("start_time", { ascending: false });
+  if (limit) q = q.limit(limit);
+  const { data } = await q;
   return ((data as any[]) || []).map((a) => {
     const sourceLabel = mapTerraProviderLabel(a.provider);
     const sportType = mapTerraSportType(a.activity_type);
@@ -347,41 +355,43 @@ async function fetchUserRaces(userId: string): Promise<UserRace[]> {
   }));
 }
 
-export function useActivities() {
+export function useActivities(options?: { limit?: number }) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const limit = options?.limit;
 
   const activitiesQuery = useQuery({
-    queryKey: ["strava-activities", user?.id],
-    queryFn: () => fetchActivities(user!.id),
+    queryKey: ["strava-activities", user?.id, limit ?? "all"],
+    queryFn: () => fetchActivities(user!.id, limit),
     enabled: !!user,
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
   });
 
   const appleHealthQuery = useQuery({
-    queryKey: ["apple-health-activities", user?.id],
-    queryFn: () => fetchAppleHealthActivities(user!.id),
+    queryKey: ["apple-health-activities", user?.id, limit ?? "all"],
+    queryFn: () => fetchAppleHealthActivities(user!.id, limit),
     enabled: !!user,
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
   });
 
   const garminQuery = useQuery({
-    queryKey: ["garmin-activities", user?.id],
-    queryFn: () => fetchGarminActivities(user!.id),
+    queryKey: ["garmin-activities", user?.id, limit ?? "all"],
+    queryFn: () => fetchGarminActivities(user!.id, limit),
     enabled: !!user,
     staleTime: 30 * 1000,
     gcTime: 10 * 60 * 1000,
   });
 
   const terraQuery = useQuery({
-    queryKey: ["terra-activities", user?.id],
-    queryFn: () => fetchTerraActivities(user!.id),
+    queryKey: ["terra-activities", user?.id, limit ?? "all"],
+    queryFn: () => fetchTerraActivities(user!.id, limit),
     enabled: !!user,
     staleTime: 30 * 1000,
     gcTime: 10 * 60 * 1000,
   });
+
 
   const profileQuery = useQuery({
     queryKey: ["user-profile", user?.id],

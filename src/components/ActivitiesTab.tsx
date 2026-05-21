@@ -499,8 +499,11 @@ const MonthlyActivityList = ({
 const ActivitiesTab = ({ lang }: Props) => {
   const { user } = useAuth();
   const { isPremium } = usePremium();
+  // Cold-start optimization: only fetch the most recent N activities by default.
+  // Press "View all activities" to load the full history.
+  const [showAll, setShowAll] = useState(false);
   const { activities, profile, connected, fitnessAppConnected, plannedWorkouts, userRaces, loading, invalidateAll } =
-    useActivities();
+    useActivities(showAll ? undefined : { limit: 60 });
   const [selectedActivity, setSelectedActivity] = useState<StravaActivity | null>(null);
   const [showAllActivities, setShowAllActivities] = useState(false);
   const [dateSheet, setDateSheet] = useState<{
@@ -728,6 +731,12 @@ const ActivitiesTab = ({ lang }: Props) => {
             </button>
           )}
         </div>
+        {loading && (
+          <div className="flex items-center justify-center py-6 text-xs text-muted-foreground gap-2">
+            <RefreshCw size={14} className="animate-spin" />
+            {lang === "zh" ? "載入所有活動中…" : "Loading all activities…"}
+          </div>
+        )}
         <MonthlyActivityList
           activities={activities}
           lang={lang}
@@ -757,7 +766,7 @@ const ActivitiesTab = ({ lang }: Props) => {
           </h2>
           {activities.length > 0 && (
             <button
-              onClick={() => setShowAllActivities(true)}
+              onClick={() => { setShowAll(true); setShowAllActivities(true); }}
               className="flex items-center gap-1 text-xs font-medium text-primary hover:text-primary/80 transition-colors"
             >
               {lang === "zh" ? "查看全部" : "See all"}

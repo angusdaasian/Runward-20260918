@@ -499,13 +499,43 @@ const MonthlyActivityList = ({
 const ActivitiesTab = ({ lang }: Props) => {
   const { user } = useAuth();
   const { isPremium } = usePremium();
-  // Cold-start optimization: only fetch the most recent N activities by default.
-  // Press "View all activities" to load the full history.
-  const [showAll, setShowAll] = useState(false);
-  const { activities, profile, connected, fitnessAppConnected, plannedWorkouts, userRaces, loading, invalidateAll } =
-    useActivities(showAll ? undefined : { limit: 60 });
-  const [selectedActivity, setSelectedActivity] = useState<StravaActivity | null>(null);
+  // Homepage shows ONLY the latest activity → tiny, fast query.
+  // The full history is loaded in the background and used by the calendar,
+  // monthly road quest, and the "All Activities" page — without ever
+  // changing the latest-activity card on the homepage.
   const [showAllActivities, setShowAllActivities] = useState(false);
+  const [warmupReady, setWarmupReady] = useState(false);
+  useEffect(() => {
+    const w = window as any;
+    let idleId: any;
+    let timeoutId: any;
+    if (typeof w.requestIdleCallback === "function") {
+      idleId = w.requestIdleCallback(() => setWarmupReady(true), { timeout: 4000 });
+    } else {
+      timeoutId = setTimeout(() => setWarmupReady(true), 1500);
+    }
+    return () => {
+      if (idleId && typeof w.cancelIdleCallback === "function") w.cancelIdleCallback(idleId);
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, []);
+
+  const homepage = useActivities({ limit: 1 });
+  const full = useActivities({ enabled: warmupReady });
+
+  const profile = homepage.profile;
+  const connected = homepage.connected;
+  const fitnessAppConnected = homepage.fitnessAppConnected;
+  const plannedWorkouts = homepage.plannedWorkouts;
+  const userRaces = homepage.userRaces;
+  const invalidateAll = homepage.invalidateAll;
+  const loading = homepage.loading;
+  const fullLoading = full.loading;
+
+  // Use the full list as soon as it's ready; otherwise fall back to the
+  // homepage's latest-only list. The latest activity is identical in both,
+  // so the homepage card never swaps mid-render.
+  const activities = full.activities.length > 0 ? full.activities : homepage.activities;
   const [dateSheet, setDateSheet] = useState<{
     dateLabel: string;
     activities: StravaActivity[];

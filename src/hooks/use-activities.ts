@@ -75,26 +75,22 @@ export interface UserRace {
 
 const appEnv = getAppEnvironment();
 
-async function fetchActivities(userId: string, limit?: number): Promise<StravaActivity[]> {
-  let q = supabase
+async function fetchActivities(userId: string): Promise<StravaActivity[]> {
+  const { data } = await supabase
     .from("strava_activities")
     .select("*")
     .eq("user_id", userId)
     .eq("environment", appEnv)
     .order("start_date", { ascending: false });
-  if (limit) q = q.limit(limit);
-  const { data } = await q;
   return ((data as any[]) || []).map((a) => ({ ...a, source: "strava", provenance: "strava" as const }));
 }
 
-async function fetchAppleHealthActivities(userId: string, limit?: number): Promise<StravaActivity[]> {
-  let q = supabase
+async function fetchAppleHealthActivities(userId: string): Promise<StravaActivity[]> {
+  const { data } = await supabase
     .from("apple_health_activities")
     .select("*")
     .eq("user_id", userId)
     .order("start_date", { ascending: false });
-  if (limit) q = q.limit(limit);
-  const { data } = await q;
   return ((data as any[]) || []).map((a) => ({
     ...a,
     strava_id: 0,
@@ -114,14 +110,12 @@ async function fetchProfile(userId: string) {
   return data as any;
 }
 
-async function fetchGarminActivities(userId: string, limit?: number): Promise<StravaActivity[]> {
-  let q = supabase
+async function fetchGarminActivities(userId: string): Promise<StravaActivity[]> {
+  const { data } = await supabase
     .from("garmin_activities")
     .select("*")
     .eq("user_id", userId)
     .order("start_time", { ascending: false });
-  if (limit) q = q.limit(limit);
-  const { data } = await q;
   return ((data as any[]) || []).map((a) => {
     const isCoros = typeof a.garmin_activity_id === "string" && a.garmin_activity_id.startsWith("coros-");
     return {
@@ -238,14 +232,12 @@ function mapTerraProviderLabel(provider: string): string {
   return provider.charAt(0).toUpperCase() + provider.slice(1).toLowerCase();
 }
 
-async function fetchTerraActivities(userId: string, limit?: number): Promise<StravaActivity[]> {
-  let q = supabase
+async function fetchTerraActivities(userId: string): Promise<StravaActivity[]> {
+  const { data } = await supabase
     .from("terra_activities")
     .select("*")
     .eq("user_id", userId)
     .order("start_time", { ascending: false });
-  if (limit) q = q.limit(limit);
-  const { data } = await q;
   return ((data as any[]) || []).map((a) => {
     const sourceLabel = mapTerraProviderLabel(a.provider);
     const sportType = mapTerraSportType(a.activity_type);
@@ -355,55 +347,41 @@ async function fetchUserRaces(userId: string): Promise<UserRace[]> {
   }));
 }
 
-export function useActivities(options?: { limit?: number; enabled?: boolean }) {
+export function useActivities() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const limit = options?.limit;
-  const activityQueriesEnabled = !!user && (options?.enabled ?? true);
-
-  // Terra is the highest-priority source: load it first, then gate Strava /
-  // Apple Health / Garmin (Railway) until Terra's first fetch settles.
-  // This avoids painting a Garmin/Railway row first that later gets de-duped
-  // away when the matching Terra activity arrives.
-  const terraQuery = useQuery({
-    queryKey: ["terra-activities", user?.id, limit ?? "all"],
-    queryFn: () => fetchTerraActivities(user!.id, limit),
-    enabled: activityQueriesEnabled,
-    staleTime: 30 * 1000,
-    gcTime: 10 * 60 * 1000,
-  });
-
-  // Wait until Terra's CURRENT fetch settles (not just any prior fetch from
-  // cache). On a stale refetch isFetched is already true from the previous
-  // run, which would let Garmin/Railway return first and briefly replace the
-  // Terra row at the top of the list.
-  const secondaryEnabled =
-    activityQueriesEnabled && terraQuery.isFetched && !terraQuery.isFetching;
 
   const activitiesQuery = useQuery({
-    queryKey: ["strava-activities", user?.id, limit ?? "all"],
-    queryFn: () => fetchActivities(user!.id, limit),
-    enabled: secondaryEnabled,
+    queryKey: ["strava-activities", user?.id],
+    queryFn: () => fetchActivities(user!.id),
+    enabled: !!user,
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
   });
 
   const appleHealthQuery = useQuery({
-    queryKey: ["apple-health-activities", user?.id, limit ?? "all"],
-    queryFn: () => fetchAppleHealthActivities(user!.id, limit),
-    enabled: secondaryEnabled,
+    queryKey: ["apple-health-activities", user?.id],
+    queryFn: () => fetchAppleHealthActivities(user!.id),
+    enabled: !!user,
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
   });
 
   const garminQuery = useQuery({
-    queryKey: ["garmin-activities", user?.id, limit ?? "all"],
-    queryFn: () => fetchGarminActivities(user!.id, limit),
-    enabled: secondaryEnabled,
+    queryKey: ["garmin-activities", user?.id],
+    queryFn: () => fetchGarminActivities(user!.id),
+    enabled: !!user,
     staleTime: 30 * 1000,
     gcTime: 10 * 60 * 1000,
   });
 
+  const terraQuery = useQuery({
+    queryKey: ["terra-activities", user?.id],
+    queryFn: () => fetchTerraActivities(user!.id),
+    enabled: !!user,
+    staleTime: 30 * 1000,
+    gcTime: 10 * 60 * 1000,
+  });
 
   const profileQuery = useQuery({
     queryKey: ["user-profile", user?.id],
@@ -453,31 +431,19 @@ export function useActivities(options?: { limit?: number; enabled?: boolean }) {
     const gm = garminQuery.data || [];
     const tr = terraQuery.data || [];
 
-    // Wait for BOTH garmin and terra current fetches to settle before
-    // running dedup. isFetched alone is true from prior cached runs, so we
-    // also require !isFetching to avoid showing a stale garmin row that
-    // hasn't yet been deduped against the still-loading terra response.
-    const bothSettled =
-      terraQuery.isFetched && !terraQuery.isFetching &&
-      garminQuery.isFetched && !garminQuery.isFetching;
+    // If either source is still loading for the first time, skip dedup and
+    // show whatever we already have rather than risk dropping rows.
+    const bothLoaded =
+      (!garminQuery.isLoading || garminQuery.isFetched) &&
+      (!terraQuery.isLoading || terraQuery.isFetched);
 
-    let filteredGarmin: StravaActivity[];
-    if (bothSettled) {
-      filteredGarmin = gm.filter((g) => !tr.some((t) => {
-        const timeDiff = Math.abs(new Date(g.start_date).getTime() - new Date(t.start_date).getTime());
-        const distanceDiff = Math.abs((g.distance || 0) - (t.distance || 0));
-        return timeDiff < 5 * 60 * 1000 && distanceDiff < 100;
-      }));
-    } else if (terraQuery.isFetching && tr.length > 0) {
-      // Terra still loading: hide any garmin row newer-or-equal to the newest
-      // terra row we have, since it's likely a duplicate that will be deduped
-      // once terra finishes. This prevents garmin/railway from briefly
-      // replacing the latest terra activity at the top of the list.
-      const newestTerraTs = new Date(tr[0].start_date).getTime();
-      filteredGarmin = gm.filter((g) => new Date(g.start_date).getTime() < newestTerraTs);
-    } else {
-      filteredGarmin = gm;
-    }
+    const filteredGarmin = bothLoaded
+      ? gm.filter((g) => !tr.some((t) => {
+          const timeDiff = Math.abs(new Date(g.start_date).getTime() - new Date(t.start_date).getTime());
+          const distanceDiff = Math.abs((g.distance || 0) - (t.distance || 0));
+          return timeDiff < 5 * 60 * 1000 && distanceDiff < 100;
+        }))
+      : gm;
     const all = [...strava, ...ah, ...filteredGarmin, ...tr];
     all.sort((a, b) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime());
     return all;
@@ -486,9 +452,9 @@ export function useActivities(options?: { limit?: number; enabled?: boolean }) {
     appleHealthQuery.data,
     garminQuery.data,
     terraQuery.data,
-    garminQuery.isFetching,
+    garminQuery.isLoading,
     garminQuery.isFetched,
-    terraQuery.isFetching,
+    terraQuery.isLoading,
     terraQuery.isFetched,
   ]);
 

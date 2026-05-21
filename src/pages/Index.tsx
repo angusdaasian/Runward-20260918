@@ -104,31 +104,6 @@ const Index = () => {
     if (user) preloadHeaderProfile(user.id);
   }, [user?.id]);
 
-  // Cold-start optimization: ActivitiesTab loads only the latest 60 activities.
-  // After first paint, prefetch the full activity history + warm up lazy tab
-  // chunks in the background so subsequent navigation is instant.
-  useEffect(() => {
-    if (!user?.id) return;
-    const idle = (cb: () => void) => {
-      const w = window as any;
-      if (typeof w.requestIdleCallback === "function") w.requestIdleCallback(cb, { timeout: 5000 });
-      else setTimeout(cb, 2000);
-    };
-    idle(() => {
-      // Warm lazy tab bundles so first navigation doesn't pay the network cost.
-      import("@/components/AnalyticsTab");
-      import("@/components/TrainingTab");
-      import("@/components/RewardsTab");
-      import("@/components/RaceTab");
-      import("@/components/MoreTab");
-      // Prefetch full activity history into react-query so analytics/training
-      // tabs render instantly when first visited.
-      import("@/hooks/use-activities").then(() => {
-        import("@tanstack/react-query").then(({ QueryClient: _ }) => { /* shared singleton */ });
-      });
-    });
-  }, [user?.id]);
-
   // Resolve onboarding state without blocking first paint.
   // Optimistically assume returning users are onboarded — cache the flag in
   // localStorage so subsequent cold starts skip the network round-trip and

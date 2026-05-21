@@ -760,7 +760,7 @@ const ActivitiesTab = ({ lang }: Props) => {
           </h2>
           {activities.length > 0 && (
             <button
-              onClick={() => setShowAllActivities(true)}
+              onClick={() => { setShowAll(true); setShowAllActivities(true); }}
               className="flex items-center gap-1 text-xs font-medium text-primary hover:text-primary/80 transition-colors"
             >
               {lang === "zh" ? "查看全部" : "See all"}

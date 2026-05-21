@@ -361,10 +361,24 @@ export function useActivities(options?: { limit?: number; enabled?: boolean }) {
   const limit = options?.limit;
   const activityQueriesEnabled = !!user && (options?.enabled ?? true);
 
+  // Terra is the highest-priority source: load it first, then gate Strava /
+  // Apple Health / Garmin (Railway) until Terra's first fetch settles.
+  // This avoids painting a Garmin/Railway row first that later gets de-duped
+  // away when the matching Terra activity arrives.
+  const terraQuery = useQuery({
+    queryKey: ["terra-activities", user?.id, limit ?? "all"],
+    queryFn: () => fetchTerraActivities(user!.id, limit),
+    enabled: activityQueriesEnabled,
+    staleTime: 30 * 1000,
+    gcTime: 10 * 60 * 1000,
+  });
+
+  const secondaryEnabled = activityQueriesEnabled && terraQuery.isFetched;
+
   const activitiesQuery = useQuery({
     queryKey: ["strava-activities", user?.id, limit ?? "all"],
     queryFn: () => fetchActivities(user!.id, limit),
-    enabled: activityQueriesEnabled,
+    enabled: secondaryEnabled,
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
   });
@@ -372,7 +386,7 @@ export function useActivities(options?: { limit?: number; enabled?: boolean }) {
   const appleHealthQuery = useQuery({
     queryKey: ["apple-health-activities", user?.id, limit ?? "all"],
     queryFn: () => fetchAppleHealthActivities(user!.id, limit),
-    enabled: activityQueriesEnabled,
+    enabled: secondaryEnabled,
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
   });
@@ -380,15 +394,7 @@ export function useActivities(options?: { limit?: number; enabled?: boolean }) {
   const garminQuery = useQuery({
     queryKey: ["garmin-activities", user?.id, limit ?? "all"],
     queryFn: () => fetchGarminActivities(user!.id, limit),
-    enabled: activityQueriesEnabled,
-    staleTime: 30 * 1000,
-    gcTime: 10 * 60 * 1000,
-  });
-
-  const terraQuery = useQuery({
-    queryKey: ["terra-activities", user?.id, limit ?? "all"],
-    queryFn: () => fetchTerraActivities(user!.id, limit),
-    enabled: activityQueriesEnabled,
+    enabled: secondaryEnabled,
     staleTime: 30 * 1000,
     gcTime: 10 * 60 * 1000,
   });

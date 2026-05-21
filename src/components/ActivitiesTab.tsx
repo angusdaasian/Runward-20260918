@@ -493,6 +493,106 @@ const MonthlyActivityList = ({
   );
 };
 
+// ---------- All Activities View (progressive month reveal) ----------
+const AllActivitiesView = ({
+  lang,
+  activities,
+  loading,
+  activityScores,
+  activityLoads,
+  isPremium,
+  onBack,
+  onSelect,
+}: {
+  lang: Lang;
+  activities: StravaActivity[];
+  loading: boolean;
+  activityScores: Record<string, number | null>;
+  activityLoads: Record<string, number | null>;
+  isPremium: boolean;
+  onBack: () => void;
+  onSelect: (a: StravaActivity) => void;
+}) => {
+  // Group activities by year-month to enable progressive reveal.
+  const monthBuckets = useMemo(() => {
+    const map = new Map<string, StravaActivity[]>();
+    for (const a of activities) {
+      const d = new Date(a.start_date);
+      const key = `${d.getFullYear()}-${String(d.getMonth()).padStart(2, "0")}`;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(a);
+    }
+    // Most-recent month first.
+    return Array.from(map.entries()).sort((a, b) => (a[0] < b[0] ? 1 : -1));
+  }, [activities]);
+
+  const [visibleMonths, setVisibleMonths] = useState(1);
+
+  // Reset when activities reload (e.g. background prefetch finishes).
+  useEffect(() => {
+    setVisibleMonths(1);
+  }, [monthBuckets.length === 0]);
+
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (visibleMonths >= monthBuckets.length) return;
+    const node = sentinelRef.current;
+    if (!node || typeof IntersectionObserver === "undefined") return;
+    const obs = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          setVisibleMonths((n) => Math.min(n + 1, monthBuckets.length));
+        }
+      },
+      { rootMargin: "200px" },
+    );
+    obs.observe(node);
+    return () => obs.disconnect();
+  }, [visibleMonths, monthBuckets.length]);
+
+  const visibleActivities = useMemo(
+    () => monthBuckets.slice(0, visibleMonths).flatMap(([, items]) => items),
+    [monthBuckets, visibleMonths],
+  );
+
+  const hasMore = visibleMonths < monthBuckets.length;
+
+  return (
+    <FadeIn className="px-5 pt-6 max-w-lg mx-auto pb-24">
+      <div className="flex items-center justify-between mb-5">
+        <div className="flex items-center gap-3">
+          <button onClick={onBack} className="p-1">
+            <ChevronDown size={24} className="text-foreground rotate-90" />
+          </button>
+          <h1 className="font-display text-xl font-bold text-foreground">
+            {lang === "zh" ? "所有活動" : "All Activities"}
+          </h1>
+        </div>
+      </div>
+      {loading && activities.length === 0 && (
+        <div className="flex items-center justify-center py-6 text-xs text-muted-foreground gap-2">
+          <RefreshCw size={14} className="animate-spin" />
+          {lang === "zh" ? "載入所有活動中…" : "Loading all activities…"}
+        </div>
+      )}
+      <MonthlyActivityList
+        activities={visibleActivities}
+        lang={lang}
+        activityScores={activityScores}
+        activityLoads={activityLoads}
+        isPremium={isPremium}
+        onSelect={onSelect}
+      />
+      {hasMore && (
+        <div ref={sentinelRef} className="flex items-center justify-center py-6 text-xs text-muted-foreground gap-2">
+          <RefreshCw size={14} className="animate-spin" />
+          {lang === "zh" ? "載入較早月份…" : "Loading earlier months…"}
+        </div>
+      )}
+    </FadeIn>
+  );
+};
+
 // ---------- Main Component ----------
 
 

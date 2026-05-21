@@ -87,12 +87,14 @@ async function fetchActivities(userId: string, limit?: number): Promise<StravaAc
   return ((data as any[]) || []).map((a) => ({ ...a, source: "strava", provenance: "strava" as const }));
 }
 
-async function fetchAppleHealthActivities(userId: string): Promise<StravaActivity[]> {
-  const { data } = await supabase
+async function fetchAppleHealthActivities(userId: string, limit?: number): Promise<StravaActivity[]> {
+  let q = supabase
     .from("apple_health_activities")
     .select("*")
     .eq("user_id", userId)
     .order("start_date", { ascending: false });
+  if (limit) q = q.limit(limit);
+  const { data } = await q;
   return ((data as any[]) || []).map((a) => ({
     ...a,
     strava_id: 0,

@@ -75,13 +75,15 @@ export interface UserRace {
 
 const appEnv = getAppEnvironment();
 
-async function fetchActivities(userId: string): Promise<StravaActivity[]> {
-  const { data } = await supabase
+async function fetchActivities(userId: string, limit?: number): Promise<StravaActivity[]> {
+  let q = supabase
     .from("strava_activities")
     .select("*")
     .eq("user_id", userId)
     .eq("environment", appEnv)
     .order("start_date", { ascending: false });
+  if (limit) q = q.limit(limit);
+  const { data } = await q;
   return ((data as any[]) || []).map((a) => ({ ...a, source: "strava", provenance: "strava" as const }));
 }
 

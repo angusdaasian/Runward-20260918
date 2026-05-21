@@ -296,9 +296,9 @@ const Index = () => {
         )}
       </div>
       {activeTab === "activities" && (
-        <PullToRefreshContainer>
+        <div className="flex-1 overflow-y-auto relative" style={{ paddingBottom: 'calc(5rem + var(--safe-area-bottom, 0px))' }}>
           <ActivitiesTab lang={lang} />
-        </PullToRefreshContainer>
+        </div>
       )}
 
       <div className="fixed bottom-0 left-0 right-0 bg-card border-t border-border" style={{ paddingBottom: 'var(--safe-area-bottom, 0px)' }}>

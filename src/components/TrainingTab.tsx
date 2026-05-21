@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { shareTrainingWeek } from "@/lib/sharePlanWeek";
 import { estimateMaxHr, estimateRestingHr, zoneBoundaries, isValidCustomZones } from "@/lib/hrZones";
+import { predictRaceFromActivities, typeLabel, type RunType } from "@/lib/racePredictionHr";
 import {
   DndContext, PointerSensor, TouchSensor, useSensor, useSensors,
   closestCenter, type DragEndEvent

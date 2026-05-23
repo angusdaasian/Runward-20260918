@@ -103,6 +103,27 @@ const RewardCodeManager = () => {
     setCodes((prev) => prev.filter((c) => c.id !== id));
   };
 
+  const [deletingAll, setDeletingAll] = useState(false);
+  const handleDeleteAll = async (onlyAvailable: boolean) => {
+    const scope = onlyAvailable ? "all UNASSIGNED codes" : "ALL codes (including assigned)";
+    if (!confirm(`Delete ${scope}? This cannot be undone.`)) return;
+    setDeletingAll(true);
+    try {
+      let q = supabase.from("reward_codes").delete();
+      q = onlyAvailable ? q.eq("is_assigned", false) : q.not("id", "is", null);
+      const { error } = await q;
+      if (error) throw error;
+      toast({ title: "Deleted", description: `Removed ${scope}` });
+      fetchCodes();
+    } catch (e) {
+      toast({ title: "Error", description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setDeletingAll(false);
+    }
+  };
+
+
+
   const available = codes.filter((c) => !c.is_assigned).length;
   const assigned = codes.filter((c) => c.is_assigned).length;
 

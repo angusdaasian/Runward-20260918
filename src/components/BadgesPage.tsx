@@ -154,8 +154,8 @@ const BadgesPage = ({ lang, onBack }: Props) => {
                 alt={c.name}
                 className={`w-32 h-32 mx-auto mb-3 object-contain ${p.unlocked ? "" : "grayscale opacity-60"}`}
               />
-              <h3 className="font-display text-xl font-bold mb-1">{c.name}</h3>
-              <p className="text-sm text-muted-foreground mb-4">{c.desc}</p>
+              <h3 className="font-display text-xl font-bold mb-4">{c.name}</h3>
+
               {selected.target > 1 ? (
                 <>
                   <div className="h-2 bg-muted rounded-full overflow-hidden">

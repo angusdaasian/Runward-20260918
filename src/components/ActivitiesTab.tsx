@@ -768,6 +768,7 @@ const ActivitiesTab = ({ lang }: Props) => {
           startDate: today,
           endDate: tomorrow,
           latestWithSamples: true,
+          forceEnv: "prod",
         }),
       });
       const result = await response.json().catch(() => null);

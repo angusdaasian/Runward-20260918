@@ -543,11 +543,19 @@ export function computeBadgeProgress(ctx: BadgeContext): Record<string, BadgePro
       case "sub_5":      value = bestSec <= 300 ? 1 : 0; break;
       case "speedster":  value = bestSec <= 240 ? 1 : 0; break;
       case "sprint_king":value = bestSec <= 210 ? 1 : 0; break;
+      case "marathon_sub5":   value = bestSecMarathon <= 300 ? 1 : 0; break;
+      case "marathon_sub430": value = bestSecMarathon <= 270 ? 1 : 0; break;
+      case "marathon_sub4":   value = bestSecMarathon <= 240 ? 1 : 0; break;
+      case "marathon_sub330": value = bestSecMarathon <= 210 ? 1 : 0; break;
+      case "marathon_sub3":   value = bestSecMarathon <= 180 ? 1 : 0; break;
       // volume
       case "fifty_k_week":    value = best7; break;
       case "hundred_k_week":  value = best7; break;
       case "century_month":   value = month.km; break;
       case "volume_king":     value = month.km; break;
+      case "monthly_300":     value = month.km; break;
+      case "monthly_400":     value = month.km; break;
+      case "monthly_500":     value = month.km; break;
       case "frequency_king":  value = month.runs; break;
       // elevation
       case "hill_climber":

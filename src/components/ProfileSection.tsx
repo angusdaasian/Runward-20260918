@@ -815,10 +815,7 @@ const ProfileSection = ({ lang, subpage = "main", onNavigate }: ProfileSectionPr
           <Award size={20} className="text-amber-500" />
           <div className="text-left">
             <span className="font-medium text-foreground block">
-              {lang === "zh" ? "成就徽章" : "Achievement Badges"}
-            </span>
-            <span className="text-[11px] text-muted-foreground">
-              {lang === "zh" ? "查看你解鎖的徽章" : "View badges you've unlocked"}
+              {lang === "zh" ? "成就" : "Achievements"}
             </span>
           </div>
         </div>

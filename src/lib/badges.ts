@@ -188,20 +188,20 @@ export const BADGES: BadgeDef[] = [
     en: { name: "Sprint King",      desc: "Average sub 3:30/km on any run (≥1 km)" },
     zh: { name: "衝刺之王",         desc: "首次跑出 3:30/km 以內" } },
   { id: "marathon_sub5", category: "pace", image: imgMarathonSub5, target: 1,
-    en: { name: "Sub-5:00 Marathon", desc: "Average sub 5:00/km on a 42.2 km+ run" },
-    zh: { name: "破 5 全馬",        desc: "完成 42.2 公里以上均速破 5:00/km" } },
+    en: { name: "Sub-5 Marathon",   desc: "Finish a marathon (42.2 km+) in under 5 hours" },
+    zh: { name: "破 5 全馬",        desc: "完成 42.2 公里以上並以 5 小時內完賽" } },
   { id: "marathon_sub430", category: "pace", image: imgMarathonSub430, target: 1,
-    en: { name: "Sub-4:30 Marathon", desc: "Average sub 4:30/km on a 42.2 km+ run" },
-    zh: { name: "破 4:30 全馬",     desc: "完成 42.2 公里以上均速破 4:30/km" } },
+    en: { name: "Sub-4:30 Marathon", desc: "Finish a marathon (42.2 km+) in under 4:30" },
+    zh: { name: "破 4:30 全馬",     desc: "完成 42.2 公里以上並以 4 小時 30 分內完賽" } },
   { id: "marathon_sub4", category: "pace", image: imgMarathonSub4, target: 1,
-    en: { name: "Sub-4:00 Marathon", desc: "Average sub 4:00/km on a 42.2 km+ run" },
-    zh: { name: "破 4 全馬",        desc: "完成 42.2 公里以上均速破 4:00/km" } },
+    en: { name: "Sub-4 Marathon",   desc: "Finish a marathon (42.2 km+) in under 4 hours" },
+    zh: { name: "破 4 全馬",        desc: "完成 42.2 公里以上並以 4 小時內完賽" } },
   { id: "marathon_sub330", category: "pace", image: imgMarathonSub330, target: 1,
-    en: { name: "Sub-3:30 Marathon", desc: "Average sub 3:30/km on a 42.2 km+ run" },
-    zh: { name: "破 3:30 全馬",     desc: "完成 42.2 公里以上均速破 3:30/km" } },
+    en: { name: "Sub-3:30 Marathon", desc: "Finish a marathon (42.2 km+) in under 3:30" },
+    zh: { name: "破 3:30 全馬",     desc: "完成 42.2 公里以上並以 3 小時 30 分內完賽" } },
   { id: "marathon_sub3", category: "pace", image: imgMarathonSub3, target: 1,
-    en: { name: "Sub-3:00 Marathon", desc: "Average sub 3:00/km on a 42.2 km+ run" },
-    zh: { name: "破 3 全馬",        desc: "完成 42.2 公里以上均速破 3:00/km" } },
+    en: { name: "Sub-3 Marathon",   desc: "Finish a marathon (42.2 km+) in under 3 hours" },
+    zh: { name: "破 3 全馬",        desc: "完成 42.2 公里以上並以 3 小時內完賽" } },
 
   // ── Volume windows (rolling weekly / calendar month) ──────────────
   { id: "fifty_k_week", category: "volume", image: imgFiftyKWeek, target: 50, unit: "km",
@@ -433,6 +433,17 @@ function bestPaceSecPerKmOver(activities: StravaActivity[], minMeters: number): 
   return best;
 }
 
+/** Best (lowest) finish time in seconds for any run >= minMeters distance */
+function bestFinishTimeSec(activities: StravaActivity[], minMeters: number): number {
+  let best = Infinity;
+  for (const a of activities) {
+    if ((a.distance || 0) < minMeters) continue;
+    const t = a.moving_time || a.elapsed_time || 0;
+    if (t > 0 && t < best) best = t;
+  }
+  return best;
+}
+
 function hasNegativeSplit(activities: StravaActivity[]): boolean {
   for (const a of activities) {
     if ((a.distance || 0) < 10000 || !a.distance_samples || a.distance_samples.length < 4) continue;
@@ -475,7 +486,7 @@ export function computeBadgeProgress(ctx: BadgeContext): Record<string, BadgePro
   const streak = computeStreak(ctx.activities);
   const bestSec = bestPaceSecPerKm(ctx.activities);
   const bestSec10k = bestPaceSecPerKmOver(ctx.activities, 10000);
-  const bestSecMarathon = bestPaceSecPerKmOver(ctx.activities, 42195);
+  const bestMarathonFinish = bestFinishTimeSec(ctx.activities, 42000);
   const longestRunM = maxRunDistance(ctx.activities);
   const steepestM = maxRunElevation(ctx.activities);
   const best7 = bestRollingDistanceKm(ctx.activities, 7);
@@ -543,11 +554,11 @@ export function computeBadgeProgress(ctx: BadgeContext): Record<string, BadgePro
       case "sub_5":      value = bestSec <= 300 ? 1 : 0; break;
       case "speedster":  value = bestSec <= 240 ? 1 : 0; break;
       case "sprint_king":value = bestSec <= 210 ? 1 : 0; break;
-      case "marathon_sub5":   value = bestSecMarathon <= 300 ? 1 : 0; break;
-      case "marathon_sub430": value = bestSecMarathon <= 270 ? 1 : 0; break;
-      case "marathon_sub4":   value = bestSecMarathon <= 240 ? 1 : 0; break;
-      case "marathon_sub330": value = bestSecMarathon <= 210 ? 1 : 0; break;
-      case "marathon_sub3":   value = bestSecMarathon <= 180 ? 1 : 0; break;
+      case "marathon_sub5":   value = bestMarathonFinish <= 18000 ? 1 : 0; break;
+      case "marathon_sub430": value = bestMarathonFinish <= 16200 ? 1 : 0; break;
+      case "marathon_sub4":   value = bestMarathonFinish <= 14400 ? 1 : 0; break;
+      case "marathon_sub330": value = bestMarathonFinish <= 12600 ? 1 : 0; break;
+      case "marathon_sub3":   value = bestMarathonFinish <= 10800 ? 1 : 0; break;
       // volume
       case "fifty_k_week":    value = best7; break;
       case "hundred_k_week":  value = best7; break;

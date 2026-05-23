@@ -57,10 +57,26 @@ const BadgesPage = ({ lang, onBack }: Props) => {
     })();
   }, [user]);
 
-  const progress = useMemo(
+  const liveProgress = useMemo(
     () => computeBadgeProgress({ activities, isEarlyAdopter, premiumActivatedAt }),
     [activities, isEarlyAdopter, premiumActivatedAt]
   );
+
+  // Keep highest-ever progress to avoid flicker as cached queries refetch
+  // and activities briefly arrive as a smaller subset.
+  const [progress, setProgress] = useState(liveProgress);
+  useEffect(() => {
+    setProgress((prev) => {
+      const merged: typeof prev = { ...prev };
+      for (const id in liveProgress) {
+        const next = liveProgress[id];
+        const old = prev[id];
+        if (!old || next.value > old.value || next.unlocked) merged[id] = next;
+        else merged[id] = old;
+      }
+      return merged;
+    });
+  }, [liveProgress]);
 
   const unlockedCount = Object.values(progress).filter((p) => p.unlocked).length;
 

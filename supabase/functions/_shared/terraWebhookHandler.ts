@@ -987,7 +987,44 @@ export async function handleTerraWebhook(req: Request, env: TerraEnv = "prod"): 
   let payload: any = {};
   try { payload = JSON.parse(raw); } catch { payload = { _parse_error: true, raw }; }
 
+  // ── Ping mode (S3 payload delivery) ──
+  // Terra sends { status, type: "s3_payload", url, expires_in } when ping mode is enabled
+  // for high-volume / large payloads. Fetch the full payload from the pre-signed URL and
+  // use it in place of the inline payload. Signature verification is still done on the
+  // original POST body above (which contains the s3_payload notification).
+  if (payload?.type === "s3_payload" && typeof payload?.url === "string") {
+    const pingUrl: string = payload.url;
+    try {
+      const resp = await fetch(pingUrl);
+      if (!resp.ok) {
+        console.error("[terra-webhook] ping fetch failed", resp.status, await resp.text().catch(() => ""));
+        await supa.from("terra_webhook_events").insert({
+          type: "s3_payload_fetch_error",
+          payload: { url: pingUrl, status: resp.status, env },
+          signature_valid: signatureValid,
+          processing_error: `ping fetch ${resp.status}`,
+        });
+        return new Response(JSON.stringify({ ok: true, ping_fetch_failed: true }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      payload = await resp.json();
+    } catch (e: any) {
+      console.error("[terra-webhook] ping fetch threw", e?.message ?? e);
+      await supa.from("terra_webhook_events").insert({
+        type: "s3_payload_fetch_error",
+        payload: { url: pingUrl, env },
+        signature_valid: signatureValid,
+        processing_error: String(e?.message ?? e),
+      });
+      return new Response(JSON.stringify({ ok: true, ping_fetch_failed: true }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+  }
+
   const type: string = payload?.type ?? "unknown";
+
   // user_reauth payloads use old_user / new_user instead of user.
   const isReauth = type === "user_reauth";
   const user = isReauth ? (payload?.new_user ?? {}) : (payload?.user ?? {});

@@ -381,21 +381,23 @@ const ProfileSection = ({ lang, subpage = "main", onNavigate }: ProfileSectionPr
     return best > 0 ? Math.round(best * 10) / 10 : null;
   }, [pbs]);
 
-  if (!profile) return (
-    <div className="space-y-4">
-      <div className="bg-card border border-border rounded-xl p-4">
-        <div className="flex items-center gap-4 mb-4">
-          <Skeleton className="h-16 w-16 rounded-full" />
-          <div className="flex-1 space-y-2">
-            <Skeleton className="h-8 w-full" />
-            <Skeleton className="h-4 w-40" />
+  if (!profile && subpage !== "main") {
+    return (
+      <div className="space-y-4">
+        <div className="bg-card border border-border rounded-xl p-4">
+          <div className="flex items-center gap-4 mb-4">
+            <Skeleton className="h-16 w-16 rounded-full" />
+            <div className="flex-1 space-y-2">
+              <Skeleton className="h-8 w-full" />
+              <Skeleton className="h-4 w-40" />
+            </div>
           </div>
         </div>
+        <Skeleton className="h-20 w-full rounded-xl" />
+        <Skeleton className="h-32 w-full rounded-xl" />
       </div>
-      <Skeleton className="h-20 w-full rounded-xl" />
-      <Skeleton className="h-32 w-full rounded-xl" />
-    </div>
-  );
+    );
+  }
 
   // ── Subpage: Heart Rate Zones ──
   if (subpage === "hr-zones") {
@@ -783,13 +785,13 @@ const ProfileSection = ({ lang, subpage = "main", onNavigate }: ProfileSectionPr
       {/* Centered Profile Header */}
       <div className="flex flex-col items-center pt-2 pb-2">
         <Avatar className="h-24 w-24 ring-4 ring-primary/30">
-          <AvatarImage src={profile.avatar_url || undefined} />
+          <AvatarImage src={profile?.avatar_url || undefined} />
           <AvatarFallback className="text-2xl font-display bg-primary/10 text-primary">
-            {(profile.display_name || "U")[0].toUpperCase()}
+            {(profile?.display_name || "U")[0].toUpperCase()}
           </AvatarFallback>
         </Avatar>
         <h2 className="mt-3 font-display text-2xl font-bold text-foreground">
-          {profile.display_name || (lang === "zh" ? "使用者" : "User")}
+          {profile?.display_name || (lang === "zh" ? "使用者" : "User")}
         </h2>
         {user?.created_at && (
           <p className="mt-1 text-sm text-muted-foreground">

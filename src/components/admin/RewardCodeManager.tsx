@@ -136,11 +136,20 @@ const RewardCodeManager = () => {
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Stats */}
-        <div className="flex gap-3 text-sm">
+        <div className="flex gap-3 text-sm items-center flex-wrap">
           <Badge variant="secondary">{codes.length} Total</Badge>
           <Badge className="bg-primary text-primary-foreground">{available} Available</Badge>
           <Badge variant="outline">{assigned} Assigned</Badge>
+          <div className="ml-auto flex gap-2">
+            <Button size="sm" variant="outline" onClick={() => handleDeleteAll(true)} disabled={deletingAll || available === 0}>
+              <Trash2 className="h-4 w-4 mr-1" /> Delete unassigned
+            </Button>
+            <Button size="sm" variant="destructive" onClick={() => handleDeleteAll(false)} disabled={deletingAll || codes.length === 0}>
+              <Trash2 className="h-4 w-4 mr-1" /> {deletingAll ? "Deleting..." : "Delete ALL"}
+            </Button>
+          </div>
         </div>
+
 
         {/* Bulk Upload */}
         <div className="space-y-2">

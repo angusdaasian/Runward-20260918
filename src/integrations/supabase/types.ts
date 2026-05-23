@@ -1352,6 +1352,39 @@ export type Database = {
           },
         ]
       }
+      terra_reconciliation_log: {
+        Row: {
+          created_at: string
+          data_type: string | null
+          detail: string | null
+          id: string
+          payload_id: string
+          source_table: string
+          status: string
+          terra_user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          data_type?: string | null
+          detail?: string | null
+          id?: string
+          payload_id: string
+          source_table: string
+          status: string
+          terra_user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          data_type?: string | null
+          detail?: string | null
+          id?: string
+          payload_id?: string
+          source_table?: string
+          status?: string
+          terra_user_id?: string | null
+        }
+        Relationships: []
+      }
       terra_users: {
         Row: {
           created_at: string | null
@@ -1383,6 +1416,7 @@ export type Database = {
         Row: {
           id: string
           payload: Json | null
+          payload_id: string | null
           processing_error: string | null
           received_at: string
           reference_id: string | null
@@ -1393,6 +1427,7 @@ export type Database = {
         Insert: {
           id?: string
           payload?: Json | null
+          payload_id?: string | null
           processing_error?: string | null
           received_at?: string
           reference_id?: string | null
@@ -1403,6 +1438,7 @@ export type Database = {
         Update: {
           id?: string
           payload?: Json | null
+          payload_id?: string | null
           processing_error?: string | null
           received_at?: string
           reference_id?: string | null

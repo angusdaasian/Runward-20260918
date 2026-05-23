@@ -785,13 +785,13 @@ const ProfileSection = ({ lang, subpage = "main", onNavigate }: ProfileSectionPr
       {/* Centered Profile Header */}
       <div className="flex flex-col items-center pt-2 pb-2">
         <Avatar className="h-24 w-24 ring-4 ring-primary/30">
-          <AvatarImage src={profile.avatar_url || undefined} />
+          <AvatarImage src={profile?.avatar_url || undefined} />
           <AvatarFallback className="text-2xl font-display bg-primary/10 text-primary">
-            {(profile.display_name || "U")[0].toUpperCase()}
+            {(profile?.display_name || "U")[0].toUpperCase()}
           </AvatarFallback>
         </Avatar>
         <h2 className="mt-3 font-display text-2xl font-bold text-foreground">
-          {profile.display_name || (lang === "zh" ? "使用者" : "User")}
+          {profile?.display_name || (lang === "zh" ? "使用者" : "User")}
         </h2>
         {user?.created_at && (
           <p className="mt-1 text-sm text-muted-foreground">

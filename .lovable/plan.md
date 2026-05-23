@@ -1,48 +1,58 @@
-## Issue 1 — Stale Garmin (Railway) activity until app restart
+## Achievements page updates
 
-**Root cause:** `ActivitiesTab` subscribes via `supabase.channel(...).on("postgres_changes", ...)` to `strava_activities`, `apple_health_activities`, `garmin_activities`, and `terra_activities`, but **none of these tables are in the `supabase_realtime` publication**. I verified by querying `pg_publication_tables` — zero rows. So when `terra-webhook` upserts a new activity after a sync, the client never gets a change event, never invalidates React Query, and continues to show the cached merged list (Garmin row from Railway + no Terra row yet → Garmin row not de-duped). After restart, queries refetch from scratch, Terra row arrives, dedup kicks in, Garmin row disappears.
+### 1. Rename and simplify
+- In `src/components/BadgesPage.tsx`, change hero label `Achievement Badges` / `成就徽章` → `Achievements` / `成就`.
+- Remove the description paragraph (`{c.desc}`) from the detail modal so it only shows the badge name + progress.
+- Tile grid already only shows names — no change needed there.
 
-A secondary contributor: `garmin-activities` has `staleTime: 5 * 60_000` while `terra-activities` is `30_000`. On window-focus refetch only Terra refreshes within 30s; Garmin keeps serving the stale cached row.
+### 2. App anniversary → Mar 28, 2026
+In `src/lib/badges.ts`:
+- `APP_LAUNCH_DATE = "2026-03-28"`.
+- `appBirthday = anyOnMonthDay(activities, 2, 28)` (March = month 2).
+- `app_birthday` badge copy: `Run on the app's anniversary date (Mar 28)` / `於 App 週年日跑步（3 月 28 日）`.
 
-**Fix:**
-1. Migration: add the four activity tables to the `supabase_realtime` publication and set `REPLICA IDENTITY FULL` so updates emit a full row.
-2. (Defensive) In `useActivities`, lower `garmin-activities` `staleTime` to `30_000` to match Terra, so the dedup pair stays in sync on refocus even if a realtime event is ever missed.
+### 3. New badges (14 total)
 
-## Issue 2 — App stays in skeleton for 3-4s
+**Lifetime distance** (category `distance`, value = `totalKm`):
+- `mileage_1500` — 1,500 km
+- `mileage_2000` — 2,000 km
+- `mileage_2500` — 2,500 km
+- `mileage_3000` — 3,000 km
+- `mileage_3500` — 3,500 km
+- `mileage_4000` — 4,000 km
 
-The visible delay is a sum of several artificial waits that stack on cold start. Concretely, on cold start the user sees:
+**Monthly volume** (category `volume`, value = `month.km`):
+- `monthly_300` — 300 km in a calendar month
+- `monthly_400` — 400 km in a calendar month
+- `monthly_500` — 500 km in a calendar month
+- (existing `volume_king` = 200 km stays)
 
-```
-AuthProvider 400ms setTimeout    ──▶ loading=false
-        │
-        ▼
-Index profile-check query        ──▶ checkingProfile=false  (~300-800ms)
-        │
-        ▼
-ActivitiesTab SKELETON_MIN_MS 400ms gate + useActivities first paint
-        │
-        ▼
-Real content
-```
+**Marathon pace** (category `pace`, value uses `bestPaceSecPerKmOver(activities, 42195)`):
+- `marathon_sub5` — sub 5:00/km marathon (300 s)
+- `marathon_sub430` — sub 4:30/km marathon (270 s)
+- `marathon_sub4` — sub 4:00/km marathon (240 s)
+- `marathon_sub330` — sub 3:30/km marathon (210 s)
+- `marathon_sub3` — sub 3:00/km marathon (180 s)
 
-Plus `useActivities` fires **8 parallel queries** before first paint (strava, apple_health, garmin, terra, profile, connection, planned-workouts, user-races) and the merged-list memo waits for both Garmin and Terra to finish their first fetch before rendering rows.
+Add `bestSecMarathon` computation in `computeBadgeProgress` and 5 new switch cases.
 
-**Fix (frontend-only, no behavior change):**
-1. **Remove the 400ms `setTimeout(loading=false)` in `AuthContext`** on cold start. `getSession()` already resolves synchronously from storage; the delay is leftover defensive code and adds 400ms to every cold start. Keep `isWarmResume` short-circuit as is.
-2. **Remove the `SKELETON_MIN_MS = 400` gate in `ActivitiesTab`.** This is a forced minimum skeleton with no purpose other than avoiding flicker — but React Query's `placeholderData` / cached data already prevents flicker on warm navigations, and on cold start it just delays first paint.
-3. **Stop blocking the whole Index render on `checkingProfile`.** Today, Index returns `<TabPageSkeleton />` until the `profiles.onboarding_completed` lookup finishes, which adds ~300-800ms of dead time where the cached activities could already be painting. Change to:
-   - If `onboarding_completed` is unknown, render Index optimistically (assume onboarded). Only show the Onboarding screen if the lookup returns `onboarding_completed === false`. This is safe because returning users (the common case) are already onboarded; the rare new-signup case still routes through `ONBOARDING_SIGNUP_IN_PROGRESS_KEY`.
-4. **Cache `onboarding_completed` in localStorage** after the first successful check (per `user.id`) so subsequent cold starts skip the network round-trip entirely.
-5. **Defer the non-critical queries in `useActivities`** so the first paint isn't gated on them. Concretely, give `user-races`, `planned-workouts`, and `fitness-connection` a small startup deferral (or mark them with `enabled` after the activities queries resolve). The home screen only needs activities + profile to render the first card.
+### 4. Collector badge rework
+Rename `completionist` meta badge:
+- EN: name `50 Badges Collected`, desc `Collect 50 badges`
+- ZH: name `收藏 50 個徽章`, desc `收集 50 個徽章`
+- `target: 50` (was 45). With 14 new badges added, total non-meta badges ≈ 56, so 50 is achievable.
 
-Expected impact: cold-start time to first activity card drops from ~3-4s to ~700-1200ms (network-bound on the activities query alone).
+### 5. Generate badge artwork
+Use `imagegen--generate_image` (premium tier for clean illustration consistency) for each of the 14 new badges. Match the existing style — circular medal, gradient backdrop, central icon + number, no text-heavy clutter. Save to `src/assets/badges/<id>.png` and import in `badges.ts`.
 
-## Files touched
+Example prompts:
+- Distance: "Circular running achievement medal badge, '2000 KM' bold numeral, runner silhouette, gold-bronze gradient ring, on a solid white background, same style as a sports milestone badge"
+- Monthly: "Circular monthly volume badge with '500' and 'KM/MO', calendar accent, vibrant blue-purple gradient, on a solid white background"
+- Marathon pace: "Circular marathon pace badge with 'SUB 3:00' and '42K', stopwatch + laurel motif, racing red gradient, on a solid white background"
 
-- `supabase/migrations/<new>.sql` — add tables to `supabase_realtime`, set replica identity
-- `src/contexts/AuthContext.tsx` — drop 400ms timeout
-- `src/pages/Index.tsx` — optimistic onboarding render + localStorage cache
-- `src/components/ActivitiesTab.tsx` — drop `SKELETON_MIN_MS` gate
-- `src/hooks/use-activities.ts` — lower `garmin` staleTime; defer non-critical queries
+### Files changed
+- `src/lib/badges.ts` — anniversary date, 14 new BadgeDef entries, marathon-pace computation, completionist target/copy.
+- `src/components/BadgesPage.tsx` — hero label + remove modal desc.
+- `src/assets/badges/*.png` — 14 new images.
 
-No backend logic or UI changes beyond what's listed.
+No DB/migration changes.

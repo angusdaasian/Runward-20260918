@@ -91,7 +91,16 @@ const BadgesPage = ({ lang, onBack }: Props) => {
 
   // Keep highest-ever progress to avoid flicker as cached queries refetch
   // and activities briefly arrive as a smaller subset.
-  const [progress, setProgress] = useState(liveProgress);
+  const [progress, setProgress] = useState<Record<string, BadgeProgress>>(
+    () => cachedBadgeUserId === user?.id && cachedBadgeProgress ? cachedBadgeProgress : EMPTY_BADGE_PROGRESS
+  );
+  useEffect(() => {
+    if (cachedBadgeUserId !== user?.id) {
+      cachedBadgeUserId = user?.id ?? null;
+      cachedBadgeProgress = null;
+      setProgress(EMPTY_BADGE_PROGRESS);
+    }
+  }, [user?.id]);
   useEffect(() => {
     if (!ready) return;
     setProgress((prev) => {
@@ -102,9 +111,11 @@ const BadgesPage = ({ lang, onBack }: Props) => {
         if (!old || next.value > old.value || next.unlocked) merged[id] = next;
         else merged[id] = old;
       }
+      cachedBadgeUserId = user?.id ?? null;
+      cachedBadgeProgress = merged;
       return merged;
     });
-  }, [liveProgress, ready]);
+  }, [liveProgress, ready, user?.id]);
 
   const unlockedCount = Object.values(progress).filter((p) => p.unlocked).length;
 

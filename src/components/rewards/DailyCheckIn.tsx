@@ -134,6 +134,7 @@ const DailyCheckIn = ({ lang, userId, lastLogin, currentXp, onXpGain }: Props) =
     setCheckedIn(true);
     setStreak(newStreak);
     setLastCheckInDate(todayHKT);
+    checkInCache[userId] = { streak: newStreak, lastCheckInDate: todayHKT };
     onXpGain(newXp);
     setChecking(false);
 

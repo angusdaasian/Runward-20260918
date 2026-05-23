@@ -72,6 +72,7 @@ const App = () => (
             </Suspense>
           </BrowserRouter>
         </PremiumProvider>
+        </ThemeProvider>
       </AuthProvider>
     </TooltipProvider>
   </QueryClientProvider>

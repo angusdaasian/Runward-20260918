@@ -86,32 +86,46 @@ async function fetchAlreadyRecovered(): Promise<Set<string>> {
   return new Set(((data as any[]) ?? []).map((r) => r.payload_id));
 }
 
-function endpointForDataType(dataType: string | null): "activity" | "daily" | "sleep" | "body" | "nutrition" | "menstruation" | null {
+function bucketFolderForDataType(dataType: string | null): string | null {
   if (!dataType) return null;
   const t = dataType.toLowerCase();
+  // Terra stores raw JSON at {data_type}/{payload_id}.json in the
+  // `terra-payloads` bucket. Normalize to the folder Terra writes.
   if (t.includes("activity")) return "activity";
   if (t.includes("sleep")) return "sleep";
   if (t.includes("daily")) return "daily";
   if (t.includes("body")) return "body";
   if (t.includes("nutrition")) return "nutrition";
   if (t.includes("menstruation")) return "menstruation";
-  return null;
+  if (t.includes("athlete")) return "athlete";
+  return t.split(/[^a-z0-9_]/)[0] || null;
 }
 
-async function refetchFromTerra(row: DestRow): Promise<{ ok: boolean; detail: string }> {
-  const endpoint = endpointForDataType(row.data_type);
-  if (!endpoint) return { ok: false, detail: `unsupported data_type ${row.data_type}` };
+async function refetchFromBucket(row: DestRow): Promise<{ ok: boolean; detail: string }> {
+  const folder = bucketFolderForDataType(row.data_type);
+  if (!folder) return { ok: false, detail: `unsupported data_type ${row.data_type}` };
 
-  const start = (row.start_time ?? row.created_at ?? new Date().toISOString()).slice(0, 10);
-  const end = (row.end_time ?? row.created_at ?? new Date().toISOString()).slice(0, 10);
+  const path = `${folder}/${row.payload_id}.json`;
+  const { data: file, error } = await supa.storage.from("terra-payloads").download(path);
+  if (error || !file) {
+    return { ok: false, detail: `bucket download failed ${error?.message ?? "no file"} (${path})` };
+  }
 
-  const creds = getTerraCreds("prod");
-  const url = `https://api.tryterra.co/v2/${endpoint}?user_id=${encodeURIComponent(row.user_id)}&start_date=${start}&end_date=${end}&to_webhook=true&with_samples=true`;
+  let payload: any;
+  try {
+    payload = JSON.parse(await file.text());
+  } catch (e: any) {
+    return { ok: false, detail: `parse failed: ${e?.message ?? e}` };
+  }
 
-  const resp = await fetch(url, {
-    headers: { "dev-id": creds.devId, "x-api-key": creds.apiKey },
+  // Synthesize a webhook-style Request and ingest via the shared handler.
+  const synthetic = new Request("https://reconcile.local/terra", {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-terra-source": "reconcile-bucket" },
+    body: JSON.stringify(payload),
   });
-  return { ok: resp.ok, detail: `terra ${endpoint} ${resp.status}` };
+  const resp = await handleTerraWebhook(synthetic, "prod");
+  return { ok: resp.ok, detail: `ingested from bucket ${path} → ${resp.status}` };
 }
 
 async function runReconcile() {

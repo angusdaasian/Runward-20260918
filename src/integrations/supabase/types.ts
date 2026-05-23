@@ -1448,6 +1448,42 @@ export type Database = {
         }
         Relationships: []
       }
+      terra_webhook_queue: {
+        Row: {
+          attempts: number
+          env: string
+          id: string
+          last_error: string | null
+          processed_at: string | null
+          raw_body: string
+          received_at: string
+          signature_header: string | null
+          status: string
+        }
+        Insert: {
+          attempts?: number
+          env: string
+          id?: string
+          last_error?: string | null
+          processed_at?: string | null
+          raw_body: string
+          received_at?: string
+          signature_header?: string | null
+          status?: string
+        }
+        Update: {
+          attempts?: number
+          env?: string
+          id?: string
+          last_error?: string | null
+          processed_at?: string | null
+          raw_body?: string
+          received_at?: string
+          signature_header?: string | null
+          status?: string
+        }
+        Relationships: []
+      }
       territory_captures: {
         Row: {
           activity_id: string | null
@@ -1945,6 +1981,16 @@ export type Database = {
       }
     }
     Functions: {
+      claim_terra_webhook_queue: {
+        Args: { batch_size: number }
+        Returns: {
+          attempts: number
+          env: string
+          id: string
+          raw_body: string
+          signature_header: string
+        }[]
+      }
       get_leaderboard: {
         Args: { p_is_premium: boolean; p_limit: number }
         Returns: {

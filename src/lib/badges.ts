@@ -484,7 +484,7 @@ export function computeBadgeProgress(ctx: BadgeContext): Record<string, BadgePro
   const midnight = countByHour(ctx.activities, (h, m) => (h === 23 && m >= 30) || h === 0 && m <= 30) > 0 ? 1 : 0;
   const newYear = anyOnMonthDay(ctx.activities, 0, 1) ? 1 : 0;
   const christmas = anyOnMonthDay(ctx.activities, 11, 25) ? 1 : 0;
-  const appBirthday = anyOnMonthDay(ctx.activities, 4, 1) ? 1 : 0; // May 1
+  const appBirthday = anyOnMonthDay(ctx.activities, 2, 28) ? 1 : 0; // Mar 28
   const negSplit = hasNegativeSplit(ctx.activities) ? 1 : 0;
 
   // Weather counts

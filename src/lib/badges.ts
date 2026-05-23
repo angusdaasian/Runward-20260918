@@ -486,7 +486,8 @@ export function computeBadgeProgress(ctx: BadgeContext): Record<string, BadgePro
   const streak = computeStreak(ctx.activities);
   const bestSec = bestPaceSecPerKm(ctx.activities);
   const bestSec10k = bestPaceSecPerKmOver(ctx.activities, 10000);
-  const bestSecMarathon = bestPaceSecPerKmOver(ctx.activities, 42195);
+  const bestSecMarathon = bestPaceSecPerKmOver(ctx.activities, 42000);
+  const bestMarathonFinish = bestFinishTimeSec(ctx.activities, 42000);
   const longestRunM = maxRunDistance(ctx.activities);
   const steepestM = maxRunElevation(ctx.activities);
   const best7 = bestRollingDistanceKm(ctx.activities, 7);

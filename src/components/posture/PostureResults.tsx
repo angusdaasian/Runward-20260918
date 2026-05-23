@@ -2,6 +2,7 @@ import { useState } from "react";
 import { CheckCircle, AlertTriangle, Video, Loader2 } from "lucide-react";
 import { Lang } from "@/lib/i18n";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 import PostureRadarChart from "./PostureRadarChart";
 import PostureScoreCard from "./PostureScoreCard";
 
@@ -70,11 +71,19 @@ const PostureResults = ({ result, averages, lang, onTranslated }: Props) => {
     if (targetLang === displayLang) return;
     setTranslating(true);
     try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+      if (!accessToken) {
+        toast({ title: displayLang === "zh" ? "請先登入" : "Please sign in", variant: "destructive" });
+        setTranslating(false);
+        return;
+      }
       const resp = await fetch(CHAT_URL, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          Authorization: `Bearer ${accessToken}`,
         },
         body: JSON.stringify({
           translate: true,

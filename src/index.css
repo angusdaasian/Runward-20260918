@@ -183,3 +183,23 @@
     font-family: 'Inter', sans-serif;
   }
 }
+
+/* ============ Modern theme global flourishes ============ */
+/* Applied automatically to all cards so the visual difference is unmistakable
+   without touching individual components. */
+.theme-modern .bg-card {
+  background-image: var(--gradient-card);
+  box-shadow: var(--shadow-elevated);
+  border-color: hsl(var(--border));
+}
+
+.theme-modern body {
+  background:
+    radial-gradient(ellipse 80% 50% at 50% -10%, hsl(84 90% 58% / 0.08), transparent 60%),
+    hsl(var(--background));
+}
+
+/* Letter-spaced display headings give Modern an editorial feel */
+.theme-modern .font-display {
+  letter-spacing: -0.02em;
+}

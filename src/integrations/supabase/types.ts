@@ -1285,6 +1285,100 @@ export type Database = {
         }
         Relationships: []
       }
+      terra_data_payloads: {
+        Row: {
+          created_at: string | null
+          data_type: string | null
+          end_time: string | null
+          payload_id: string
+          start_time: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          data_type?: string | null
+          end_time?: string | null
+          payload_id: string
+          start_time?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          data_type?: string | null
+          end_time?: string | null
+          payload_id?: string
+          start_time?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_data_user"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "terra_users"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      terra_misc_payloads: {
+        Row: {
+          created_at: string | null
+          data_type: string | null
+          payload_id: string
+          payload_type: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          data_type?: string | null
+          payload_id: string
+          payload_type?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          data_type?: string | null
+          payload_id?: string
+          payload_type?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_misc_user"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "terra_users"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      terra_users: {
+        Row: {
+          created_at: string | null
+          granted_scopes: string | null
+          provider: string | null
+          reference_id: string | null
+          state: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          granted_scopes?: string | null
+          provider?: string | null
+          reference_id?: string | null
+          state?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          granted_scopes?: string | null
+          provider?: string | null
+          reference_id?: string | null
+          state?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       terra_webhook_events: {
         Row: {
           id: string

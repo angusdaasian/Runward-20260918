@@ -381,21 +381,23 @@ const ProfileSection = ({ lang, subpage = "main", onNavigate }: ProfileSectionPr
     return best > 0 ? Math.round(best * 10) / 10 : null;
   }, [pbs]);
 
-  if (!profile) return (
-    <div className="space-y-4">
-      <div className="bg-card border border-border rounded-xl p-4">
-        <div className="flex items-center gap-4 mb-4">
-          <Skeleton className="h-16 w-16 rounded-full" />
-          <div className="flex-1 space-y-2">
-            <Skeleton className="h-8 w-full" />
-            <Skeleton className="h-4 w-40" />
+  if (!profile && subpage !== "main") {
+    return (
+      <div className="space-y-4">
+        <div className="bg-card border border-border rounded-xl p-4">
+          <div className="flex items-center gap-4 mb-4">
+            <Skeleton className="h-16 w-16 rounded-full" />
+            <div className="flex-1 space-y-2">
+              <Skeleton className="h-8 w-full" />
+              <Skeleton className="h-4 w-40" />
+            </div>
           </div>
         </div>
+        <Skeleton className="h-20 w-full rounded-xl" />
+        <Skeleton className="h-32 w-full rounded-xl" />
       </div>
-      <Skeleton className="h-20 w-full rounded-xl" />
-      <Skeleton className="h-32 w-full rounded-xl" />
-    </div>
-  );
+    );
+  }
 
   // ── Subpage: Heart Rate Zones ──
   if (subpage === "hr-zones") {

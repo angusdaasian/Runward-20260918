@@ -2,6 +2,7 @@ import { useState } from "react";
 import { CheckCircle, AlertTriangle, Video, Loader2 } from "lucide-react";
 import { Lang } from "@/lib/i18n";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 import PostureRadarChart from "./PostureRadarChart";
 import PostureScoreCard from "./PostureScoreCard";
 

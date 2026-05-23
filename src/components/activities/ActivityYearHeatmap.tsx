@@ -300,7 +300,97 @@ const ActivityYearHeatmap = ({ lang, activities }: Props) => {
           : `${totals.distanceKm.toFixed(0)} km · ${totalHours}h total`}
       </p>
 
-      {view === "bar" ? (
+      {view === "weekly" ? (
+        // Weekly mileage curve — horizontally scrollable
+        (() => {
+          const stepX = 28;
+          const chartH = 140;
+          const width = Math.max(weekly.length * stepX, 100);
+          const todayIdx = (() => {
+            const now = new Date();
+            if (now.getFullYear() !== year) return -1;
+            const start = new Date(year, 0, 1);
+            const firstDow = mondayDow(start);
+            const gridStart = new Date(start);
+            gridStart.setDate(gridStart.getDate() - firstDow);
+            return Math.floor((now.getTime() - gridStart.getTime()) / (7 * 86400000));
+          })();
+          return (
+            <div className="-mx-4">
+              <div className="overflow-x-auto px-4 pb-1" style={{ scrollbarWidth: "thin" }}>
+                <div style={{ width, minWidth: "100%" }}>
+                  <svg width={width} height={chartH + 22} className="block">
+                    {/* gridlines */}
+                    {[0.25, 0.5, 0.75].map((r) => (
+                      <line
+                        key={r}
+                        x1={0}
+                        x2={width}
+                        y1={10 + (1 - r) * (chartH - 14)}
+                        y2={10 + (1 - r) * (chartH - 14)}
+                        className="stroke-border"
+                        strokeDasharray="2 4"
+                      />
+                    ))}
+                    {weeklyPath.area && (
+                      <path d={weeklyPath.area} fill="hsl(var(--primary) / 0.15)" />
+                    )}
+                    {weeklyPath.d && (
+                      <path
+                        d={weeklyPath.d}
+                        fill="none"
+                        stroke="hsl(var(--primary))"
+                        strokeWidth={2}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    )}
+                    {weeklyPath.points.map((p, i) => {
+                      const km = weekly[i].distanceKm;
+                      if (km <= 0) return null;
+                      const isToday = i === todayIdx;
+                      return (
+                        <g key={i}>
+                          <circle
+                            cx={p.x}
+                            cy={p.y}
+                            r={isToday ? 3.5 : 2}
+                            className={isToday ? "fill-orange-400" : "fill-primary"}
+                          />
+                          <title>{`${weekly[i].weekStart.toLocaleDateString()} · ${km.toFixed(1)} km`}</title>
+                        </g>
+                      );
+                    })}
+                    {/* Month tick labels */}
+                    {weekly.map((w, i) => {
+                      if (w.weekStart.getDate() > 7) return null;
+                      if (w.weekStart.getFullYear() !== year) return null;
+                      const lbl = monthLabelsArr[w.weekStart.getMonth()];
+                      return (
+                        <text
+                          key={i}
+                          x={i * stepX + stepX / 2}
+                          y={chartH + 16}
+                          textAnchor="middle"
+                          className="fill-muted-foreground"
+                          style={{ fontSize: 10 }}
+                        >
+                          {lbl}
+                        </text>
+                      );
+                    })}
+                  </svg>
+                </div>
+              </div>
+              <p className="px-4 mt-2 text-[10px] text-muted-foreground tracking-wider uppercase">
+                {lang === "zh"
+                  ? `每週公里 · 高峰 ${maxWeekKm.toFixed(1)} km`
+                  : `Weekly km · peak ${maxWeekKm.toFixed(1)} km`}
+              </p>
+            </div>
+          );
+        })()
+      ) : view === "bar" ? (
         // Bar chart by month
         <div>
           <div className="flex items-end gap-1.5 h-40">
@@ -338,6 +428,7 @@ const ActivityYearHeatmap = ({ lang, activities }: Props) => {
           </div>
         </div>
       ) : (
+
         // Heatmap grid
         <div className="overflow-x-auto -mx-1 px-1">
           <div className="inline-block min-w-full">

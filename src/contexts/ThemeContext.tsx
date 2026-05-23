@@ -14,26 +14,32 @@ const ThemeContext = createContext<ThemeContextValue>({
 
 function readInitial(): Palette {
   if (typeof window === "undefined") return "classic";
-  const stored = localStorage.getItem("app_palette");
-  return stored === "modern" ? "modern" : "classic";
+  return localStorage.getItem("app_palette") === "modern" ? "modern" : "classic";
 }
 
-// Apply class as early as possible to avoid FOUC.
-if (typeof document !== "undefined") {
-  const initial = readInitial();
-  if (initial === "modern") document.documentElement.classList.add("theme-modern");
-  else document.documentElement.classList.remove("theme-modern");
+function applyPalette(p: Palette) {
+  if (typeof document === "undefined") return;
+  const root = document.documentElement;
+  if (p === "modern") {
+    root.classList.add("theme-modern");
+    // Modern is an OLED-style dark aesthetic — force dark regardless of app_theme
+    root.classList.add("dark");
+  } else {
+    root.classList.remove("theme-modern");
+    // Restore user's dark-mode preference for Classic
+    if (localStorage.getItem("app_theme") === "dark") root.classList.add("dark");
+    else root.classList.remove("dark");
+  }
 }
+
+// Apply immediately to avoid FOUC
+applyPalette(readInitial());
 
 export const ThemeProvider = ({ children }: { children: ReactNode }) => {
   const [palette, setPaletteState] = useState<Palette>(readInitial);
 
   useEffect(() => {
-    if (palette === "modern") {
-      document.documentElement.classList.add("theme-modern");
-    } else {
-      document.documentElement.classList.remove("theme-modern");
-    }
+    applyPalette(palette);
     localStorage.setItem("app_palette", palette);
   }, [palette]);
 

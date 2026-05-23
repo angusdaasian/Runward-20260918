@@ -87,7 +87,7 @@ const BadgesPage = ({ lang, onBack }: Props) => {
         <div className="absolute -right-4 -bottom-6 text-8xl opacity-20 select-none">🏅</div>
         <div className="relative">
           <div className="text-[10px] uppercase tracking-wider opacity-90 font-medium">
-            {isZh ? "成就徽章" : "Achievement Badges"}
+            {isZh ? "成就" : "Achievements"}
           </div>
           <div className="font-display text-3xl font-bold mt-1">
             {unlockedCount}<span className="text-xl opacity-80"> / {BADGES.length}</span>

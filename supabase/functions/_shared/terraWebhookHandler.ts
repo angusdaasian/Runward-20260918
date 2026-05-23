@@ -987,23 +987,31 @@ async function processWebhook(
 export async function handleTerraWebhook(req: Request, env: TerraEnv = "prod"): Promise<Response> {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
-  try {
-    const raw = await req.text();
-    const sigHeader = req.headers.get("terra-signature");
-    const { error } = await supa.from("terra_webhook_queue").insert({
-      env,
-      raw_body: raw,
-      signature_header: sigHeader,
-    });
+  const raw = await req.text();
+  const sigHeader = req.headers.get("terra-signature");
+
+  const enqueue = supa.from("terra_webhook_queue").insert({
+    env,
+    raw_body: raw,
+    signature_header: sigHeader,
+  }).then(({ error }) => {
     if (error) console.error("[terra-webhook] enqueue failed", error);
-  } catch (e) {
+  }, (e) => {
     console.error("[terra-webhook] enqueue threw", e);
+  });
+
+  // @ts-ignore - EdgeRuntime is provided by the Supabase Edge runtime
+  if (typeof EdgeRuntime !== "undefined" && (EdgeRuntime as any)?.waitUntil) {
+    // @ts-ignore
+    (EdgeRuntime as any).waitUntil(enqueue);
   }
 
-  // Always ACK so Terra's circuit breaker stays closed; the reconciler
-  // cron will re-fetch anything we lose.
-  return new Response(JSON.stringify({ ok: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+  return new Response(
+    JSON.stringify({ ok: true }),
+    { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+  );
 }
+
 
 /**
  * Worker entry point — called by `process-terra-queue` for each claimed

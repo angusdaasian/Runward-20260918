@@ -283,6 +283,14 @@ const ActivityYearHeatmap = ({ lang, activities }: Props) => {
             >
               <BarChart3 size={14} />
             </button>
+            <button
+              onClick={() => setView("weekly")}
+              aria-label="Weekly mileage view"
+              className={`p-1 rounded ${view === "weekly" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+            >
+              <Activity size={14} />
+            </button>
+
           </div>
         </div>
       </div>

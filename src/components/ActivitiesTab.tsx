@@ -918,16 +918,30 @@ const ActivitiesTab = ({ lang }: Props) => {
           <h2 className="font-display text-lg font-bold text-foreground">
             {lang === "zh" ? "最近活動" : "Recent Activity"}
           </h2>
-          {(latestActivity || activities.length > 0) && (
-            <button
-              onClick={() => { setWarmupReady(true); setShowAllActivities(true); }}
-              className="flex items-center gap-1 text-xs font-medium text-primary hover:text-primary/80 transition-colors"
-            >
-              {lang === "zh" ? "查看全部" : "See all"}
-              <ChevronRight size={14} />
-            </button>
-          )}
+          <div className="flex items-center gap-3">
+            {fitnessAppConnected && (
+              <button
+                onClick={handleFetchTodayTerra}
+                disabled={fetchingToday}
+                className="flex items-center gap-1 text-xs font-medium text-primary hover:text-primary/80 transition-colors disabled:opacity-50"
+                aria-label={lang === "zh" ? "取得今日活動" : "Fetch today"}
+              >
+                <RefreshCw size={14} className={fetchingToday ? "animate-spin" : ""} />
+                {lang === "zh" ? "今日" : "Today"}
+              </button>
+            )}
+            {(latestActivity || activities.length > 0) && (
+              <button
+                onClick={() => { setWarmupReady(true); setShowAllActivities(true); }}
+                className="flex items-center gap-1 text-xs font-medium text-primary hover:text-primary/80 transition-colors"
+              >
+                {lang === "zh" ? "查看全部" : "See all"}
+                <ChevronRight size={14} />
+              </button>
+            )}
+          </div>
         </div>
+
 
         {!latestActivity && activities.length === 0 ? (
           <div className="bg-accent/50 border border-border rounded-xl p-5 text-center">

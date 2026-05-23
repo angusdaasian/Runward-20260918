@@ -4,12 +4,16 @@ import { Lang } from "@/lib/i18n";
 import { useActivities } from "@/hooks/use-activities";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
-import { BADGES, BadgeDef, BadgeProgress, computeBadgeProgress } from "@/lib/badges";
+import { BADGES, BadgeDef, computeBadgeProgress } from "@/lib/badges";
+import type { BadgeProgress } from "@/lib/badges";
 
 const EMPTY_BADGE_PROGRESS = BADGES.reduce<Record<string, BadgeProgress>>((acc, badge) => {
   acc[badge.id] = { id: badge.id, value: 0, target: badge.target, unlocked: false };
   return acc;
 }, {});
+
+let cachedBadgeUserId: string | null = null;
+let cachedBadgeProgress: Record<string, BadgeProgress> | null = null;
 
 interface Props {
   lang: Lang;

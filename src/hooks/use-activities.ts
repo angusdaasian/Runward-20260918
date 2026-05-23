@@ -444,6 +444,19 @@ export function useActivities(options?: { limit?: number; enabled?: boolean }) {
     staleTime: 5 * 60 * 1000,
   });
 
+  const activitiesReady = !activityQueriesEnabled || (
+    terraQuery.isFetched &&
+    !terraQuery.isFetching &&
+    (hasTerraForLatestView || (
+      activitiesQuery.isFetched &&
+      !activitiesQuery.isFetching &&
+      appleHealthQuery.isFetched &&
+      !appleHealthQuery.isFetching &&
+      garminQuery.isFetched &&
+      !garminQuery.isFetching
+    ))
+  );
+
   // Merge Strava + Apple Health + Garmin + Terra activities (prefer Terra over duplicate Garmin imports)
   // Wait until BOTH garmin and terra queries have completed at least once before
   // running dedup. Otherwise on refocus one query may briefly return empty/stale
@@ -566,6 +579,7 @@ export function useActivities(options?: { limit?: number; enabled?: boolean }) {
     fitnessAppConnected: connectionQuery.data?.fitnessApp ?? false,
     plannedWorkouts: workoutsQuery.data || [],
     userRaces: userRacesQuery.data || [],
+    activitiesReady,
     loading: activitiesQuery.isLoading || appleHealthQuery.isLoading || garminQuery.isLoading || terraQuery.isLoading || profileQuery.isLoading || connectionQuery.isLoading,
     invalidateAll,
   };

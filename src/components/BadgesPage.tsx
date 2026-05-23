@@ -4,7 +4,12 @@ import { Lang } from "@/lib/i18n";
 import { useActivities } from "@/hooks/use-activities";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
-import { BADGES, BadgeDef, computeBadgeProgress } from "@/lib/badges";
+import { BADGES, BadgeDef, BadgeProgress, computeBadgeProgress } from "@/lib/badges";
+
+const EMPTY_BADGE_PROGRESS = BADGES.reduce<Record<string, BadgeProgress>>((acc, badge) => {
+  acc[badge.id] = { id: badge.id, value: 0, target: badge.target, unlocked: false };
+  return acc;
+}, {});
 
 interface Props {
   lang: Lang;
@@ -31,13 +36,21 @@ const CATEGORY_LABELS: Record<string, { en: string; zh: string }> = {
 const BadgesPage = ({ lang, onBack }: Props) => {
   const isZh = lang === "zh";
   const { user } = useAuth();
-  const { activities } = useActivities();
+  const { activities, activitiesReady } = useActivities();
   const [premiumActivatedAt, setPremiumActivatedAt] = useState<string | null>(null);
   const [isEarlyAdopter, setIsEarlyAdopter] = useState(false);
+  const [premiumReady, setPremiumReady] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!user) return;
+    setPremiumReady(false);
+    if (!user) {
+      setPremiumActivatedAt(null);
+      setIsEarlyAdopter(false);
+      setPremiumReady(true);
+      return;
+    }
+    let cancelled = false;
     (async () => {
       const { data } = await supabase
         .from("premium_subscriptions")
@@ -45,6 +58,7 @@ const BadgesPage = ({ lang, onBack }: Props) => {
         .eq("user_id", user.id)
         .order("activated_at", { ascending: true })
         .limit(1);
+      if (cancelled) return;
       const activatedAt = data?.[0]?.activated_at ?? null;
       setPremiumActivatedAt(activatedAt);
       if (activatedAt) {
@@ -52,20 +66,30 @@ const BadgesPage = ({ lang, onBack }: Props) => {
           .from("premium_subscriptions")
           .select("id", { count: "exact", head: true })
           .lt("activated_at", activatedAt);
+        if (cancelled) return;
         setIsEarlyAdopter((count ?? 999) < 100);
+      } else {
+        setIsEarlyAdopter(false);
       }
+      setPremiumReady(true);
     })();
+    return () => {
+      cancelled = true;
+    };
   }, [user]);
 
+  const ready = activitiesReady && premiumReady;
+
   const liveProgress = useMemo(
-    () => computeBadgeProgress({ activities, isEarlyAdopter, premiumActivatedAt }),
-    [activities, isEarlyAdopter, premiumActivatedAt]
+    () => ready ? computeBadgeProgress({ activities, isEarlyAdopter, premiumActivatedAt }) : EMPTY_BADGE_PROGRESS,
+    [activities, isEarlyAdopter, premiumActivatedAt, ready]
   );
 
   // Keep highest-ever progress to avoid flicker as cached queries refetch
   // and activities briefly arrive as a smaller subset.
   const [progress, setProgress] = useState(liveProgress);
   useEffect(() => {
+    if (!ready) return;
     setProgress((prev) => {
       const merged: typeof prev = { ...prev };
       for (const id in liveProgress) {
@@ -76,7 +100,7 @@ const BadgesPage = ({ lang, onBack }: Props) => {
       }
       return merged;
     });
-  }, [liveProgress]);
+  }, [liveProgress, ready]);
 
   const unlockedCount = Object.values(progress).filter((p) => p.unlocked).length;
 

@@ -146,7 +146,7 @@ async function runReconcile() {
       inSyncCount++;
       return;
     }
-    const res = await refetchFromTerra(row);
+    const res = await refetchFromBucket(row);
     if (res.ok) recoveredCount++; else failedCount++;
     await supa.from("terra_reconciliation_log").insert({
       payload_id: row.payload_id,

@@ -1416,7 +1416,7 @@ export type Database = {
         Row: {
           id: string
           payload: Json | null
-          payload_id: string | null
+          payload_ids: string[] | null
           processing_error: string | null
           received_at: string
           reference_id: string | null
@@ -1427,7 +1427,7 @@ export type Database = {
         Insert: {
           id?: string
           payload?: Json | null
-          payload_id?: string | null
+          payload_ids?: string[] | null
           processing_error?: string | null
           received_at?: string
           reference_id?: string | null
@@ -1438,7 +1438,7 @@ export type Database = {
         Update: {
           id?: string
           payload?: Json | null
-          payload_id?: string | null
+          payload_ids?: string[] | null
           processing_error?: string | null
           received_at?: string
           reference_id?: string | null

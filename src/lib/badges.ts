@@ -49,9 +49,23 @@ import imgOneYearParty from "@/assets/badges/one_year_party.png";
 import imgRainRunner from "@/assets/badges/rain_runner.png";
 import imgHotWeather from "@/assets/badges/hot_weather.png";
 import imgColdWeather from "@/assets/badges/cold_weather.png";
+import imgMileage1500 from "@/assets/badges/mileage_1500.png";
+import imgMileage2000 from "@/assets/badges/mileage_2000.png";
+import imgMileage2500 from "@/assets/badges/mileage_2500.png";
+import imgMileage3000 from "@/assets/badges/mileage_3000.png";
+import imgMileage3500 from "@/assets/badges/mileage_3500.png";
+import imgMileage4000 from "@/assets/badges/mileage_4000.png";
+import imgMonthly300 from "@/assets/badges/monthly_300.png";
+import imgMonthly400 from "@/assets/badges/monthly_400.png";
+import imgMonthly500 from "@/assets/badges/monthly_500.png";
+import imgMarathonSub5 from "@/assets/badges/marathon_sub5.png";
+import imgMarathonSub430 from "@/assets/badges/marathon_sub430.png";
+import imgMarathonSub4 from "@/assets/badges/marathon_sub4.png";
+import imgMarathonSub330 from "@/assets/badges/marathon_sub330.png";
+import imgMarathonSub3 from "@/assets/badges/marathon_sub3.png";
 
 /** App launch / anniversary anchor date — used for App Birthday */
-export const APP_LAUNCH_DATE = "2025-05-01";
+export const APP_LAUNCH_DATE = "2026-03-28";
 
 export type BadgeCategory =
   | "distance"

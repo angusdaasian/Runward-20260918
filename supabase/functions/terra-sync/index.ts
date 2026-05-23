@@ -440,8 +440,10 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ ok: true, synced: 0, message: "no active connections" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    const { devId, apiKey, env } = getTerraCreds(pickEnvFromRequest(req));
-    console.log(`[terra-sync] env=${env}`);
+    const forceProd = body.forceEnv === "prod" || body.useProd === true;
+    const resolvedEnv = forceProd ? "prod" : pickEnvFromRequest(req);
+    const { devId, apiKey, env } = getTerraCreds(resolvedEnv);
+    console.log(`[terra-sync] env=${env}${forceProd ? " (forced)" : ""}`);
     const end = new Date();
     end.setDate(end.getDate() + 1);
     const start = new Date();

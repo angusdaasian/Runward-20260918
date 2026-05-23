@@ -740,6 +740,54 @@ const ActivitiesTab = ({ lang }: Props) => {
   }, [activities, profile]);
 
   const [resyncing, setResyncing] = useState(false);
+  const [fetchingToday, setFetchingToday] = useState(false);
+
+  const handleFetchTodayTerra = useCallback(async () => {
+    if (!user || fetchingToday) return;
+    setFetchingToday(true);
+    try {
+      // Today's date in HKT (UTC+8)
+      const nowHkt = new Date(Date.now() + 8 * 60 * 60 * 1000);
+      const today = nowHkt.toISOString().slice(0, 10);
+      const tomorrow = new Date(nowHkt.getTime() + 24 * 60 * 60 * 1000)
+        .toISOString()
+        .slice(0, 10);
+
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData?.session?.access_token;
+      if (!accessToken) throw new Error("Not authenticated");
+
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/terra-sync`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        },
+        body: JSON.stringify({
+          startDate: today,
+          endDate: tomorrow,
+          latestWithSamples: true,
+        }),
+      });
+      const result = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(result?.error ?? `Terra sync failed (${response.status})`);
+
+      invalidateAll();
+      const count = result?.activities ?? 0;
+      if (count > 0) {
+        toast.success(lang === "zh" ? "已取得今日最新活動" : "Fetched today's latest activity");
+      } else {
+        toast.info(lang === "zh" ? "今日暫無新活動" : "No new activity for today yet");
+      }
+    } catch (err) {
+      console.error("Fetch today terra error:", err);
+      toast.error(lang === "zh" ? "取得今日活動失敗" : "Failed to fetch today's activity");
+    }
+    setFetchingToday(false);
+  }, [user, fetchingToday, invalidateAll, lang]);
+
+
 
   const handleResync = useCallback(async () => {
     if (!user || resyncing) return;
@@ -870,16 +918,30 @@ const ActivitiesTab = ({ lang }: Props) => {
           <h2 className="font-display text-lg font-bold text-foreground">
             {lang === "zh" ? "最近活動" : "Recent Activity"}
           </h2>
-          {(latestActivity || activities.length > 0) && (
-            <button
-              onClick={() => { setWarmupReady(true); setShowAllActivities(true); }}
-              className="flex items-center gap-1 text-xs font-medium text-primary hover:text-primary/80 transition-colors"
-            >
-              {lang === "zh" ? "查看全部" : "See all"}
-              <ChevronRight size={14} />
-            </button>
-          )}
+          <div className="flex items-center gap-3">
+            {fitnessAppConnected && (
+              <button
+                onClick={handleFetchTodayTerra}
+                disabled={fetchingToday}
+                className="flex items-center gap-1 text-xs font-medium text-primary hover:text-primary/80 transition-colors disabled:opacity-50"
+                aria-label={lang === "zh" ? "取得今日活動" : "Fetch today"}
+              >
+                <RefreshCw size={14} className={fetchingToday ? "animate-spin" : ""} />
+                {lang === "zh" ? "今日" : "Today"}
+              </button>
+            )}
+            {(latestActivity || activities.length > 0) && (
+              <button
+                onClick={() => { setWarmupReady(true); setShowAllActivities(true); }}
+                className="flex items-center gap-1 text-xs font-medium text-primary hover:text-primary/80 transition-colors"
+              >
+                {lang === "zh" ? "查看全部" : "See all"}
+                <ChevronRight size={14} />
+              </button>
+            )}
+          </div>
         </div>
+
 
         {!latestActivity && activities.length === 0 ? (
           <div className="bg-accent/50 border border-border rounded-xl p-5 text-center">

@@ -49,9 +49,23 @@ import imgOneYearParty from "@/assets/badges/one_year_party.png";
 import imgRainRunner from "@/assets/badges/rain_runner.png";
 import imgHotWeather from "@/assets/badges/hot_weather.png";
 import imgColdWeather from "@/assets/badges/cold_weather.png";
+import imgMileage1500 from "@/assets/badges/mileage_1500.png";
+import imgMileage2000 from "@/assets/badges/mileage_2000.png";
+import imgMileage2500 from "@/assets/badges/mileage_2500.png";
+import imgMileage3000 from "@/assets/badges/mileage_3000.png";
+import imgMileage3500 from "@/assets/badges/mileage_3500.png";
+import imgMileage4000 from "@/assets/badges/mileage_4000.png";
+import imgMonthly300 from "@/assets/badges/monthly_300.png";
+import imgMonthly400 from "@/assets/badges/monthly_400.png";
+import imgMonthly500 from "@/assets/badges/monthly_500.png";
+import imgMarathonSub5 from "@/assets/badges/marathon_sub5.png";
+import imgMarathonSub430 from "@/assets/badges/marathon_sub430.png";
+import imgMarathonSub4 from "@/assets/badges/marathon_sub4.png";
+import imgMarathonSub330 from "@/assets/badges/marathon_sub330.png";
+import imgMarathonSub3 from "@/assets/badges/marathon_sub3.png";
 
 /** App launch / anniversary anchor date — used for App Birthday */
-export const APP_LAUNCH_DATE = "2025-05-01";
+export const APP_LAUNCH_DATE = "2026-03-28";
 
 export type BadgeCategory =
   | "distance"
@@ -98,6 +112,25 @@ export const BADGES: BadgeDef[] = [
   { id: "marathon_veteran", category: "distance", image: imgMarathonVeteran, target: 1000, unit: "km",
     en: { name: "Marathon Veteran", desc: "Run 1,000 km in total" },
     zh: { name: "馬拉松老將",       desc: "累計跑量 1,000 公里" } },
+  { id: "mileage_1500", category: "distance", image: imgMileage1500, target: 1500, unit: "km",
+    en: { name: "1,500 KM Club",    desc: "Run 1,500 km in total" },
+    zh: { name: "1,500 公里俱樂部", desc: "累計跑量 1,500 公里" } },
+  { id: "mileage_2000", category: "distance", image: imgMileage2000, target: 2000, unit: "km",
+    en: { name: "2,000 KM Club",    desc: "Run 2,000 km in total" },
+    zh: { name: "2,000 公里俱樂部", desc: "累計跑量 2,000 公里" } },
+  { id: "mileage_2500", category: "distance", image: imgMileage2500, target: 2500, unit: "km",
+    en: { name: "2,500 KM Club",    desc: "Run 2,500 km in total" },
+    zh: { name: "2,500 公里俱樂部", desc: "累計跑量 2,500 公里" } },
+  { id: "mileage_3000", category: "distance", image: imgMileage3000, target: 3000, unit: "km",
+    en: { name: "3,000 KM Club",    desc: "Run 3,000 km in total" },
+    zh: { name: "3,000 公里俱樂部", desc: "累計跑量 3,000 公里" } },
+  { id: "mileage_3500", category: "distance", image: imgMileage3500, target: 3500, unit: "km",
+    en: { name: "3,500 KM Club",    desc: "Run 3,500 km in total" },
+    zh: { name: "3,500 公里俱樂部", desc: "累計跑量 3,500 公里" } },
+  { id: "mileage_4000", category: "distance", image: imgMileage4000, target: 4000, unit: "km",
+    en: { name: "4,000 KM Legend",  desc: "Run 4,000 km in total" },
+    zh: { name: "4,000 公里傳奇",   desc: "累計跑量 4,000 公里" } },
+
 
   // ── Single-run distance challenges ────────────────────────────────
   { id: "endurance_beast", category: "single_run", image: imgEnduranceBeast, target: 1,
@@ -154,6 +187,21 @@ export const BADGES: BadgeDef[] = [
   { id: "sprint_king", category: "pace", image: imgSprintKing, target: 1,
     en: { name: "Sprint King",      desc: "Average sub 3:30/km on any run (≥1 km)" },
     zh: { name: "衝刺之王",         desc: "首次跑出 3:30/km 以內" } },
+  { id: "marathon_sub5", category: "pace", image: imgMarathonSub5, target: 1,
+    en: { name: "Sub-5:00 Marathon", desc: "Average sub 5:00/km on a 42.2 km+ run" },
+    zh: { name: "破 5 全馬",        desc: "完成 42.2 公里以上均速破 5:00/km" } },
+  { id: "marathon_sub430", category: "pace", image: imgMarathonSub430, target: 1,
+    en: { name: "Sub-4:30 Marathon", desc: "Average sub 4:30/km on a 42.2 km+ run" },
+    zh: { name: "破 4:30 全馬",     desc: "完成 42.2 公里以上均速破 4:30/km" } },
+  { id: "marathon_sub4", category: "pace", image: imgMarathonSub4, target: 1,
+    en: { name: "Sub-4:00 Marathon", desc: "Average sub 4:00/km on a 42.2 km+ run" },
+    zh: { name: "破 4 全馬",        desc: "完成 42.2 公里以上均速破 4:00/km" } },
+  { id: "marathon_sub330", category: "pace", image: imgMarathonSub330, target: 1,
+    en: { name: "Sub-3:30 Marathon", desc: "Average sub 3:30/km on a 42.2 km+ run" },
+    zh: { name: "破 3:30 全馬",     desc: "完成 42.2 公里以上均速破 3:30/km" } },
+  { id: "marathon_sub3", category: "pace", image: imgMarathonSub3, target: 1,
+    en: { name: "Sub-3:00 Marathon", desc: "Average sub 3:00/km on a 42.2 km+ run" },
+    zh: { name: "破 3 全馬",        desc: "完成 42.2 公里以上均速破 3:00/km" } },
 
   // ── Volume windows (rolling weekly / calendar month) ──────────────
   { id: "fifty_k_week", category: "volume", image: imgFiftyKWeek, target: 50, unit: "km",
@@ -168,6 +216,15 @@ export const BADGES: BadgeDef[] = [
   { id: "volume_king", category: "volume", image: imgVolumeKing, target: 200, unit: "km",
     en: { name: "Volume King",      desc: "Run 200 km in a single calendar month" },
     zh: { name: "里程之王",         desc: "單月累積 200 公里" } },
+  { id: "monthly_300", category: "volume", image: imgMonthly300, target: 300, unit: "km",
+    en: { name: "300K Month",       desc: "Run 300 km in a single calendar month" },
+    zh: { name: "300K 月",          desc: "單月累積 300 公里" } },
+  { id: "monthly_400", category: "volume", image: imgMonthly400, target: 400, unit: "km",
+    en: { name: "400K Month",       desc: "Run 400 km in a single calendar month" },
+    zh: { name: "400K 月",          desc: "單月累積 400 公里" } },
+  { id: "monthly_500", category: "volume", image: imgMonthly500, target: 500, unit: "km",
+    en: { name: "500K Month",       desc: "Run 500 km in a single calendar month" },
+    zh: { name: "500K 月",          desc: "單月累積 500 公里" } },
   { id: "frequency_king", category: "volume", image: imgFrequencyKing, target: 25, unit: "runs",
     en: { name: "Frequency King",   desc: "25+ runs in a single calendar month" },
     zh: { name: "頻率之王",         desc: "單月跑步 25 次以上" } },
@@ -229,8 +286,8 @@ export const BADGES: BadgeDef[] = [
 
   // ── Anniversary ───────────────────────────────────────────────────
   { id: "app_birthday", category: "anniversary", image: imgAppBirthday, target: 1,
-    en: { name: "App Birthday",     desc: "Run on the app's anniversary date (May 1)" },
-    zh: { name: "App 生日",         desc: "於 App 週年日跑步（5 月 1 日）" } },
+    en: { name: "App Birthday",     desc: "Run on the app's anniversary date (Mar 28)" },
+    zh: { name: "App 生日",         desc: "於 App 週年日跑步（3 月 28 日）" } },
   { id: "one_year_party", category: "anniversary", image: imgOneYearParty, target: 1,
     en: { name: "One Year Party",   desc: "Active member for 365+ days" },
     zh: { name: "一週年派對",       desc: "成為會員滿 365 天" } },
@@ -242,9 +299,9 @@ export const BADGES: BadgeDef[] = [
   { id: "badge_hoarder", category: "meta", image: imgHoarder, target: 25, unit: "badges",
     en: { name: "Hoarder",          desc: "Unlock 25 badges" },
     zh: { name: "藏寶者",           desc: "解鎖 25 個徽章" } },
-  { id: "completionist", category: "meta", image: imgCompletionist, target: 45, unit: "badges",
-    en: { name: "Completionist",    desc: "Unlock every badge" },
-    zh: { name: "全收集",           desc: "解鎖所有徽章" } },
+  { id: "completionist", category: "meta", image: imgCompletionist, target: 50, unit: "badges",
+    en: { name: "50 Badges Collected", desc: "Collect 50 badges" },
+    zh: { name: "收藏 50 個徽章",   desc: "收集 50 個徽章" } },
 
   // ── Special / exclusive ───────────────────────────────────────────
   { id: "early_adopter", category: "special", image: imgEarlyAdopter, target: 1,
@@ -418,6 +475,7 @@ export function computeBadgeProgress(ctx: BadgeContext): Record<string, BadgePro
   const streak = computeStreak(ctx.activities);
   const bestSec = bestPaceSecPerKm(ctx.activities);
   const bestSec10k = bestPaceSecPerKmOver(ctx.activities, 10000);
+  const bestSecMarathon = bestPaceSecPerKmOver(ctx.activities, 42195);
   const longestRunM = maxRunDistance(ctx.activities);
   const steepestM = maxRunElevation(ctx.activities);
   const best7 = bestRollingDistanceKm(ctx.activities, 7);
@@ -427,7 +485,7 @@ export function computeBadgeProgress(ctx: BadgeContext): Record<string, BadgePro
   const midnight = countByHour(ctx.activities, (h, m) => (h === 23 && m >= 30) || h === 0 && m <= 30) > 0 ? 1 : 0;
   const newYear = anyOnMonthDay(ctx.activities, 0, 1) ? 1 : 0;
   const christmas = anyOnMonthDay(ctx.activities, 11, 25) ? 1 : 0;
-  const appBirthday = anyOnMonthDay(ctx.activities, 4, 1) ? 1 : 0; // May 1
+  const appBirthday = anyOnMonthDay(ctx.activities, 2, 28) ? 1 : 0; // Mar 28
   const negSplit = hasNegativeSplit(ctx.activities) ? 1 : 0;
 
   // Weather counts
@@ -458,6 +516,12 @@ export function computeBadgeProgress(ctx: BadgeContext): Record<string, BadgePro
       case "dedicated_runner":
       case "century_club":
       case "marathon_veteran":
+      case "mileage_1500":
+      case "mileage_2000":
+      case "mileage_2500":
+      case "mileage_3000":
+      case "mileage_3500":
+      case "mileage_4000":
         value = totalKm; break;
       // single run
       case "endurance_beast":      value = longestRunM >= 20000 ? 1 : 0; break;
@@ -479,11 +543,19 @@ export function computeBadgeProgress(ctx: BadgeContext): Record<string, BadgePro
       case "sub_5":      value = bestSec <= 300 ? 1 : 0; break;
       case "speedster":  value = bestSec <= 240 ? 1 : 0; break;
       case "sprint_king":value = bestSec <= 210 ? 1 : 0; break;
+      case "marathon_sub5":   value = bestSecMarathon <= 300 ? 1 : 0; break;
+      case "marathon_sub430": value = bestSecMarathon <= 270 ? 1 : 0; break;
+      case "marathon_sub4":   value = bestSecMarathon <= 240 ? 1 : 0; break;
+      case "marathon_sub330": value = bestSecMarathon <= 210 ? 1 : 0; break;
+      case "marathon_sub3":   value = bestSecMarathon <= 180 ? 1 : 0; break;
       // volume
       case "fifty_k_week":    value = best7; break;
       case "hundred_k_week":  value = best7; break;
       case "century_month":   value = month.km; break;
       case "volume_king":     value = month.km; break;
+      case "monthly_300":     value = month.km; break;
+      case "monthly_400":     value = month.km; break;
+      case "monthly_500":     value = month.km; break;
       case "frequency_king":  value = month.runs; break;
       // elevation
       case "hill_climber":

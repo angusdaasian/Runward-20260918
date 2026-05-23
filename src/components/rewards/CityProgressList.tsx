@@ -149,8 +149,11 @@ const CityProgressList = ({ userId, lang, onCityFocus, focusedSlug, refreshKey }
           </button>
         );
       })}
+        </div>
+      )}
     </div>
   );
 };
 
 export default CityProgressList;
+

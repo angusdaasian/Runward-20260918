@@ -3,7 +3,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { Lang } from "@/lib/i18n";
 import { Progress } from "@/components/ui/progress";
 import { getCityBadge, nextCityBadge } from "@/lib/cityBadges";
-import { MapPin } from "lucide-react";
+import { MapPin, ChevronDown } from "lucide-react";
+
 
 interface City {
   slug: string;

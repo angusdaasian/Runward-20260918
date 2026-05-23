@@ -40,6 +40,7 @@ type ViewMode = "bar" | "heatmap" | "weekly";
 
 const ActivityYearHeatmap = ({ lang, activities }: Props) => {
   const [view, setView] = useState<ViewMode>("bar");
+  const [selectedWeekIdx, setSelectedWeekIdx] = useState<number | null>(null);
 
   // Pick the most recent year that has activities (default = current year)
   const availableYears = useMemo(() => {

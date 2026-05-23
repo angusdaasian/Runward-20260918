@@ -103,6 +103,27 @@ const RewardCodeManager = () => {
     setCodes((prev) => prev.filter((c) => c.id !== id));
   };
 
+  const [deletingAll, setDeletingAll] = useState(false);
+  const handleDeleteAll = async (onlyAvailable: boolean) => {
+    const scope = onlyAvailable ? "all UNASSIGNED codes" : "ALL codes (including assigned)";
+    if (!confirm(`Delete ${scope}? This cannot be undone.`)) return;
+    setDeletingAll(true);
+    try {
+      let q = supabase.from("reward_codes").delete();
+      q = onlyAvailable ? q.eq("is_assigned", false) : q.not("id", "is", null);
+      const { error } = await q;
+      if (error) throw error;
+      toast({ title: "Deleted", description: `Removed ${scope}` });
+      fetchCodes();
+    } catch (e) {
+      toast({ title: "Error", description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setDeletingAll(false);
+    }
+  };
+
+
+
   const available = codes.filter((c) => !c.is_assigned).length;
   const assigned = codes.filter((c) => c.is_assigned).length;
 
@@ -115,11 +136,20 @@ const RewardCodeManager = () => {
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Stats */}
-        <div className="flex gap-3 text-sm">
+        <div className="flex gap-3 text-sm items-center flex-wrap">
           <Badge variant="secondary">{codes.length} Total</Badge>
           <Badge className="bg-primary text-primary-foreground">{available} Available</Badge>
           <Badge variant="outline">{assigned} Assigned</Badge>
+          <div className="ml-auto flex gap-2">
+            <Button size="sm" variant="outline" onClick={() => handleDeleteAll(true)} disabled={deletingAll || available === 0}>
+              <Trash2 className="h-4 w-4 mr-1" /> Delete unassigned
+            </Button>
+            <Button size="sm" variant="destructive" onClick={() => handleDeleteAll(false)} disabled={deletingAll || codes.length === 0}>
+              <Trash2 className="h-4 w-4 mr-1" /> {deletingAll ? "Deleting..." : "Delete ALL"}
+            </Button>
+          </div>
         </div>
+
 
         {/* Bulk Upload */}
         <div className="space-y-2">

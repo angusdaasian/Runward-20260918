@@ -1033,6 +1033,16 @@ export async function handleTerraWebhook(req: Request, env: TerraEnv = "prod"): 
   const referenceId: string | null = user?.reference_id ?? null;
   const provider: string = mapProvider(user?.provider ?? payload?.resource);
 
+  // Extract Terra payload IDs (summary_id per data item) so the reconcile
+  // job can match this webhook against rows in terra_data_payloads /
+  // terra_misc_payloads written by Terra's Supabase destination.
+  const dataArr: any[] = Array.isArray(payload?.data)
+    ? payload.data
+    : payload?.data ? [payload.data] : [];
+  const payloadIds: string[] = dataArr
+    .map((d: any) => d?.metadata?.summary_id ?? d?.summary_id ?? d?.metadata?.upload_id ?? d?.metadata?.id ?? null)
+    .filter((id: any): id is string => typeof id === "string" && id.length > 0);
+
   const { data: eventRow, error: eventInsertErr } = await supa
     .from("terra_webhook_events")
     .insert({
@@ -1040,6 +1050,7 @@ export async function handleTerraWebhook(req: Request, env: TerraEnv = "prod"): 
       terra_user_id: terraUserId,
       reference_id: referenceId,
       signature_valid: signatureValid,
+      payload_ids: payloadIds.length > 0 ? payloadIds : null,
       payload: isReauth
         ? { type, old_user: payload?.old_user, new_user: payload?.new_user, env }
         : { type, user: payload?.user, env, count: Array.isArray(payload?.data) ? payload.data.length : (payload?.data ? 1 : 0) },

@@ -286,8 +286,8 @@ export const BADGES: BadgeDef[] = [
 
   // ── Anniversary ───────────────────────────────────────────────────
   { id: "app_birthday", category: "anniversary", image: imgAppBirthday, target: 1,
-    en: { name: "App Birthday",     desc: "Run on the app's anniversary date (May 1)" },
-    zh: { name: "App 生日",         desc: "於 App 週年日跑步（5 月 1 日）" } },
+    en: { name: "App Birthday",     desc: "Run on the app's anniversary date (Mar 28)" },
+    zh: { name: "App 生日",         desc: "於 App 週年日跑步（3 月 28 日）" } },
   { id: "one_year_party", category: "anniversary", image: imgOneYearParty, target: 1,
     en: { name: "One Year Party",   desc: "Active member for 365+ days" },
     zh: { name: "一週年派對",       desc: "成為會員滿 365 天" } },
@@ -299,9 +299,9 @@ export const BADGES: BadgeDef[] = [
   { id: "badge_hoarder", category: "meta", image: imgHoarder, target: 25, unit: "badges",
     en: { name: "Hoarder",          desc: "Unlock 25 badges" },
     zh: { name: "藏寶者",           desc: "解鎖 25 個徽章" } },
-  { id: "completionist", category: "meta", image: imgCompletionist, target: 45, unit: "badges",
-    en: { name: "Completionist",    desc: "Unlock every badge" },
-    zh: { name: "全收集",           desc: "解鎖所有徽章" } },
+  { id: "completionist", category: "meta", image: imgCompletionist, target: 50, unit: "badges",
+    en: { name: "50 Badges Collected", desc: "Collect 50 badges" },
+    zh: { name: "收藏 50 個徽章",   desc: "收集 50 個徽章" } },
 
   // ── Special / exclusive ───────────────────────────────────────────
   { id: "early_adopter", category: "special", image: imgEarlyAdopter, target: 1,

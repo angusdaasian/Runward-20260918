@@ -183,6 +183,73 @@ const ActivityYearHeatmap = ({ lang, activities }: Props) => {
   );
   const monthLabelsArr = lang === "zh" ? MONTHS_ZH : MONTHS_EN;
 
+  // Weekly mileage (Mon-Sun ISO weeks) for the chosen year
+  const weekly = useMemo(() => {
+    // Find Monday on/before Jan 1
+    const start = new Date(year, 0, 1);
+    const firstDow = mondayDow(start);
+    const gridStart = new Date(start);
+    gridStart.setDate(gridStart.getDate() - firstDow);
+
+    const end = new Date(year, 11, 31);
+    const lastDow = mondayDow(end);
+    const gridEnd = new Date(end);
+    gridEnd.setDate(gridEnd.getDate() + (6 - lastDow));
+
+    const buckets: { weekStart: Date; distanceKm: number; minutes: number }[] = [];
+    let cur = new Date(gridStart);
+    while (cur <= gridEnd) {
+      buckets.push({ weekStart: new Date(cur), distanceKm: 0, minutes: 0 });
+      cur.setDate(cur.getDate() + 7);
+    }
+    for (const act of activities) {
+      const d = new Date(act.start_date);
+      if (isNaN(d.getTime())) continue;
+      if (d.getFullYear() !== year) continue;
+      const diffDays = Math.floor((d.getTime() - gridStart.getTime()) / 86400000);
+      const idx = Math.floor(diffDays / 7);
+      if (idx < 0 || idx >= buckets.length) continue;
+      const runOnly = isRunning(act.sport_type);
+      buckets[idx].distanceKm += runOnly ? (act.distance ?? 0) / 1000 : 0;
+      buckets[idx].minutes += (act.moving_time ?? 0) / 60;
+    }
+    return buckets;
+  }, [activities, year]);
+
+  const maxWeekKm = useMemo(
+    () => weekly.reduce((m, x) => Math.max(m, x.distanceKm), 0),
+    [weekly],
+  );
+
+  // Smooth SVG path (Catmull-Rom-ish via cubic Bezier)
+  const weeklyPath = useMemo(() => {
+    if (weekly.length === 0 || maxWeekKm <= 0) return { d: "", area: "", points: [] as { x: number; y: number }[] };
+    const stepX = 28;
+    const chartH = 140;
+    const padTop = 10;
+    const points = weekly.map((w, i) => ({
+      x: i * stepX + stepX / 2,
+      y: padTop + (1 - w.distanceKm / maxWeekKm) * (chartH - padTop - 4),
+    }));
+    let d = `M ${points[0].x} ${points[0].y}`;
+    for (let i = 0; i < points.length - 1; i++) {
+      const p0 = points[i - 1] ?? points[i];
+      const p1 = points[i];
+      const p2 = points[i + 1];
+      const p3 = points[i + 2] ?? p2;
+      const cp1x = p1.x + (p2.x - p0.x) / 6;
+      const cp1y = p1.y + (p2.y - p0.y) / 6;
+      const cp2x = p2.x - (p3.x - p1.x) / 6;
+      const cp2y = p2.y - (p3.y - p1.y) / 6;
+      d += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p2.x} ${p2.y}`;
+    }
+    const last = points[points.length - 1];
+    const first = points[0];
+    const area = `${d} L ${last.x} ${chartH} L ${first.x} ${chartH} Z`;
+    return { d, area, points };
+  }, [weekly, maxWeekKm]);
+
+
   return (
     <div className="bg-card border border-border rounded-xl p-4 mb-5">
       <div className="flex items-center justify-between flex-wrap gap-2 mb-1">

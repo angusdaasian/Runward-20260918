@@ -19,6 +19,9 @@ verify_jwt = false
 [functions.terra-reconcile]
 verify_jwt = false
 
+[functions.process-terra-queue]
+verify_jwt = false
+
 
 [functions.weekly-plan-review]
 verify_jwt = false

@@ -43,11 +43,15 @@ function calculateStreak(lastCheckInDate: string | null, currentStreak: number):
   return 1; // streak broken
 }
 
+// Module-level cache to prevent flicker when remounting
+const checkInCache: Record<string, { streak: number; lastCheckInDate: string | null }> = {};
+
 const DailyCheckIn = ({ lang, userId, lastLogin, currentXp, onXpGain }: Props) => {
+  const cached = checkInCache[userId];
   const [checking, setChecking] = useState(false);
-  const [streak, setStreak] = useState(0);
-  const [lastCheckInDate, setLastCheckInDate] = useState<string | null>(null);
-  const [checkedIn, setCheckedIn] = useState(false);
+  const [streak, setStreak] = useState(cached?.streak ?? 0);
+  const [lastCheckInDate, setLastCheckInDate] = useState<string | null>(cached?.lastCheckInDate ?? null);
+  const [checkedIn, setCheckedIn] = useState(cached ? !canCheckInToday(cached.lastCheckInDate) : false);
   const [showXpFloat, setShowXpFloat] = useState(false);
   const [floatXp, setFloatXp] = useState(0);
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -61,9 +65,12 @@ const DailyCheckIn = ({ lang, userId, lastLogin, currentXp, onXpGain }: Props) =
         .eq("user_id", userId)
         .single();
       if (data) {
-        setStreak(data.check_in_streak ?? 0);
-        setLastCheckInDate(data.last_check_in_date ?? null);
-        setCheckedIn(!canCheckInToday(data.last_check_in_date ?? null));
+        const s = data.check_in_streak ?? 0;
+        const d = data.last_check_in_date ?? null;
+        checkInCache[userId] = { streak: s, lastCheckInDate: d };
+        setStreak(s);
+        setLastCheckInDate(d);
+        setCheckedIn(!canCheckInToday(d));
       }
     };
     fetchStreak();

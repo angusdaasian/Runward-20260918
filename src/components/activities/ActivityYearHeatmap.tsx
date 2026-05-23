@@ -348,16 +348,22 @@ const ActivityYearHeatmap = ({ lang, activities }: Props) => {
                     )}
                     {weeklyPath.points.map((p, i) => {
                       const km = weekly[i].distanceKm;
-                      if (km <= 0) return null;
                       const isToday = i === todayIdx;
+                      const isSelected = i === selectedWeekIdx;
+                      const hasData = km > 0;
                       return (
-                        <g key={i}>
-                          <circle
-                            cx={p.x}
-                            cy={p.y}
-                            r={isToday ? 3.5 : 2}
-                            className={isToday ? "fill-orange-400" : "fill-primary"}
-                          />
+                        <g key={i} style={{ cursor: "pointer" }} onClick={() => setSelectedWeekIdx(isSelected ? null : i)}>
+                          {/* invisible larger hit area */}
+                          <circle cx={p.x} cy={p.y} r={12} fill="transparent" />
+                          {hasData && (
+                            <circle
+                              cx={p.x}
+                              cy={p.y}
+                              r={isSelected ? 5 : isToday ? 3.5 : 2}
+                              className={isSelected ? "fill-orange-400 stroke-background" : isToday ? "fill-orange-400" : "fill-primary"}
+                              strokeWidth={isSelected ? 2 : 0}
+                            />
+                          )}
                           <title>{`${weekly[i].weekStart.toLocaleDateString()} · ${km.toFixed(1)} km`}</title>
                         </g>
                       );
@@ -383,10 +389,30 @@ const ActivityYearHeatmap = ({ lang, activities }: Props) => {
                   </svg>
                 </div>
               </div>
+              {selectedWeekIdx !== null && weekly[selectedWeekIdx] && (() => {
+                const w = weekly[selectedWeekIdx];
+                const start = w.weekStart;
+                const end = new Date(start); end.setDate(end.getDate() + 6);
+                const fmt = (d: Date) => `${d.getMonth() + 1}/${d.getDate()}`;
+                return (
+                  <div className="mx-4 mt-2 p-2.5 rounded-lg bg-muted/60 border border-border flex items-center justify-between">
+                    <div>
+                      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                        {lang === "zh" ? "選定週次" : "Selected week"}
+                      </div>
+                      <div className="text-xs font-medium text-foreground">{fmt(start)} – {fmt(end)}</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-display text-lg font-bold text-foreground tabular-nums">{w.distanceKm.toFixed(1)} km</div>
+                      <div className="text-[10px] text-muted-foreground">{Math.round(w.minutes)} {lang === "zh" ? "分鐘" : "min"}</div>
+                    </div>
+                  </div>
+                );
+              })()}
               <p className="px-4 mt-2 text-[10px] text-muted-foreground tracking-wider uppercase">
                 {lang === "zh"
-                  ? `每週公里 · 高峰 ${maxWeekKm.toFixed(1)} km`
-                  : `Weekly km · peak ${maxWeekKm.toFixed(1)} km`}
+                  ? `每週公里 · 高峰 ${maxWeekKm.toFixed(1)} km · 點擊資料點查看`
+                  : `Weekly km · peak ${maxWeekKm.toFixed(1)} km · tap a point`}
               </p>
             </div>
           );

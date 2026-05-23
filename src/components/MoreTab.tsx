@@ -70,6 +70,7 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps }: Props
   const { isAdmin, loading: adminLoading } = useAdmin();
   const { toast } = useToast();
   const { launchPaywall, redeemOfferCode } = useDespiaPurchases();
+  const { palette, setPalette } = useTheme();
 
   const [showLoginPrompt, setShowLoginPrompt] = useState(false);
   const [showRedeemDialog, setShowRedeemDialog] = useState(false);

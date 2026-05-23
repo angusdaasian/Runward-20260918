@@ -516,11 +516,6 @@ export function computeBadgeProgress(ctx: BadgeContext): Record<string, BadgePro
       case "dedicated_runner":
       case "century_club":
       case "marathon_veteran":
-      case "first_steps":
-      case "getting_started":
-      case "dedicated_runner":
-      case "century_club":
-      case "marathon_veteran":
       case "mileage_1500":
       case "mileage_2000":
       case "mileage_2500":

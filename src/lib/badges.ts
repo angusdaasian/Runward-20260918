@@ -433,6 +433,17 @@ function bestPaceSecPerKmOver(activities: StravaActivity[], minMeters: number): 
   return best;
 }
 
+/** Best (lowest) finish time in seconds for any run >= minMeters distance */
+function bestFinishTimeSec(activities: StravaActivity[], minMeters: number): number {
+  let best = Infinity;
+  for (const a of activities) {
+    if ((a.distance || 0) < minMeters) continue;
+    const t = a.moving_time || a.elapsed_time || 0;
+    if (t > 0 && t < best) best = t;
+  }
+  return best;
+}
+
 function hasNegativeSplit(activities: StravaActivity[]): boolean {
   for (const a of activities) {
     if ((a.distance || 0) < 10000 || !a.distance_samples || a.distance_samples.length < 4) continue;

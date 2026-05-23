@@ -204,7 +204,36 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps }: Props
             >
               <span className={`inline-block h-5 w-5 rounded-full bg-background shadow-lg transition-transform ${darkMode ? "translate-x-5" : "translate-x-0.5"}`} />
             </button>
+        </div>
+
+        {/* Theme palette */}
+        <div className="bg-card border border-border rounded-xl p-4">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <ScanEye size={20} className="text-primary shrink-0" />
+              <span className="font-medium text-foreground truncate">
+                {lang === "zh" ? "主題" : "Theme"}
+              </span>
+            </div>
+            <div className="inline-flex rounded-full bg-muted p-0.5">
+              {(["classic", "modern"] as const).map((p) => (
+                <button
+                  key={p}
+                  onClick={() => setPalette(p)}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
+                    palette === p
+                      ? "bg-background text-foreground shadow-sm"
+                      : "text-muted-foreground"
+                  }`}
+                >
+                  {p === "classic"
+                    ? lang === "zh" ? "經典" : "Classic"
+                    : lang === "zh" ? "現代" : "Modern"}
+                </button>
+              ))}
+            </div>
           </div>
+        </div>
         </div>
 
         {!user && (

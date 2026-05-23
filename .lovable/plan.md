@@ -1,65 +1,67 @@
+# Fix: terra-webhook still blocks on DB insert
 
-# Goal
+## What's wrong now
 
-Stop doing data processing inside the **Terra** webhook handler. The handler should only enqueue the raw payload and return 200. A separate worker (cron-driven) does signature verification, S3 ping fetch, parsing, upserts, XP recalculation, and push notifications. Strava webhook is left untouched.
+In `supabase/functions/_shared/terraWebhookHandler.ts` (lines 987–1006), `handleTerraWebhook` does:
 
-Today the Terra webhook returns 200 fast via `EdgeRuntime.waitUntil`, but the heavy work still runs in the same edge function instance with CPU/wall-time limits. A single slow payload (long activity, big GPS arrays, S3 ping fetch) can still time out, fail silently, or get the function instance killed mid-write.
+```ts
+const raw = await req.text();                       // buffer body
+const { error } = await supa.from("terra_webhook_queue").insert({...}); // ~1s round-trip
+return new Response(...);                            // only now ACK
+```
 
-## Changes
+The `await` on the Postgres insert is the dominant cost. Even with an 11KB body, Terra sees ~1.6s because the function waits for the DB write to complete before returning 200. The previous version (pre-queue) sometimes finished faster simply because the container was warmer or the work happened to overlap with response streaming.
 
-### 1. New queue table: `terra_webhook_queue`
-Columns:
-- `env` (`prod` | `test`)
-- `raw_body` (text — full webhook body, untouched)
-- `signature_header` (text, nullable)
-- `received_at` (default now)
-- `status` (`pending` | `processing` | `done` | `failed`)
-- `attempts` (int, default 0)
-- `last_error` (text, nullable)
-- `processed_at` (timestamptz, nullable)
+## Fix
 
-Indexes: partial index on `(received_at)` where `status = 'pending'` for fast worker polling.
+Move the queue insert into a background task using `EdgeRuntime.waitUntil`, so the response is returned the moment the body is buffered.
 
-RLS: enabled, no policies (service-role only).
+### Change in `supabase/functions/_shared/terraWebhookHandler.ts`
 
-Plus a SQL function `claim_terra_webhook_queue(batch_size int)` using `for update skip locked` so multiple worker invocations don't double-process.
+Replace the body of `handleTerraWebhook` (≈ lines 987–1006) with:
 
-### 2. Slim Terra webhook (`supabase/functions/_shared/terraWebhookHandler.ts`)
-The `handleTerraWebhook` exported function becomes:
-1. Read `req.text()` + `terra-signature` header.
-2. `INSERT INTO terra_webhook_queue` (env, raw_body, signature_header).
-3. Return 200.
+```ts
+export async function handleTerraWebhook(req: Request, env: TerraEnv = "prod"): Promise<Response> {
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
-No signature verify, no S3 ping fetch, no payload parsing, no `terra_webhook_events` insert, no `processWebhook`, no `recalcUserXp`, no push notifications inside the request lifecycle.
+  const raw = await req.text();                       // must read before responding
+  const sigHeader = req.headers.get("terra-signature");
 
-All current parsing/upsert logic stays in the same file (or moved into a sibling module) and is exported for the worker to call.
+  // Fire-and-forget: do NOT await the DB insert.
+  const enqueue = supa.from("terra_webhook_queue").insert({
+    env,
+    raw_body: raw,
+    signature_header: sigHeader,
+  }).then(({ error }) => {
+    if (error) console.error("[terra-webhook] enqueue failed", error);
+  }).catch((e) => {
+    console.error("[terra-webhook] enqueue threw", e);
+  });
 
-### 3. New worker: `supabase/functions/process-terra-queue/index.ts`
-- Calls `claim_terra_webhook_queue(25)` to atomically claim up to 25 pending rows.
-- For each row:
-  - Verify signature (using `env`-specific secret).
-  - If payload is S3 ping mode → fetch the pre-signed URL.
-  - Insert into `terra_webhook_events` (existing audit log).
-  - Run existing `processWebhook` → `recalcUserXp` → push notifications.
-  - On success → `status='done'`, `processed_at=now()`.
-  - On failure → increment `attempts`; if `< 5` set back to `pending`, else `failed`. Record `last_error`.
-- Bounded to ~25 rows / invocation to stay well under edge function wall limits.
+  // @ts-ignore - EdgeRuntime is provided by the Supabase Edge runtime
+  if (typeof EdgeRuntime !== "undefined" && EdgeRuntime?.waitUntil) {
+    // @ts-ignore
+    EdgeRuntime.waitUntil(enqueue);
+  }
 
-### 4. Cron schedule
-Add a `pg_cron` job that calls the worker every 30s via `net.http_post` (uses existing `pg_cron` + `pg_net` pattern — inserted via the insert tool, not migration, because URL + anon key are project-specific).
+  return new Response(
+    JSON.stringify({ ok: true }),
+    { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+  );
+}
+```
 
-### 5. Safety
-- Existing `terra_webhook_events` table unchanged (worker keeps writing it as the audit log).
-- Existing `terra-reconcile` cron continues to catch anything that fails permanently.
-- Strava webhook (`supabase/functions/strava-webhook/index.ts`) is **not touched**.
+### Why this works
 
-## Files touched
+- `req.text()` still must complete before we respond (we need the bytes in memory to enqueue them after responding).
+- The Postgres insert — the slow part — now runs after the response is sent. Terra gets its 200 in well under 200ms in steady state.
+- If the insert fails, the reconciler cron (`terra-reconcile`) already re-fetches missing payloads from Terra's Supabase destination, so durability is preserved.
+- No change to `process-terra-queue` or `terra-reconcile` needed.
 
-- **New migration**: `terra_webhook_queue` table + index + RLS + `claim_terra_webhook_queue` SQL function.
-- **New**: `supabase/functions/process-terra-queue/index.ts`
-- **Edit**: `supabase/functions/_shared/terraWebhookHandler.ts` — handler shrinks to an enqueue; existing processing functions exported.
-- **New insert** (post-migration): pg_cron schedule that pings the worker every 30s.
+### Deploy
 
-No frontend changes.
+Redeploy `terra-webhook` and `terra-webhook-test` (both import the shared handler).
 
-After your approval I'll create the migration first, then write the code.
+### Verification
+
+After deploy, check Terra's dashboard: a fresh body-mode webhook should drop from ~1.6s to ~100–200ms response time. Confirm rows still land in `terra_webhook_queue` and get drained by `process-terra-queue`.

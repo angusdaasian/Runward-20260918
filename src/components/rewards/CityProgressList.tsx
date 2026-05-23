@@ -30,9 +30,12 @@ interface Row {
 
 const CityProgressList = ({ userId, lang, onCityFocus, focusedSlug, refreshKey }: Props) => {
   const [rows, setRows] = useState<Row[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
+    if (!open) return;
     let cancelled = false;
     (async () => {
       setLoading(true);
@@ -43,7 +46,7 @@ const CityProgressList = ({ userId, lang, onCityFocus, focusedSlug, refreshKey }
         .eq("user_id", userId);
       const hexIds = Array.from(new Set((caps ?? []).map((r: any) => r.hex_id as string)));
       if (hexIds.length === 0) {
-        if (!cancelled) { setRows([]); setLoading(false); }
+        if (!cancelled) { setRows([]); setLoading(false); setLoaded(true); }
         return;
       }
       // Look up city_slug for each captured hex
@@ -58,7 +61,7 @@ const CityProgressList = ({ userId, lang, onCityFocus, focusedSlug, refreshKey }
       }
       const slugs = Array.from(counts.keys());
       if (slugs.length === 0) {
-        if (!cancelled) { setRows([]); setLoading(false); }
+        if (!cancelled) { setRows([]); setLoading(false); setLoaded(true); }
         return;
       }
       const { data: cities } = await supabase
@@ -73,26 +76,39 @@ const CityProgressList = ({ userId, lang, onCityFocus, focusedSlug, refreshKey }
         out.push({ city: c, owned, percent });
       }
       out.sort((a, b) => b.percent - a.percent);
-      if (!cancelled) { setRows(out); setLoading(false); }
+      if (!cancelled) { setRows(out); setLoading(false); setLoaded(true); }
     })();
     return () => { cancelled = true; };
-  }, [userId, refreshKey]);
-
-  if (loading) return null;
-  if (rows.length === 0) {
-    return (
-      <div className="rounded-lg border border-border bg-card/50 p-3 text-xs text-muted-foreground text-center">
-        {lang === "zh" ? "完成同步以解鎖城市進度" : "Sync to unlock city progress"}
-      </div>
-    );
-  }
+  }, [userId, refreshKey, open]);
 
   return (
     <div className="space-y-2">
-      <div className="text-xs font-semibold text-muted-foreground px-1 flex items-center gap-1.5">
-        <MapPin size={12} />
-        {lang === "zh" ? "城市探索進度" : "City exploration"}
-      </div>
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="w-full flex items-center justify-between px-1 text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors"
+      >
+        <span className="flex items-center gap-1.5">
+          <MapPin size={12} />
+          {lang === "zh" ? "城市探索進度" : "City exploration"}
+          {loaded && rows.length > 0 && (
+            <span className="text-muted-foreground/70">({rows.length})</span>
+          )}
+        </span>
+        <ChevronDown size={14} className={`transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && loading && (
+        <div className="text-xs text-muted-foreground text-center py-2">
+          {lang === "zh" ? "載入中…" : "Loading…"}
+        </div>
+      )}
+      {open && loaded && rows.length === 0 && (
+        <div className="rounded-lg border border-border bg-card/50 p-3 text-xs text-muted-foreground text-center">
+          {lang === "zh" ? "完成同步以解鎖城市進度" : "Sync to unlock city progress"}
+        </div>
+      )}
+      {open && !loading && rows.length > 0 && (
+        <div className="space-y-2">
+
       {rows.map(({ city, owned, percent }) => {
         const badge = getCityBadge(percent);
         const next = nextCityBadge(percent);

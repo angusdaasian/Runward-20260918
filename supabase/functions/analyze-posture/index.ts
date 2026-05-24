@@ -8,7 +8,7 @@ const corsHeaders = {
 async function callVertexAI(opts: { apiKey: string; model?: string; messages: Array<{ role: string; content: any }> }): Promise<Response> {
   const VERTEX_MODEL_MAP: Record<string, string> = {
     "google/gemini-3.1-pro-preview": "gemini-3.1-pro-preview",
-    "google/gemini-3.1-flash-preview": "gemini-3-flash-preview",
+    "google/gemini-2.5-flash": "gemini-3-flash-preview",
     "google/gemini-3.1-flash-lite-preview": "gemini-3.1-flash-lite-preview",
     "google/gemini-3-flash-preview": "gemini-3-flash-preview",
   };
@@ -101,7 +101,7 @@ ${JSON.stringify(existingResult)}`;
 
       const tlResp = await callVertexAI({
         apiKey: VERTEX_API_KEY,
-        model: "google/gemini-3.1-flash-preview",
+        model: "google/gemini-2.5-flash",
         messages: [
           { role: "user", content: translatePrompt },
         ],
@@ -189,7 +189,7 @@ Scores should be objective based on actual posture observed. Be specific in feed
 
     const response = await callVertexAI({
       apiKey: VERTEX_API_KEY,
-      model: "google/gemini-3.1-flash-preview",
+      model: "google/gemini-2.5-flash",
       messages: [
         { role: "system", content: systemPrompt },
         {

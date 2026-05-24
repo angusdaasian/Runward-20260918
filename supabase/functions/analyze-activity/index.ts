@@ -431,6 +431,7 @@ serve(async (req) => {
       }
     }
 
+    lap("start weather/race resolution");
     // --- Resolve race + weather ---
     let resolvedRaceName: string | null = raceName?.trim() || null;
     let raceCity: string | null = null;

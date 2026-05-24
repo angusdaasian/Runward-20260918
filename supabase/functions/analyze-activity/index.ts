@@ -1074,6 +1074,9 @@ If the runner raced hard today or said they struggled, suggest rest or a very ea
 
     const userMessage = `${planContext}${raceContext}\n\n--- Activity Data ---\n${statsText}`;
 
+    const promptChars = systemPrompt.length + userMessage.length;
+    const aiStart = Date.now();
+    console.log(`[analyze-activity] calling AI: promptChars=${promptChars}, lang=${lang}`);
     const response = await callVertexAI({
       apiKey: VERTEX_API_KEY,
       model: "google/gemini-3.1-flash-lite-preview",
@@ -1081,7 +1084,10 @@ If the runner raced hard today or said they struggled, suggest rest or a very ea
         { role: "system", content: systemPrompt },
         { role: "user", content: userMessage },
       ],
+      thinkingLevel: "minimal",
+      maxOutputTokens: 1024,
     });
+    console.log(`[analyze-activity] AI returned in ${Date.now() - aiStart}ms status=${response.status}`);
 
     if (!response.ok) {
       if (response.status === 429) return jsonResponse({ error: "Rate limited, please try again later." }, 429);

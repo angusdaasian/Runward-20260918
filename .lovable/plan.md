@@ -1,47 +1,25 @@
-## Goal
+## Problem
 
-Trigger a one-off Terra **activity** sync for **today (2026-05-24 UTC)** for every active Terra connection, staggered **2 minutes apart per user** so we don't hammer Terra's API and don't fight the 8s webhook circuit breaker.
+`POST /functions/v1/analyze-posture` returns **401 Unauthorized** with body `{"error":"Unauthorized"}` even when called with a valid logged-in user token. Confirmed by direct curl against the deployed function — the request never reaches the function code (edge logs only show `shutdown` events, no boot/invocation).
 
-## Approach
+## Root cause
 
-A one-off script run from the sandbox — no new permanent edge function, no schema changes, no UI.
+`supabase/config.toml` does not contain an entry for `analyze-posture`, so it falls back to the platform default `verify_jwt = true`. With the project on the new signing-keys system, the Supabase gateway is rejecting the user JWT before it ever reaches the function. Other working functions in this project (`get-weather`, `terra-webhook`, `weekly-plan-review`, `reset-season`, etc.) all have `verify_jwt = false` and validate the JWT in code instead.
 
-### Steps
+`analyze-posture/index.ts` already does proper in-code auth via `sb.auth.getClaims(token)` (lines 60–75), so disabling gateway verification is safe — auth is still enforced.
 
-1. **Enumerate users**
-   - `SELECT user_id, terra_user_id, provider FROM terra_connections WHERE active = true` (prod env by default).
+## Fix
 
-2. **For each connection, call Terra's activity endpoint with `to_webhook=true`**
-   ```
-   GET https://api.tryterra.co/v2/activity
-       ?user_id=<terra_user_id>
-       &start_date=2026-05-24
-       &end_date=2026-05-24
-       &to_webhook=true
-       &with_samples=true
-   Headers: dev-id, x-api-key  (TERRA_DEV_ID / TERRA_API_KEY)
-   ```
-   Terra responds 200 immediately and then POSTs the full activity payload to `terra-webhook`, which already handles upsert into `terra_activities`.
+Add a single block to `supabase/config.toml`:
 
-3. **Pacing**: `await sleep(120_000)` (2 minutes) between each user. Log per-user: `provider`, `terra_user_id`, HTTP status, `terra-reference` header.
+```toml
+[functions.analyze-posture]
+verify_jwt = false
+```
 
-4. **Audit log**: insert one summary row into `terra_webhook_events` with `type='one_off_today_backfill'` containing the per-user results (mirrors how `terra-confirm` logs its backfill), so we have a record of what was triggered.
+No code changes needed. After deploy, verify with a logged-in curl that the function returns 200 (or a proper non-401 error from the AI step) instead of the gateway 401.
 
-5. **Verification**: after the run, query
-   ```sql
-   SELECT user_id, COUNT(*) FROM terra_activities
-   WHERE start_time::date = '2026-05-24'
-   GROUP BY user_id;
-   ```
-   and report the count.
+## Out of scope
 
-## Technical notes
-
-- Run via `code--exec` with a Deno/Node one-shot using `TERRA_DEV_ID` + `TERRA_API_KEY` from env, and `psql` for the connection list + audit insert.
-- Total wall time ≈ `N_users × 2` minutes. With sandbox `code--exec` capped at 600s (10 min) per call, the script will run in chunks of ~4 users per call, resuming from where it left off (tracked by a small `/tmp/terra_today_progress.json` file).
-- No code in the repo changes; this is purely operational.
-
-## Open questions before I run it
-
-1. Prod only, or include the `test` Terra env too?
-2. Today = 2026-05-24 **UTC**, correct? Or local timezone?
+- No changes to the function logic, CORS, or call sites in `PostureTab.tsx` / `PostureResults.tsx`.
+- The earlier Terra auth-init improvement (store `terra_user_id` at init + 7-day backfill) is a separate task — not included here.

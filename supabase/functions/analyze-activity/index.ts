@@ -240,6 +240,8 @@ function summarizeWeather(weather: any): string {
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
+  const t0 = Date.now();
+  const lap = (label: string) => console.log(`[analyze-activity] +${Date.now() - t0}ms ${label}`);
   try {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) return jsonResponse({ error: "Unauthorized" }, 401);
@@ -429,6 +431,7 @@ serve(async (req) => {
       }
     }
 
+    lap("start weather/race resolution");
     // --- Resolve race + weather ---
     let resolvedRaceName: string | null = raceName?.trim() || null;
     let raceCity: string | null = null;
@@ -1074,6 +1077,9 @@ If the runner raced hard today or said they struggled, suggest rest or a very ea
 
     const userMessage = `${planContext}${raceContext}\n\n--- Activity Data ---\n${statsText}`;
 
+    const promptChars = systemPrompt.length + userMessage.length;
+    lap(`calling AI: promptChars=${promptChars}, lang=${lang}`);
+    const aiStart = Date.now();
     const response = await callVertexAI({
       apiKey: VERTEX_API_KEY,
       model: "google/gemini-3.1-flash-lite-preview",
@@ -1081,7 +1087,10 @@ If the runner raced hard today or said they struggled, suggest rest or a very ea
         { role: "system", content: systemPrompt },
         { role: "user", content: userMessage },
       ],
+      thinkingLevel: "minimal",
+      maxOutputTokens: 1024,
     });
+    lap(`AI returned in ${Date.now() - aiStart}ms status=${response.status}`);
 
     if (!response.ok) {
       if (response.status === 429) return jsonResponse({ error: "Rate limited, please try again later." }, 429);

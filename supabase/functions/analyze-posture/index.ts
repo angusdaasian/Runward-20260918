@@ -8,7 +8,7 @@ const corsHeaders = {
 async function callVertexAI(opts: { apiKey: string; model?: string; messages: Array<{ role: string; content: any }> }): Promise<Response> {
   const VERTEX_MODEL_MAP: Record<string, string> = {
     "google/gemini-3.1-pro-preview": "gemini-3.1-pro-preview",
-    "google/gemini-2.5-flash": "gemini-3-flash-preview",
+    "google/gemini-2.5-flash": "gemini-2.5-flash",
     "google/gemini-3.1-flash-lite-preview": "gemini-3.1-flash-lite-preview",
     "google/gemini-3-flash-preview": "gemini-3-flash-preview",
   };

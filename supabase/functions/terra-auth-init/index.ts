@@ -92,7 +92,7 @@ Deno.serve(async (req) => {
           const { error: upsertErr } = await admin.from("terra_connections").upsert({
             user_id: user.id,
             terra_user_id: terraUserId,
-            provider,
+            provider: resolvedProvider,
             reference_id: user.id,
             active: true,
           }, { onConflict: "user_id,provider" });

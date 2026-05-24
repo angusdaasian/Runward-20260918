@@ -1,35 +1,45 @@
-# Fix the IOwait spike
+## Why Terra reports 2–3s
 
-## What's causing it
+`terra-webhook` is already enqueue-only at runtime (one INSERT into `terra_webhook_queue`, response returned without awaiting). But its entry file imports `_shared/terraWebhookHandler.ts` — a 1,102-line module containing the full processing pipeline (VDOT/XP recompute, GPS/polyline/elevation/HR/lap/sleep extractors, the `processQueuedTerraWebhook` worker, signature verification, etc.).
 
-The 85% IOwait started right after we introduced the Terra webhook queue + reconcile workflow. Two pg_cron jobs are now running **every single minute** on the Free-tier instance:
+Terra calls the webhook in bursts with long idle gaps, so most deliveries hit a **cold isolate**. The isolate must parse + link + evaluate that entire module before the handler runs. That module-eval time is what Terra measures as "response time" — not the INSERT itself.
 
-- **Job 11 — `terra-reconcile`** (`* * * * *`): scans up to 500 rows from `terra_data_payloads`, 500 from `terra_misc_payloads`, 2 000 rows from `terra_webhook_events` (with a GIN scan over `payload_ids`), plus the recon log, then computes set diffs. This is the heavy one.
-- **Job 12 — `process-terra-queue`** (`* * * * *`): claims a batch and runs the webhook handler. Cheaper, but still wakes the DB every 60 s.
+The fix is to make the webhook entry point depend on *nothing* except the Supabase client and one tiny env helper.
 
-On top of that, every Supabase Studio page load fires the expensive `pg_available_extensions` / `pg_timezone_names` / `reports-database-large-objects` probes that we can see sitting in `pg_stat_activity` for 50–90 seconds each. On a small shared-IO instance these all stack up and the disk queue blows out → 85% IOwait.
+## Changes
 
-Database tables themselves are tiny (queue has 3 live rows, webhook_events has 8) and indexes are correct, so this is purely scheduling pressure, not missing indexes or table bloat.
+### 1. Inline the enqueue handler into `supabase/functions/terra-webhook/index.ts`
 
-## The fix
+Replace the current one-liner that re-exports `handleTerraWebhook` with a self-contained handler:
 
-1. **Reschedule `terra-reconcile`** from `* * * * *` → `*/10 * * * *` (every 10 minutes). It's a safety net for missed webhooks; the live webhook path already handles 99% of traffic and the recon window is 60 minutes anyway, so 10-minute granularity is more than enough.
-2. **Reschedule `process-terra-queue`** from `* * * * *` → `*/2 * * * *` (every 2 minutes). With current volume (~6 webhooks/min, batch size 25) this still drains well under capacity and halves the wakeups.
-3. Leave indexes, table layout, and the `waitUntil` webhook handler unchanged.
+- Import only `createClient` from `@supabase/supabase-js` and the small `TerraEnv` type.
+- Read `req.text()`, grab `terra-signature` header.
+- `supa.from("terra_webhook_queue").insert({ env: "prod", raw_body, signature_header })` — not awaited.
+- Wrap the insert in `EdgeRuntime.waitUntil(...)` so it completes after the response.
+- Return `200 {ok:true}` immediately with CORS headers.
 
-## Technical details
+No import of `terraWebhookHandler.ts`. No XP math, no extractors, no worker code loaded.
 
-Migration:
+### 2. Same treatment for `supabase/functions/terra-webhook-test/index.ts`
 
-```sql
-SELECT cron.alter_job(job_id := 11, schedule := '*/10 * * * *');
-SELECT cron.alter_job(job_id := 12, schedule := '*/2  * * * *');
-```
+Mirror the change so test deliveries also get the fast path.
 
-Expected result: IOwait should drop back to single-digit % within a few minutes. If it doesn't, the next suspect is Studio dashboard polling, which we can't change from inside the project — closing the Studio tab when not in use will help.
+### 3. Keep `_shared/terraWebhookHandler.ts` as-is
 
-## Out of scope
+`process-terra-queue` and `terra-reconcile` continue to import it — they're the workers and already tolerate 2–3s.
 
-- No edge function code changes.
-- No schema or index changes.
-- No upgrade to Supabase Pro (still well under Free-tier limits).
+### 4. Verify
+
+- Deploy `terra-webhook` + `terra-webhook-test`.
+- Send a test payload via `supabase--curl_edge_functions` and confirm `execution_time_ms` drops well under 300ms even on the first call after deploy (cold).
+- Watch Terra dashboard for the next real delivery — expect single-digit-hundreds of ms.
+
+## Expected impact
+
+- Cold-start response: 2–3s → ~150–300ms (TLS + tiny module eval + one INSERT, not awaited).
+- Warm response: already fast, will stay <100ms.
+- No behavior change: queue rows still drained by `process-terra-queue` every 2 min; reconcile + workers untouched.
+
+## What this does NOT fix
+
+- End-to-end "activity finishes → row in `terra_activities`" latency is still bounded by the 2-minute `process-terra-queue` cron. If you want that lower, that's a separate change (e.g. drop to `*/1`, or have the webhook also `EdgeRuntime.waitUntil` a fire-and-forget call to `process-terra-queue` after enqueue).

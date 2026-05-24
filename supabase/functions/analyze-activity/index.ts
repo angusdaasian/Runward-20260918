@@ -1078,8 +1078,8 @@ If the runner raced hard today or said they struggled, suggest rest or a very ea
     const userMessage = `${planContext}${raceContext}\n\n--- Activity Data ---\n${statsText}`;
 
     const promptChars = systemPrompt.length + userMessage.length;
+    lap(`calling AI: promptChars=${promptChars}, lang=${lang}`);
     const aiStart = Date.now();
-    console.log(`[analyze-activity] calling AI: promptChars=${promptChars}, lang=${lang}`);
     const response = await callVertexAI({
       apiKey: VERTEX_API_KEY,
       model: "google/gemini-3.1-flash-lite-preview",

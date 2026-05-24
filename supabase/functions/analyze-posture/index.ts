@@ -43,7 +43,17 @@ async function callVertexAI(opts: { apiKey: string; model?: string; messages: Ar
   }
   const body: any = { contents };
   if (systemParts.length) body.systemInstruction = { parts: systemParts };
-  const vRes = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const ac = new AbortController();
+  const timer = setTimeout(() => ac.abort(), 110_000);
+  let vRes: Response;
+  try {
+    vRes = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body), signal: ac.signal });
+  } catch (e) {
+    clearTimeout(timer);
+    console.error("Vertex fetch failed/aborted:", e, "model:", model);
+    return new Response(JSON.stringify({ error: "Upstream timeout" }), { status: 504, headers: { "Content-Type": "application/json" } });
+  }
+  clearTimeout(timer);
   if (!vRes.ok) {
     const errBody = await vRes.text();
     console.error("Vertex error:", vRes.status, "model:", model, "body:", errBody.slice(0, 1000));

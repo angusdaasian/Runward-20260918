@@ -8,6 +8,17 @@ const corsHeaders = {
 
 const redirect = (to: string) => new Response(null, { status: 302, headers: { ...corsHeaders, Location: to } });
 
+const allowedReturnHosts = new Set(["pacecalculator.fun", "www.pacecalculator.fun", "angustest.site", "www.angustest.site", "welcome-ward-start.lovable.app"]);
+const safeReturnUrl = (raw: string | null, env: TerraEnv) => {
+  const fallback = env === "test" ? "https://angustest.site/terra-return" : "https://pacecalculator.fun/terra-return";
+  try {
+    const parsed = new URL(raw || fallback);
+    return allowedReturnHosts.has(parsed.hostname) ? parsed : new URL(fallback);
+  } catch {
+    return new URL(fallback);
+  }
+};
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -17,7 +28,7 @@ Deno.serve(async (req) => {
   const referenceId = (url.searchParams.get("reference_id") ?? "").trim();
   const provider = (url.searchParams.get("resource") ?? url.searchParams.get("provider") ?? "").toUpperCase().trim();
   const env: TerraEnv = url.searchParams.get("env") === "test" ? "test" : "prod";
-  const returnUrl = new URL(url.searchParams.get("return_url") || (env === "test" ? "https://angustest.site/terra-return" : "https://pacecalculator.fun/terra-return"));
+  const returnUrl = safeReturnUrl(url.searchParams.get("return_url"), env);
 
   for (const [key, value] of url.searchParams.entries()) {
     if (!["return_url", "env"].includes(key)) returnUrl.searchParams.set(key, value);

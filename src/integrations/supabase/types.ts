@@ -1451,6 +1451,7 @@ export type Database = {
       terra_webhook_queue: {
         Row: {
           attempts: number
+          claimed_at: string | null
           env: string
           id: string
           last_error: string | null
@@ -1462,6 +1463,7 @@ export type Database = {
         }
         Insert: {
           attempts?: number
+          claimed_at?: string | null
           env: string
           id?: string
           last_error?: string | null
@@ -1473,6 +1475,7 @@ export type Database = {
         }
         Update: {
           attempts?: number
+          claimed_at?: string | null
           env?: string
           id?: string
           last_error?: string | null

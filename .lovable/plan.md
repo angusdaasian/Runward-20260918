@@ -1,67 +1,35 @@
-# Fix: terra-webhook still blocks on DB insert
+# Fix the IOwait spike
 
-## What's wrong now
+## What's causing it
 
-In `supabase/functions/_shared/terraWebhookHandler.ts` (lines 987–1006), `handleTerraWebhook` does:
+The 85% IOwait started right after we introduced the Terra webhook queue + reconcile workflow. Two pg_cron jobs are now running **every single minute** on the Free-tier instance:
 
-```ts
-const raw = await req.text();                       // buffer body
-const { error } = await supa.from("terra_webhook_queue").insert({...}); // ~1s round-trip
-return new Response(...);                            // only now ACK
+- **Job 11 — `terra-reconcile`** (`* * * * *`): scans up to 500 rows from `terra_data_payloads`, 500 from `terra_misc_payloads`, 2 000 rows from `terra_webhook_events` (with a GIN scan over `payload_ids`), plus the recon log, then computes set diffs. This is the heavy one.
+- **Job 12 — `process-terra-queue`** (`* * * * *`): claims a batch and runs the webhook handler. Cheaper, but still wakes the DB every 60 s.
+
+On top of that, every Supabase Studio page load fires the expensive `pg_available_extensions` / `pg_timezone_names` / `reports-database-large-objects` probes that we can see sitting in `pg_stat_activity` for 50–90 seconds each. On a small shared-IO instance these all stack up and the disk queue blows out → 85% IOwait.
+
+Database tables themselves are tiny (queue has 3 live rows, webhook_events has 8) and indexes are correct, so this is purely scheduling pressure, not missing indexes or table bloat.
+
+## The fix
+
+1. **Reschedule `terra-reconcile`** from `* * * * *` → `*/10 * * * *` (every 10 minutes). It's a safety net for missed webhooks; the live webhook path already handles 99% of traffic and the recon window is 60 minutes anyway, so 10-minute granularity is more than enough.
+2. **Reschedule `process-terra-queue`** from `* * * * *` → `*/2 * * * *` (every 2 minutes). With current volume (~6 webhooks/min, batch size 25) this still drains well under capacity and halves the wakeups.
+3. Leave indexes, table layout, and the `waitUntil` webhook handler unchanged.
+
+## Technical details
+
+Migration:
+
+```sql
+SELECT cron.alter_job(job_id := 11, schedule := '*/10 * * * *');
+SELECT cron.alter_job(job_id := 12, schedule := '*/2  * * * *');
 ```
 
-The `await` on the Postgres insert is the dominant cost. Even with an 11KB body, Terra sees ~1.6s because the function waits for the DB write to complete before returning 200. The previous version (pre-queue) sometimes finished faster simply because the container was warmer or the work happened to overlap with response streaming.
+Expected result: IOwait should drop back to single-digit % within a few minutes. If it doesn't, the next suspect is Studio dashboard polling, which we can't change from inside the project — closing the Studio tab when not in use will help.
 
-## Fix
+## Out of scope
 
-Move the queue insert into a background task using `EdgeRuntime.waitUntil`, so the response is returned the moment the body is buffered.
-
-### Change in `supabase/functions/_shared/terraWebhookHandler.ts`
-
-Replace the body of `handleTerraWebhook` (≈ lines 987–1006) with:
-
-```ts
-export async function handleTerraWebhook(req: Request, env: TerraEnv = "prod"): Promise<Response> {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
-
-  const raw = await req.text();                       // must read before responding
-  const sigHeader = req.headers.get("terra-signature");
-
-  // Fire-and-forget: do NOT await the DB insert.
-  const enqueue = supa.from("terra_webhook_queue").insert({
-    env,
-    raw_body: raw,
-    signature_header: sigHeader,
-  }).then(({ error }) => {
-    if (error) console.error("[terra-webhook] enqueue failed", error);
-  }).catch((e) => {
-    console.error("[terra-webhook] enqueue threw", e);
-  });
-
-  // @ts-ignore - EdgeRuntime is provided by the Supabase Edge runtime
-  if (typeof EdgeRuntime !== "undefined" && EdgeRuntime?.waitUntil) {
-    // @ts-ignore
-    EdgeRuntime.waitUntil(enqueue);
-  }
-
-  return new Response(
-    JSON.stringify({ ok: true }),
-    { headers: { ...corsHeaders, "Content-Type": "application/json" } },
-  );
-}
-```
-
-### Why this works
-
-- `req.text()` still must complete before we respond (we need the bytes in memory to enqueue them after responding).
-- The Postgres insert — the slow part — now runs after the response is sent. Terra gets its 200 in well under 200ms in steady state.
-- If the insert fails, the reconciler cron (`terra-reconcile`) already re-fetches missing payloads from Terra's Supabase destination, so durability is preserved.
-- No change to `process-terra-queue` or `terra-reconcile` needed.
-
-### Deploy
-
-Redeploy `terra-webhook` and `terra-webhook-test` (both import the shared handler).
-
-### Verification
-
-After deploy, check Terra's dashboard: a fresh body-mode webhook should drop from ~1.6s to ~100–200ms response time. Confirm rows still land in `terra_webhook_queue` and get drained by `process-terra-queue`.
+- No edge function code changes.
+- No schema or index changes.
+- No upgrade to Supabase Pro (still well under Free-tier limits).

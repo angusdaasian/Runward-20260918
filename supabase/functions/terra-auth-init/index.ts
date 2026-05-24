@@ -33,19 +33,8 @@ Deno.serve(async (req) => {
     const baseHost = env === "test" ? "https://angustest.site" : "https://pacecalculator.fun";
     const DEFAULT_SUCCESS = `${baseHost}/terra-return?status=success&native=true`;
     const DEFAULT_FAILURE = `${baseHost}/terra-return?status=failure&native=true`;
-    const appSuccessUrl = (typeof body.success_url === "string" && body.success_url.trim()) ? body.success_url.trim() : DEFAULT_SUCCESS;
-    const appFailureUrl = (typeof body.failure_url === "string" && body.failure_url.trim()) ? body.failure_url.trim() : DEFAULT_FAILURE;
-    const callbackBase = `${Deno.env.get("SUPABASE_URL")}/functions/v1/terra-auth-callback`;
-    const makeCallbackUrl = (status: "success" | "failure", returnUrl: string) => {
-      const url = new URL(callbackBase);
-      url.searchParams.set("status", status);
-      url.searchParams.set("provider", provider);
-      url.searchParams.set("env", env);
-      url.searchParams.set("return_url", returnUrl);
-      return url.toString();
-    };
-    const successUrl = makeCallbackUrl("success", appSuccessUrl);
-    const failureUrl = makeCallbackUrl("failure", appFailureUrl);
+    const successUrl = (typeof body.success_url === "string" && body.success_url.trim()) ? body.success_url.trim() : DEFAULT_SUCCESS;
+    const failureUrl = (typeof body.failure_url === "string" && body.failure_url.trim()) ? body.failure_url.trim() : DEFAULT_FAILURE;
 
     const tres = await fetch(`https://api.tryterra.co/v2/auth/authenticateUser?resource=${provider}`, {
       method: "POST",

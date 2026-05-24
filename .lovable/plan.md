@@ -1,45 +1,58 @@
-## Why Terra reports 2–3s
+## Achievements page updates
 
-`terra-webhook` is already enqueue-only at runtime (one INSERT into `terra_webhook_queue`, response returned without awaiting). But its entry file imports `_shared/terraWebhookHandler.ts` — a 1,102-line module containing the full processing pipeline (VDOT/XP recompute, GPS/polyline/elevation/HR/lap/sleep extractors, the `processQueuedTerraWebhook` worker, signature verification, etc.).
+### 1. Rename and simplify
+- In `src/components/BadgesPage.tsx`, change hero label `Achievement Badges` / `成就徽章` → `Achievements` / `成就`.
+- Remove the description paragraph (`{c.desc}`) from the detail modal so it only shows the badge name + progress.
+- Tile grid already only shows names — no change needed there.
 
-Terra calls the webhook in bursts with long idle gaps, so most deliveries hit a **cold isolate**. The isolate must parse + link + evaluate that entire module before the handler runs. That module-eval time is what Terra measures as "response time" — not the INSERT itself.
+### 2. App anniversary → Mar 28, 2026
+In `src/lib/badges.ts`:
+- `APP_LAUNCH_DATE = "2026-03-28"`.
+- `appBirthday = anyOnMonthDay(activities, 2, 28)` (March = month 2).
+- `app_birthday` badge copy: `Run on the app's anniversary date (Mar 28)` / `於 App 週年日跑步（3 月 28 日）`.
 
-The fix is to make the webhook entry point depend on *nothing* except the Supabase client and one tiny env helper.
+### 3. New badges (14 total)
 
-## Changes
+**Lifetime distance** (category `distance`, value = `totalKm`):
+- `mileage_1500` — 1,500 km
+- `mileage_2000` — 2,000 km
+- `mileage_2500` — 2,500 km
+- `mileage_3000` — 3,000 km
+- `mileage_3500` — 3,500 km
+- `mileage_4000` — 4,000 km
 
-### 1. Inline the enqueue handler into `supabase/functions/terra-webhook/index.ts`
+**Monthly volume** (category `volume`, value = `month.km`):
+- `monthly_300` — 300 km in a calendar month
+- `monthly_400` — 400 km in a calendar month
+- `monthly_500` — 500 km in a calendar month
+- (existing `volume_king` = 200 km stays)
 
-Replace the current one-liner that re-exports `handleTerraWebhook` with a self-contained handler:
+**Marathon pace** (category `pace`, value uses `bestPaceSecPerKmOver(activities, 42195)`):
+- `marathon_sub5` — sub 5:00/km marathon (300 s)
+- `marathon_sub430` — sub 4:30/km marathon (270 s)
+- `marathon_sub4` — sub 4:00/km marathon (240 s)
+- `marathon_sub330` — sub 3:30/km marathon (210 s)
+- `marathon_sub3` — sub 3:00/km marathon (180 s)
 
-- Import only `createClient` from `@supabase/supabase-js` and the small `TerraEnv` type.
-- Read `req.text()`, grab `terra-signature` header.
-- `supa.from("terra_webhook_queue").insert({ env: "prod", raw_body, signature_header })` — not awaited.
-- Wrap the insert in `EdgeRuntime.waitUntil(...)` so it completes after the response.
-- Return `200 {ok:true}` immediately with CORS headers.
+Add `bestSecMarathon` computation in `computeBadgeProgress` and 5 new switch cases.
 
-No import of `terraWebhookHandler.ts`. No XP math, no extractors, no worker code loaded.
+### 4. Collector badge rework
+Rename `completionist` meta badge:
+- EN: name `50 Badges Collected`, desc `Collect 50 badges`
+- ZH: name `收藏 50 個徽章`, desc `收集 50 個徽章`
+- `target: 50` (was 45). With 14 new badges added, total non-meta badges ≈ 56, so 50 is achievable.
 
-### 2. Same treatment for `supabase/functions/terra-webhook-test/index.ts`
+### 5. Generate badge artwork
+Use `imagegen--generate_image` (premium tier for clean illustration consistency) for each of the 14 new badges. Match the existing style — circular medal, gradient backdrop, central icon + number, no text-heavy clutter. Save to `src/assets/badges/<id>.png` and import in `badges.ts`.
 
-Mirror the change so test deliveries also get the fast path.
+Example prompts:
+- Distance: "Circular running achievement medal badge, '2000 KM' bold numeral, runner silhouette, gold-bronze gradient ring, on a solid white background, same style as a sports milestone badge"
+- Monthly: "Circular monthly volume badge with '500' and 'KM/MO', calendar accent, vibrant blue-purple gradient, on a solid white background"
+- Marathon pace: "Circular marathon pace badge with 'SUB 3:00' and '42K', stopwatch + laurel motif, racing red gradient, on a solid white background"
 
-### 3. Keep `_shared/terraWebhookHandler.ts` as-is
+### Files changed
+- `src/lib/badges.ts` — anniversary date, 14 new BadgeDef entries, marathon-pace computation, completionist target/copy.
+- `src/components/BadgesPage.tsx` — hero label + remove modal desc.
+- `src/assets/badges/*.png` — 14 new images.
 
-`process-terra-queue` and `terra-reconcile` continue to import it — they're the workers and already tolerate 2–3s.
-
-### 4. Verify
-
-- Deploy `terra-webhook` + `terra-webhook-test`.
-- Send a test payload via `supabase--curl_edge_functions` and confirm `execution_time_ms` drops well under 300ms even on the first call after deploy (cold).
-- Watch Terra dashboard for the next real delivery — expect single-digit-hundreds of ms.
-
-## Expected impact
-
-- Cold-start response: 2–3s → ~150–300ms (TLS + tiny module eval + one INSERT, not awaited).
-- Warm response: already fast, will stay <100ms.
-- No behavior change: queue rows still drained by `process-terra-queue` every 2 min; reconcile + workers untouched.
-
-## What this does NOT fix
-
-- End-to-end "activity finishes → row in `terra_activities`" latency is still bounded by the 2-minute `process-terra-queue` cron. If you want that lower, that's a separate change (e.g. drop to `*/1`, or have the webhook also `EdgeRuntime.waitUntil` a fire-and-forget call to `process-terra-queue` after enqueue).
+No DB/migration changes.

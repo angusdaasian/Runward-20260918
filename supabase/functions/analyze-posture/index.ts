@@ -63,7 +63,6 @@ serve(async (req) => {
   if (!token) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
-  let authedUserId: string | null = null;
   try {
     const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2.49.4");
     const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, { global: { headers: { Authorization: `Bearer ${token}` } } });
@@ -71,35 +70,9 @@ serve(async (req) => {
     if (error || !data?.claims) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
-    authedUserId = (data.claims as any).sub as string;
-
-    // Server-side daily rate limit for non-premium users (1/day)
-    const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-    const { data: profile } = await admin
-      .from("profiles")
-      .select("is_premium")
-      .eq("user_id", authedUserId)
-      .maybeSingle();
-
-    if (!profile?.is_premium) {
-      const since = new Date();
-      since.setUTCHours(0, 0, 0, 0);
-      const { count } = await admin
-        .from("posture_analyses")
-        .select("id", { count: "exact", head: true })
-        .eq("user_id", authedUserId)
-        .gte("created_at", since.toISOString());
-      if ((count ?? 0) >= 1) {
-        return new Response(
-          JSON.stringify({ error: "Daily limit reached. Upgrade to premium for unlimited analyses." }),
-          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-    }
   } catch {
     return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
-
 
 
   try {

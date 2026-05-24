@@ -1285,138 +1285,10 @@ export type Database = {
         }
         Relationships: []
       }
-      terra_data_payloads: {
-        Row: {
-          created_at: string | null
-          data_type: string | null
-          end_time: string | null
-          payload_id: string
-          start_time: string | null
-          user_id: string
-        }
-        Insert: {
-          created_at?: string | null
-          data_type?: string | null
-          end_time?: string | null
-          payload_id: string
-          start_time?: string | null
-          user_id: string
-        }
-        Update: {
-          created_at?: string | null
-          data_type?: string | null
-          end_time?: string | null
-          payload_id?: string
-          start_time?: string | null
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "fk_data_user"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "terra_users"
-            referencedColumns: ["user_id"]
-          },
-        ]
-      }
-      terra_misc_payloads: {
-        Row: {
-          created_at: string | null
-          data_type: string | null
-          payload_id: string
-          payload_type: string | null
-          user_id: string
-        }
-        Insert: {
-          created_at?: string | null
-          data_type?: string | null
-          payload_id: string
-          payload_type?: string | null
-          user_id: string
-        }
-        Update: {
-          created_at?: string | null
-          data_type?: string | null
-          payload_id?: string
-          payload_type?: string | null
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "fk_misc_user"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "terra_users"
-            referencedColumns: ["user_id"]
-          },
-        ]
-      }
-      terra_reconciliation_log: {
-        Row: {
-          created_at: string
-          data_type: string | null
-          detail: string | null
-          id: string
-          payload_id: string
-          source_table: string
-          status: string
-          terra_user_id: string | null
-        }
-        Insert: {
-          created_at?: string
-          data_type?: string | null
-          detail?: string | null
-          id?: string
-          payload_id: string
-          source_table: string
-          status: string
-          terra_user_id?: string | null
-        }
-        Update: {
-          created_at?: string
-          data_type?: string | null
-          detail?: string | null
-          id?: string
-          payload_id?: string
-          source_table?: string
-          status?: string
-          terra_user_id?: string | null
-        }
-        Relationships: []
-      }
-      terra_users: {
-        Row: {
-          created_at: string | null
-          granted_scopes: string | null
-          provider: string | null
-          reference_id: string | null
-          state: string | null
-          user_id: string
-        }
-        Insert: {
-          created_at?: string | null
-          granted_scopes?: string | null
-          provider?: string | null
-          reference_id?: string | null
-          state?: string | null
-          user_id: string
-        }
-        Update: {
-          created_at?: string | null
-          granted_scopes?: string | null
-          provider?: string | null
-          reference_id?: string | null
-          state?: string | null
-          user_id?: string
-        }
-        Relationships: []
-      }
       terra_webhook_events: {
         Row: {
           id: string
           payload: Json | null
-          payload_ids: string[] | null
           processing_error: string | null
           received_at: string
           reference_id: string | null
@@ -1427,7 +1299,6 @@ export type Database = {
         Insert: {
           id?: string
           payload?: Json | null
-          payload_ids?: string[] | null
           processing_error?: string | null
           received_at?: string
           reference_id?: string | null
@@ -1438,52 +1309,12 @@ export type Database = {
         Update: {
           id?: string
           payload?: Json | null
-          payload_ids?: string[] | null
           processing_error?: string | null
           received_at?: string
           reference_id?: string | null
           signature_valid?: boolean | null
           terra_user_id?: string | null
           type?: string | null
-        }
-        Relationships: []
-      }
-      terra_webhook_queue: {
-        Row: {
-          attempts: number
-          claimed_at: string | null
-          env: string
-          id: string
-          last_error: string | null
-          processed_at: string | null
-          raw_body: string
-          received_at: string
-          signature_header: string | null
-          status: string
-        }
-        Insert: {
-          attempts?: number
-          claimed_at?: string | null
-          env: string
-          id?: string
-          last_error?: string | null
-          processed_at?: string | null
-          raw_body: string
-          received_at?: string
-          signature_header?: string | null
-          status?: string
-        }
-        Update: {
-          attempts?: number
-          claimed_at?: string | null
-          env?: string
-          id?: string
-          last_error?: string | null
-          processed_at?: string | null
-          raw_body?: string
-          received_at?: string
-          signature_header?: string | null
-          status?: string
         }
         Relationships: []
       }
@@ -1984,16 +1815,6 @@ export type Database = {
       }
     }
     Functions: {
-      claim_terra_webhook_queue: {
-        Args: { batch_size: number }
-        Returns: {
-          attempts: number
-          env: string
-          id: string
-          raw_body: string
-          signature_header: string
-        }[]
-      }
       get_leaderboard: {
         Args: { p_is_premium: boolean; p_limit: number }
         Returns: {

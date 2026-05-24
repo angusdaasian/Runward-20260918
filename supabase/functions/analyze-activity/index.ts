@@ -14,6 +14,7 @@ function jsonResponse(body: Record<string, unknown>, status = 200) {
 
 // ── Vertex AI helper (OpenAI-compatible response shape) ──
 const VERTEX_MODEL_MAP: Record<string, string> = {
+  "google/gemini-3-flash-preview": "gemini-3-flash-preview",
   "google/gemini-3.1-flash-lite-preview": "gemini-3.1-flash-lite-preview",
   "google/gemini-2.5-flash": "gemini-2.5-flash",
   "google/gemini-2.5-flash-lite": "gemini-2.5-flash-lite",
@@ -24,12 +25,8 @@ async function callVertexAI(opts: {
   apiKey: string;
   model?: string;
   messages: Array<{ role: string; content: any }>;
-  thinkingLevel?: "minimal" | "low" | "medium" | "high";
-  thinkingBudget?: number;
-  maxOutputTokens?: number;
-  timeoutMs?: number;
 }): Promise<Response> {
-  const model = VERTEX_MODEL_MAP[opts.model || ""] || (opts.model || "gemini-3.1-flash-lite-preview").replace(/^google\//, "");
+  const model = VERTEX_MODEL_MAP[opts.model || ""] || (opts.model || "gemini-3-flash-preview").replace(/^google\//, "");
   const url = `https://aiplatform.googleapis.com/v1/publishers/google/models/${model}:generateContent?key=${opts.apiKey}`;
 
   const systemParts: any[] = [];
@@ -49,6 +46,7 @@ async function callVertexAI(opts: {
         if (p.type === "text") return { text: p.text };
         if (p.type === "image_url") {
           const url = p.image_url?.url || "";
+          // data URL: data:image/png;base64,xxxx
           const match = url.match(/^data:([^;]+);base64,(.+)$/);
           if (match) return { inlineData: { mimeType: match[1], data: match[2] } };
           return { fileData: { fileUri: url, mimeType: "image/jpeg" } };
@@ -61,38 +59,21 @@ async function callVertexAI(opts: {
     contents.push({ role, parts });
   }
 
-  // Match ai-running-coach: numeric thinkingBudget (0 = off), maxOutputTokens cap.
-  const THINKING_BUDGET_MAP: Record<string, number> = { minimal: 0, low: 512, medium: 2048, high: 8192 };
-  const thinkingBudget = typeof opts.thinkingBudget === "number"
-    ? opts.thinkingBudget
-    : THINKING_BUDGET_MAP[opts.thinkingLevel || "minimal"];
-  const generationConfig: any = {
-    maxOutputTokens: opts.maxOutputTokens ?? 1536,
-    thinkingConfig: { thinkingBudget },
-  };
-  const body: any = { contents, generationConfig };
+  const body: any = { contents };
   if (systemParts.length) body.systemInstruction = { parts: systemParts };
-
-
-  // Hard timeout (Supabase wall-clock is 150s; abort well before that so we can return a clean error).
-  const timeoutMs = opts.timeoutMs ?? 120_000;
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
-  let vRes: Response;
-  try {
-    vRes = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-      signal: ctrl.signal,
-    });
-  } catch (e) {
-    clearTimeout(timer);
-    const aborted = (e as any)?.name === "AbortError";
-    console.error("Vertex fetch failed:", aborted ? `timeout after ${timeoutMs}ms` : (e as Error).message);
-    return new Response(JSON.stringify({ error: aborted ? "Vertex AI timed out" : "Vertex AI request failed" }), { status: 504 });
+  // Enable medium thinking for Gemini 3 reasoning models
+  if (model.startsWith("gemini-3")) {
+    body.generationConfig = {
+      ...(body.generationConfig || {}),
+      thinkingConfig: { thinkingLevel: "medium" },
+    };
   }
-  clearTimeout(timer);
+
+  const vRes = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
 
   if (!vRes.ok) {
     const errText = await vRes.text();
@@ -100,6 +81,7 @@ async function callVertexAI(opts: {
   }
   const vData = await vRes.json();
   const text = vData?.candidates?.[0]?.content?.parts?.map((p: any) => p.text || "").join("") || "";
+  // Return OpenAI-compatible shape
   return new Response(JSON.stringify({ choices: [{ message: { content: text } }] }), {
     status: 200,
     headers: { "Content-Type": "application/json" },
@@ -155,7 +137,7 @@ async function extractCityFromRaceName(raceName: string, apiKey: string): Promis
   try {
     const resp = await callVertexAI({
       apiKey,
-      model: "google/gemini-3.1-flash-lite-preview",
+      model: "google/gemini-3-flash-preview",
       messages: [
         {
           role: "system",
@@ -240,8 +222,6 @@ function summarizeWeather(weather: any): string {
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
-  const t0 = Date.now();
-  const lap = (label: string) => console.log(`[analyze-activity] +${Date.now() - t0}ms ${label}`);
   try {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) return jsonResponse({ error: "Unauthorized" }, 401);
@@ -297,7 +277,7 @@ serve(async (req) => {
 
       const tlResp = await callVertexAI({
         apiKey: VERTEX_API_KEY,
-        model: "google/gemini-3.1-flash-lite-preview",
+        model: "google/gemini-3-flash-preview",
         messages: [
           { role: "user", content: `Translate the following running coach output into ${targetLang}. Preserve the ===ANALYSIS=== and ===NEXT_WORKOUT=== separators exactly. Keep Markdown intact. Only translate, do not change content.\n\n${combinedSource}` },
         ],
@@ -355,7 +335,7 @@ serve(async (req) => {
           const combined = `===ANALYSIS===\n${cached[otherField]}\n\n===NEXT_WORKOUT===\n${cached[otherNField] || ""}`;
           const tlResp = await callVertexAI({
             apiKey: VERTEX_API_KEY,
-            model: "google/gemini-3.1-flash-lite-preview",
+            model: "google/gemini-3-flash-preview",
             messages: [{ role: "user", content: `Translate the following running coach output into ${targetLang}. Preserve the ===ANALYSIS=== and ===NEXT_WORKOUT=== separators exactly. Keep Markdown intact. Only translate, do not change content.\n\n${combined}` }],
           });
           if (tlResp.ok) {
@@ -408,7 +388,7 @@ serve(async (req) => {
         const combined = `===ANALYSIS===\n${existingAnalysis[otherField]}\n\n===NEXT_WORKOUT===\n${existingAnalysis[otherNextField] || ""}`;
         const tlResp = await callVertexAI({
           apiKey: VERTEX_API_KEY,
-          model: "google/gemini-3.1-flash-lite-preview",
+          model: "google/gemini-3-flash-preview",
           messages: [{ role: "user", content: `Translate the following into ${targetLang}. Preserve the ===ANALYSIS=== and ===NEXT_WORKOUT=== separators. Keep Markdown.\n\n${combined}` }],
         });
         if (tlResp.ok) {
@@ -431,7 +411,6 @@ serve(async (req) => {
       }
     }
 
-    lap("start weather/race resolution");
     // --- Resolve race + weather ---
     let resolvedRaceName: string | null = raceName?.trim() || null;
     let raceCity: string | null = null;
@@ -1077,25 +1056,18 @@ If the runner raced hard today or said they struggled, suggest rest or a very ea
 
     const userMessage = `${planContext}${raceContext}\n\n--- Activity Data ---\n${statsText}`;
 
-    const promptChars = systemPrompt.length + userMessage.length;
-    lap(`calling AI: promptChars=${promptChars}, lang=${lang}`);
-    const aiStart = Date.now();
     const response = await callVertexAI({
       apiKey: VERTEX_API_KEY,
-      model: "google/gemini-3.1-flash-lite-preview",
+      model: "google/gemini-3-flash-preview",
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userMessage },
       ],
-      thinkingLevel: "minimal",
-      maxOutputTokens: 1024,
     });
-    lap(`AI returned in ${Date.now() - aiStart}ms status=${response.status}`);
 
     if (!response.ok) {
       if (response.status === 429) return jsonResponse({ error: "Rate limited, please try again later." }, 429);
       if (response.status === 402) return jsonResponse({ error: "Payment required." }, 402);
-      if (response.status === 504) return jsonResponse({ error: "Analysis is taking too long. Please try again." }, 504);
       const t = await response.text();
       console.error("AI gateway error:", response.status, t);
       return jsonResponse({ error: "AI gateway error" }, 500);

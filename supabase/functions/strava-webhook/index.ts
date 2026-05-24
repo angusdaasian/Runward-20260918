@@ -352,10 +352,12 @@ serve(async (req) => {
         : Deno.env.get('STRAVA_CLIENT_SECRET')!;
 
       if (event.aspect_type === 'delete') {
+        // Scope delete by user_id to prevent forged events from deleting other users' activities
         await supabase
           .from('strava_activities')
           .delete()
-          .eq('strava_id', event.object_id);
+          .eq('strava_id', event.object_id)
+          .eq('user_id', connection.user_id);
         await computeTrainingScore(supabase, connection.user_id, connEnv);
       } else {
         const accessToken = await refreshTokenIfNeeded(

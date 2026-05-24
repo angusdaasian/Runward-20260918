@@ -27,3 +27,6 @@ verify_jwt = false
 
 [functions.analyze-posture]
 verify_jwt = false
+
+[functions.analyze-activity]
+verify_jwt = false

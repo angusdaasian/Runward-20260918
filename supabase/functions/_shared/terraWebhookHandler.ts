@@ -1032,6 +1032,20 @@ export async function processQueuedTerraWebhook(
   let payload: any = {};
   try { payload = JSON.parse(raw); } catch { payload = { _parse_error: true, raw }; }
 
+  // Terra sends unsigned "ping" healthchecks to confirm the webhook URL is
+  // reachable. These have no HMAC and would otherwise be logged as
+  // `invalid signature`. Acknowledge and skip.
+  if (payload?.type === "ping") {
+    await supa.from("terra_webhook_events").insert({
+      type: "ping",
+      signature_valid: true,
+      payload: { env, note: "healthcheck ack" },
+      processing_error: null,
+    });
+    return { ok: true };
+  }
+
+
   // ── Ping mode (S3 payload delivery) ──
   if (payload?.type === "s3_payload" && typeof payload?.url === "string") {
     const pingUrl: string = payload.url;

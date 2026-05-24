@@ -240,6 +240,8 @@ function summarizeWeather(weather: any): string {
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
+  const t0 = Date.now();
+  const lap = (label: string) => console.log(`[analyze-activity] +${Date.now() - t0}ms ${label}`);
   try {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) return jsonResponse({ error: "Unauthorized" }, 401);

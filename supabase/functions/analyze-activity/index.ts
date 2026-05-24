@@ -1090,7 +1090,7 @@ If the runner raced hard today or said they struggled, suggest rest or a very ea
       thinkingLevel: "minimal",
       maxOutputTokens: 1024,
     });
-    console.log(`[analyze-activity] AI returned in ${Date.now() - aiStart}ms status=${response.status}`);
+    lap(`AI returned in ${Date.now() - aiStart}ms status=${response.status}`);
 
     if (!response.ok) {
       if (response.status === 429) return jsonResponse({ error: "Rate limited, please try again later." }, 429);

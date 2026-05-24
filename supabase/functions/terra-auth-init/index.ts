@@ -64,6 +64,10 @@ Deno.serve(async (req) => {
     }
 
     const terraUserId: string | undefined = tjson.user_id;
+    // Terra's response usually echoes back the provider (resource); prefer it
+    // if present so we store exactly what Terra recorded. Scopes are not
+    // available at init time — they arrive via the `auth` webhook later.
+    const resolvedProvider: string = String(tjson.resource ?? tjson.provider ?? provider).toUpperCase();
 
     // Eagerly persist the terra_user_id so we don't depend on the `auth`/`reauth`
     // webhook (which can be delayed) or the /terra-return → terra-confirm

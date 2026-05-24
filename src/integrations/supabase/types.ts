@@ -1385,6 +1385,48 @@ export type Database = {
         }
         Relationships: []
       }
+      terra_today_oneoff_queue: {
+        Row: {
+          attempted_at: string | null
+          created_at: string
+          http_status: number | null
+          id: string
+          provider: string
+          result: string | null
+          status: string
+          target_date: string
+          terra_reference: string | null
+          terra_user_id: string
+          user_id: string
+        }
+        Insert: {
+          attempted_at?: string | null
+          created_at?: string
+          http_status?: number | null
+          id?: string
+          provider: string
+          result?: string | null
+          status?: string
+          target_date: string
+          terra_reference?: string | null
+          terra_user_id: string
+          user_id: string
+        }
+        Update: {
+          attempted_at?: string | null
+          created_at?: string
+          http_status?: number | null
+          id?: string
+          provider?: string
+          result?: string | null
+          status?: string
+          target_date?: string
+          terra_reference?: string | null
+          terra_user_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       terra_users: {
         Row: {
           created_at: string | null
@@ -2024,6 +2066,7 @@ export type Database = {
         Returns: boolean
       }
       invoke_reset_season: { Args: { p_month_year?: string }; Returns: number }
+      unschedule_terra_today_oneoff: { Args: never; Returns: undefined }
     }
     Enums: {
       app_role: "admin" | "user"

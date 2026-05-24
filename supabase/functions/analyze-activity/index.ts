@@ -1082,6 +1082,7 @@ If the runner raced hard today or said they struggled, suggest rest or a very ea
     if (!response.ok) {
       if (response.status === 429) return jsonResponse({ error: "Rate limited, please try again later." }, 429);
       if (response.status === 402) return jsonResponse({ error: "Payment required." }, 402);
+      if (response.status === 504) return jsonResponse({ error: "Analysis is taking too long. Please try again." }, 504);
       const t = await response.text();
       console.error("AI gateway error:", response.status, t);
       return jsonResponse({ error: "AI gateway error" }, 500);

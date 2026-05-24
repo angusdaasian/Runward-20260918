@@ -25,6 +25,8 @@ async function callVertexAI(opts: {
   apiKey: string;
   model?: string;
   messages: Array<{ role: string; content: any }>;
+  thinkingLevel?: "minimal" | "low" | "medium" | "high";
+  timeoutMs?: number;
 }): Promise<Response> {
   const model = VERTEX_MODEL_MAP[opts.model || ""] || (opts.model || "gemini-3-flash-preview").replace(/^google\//, "");
   const url = `https://aiplatform.googleapis.com/v1/publishers/google/models/${model}:generateContent?key=${opts.apiKey}`;
@@ -46,7 +48,6 @@ async function callVertexAI(opts: {
         if (p.type === "text") return { text: p.text };
         if (p.type === "image_url") {
           const url = p.image_url?.url || "";
-          // data URL: data:image/png;base64,xxxx
           const match = url.match(/^data:([^;]+);base64,(.+)$/);
           if (match) return { inlineData: { mimeType: match[1], data: match[2] } };
           return { fileData: { fileUri: url, mimeType: "image/jpeg" } };
@@ -61,19 +62,33 @@ async function callVertexAI(opts: {
 
   const body: any = { contents };
   if (systemParts.length) body.systemInstruction = { parts: systemParts };
-  // Enable medium thinking for Gemini 3 reasoning models
+  // Default to "low" thinking for Gemini 3 (was "medium" — too slow on large prompts, hits Supabase 150s wall-clock).
   if (model.startsWith("gemini-3")) {
     body.generationConfig = {
       ...(body.generationConfig || {}),
-      thinkingConfig: { thinkingLevel: "medium" },
+      thinkingConfig: { thinkingLevel: opts.thinkingLevel || "low" },
     };
   }
 
-  const vRes = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
+  // Hard timeout (Supabase wall-clock is 150s; abort well before that so we can return a clean error).
+  const timeoutMs = opts.timeoutMs ?? 120_000;
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  let vRes: Response;
+  try {
+    vRes = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal: ctrl.signal,
+    });
+  } catch (e) {
+    clearTimeout(timer);
+    const aborted = (e as any)?.name === "AbortError";
+    console.error("Vertex fetch failed:", aborted ? `timeout after ${timeoutMs}ms` : (e as Error).message);
+    return new Response(JSON.stringify({ error: aborted ? "Vertex AI timed out" : "Vertex AI request failed" }), { status: 504 });
+  }
+  clearTimeout(timer);
 
   if (!vRes.ok) {
     const errText = await vRes.text();
@@ -81,7 +96,6 @@ async function callVertexAI(opts: {
   }
   const vData = await vRes.json();
   const text = vData?.candidates?.[0]?.content?.parts?.map((p: any) => p.text || "").join("") || "";
-  // Return OpenAI-compatible shape
   return new Response(JSON.stringify({ choices: [{ message: { content: text } }] }), {
     status: 200,
     headers: { "Content-Type": "application/json" },

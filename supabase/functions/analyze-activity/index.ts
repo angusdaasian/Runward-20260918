@@ -25,6 +25,8 @@ async function callVertexAI(opts: {
   model?: string;
   messages: Array<{ role: string; content: any }>;
   thinkingLevel?: "minimal" | "low" | "medium" | "high";
+  thinkingBudget?: number;
+  maxOutputTokens?: number;
   timeoutMs?: number;
 }): Promise<Response> {
   const model = VERTEX_MODEL_MAP[opts.model || ""] || (opts.model || "gemini-3.1-flash-lite-preview").replace(/^google\//, "");
@@ -59,15 +61,18 @@ async function callVertexAI(opts: {
     contents.push({ role, parts });
   }
 
-  const body: any = { contents };
+  // Match ai-running-coach: numeric thinkingBudget (0 = off), maxOutputTokens cap.
+  const THINKING_BUDGET_MAP: Record<string, number> = { minimal: 0, low: 512, medium: 2048, high: 8192 };
+  const thinkingBudget = typeof opts.thinkingBudget === "number"
+    ? opts.thinkingBudget
+    : THINKING_BUDGET_MAP[opts.thinkingLevel || "minimal"];
+  const generationConfig: any = {
+    maxOutputTokens: opts.maxOutputTokens ?? 1536,
+    thinkingConfig: { thinkingBudget },
+  };
+  const body: any = { contents, generationConfig };
   if (systemParts.length) body.systemInstruction = { parts: systemParts };
-  // Default to "low" thinking for Gemini 3 (was "medium" — too slow on large prompts, hits Supabase 150s wall-clock).
-  if (model.startsWith("gemini-3")) {
-    body.generationConfig = {
-      ...(body.generationConfig || {}),
-      thinkingConfig: { thinkingLevel: opts.thinkingLevel || "low" },
-    };
-  }
+
 
   // Hard timeout (Supabase wall-clock is 150s; abort well before that so we can return a clean error).
   const timeoutMs = opts.timeoutMs ?? 120_000;

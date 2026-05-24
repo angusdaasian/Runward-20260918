@@ -36,7 +36,16 @@ Deno.serve(async (req) => {
     const info = await fetch(`https://api.tryterra.co/v2/userInfo?user_id=${encodeURIComponent(terraUserId)}`, {
       headers: { "dev-id": devId, "x-api-key": apiKey },
     });
-    if (info.ok) terraUser = (await info.json().catch(() => ({})))?.user ?? null;
+    if (!info.ok) {
+      console.error(`[terra-auth-callback] userInfo failed terra_user_id=${terraUserId} status=${info.status}`);
+      return redirect(returnUrl.toString());
+    }
+    const userInfo = await info.json().catch(() => ({}));
+    terraUser = userInfo?.user ?? null;
+    if (!terraUser || userInfo?.is_authenticated === false) {
+      console.error(`[terra-auth-callback] userInfo not authenticated terra_user_id=${terraUserId}`);
+      return redirect(returnUrl.toString());
+    }
 
     if (terraUser?.reference_id && terraUser.reference_id !== referenceId) {
       console.error(`[terra-auth-callback] reference mismatch terra_user_id=${terraUserId} redirect=${referenceId} terra=${terraUser.reference_id}`);

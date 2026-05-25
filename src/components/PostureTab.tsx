@@ -17,7 +17,7 @@ interface Props {
   lang: Lang;
 }
 
-function extractFrames(videoFile: File, count = 6): Promise<string[]> {
+function extractFrames(videoFile: File, count = 4): Promise<string[]> {
   return new Promise((resolve, reject) => {
     const video = document.createElement("video");
     video.preload = "metadata";
@@ -48,10 +48,10 @@ function extractFrames(videoFile: File, count = 6): Promise<string[]> {
       };
 
       video.onseeked = () => {
-        canvas.width = Math.min(video.videoWidth, 640);
+        canvas.width = Math.min(video.videoWidth, 480);
         canvas.height = (canvas.width / video.videoWidth) * video.videoHeight;
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        frames.push(canvas.toDataURL("image/jpeg", 0.7));
+        frames.push(canvas.toDataURL("image/jpeg", 0.6));
         currentFrame++;
         captureFrame();
       };

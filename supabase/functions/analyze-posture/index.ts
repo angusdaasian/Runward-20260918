@@ -44,16 +44,19 @@ async function callVertexAI(opts: { apiKey: string; model?: string; messages: Ar
   const body: any = { contents };
   if (systemParts.length) body.systemInstruction = { parts: systemParts };
   const ac = new AbortController();
-  const timer = setTimeout(() => ac.abort(), 110_000);
+  const timer = setTimeout(() => ac.abort(), 140_000);
+  const t0 = Date.now();
+  console.log(`[analyze-posture] vertex call start model=${model} contents=${contents.length}`);
   let vRes: Response;
   try {
     vRes = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body), signal: ac.signal });
   } catch (e) {
     clearTimeout(timer);
-    console.error("Vertex fetch failed/aborted:", e, "model:", model);
+    console.error(`[analyze-posture] vertex fetch failed/aborted after ${Date.now() - t0}ms model=${model}`, e);
     return new Response(JSON.stringify({ error: "Upstream timeout" }), { status: 504, headers: { "Content-Type": "application/json" } });
   }
   clearTimeout(timer);
+  console.log(`[analyze-posture] vertex responded in ${Date.now() - t0}ms status=${vRes.status} model=${model}`);
   if (!vRes.ok) {
     const errBody = await vRes.text();
     console.error("Vertex error:", vRes.status, "model:", model, "body:", errBody.slice(0, 1000));
@@ -187,9 +190,10 @@ Scores should be objective based on actual posture observed. Be specific in feed
       image_url: { url: frame },
     }));
 
+    console.log(`[analyze-posture] analyze start frames=${frames.length} lang=${lang}`);
     const response = await callVertexAI({
       apiKey: VERTEX_API_KEY,
-      model: "google/gemini-2.5-flash",
+      model: "google/gemini-3.1-flash-lite-preview",
       messages: [
         { role: "system", content: systemPrompt },
         {

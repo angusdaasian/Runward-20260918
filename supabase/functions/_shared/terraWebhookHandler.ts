@@ -977,8 +977,28 @@ export async function processQueuedTerraWebhook(
   let signatureValid = false;
   try { signatureValid = secret ? await verifySignature(secret, signatureHeader, rawBody) : false; } catch { signatureValid = false; }
 
+  // Ping mode: Terra sends { type: "s3_payload", url: "..." }. Signature is
+  // computed over the PING body (rawBody). Once verified, fetch the URL and
+  // continue with the resolved JSON as the real payload.
+  let bodyForProcessing = rawBody;
+  let viaS3 = false;
+  try {
+    const ping = JSON.parse(rawBody);
+    if (signatureValid && ping && ping.type === "s3_payload" && typeof ping.url === "string") {
+      const res = await fetch(ping.url);
+      if (res.ok) {
+        bodyForProcessing = await res.text();
+        viaS3 = true;
+        console.log(`[terra-webhook] resolved s3_payload, size=${bodyForProcessing.length}`);
+      } else {
+        console.error(`[terra-webhook] s3_payload fetch failed: ${res.status}`);
+        return { ok: false, error: `s3_payload fetch failed: ${res.status}` };
+      }
+    }
+  } catch { /* not JSON, fall through */ }
+
   let payload: any = {};
-  try { payload = JSON.parse(rawBody); } catch { payload = { _parse_error: true }; }
+  try { payload = JSON.parse(bodyForProcessing); } catch { payload = { _parse_error: true }; }
 
   const type: string = payload?.type ?? "unknown";
   const isReauth = type === "user_reauth";
@@ -996,8 +1016,8 @@ export async function processQueuedTerraWebhook(
       reference_id: referenceId,
       signature_valid: signatureValid,
       payload: isReauth
-        ? { type, old_user: payload?.old_user, new_user: payload?.new_user, env }
-        : { type, user: payload?.user, env, count: Array.isArray(payload?.data) ? payload.data.length : (payload?.data ? 1 : 0) },
+        ? { type, old_user: payload?.old_user, new_user: payload?.new_user, env, ...(viaS3 ? { via: "s3_payload" } : {}) }
+        : { type, user: payload?.user, env, ...(viaS3 ? { via: "s3_payload" } : {}), count: Array.isArray(payload?.data) ? payload.data.length : (payload?.data ? 1 : 0) },
       processing_error: null,
     })
     .select("id")
@@ -1011,28 +1031,10 @@ export async function processQueuedTerraWebhook(
   return { ok: err == null, error: err };
 }
 
-// Minimal Terra callback: mirror Terra's Flask example as closely as possible.
-// Read body, require signature, verify HMAC, return immediately. No DB writes,
-// no JSON processing, no worker kick in the request path.
-async function resolvePingPayload(rawBody: string): Promise<string> {
-  let data: any;
-  try { data = JSON.parse(rawBody); } catch { return rawBody; }
-  if (data && data.type === "s3_payload" && typeof data.url === "string") {
-    try {
-      const res = await fetch(data.url);
-      if (res.ok) {
-        const text = await res.text();
-        console.log(`[terra-webhook] resolved s3_payload, size=${text.length}`);
-        return text;
-      }
-      console.error(`[terra-webhook] s3_payload fetch failed: ${res.status}`);
-    } catch (e) {
-      console.error("[terra-webhook] s3_payload fetch error", e);
-    }
-  }
-  return rawBody;
-}
-
+// Minimal Terra callback handler: enqueue the raw body + signature and return
+// 200 immediately. All work (signature verify, s3_payload URL fetch, parsing,
+// DB writes) happens in the background worker that drains terra_webhook_queue.
+// This keeps Terra's request-side latency to a single DB insert.
 export async function handleTerraWebhook(req: Request, env: TerraEnv = "prod"): Promise<Response> {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -1040,57 +1042,13 @@ export async function handleTerraWebhook(req: Request, env: TerraEnv = "prod"): 
     const raw = await req.text();
     const sig = req.headers.get("terra-signature");
 
-    // Background: resolve ping (s3_payload) → fetch full payload → process.
-    // Signature is verified inside processQueuedTerraWebhook against the
-    // ORIGINAL ping body (Terra signs the body it sends, not the S3 content).
-    const bg = (async () => {
-      try {
-        const resolvedBody = await resolvePingPayload(raw);
-        // If we resolved an s3 payload, the signature header only matches the
-        // original ping body. Verify sig against `raw`, but process resolved body.
-        if (resolvedBody !== raw) {
-          const secret = getTerraCreds(env).signingSecret;
-          const sigValid = secret ? await verifySignature(secret, sig, raw) : false;
-          if (!sigValid) {
-            console.error("[terra-webhook] s3_payload ping signature invalid; dropping");
-            return;
-          }
-          // Process resolved payload with sig=null (already validated upstream).
-          // processQueuedTerraWebhook re-verifies; bypass by passing original sig
-          // won't match resolved body. Instead, persist event + run processor directly.
-          let payload: any = {};
-          try { payload = JSON.parse(resolvedBody); } catch { payload = {}; }
-          const type: string = payload?.type ?? "unknown";
-          const isReauth = type === "user_reauth";
-          const user = isReauth ? (payload?.new_user ?? {}) : (payload?.user ?? {});
-          const oldUser = isReauth ? (payload?.old_user ?? null) : null;
-          const terraUserId: string | null = user?.user_id ?? null;
-          const referenceId: string | null = user?.reference_id ?? null;
-          const provider: string = mapProvider(user?.provider ?? payload?.resource);
-          const { data: eventRow } = await supa.from("terra_webhook_events").insert({
-            type,
-            terra_user_id: terraUserId,
-            reference_id: referenceId,
-            signature_valid: true,
-            payload: isReauth
-              ? { type, old_user: payload?.old_user, new_user: payload?.new_user, env, via: "s3_payload" }
-              : { type, user: payload?.user, env, via: "s3_payload", count: Array.isArray(payload?.data) ? payload.data.length : (payload?.data ? 1 : 0) },
-            processing_error: null,
-          }).select("id").single();
-          const err = await processWebhook(payload, true, secret, type, terraUserId, referenceId, provider, user, env, oldUser);
-          if (err && eventRow?.id) {
-            await supa.from("terra_webhook_events").update({ processing_error: err }).eq("id", eventRow.id);
-          }
-          return;
-        }
-        // Normal (inline) payload — sig matches raw body.
-        await processQueuedTerraWebhook(raw, sig, env);
-      } catch (e) {
-        console.error("[terra-webhook] background processing failed", e);
-      }
-    })();
-
-    try { (globalThis as any).EdgeRuntime?.waitUntil?.(bg); } catch { /* ignore */ }
+    const { error: enqueueErr } = await supa.from("terra_webhook_queue").insert({
+      env,
+      raw_body: raw,
+      signature_header: sig,
+      status: "pending",
+    });
+    if (enqueueErr) console.error("[terra-webhook] enqueue failed", enqueueErr);
 
     return new Response(JSON.stringify({ message: "Webhook received successfully" }), {
       status: 200,

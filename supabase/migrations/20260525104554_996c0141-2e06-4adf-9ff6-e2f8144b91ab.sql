@@ -1,0 +1,2 @@
+INSERT INTO public.terra_today_oneoff_queue (user_id, terra_user_id, provider, target_date, status)
+VALUES ('0515e94a-7c0c-4f5e-9b8f-7c5e8a9b0c1d', 'c1c707f2-b637-4956-ae64-3aca1f129f9c', 'STRAVA', (now() AT TIME ZONE 'UTC')::date, 'pending');

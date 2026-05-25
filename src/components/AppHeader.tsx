@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Settings, Bell, Megaphone, Menu, Cloud, HelpCircle } from "lucide-react";
+import { Settings, Bell, Megaphone, Menu, Cloud, HelpCircle, Headset } from "lucide-react";
 import AppGuideDialog from "@/components/AppGuideDialog";
 import { Lang } from "@/lib/i18n";
 import { useAuth } from "@/contexts/AuthContext";
@@ -226,13 +226,12 @@ const AppHeader = ({ lang, onNavigateSettings, onOpenPromoBanner, isGuest }: App
       </button>
       <div className="flex items-center gap-2">
         <button
-          aria-label={lang === "zh" ? "應用程式指南" : "App guide"}
-          onClick={() => setGuideOpen(true)}
+          aria-label={lang === "zh" ? "評價應用程式" : "Rate app"}
+          onClick={() => window.open("https://apps.apple.com/us/app/runward/id6761060757?action=write-review", "_blank", "noopener,noreferrer")}
           className="w-10 h-10 rounded-full bg-muted flex items-center justify-center hover:bg-muted/80 active:scale-90 active:bg-muted/60 transition-all duration-150"
         >
-          <HelpCircle size={18} className="text-foreground" />
+          <Headset size={18} className="text-foreground" />
         </button>
-        <AppGuideDialog open={guideOpen} onOpenChange={setGuideOpen} lang={lang} />
         <Popover>
           <PopoverTrigger asChild>
             <button
@@ -306,11 +305,30 @@ const AppHeader = ({ lang, onNavigateSettings, onOpenPromoBanner, isGuest }: App
                 </div>
               </button>
 
+              {/* App Guide */}
+              <button
+                onClick={() => setGuideOpen(true)}
+                className="flex items-center gap-3 px-2 py-1.5 rounded-md hover:bg-muted/60 transition-colors text-left active:scale-[0.98] w-full"
+              >
+                <span className="w-10 h-10 rounded-full bg-muted flex items-center justify-center shrink-0">
+                  <HelpCircle size={18} className="text-foreground" />
+                </span>
+                <div className="flex flex-col">
+                  <span className="text-sm font-medium text-foreground leading-tight">
+                    {lang === "zh" ? "應用程式指南" : "App Guide"}
+                  </span>
+                  <span className="text-[11px] text-muted-foreground leading-tight">
+                    {lang === "zh" ? "了解所有功能" : "Learn about all features"}
+                  </span>
+                </div>
+              </button>
+
               {/* Announcements — entire row triggers */}
               <AnnouncementRow lang={lang} />
             </div>
           </PopoverContent>
         </Popover>
+        <AppGuideDialog open={guideOpen} onOpenChange={setGuideOpen} lang={lang} />
       </div>
     </div>
   );

@@ -462,6 +462,7 @@ Deno.serve(async (req) => {
 
     let activityCount = 0;
     let dailyCount = 0;
+    const healthFields = { sleep: 0, vo2max: 0, resting_hr: 0, hrv: 0, steps: 0 };
 
     for (const c of conns) {
       const headers = { "dev-id": devId, "x-api-key": apiKey };

@@ -913,10 +913,11 @@ const ActivitiesTab = ({ lang }: Props) => {
                 onClick={handleFetchTodayTerra}
                 disabled={fetchingToday}
                 className="flex items-center gap-1 text-xs font-medium text-primary hover:text-primary/80 transition-colors disabled:opacity-50"
-                aria-label={lang === "zh" ? "取得今日活動" : "Fetch today"}
+                aria-label={lang === "zh" ? "同步過去 7 天" : "Sync last 7 days"}
               >
                 <RefreshCw size={14} className={fetchingToday ? "animate-spin" : ""} />
-                {lang === "zh" ? "今日" : "Today"}
+                {lang === "zh" ? "同步 7 天" : "Sync last 7 days"}
+
               </button>
             )}
             {(latestActivity || activities.length > 0) && (

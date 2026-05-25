@@ -7,6 +7,8 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { getTerraCreds } from "../_shared/terraEnv.ts";
+import { ingestTrustedTerraPayload } from "../_shared/terraWebhookHandler.ts";
+
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -62,26 +64,46 @@ Deno.serve(async (req) => {
     const { devId, apiKey } = getTerraCreds("prod");
     const url = `https://api.tryterra.co/v2/activity?user_id=${row.terra_user_id}` +
       `&start_date=${row.target_date}&end_date=${row.target_date}` +
-      `&to_webhook=true&with_samples=true`;
+      `&to_webhook=false&with_samples=true`;
 
     const res = await fetch(url, { headers: { "dev-id": devId, "x-api-key": apiKey } });
     const ref = res.headers.get("terra-reference");
     const body = await res.text().catch(() => "");
 
+    let ingestOk = false;
+    let ingestErr: string | null = null;
+    let ingestCount = 0;
+    if (res.ok && body) {
+      try {
+        const r = await ingestTrustedTerraPayload(body, "prod");
+        ingestOk = r.ok;
+        ingestErr = r.error;
+        ingestCount = r.count;
+      } catch (e) {
+        ingestErr = `ingest threw: ${String(e).slice(0, 500)}`;
+      }
+    }
+
+    const finalStatus = res.ok && ingestOk ? "done" : "error";
+    const resultMsg = res.ok
+      ? (ingestOk ? `ingested ${ingestCount}` : `ingest_err: ${ingestErr ?? "unknown"}`)
+      : `http_${res.status}: ${body.slice(0, 300)}`;
+
     await admin
       .from("terra_today_oneoff_queue")
       .update({
-        status: res.ok ? "done" : "error",
+        status: finalStatus,
         http_status: res.status,
         terra_reference: ref,
-        result: body.slice(0, 2000),
+        result: resultMsg.slice(0, 2000),
       })
       .eq("id", row.id);
 
-    console.log(`[terra-today-oneoff] user=${row.user_id} provider=${row.provider} status=${res.status} ref=${ref}`);
-    return new Response(JSON.stringify({ ok: res.ok, user_id: row.user_id, http_status: res.status, terra_reference: ref }), {
+    console.log(`[terra-today-oneoff] user=${row.user_id} provider=${row.provider} http=${res.status} ref=${ref} ingest=${ingestOk} count=${ingestCount}${ingestErr ? ` err=${ingestErr}` : ""}`);
+    return new Response(JSON.stringify({ ok: finalStatus === "done", user_id: row.user_id, http_status: res.status, terra_reference: ref, ingest_count: ingestCount, ingest_error: ingestErr }), {
       headers: { ...cors, "Content-Type": "application/json" },
     });
+
   } catch (e) {
     await admin
       .from("terra_today_oneoff_queue")

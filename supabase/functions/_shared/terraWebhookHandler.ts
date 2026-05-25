@@ -1031,6 +1031,50 @@ export async function processQueuedTerraWebhook(
   return { ok: err == null, error: err };
 }
 
+// Trusted ingest for synchronous Terra API responses (e.g. from
+// terra-today-oneoff-tick calling /v2/activity?to_webhook=false). The body is
+// already the full payload (not an s3_payload ping) and originates from our
+// own outbound call, so we skip HMAC verification. Reuses processWebhook so
+// upsert + sample/lap/GPS extraction stay identical to the webhook path,
+// giving us natural dedup via (provider, terra_activity_id) upsert.
+export async function ingestTrustedTerraPayload(
+  rawBody: string,
+  env: TerraEnv = "prod",
+): Promise<{ ok: boolean; error: string | null; count: number }> {
+  let payload: any = {};
+  try { payload = JSON.parse(rawBody); } catch { payload = { _parse_error: true }; }
+
+  const type: string = payload?.type ?? "unknown";
+  const user = payload?.user ?? {};
+  const terraUserId: string | null = user?.user_id ?? null;
+  const referenceId: string | null = user?.reference_id ?? null;
+  const provider: string = mapProvider(user?.provider ?? payload?.resource);
+  const count = Array.isArray(payload?.data) ? payload.data.length : (payload?.data ? 1 : 0);
+
+  const { data: eventRow, error: eventInsertErr } = await supa
+    .from("terra_webhook_events")
+    .insert({
+      type,
+      terra_user_id: terraUserId,
+      reference_id: referenceId,
+      signature_valid: true,
+      payload: { type, user: payload?.user, env, via: "oneoff_sync", count },
+      processing_error: null,
+    })
+    .select("id")
+    .single();
+  if (eventInsertErr) console.error("[oneoff_sync] terra_webhook_events insert failed", eventInsertErr);
+
+  // signatureValid=true + empty secret bypasses the signature gate inside processWebhook.
+  const err = await processWebhook(payload, true, "", type, terraUserId, referenceId, provider, user, env, null);
+  if (err && eventRow?.id) {
+    await supa.from("terra_webhook_events").update({ processing_error: err }).eq("id", eventRow.id);
+  }
+  return { ok: err == null, error: err, count };
+}
+
+
+
 // Minimal Terra callback handler: enqueue the raw body + signature and return
 // 200 immediately. All work (signature verify, s3_payload URL fetch, parsing,
 // DB writes) happens in the background worker that drains terra_webhook_queue.

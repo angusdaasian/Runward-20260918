@@ -1,76 +1,73 @@
 ## Goal
 
-Make `handleTerraWebhook` return 200 to Terra **before** any database work happens, so request-side latency is just the time to read the request body.
+Pull today's (2026-05-25 HKT) activities directly from Terra with `to_webhook=false`, so no extra webhook pings hit our queue, and ingest the synchronous response through the existing webhook parser (Option A). Validate on user `c7a7…` first, then roll out to all 109 active connections, spaced 15s apart.
 
-## Current behavior
+## Why Option A
 
-```
-read body → await insert into terra_webhook_queue → return 200
-```
+`terra_activities` already uses `(provider, terra_activity_id)` as the natural dedup key, and the existing `processWebhook` in `_shared/terraWebhookHandler.ts` already extracts samples, laps, GPS, etc. Reusing it means:
 
-The insert is fast but still blocks the response. Under DB load it can add 100–500 ms.
+- Dedup = the upsert itself. No drift between webhook-ingested and oneoff-ingested rows.
+- One parser to maintain.
+- No staging table, no promotion step.
 
-## New behavior
+The synchronous `/v2/activity?to_webhook=false` response has the same JSON shape as a webhook push (`{ type: "activity", user, data: [...] }`), so it slots into the existing path cleanly. The only thing to bypass is the HMAC signature check, since the call originates from us.
 
-```
-read body → schedule background task (insert + log) via EdgeRuntime.waitUntil → return 200 immediately
-```
+## Changes
 
-The 200 is flushed first; the queue insert happens after the response is sent. The existing `terra-webhook-worker` cron continues to drain the queue.
+### 1. `supabase/functions/_shared/terraWebhookHandler.ts`
 
-## Change
-
-In `supabase/functions/_shared/terraWebhookHandler.ts`, rewrite `handleTerraWebhook` (lines 1038–1062):
+Add a small exported helper:
 
 ```ts
-export async function handleTerraWebhook(req: Request, env: TerraEnv = "prod"): Promise<Response> {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
-
-  // Must read body in-request — Terra is waiting on the TCP write to finish.
-  const raw = await req.text();
-  const sig = req.headers.get("terra-signature");
-
-  // Fire-and-forget: persist after response is sent.
-  const bg = (async () => {
-    try {
-      const { error } = await supa.from("terra_webhook_queue").insert({
-        env, raw_body: raw, signature_header: sig, status: "pending",
-      });
-      if (error) console.error("[terra-webhook] async enqueue failed", error);
-    } catch (e) {
-      console.error("[terra-webhook] async enqueue threw", e);
-    }
-  })();
-
-  // @ts-ignore — EdgeRuntime is available in Supabase Edge Functions runtime
-  if (typeof EdgeRuntime !== "undefined" && EdgeRuntime?.waitUntil) {
-    // @ts-ignore
-    EdgeRuntime.waitUntil(bg);
-  }
-
-  return new Response(JSON.stringify({ message: "Webhook received successfully" }), {
-    status: 200,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-  });
-}
+export async function ingestTrustedTerraPayload(
+  rawBody: string,
+  env: TerraEnv = "prod",
+): Promise<{ ok: boolean; error: string | null; inserted: number }>
 ```
 
-Key points:
-- The only awaited work before responding is `req.text()` (unavoidable — Terra's HTTP request isn't complete until we read it).
-- The DB insert runs in a background promise registered via `EdgeRuntime.waitUntil`, which keeps the worker alive after the response is flushed.
-- If `EdgeRuntime` isn't present (local dev/test), the promise still runs but isn't formally tracked — acceptable since tests assert on response only.
+- Same flow as `processQueuedTerraWebhook` but forces `signatureValid = true` (no HMAC verify, no s3_payload fetch — the body is already the full payload).
+- Writes a `terra_webhook_events` audit row with `payload.via = "oneoff_sync"` so we can tell these apart in logs.
+- Calls the existing `processWebhook(...)` so all upsert + sample extraction logic runs unchanged.
+- Returns ingest result so the caller can mark the queue row.
 
-## Trade-off acknowledged
+### 2. `supabase/functions/terra-today-oneoff-tick/index.ts`
 
-Fire-and-forget means a queue-insert failure no longer surfaces in the HTTP response. The user accepts this for latency. The Terra dashboard will retry on non-200, but since we always return 200, lost inserts (rare DB outage) would mean lost webhooks. Mitigations already in place: Terra retries on next event, and the periodic cron picks up anything that lands.
+- Keep `to_webhook=false&with_samples=true` in the Terra API call.
+- After `await res.text()`, if `res.ok`, call `ingestTrustedTerraPayload(body, "prod")`.
+- Queue row status:
+  - `done` if HTTP ok AND ingest ok.
+  - `error` if HTTP failed OR ingest returned an error (store ingest error in `result`).
+- Keep self-unschedule when queue empty.
+- Trim `result` storage to a short status string (no need to dump 1MB+ payloads into the queue table).
 
-## Files
+### 3. Single-user test for `c7a7…`
 
-- `supabase/functions/_shared/terraWebhookHandler.ts` — replace `handleTerraWebhook`.
-- No other files, no migrations, no worker changes.
+After deploy:
 
-## Verification
+1. Read DB: get `terra_user_id` + `provider` for the c7a7 user from `terra_connections`.
+2. Snapshot baseline: count of `terra_activities` rows for that user with `start_time::date = '2026-05-25'`.
+3. Insert ONE pending row into `terra_today_oneoff_queue` for that user, `target_date = 2026-05-25`.
+4. Invoke `terra-today-oneoff-tick` once via `curl_edge_functions` (passing `x-webhook-key`).
+5. Verify:
+   - Queue row → `status='done'`, `http_status=200`.
+   - `terra_activities` count for that user/date ≥ baseline; new rows have `provider` set, GPS/samples populated.
+   - `terra_webhook_events` for that `terra_user_id` shows ONE new row with `payload.via = "oneoff_sync"` and NO new `type='activity'` push from Terra.
+   - Edge function logs show clean ingest, no signature errors.
 
-- Deploy `terra-webhook` and `terra-webhook-test`.
-- Trigger a webhook from Terra dashboard; confirm response time drops to ~body-read latency (sub-100 ms typical).
-- Query `terra_webhook_queue` to confirm rows still arrive and the worker drains them.
+### 4. Rollout (only after test passes)
+
+- Insert one `pending` row per active `terra_connections` for `target_date = 2026-05-25` (skip the c7a7 row already done).
+- Schedule pg_cron job `terra-today-oneoff` with `'15 seconds'` interval, calling the tick endpoint with `x-webhook-key` from `vault.decrypted_secrets` (same pattern as existing `terra-webhook-drain`).
+- Tick self-unschedules when queue drains (~27 min for 108 remaining at 15s).
+
+## Verification during rollout
+
+- Watch `terra_today_oneoff_queue` status distribution.
+- Watch `terra_activities` insert rate.
+- Confirm `terra_webhook_events` does NOT show a spike of `type='activity'` pushes from Terra for these users (proves no loop re-triggered).
+
+## Out of scope
+
+- No changes to the main webhook handler dedup, worker, or any other Terra entrypoint.
+- No change to `to_webhook` semantics anywhere else.
+- No new tables.

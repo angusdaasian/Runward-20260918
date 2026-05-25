@@ -976,19 +976,22 @@ async function processWebhook(
   return processingError;
 }
 
-export async function handleTerraWebhook(req: Request, env: TerraEnv = "prod"): Promise<Response> {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
-  const raw = await req.text();
-  const sigHeader = req.headers.get("terra-signature");
+// Worker-side processing: parse + verify signature + insert event row + run the
+// heavy `processWebhook` logic. Called by `terra-webhook-worker` after the
+// thin enqueuer has already returned 200 to Terra.
+export async function processQueuedTerraWebhook(
+  rawBody: string,
+  signatureHeader: string | null,
+  env: TerraEnv = "prod",
+): Promise<{ ok: boolean; error: string | null }> {
   const secret = getTerraCreds(env).signingSecret;
   let signatureValid = false;
-  try { signatureValid = secret ? await verifySignature(secret, sigHeader, raw) : false; } catch { signatureValid = false; }
+  try { signatureValid = secret ? await verifySignature(secret, signatureHeader, rawBody) : false; } catch { signatureValid = false; }
 
   let payload: any = {};
-  try { payload = JSON.parse(raw); } catch { payload = { _parse_error: true, raw }; }
+  try { payload = JSON.parse(rawBody); } catch { payload = { _parse_error: true }; }
 
   const type: string = payload?.type ?? "unknown";
-  // user_reauth payloads use old_user / new_user instead of user.
   const isReauth = type === "user_reauth";
   const user = isReauth ? (payload?.new_user ?? {}) : (payload?.user ?? {});
   const oldUser = isReauth ? (payload?.old_user ?? null) : null;
@@ -1012,18 +1015,53 @@ export async function handleTerraWebhook(req: Request, env: TerraEnv = "prod"): 
     .single();
   if (eventInsertErr) console.error("terra_webhook_events insert failed", eventInsertErr);
 
-  const work = (async () => {
-    const err = await processWebhook(payload, signatureValid, secret, type, terraUserId, referenceId, provider, user, env, oldUser);
-    if (err && eventRow?.id) {
-      await supa.from("terra_webhook_events").update({ processing_error: err }).eq("id", eventRow.id);
+  const err = await processWebhook(payload, signatureValid, secret, type, terraUserId, referenceId, provider, user, env, oldUser);
+  if (err && eventRow?.id) {
+    await supa.from("terra_webhook_events").update({ processing_error: err }).eq("id", eventRow.id);
+  }
+  return { ok: err == null, error: err };
+}
+
+// Thin enqueuer: writes the raw webhook into `terra_webhook_queue` and returns
+// 200 immediately. A separate worker (`terra-webhook-worker`, drained by a
+// pg_cron job every minute) handles signature verification and processing.
+// This keeps Terra's 8s circuit breaker happy regardless of payload size.
+export async function handleTerraWebhook(req: Request, env: TerraEnv = "prod"): Promise<Response> {
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+
+  let raw = "";
+  try { raw = await req.text(); } catch (e) {
+    console.error("[terra-webhook] failed to read body", e);
+    return new Response(JSON.stringify({ ok: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+  }
+  const sigHeader = req.headers.get("terra-signature");
+
+  // Single insert — typically <100ms regardless of payload size.
+  const { error: enqueueErr } = await supa
+    .from("terra_webhook_queue")
+    .insert({ env, raw_body: raw, signature_header: sigHeader, status: "pending" });
+  if (enqueueErr) {
+    console.error("[terra-webhook] enqueue failed", enqueueErr);
+    // Still 200 so Terra doesn't trip its circuit breaker; we'll catch the gap in logs.
+  }
+
+  // Best-effort: kick the worker so the common case is near-realtime instead of
+  // waiting up to 60s for the cron tick. Fire-and-forget.
+  try {
+    const workerUrl = `${Deno.env.get("SUPABASE_URL")!}/functions/v1/terra-webhook-worker`;
+    const webhookKey = Deno.env.get("WEBHOOK_AUTH_KEY") ?? "";
+    const kick = fetch(workerUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-webhook-key": webhookKey },
+      body: "{}",
+    }).catch((e) => console.error("[terra-webhook] worker kick failed", e));
+    // @ts-ignore EdgeRuntime is provided by Supabase edge runtime
+    if (typeof EdgeRuntime !== "undefined" && (EdgeRuntime as any).waitUntil) {
+      // @ts-ignore
+      EdgeRuntime.waitUntil(kick);
     }
-  })();
-  // @ts-ignore EdgeRuntime is provided by Supabase edge runtime
-  if (typeof EdgeRuntime !== "undefined" && (EdgeRuntime as any).waitUntil) {
-    // @ts-ignore
-    EdgeRuntime.waitUntil(work);
-  } else {
-    work.catch((e) => console.error("terra-webhook background error", e));
+  } catch (e) {
+    console.error("[terra-webhook] worker kick setup failed", e);
   }
 
   return new Response(JSON.stringify({ ok: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });

@@ -490,8 +490,21 @@ Deno.serve(async (req) => {
         }
         console.log(`[terra-sync] activity ${c.provider} items=${items.length} status=${r.status} type=${j?.type} forceWebhookRequested=${forceWebhook}`);
         for (const a of items) {
-          await upsertTerraActivity(admin, c, a);
-          activityCount++;
+          // Route through the trusted webhook ingest pipeline so manual sync
+          // produces the same row shape (full hr/distance/elev/cadence samples)
+          // as a real webhook delivery. Dedup via (provider, terra_activity_id).
+          const envelope = {
+            type: "activity",
+            user: { user_id: c.terra_user_id, reference_id: c.reference_id, provider: c.provider },
+            data: [a],
+          };
+          try {
+            const ing = await ingestTrustedTerraPayload(JSON.stringify(envelope), "prod", "manual_sync");
+            if (ing.ok) activityCount++;
+            else console.warn(`[terra-sync] trusted ingest err ${c.provider}: ${ing.error}`);
+          } catch (e) {
+            console.error(`[terra-sync] trusted ingest threw ${c.provider}`, e);
+          }
         }
         if (latestWithSamples && items.length === 0) {
           const { data: withSamples } = await admin

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Settings, Bell, Megaphone, Menu, Cloud, HelpCircle, Headset } from "lucide-react";
 import AppGuideDialog from "@/components/AppGuideDialog";
 import { Lang } from "@/lib/i18n";
@@ -128,6 +129,7 @@ interface AppHeaderProps {
 }
 
 const AppHeader = ({ lang, onNavigateSettings, onOpenPromoBanner, isGuest }: AppHeaderProps) => {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const [profile, setProfile] = useState(() =>
     _headerUserId === user?.id ? _headerProfile : null
@@ -226,8 +228,8 @@ const AppHeader = ({ lang, onNavigateSettings, onOpenPromoBanner, isGuest }: App
       </button>
       <div className="flex items-center gap-2">
         <button
-          aria-label={lang === "zh" ? "評價應用程式" : "Rate app"}
-          onClick={() => window.open("https://apps.apple.com/us/app/runward/id6761060757?action=write-review", "_blank", "noopener,noreferrer")}
+          aria-label={lang === "zh" ? "支援與幫助" : "Support"}
+          onClick={() => navigate("/support")}
           className="w-10 h-10 rounded-full bg-muted flex items-center justify-center hover:bg-muted/80 active:scale-90 active:bg-muted/60 transition-all duration-150"
         >
           <Headset size={18} className="text-foreground" />

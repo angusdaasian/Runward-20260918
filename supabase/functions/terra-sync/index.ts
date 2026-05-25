@@ -707,15 +707,23 @@ Deno.serve(async (req) => {
       const sleepRows = Object.values(dailyByDate).filter((r: any) => r.sleep_seconds != null).length;
       console.log(`[terra-sync] daily upsert ${c.provider}: total=${Object.values(dailyByDate).length} withSleep=${sleepRows}`);
       for (const row of Object.values(dailyByDate)) {
+        const r: any = row;
         const { error: upErr } = await admin.from("terra_daily_health").upsert(row, { onConflict: "user_id,provider,date" });
-        if (upErr) console.error(`[terra-sync] upsert failed for ${(row as any).date}:`, upErr.message, JSON.stringify(row));
+        if (upErr) console.error(`[terra-sync] upsert failed for ${r.date}:`, upErr.message, JSON.stringify(row));
+        else {
+          if (r.sleep_seconds != null) healthFields.sleep++;
+          if (r.vo2max != null) healthFields.vo2max++;
+          if (r.resting_hr != null) healthFields.resting_hr++;
+          if (r.hrv != null) healthFields.hrv++;
+          if (r.steps != null) healthFields.steps++;
+        }
         dailyCount++;
       }
 
       await admin.from("terra_connections").update({ last_synced_at: new Date().toISOString() }).eq("id", c.id);
     }
 
-    return new Response(JSON.stringify({ ok: true, activities: activityCount, daily: dailyCount }), {
+    return new Response(JSON.stringify({ ok: true, activities: activityCount, daily: dailyCount, health: healthFields }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {

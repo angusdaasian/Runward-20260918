@@ -1038,26 +1038,37 @@ export async function processQueuedTerraWebhook(
 export async function handleTerraWebhook(req: Request, env: TerraEnv = "prod"): Promise<Response> {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
+  // Must read body in-request — Terra's HTTP request isn't complete until we read it.
+  const raw = await req.text();
+  const sig = req.headers.get("terra-signature");
+
+  // Fire-and-forget: persist after the response is flushed.
+  const bg = (async () => {
+    try {
+      const { error } = await supa.from("terra_webhook_queue").insert({
+        env,
+        raw_body: raw,
+        signature_header: sig,
+        status: "pending",
+      });
+      if (error) console.error("[terra-webhook] async enqueue failed", error);
+    } catch (e) {
+      console.error("[terra-webhook] async enqueue threw", e);
+    }
+  })();
+
   try {
-    const raw = await req.text();
-    const sig = req.headers.get("terra-signature");
-
-    const { error: enqueueErr } = await supa.from("terra_webhook_queue").insert({
-      env,
-      raw_body: raw,
-      signature_header: sig,
-      status: "pending",
-    });
-    if (enqueueErr) console.error("[terra-webhook] enqueue failed", enqueueErr);
-
-    return new Response(JSON.stringify({ message: "Webhook received successfully" }), {
-      status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
-  } catch (e) {
-    return new Response(JSON.stringify({ error: String(e) }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    // @ts-ignore EdgeRuntime is provided by Supabase Edge Functions runtime
+    if (typeof EdgeRuntime !== "undefined" && (EdgeRuntime as any)?.waitUntil) {
+      // @ts-ignore
+      (EdgeRuntime as any).waitUntil(bg);
+    }
+  } catch {
+    // ignore — bg promise still runs
   }
+
+  return new Response(JSON.stringify({ message: "Webhook received successfully" }), {
+    status: 200,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
 }

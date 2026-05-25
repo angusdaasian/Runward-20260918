@@ -1,73 +1,57 @@
 ## Goal
 
-Pull today's (2026-05-25 HKT) activities directly from Terra with `to_webhook=false`, so no extra webhook pings hit our queue, and ingest the synchronous response through the existing webhook parser (Option A). Validate on user `c7a7…` first, then roll out to all 109 active connections, spaced 15s apart.
+Make the two manual sync buttons pull data directly from Terra with `to_webhook=false` so users get an instant result without waiting for webhooks, while keeping the regular webhook path untouched. Use the same trusted-ingest pipeline as the one-off tick so activities come through with full samples and zero risk of re-triggering Terra.
 
-## Why Option A
+## What's already true
 
-`terra_activities` already uses `(provider, terra_activity_id)` as the natural dedup key, and the existing `processWebhook` in `_shared/terraWebhookHandler.ts` already extracts samples, laps, GPS, etc. Reusing it means:
+- `terra-sync` already calls Terra with `to_webhook=false` for `activity`, `daily`, `body`, and `sleep` — no webhook side effects today.
+- `useRefreshTerraDailyHealth` (daily health card refresh button) already invokes `terra-sync` with `healthOnly: true`. Health refresh already does what the user wants; the only thing to do here is make sure the toast surfaces what was updated.
+- The home page "Fetch today" button (`ActivitiesTab.handleFetchTodayTerra`) and the resync button both already hit `terra-sync` with `to_webhook=false`, but the activity branch ingests through the older `upsertTerraActivity` parser, which produces thinner rows than the webhook parser (e.g. HR/distance/elevation/cadence sample arrays can be missing or partial).
 
-- Dedup = the upsert itself. No drift between webhook-ingested and oneoff-ingested rows.
-- One parser to maintain.
-- No staging table, no promotion step.
+## What changes
 
-The synchronous `/v2/activity?to_webhook=false` response has the same JSON shape as a webhook push (`{ type: "activity", user, data: [...] }`), so it slots into the existing path cleanly. The only thing to bypass is the HMAC signature check, since the call originates from us.
+### 1. `supabase/functions/terra-sync/index.ts` — route activity ingest through the trusted handler
 
-## Changes
+In the activity branch (around L468–541), after the `to_webhook=false&with_samples=true` fetch:
 
-### 1. `supabase/functions/_shared/terraWebhookHandler.ts`
+- Build a synthetic Terra webhook envelope per item:
+  ```json
+  { "type": "activity", "user": { "user_id": c.terra_user_id, "reference_id": c.reference_id }, "data": [item] }
+  ```
+- Call `ingestTrustedTerraPayload(JSON.stringify(env), "prod")` (the same helper used by `terra-today-oneoff-tick`).
+- Replace the `upsertTerraActivity(...)` call with this. Keep the existing `latestWithSamples` filter and the existing backfill-missing-samples loop (the backfill loop is still useful for older rows already in DB).
+- Tag the audit row with `payload.via = "manual_sync"` (the helper already writes `terra_webhook_events` — extend the helper or pass a `source` arg so we can distinguish `oneoff_sync` vs `manual_sync` in logs).
+- Sum `inserted` counts from the helper and return as `activities` so the existing toast logic ("Fetched today's latest activity" / "No new activity for today yet") still works.
 
-Add a small exported helper:
+Result: pressing the home page button gives the user a row with the same shape and sample density as a webhook-delivered activity, immediately, with no Terra webhook traffic generated.
 
-```ts
-export async function ingestTrustedTerraPayload(
-  rawBody: string,
-  env: TerraEnv = "prod",
-): Promise<{ ok: boolean; error: string | null; inserted: number }>
-```
+### 2. `terra-sync` — small tweaks for the manual UX
 
-- Same flow as `processQueuedTerraWebhook` but forces `signatureValid = true` (no HMAC verify, no s3_payload fetch — the body is already the full payload).
-- Writes a `terra_webhook_events` audit row with `payload.via = "oneoff_sync"` so we can tell these apart in logs.
-- Calls the existing `processWebhook(...)` so all upsert + sample extraction logic runs unchanged.
-- Returns ingest result so the caller can mark the queue row.
+- When the body has `dayOnly: true` OR an explicit `startDate==endDate-1`, skip the 30-day window math (already correct) and also skip the missing-samples backfill loop (we only want today's data for that path).
+- Return `{ ok, activities, daily, health: { sleep, vo2max, resting_hr, hrv } }` so the daily-health refresh toast can mention what got updated.
 
-### 2. `supabase/functions/terra-today-oneoff-tick/index.ts`
+### 3. `src/hooks/use-terra-daily-health.ts` — better refresh toast
 
-- Keep `to_webhook=false&with_samples=true` in the Terra API call.
-- After `await res.text()`, if `res.ok`, call `ingestTrustedTerraPayload(body, "prod")`.
-- Queue row status:
-  - `done` if HTTP ok AND ingest ok.
-  - `error` if HTTP failed OR ingest returned an error (store ingest error in `result`).
-- Keep self-unschedule when queue empty.
-- Trim `result` storage to a short status string (no need to dump 1MB+ payloads into the queue table).
+- After the call, look at the response counts and show "Updated sleep, VO₂max, RHR" (zh equivalent) instead of the current generic success message. Fall back to the generic message when counts are unknown.
+- No change to the request itself.
 
-### 3. Single-user test for `c7a7…`
+### 4. `src/components/ActivitiesTab.tsx` — keep existing button, just call the updated function
 
-After deploy:
+- No code change required if the request shape stays the same; the toast already handles `activities === 0` vs `> 0`.
+- Optional: pass `provider` if the user has multiple connections so we don't hit all providers on every tap (out of scope unless you want it).
 
-1. Read DB: get `terra_user_id` + `provider` for the c7a7 user from `terra_connections`.
-2. Snapshot baseline: count of `terra_activities` rows for that user with `start_time::date = '2026-05-25'`.
-3. Insert ONE pending row into `terra_today_oneoff_queue` for that user, `target_date = 2026-05-25`.
-4. Invoke `terra-today-oneoff-tick` once via `curl_edge_functions` (passing `x-webhook-key`).
-5. Verify:
-   - Queue row → `status='done'`, `http_status=200`.
-   - `terra_activities` count for that user/date ≥ baseline; new rows have `provider` set, GPS/samples populated.
-   - `terra_webhook_events` for that `terra_user_id` shows ONE new row with `payload.via = "oneoff_sync"` and NO new `type='activity'` push from Terra.
-   - Edge function logs show clean ingest, no signature errors.
+### 5. Garmin daily health refresh button
 
-### 4. Rollout (only after test passes)
-
-- Insert one `pending` row per active `terra_connections` for `target_date = 2026-05-25` (skip the c7a7 row already done).
-- Schedule pg_cron job `terra-today-oneoff` with `'15 seconds'` interval, calling the tick endpoint with `x-webhook-key` from `vault.decrypted_secrets` (same pattern as existing `terra-webhook-drain`).
-- Tick self-unschedules when queue drains (~27 min for 108 remaining at 15s).
-
-## Verification during rollout
-
-- Watch `terra_today_oneoff_queue` status distribution.
-- Watch `terra_activities` insert rate.
-- Confirm `terra_webhook_events` does NOT show a spike of `type='activity'` pushes from Terra for these users (proves no loop re-triggered).
+- `useRefreshGarminDailyHealth` already calls `garmin-daily-health-sync` which is the native (non-Terra, non-webhook) Garmin path. No change needed — it already pulls on demand.
 
 ## Out of scope
 
-- No changes to the main webhook handler dedup, worker, or any other Terra entrypoint.
-- No change to `to_webhook` semantics anywhere else.
-- No new tables.
+- The one-off queue, the 15s cron, and the webhook worker — no changes.
+- Any change to webhook behaviour when Terra does push us data.
+- Apple Health / Strava manual sync paths.
+
+## Verification
+
+1. Press "Fetch today" on the home page with a connected COROS/Garmin user that has a today activity not yet webhook'd → `terra_activities` row appears with full `hr_samples`, `distance_samples`, `elevation_samples`, `cadence_samples`, polyline; `terra_webhook_events` shows a `payload.via = "manual_sync"` audit row; `terra_today_oneoff_queue` is untouched; Terra dashboard shows no extra webhook delivery.
+2. Press refresh on the Garmin/Terra health card → `terra_daily_health` row for today is upserted with sleep + vo2max + RHR (when available); toast lists what was updated.
+3. Press "Fetch today" twice in a row → second press is a no-op insert (dedup on `(user_id, terra_activity_id)`); no duplicate rows, no errors.

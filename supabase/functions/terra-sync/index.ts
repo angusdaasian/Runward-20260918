@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { getTerraCreds, pickEnvFromRequest } from "../_shared/terraEnv.ts";
+import { ingestTrustedTerraPayload } from "../_shared/terraWebhookHandler.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -461,6 +462,7 @@ Deno.serve(async (req) => {
 
     let activityCount = 0;
     let dailyCount = 0;
+    const healthFields = { sleep: 0, vo2max: 0, resting_hr: 0, hrv: 0, steps: 0 };
 
     for (const c of conns) {
       const headers = { "dev-id": devId, "x-api-key": apiKey };
@@ -489,8 +491,21 @@ Deno.serve(async (req) => {
         }
         console.log(`[terra-sync] activity ${c.provider} items=${items.length} status=${r.status} type=${j?.type} forceWebhookRequested=${forceWebhook}`);
         for (const a of items) {
-          await upsertTerraActivity(admin, c, a);
-          activityCount++;
+          // Route through the trusted webhook ingest pipeline so manual sync
+          // produces the same row shape (full hr/distance/elev/cadence samples)
+          // as a real webhook delivery. Dedup via (provider, terra_activity_id).
+          const envelope = {
+            type: "activity",
+            user: { user_id: c.terra_user_id, reference_id: c.reference_id, provider: c.provider },
+            data: [a],
+          };
+          try {
+            const ing = await ingestTrustedTerraPayload(JSON.stringify(envelope), "prod", "manual_sync");
+            if (ing.ok) activityCount++;
+            else console.warn(`[terra-sync] trusted ingest err ${c.provider}: ${ing.error}`);
+          } catch (e) {
+            console.error(`[terra-sync] trusted ingest threw ${c.provider}`, e);
+          }
         }
         if (latestWithSamples && items.length === 0) {
           const { data: withSamples } = await admin
@@ -692,15 +707,23 @@ Deno.serve(async (req) => {
       const sleepRows = Object.values(dailyByDate).filter((r: any) => r.sleep_seconds != null).length;
       console.log(`[terra-sync] daily upsert ${c.provider}: total=${Object.values(dailyByDate).length} withSleep=${sleepRows}`);
       for (const row of Object.values(dailyByDate)) {
+        const r: any = row;
         const { error: upErr } = await admin.from("terra_daily_health").upsert(row, { onConflict: "user_id,provider,date" });
-        if (upErr) console.error(`[terra-sync] upsert failed for ${(row as any).date}:`, upErr.message, JSON.stringify(row));
+        if (upErr) console.error(`[terra-sync] upsert failed for ${r.date}:`, upErr.message, JSON.stringify(row));
+        else {
+          if (r.sleep_seconds != null) healthFields.sleep++;
+          if (r.vo2max != null) healthFields.vo2max++;
+          if (r.resting_hr != null) healthFields.resting_hr++;
+          if (r.hrv != null) healthFields.hrv++;
+          if (r.steps != null) healthFields.steps++;
+        }
         dailyCount++;
       }
 
       await admin.from("terra_connections").update({ last_synced_at: new Date().toISOString() }).eq("id", c.id);
     }
 
-    return new Response(JSON.stringify({ ok: true, activities: activityCount, daily: dailyCount }), {
+    return new Response(JSON.stringify({ ok: true, activities: activityCount, daily: dailyCount, health: healthFields }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {

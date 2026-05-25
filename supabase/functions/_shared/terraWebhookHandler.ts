@@ -1040,6 +1040,7 @@ export async function processQueuedTerraWebhook(
 export async function ingestTrustedTerraPayload(
   rawBody: string,
   env: TerraEnv = "prod",
+  via: string = "oneoff_sync",
 ): Promise<{ ok: boolean; error: string | null; count: number }> {
   let payload: any = {};
   try { payload = JSON.parse(rawBody); } catch { payload = { _parse_error: true }; }
@@ -1058,12 +1059,12 @@ export async function ingestTrustedTerraPayload(
       terra_user_id: terraUserId,
       reference_id: referenceId,
       signature_valid: true,
-      payload: { type, user: payload?.user, env, via: "oneoff_sync", count },
+      payload: { type, user: payload?.user, env, via, count },
       processing_error: null,
     })
     .select("id")
     .single();
-  if (eventInsertErr) console.error("[oneoff_sync] terra_webhook_events insert failed", eventInsertErr);
+  if (eventInsertErr) console.error(`[${via}] terra_webhook_events insert failed`, eventInsertErr);
 
   // signatureValid=true + empty secret bypasses the signature gate inside processWebhook.
   const err = await processWebhook(payload, true, "", type, terraUserId, referenceId, provider, user, env, null);

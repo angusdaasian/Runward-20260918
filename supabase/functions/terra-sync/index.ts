@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { getTerraCreds, pickEnvFromRequest } from "../_shared/terraEnv.ts";
+import { ingestTrustedTerraPayload } from "../_shared/terraWebhookHandler.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",

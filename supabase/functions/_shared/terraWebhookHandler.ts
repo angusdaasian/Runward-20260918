@@ -1018,16 +1018,19 @@ export async function processQueuedTerraWebhook(
 export async function handleTerraWebhook(req: Request, env: TerraEnv = "prod"): Promise<Response> {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
-  let raw = "";
-  try { raw = await req.text(); } catch (e) {
-    console.error("[terra-webhook] failed to read body", e);
-    return new Response("{\"ok\":true}", { headers: { ...corsHeaders, "Content-Type": "application/json" } });
-  }
-  const sigHeader = req.headers.get("terra-signature");
+  const backgroundReq = req.clone();
 
-  // Defer ALL network work (enqueue + worker kick) until AFTER the response is sent.
-  // This keeps the wire response time at ~network RTT only, well under Terra's 8s breaker.
+  // Defer body reading and ALL network work until AFTER the response is sent.
+  // This keeps Terra's measured webhook response time from being tied to
+  // multi-MB payload upload/parsing/DB time.
   const background = (async () => {
+    let raw = "";
+    try { raw = await backgroundReq.text(); } catch (e) {
+      console.error("[terra-webhook] failed to read body", e);
+      return;
+    }
+    const sigHeader = backgroundReq.headers.get("terra-signature");
+
     try {
       const { error: enqueueErr } = await supa
         .from("terra_webhook_queue")

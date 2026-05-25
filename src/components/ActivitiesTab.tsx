@@ -804,7 +804,7 @@ const ActivitiesTab = ({ lang }: Props) => {
         console.warn("Apple Health resync skipped/failed:", e);
       }
 
-      // Terra (Garmin/Coros/Polar/Suunto via Terra) — pulls activities + hr_samples
+      // Terra (Garmin/Coros/Polar/Suunto via Terra) — pull recent activities directly.
       try {
         const { data: sessionData } = await supabase.auth.getSession();
         const accessToken = sessionData?.session?.access_token;
@@ -816,33 +816,10 @@ const ActivitiesTab = ({ lang }: Props) => {
               Authorization: `Bearer ${accessToken}`,
               apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
             },
-            body: JSON.stringify({
-              provider: "GARMIN",
-              targetUserId: "c7a7d1ca-c7bf-4288-bb9d-794006a04087",
-              startDate: "2026-05-05",
-              endDate: "2026-05-06",
-              historicalActivity: true,
-              latestWithSamples: true,
-            }),
+            body: JSON.stringify({ provider: "GARMIN", latestWithSamples: true }),
           });
           terraResult = await response.json().catch(() => null);
           if (!response.ok) throw new Error(terraResult?.error ?? `Terra sync failed (${response.status})`);
-          for (let i = 0; i < 6; i++) {
-            const { data: sampledRows } = await (supabase as any)
-              .from("terra_activities")
-              .select("id, hr_samples")
-              .eq("user_id", "c7a7d1ca-c7bf-4288-bb9d-794006a04087")
-              .eq("provider", "GARMIN")
-              .gte("start_time", "2026-05-05T00:00:00Z")
-              .lt("start_time", "2026-05-06T00:00:00Z")
-              .not("hr_samples", "is", null)
-              .limit(1);
-            if ((sampledRows?.[0]?.hr_samples?.length ?? 0) > 0) {
-              terraResult = { ...(terraResult ?? {}), activities: Math.max(terraResult?.activities ?? 0, 1) };
-              break;
-            }
-            await new Promise((resolve) => setTimeout(resolve, 3000));
-          }
         }
       } catch (e) {
         console.warn("Terra resync failed:", e);

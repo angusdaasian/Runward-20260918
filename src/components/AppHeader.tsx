@@ -227,8 +227,8 @@ const AppHeader = ({ lang, onNavigateSettings, onOpenPromoBanner, isGuest }: App
       </button>
       <div className="flex items-center gap-2">
         <button
-          aria-label={lang === "zh" ? "評價應用程式" : "Rate app"}
-          onClick={() => window.open("https://apps.apple.com/us/app/runward/id6761060757?action=write-review", "_blank", "noopener,noreferrer")}
+          aria-label={lang === "zh" ? "支援與幫助" : "Support"}
+          onClick={() => useNavigate()("/support")}
           className="w-10 h-10 rounded-full bg-muted flex items-center justify-center hover:bg-muted/80 active:scale-90 active:bg-muted/60 transition-all duration-150"
         >
           <Headset size={18} className="text-foreground" />

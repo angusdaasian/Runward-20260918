@@ -2,11 +2,9 @@ import { useState } from "react";
 import { CheckCircle, AlertTriangle, Video, Loader2 } from "lucide-react";
 import { Lang } from "@/lib/i18n";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { invokePostureAnalysis } from "@/lib/postureAnalysis";
 import PostureRadarChart from "./PostureRadarChart";
 import PostureScoreCard from "./PostureScoreCard";
-
-const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze-posture`;
 
 interface SectionScore {
   score: number;
@@ -71,45 +69,19 @@ const PostureResults = ({ result, averages, lang, onTranslated }: Props) => {
     if (targetLang === displayLang) return;
     setTranslating(true);
     try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const accessToken = sessionData.session?.access_token;
-      if (!accessToken) {
-        toast({ title: displayLang === "zh" ? "請先登入" : "Please sign in", variant: "destructive" });
-        setTranslating(false);
-        return;
-      }
-      const resp = await fetch(CHAT_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-          Authorization: `Bearer ${accessToken}`,
-        },
-        body: JSON.stringify({
-          translate: true,
-          existingResult: displayResult,
-          lang: targetLang,
-        }),
+      const translated = await invokePostureAnalysis<PostureAnalysisResult>({
+        translate: true,
+        existingResult: displayResult,
+        lang: targetLang,
       });
-
-      if (!resp.ok) {
-        toast({
-          title: displayLang === "zh" ? "翻譯失敗" : "Translation failed",
-          description: displayLang === "zh" ? "請稍後再試" : "Please try again",
-          variant: "destructive",
-        });
-        setTranslating(false);
-        return;
-      }
-
-      const translated: PostureAnalysisResult = await resp.json();
       setDisplayResult(translated);
       setDisplayLang(targetLang);
       onTranslated?.(translated, targetLang);
-    } catch {
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "";
       toast({
         title: displayLang === "zh" ? "錯誤" : "Error",
-        description: displayLang === "zh" ? "網絡錯誤" : "Network error",
+        description: message || (displayLang === "zh" ? "網絡錯誤" : "Network error"),
         variant: "destructive",
       });
     }

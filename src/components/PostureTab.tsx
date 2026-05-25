@@ -7,11 +7,10 @@ import { useToast } from "@/hooks/use-toast";
 import { usePremium } from "@/contexts/PremiumContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { invokePostureAnalysis } from "@/lib/postureAnalysis";
 import PoseOverlay from "@/components/posture/PoseOverlay";
 import PostureResults, { PostureAnalysisResult, PostureAverages } from "@/components/posture/PostureResults";
 import { saveVideoBlob, loadVideoBlob, deleteVideoBlob } from "@/lib/videoStorage";
-
-const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze-posture`;
 
 interface Props {
   lang: Lang;
@@ -242,31 +241,7 @@ const PostureTab = ({ lang }: Props) => {
     setResult(null);
 
     try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const accessToken = sessionData.session?.access_token;
-      if (!accessToken) {
-        toast({ title: lang === "zh" ? "請先登入" : "Please sign in", variant: "destructive" });
-        setAnalyzing(false);
-        return;
-      }
-      const resp = await fetch(CHAT_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-          Authorization: `Bearer ${accessToken}`,
-        },
-        body: JSON.stringify({ frames, lang }),
-      });
-
-      if (!resp.ok) {
-        const errData = await resp.json().catch(() => ({}));
-        toast({ title: lang === "zh" ? "分析失敗" : "Analysis failed", description: errData.error || (lang === "zh" ? "請稍後再試" : "Please try again"), variant: "destructive" });
-        setAnalyzing(false);
-        return;
-      }
-
-      const parsed: PostureAnalysisResult = await resp.json();
+      const parsed = await invokePostureAnalysis<PostureAnalysisResult>({ frames, lang });
       setResult(parsed);
       setShowUpload(false);
       localStorage.setItem(POSTURE_CACHE_KEY, JSON.stringify(parsed));
@@ -276,8 +251,9 @@ const PostureTab = ({ lang }: Props) => {
       if (!isPremium) markUsedToday();
 
       await Promise.all([saveResult(parsed), fetchAverages()]);
-    } catch {
-      toast({ title: lang === "zh" ? "錯誤" : "Error", description: lang === "zh" ? "網絡錯誤，請重試" : "Network error, please retry", variant: "destructive" });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "";
+      toast({ title: lang === "zh" ? "錯誤" : "Error", description: message || (lang === "zh" ? "網絡錯誤，請重試" : "Network error, please retry"), variant: "destructive" });
     }
     setAnalyzing(false);
   }, [frames, lang, toast, saveResult, fetchAverages]);

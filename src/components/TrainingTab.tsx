@@ -19,7 +19,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   Loader2, Lock, ChevronLeft, ChevronRight, Plus, Calendar, Target, Trophy,
   Repeat, Route, HelpCircle, X, WifiOff, Sparkles, GripVertical, Save,
-  ChevronDown, Pencil, Share2, Gift, Timer, Settings
+  ChevronDown, Pencil, Share2
 } from "lucide-react";
 import { shareTrainingWeek } from "@/lib/sharePlanWeek";
 import { estimateMaxHr, estimateRestingHr, zoneBoundaries, isValidCustomZones } from "@/lib/hrZones";

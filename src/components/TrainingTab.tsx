@@ -2447,38 +2447,40 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                   </div>
 
                   <div className="space-y-1">
-                    {(currentWeek.days || []).map((day: any, i: number) => (
-                      <div key={i} className="flex items-stretch gap-2">
-                        <div className="w-10 flex-shrink-0 flex flex-col items-center pt-3">
-                          <span className="text-[10px] font-medium text-muted-foreground uppercase">{labelForDay(day, i)}</span>
-                        </div>
-                        {day.type === "Rest" ? (
-                          <div className="flex-1 border-l-2 border-border pl-3 py-3 min-h-[48px] flex items-center">
-                            <span className="text-xs text-muted-foreground">{lang === "zh" ? "休息" : "Rest"}</span>
+                    {(currentWeek.days || []).map((day: any, i: number) => {
+                      const key = `${freeWeekIdx}-${i}`;
+                      const isExpanded = !!freeExpanded[key];
+                      return (
+                        <div key={i} className="flex items-stretch gap-2">
+                          <div className="w-10 flex-shrink-0 flex flex-col items-center pt-3">
+                            <span className="text-[10px] font-medium text-muted-foreground uppercase">{labelForDay(day, i)}</span>
                           </div>
-                        ) : (
-                          <div className="flex-1 border-l-2 pl-3 py-2" style={{ borderColor: day.color || "hsl(var(--border))" }}>
-                            <div className="bg-card border border-border rounded-lg p-3">
-                              <div className="flex items-center justify-between">
-                                <span className="font-medium text-sm text-foreground">{localizeTitle(day.type, lang)}</span>
-                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                  {(day.type === "Trail Run" || day.type === "Trail Race") ? (
-                                    <>
-                                      {day.eph > 0 && <span>EpH {day.eph}</span>}
-                                      {day.elevation_m > 0 && <span>+{Math.round(day.elevation_m)}m</span>}
-                                    </>
-                                  ) : (
-                                    day.pace && <span>{/\/(km|mi)\b/i.test(day.pace) ? day.pace : `${day.pace}/km`}</span>
-                                  )}
-                                  {day.distance_km && <span>{day.distance_km} km</span>}
-                                </div>
-                              </div>
-                              <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{localizeDescription(day, lang)}</p>
+                          {day.type === "Rest" ? (
+                            <div className="flex-1 border-l-2 border-border pl-3 py-3 min-h-[48px] flex items-center">
+                              <span className="text-xs text-muted-foreground">{lang === "zh" ? "休息" : "Rest"}</span>
                             </div>
-                          </div>
-                        )}
-                      </div>
-                    ))}
+                          ) : (
+                            <div className="flex-1 border-l-2 pl-3 py-2" style={{ borderColor: day.color || "hsl(var(--border))" }}>
+                              <div className="bg-card border border-border rounded-lg p-3">
+                                <div className="flex items-center gap-2">
+                                  <span className="flex-1 font-medium text-sm text-foreground truncate">{localizeTitle(day.type, lang)}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => setFreeExpanded((prev) => ({ ...prev, [key]: !prev[key] }))}
+                                    className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground"
+                                    aria-expanded={isExpanded}
+                                    aria-label={lang === "zh" ? "展開" : "Expand"}
+                                  >
+                                    <ChevronDown size={16} className={`transition-transform ${isExpanded ? "rotate-180" : ""}`} />
+                                  </button>
+                                </div>
+                                {isExpanded && <WorkoutDetails day={day} lang={lang} hrBounds={hrBounds} />}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
 
                   {/* Add to Calendar button */}

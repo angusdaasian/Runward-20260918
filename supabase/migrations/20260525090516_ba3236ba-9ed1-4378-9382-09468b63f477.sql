@@ -1,0 +1,2 @@
+INSERT INTO public.terra_today_oneoff_queue (user_id, terra_user_id, provider, target_date, status)
+VALUES ('c7a7d1ca-c7bf-4288-bb9d-794006a04087', '8757e1ca-0e65-4f89-9ae4-c98e0242e5b9', 'GARMIN', DATE '2026-05-25', 'pending');

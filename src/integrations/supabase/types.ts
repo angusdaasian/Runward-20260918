@@ -1083,27 +1083,42 @@ export type Database = {
       }
       support_feedback: {
         Row: {
+          admin_response: string | null
           created_at: string
           description: string
           id: string
-          name: string
+          name: string | null
+          responded_at: string | null
+          responded_by: string | null
+          status: string
           title: string
+          updated_at: string
           user_id: string | null
         }
         Insert: {
+          admin_response?: string | null
           created_at?: string
           description: string
           id?: string
-          name: string
+          name?: string | null
+          responded_at?: string | null
+          responded_by?: string | null
+          status?: string
           title: string
+          updated_at?: string
           user_id?: string | null
         }
         Update: {
+          admin_response?: string | null
           created_at?: string
           description?: string
           id?: string
-          name?: string
+          name?: string | null
+          responded_at?: string | null
+          responded_by?: string | null
+          status?: string
           title?: string
+          updated_at?: string
           user_id?: string | null
         }
         Relationships: []

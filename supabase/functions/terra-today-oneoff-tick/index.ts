@@ -1,8 +1,10 @@
 // One-off tick: pops one pending row from terra_today_oneoff_queue and asks
-// Terra for today's activity directly. Do not use to_webhook=true here: that
-// can enqueue replayable activity deliveries and make old pings loop.
-// Self-unschedules pg_cron job
+// Terra for today's activity. Uses to_webhook=true so the existing webhook
+// pipeline (with built-in dedup) ingests the payload. The cron schedule
+// spaces calls (e.g. every 15s) to avoid hammering Terra and to let the
+// webhook queue drain between requests. Self-unschedules pg_cron job
 // "terra-today-oneoff" when queue is empty.
+
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { getTerraCreds } from "../_shared/terraEnv.ts";
 

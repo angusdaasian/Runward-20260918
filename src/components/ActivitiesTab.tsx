@@ -746,9 +746,12 @@ const ActivitiesTab = ({ lang }: Props) => {
     if (!user || fetchingToday) return;
     setFetchingToday(true);
     try {
-      // Today's date in HKT (UTC+8)
+      // Past 7 days window in HKT (UTC+8)
       const nowHkt = new Date(Date.now() + 8 * 60 * 60 * 1000);
       const today = nowHkt.toISOString().slice(0, 10);
+      const start = new Date(nowHkt.getTime() - 7 * 24 * 60 * 60 * 1000)
+        .toISOString()
+        .slice(0, 10);
       const tomorrow = new Date(nowHkt.getTime() + 24 * 60 * 60 * 1000)
         .toISOString()
         .slice(0, 10);
@@ -757,36 +760,44 @@ const ActivitiesTab = ({ lang }: Props) => {
       const accessToken = sessionData?.session?.access_token;
       if (!accessToken) throw new Error("Not authenticated");
 
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/terra-sync`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${accessToken}`,
-          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-        },
-        body: JSON.stringify({
-          startDate: today,
-          endDate: tomorrow,
-          latestWithSamples: true,
-          forceEnv: "prod",
-        }),
-      });
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60_000);
+      let response: Response;
+      try {
+        response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/terra-sync`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${accessToken}`,
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          },
+          body: JSON.stringify({
+            startDate: start,
+            endDate: tomorrow,
+            forceEnv: "prod",
+          }),
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timeoutId);
+      }
       const result = await response.json().catch(() => null);
       if (!response.ok) throw new Error(result?.error ?? `Terra sync failed (${response.status})`);
 
       invalidateAll();
       const count = result?.activities ?? 0;
       if (count > 0) {
-        toast.success(lang === "zh" ? "已取得今日最新活動" : "Fetched today's latest activity");
+        toast.success(lang === "zh" ? `已同步 ${count} 個活動` : `Synced ${count} activities`);
       } else {
-        toast.info(lang === "zh" ? "今日暫無新活動" : "No new activity for today yet");
+        toast.info(lang === "zh" ? "過去 7 天暫無新活動" : "No new activities in the past 7 days");
       }
     } catch (err) {
-      console.error("Fetch today terra error:", err);
-      toast.error(lang === "zh" ? "取得今日活動失敗" : "Failed to fetch today's activity");
+      console.error("Fetch 7-day terra error:", err);
+      toast.error(lang === "zh" ? "同步失敗" : "Sync failed");
     }
     setFetchingToday(false);
   }, [user, fetchingToday, invalidateAll, lang]);
+
 
 
 
@@ -902,10 +913,11 @@ const ActivitiesTab = ({ lang }: Props) => {
                 onClick={handleFetchTodayTerra}
                 disabled={fetchingToday}
                 className="flex items-center gap-1 text-xs font-medium text-primary hover:text-primary/80 transition-colors disabled:opacity-50"
-                aria-label={lang === "zh" ? "取得今日活動" : "Fetch today"}
+                aria-label={lang === "zh" ? "同步過去 7 天" : "Sync last 7 days"}
               >
                 <RefreshCw size={14} className={fetchingToday ? "animate-spin" : ""} />
-                {lang === "zh" ? "今日" : "Today"}
+                {lang === "zh" ? "同步 7 天" : "Sync last 7 days"}
+
               </button>
             )}
             {(latestActivity || activities.length > 0) && (

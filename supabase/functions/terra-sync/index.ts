@@ -489,7 +489,11 @@ Deno.serve(async (req) => {
             .slice(0, 1)
             .map(({ item }) => item);
         }
-        console.log(`[terra-sync] activity ${c.provider} items=${items.length} status=${r.status} type=${j?.type} forceWebhookRequested=${forceWebhook}`);
+        const terraReference = r.headers.get("terra-reference");
+        const itemIds = items.map((it: any) => String(it?.metadata?.summary_id ?? it?.metadata?.upload_id ?? it?.metadata?.start_time ?? "")).filter(Boolean);
+        console.log(`[terra-sync] activity ${c.provider} items=${items.length} status=${r.status} type=${j?.type} terraReference=${terraReference ?? "none"} forceWebhookRequested=${forceWebhook} ids=${JSON.stringify(itemIds).slice(0, 1000)}`);
+        let ingestedHere = 0;
+        let skippedHere = 0;
         for (const a of items) {
           // Route through the trusted webhook ingest pipeline so manual sync
           // produces the same row shape (full hr/distance/elev/cadence samples)
@@ -499,14 +503,18 @@ Deno.serve(async (req) => {
             user: { user_id: c.terra_user_id, reference_id: c.reference_id, provider: c.provider },
             data: [a],
           };
+          const aid = String(a?.metadata?.summary_id ?? a?.metadata?.upload_id ?? "");
           try {
             const ing = await ingestTrustedTerraPayload(JSON.stringify(envelope), "prod", "manual_sync");
-            if (ing.ok) activityCount++;
-            else console.warn(`[terra-sync] trusted ingest err ${c.provider}: ${ing.error}`);
+            if (ing.ok) { activityCount++; ingestedHere++; }
+            else { skippedHere++; console.warn(`[terra-sync] trusted ingest err ${c.provider} id=${aid}: ${ing.error}`); }
           } catch (e) {
-            console.error(`[terra-sync] trusted ingest threw ${c.provider}`, e);
+            skippedHere++;
+            console.error(`[terra-sync] trusted ingest threw ${c.provider} id=${aid}`, e);
           }
         }
+        console.log(`[terra-sync] activity ingest summary ${c.provider} returned=${items.length} ingested=${ingestedHere} skipped=${skippedHere}`);
+
         if (latestWithSamples && items.length === 0) {
           const { data: withSamples } = await admin
             .from("terra_activities")

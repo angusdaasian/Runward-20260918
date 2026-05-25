@@ -40,49 +40,53 @@ Deno.serve(async (req) => {
   const startDate = nowHkt.toISOString().slice(0, 10);
   const endDate = new Date(nowHkt.getTime() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
-  const results: any[] = [];
   const list = conns ?? [];
-  for (let i = 0; i < list.length; i++) {
-    const c = list[i];
-    try {
-      const url = `https://api.tryterra.co/v2/activity?user_id=${c.terra_user_id}` +
-        `&start_date=${startDate}&end_date=${endDate}` +
-        `&to_webhook=false&with_samples=true`;
-      const res = await fetch(url, {
-        headers: { "dev-id": devId, "x-api-key": apiKey },
-        signal: AbortSignal.timeout(20_000),
-      });
-      const body = await res.text().catch(() => "");
-      let ingested = 0;
-      let err: string | null = null;
-      if (res.ok && body) {
-        try {
-          const r = await ingestTrustedTerraPayload(body, "prod", "cron_tick_all");
-          ingested = r.count;
-          err = r.error;
-        } catch (e) {
-          err = `ingest threw: ${String(e).slice(0, 300)}`;
-        }
-        await admin
-          .from("terra_connections")
-          .update({ last_synced_at: new Date().toISOString() })
-          .eq("id", c.id);
-      } else {
-        err = `http_${res.status}: ${body.slice(0, 200)}`;
-      }
-      results.push({ user_id: c.user_id, provider: c.provider, http: res.status, ingested, err });
-      console.log(`[terra-tick-all] user=${c.user_id} provider=${c.provider} http=${res.status} ingested=${ingested}${err ? ` err=${err}` : ""}`);
-    } catch (e) {
-      results.push({ user_id: c.user_id, provider: c.provider, err: String(e).slice(0, 300) });
-      console.error(`[terra-tick-all] fetch failed user=${c.user_id} provider=${c.provider}`, e);
-    }
-    // Space requests 10s apart to avoid hammering Terra
-    if (i < list.length - 1) {
-      await new Promise((r) => setTimeout(r, 10_000));
-    }
-  }
 
-  return new Response(JSON.stringify({ ok: true, connections: conns?.length ?? 0, results }), {
+  // Run in background so we don't hit the 150s response wall.
+  const work = (async () => {
+    for (let i = 0; i < list.length; i++) {
+      const c = list[i];
+      try {
+        const url = `https://api.tryterra.co/v2/activity?user_id=${c.terra_user_id}` +
+          `&start_date=${startDate}&end_date=${endDate}` +
+          `&to_webhook=false&with_samples=true`;
+        const res = await fetch(url, {
+          headers: { "dev-id": devId, "x-api-key": apiKey },
+          signal: AbortSignal.timeout(20_000),
+        });
+        const body = await res.text().catch(() => "");
+        let ingested = 0;
+        let err: string | null = null;
+        if (res.ok && body) {
+          try {
+            const r = await ingestTrustedTerraPayload(body, "prod", "cron_tick_all");
+            ingested = r.count;
+            err = r.error;
+          } catch (e) {
+            err = `ingest threw: ${String(e).slice(0, 300)}`;
+          }
+          await admin
+            .from("terra_connections")
+            .update({ last_synced_at: new Date().toISOString() })
+            .eq("id", c.id);
+        } else {
+          err = `http_${res.status}: ${body.slice(0, 200)}`;
+        }
+        console.log(`[terra-tick-all] (${i + 1}/${list.length}) user=${c.user_id} provider=${c.provider} http=${res.status} ingested=${ingested}${err ? ` err=${err}` : ""}`);
+      } catch (e) {
+        console.error(`[terra-tick-all] (${i + 1}/${list.length}) fetch failed user=${c.user_id} provider=${c.provider}`, e);
+      }
+      if (i < list.length - 1) {
+        await new Promise((r) => setTimeout(r, 10_000));
+      }
+    }
+    console.log(`[terra-tick-all] DONE processed=${list.length}`);
+  })();
+
+  // @ts-ignore EdgeRuntime is available in Supabase Edge Functions
+  try { EdgeRuntime.waitUntil(work); } catch { /* fallback: detach */ work.catch(() => {}); }
+
+  return new Response(JSON.stringify({ ok: true, started: list.length, startDate, endDate }), {
     headers: { ...cors, "Content-Type": "application/json" },
   });
 });

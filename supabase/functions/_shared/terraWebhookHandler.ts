@@ -583,16 +583,10 @@ async function requestActivityHrSamplesWebhook(terraUserId: string, referenceId:
   );
   if (alreadyRequested) return;
 
-  // Empty-payload retry: widen end date by 2 days; otherwise just next day
+  // Do not ask Terra to redeliver activity ranges via webhook here. These
+  // retries can create large historical activity webhooks and push Terra's
+  // dashboard response time over its 8s circuit breaker.
   const endDate = explicitStartDate ? nextDate(nextDate(startDate)) : nextDate(startDate);
-  const creds = getTerraCreds(env);
-  const url = `https://api.tryterra.co/v2/activity?user_id=${terraUserId}&start_date=${startDate}&end_date=${endDate}&to_webhook=true&with_samples=true`;
-  const response = await fetch(url, {
-    headers: {
-      "dev-id": creds.devId,
-      "x-api-key": creds.apiKey,
-    },
-  });
   await supa.from("terra_webhook_events").insert({
     type: "terra_hr_samples_retry",
     terra_user_id: terraUserId,
@@ -603,14 +597,14 @@ async function requestActivityHrSamplesWebhook(terraUserId: string, referenceId:
       summary_id: summaryId,
       start_date: startDate,
       end_date: endDate,
-      to_webhook: true,
+      to_webhook: false,
       with_samples: true,
       env,
-      status: response.status,
-      terra_reference: response.headers.get("terra-reference"),
+      skipped: true,
+      reason: "disabled_to_avoid_slow_historical_webhooks",
     },
   });
-  console.log(`[terra-webhook] requested HR samples webhook env=${env} summary=${summaryId} status=${response.status}`);
+  console.log(`[terra-webhook] skipped HR samples webhook retry env=${env} summary=${summaryId}`);
 }
 
 async function processWebhook(
@@ -653,24 +647,19 @@ async function processWebhook(
           processingError = `connection upsert: ${upsertErr.message}`;
         }
 
-        // All Terra providers: on auth, fetch past 7 days of activities
-        // + today's daily/sleep snapshot. Skip historical daily/sleep
-        // backfill — those payloads are huge and cause 504s.
+        // Do not trigger activity backfills via webhook on auth. Historical
+        // activity payloads with samples are huge and inflate Terra dashboard
+        // response time; user-initiated sync can fetch directly with
+        // to_webhook=false instead.
         // Garmin Railway duplicates are deleted per Terra activity as
         // each payload arrives.
         {
           const today = new Date().toISOString().slice(0, 10);
-          const since = new Date(Date.now() - 7 * 86400_000).toISOString().slice(0, 10);
-
           const creds = getTerraCreds(env);
           const devId = creds.devId;
           const apiKey = creds.apiKey;
           const headers = { "dev-id": devId, "x-api-key": apiKey };
           const calls: Array<{ ep: string; url: string }> = [
-            {
-              ep: "activity",
-              url: `https://api.tryterra.co/v2/activity?user_id=${terraUserId}&start_date=${since}&end_date=${today}&to_webhook=true&with_samples=true`,
-            },
             {
               ep: "daily",
               url: `https://api.tryterra.co/v2/daily?user_id=${terraUserId}&start_date=${today}&end_date=${today}&to_webhook=true&with_samples=false`,
@@ -693,7 +682,7 @@ async function processWebhook(
                 terra_user_id: terraUserId,
                 reference_id: referenceId,
                 signature_valid: true,
-                payload: { provider, activity_window_days: 7, daily_date: today, results: summary } as any,
+                payload: { provider, activity_window_days: 0, daily_date: today, results: summary } as any,
               });
             } catch (e) {
               console.error("terra_backfill log insert failed", e);

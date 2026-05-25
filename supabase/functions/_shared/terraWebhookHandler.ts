@@ -1011,56 +1011,22 @@ export async function processQueuedTerraWebhook(
   return { ok: err == null, error: err };
 }
 
-// Thin enqueuer: writes the raw webhook into `terra_webhook_queue` and returns
-// 200 immediately. A separate worker (`terra-webhook-worker`, drained by a
-// pg_cron job every minute) handles signature verification and processing.
-// This keeps Terra's 8s circuit breaker happy regardless of payload size.
+// Minimal handler: read body, enqueue, return 200. Worker processes via cron.
 export async function handleTerraWebhook(req: Request, env: TerraEnv = "prod"): Promise<Response> {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
-  const backgroundReq = req.clone();
-
-  // Defer body reading and ALL network work until AFTER the response is sent.
-  // This keeps Terra's measured webhook response time from being tied to
-  // multi-MB payload upload/parsing/DB time.
-  const background = (async () => {
-    let raw = "";
-    try { raw = await backgroundReq.text(); } catch (e) {
-      console.error("[terra-webhook] failed to read body", e);
-      return;
-    }
-    const sigHeader = backgroundReq.headers.get("terra-signature");
-
-    try {
-      const { error: enqueueErr } = await supa
-        .from("terra_webhook_queue")
-        .insert({ env, raw_body: raw, signature_header: sigHeader, status: "pending" });
-      if (enqueueErr) console.error("[terra-webhook] enqueue failed", enqueueErr);
-    } catch (e) {
-      console.error("[terra-webhook] enqueue threw", e);
-    }
-    try {
-      const workerUrl = `${Deno.env.get("SUPABASE_URL")!}/functions/v1/terra-webhook-worker`;
-      const webhookKey = Deno.env.get("WEBHOOK_AUTH_KEY") ?? "";
-      await fetch(workerUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-webhook-key": webhookKey },
-        body: "{}",
-      });
-    } catch (e) {
-      console.error("[terra-webhook] worker kick failed", e);
-    }
-  })();
-
   try {
-    // @ts-ignore EdgeRuntime is provided by Supabase edge runtime
-    if (typeof EdgeRuntime !== "undefined" && (EdgeRuntime as any).waitUntil) {
-      // @ts-ignore
-      EdgeRuntime.waitUntil(background);
-    }
+    const raw = await req.text();
+    const sig = req.headers.get("terra-signature");
+    await supa
+      .from("terra_webhook_queue")
+      .insert({ env, raw_body: raw, signature_header: sig, status: "pending" });
   } catch (e) {
-    console.error("[terra-webhook] waitUntil failed", e);
+    console.error("[terra-webhook] enqueue failed", e);
   }
 
-  return new Response("{\"ok\":true}", { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+  return new Response('{"ok":true}', {
+    status: 200,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
 }

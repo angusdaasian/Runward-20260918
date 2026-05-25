@@ -1011,22 +1011,39 @@ export async function processQueuedTerraWebhook(
   return { ok: err == null, error: err };
 }
 
-// Minimal handler: read body, enqueue, return 200. Worker processes via cron.
+// Minimal Terra callback: mirror Terra's Flask example as closely as possible.
+// Read body, require signature, verify HMAC, return immediately. No DB writes,
+// no JSON processing, no worker kick in the request path.
 export async function handleTerraWebhook(req: Request, env: TerraEnv = "prod"): Promise<Response> {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
     const raw = await req.text();
     const sig = req.headers.get("terra-signature");
-    await supa
-      .from("terra_webhook_queue")
-      .insert({ env, raw_body: raw, signature_header: sig, status: "pending" });
-  } catch (e) {
-    console.error("[terra-webhook] enqueue failed", e);
-  }
+    if (!sig) {
+      return new Response(JSON.stringify({ error: "terra-signature header missing" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
-  return new Response('{"ok":true}', {
-    status: 200,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-  });
+    const secret = getTerraCreds(env).signingSecret;
+    const valid = secret ? await verifySignature(secret, sig, raw) : false;
+    if (!valid) {
+      return new Response(JSON.stringify({ error: "Invalid signature" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    return new Response(JSON.stringify({ message: "Webhook received successfully" }), {
+      status: 200,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  } catch (e) {
+    return new Response(JSON.stringify({ error: String(e) }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
 }

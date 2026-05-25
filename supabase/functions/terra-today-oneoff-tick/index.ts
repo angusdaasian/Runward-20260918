@@ -62,7 +62,8 @@ Deno.serve(async (req) => {
     const { devId, apiKey } = getTerraCreds("prod");
     const url = `https://api.tryterra.co/v2/activity?user_id=${row.terra_user_id}` +
       `&start_date=${row.target_date}&end_date=${row.target_date}` +
-      `&to_webhook=false&with_samples=true`;
+      `&to_webhook=true&with_samples=true`;
+
     const res = await fetch(url, { headers: { "dev-id": devId, "x-api-key": apiKey } });
     const ref = res.headers.get("terra-reference");
     const body = await res.text().catch(() => "");

@@ -70,7 +70,22 @@ Deno.serve(async (req) => {
     const ref = res.headers.get("terra-reference");
     const body = await res.text().catch(() => "");
 
-
+    // Parse Terra response metadata for diagnostics
+    let terraItemCount = 0;
+    let terraType: string | null = null;
+    let terraItemIds: string[] = [];
+    try {
+      const j = JSON.parse(body || "{}");
+      terraType = j?.type ?? null;
+      const items: any[] = Array.isArray(j?.data) ? j.data : [];
+      terraItemCount = items.length;
+      terraItemIds = items
+        .map((it: any) => String(it?.metadata?.summary_id ?? it?.metadata?.upload_id ?? it?.metadata?.start_time ?? ""))
+        .filter(Boolean)
+        .slice(0, 20);
+    } catch (_) {
+      // body not JSON
+    }
 
     let ingestOk = false;
     let ingestErr: string | null = null;
@@ -88,8 +103,8 @@ Deno.serve(async (req) => {
 
     const finalStatus = res.ok && ingestOk ? "done" : "error";
     const resultMsg = res.ok
-      ? (ingestOk ? `ingested ${ingestCount}` : `ingest_err: ${ingestErr ?? "unknown"}`)
-      : `http_${res.status}: ${body.slice(0, 300)}`;
+      ? `terra_items=${terraItemCount} type=${terraType} ids=${JSON.stringify(terraItemIds)} ingested=${ingestCount}${ingestErr ? ` err=${ingestErr}` : ""} body_head=${body.slice(0, 400)}`
+      : `http_${res.status}: ${body.slice(0, 400)}`;
 
     await admin
       .from("terra_today_oneoff_queue")
@@ -101,10 +116,11 @@ Deno.serve(async (req) => {
       })
       .eq("id", row.id);
 
-    console.log(`[terra-today-oneoff] user=${row.user_id} provider=${row.provider} http=${res.status} ref=${ref} ingest=${ingestOk} count=${ingestCount}${ingestErr ? ` err=${ingestErr}` : ""}`);
-    return new Response(JSON.stringify({ ok: finalStatus === "done", user_id: row.user_id, http_status: res.status, terra_reference: ref, ingest_count: ingestCount, ingest_error: ingestErr }), {
+    console.log(`[terra-today-oneoff] user=${row.user_id} terra=${row.terra_user_id} provider=${row.provider} date=${row.target_date} http=${res.status} ref=${ref} terra_items=${terraItemCount} type=${terraType} ingest=${ingestOk} ingested=${ingestCount}${ingestErr ? ` err=${ingestErr}` : ""} ids=${JSON.stringify(terraItemIds)} body_head=${body.slice(0, 300)}`);
+    return new Response(JSON.stringify({ ok: finalStatus === "done", user_id: row.user_id, http_status: res.status, terra_reference: ref, terra_items: terraItemCount, terra_type: terraType, terra_item_ids: terraItemIds, ingest_count: ingestCount, ingest_error: ingestErr }), {
       headers: { ...cors, "Content-Type": "application/json" },
     });
+
 
   } catch (e) {
     await admin

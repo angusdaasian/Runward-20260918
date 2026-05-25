@@ -15,6 +15,7 @@ import {
   Timer,
 } from "lucide-react";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Lang, t } from "@/lib/i18n";
 import { useAuth } from "@/contexts/AuthContext";
@@ -798,6 +799,38 @@ const ActivitiesTab = ({ lang }: Props) => {
     setFetchingToday(false);
   }, [user, fetchingToday, invalidateAll, lang]);
 
+  const handleFetchLatest = useCallback(async () => {
+    if (!user || fetchingToday) return;
+    setFetchingToday(true);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData?.session?.access_token;
+      if (!accessToken) throw new Error("Not authenticated");
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/terra-sync`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        },
+        body: JSON.stringify({ dayOnly: true, latestWithSamples: true, forceEnv: "prod" }),
+      });
+      const result = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(result?.error ?? `Sync failed (${response.status})`);
+      invalidateAll();
+      const count = result?.activities ?? 0;
+      if (count > 0) {
+        toast.success(lang === "zh" ? "已同步最新活動" : "Latest activity synced");
+      } else {
+        toast.info(lang === "zh" ? "今日暫無新活動" : "No new activity today");
+      }
+    } catch (err) {
+      console.error("Fetch latest terra error:", err);
+      toast.error(lang === "zh" ? "同步失敗" : "Sync failed");
+    }
+    setFetchingToday(false);
+  }, [user, fetchingToday, invalidateAll, lang]);
+
 
 
 
@@ -909,16 +942,27 @@ const ActivitiesTab = ({ lang }: Props) => {
           </h2>
           <div className="flex items-center gap-3">
             {fitnessAppConnected && (
-              <button
-                onClick={handleFetchTodayTerra}
-                disabled={fetchingToday}
-                className="flex items-center gap-1 text-xs font-medium text-primary hover:text-primary/80 transition-colors disabled:opacity-50"
-                aria-label={lang === "zh" ? "同步過去 7 天" : "Sync last 7 days"}
-              >
-                <RefreshCw size={14} className={fetchingToday ? "animate-spin" : ""} />
-                {lang === "zh" ? "同步 7 天" : "Sync last 7 days"}
-
-              </button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    disabled={fetchingToday}
+                    className="flex items-center gap-1 text-xs font-medium text-primary hover:text-primary/80 transition-colors disabled:opacity-50"
+                    aria-label={lang === "zh" ? "同步活動" : "Sync activities"}
+                  >
+                    <RefreshCw size={14} className={fetchingToday ? "animate-spin" : ""} />
+                    {lang === "zh" ? "同步" : "Sync"}
+                    <ChevronDown size={12} />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="min-w-[180px]">
+                  <DropdownMenuItem onClick={handleFetchLatest} disabled={fetchingToday}>
+                    {lang === "zh" ? "同步最新活動" : "Sync latest activity"}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleFetchTodayTerra} disabled={fetchingToday}>
+                    {lang === "zh" ? "同步過去 7 天" : "Sync last 7 days"}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
             {(latestActivity || activities.length > 0) && (
               <button

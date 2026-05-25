@@ -1,5 +1,7 @@
 // One-off tick: pops one pending row from terra_today_oneoff_queue and asks
-// Terra for today's activity (to_webhook=true). Self-unschedules pg_cron job
+// Terra for today's activity directly. Do not use to_webhook=true here: that
+// can enqueue replayable activity deliveries and make old pings loop.
+// Self-unschedules pg_cron job
 // "terra-today-oneoff" when queue is empty.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { getTerraCreds } from "../_shared/terraEnv.ts";
@@ -58,7 +60,7 @@ Deno.serve(async (req) => {
     const { devId, apiKey } = getTerraCreds("prod");
     const url = `https://api.tryterra.co/v2/activity?user_id=${row.terra_user_id}` +
       `&start_date=${row.target_date}&end_date=${row.target_date}` +
-      `&to_webhook=true&with_samples=true`;
+      `&to_webhook=false&with_samples=true`;
     const res = await fetch(url, { headers: { "dev-id": devId, "x-api-key": apiKey } });
     const ref = res.headers.get("terra-reference");
     const body = await res.text().catch(() => "");

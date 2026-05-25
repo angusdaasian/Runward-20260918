@@ -79,11 +79,13 @@ serve(async (req) => {
   try {
     const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2.49.4");
     const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, { global: { headers: { Authorization: `Bearer ${token}` } } });
-    const { data, error } = await sb.auth.getClaims(token);
-    if (error || !data?.claims) {
+    const { data: userData, error } = await sb.auth.getUser(token);
+    if (error || !userData?.user) {
+      console.error("[analyze-posture] auth.getUser failed:", error?.message);
       return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
-  } catch {
+  } catch (e) {
+    console.error("[analyze-posture] auth check threw:", (e as Error).message);
     return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 

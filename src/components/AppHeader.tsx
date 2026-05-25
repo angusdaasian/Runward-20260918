@@ -136,6 +136,7 @@ const AppHeader = ({ lang, onNavigateSettings, onOpenPromoBanner, isGuest }: App
     _headerUserId === user?.id ? _headerProfile : null
   );
   const [guideOpen, setGuideOpen] = useState(false);
+  const [roadmapOpen, setRoadmapOpen] = useState(false);
 
   useEffect(() => {
     if (!user) return;

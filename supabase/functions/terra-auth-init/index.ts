@@ -101,12 +101,12 @@ Deno.serve(async (req) => {
           } else {
             console.log(`[terra-auth-init] eager-linked provider=${provider} terra_user_id=${terraUserId}`);
 
-            // Fire-and-forget 7-day backfill (activity) + today daily/sleep.
+            // Fire-and-forget today's daily/sleep only. Avoid activity backfill
+            // via webhook: sampled historical activity payloads are huge and
+            // inflate Terra dashboard response time.
             const today = new Date().toISOString().slice(0, 10);
-            const since = new Date(Date.now() - 7 * 86400_000).toISOString().slice(0, 10);
             const headers = { "dev-id": devId, "x-api-key": apiKey };
             const calls = [
-              { ep: "activity", url: `https://api.tryterra.co/v2/activity?user_id=${terraUserId}&start_date=${since}&end_date=${today}&to_webhook=true&with_samples=true` },
               { ep: "daily",    url: `https://api.tryterra.co/v2/daily?user_id=${terraUserId}&start_date=${today}&end_date=${today}&to_webhook=true&with_samples=false` },
               { ep: "sleep",    url: `https://api.tryterra.co/v2/sleep?user_id=${terraUserId}&start_date=${today}&end_date=${today}&to_webhook=true&with_samples=false` },
             ];
@@ -123,7 +123,7 @@ Deno.serve(async (req) => {
                   terra_user_id: terraUserId,
                   reference_id: user.id,
                   signature_valid: true,
-                  payload: { provider, source: "terra-auth-init", env, activity_window_days: 7, daily_date: today, results: summary } as any,
+                  payload: { provider, source: "terra-auth-init", env, activity_window_days: 0, daily_date: today, results: summary } as any,
                 });
               } catch (e) {
                 console.error("[terra-auth-init] backfill log insert failed", e);

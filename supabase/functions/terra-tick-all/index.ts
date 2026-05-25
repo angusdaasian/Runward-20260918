@@ -41,7 +41,9 @@ Deno.serve(async (req) => {
   const endDate = new Date(nowHkt.getTime() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
   const results: any[] = [];
-  for (const c of conns ?? []) {
+  const list = conns ?? [];
+  for (let i = 0; i < list.length; i++) {
+    const c = list[i];
     try {
       const url = `https://api.tryterra.co/v2/activity?user_id=${c.terra_user_id}` +
         `&start_date=${startDate}&end_date=${endDate}` +
@@ -73,6 +75,10 @@ Deno.serve(async (req) => {
     } catch (e) {
       results.push({ user_id: c.user_id, provider: c.provider, err: String(e).slice(0, 300) });
       console.error(`[terra-tick-all] fetch failed user=${c.user_id} provider=${c.provider}`, e);
+    }
+    // Space requests 10s apart to avoid hammering Terra
+    if (i < list.length - 1) {
+      await new Promise((r) => setTimeout(r, 10_000));
     }
   }
 

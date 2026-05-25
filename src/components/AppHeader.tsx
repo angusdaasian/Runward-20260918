@@ -341,6 +341,7 @@ const AppHeader = ({ lang, onNavigateSettings, onOpenPromoBanner, isGuest }: App
           </PopoverContent>
         </Popover>
         <AppGuideDialog open={guideOpen} onOpenChange={setGuideOpen} lang={lang} />
+        <RoadmapDialog open={roadmapOpen} onOpenChange={setRoadmapOpen} lang={lang} />
       </div>
     </div>
   );

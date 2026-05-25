@@ -80,9 +80,28 @@ export function useRefreshTerraDailyHealth(lang: Lang) {
           );
           return false;
         }
-        toast.success(
-          lang === "zh" ? "健康資料已更新" : "Health stats updated",
-        );
+        const h = (data as any)?.health ?? {};
+        const parts: string[] = [];
+        if (lang === "zh") {
+          if (h.sleep > 0) parts.push("睡眠");
+          if (h.vo2max > 0) parts.push("VO₂max");
+          if (h.resting_hr > 0) parts.push("靜息心率");
+          if (h.hrv > 0) parts.push("HRV");
+        } else {
+          if (h.sleep > 0) parts.push("sleep");
+          if (h.vo2max > 0) parts.push("VO₂max");
+          if (h.resting_hr > 0) parts.push("RHR");
+          if (h.hrv > 0) parts.push("HRV");
+        }
+        if (parts.length > 0) {
+          toast.success(
+            (lang === "zh" ? "已更新:" : "Updated: ") + parts.join(lang === "zh" ? "、" : ", "),
+          );
+        } else {
+          toast.success(
+            lang === "zh" ? "健康資料已更新" : "Health stats updated",
+          );
+        }
         queryClient.invalidateQueries({ queryKey: ["terra-daily-health", user.id] });
         return true;
       } catch (e) {

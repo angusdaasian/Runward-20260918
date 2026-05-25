@@ -961,6 +961,27 @@ export type Database = {
         }
         Relationships: []
       }
+      roadmap_ideas: {
+        Row: {
+          created_at: string
+          id: string
+          idea: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          idea: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          idea?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       social_rewards_claimed: {
         Row: {
           claimed_at: string

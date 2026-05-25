@@ -69,6 +69,8 @@ Deno.serve(async (req) => {
     const res = await fetch(url, { headers: { "dev-id": devId, "x-api-key": apiKey } });
     const ref = res.headers.get("terra-reference");
     const body = await res.text().catch(() => "");
+    console.log(`[terra-today-oneoff] body_preview user=${row.user_id} len=${body.length} head=${body.slice(0, 400)}`);
+
 
     let ingestOk = false;
     let ingestErr: string | null = null;

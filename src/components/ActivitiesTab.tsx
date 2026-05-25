@@ -831,6 +831,38 @@ const ActivitiesTab = ({ lang }: Props) => {
     setFetchingToday(false);
   }, [user, fetchingToday, invalidateAll, lang]);
 
+  const handleFetchTodayOnly = useCallback(async () => {
+    if (!user || fetchingToday) return;
+    setFetchingToday(true);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData?.session?.access_token;
+      if (!accessToken) throw new Error("Not authenticated");
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/terra-sync-today`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        },
+        body: JSON.stringify({ forceEnv: "prod" }),
+      });
+      const result = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(result?.error ?? `Sync failed (${response.status})`);
+      invalidateAll();
+      const count = result?.activities ?? 0;
+      if (count > 0) {
+        toast.success(lang === "zh" ? `已同步 ${count} 個今日活動` : `Synced ${count} of today's activities`);
+      } else {
+        toast.info(lang === "zh" ? "今日暫無新活動" : "No new activity today");
+      }
+    } catch (err) {
+      console.error("Fetch today terra error:", err);
+      toast.error(lang === "zh" ? "同步失敗" : "Sync failed");
+    }
+    setFetchingToday(false);
+  }, [user, fetchingToday, invalidateAll, lang]);
+
 
 
 
@@ -957,6 +989,9 @@ const ActivitiesTab = ({ lang }: Props) => {
                 <DropdownMenuContent align="end" className="min-w-[180px]">
                   <DropdownMenuItem onClick={handleFetchLatest} disabled={fetchingToday}>
                     {lang === "zh" ? "同步最新活動" : "Sync latest activity"}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleFetchTodayOnly} disabled={fetchingToday}>
+                    {lang === "zh" ? "同步今日活動" : "Sync today's activities"}
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={handleFetchTodayTerra} disabled={fetchingToday}>
                     {lang === "zh" ? "同步過去 7 天" : "Sync last 7 days"}

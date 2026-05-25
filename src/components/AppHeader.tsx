@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Settings, Bell, Megaphone, Menu, Cloud, HelpCircle, Headset } from "lucide-react";
+import { Settings, Bell, Megaphone, Menu, Cloud, HelpCircle, Headset, Rocket } from "lucide-react";
 import AppGuideDialog from "@/components/AppGuideDialog";
+import RoadmapDialog from "@/components/RoadmapDialog";
 import { Lang } from "@/lib/i18n";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -135,6 +136,7 @@ const AppHeader = ({ lang, onNavigateSettings, onOpenPromoBanner, isGuest }: App
     _headerUserId === user?.id ? _headerProfile : null
   );
   const [guideOpen, setGuideOpen] = useState(false);
+  const [roadmapOpen, setRoadmapOpen] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -234,6 +236,14 @@ const AppHeader = ({ lang, onNavigateSettings, onOpenPromoBanner, isGuest }: App
         >
           <Headset size={18} className="text-foreground" />
         </button>
+        <button
+          aria-label={lang === "zh" ? "產品路線圖" : "Roadmap"}
+          onClick={() => setRoadmapOpen(true)}
+          className="relative w-10 h-10 rounded-full bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center hover:from-primary/30 hover:to-primary/10 active:scale-90 transition-all duration-150 group"
+        >
+          <Rocket size={18} className="text-primary group-hover:-translate-y-0.5 group-hover:translate-x-0.5 transition-transform" />
+          <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+        </button>
         <Popover>
           <PopoverTrigger asChild>
             <button
@@ -331,6 +341,7 @@ const AppHeader = ({ lang, onNavigateSettings, onOpenPromoBanner, isGuest }: App
           </PopoverContent>
         </Popover>
         <AppGuideDialog open={guideOpen} onOpenChange={setGuideOpen} lang={lang} />
+        <RoadmapDialog open={roadmapOpen} onOpenChange={setRoadmapOpen} lang={lang} />
       </div>
     </div>
   );

@@ -1032,37 +1032,43 @@ export async function handleTerraWebhook(req: Request, env: TerraEnv = "prod"): 
   let raw = "";
   try { raw = await req.text(); } catch (e) {
     console.error("[terra-webhook] failed to read body", e);
-    return new Response(JSON.stringify({ ok: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    return new Response("{\"ok\":true}", { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
   const sigHeader = req.headers.get("terra-signature");
 
-  // Single insert — typically <100ms regardless of payload size.
-  const { error: enqueueErr } = await supa
-    .from("terra_webhook_queue")
-    .insert({ env, raw_body: raw, signature_header: sigHeader, status: "pending" });
-  if (enqueueErr) {
-    console.error("[terra-webhook] enqueue failed", enqueueErr);
-    // Still 200 so Terra doesn't trip its circuit breaker; we'll catch the gap in logs.
-  }
+  // Defer ALL network work (enqueue + worker kick) until AFTER the response is sent.
+  // This keeps the wire response time at ~network RTT only, well under Terra's 8s breaker.
+  const background = (async () => {
+    try {
+      const { error: enqueueErr } = await supa
+        .from("terra_webhook_queue")
+        .insert({ env, raw_body: raw, signature_header: sigHeader, status: "pending" });
+      if (enqueueErr) console.error("[terra-webhook] enqueue failed", enqueueErr);
+    } catch (e) {
+      console.error("[terra-webhook] enqueue threw", e);
+    }
+    try {
+      const workerUrl = `${Deno.env.get("SUPABASE_URL")!}/functions/v1/terra-webhook-worker`;
+      const webhookKey = Deno.env.get("WEBHOOK_AUTH_KEY") ?? "";
+      await fetch(workerUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-webhook-key": webhookKey },
+        body: "{}",
+      });
+    } catch (e) {
+      console.error("[terra-webhook] worker kick failed", e);
+    }
+  })();
 
-  // Best-effort: kick the worker so the common case is near-realtime instead of
-  // waiting up to 60s for the cron tick. Fire-and-forget.
   try {
-    const workerUrl = `${Deno.env.get("SUPABASE_URL")!}/functions/v1/terra-webhook-worker`;
-    const webhookKey = Deno.env.get("WEBHOOK_AUTH_KEY") ?? "";
-    const kick = fetch(workerUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-webhook-key": webhookKey },
-      body: "{}",
-    }).catch((e) => console.error("[terra-webhook] worker kick failed", e));
     // @ts-ignore EdgeRuntime is provided by Supabase edge runtime
     if (typeof EdgeRuntime !== "undefined" && (EdgeRuntime as any).waitUntil) {
       // @ts-ignore
-      EdgeRuntime.waitUntil(kick);
+      EdgeRuntime.waitUntil(background);
     }
   } catch (e) {
-    console.error("[terra-webhook] worker kick setup failed", e);
+    console.error("[terra-webhook] waitUntil failed", e);
   }
 
-  return new Response(JSON.stringify({ ok: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+  return new Response("{\"ok\":true}", { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 }

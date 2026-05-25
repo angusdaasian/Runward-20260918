@@ -1177,6 +1177,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
   const [selectedFreePlan, setSelectedFreePlan] = useState<any>(null);
   const [freeWeekIdx, setFreeWeekIdx] = useState(0);
   const [loadingFree, setLoadingFree] = useState(false);
+  const [freeExpanded, setFreeExpanded] = useState<Record<string, boolean>>({});
   const [showAddToCalendar, setShowAddToCalendar] = useState(false);
   const [calendarStartDate, setCalendarStartDate] = useState("");
   const [addingToCalendar, setAddingToCalendar] = useState(false);

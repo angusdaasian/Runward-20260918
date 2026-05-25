@@ -129,6 +129,7 @@ interface AppHeaderProps {
 }
 
 const AppHeader = ({ lang, onNavigateSettings, onOpenPromoBanner, isGuest }: AppHeaderProps) => {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const [profile, setProfile] = useState(() =>
     _headerUserId === user?.id ? _headerProfile : null

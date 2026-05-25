@@ -478,7 +478,7 @@ Deno.serve(async (req) => {
         console.log(`[terra-sync] activity fetch ${c.provider} url=${url}`);
         const r = await fetch(url, { headers });
         const j = await r.json();
-        let items: any[] = forceWebhook ? [] : (Array.isArray(j?.data) ? j.data : []);
+        let items: any[] = Array.isArray(j?.data) ? j.data : [];
         if (latestWithSamples) {
           items = items
             .map((item) => ({ item, hrSampleCount: extractHrSamples(item).length }))

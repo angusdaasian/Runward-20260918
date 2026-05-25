@@ -467,14 +467,13 @@ Deno.serve(async (req) => {
       // activity (skipped when caller only wants health stats)
       if (!healthOnly) {
       if (historicalActivity) {
-        try {
-          await applyHistoricalActivityWebhook(admin, c, headers, startStr, endStr);
-        } catch (e) { console.error("historical activity request failed", c.provider, e); }
+        console.warn(`[terra-sync] historicalActivity webhook request skipped for ${c.provider}; use direct sync only`);
       }
       try {
-        // When forceWebhook=true, ask Terra to RE-DELIVER the activity (with samples)
-        // via the webhook destination — bypasses Terra's range-endpoint dedupe.
-        const toWebhookFlag = forceWebhook ? "true" : "false";
+        // Never ask Terra to redeliver range activity data via webhook here:
+        // sampled historical payloads are huge and inflate Terra dashboard
+        // response time. Fetch directly and process inline instead.
+        const toWebhookFlag = "false";
         const url = `https://api.tryterra.co/v2/activity?user_id=${c.terra_user_id}&start_date=${startStr}&end_date=${endStr}&to_webhook=${toWebhookFlag}&with_samples=true`;
         console.log(`[terra-sync] activity fetch ${c.provider} url=${url}`);
         const r = await fetch(url, { headers });
@@ -488,7 +487,7 @@ Deno.serve(async (req) => {
             .slice(0, 1)
             .map(({ item }) => item);
         }
-        console.log(`[terra-sync] activity ${c.provider} items=${items.length} status=${r.status} type=${j?.type} forceWebhook=${forceWebhook}`);
+        console.log(`[terra-sync] activity ${c.provider} items=${items.length} status=${r.status} type=${j?.type} forceWebhookRequested=${forceWebhook}`);
         for (const a of items) {
           await upsertTerraActivity(admin, c, a);
           activityCount++;

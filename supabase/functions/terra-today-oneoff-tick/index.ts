@@ -62,11 +62,10 @@ Deno.serve(async (req) => {
 
   try {
     const { devId, apiKey } = getTerraCreds("prod");
-    // Widen window: yesterday → tomorrow. Terra treats end_date as exclusive,
-    // so target_date+1 is required to include today's activities, and we look
-    // back one day so anything not yet queryable under today still surfaces.
+    // Narrow window: target_date → target_date+1 (Terra end_date is exclusive).
+    // Goal: only return today's activities to validate latest-activity flow.
     const baseMs = new Date(row.target_date + "T00:00:00Z").getTime();
-    const startDate = new Date(baseMs - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const startDate = row.target_date;
     const endDate = new Date(baseMs + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
     const url = `https://api.tryterra.co/v2/activity?user_id=${row.terra_user_id}` +
       `&start_date=${startDate}&end_date=${endDate}` +

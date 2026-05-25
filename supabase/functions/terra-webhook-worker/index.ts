@@ -64,17 +64,29 @@ Deno.serve(async (req) => {
             .eq("id", row.id);
           processed++;
         } else {
+          const terminal = result.error === "invalid signature" || row.attempts >= 5;
           await admin
             .from("terra_webhook_queue")
-            .update({ status: "pending", last_error: result.error, claimed_at: null })
+            .update({
+              status: terminal ? "failed" : "pending",
+              last_error: result.error,
+              claimed_at: null,
+              processed_at: terminal ? new Date().toISOString() : null,
+            })
             .eq("id", row.id);
           errors++;
         }
       } catch (e) {
         console.error("[terra-webhook-worker] processing error", e);
+        const terminal = row.attempts >= 5;
         await admin
           .from("terra_webhook_queue")
-          .update({ status: "pending", last_error: String(e), claimed_at: null })
+          .update({
+            status: terminal ? "failed" : "pending",
+            last_error: String(e),
+            claimed_at: null,
+            processed_at: terminal ? new Date().toISOString() : null,
+          })
           .eq("id", row.id);
         errors++;
       }

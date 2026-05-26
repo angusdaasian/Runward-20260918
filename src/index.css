@@ -124,3 +124,18 @@
     font-family: 'Inter', sans-serif;
   }
 }
+
+@layer utilities {
+  @keyframes runner-bob {
+    0%, 100% { transform: translateY(0) rotate(-1deg); }
+    50% { transform: translateY(-6%) rotate(1deg); }
+  }
+  .animate-runner-bob {
+    animation: runner-bob 1.1s ease-in-out infinite;
+    transform-origin: center bottom;
+  }
+  .animate-runner-bob-slow {
+    animation: runner-bob 1.6s ease-in-out infinite;
+    transform-origin: center bottom;
+  }
+}

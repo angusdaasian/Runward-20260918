@@ -655,19 +655,28 @@ const ProfileSection = ({ lang, subpage = "main", onNavigate }: ProfileSectionPr
           <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground px-1">
             {lang === "zh" ? "選擇頭像" : "Pick an avatar"}
           </label>
-          <div className="grid grid-cols-6 gap-2">
+          <div className="grid grid-cols-3 gap-3">
             {[1, 2, 3, 4, 5, 6].map((n) => {
               const url = `/avatars/runner-${n}.png`;
               const selected = profile.avatar_url === url;
+              const animClass = n % 2 === 0 ? "animate-runner-bob-slow" : "animate-runner-bob";
               return (
                 <button
                   key={n}
                   type="button"
                   onClick={() => handlePickPreset(url)}
                   disabled={uploading}
-                  className={`relative aspect-square rounded-lg overflow-hidden border-2 transition-all ${selected ? "border-primary ring-2 ring-primary/30" : "border-border hover:border-primary/60"} disabled:opacity-50`}
+                  className={`relative aspect-square rounded-xl overflow-hidden border-2 transition-all bg-gradient-to-br from-primary/5 to-primary/10 ${selected ? "border-primary ring-2 ring-primary/30 scale-105" : "border-border hover:border-primary/60 hover:scale-105"} disabled:opacity-50`}
                 >
-                  <img src={url} alt={`Runner ${n}`} loading="lazy" className="w-full h-full object-cover bg-white" />
+                  <img
+                    src={url}
+                    alt={`Runner ${n}`}
+                    loading="lazy"
+                    width={512}
+                    height={512}
+                    className={`w-full h-full object-contain ${animClass}`}
+                    style={{ animationDelay: `${n * 0.13}s` }}
+                  />
                 </button>
               );
             })}

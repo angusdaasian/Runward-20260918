@@ -448,6 +448,7 @@ Format:
       const tResp = await callVertexAI({
         apiKey: VERTEX_API_KEY,
         model: "google/gemini-3.1-flash-lite-preview",
+        timeoutMs: 30_000,
         messages: [
           { role: "system", content: sysT },
           { role: "user", content: suggestion },

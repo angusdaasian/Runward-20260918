@@ -32,7 +32,7 @@ import ActivityMap from "./ActivityMap";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from "recharts";
 import { loadForActivity, isRunning } from "@/lib/trainingLoad";
 import { calculateRunningScore } from "@/lib/vdot";
-import { computeZonePct, estimateMaxHr, estimateRestingHr } from "@/lib/hrZones";
+import { computeZonePct, estimateMaxHr, estimateRestingHr, zoneBoundaries, ZONE_LABELS, isValidCustomZones } from "@/lib/hrZones";
 import HrZoneBars from "./HrZoneBars";
 import PlanNextWorkoutCard from "./PlanNextWorkoutCard";
 
@@ -720,6 +720,58 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
     return null;
   }, [activity.hr_samples, profileMaxHr, profileAge, profileRestingHr, profileCustomZones, streams]);
 
+  // Per-point HR zone color stops for the HR chart gradient, so the curve
+  // visually matches the zone distribution (Z1 grey, Z2 blue, Z3 green, ...).
+  const hrGradientStops = useMemo(() => {
+    const pts = chartData.filter((d: any) => typeof d.heartrate === "number" && d.heartrate > 0);
+    if (pts.length < 2) return null;
+    const maxHr = estimateMaxHr(profileAge ?? null, profileMaxHr ?? null);
+    const restHr = estimateRestingHr(profileRestingHr ?? null);
+    const custom = profileCustomZones ?? null;
+    const bounds = zoneBoundaries(maxHr, restHr, custom);
+    const useCustom = custom && isValidCustomZones(custom);
+    const colorFor = (bpm: number): string => {
+      let key: "z1" | "z2" | "z3" | "z4" | "z5" = "z1";
+      if (useCustom) {
+        if (bpm >= custom![4]) key = "z5";
+        else if (bpm >= custom![3]) key = "z4";
+        else if (bpm >= custom![2]) key = "z3";
+        else if (bpm >= custom![1]) key = "z2";
+        else key = "z1";
+      } else {
+        const reserve = Math.max(1, maxHr - restHr);
+        const pct = (bpm - restHr) / reserve;
+        if (pct >= 0.9) key = "z5";
+        else if (pct >= 0.8) key = "z4";
+        else if (pct >= 0.7) key = "z3";
+        else if (pct >= 0.6) key = "z2";
+        else key = "z1";
+      }
+      return ZONE_LABELS.find(z => z.key === key)!.color;
+    };
+    const xs = pts.map((p: any) => p.distance_km);
+    const minX = xs[0];
+    const maxX = xs[xs.length - 1];
+    const span = Math.max(1e-6, maxX - minX);
+    const stops: Array<{ offset: number; color: string }> = [];
+    let prevColor = "";
+    for (let i = 0; i < pts.length; i++) {
+      const offset = ((pts[i].distance_km - minX) / span) * 100;
+      const color = colorFor(pts[i].heartrate);
+      if (color !== prevColor) {
+        if (prevColor && i > 0) {
+          // hard boundary: duplicate previous color at this offset
+          stops.push({ offset, color: prevColor });
+        }
+        stops.push({ offset, color });
+        prevColor = color;
+      }
+    }
+    // ensure trailing stop
+    stops.push({ offset: 100, color: prevColor });
+    return stops;
+  }, [chartData, profileAge, profileMaxHr, profileRestingHr, profileCustomZones]);
+
   const dateStr = new Date(activity.start_date).toLocaleDateString(
     lang === "zh" ? "zh-TW" : "en-US",
     { year: "numeric", month: "long", day: "numeric", weekday: "long" }
@@ -1152,12 +1204,27 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
                   <Tooltip contentStyle={{ backgroundColor: "#FFFFFF", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 12, color: "#0F172A" }}
                     formatter={(value: number) => [Math.round(value), "bpm"]} labelFormatter={(v) => `${v} km`} />
                   <defs>
-                    <linearGradient id="hrGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#EF4444" stopOpacity={0.35} />
-                      <stop offset="95%" stopColor="#EF4444" stopOpacity={0} />
+                    <linearGradient id="hrGradient" x1="0" y1="0" x2="1" y2="0">
+                      {hrGradientStops
+                        ? hrGradientStops.map((s, i) => (
+                            <stop key={i} offset={`${s.offset}%`} stopColor={s.color} stopOpacity={0.45} />
+                          ))
+                        : (
+                          <>
+                            <stop offset="5%" stopColor="#EF4444" stopOpacity={0.35} />
+                            <stop offset="95%" stopColor="#EF4444" stopOpacity={0} />
+                          </>
+                        )}
+                    </linearGradient>
+                    <linearGradient id="hrStrokeGradient" x1="0" y1="0" x2="1" y2="0">
+                      {hrGradientStops
+                        ? hrGradientStops.map((s, i) => (
+                            <stop key={i} offset={`${s.offset}%`} stopColor={s.color} stopOpacity={1} />
+                          ))
+                        : <stop offset="0%" stopColor="#EF4444" stopOpacity={1} />}
                     </linearGradient>
                   </defs>
-                  <Area type="monotone" dataKey="heartrate" stroke="#EF4444" fill="url(#hrGradient)" strokeWidth={2.5} dot={false} />
+                  <Area type="monotone" dataKey="heartrate" stroke="url(#hrStrokeGradient)" fill="url(#hrGradient)" strokeWidth={2.5} dot={false} />
                 </AreaChart>
               ) : activeChart === "altitude" ? (
                 <AreaChart data={chartData}>

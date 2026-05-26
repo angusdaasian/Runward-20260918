@@ -23,7 +23,6 @@ export interface ShareActivityAnalysisInput {
   movingTimeSeconds: number;
   averageSpeed: number;
   analysis: string;
-  nextWorkout?: string | null;
   lang: Lang;
 }
 
@@ -68,46 +67,16 @@ export async function shareActivityAnalysis(input: ShareActivityAnalysisInput): 
     const bodyY = ty + 40;
     const bodyBottom = H - 160;
     const lineHeight = 38;
-    const nextText = stripMarkdown(input.nextWorkout || "");
-    const hasNext = nextText.length > 0;
-
-    // Reserve space for "Next workout" section if present
-    const nextHeaderH = hasNext ? 56 : 0; // label + spacing
-    const nextMaxLines = hasNext ? 6 : 0;
-    const nextBlockH = hasNext ? nextHeaderH + nextMaxLines * lineHeight + 24 : 0;
-
-    const analysisBottom = bodyBottom - nextBlockH;
 
     ctx.fillStyle = "#1F2937";
     ctx.font = `500 26px ${FONT_TEXT}`;
-    const maxLines = Math.max(1, Math.floor((analysisBottom - bodyY) / lineHeight));
+    const maxLines = Math.max(1, Math.floor((bodyBottom - bodyY) / lineHeight));
     const text = stripMarkdown(input.analysis || "");
     const lines = wrapText(ctx, text, cardW - 88).slice(0, maxLines);
     let cy = bodyY;
     for (const ln of lines) {
       ctx.fillText(ln, cardX + 44, cy);
       cy += lineHeight;
-    }
-
-    if (hasNext) {
-      cy += 16;
-      // Divider
-      ctx.fillStyle = "#E5E7EB";
-      ctx.fillRect(cardX + 44, cy, cardW - 88, 2);
-      cy += 20;
-      // Section label
-      ctx.fillStyle = "#FC4C02";
-      ctx.font = `800 22px ${FONT_DISPLAY}`;
-      ctx.fillText(isZh ? "建議下一次訓練" : "SUGGESTED NEXT WORKOUT", cardX + 44, cy);
-      cy += 32;
-      // Body
-      ctx.fillStyle = "#1F2937";
-      ctx.font = `500 24px ${FONT_TEXT}`;
-      const nLines = wrapText(ctx, nextText, cardW - 88).slice(0, nextMaxLines);
-      for (const ln of nLines) {
-        ctx.fillText(ln, cardX + 44, cy);
-        cy += lineHeight;
-      }
     }
 
     await drawBrandFooter(ctx, W, H, input.lang, { cardX, cardW });

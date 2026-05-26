@@ -1574,7 +1574,6 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
                   movingTimeSeconds: activity.moving_time,
                   averageSpeed: activity.average_speed,
                   analysis: aiAnalysis,
-                  nextWorkout: aiNextWorkout,
                   lang,
                 })}
                 className="flex items-center gap-1 px-2 py-1 rounded-md text-[11px] text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"

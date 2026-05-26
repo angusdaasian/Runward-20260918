@@ -230,19 +230,11 @@ const AppHeader = ({ lang, onNavigateSettings, onOpenPromoBanner, isGuest }: App
       </button>
       <div className="flex items-center gap-2">
         <button
-          aria-label={lang === "zh" ? "支援與幫助" : "Support"}
-          onClick={() => navigate("/support")}
-          className="w-10 h-10 rounded-full bg-muted flex items-center justify-center hover:bg-muted/80 active:scale-90 active:bg-muted/60 transition-all duration-150"
-        >
-          <Headset size={18} className="text-foreground" />
-        </button>
-        <button
           aria-label={lang === "zh" ? "產品路線圖" : "Roadmap"}
           onClick={() => setRoadmapOpen(true)}
           className="relative w-10 h-10 rounded-full bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center hover:from-primary/30 hover:to-primary/10 active:scale-90 transition-all duration-150 group"
         >
           <Rocket size={18} className="text-primary group-hover:-translate-y-0.5 group-hover:translate-x-0.5 transition-transform" />
-          <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
         </button>
         <Popover>
           <PopoverTrigger asChild>
@@ -337,6 +329,24 @@ const AppHeader = ({ lang, onNavigateSettings, onOpenPromoBanner, isGuest }: App
 
               {/* Announcements — entire row triggers */}
               <AnnouncementRow lang={lang} />
+
+              {/* Support */}
+              <button
+                onClick={() => navigate("/support")}
+                className="flex items-center gap-3 px-2 py-1.5 rounded-md hover:bg-muted/60 transition-colors text-left active:scale-[0.98] w-full"
+              >
+                <span className="w-10 h-10 rounded-full bg-muted flex items-center justify-center shrink-0">
+                  <Headset size={18} className="text-foreground" />
+                </span>
+                <div className="flex flex-col">
+                  <span className="text-sm font-medium text-foreground leading-tight">
+                    {lang === "zh" ? "支援與幫助" : "Support"}
+                  </span>
+                  <span className="text-[11px] text-muted-foreground leading-tight">
+                    {lang === "zh" ? "常見問題與回報問題" : "FAQ & report issues"}
+                  </span>
+                </div>
+              </button>
             </div>
           </PopoverContent>
         </Popover>

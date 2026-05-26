@@ -656,7 +656,7 @@ const ProfileSection = ({ lang, subpage = "main", onNavigate }: ProfileSectionPr
             {lang === "zh" ? "選擇頭像" : "Pick an avatar"}
           </label>
           <div className="grid grid-cols-3 gap-3">
-            {[1, 2, 3, 4, 5, 6].map((n) => {
+            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((n) => {
               const url = `/avatars/runner-${n}.png`;
               const selected = profile.avatar_url === url;
               const animClass = n % 2 === 0 ? "animate-runner-bob-slow" : "animate-runner-bob";

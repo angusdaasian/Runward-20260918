@@ -40,6 +40,7 @@ import RaceManager from "@/components/admin/RaceManager";
 import PendingRaceManager from "@/components/admin/PendingRaceManager";
 import RewardCodeManager from "@/components/admin/RewardCodeManager";
 import NotificationManager from "@/components/admin/NotificationManager";
+import TerraSyncTester from "@/components/admin/TerraSyncTester";
 
 interface UserRow {
   user_id: string;

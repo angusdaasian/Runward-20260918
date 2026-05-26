@@ -61,7 +61,7 @@ function isRunningActivity(activityType?: unknown, activityName?: unknown): bool
 }
 
 // ── Vertex AI helper ──
-async function callVertexAI(opts: { apiKey: string; model?: string; messages: Array<{ role: string; content: any }> }): Promise<Response> {
+async function callVertexAI(opts: { apiKey: string; model?: string; messages: Array<{ role: string; content: any }>; timeoutMs?: number; thinkingLevel?: "minimal" | "low" | "medium" | "high" }): Promise<Response> {
   const VERTEX_MODEL_MAP: Record<string, string> = {
     "google/gemini-3.1-flash-lite-preview": "gemini-3.1-flash-lite-preview",
   };
@@ -77,9 +77,19 @@ async function callVertexAI(opts: { apiKey: string; model?: string; messages: Ar
   const body: any = { contents };
   if (systemParts.length) body.systemInstruction = { parts: systemParts };
   if (model.startsWith("gemini-3")) {
-    body.generationConfig = { ...(body.generationConfig || {}), thinkingConfig: { thinkingLevel: "medium" } };
+    // Keep latency low — "medium" thinking can take 60-120s and stack with translation to blow the 150s edge timeout.
+    body.generationConfig = { ...(body.generationConfig || {}), thinkingConfig: { thinkingLevel: opts.thinkingLevel || "minimal" } };
   }
-  const vRes = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), opts.timeoutMs ?? 90_000);
+  let vRes: Response;
+  try {
+    vRes = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body), signal: ctrl.signal });
+  } catch (e) {
+    clearTimeout(timer);
+    return new Response(JSON.stringify({ error: "vertex_timeout", detail: String(e) }), { status: 504 });
+  }
+  clearTimeout(timer);
   if (!vRes.ok) return new Response(await vRes.text(), { status: vRes.status });
   const vData = await vRes.json();
   const text = vData?.candidates?.[0]?.content?.parts?.map((p: any) => p.text || "").join("") || "";

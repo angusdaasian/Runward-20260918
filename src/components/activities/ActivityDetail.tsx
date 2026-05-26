@@ -1001,6 +1001,44 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
                   {!isPremium && <Lock size={12} className="ml-auto text-muted-foreground" />}
                 </span>
               </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={async () => {
+                  toast.loading(lang === "zh" ? "正在生成 .fit 檔..." : "Generating .fit file...", { id: "fit-export" });
+                  try {
+                    await exportActivityFit({
+                      id: activity.id,
+                      strava_id: activity.strava_id,
+                      name: activityName,
+                      sport_type: activity.sport_type,
+                      distance: activity.distance,
+                      moving_time: activity.moving_time,
+                      elapsed_time: activity.elapsed_time,
+                      total_elevation_gain: activity.total_elevation_gain,
+                      start_date: activity.start_date,
+                      average_speed: activity.average_speed,
+                      max_speed: activity.max_speed,
+                      average_heartrate: activity.average_heartrate ?? null,
+                      max_heartrate: activity.max_heartrate ?? null,
+                      source: activity.source ?? null,
+                      provenance: (activity as any).provenance ?? null,
+                      summary_polyline: activity.summary_polyline ?? null,
+                      hr_samples: activity.hr_samples ?? null,
+                      distance_samples: activity.distance_samples ?? null,
+                      elevation_samples: activity.elevation_samples ?? null,
+                      cadence_samples: activity.cadence_samples ?? null,
+                    });
+                    toast.success(lang === "zh" ? ".fit 已下載" : ".fit downloaded", { id: "fit-export" });
+                  } catch (err) {
+                    console.error(err);
+                    toast.error(lang === "zh" ? "匯出失敗" : "Export failed", { id: "fit-export" });
+                  }
+                }}
+              >
+                <span className="flex items-center gap-2 w-full">
+                  <Download size={12} />
+                  {lang === "zh" ? "匯出 .fit 檔" : "Export .fit file"}
+                </span>
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         <AlertDialog>

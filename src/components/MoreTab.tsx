@@ -74,7 +74,7 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps }: Props
   const [showRedeemDialog, setShowRedeemDialog] = useState(false);
   const [showPlanCompare, setShowPlanCompare] = useState(false);
   const [offerCode, setOfferCode] = useState("");
-  const [profileSubpage, setProfileSubpage] = useState<"main" | "hr-zones" | "personal-bests" | "edit-profile" | "badges">("main");
+  const [profileSubpage, setProfileSubpage] = useState<"main" | "hr-zones" | "personal-bests" | "edit-profile" /* | "badges" */>("main");
   const [aiChatDisabled, setAiChatDisabled] = useState(() => localStorage.getItem("ai_chat_disabled") === "true");
 
   // Open HR zones subpage when navigated via #hr-zones (e.g. from ActivityDetail).

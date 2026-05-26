@@ -314,6 +314,8 @@ const AdminPanel = () => {
         return <PendingRaceManager />;
       case "feedback":
         return <FeedbackManager />;
+      case "terra":
+        return <TerraSyncTester />;
     }
   };
 

@@ -501,23 +501,52 @@ Deno.serve(async (req) => {
           // and reliably returns the full sample arrays.
           if (items.length > 0 && extractHrSamples(items[0]).length === 0) {
             const meta = items[0]?.metadata ?? {};
-            const summaryId = String(meta.summary_id ?? meta.upload_id ?? "");
-            if (summaryId) {
+            const rawSummaryId = String(meta.summary_id ?? meta.upload_id ?? "");
+            // Try several id shapes — Terra's per-activity GET is finicky about
+            // provider-prefixed ids (e.g. Garmin "1:23008025282" vs "23008025282").
+            const candidates: string[] = [];
+            if (rawSummaryId) {
+              candidates.push(rawSummaryId);
+              if (rawSummaryId.includes(":")) candidates.push(rawSummaryId.split(":").slice(1).join(":"));
+              else candidates.push(`1:${rawSummaryId}`);
+            }
+            let hydrated: any = null;
+            for (const sid of candidates) {
               try {
-                const hurl = `https://api.tryterra.co/v2/activity/${encodeURIComponent(summaryId)}?user_id=${c.terra_user_id}&with_samples=true`;
-                console.log(`[terra-sync] latestWithSamples hydrate ${c.provider} summary=${summaryId} url=${hurl}`);
+                const hurl = `https://api.tryterra.co/v2/activity/${encodeURIComponent(sid)}?user_id=${c.terra_user_id}&with_samples=true`;
+                console.log(`[terra-sync] latestWithSamples hydrate ${c.provider} try=${sid} url=${hurl}`);
                 const hr = await fetch(hurl, { headers });
                 const hj = await hr.json();
-                const hydrated = Array.isArray(hj?.data) ? hj.data[0] : hj?.data;
-                if (hydrated) {
-                  const hydratedHr = extractHrSamples(hydrated).length;
-                  console.log(`[terra-sync] latestWithSamples hydrated ${c.provider} summary=${summaryId} status=${hr.status} hrSamples=${hydratedHr}`);
-                  items[0] = hydrated;
-                } else {
-                  console.warn(`[terra-sync] latestWithSamples hydrate ${c.provider} summary=${summaryId} no data status=${hr.status}`);
-                }
+                const cand = Array.isArray(hj?.data) ? hj.data[0] : hj?.data;
+                const cnt = cand ? extractHrSamples(cand).length : 0;
+                console.log(`[terra-sync] latestWithSamples hydrate ${c.provider} try=${sid} status=${hr.status} hrSamples=${cnt}`);
+                if (cand && cnt > 0) { hydrated = cand; break; }
+                if (cand && !hydrated) hydrated = cand;
               } catch (e) {
-                console.error(`[terra-sync] latestWithSamples hydrate failed ${c.provider} summary=${summaryId}`, e);
+                console.error(`[terra-sync] latestWithSamples hydrate try=${sid} threw`, e);
+              }
+            }
+            if (hydrated) items[0] = hydrated;
+
+            // Last-resort: if direct GETs still produced no samples, ask Terra
+            // to redeliver this date via webhook with samples=true. The webhook
+            // path uses S3 payloads which reliably include the full HR series.
+            if (extractHrSamples(items[0]).length === 0) {
+              const startDate = String(meta.start_time ?? "").slice(0, 10);
+              if (startDate) {
+                const endDate = new Date(startDate); endDate.setUTCDate(endDate.getUTCDate() + 1);
+                const endStr2 = endDate.toISOString().slice(0, 10);
+                const wurl = `https://api.tryterra.co/v2/activity?user_id=${c.terra_user_id}&start_date=${startDate}&end_date=${endStr2}&to_webhook=true&with_samples=true`;
+                console.log(`[terra-sync] latestWithSamples webhook redeliver url=${wurl}`);
+                try {
+                  const wr = await fetch(wurl, { headers });
+                  console.log(`[terra-sync] latestWithSamples webhook redeliver status=${wr.status}`);
+                } catch (e) {
+                  console.error(`[terra-sync] latestWithSamples webhook redeliver threw`, e);
+                }
+              }
+            }
+          }
               }
             }
           }

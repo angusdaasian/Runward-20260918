@@ -545,6 +545,114 @@ serve(async (req) => {
 - Target finishing time: ${plan.target_time}
 - Race date: ${plan.race_date}
 ${plannedWorkout ? `- ${plannedWorkout}` : ""}`;
+
+        // --- Plan-shift / missed-workout detection (±3 days window) ---
+        try {
+          const allPlannedDays = new Map<string, any>();
+          for (const w of planData) {
+            for (const d of asArray<any>(w?.days)) {
+              if (d?.date) allPlannedDays.set(d.date, d);
+            }
+          }
+          const todayStr = fallbackDateStr;
+          const isoOffset = (days: number) => {
+            const d = new Date(activityDate);
+            d.setUTCDate(d.getUTCDate() + days);
+            return d.toISOString().slice(0, 10);
+          };
+          const winStartISO = `${isoOffset(-3)}T00:00:00.000Z`;
+          const winEndISO = `${isoOffset(4)}T00:00:00.000Z`;
+
+          const [sR, gR, tR, aR] = await Promise.all([
+            serviceClient.from("strava_activities").select("start_date,distance,moving_time,sport_type")
+              .eq("user_id", user.id).gte("start_date", winStartISO).lt("start_date", winEndISO),
+            serviceClient.from("garmin_activities").select("start_time,distance_meters,duration_seconds,activity_type")
+              .eq("user_id", user.id).gte("start_time", winStartISO).lt("start_time", winEndISO),
+            serviceClient.from("terra_activities").select("start_time,distance_meters,duration_seconds,activity_type")
+              .eq("user_id", user.id).gte("start_time", winStartISO).lt("start_time", winEndISO),
+            serviceClient.from("apple_health_activities").select("start_date,distance,moving_time,sport_type")
+              .eq("user_id", user.id).gte("start_date", winStartISO).lt("start_date", winEndISO),
+          ]);
+          type Actual = { date: string; km: number; min: number; type: string };
+          const actuals: Actual[] = [];
+          const pushAct = (dt: string | null, distM: number, durS: number, type: string) => {
+            if (!dt) return;
+            actuals.push({ date: dt.slice(0, 10), km: (Number(distM) || 0) / 1000, min: Math.round((Number(durS) || 0) / 60), type: type || "Run" });
+          };
+          for (const r of (sR.data || [])) pushAct(r.start_date, r.distance, r.moving_time, r.sport_type);
+          for (const r of (gR.data || [])) pushAct(r.start_time, r.distance_meters, r.duration_seconds, r.activity_type);
+          for (const r of (tR.data || [])) pushAct(r.start_time, r.distance_meters, r.duration_seconds, r.activity_type);
+          for (const r of (aR.data || [])) pushAct(r.start_date, r.distance, r.moving_time, r.sport_type);
+          const seen = new Set<string>();
+          const dedupActuals = actuals.filter((a) => {
+            const k = `${a.date}|${Math.round(a.km * 10)}|${Math.round(a.min / 5)}`;
+            if (seen.has(k)) return false;
+            seen.add(k);
+            return true;
+          });
+          const actualByDate = new Map<string, Actual[]>();
+          for (const a of dedupActuals) {
+            const arr = actualByDate.get(a.date) || [];
+            arr.push(a);
+            actualByDate.set(a.date, arr);
+          }
+
+          const todayPlanned = allPlannedDays.get(todayStr);
+          const todayHasPlannedRun = !!todayPlanned && (Number(todayPlanned.distance_km ?? todayPlanned.distance ?? 0) > 0) &&
+            String(todayPlanned.type || todayPlanned.workout || "").toLowerCase() !== "rest";
+
+          const missedPrior: Array<{ date: string; type: string; km: number; pace?: string }> = [];
+          for (let i = 1; i <= 3; i++) {
+            const ds = isoOffset(-i);
+            const p = allPlannedDays.get(ds);
+            if (!p) continue;
+            const pk = Number(p.distance_km ?? p.distance ?? 0);
+            const ptype = String(p.type || p.workout || "");
+            if (pk <= 0 || ptype.toLowerCase() === "rest") continue;
+            const ranThatDay = (actualByDate.get(ds) || []).some((a) => a.km > 0.5);
+            if (!ranThatDay) missedPrior.push({ date: ds, type: ptype || "Run", km: pk, pace: p.pace });
+          }
+
+          const upcomingPlanned: Array<{ date: string; type: string; km: number; pace?: string; ranAlready: boolean; actualKm: number }> = [];
+          for (let i = 1; i <= 3; i++) {
+            const ds = isoOffset(i);
+            const p = allPlannedDays.get(ds);
+            if (!p) continue;
+            const pk = Number(p.distance_km ?? p.distance ?? 0);
+            const ptype = String(p.type || p.workout || "");
+            const ran = actualByDate.get(ds) || [];
+            const actualKm = ran.reduce((s, x) => s + x.km, 0);
+            upcomingPlanned.push({ date: ds, type: ptype || "Rest", km: pk, pace: p.pace, ranAlready: actualKm > 0.5, actualKm });
+          }
+
+          const todayKm = (Number(activity.distance) || 0) / 1000;
+          const bits: string[] = [];
+          bits.push(`\n\n📅 PLAN-SHIFT / MISSED-WORKOUT CHECK (±3 days around ${todayStr}):`);
+          bits.push(`- Today (${todayStr}): planned = ${todayPlanned ? `${todayPlanned.type || todayPlanned.workout || "Rest"}${(todayPlanned.distance_km ?? todayPlanned.distance) ? ` (${todayPlanned.distance_km ?? todayPlanned.distance} km)` : ""}` : "NO PLANNED WORKOUT"}; actual = ${todayKm.toFixed(2)} km.`);
+          if (missedPrior.length) {
+            bits.push(`- ⚠️ MISSED PLANNED RUN(S) in the last 3 days:`);
+            for (const m of missedPrior) bits.push(`    • ${m.date}: ${m.type}${m.km ? ` ${m.km} km` : ""}${m.pace ? ` @ ${m.pace}` : ""} — no activity logged that day.`);
+          } else {
+            bits.push(`- No missed planned runs in the previous 3 days.`);
+          }
+          if (upcomingPlanned.length) {
+            bits.push(`- Next 3 days planned:`);
+            for (const u of upcomingPlanned) bits.push(`    • ${u.date}: ${u.type}${u.km ? ` ${u.km} km` : ""}${u.pace ? ` @ ${u.pace}` : ""}${u.ranAlready ? ` — already completed ${u.actualKm.toFixed(2)} km` : ""}.`);
+          }
+          if (!todayHasPlannedRun && missedPrior.length) {
+            const lastMissed = missedPrior[0];
+            bits.push(`\n→ ANALYSIS REQUIRED — possible plan shift:`);
+            bits.push(`  1. Today had NO planned workout, but the runner missed "${lastMissed.type}${lastMissed.km ? ` ${lastMissed.km} km` : ""}" on ${lastMissed.date}. Today's ${todayKm.toFixed(2)} km may be a MAKEUP for that missed session.`);
+            bits.push(`  2. Compare today's distance/type vs the missed session — did it cover what was missed? (e.g. missed 20 km long run replaced by 8 km easy run does NOT fulfill the long-run stimulus.)`);
+            bits.push(`  3. Evaluate whether shifting to today is sensible given the NEXT planned workout above. If tomorrow is a hard/quality session, doing a long/hard makeup today compromises it — recommend swapping or easing tomorrow.`);
+            bits.push(`  4. Give a concrete plan-adjustment suggestion: keep schedule, move the next planned workout, insert recovery, or re-do the missed session properly on another day.`);
+          } else if (todayHasPlannedRun && missedPrior.length) {
+            bits.push(`\n→ Runner completed today's planned session but has unaddressed missed workouts above — briefly note this and suggest how to handle them without overloading the week.`);
+          }
+          planContext += bits.join("\n");
+        } catch (e) {
+          console.warn("plan-shift detection failed:", (e as Error).message);
+        }
       }
     } else {
       planContext = "The user does not have an active training plan.";

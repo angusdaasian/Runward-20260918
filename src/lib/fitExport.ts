@@ -322,9 +322,8 @@ export function fitFilenameFor(activity: FitActivityInput): string {
   return `${dt}_${safeName(activity.name || "activity", 40)}.fit`;
 }
 
-export function triggerDownload(bytes: Uint8Array, filename: string, mime = "application/octet-stream") {
-  // Cast Uint8Array to a generic ArrayBuffer-backed BlobPart to satisfy newer DOM lib types
-  const blob = new Blob([bytes as unknown as BlobPart], { type: mime });
+export function triggerDownload(bytes: Uint8Array | Blob, filename: string, mime = "application/octet-stream") {
+  const blob = bytes instanceof Blob ? bytes : new Blob([bytes as unknown as BlobPart], { type: mime });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
@@ -338,11 +337,38 @@ export function triggerDownload(bytes: Uint8Array, filename: string, mime = "app
   }, 0);
 }
 
-export async function exportActivityFit(activity: FitActivityInput): Promise<void> {
+/**
+ * Try Web Share API (WhatsApp/Messenger/etc). Falls back to a regular download
+ * if sharing files is not supported or the user cancels with an error.
+ */
+export async function shareOrDownloadFile(
+  bytes: Uint8Array | Blob,
+  filename: string,
+  mime: string,
+  title?: string,
+): Promise<"shared" | "downloaded"> {
+  const blob = bytes instanceof Blob ? bytes : new Blob([bytes as unknown as BlobPart], { type: mime });
+  try {
+    const file = new File([blob], filename, { type: mime });
+    const nav: any = navigator;
+    if (typeof nav.share === "function" && typeof nav.canShare === "function" && nav.canShare({ files: [file] })) {
+      await nav.share({ files: [file], title: title || filename });
+      return "shared";
+    }
+  } catch (err: any) {
+    // AbortError = user cancelled; don't fall back to download in that case.
+    if (err && (err.name === "AbortError" || err.code === 20)) return "shared";
+    console.warn("[fitExport] share failed, falling back to download:", err);
+  }
+  triggerDownload(blob, filename, mime);
+  return "downloaded";
+}
+
+export async function exportActivityFit(activity: FitActivityInput): Promise<"shared" | "downloaded"> {
   let streams: any[] | null = null;
   if (activity.strava_id && activity.strava_id > 0 && activity.provenance !== "garmin" && activity.provenance !== "terra" && activity.source !== "Apple Health") {
     streams = await fetchStravaStreams(activity.strava_id);
   }
   const bytes = buildFitFile(activity, streams);
-  triggerDownload(bytes, fitFilenameFor(activity));
+  return shareOrDownloadFile(bytes, fitFilenameFor(activity), "application/octet-stream", activity.name || "Activity");
 }

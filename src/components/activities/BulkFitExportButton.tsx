@@ -3,7 +3,7 @@ import { Download, Lock, Loader2 } from "lucide-react";
 import { Lang } from "@/lib/i18n";
 import { toast } from "sonner";
 import JSZip from "jszip";
-import { buildFitFile, fetchStravaStreams, fitFilenameFor, triggerDownload } from "@/lib/fitExport";
+import { buildFitFile, fetchStravaStreams, fitFilenameFor, shareOrDownloadFile } from "@/lib/fitExport";
 import type { StravaActivity } from "@/hooks/use-activities";
 
 interface Props {
@@ -100,13 +100,14 @@ const BulkFitExportButton = ({ lang, activities, isPremium }: Props) => {
     await Promise.all(Array.from({ length: concurrency }, () => worker()));
 
     try {
-      const blob = await zip.generateAsync({ type: "uint8array", compression: "DEFLATE", compressionOptions: { level: 6 } });
+      const blob = await zip.generateAsync({ type: "blob", compression: "DEFLATE", compressionOptions: { level: 6 } });
       const stamp = new Date().toISOString().slice(0, 10);
-      triggerDownload(blob, `activities-${stamp}.zip`, "application/zip");
+      const filename = `activities-${stamp}.zip`;
+      const result = await shareOrDownloadFile(blob, filename, "application/zip", "Activities");
       toast.success(
         lang === "zh"
-          ? `已匯出 ${done - failed} 個活動${failed ? `（${failed} 個失敗）` : ""}`
-          : `Exported ${done - failed} activities${failed ? ` (${failed} failed)` : ""}`,
+          ? `${result === "shared" ? "已分享" : "已匯出"} ${done - failed} 個活動${failed ? `（${failed} 個失敗）` : ""}`
+          : `${result === "shared" ? "Shared" : "Exported"} ${done - failed} activities${failed ? ` (${failed} failed)` : ""}`,
         { id: tid },
       );
     } catch (err) {

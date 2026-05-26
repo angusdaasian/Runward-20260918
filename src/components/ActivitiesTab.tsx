@@ -570,6 +570,7 @@ const AllActivitiesView = ({
             {lang === "zh" ? "所有活動" : "All Activities"}
           </h1>
         </div>
+        <BulkFitExportButton lang={lang} activities={activities} isPremium={isPremium} />
       </div>
       {loading && activities.length === 0 && (
         <div className="flex items-center justify-center py-6 text-xs text-muted-foreground gap-2">
@@ -1042,7 +1043,6 @@ const ActivitiesTab = ({ lang }: Props) => {
       <div className="pb-4">
         <div className="flex items-center justify-between mb-2">
           <h2 className="text-sm font-semibold text-foreground">{lang === "zh" ? "月曆" : "Monthly Overview"}</h2>
-          <BulkFitExportButton lang={lang} activities={activities} isPremium={isPremium} />
         </div>
         <ActivityCalendar
           lang={lang}

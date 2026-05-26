@@ -449,7 +449,12 @@ Deno.serve(async (req) => {
     end.setDate(end.getDate() + 1);
     const start = new Date();
     if (dayOnly) {
-      // Today only — Terra still treats end_date as exclusive, so ask through tomorrow.
+      // Today only — but Terra filters by activity date in UTC, so a late-evening
+      // local run (e.g. 21:38 HKT = 13:38 UTC the previous day) lands on the
+      // previous UTC date page. Widen the lower bound by 1 day so those runs
+      // are still returned; dedup on (provider, terra_activity_id) makes any
+      // already-ingested rows a no-op.
+      start.setDate(start.getDate() - 1);
     } else {
       start.setDate(start.getDate() - 30);
     }

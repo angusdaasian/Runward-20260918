@@ -15,6 +15,7 @@ import {
   Lightbulb,
   ArrowRight,
   Zap,
+  Route,
 } from "lucide-react";
 import { Lang } from "@/lib/i18n";
 import { supabase } from "@/integrations/supabase/client";

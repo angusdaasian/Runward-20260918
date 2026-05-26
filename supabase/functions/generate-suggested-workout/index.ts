@@ -420,6 +420,8 @@ Format:
     const aiResp = await callVertexAI({
       apiKey: VERTEX_API_KEY,
       model: "google/gemini-3-flash-preview",
+      thinkingLevel: "minimal",
+      timeoutMs: 90_000,
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: context },

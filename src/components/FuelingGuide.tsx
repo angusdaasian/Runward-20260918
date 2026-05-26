@@ -1,5 +1,11 @@
-import { ArrowLeft, Droplet, Zap, Flame, Timer, Trophy, Mountain, Coffee, Apple, AlertTriangle, Info, Beaker } from "lucide-react";
+import { useMemo, useState } from "react";
+import { ArrowLeft, Droplet, Zap, Flame, Timer, Trophy, Mountain, Coffee, Apple, AlertTriangle, Info, Beaker, ChevronDown, Calculator, Plus, X } from "lucide-react";
 import { Lang } from "@/lib/i18n";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface Props {
   lang: Lang;
@@ -141,12 +147,394 @@ const races: Race[] = [
   },
 ];
 
+// ============================================================
+// Gel nutrition database (carbs in grams per sachet)
+// Source: dailyrunningco.com/energy-gels-comparison-table/ + AminoVital Red Shot (Ajinomoto JP)
+// ============================================================
+type Gel = { name: string; carbs: number; caffeine?: number };
+const GEL_DB: Record<string, Gel[]> = {
+  "AminoVital": [
+    { name: "Red Shot (Pro 45g pouch)", carbs: 26, caffeine: 80 },
+  ],
+  "CLIF Shot": [
+    { name: "Vanilla", carbs: 25 },
+    { name: "Citrus (caf)", carbs: 25, caffeine: 25 },
+    { name: "Mocha (caf)", carbs: 24, caffeine: 50 },
+    { name: "Chocolate", carbs: 23 },
+    { name: "Chocolate Cherry (caf)", carbs: 23, caffeine: 100 },
+    { name: "Strawberry (caf)", carbs: 25, caffeine: 25 },
+    { name: "Double Espresso (caf)", carbs: 24, caffeine: 100 },
+    { name: "Razz", carbs: 24 },
+  ],
+  "GU Energy": [
+    { name: "Cola Me Happy", carbs: 22 },
+    { name: "Tri-Berry (caf)", carbs: 23, caffeine: 20 },
+    { name: "Vanilla Bean (caf)", carbs: 22, caffeine: 20 },
+    { name: "Chocolate Outrage (caf)", carbs: 21, caffeine: 20 },
+    { name: "Strawberry Banana", carbs: 23 },
+    { name: "Salted Caramel (caf)", carbs: 22, caffeine: 20 },
+    { name: "Jet Blackberry (caf)", carbs: 22, caffeine: 40 },
+    { name: "Espresso Love (caf)", carbs: 23, caffeine: 40 },
+    { name: "Caramel Macchiato (caf)", carbs: 22, caffeine: 40 },
+  ],
+  "GU Roctane": [
+    { name: "Cold Brew Coffee (caf)", carbs: 21, caffeine: 70 },
+    { name: "Blueberry Pomegranate (caf)", carbs: 21, caffeine: 35 },
+    { name: "Vanilla Orange (caf)", carbs: 21, caffeine: 35 },
+    { name: "Sea Salt Chocolate (caf)", carbs: 21, caffeine: 35 },
+    { name: "Salted Lime (caf)", carbs: 21, caffeine: 35 },
+  ],
+  "Huma": [
+    { name: "Strawberry", carbs: 22 },
+    { name: "Apple Cinnamon", carbs: 22 },
+    { name: "Café Mocha (caf)", carbs: 25, caffeine: 50 },
+    { name: "Chocolate (caf)", carbs: 25, caffeine: 25 },
+    { name: "Lemonade (caf)", carbs: 22, caffeine: 25 },
+    { name: "Plus Berries & Pomegranate", carbs: 21 },
+    { name: "Plus Strawberry Lemonade (caf)", carbs: 21, caffeine: 25 },
+  ],
+  "KODA Nutrition": [
+    { name: "Lemon Lime", carbs: 30 },
+    { name: "Wild Berry", carbs: 30 },
+    { name: "Green Plum (caf)", carbs: 30, caffeine: 80 },
+    { name: "Cappuccino (caf)", carbs: 30, caffeine: 80 },
+    { name: "Cola Vanilla (caf)", carbs: 30, caffeine: 80 },
+  ],
+  "Mag-On": [
+    { name: "AO Mikan (caf)", carbs: 30, caffeine: 25 },
+    { name: "Pink Grapefruit (caf)", carbs: 30, caffeine: 25 },
+    { name: "Lemon (caf)", carbs: 30, caffeine: 25 },
+    { name: "Apple", carbs: 30 },
+    { name: "Ume", carbs: 30 },
+  ],
+  "Maurten": [
+    { name: "Gel 100", carbs: 25 },
+    { name: "Gel 100 Caf 100", carbs: 25, caffeine: 100 },
+  ],
+  "PURE Nutrition": [
+    { name: "Manuka Honey", carbs: 23 },
+    { name: "Raspberry (caf)", carbs: 25, caffeine: 30 },
+    { name: "Lemon Lime", carbs: 25 },
+    { name: "Lemon Lime (caf)", carbs: 25, caffeine: 30 },
+    { name: "Espresso (caf)", carbs: 22, caffeine: 30 },
+  ],
+  "SiS GO Isotonic": [
+    { name: "Apple", carbs: 22 },
+    { name: "Lemon & Lime", carbs: 22 },
+    { name: "Orange", carbs: 22 },
+    { name: "Tropical", carbs: 22 },
+  ],
+  "TORQ": [
+    { name: "Cherry Bakewell", carbs: 29 },
+    { name: "Apple Crumble", carbs: 29 },
+    { name: "Lemon Drizzle", carbs: 29 },
+    { name: "Caramel Latte (caf)", carbs: 29, caffeine: 89 },
+    { name: "Banoffee (caf)", carbs: 29, caffeine: 89 },
+  ],
+  "Unived Elite": [
+    { name: "Berry Blast", carbs: 45 },
+    { name: "Melon Sea Salt", carbs: 45 },
+    { name: "Choco Fudge (caf)", carbs: 45, caffeine: 50 },
+    { name: "Double Espresso (caf)", carbs: 45, caffeine: 100 },
+  ],
+  "Veloforte": [
+    { name: "Riba Blackcurrant", carbs: 22 },
+    { name: "Doppio Coffee (caf)", carbs: 22, caffeine: 75 },
+    { name: "Primo Beetroot Lemon", carbs: 22 },
+  ],
+};
+
+// Race carb-rate brackets (g/h, midpoint of published range)
+function carbsPerHourForFinishTime(distance: "HM" | "FM", totalMin: number): { rate: number; bracket: string } {
+  if (distance === "HM") {
+    if (totalMin < 75) return { rate: 62, bracket: "Sub 1:15" };
+    if (totalMin < 90) return { rate: 52, bracket: "Sub 1:30" };
+    if (totalMin < 105) return { rate: 45, bracket: "Sub 1:45" };
+    if (totalMin < 120) return { rate: 39, bracket: "Sub 2:00" };
+    return { rate: 35, bracket: "Sub 2:15+" };
+  }
+  if (totalMin < 150) return { rate: 75, bracket: "Sub 2:30" };
+  if (totalMin < 180) return { rate: 63, bracket: "Sub 3:00" };
+  if (totalMin < 210) return { rate: 54, bracket: "Sub 3:30" };
+  if (totalMin < 240) return { rate: 47, bracket: "Sub 4:00" };
+  return { rate: 42, bracket: "Sub 4:30+" };
+}
+
+function parseTimeToMin(s: string): number | null {
+  // Accept H:MM:SS or MM:SS
+  const parts = s.trim().split(":").map((x) => x.trim());
+  if (parts.some((p) => p === "" || isNaN(Number(p)))) return null;
+  if (parts.length === 3) return Number(parts[0]) * 60 + Number(parts[1]) + Number(parts[2]) / 60;
+  if (parts.length === 2) return Number(parts[0]) + Number(parts[1]) / 60;
+  return null;
+}
+function fmtMin(min: number): string {
+  const h = Math.floor(min / 60);
+  const m = Math.floor(min % 60);
+  const s = Math.round((min - Math.floor(min)) * 60);
+  return h > 0 ? `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}` : `${m}:${String(s).padStart(2, "0")}`;
+}
+function fmtPace(minPerKm: number): string {
+  const m = Math.floor(minPerKm);
+  const s = Math.round((minPerKm - m) * 60);
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
+
+// ============================================================
+// Calculator
+// ============================================================
+const RaceFuelCalculator = ({ isZh }: { isZh: boolean }) => {
+  const [distance, setDistance] = useState<"HM" | "FM">("HM");
+  const [brand, setBrand] = useState<string>("Maurten");
+  const [flavor, setFlavor] = useState<string>("Gel 100");
+  const [customCarbs, setCustomCarbs] = useState<string>("");
+  const [paceStr, setPaceStr] = useState<string>(""); // "5:30"
+  const [timeStr, setTimeStr] = useState<string>(""); // "1:55:00"
+  const [stationsStr, setStationsStr] = useState<string>("");
+
+  const totalKm = distance === "HM" ? 21.0975 : 42.195;
+  const brandGels = GEL_DB[brand] || [];
+  const selectedGel = brandGels.find((g) => g.name === flavor);
+  const gelCarbs = customCarbs ? Number(customCarbs) : selectedGel?.carbs ?? 0;
+
+  // Sync pace ↔ time
+  const handlePaceChange = (v: string) => {
+    setPaceStr(v);
+    const pm = parseTimeToMin(v);
+    if (pm && pm > 0) setTimeStr(fmtMin(pm * totalKm));
+  };
+  const handleTimeChange = (v: string) => {
+    setTimeStr(v);
+    const tm = parseTimeToMin(v);
+    if (tm && tm > 0) setPaceStr(fmtPace(tm / totalKm));
+  };
+
+  const totalMin = parseTimeToMin(timeStr);
+  const paceMin = parseTimeToMin(paceStr);
+
+  const stations = useMemo(() => {
+    return stationsStr
+      .split(/[,\s]+/)
+      .map((s) => Number(s))
+      .filter((n) => !isNaN(n) && n > 0 && n < totalKm)
+      .sort((a, b) => a - b);
+  }, [stationsStr, totalKm]);
+
+  const plan = useMemo(() => {
+    if (!totalMin || !gelCarbs || gelCarbs <= 0) return null;
+    const { rate, bracket } = carbsPerHourForFinishTime(distance, totalMin);
+    const totalCarbsNeeded = (rate * totalMin) / 60;
+    const numGels = Math.max(1, Math.ceil(totalCarbsNeeded / gelCarbs));
+    // ideal evenly-spaced km marks (skip start, ensure within race)
+    const idealKm: number[] = [];
+    for (let i = 1; i <= numGels; i++) {
+      idealKm.push((i * totalKm) / (numGels + 1));
+    }
+    // align to water stations if provided
+    const usedStations = new Set<number>();
+    const schedule = idealKm.map((target) => {
+      let km = target;
+      let aligned = false;
+      if (stations.length) {
+        // find nearest unused water station within 2 km
+        let best: number | null = null;
+        let bestDist = Infinity;
+        for (const st of stations) {
+          if (usedStations.has(st)) continue;
+          const d = Math.abs(st - target);
+          if (d < bestDist && d <= 2.5) { best = st; bestDist = d; }
+        }
+        if (best !== null) { km = best; usedStations.add(best); aligned = true; }
+      }
+      const min = paceMin ? km * paceMin : (km / totalKm) * totalMin;
+      return { targetKm: target, km, aligned, min };
+    });
+    return { rate, bracket, totalCarbsNeeded, numGels, schedule };
+  }, [totalMin, gelCarbs, distance, totalKm, stations, paceMin]);
+
+  return (
+    <div className="space-y-4">
+      {/* Distance */}
+      <div>
+        <Label className="text-xs font-semibold">{isZh ? "1. 比賽距離" : "1. Race distance"}</Label>
+        <div className="grid grid-cols-2 gap-2 mt-1.5">
+          {(["HM", "FM"] as const).map((d) => (
+            <button
+              key={d}
+              onClick={() => setDistance(d)}
+              className={`rounded-lg border px-3 py-2 text-sm font-semibold transition-colors ${distance === d ? "bg-primary text-primary-foreground border-primary" : "bg-card border-border hover:bg-muted"}`}
+            >
+              {d === "HM" ? (isZh ? "半馬 21.1 km" : "Half Marathon 21.1 km") : (isZh ? "全馬 42.2 km" : "Full Marathon 42.2 km")}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Gel selection */}
+      <div>
+        <Label className="text-xs font-semibold">{isZh ? "2. 你的果膠" : "2. Your gel"}</Label>
+        <div className="grid grid-cols-2 gap-2 mt-1.5">
+          <Select value={brand} onValueChange={(v) => { setBrand(v); setFlavor(GEL_DB[v]?.[0]?.name ?? ""); setCustomCarbs(""); }}>
+            <SelectTrigger><SelectValue placeholder={isZh ? "品牌" : "Brand"} /></SelectTrigger>
+            <SelectContent>{Object.keys(GEL_DB).map((b) => <SelectItem key={b} value={b}>{b}</SelectItem>)}</SelectContent>
+          </Select>
+          <Select value={flavor} onValueChange={(v) => { setFlavor(v); setCustomCarbs(""); }}>
+            <SelectTrigger><SelectValue placeholder={isZh ? "口味" : "Flavor"} /></SelectTrigger>
+            <SelectContent>{brandGels.map((g) => <SelectItem key={g.name} value={g.name}>{g.name} · {g.carbs}g{g.caffeine ? ` · ${g.caffeine}mg caf` : ""}</SelectItem>)}</SelectContent>
+          </Select>
+        </div>
+        <div className="mt-2">
+          <Label className="text-[11px] text-muted-foreground">
+            {isZh ? "找不到？輸入碳水克數（看包裝營養標示「碳水化合物 / Carbohydrate」每包數值）" : "Not listed? Enter carbs per sachet (look at the nutrition label — \"Carbohydrate\" per serving)"}
+          </Label>
+          <Input
+            type="number"
+            inputMode="decimal"
+            placeholder={isZh ? "例：25" : "e.g. 25"}
+            value={customCarbs}
+            onChange={(e) => setCustomCarbs(e.target.value)}
+            className="mt-1 h-9"
+          />
+        </div>
+        <div className="mt-1.5 text-[11px] text-muted-foreground">
+          {isZh ? "使用碳水量：" : "Using: "}<span className="font-semibold text-foreground">{gelCarbs || "—"} g</span> / {isZh ? "包" : "gel"}
+        </div>
+      </div>
+
+      {/* Pace / time */}
+      <div>
+        <Label className="text-xs font-semibold">{isZh ? "3. 目標配速或完賽時間（擇一）" : "3. Target pace or finish time (either one)"}</Label>
+        <div className="grid grid-cols-2 gap-2 mt-1.5">
+          <div>
+            <div className="text-[10px] text-muted-foreground mb-1">{isZh ? "配速 (min/km)" : "Pace (min/km)"}</div>
+            <Input placeholder="5:30" value={paceStr} onChange={(e) => handlePaceChange(e.target.value)} className="h-9 font-mono" />
+          </div>
+          <div>
+            <div className="text-[10px] text-muted-foreground mb-1">{isZh ? "完賽時間 (h:mm:ss)" : "Finish time (h:mm:ss)"}</div>
+            <Input placeholder="1:55:00" value={timeStr} onChange={(e) => handleTimeChange(e.target.value)} className="h-9 font-mono" />
+          </div>
+        </div>
+      </div>
+
+      {/* Water stations (optional) */}
+      <div>
+        <Label className="text-xs font-semibold">{isZh ? "4. 水站位置（選填）" : "4. Water stations (optional)"}</Label>
+        <div className="text-[11px] text-muted-foreground mt-0.5 mb-1.5">
+          {isZh ? "若你知道路線水站，輸入會更精準。用逗號分隔每個水站的公里數。" : "Optional — if you know the route's water stations, the plan will align gels with water. Comma-separate the km marks."}
+        </div>
+        <Input
+          placeholder={isZh ? "例：5, 10, 15, 17.5" : "e.g. 5, 10, 15, 17.5"}
+          value={stationsStr}
+          onChange={(e) => setStationsStr(e.target.value)}
+          className="h-9 font-mono"
+        />
+      </div>
+
+      {/* Result */}
+      {plan && (
+        <div className="bg-muted/40 border border-border rounded-xl p-3.5">
+          <div className="flex items-center gap-1.5 mb-2">
+            <Calculator size={14} className="text-primary" />
+            <h4 className="text-sm font-bold">{isZh ? "你的補給計劃" : "Your fueling plan"}</h4>
+          </div>
+          <div className="grid grid-cols-3 gap-2 mb-3 text-center">
+            <div className="bg-card border border-border rounded-lg p-2">
+              <div className="text-[10px] text-muted-foreground uppercase tracking-wider">{isZh ? "目標速率" : "Target rate"}</div>
+              <div className="text-sm font-bold">{plan.rate} g/h</div>
+              <div className="text-[10px] text-muted-foreground">{plan.bracket}</div>
+            </div>
+            <div className="bg-card border border-border rounded-lg p-2">
+              <div className="text-[10px] text-muted-foreground uppercase tracking-wider">{isZh ? "總碳水" : "Total carbs"}</div>
+              <div className="text-sm font-bold">{Math.round(plan.totalCarbsNeeded)} g</div>
+              <div className="text-[10px] text-muted-foreground">{fmtMin(totalMin!)}</div>
+            </div>
+            <div className="bg-primary/10 border border-primary/30 rounded-lg p-2">
+              <div className="text-[10px] text-primary uppercase tracking-wider">{isZh ? "果膠數量" : "Gels"}</div>
+              <div className="text-sm font-bold text-primary">{plan.numGels}</div>
+              <div className="text-[10px] text-muted-foreground">@ {gelCarbs} g</div>
+            </div>
+          </div>
+
+          <div className="bg-card border border-border rounded-lg overflow-hidden">
+            <table className="w-full text-[11px]">
+              <thead className="bg-muted/60">
+                <tr>
+                  <th className="text-left px-2 py-1.5 font-semibold">{isZh ? "第" : "Gel"}</th>
+                  <th className="text-left px-2 py-1.5 font-semibold">{isZh ? "公里" : "Km"}</th>
+                  <th className="text-left px-2 py-1.5 font-semibold">{isZh ? "時間" : "Time"}</th>
+                  <th className="text-left px-2 py-1.5 font-semibold">{isZh ? "累積碳水" : "Cum. carbs"}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {plan.schedule.map((s, i) => (
+                  <tr key={i} className="border-t border-border">
+                    <td className="px-2 py-1.5 font-semibold">#{i + 1}</td>
+                    <td className="px-2 py-1.5 font-mono">
+                      {s.km.toFixed(1)}
+                      {s.aligned && <span className="ml-1 text-sky-500" title={isZh ? "對齊水站" : "Aligned to water station"}>💧</span>}
+                    </td>
+                    <td className="px-2 py-1.5 font-mono text-muted-foreground">{fmtMin(s.min)}</td>
+                    <td className="px-2 py-1.5 text-muted-foreground">{Math.round((i + 1) * gelCarbs)} g</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="text-[10px] text-muted-foreground mt-2 leading-relaxed">
+            {stations.length > 0
+              ? (isZh ? "💧 表示已對齊到你輸入的水站。建議每包果膠搭配 150–200 ml 水。" : "💧 = aligned to your water station. Take each gel with 150–200 ml water.")
+              : (isZh ? "果膠均勻分配於賽程。建議每包搭配 150–200 ml 水（在水站取水）。" : "Gels evenly spaced across the race. Take each with 150–200 ml water (grab at stations).")}
+          </p>
+        </div>
+      )}
+
+      {!plan && (
+        <div className="text-[11px] text-muted-foreground bg-muted/30 border border-dashed border-border rounded-lg p-3 text-center">
+          {isZh ? "輸入配速或完賽時間後產生個人化補給計劃" : "Enter pace or finish time above to generate your personalised plan"}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ============================================================
+// Collapsible section wrapper
+// ============================================================
+const Section = ({
+  title,
+  icon: Icon,
+  iconColor = "text-primary",
+  defaultOpen = false,
+  children,
+}: {
+  title: string;
+  icon: typeof Flame;
+  iconColor?: string;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+}) => {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <Collapsible open={open} onOpenChange={setOpen} className="bg-card border border-border rounded-xl overflow-hidden">
+      <CollapsibleTrigger className="w-full flex items-center justify-between gap-2 px-4 py-3 hover:bg-muted/40 transition-colors">
+        <div className="flex items-center gap-2">
+          <Icon size={16} className={iconColor} />
+          <span className="font-display font-bold text-sm">{title}</span>
+        </div>
+        <ChevronDown size={16} className={`text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} />
+      </CollapsibleTrigger>
+      <CollapsibleContent>
+        <div className="px-4 pb-4 pt-1">{children}</div>
+      </CollapsibleContent>
+    </Collapsible>
+  );
+};
+
 const FuelingGuide = ({ lang, onBack }: Props) => {
   const isZh = lang === "zh";
 
   return (
     <div className="px-5 pt-2 pb-8 max-w-lg mx-auto">
-      {/* Header */}
       <button onClick={onBack} className="flex items-center gap-1 text-sm text-muted-foreground mb-3 -ml-1">
         <ArrowLeft size={18} />
         <span>{isZh ? "返回" : "Back"}</span>
@@ -167,202 +555,194 @@ const FuelingGuide = ({ lang, onBack }: Props) => {
           </h1>
           <p className="text-xs opacity-95 leading-relaxed max-w-[90%]">
             {isZh
-              ? "用對的時間、對的碳水量，跑得更遠、撞牆更晚。練習中試用，比賽日才不會出包。"
-              : "Right carbs, right timing — run further, hit the wall later. Always practice fueling in training before race day."}
+              ? "用對的時間、對的碳水量，跑得更遠、撞牆更晚。展開下方分頁查看細節。"
+              : "Right carbs, right timing — run further, hit the wall later. Tap any section below to expand."}
           </p>
         </div>
       </div>
 
-      {/* What's in a sports gel */}
-      <div className="mb-6 bg-card border border-border rounded-xl p-4">
-        <h2 className="font-display text-base font-bold mb-2 flex items-center gap-1.5">
-          <Beaker size={16} className="text-primary" />
-          {isZh ? "果膠裡有什麼？" : "What's in a Sports Gel?"}
-        </h2>
-        <p className="text-[11px] text-muted-foreground leading-relaxed mb-3">
-          {isZh
-            ? "市面果膠成分大同小異 — 你可以選任何品牌（SiS、GU、High5、Precision、Maurten、Huma 等）。重點看每包碳水克數，而不是品牌。"
-            : "Most sports gels share the same building blocks — any reputable brand works (SiS, GU, High5, Precision, Maurten, Huma, etc.). What matters is the carbs per sachet, not the logo."}
-        </p>
-        <div className="grid grid-cols-2 gap-2 text-[11px]">
-          <div className="bg-muted/50 rounded-lg p-2">
-            <div className="font-semibold mb-0.5">{isZh ? "雙碳水組合" : "Dual carbs"}</div>
-            <div className="text-muted-foreground">{isZh ? "麥芽糊精 + 果糖（2:1 比例）— 吸收更快、上限更高" : "Maltodextrin + fructose (2:1) — faster uptake, higher ceiling"}</div>
-          </div>
-          <div className="bg-muted/50 rounded-lg p-2">
-            <div className="font-semibold mb-0.5">{isZh ? "電解質" : "Electrolytes"}</div>
-            <div className="text-muted-foreground">{isZh ? "鈉、鉀 — 預防抽筋與低血鈉" : "Sodium, potassium — cramp & hyponatremia defence"}</div>
-          </div>
-          <div className="bg-muted/50 rounded-lg p-2">
-            <div className="font-semibold mb-0.5">{isZh ? "咖啡因（選用）" : "Caffeine (optional)"}</div>
-            <div className="text-muted-foreground">{isZh ? "每包 25–100 mg — 後段衝刺神器" : "25–100 mg per gel — late-race kick"}</div>
-          </div>
-          <div className="bg-muted/50 rounded-lg p-2">
-            <div className="font-semibold mb-0.5">{isZh ? "水分搭配" : "Take with water"}</div>
-            <div className="text-muted-foreground">{isZh ? "每包配 150–200 ml 水，預防腸胃不適" : "150–200 ml water per gel to prevent GI issues"}</div>
-          </div>
-        </div>
-      </div>
+      <div className="space-y-2.5">
+        {/* === Calculator (open by default) === */}
+        <Section
+          title={isZh ? "比賽補給計算器 (HM/FM)" : "Race Fuel Calculator (HM/FM)"}
+          icon={Calculator}
+          iconColor="text-primary"
+          defaultOpen
+        >
+          <RaceFuelCalculator isZh={isZh} />
+        </Section>
 
-      {/* Key principles */}
-      <div className="mb-6">
-        <h2 className="font-display text-base font-bold mb-2 flex items-center gap-1.5">
-          <Info size={16} className="text-primary" />
-          {isZh ? "每小時碳水攝取" : "Carbs per Hour"}
-        </h2>
-        <div className="grid grid-cols-2 gap-2">
-          <div className="bg-card border border-border rounded-xl p-3">
-            <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-0.5">{isZh ? "短於" : "Under"} 60 min</div>
-            <div className="text-sm font-semibold">{isZh ? "只需喝水" : "Water is enough"}</div>
-            <div className="text-[10px] text-muted-foreground mt-0.5">0 {isZh ? "包" : "gels"}</div>
-          </div>
-          <div className="bg-card border border-border rounded-xl p-3">
-            <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-0.5">60–90 min</div>
-            <div className="text-sm font-semibold">30–60 g {isZh ? "碳水/小時" : "carbs/h"}</div>
-            <div className="text-[10px] text-muted-foreground mt-0.5">1–2 {isZh ? "包/小時" : "gels/h"}</div>
-          </div>
-          <div className="bg-card border border-border rounded-xl p-3">
-            <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-0.5">{isZh ? "超過" : "Over"} 90 min</div>
-            <div className="text-sm font-semibold">60–90 g {isZh ? "碳水/小時" : "carbs/h"}</div>
-            <div className="text-[10px] text-muted-foreground mt-0.5">2–3 {isZh ? "包/小時" : "gels/h"}</div>
-          </div>
-          <div className="bg-card border border-border rounded-xl p-3">
-            <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-0.5">{isZh ? "精英級" : "Elite"}</div>
-            <div className="text-sm font-semibold">90–120 g {isZh ? "碳水/小時" : "carbs/h"}</div>
-            <div className="text-[10px] text-muted-foreground mt-0.5">3–4 {isZh ? "包/小時（需訓練）" : "gels/h (train it!)"}</div>
-          </div>
-        </div>
-      </div>
-
-      {/* Training sessions */}
-      <h2 className="font-display text-base font-bold mb-2 flex items-center gap-1.5">
-        <Apple size={16} className="text-emerald-500" />
-        {isZh ? "訓練日補給" : "Training Fueling"}
-      </h2>
-      <div className="space-y-3 mb-6">
-        {trainingSessions.map((s, i) => {
-          const Icon = s.icon;
-          const c = isZh ? s.zh : s.en;
-          return (
-            <div key={i} className="bg-card border border-border rounded-xl p-3.5">
-              <div className="flex items-start gap-3 mb-2.5">
-                <div className={`shrink-0 w-11 h-11 rounded-xl ${s.bg} flex items-center justify-center border border-border`}>
-                  <Icon size={20} className={s.color} strokeWidth={2} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-display font-semibold text-sm leading-tight">{c.title}</h3>
-                  <p className="text-[11px] text-muted-foreground leading-snug mt-0.5">{c.desc}</p>
-                </div>
-              </div>
-              <div className="space-y-1.5 pl-1">
-                {s.phases.map((p, j) => (
-                  <div key={j} className="flex items-start gap-2 text-[11px]">
-                    <div className="shrink-0 w-1.5 h-1.5 rounded-full bg-primary mt-1.5" />
-                    <div className="flex-1">
-                      <span className="font-semibold">{isZh ? p.label.zh : p.label.en}</span>
-                      <span className="text-muted-foreground"> · {isZh ? p.when.zh : p.when.en}</span>
-                      <div className="text-muted-foreground">→ {isZh ? p.what.zh : p.what.en}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
+        {/* === What's in a gel === */}
+        <Section title={isZh ? "果膠裡有什麼？" : "What's in a Sports Gel?"} icon={Beaker}>
+          <p className="text-[11px] text-muted-foreground leading-relaxed mb-3">
+            {isZh
+              ? "市面果膠成分大同小異 — 重點看每包碳水克數，而不是品牌。"
+              : "Most sports gels share the same building blocks — what matters is the carbs per sachet, not the logo."}
+          </p>
+          <div className="grid grid-cols-2 gap-2 text-[11px]">
+            <div className="bg-muted/50 rounded-lg p-2">
+              <div className="font-semibold mb-0.5">{isZh ? "雙碳水組合" : "Dual carbs"}</div>
+              <div className="text-muted-foreground">{isZh ? "麥芽糊精 + 果糖（2:1）— 吸收更快" : "Maltodextrin + fructose (2:1) — faster uptake"}</div>
             </div>
-          );
-        })}
-      </div>
+            <div className="bg-muted/50 rounded-lg p-2">
+              <div className="font-semibold mb-0.5">{isZh ? "電解質" : "Electrolytes"}</div>
+              <div className="text-muted-foreground">{isZh ? "鈉、鉀 — 預防抽筋" : "Sodium, potassium — cramp defence"}</div>
+            </div>
+            <div className="bg-muted/50 rounded-lg p-2">
+              <div className="font-semibold mb-0.5">{isZh ? "咖啡因（選用）" : "Caffeine (optional)"}</div>
+              <div className="text-muted-foreground">{isZh ? "每包 25–100 mg" : "25–100 mg per gel"}</div>
+            </div>
+            <div className="bg-muted/50 rounded-lg p-2">
+              <div className="font-semibold mb-0.5">{isZh ? "水分搭配" : "Take with water"}</div>
+              <div className="text-muted-foreground">{isZh ? "每包配 150–200 ml 水" : "150–200 ml water per gel"}</div>
+            </div>
+          </div>
+        </Section>
 
-      {/* Race day */}
-      <h2 className="font-display text-base font-bold mb-2 flex items-center gap-1.5">
-        <Trophy size={16} className="text-warning" />
-        {isZh ? "比賽日補給" : "Race Day Fueling"}
-      </h2>
-      <div className="space-y-3 mb-6">
-        {races.map((r, i) => {
-          const Icon = r.icon;
-          const c = isZh ? r.zh : r.en;
-          return (
-            <div key={i} className="bg-card border border-border rounded-xl overflow-hidden">
-              <div className={`${r.bg} px-3.5 py-3 border-b border-border flex items-start gap-3`}>
-                <div className={`shrink-0 w-11 h-11 rounded-xl bg-background flex items-center justify-center border border-border`}>
-                  <Icon size={20} className={r.color} strokeWidth={2} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-display font-bold text-sm leading-tight">{c.title}</h3>
-                  <div className="text-[11px] text-muted-foreground mt-0.5">{c.tag}</div>
-                  <div className={`text-[11px] font-semibold ${r.color} mt-0.5`}>{isZh ? r.carbs.zh : r.carbs.en}</div>
-                </div>
-              </div>
-              <div className="p-3.5 space-y-2">
-                {r.phases.map((p, j) => (
-                  <div key={j} className="flex gap-2.5">
-                    <div className="shrink-0 flex flex-col items-center pt-0.5">
-                      <div className={`w-2 h-2 rounded-full ${r.color.replace("text-", "bg-")}`} />
-                      {j < r.phases.length - 1 && <div className="w-px flex-1 bg-border mt-1" />}
+        {/* === Carbs per hour === */}
+        <Section title={isZh ? "每小時碳水攝取" : "Carbs per Hour"} icon={Info}>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="bg-muted/40 rounded-lg p-3">
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-0.5">{isZh ? "短於" : "Under"} 60 min</div>
+              <div className="text-sm font-semibold">{isZh ? "只需喝水" : "Water is enough"}</div>
+              <div className="text-[10px] text-muted-foreground mt-0.5">0 {isZh ? "包" : "gels"}</div>
+            </div>
+            <div className="bg-muted/40 rounded-lg p-3">
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-0.5">60–90 min</div>
+              <div className="text-sm font-semibold">30–60 g {isZh ? "碳水/小時" : "carbs/h"}</div>
+              <div className="text-[10px] text-muted-foreground mt-0.5">1–2 {isZh ? "包/小時" : "gels/h"}</div>
+            </div>
+            <div className="bg-muted/40 rounded-lg p-3">
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-0.5">{isZh ? "超過" : "Over"} 90 min</div>
+              <div className="text-sm font-semibold">60–90 g {isZh ? "碳水/小時" : "carbs/h"}</div>
+              <div className="text-[10px] text-muted-foreground mt-0.5">2–3 {isZh ? "包/小時" : "gels/h"}</div>
+            </div>
+            <div className="bg-muted/40 rounded-lg p-3">
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-0.5">{isZh ? "精英級" : "Elite"}</div>
+              <div className="text-sm font-semibold">90–120 g {isZh ? "碳水/小時" : "carbs/h"}</div>
+              <div className="text-[10px] text-muted-foreground mt-0.5">3–4 {isZh ? "包/小時" : "gels/h"}</div>
+            </div>
+          </div>
+        </Section>
+
+        {/* === Training fueling === */}
+        <Section title={isZh ? "訓練日補給" : "Training Fueling"} icon={Apple} iconColor="text-emerald-500">
+          <div className="space-y-3">
+            {trainingSessions.map((s, i) => {
+              const Icon = s.icon;
+              const c = isZh ? s.zh : s.en;
+              return (
+                <div key={i} className="bg-muted/30 border border-border rounded-xl p-3">
+                  <div className="flex items-start gap-2.5 mb-2">
+                    <div className={`shrink-0 w-9 h-9 rounded-lg ${s.bg} flex items-center justify-center border border-border`}>
+                      <Icon size={16} className={s.color} strokeWidth={2} />
                     </div>
-                    <div className="flex-1 pb-1">
-                      <div className="flex items-baseline gap-2">
-                        <span className="text-xs font-semibold">{isZh ? p.label.zh : p.label.en}</span>
-                        <span className="text-[10px] text-muted-foreground">{isZh ? p.when.zh : p.when.en}</span>
-                      </div>
-                      <div className="text-[11px] text-muted-foreground leading-snug">{isZh ? p.what.zh : p.what.en}</div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-display font-semibold text-xs leading-tight">{c.title}</h3>
+                      <p className="text-[11px] text-muted-foreground leading-snug mt-0.5">{c.desc}</p>
                     </div>
                   </div>
-                ))}
-                {r.splits && (
-                  <div className="mt-3 pt-3 border-t border-border">
-                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5">
-                      {isZh ? "依配速分配" : "Carbs by finish time"}
-                    </div>
-                    <div className="grid grid-cols-2 gap-1">
-                      {r.splits.map((sp, k) => (
-                        <div key={k} className="flex justify-between bg-muted/50 rounded-md px-2 py-1 text-[11px]">
-                          <span className="font-mono font-semibold">{sp.pace}</span>
-                          <span className="text-muted-foreground">{sp.rate}</span>
+                  <div className="space-y-1 pl-1">
+                    {s.phases.map((p, j) => (
+                      <div key={j} className="flex items-start gap-2 text-[11px]">
+                        <div className="shrink-0 w-1.5 h-1.5 rounded-full bg-primary mt-1.5" />
+                        <div className="flex-1">
+                          <span className="font-semibold">{isZh ? p.label.zh : p.label.en}</span>
+                          <span className="text-muted-foreground"> · {isZh ? p.when.zh : p.when.en}</span>
+                          <div className="text-muted-foreground">→ {isZh ? p.what.zh : p.what.en}</div>
                         </div>
-                      ))}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </Section>
+
+        {/* === Race day fueling === */}
+        <Section title={isZh ? "比賽日補給" : "Race Day Fueling"} icon={Trophy} iconColor="text-warning">
+          <div className="space-y-3">
+            {races.map((r, i) => {
+              const Icon = r.icon;
+              const c = isZh ? r.zh : r.en;
+              return (
+                <div key={i} className="bg-muted/30 border border-border rounded-xl overflow-hidden">
+                  <div className={`${r.bg} px-3 py-2.5 border-b border-border flex items-start gap-2.5`}>
+                    <div className="shrink-0 w-9 h-9 rounded-lg bg-background flex items-center justify-center border border-border">
+                      <Icon size={16} className={r.color} strokeWidth={2} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-display font-bold text-xs leading-tight">{c.title}</h3>
+                      <div className="text-[11px] text-muted-foreground mt-0.5">{c.tag}</div>
+                      <div className={`text-[11px] font-semibold ${r.color} mt-0.5`}>{isZh ? r.carbs.zh : r.carbs.en}</div>
                     </div>
                   </div>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Hydration + caffeine tips */}
-      <div className="grid grid-cols-1 gap-2 mb-5">
-        <div className="bg-sky-500/10 border border-sky-500/20 rounded-xl p-3 flex items-start gap-2.5">
-          <Droplet size={16} className="text-sky-500 shrink-0 mt-0.5" />
-          <div>
-            <div className="text-xs font-semibold mb-0.5">{isZh ? "水分與電解質" : "Hydration & Electrolytes"}</div>
-            <p className="text-[11px] text-muted-foreground leading-relaxed">
-              {isZh
-                ? "炎熱潮濕時每小時 500–750 ml 水並加電解質。深色尿液 = 補水不足。"
-                : "In heat/humidity: 500–750 ml/h with electrolytes. Dark urine = under-hydrated."}
-            </p>
+                  <div className="p-3 space-y-2">
+                    {r.phases.map((p, j) => (
+                      <div key={j} className="flex gap-2.5">
+                        <div className="shrink-0 flex flex-col items-center pt-0.5">
+                          <div className={`w-2 h-2 rounded-full ${r.color.replace("text-", "bg-")}`} />
+                          {j < r.phases.length - 1 && <div className="w-px flex-1 bg-border mt-1" />}
+                        </div>
+                        <div className="flex-1 pb-1">
+                          <div className="flex items-baseline gap-2">
+                            <span className="text-xs font-semibold">{isZh ? p.label.zh : p.label.en}</span>
+                            <span className="text-[10px] text-muted-foreground">{isZh ? p.when.zh : p.when.en}</span>
+                          </div>
+                          <div className="text-[11px] text-muted-foreground leading-snug">{isZh ? p.what.zh : p.what.en}</div>
+                        </div>
+                      </div>
+                    ))}
+                    {r.splits && (
+                      <div className="mt-3 pt-3 border-t border-border">
+                        <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5">
+                          {isZh ? "依配速分配" : "Carbs by finish time"}
+                        </div>
+                        <div className="grid grid-cols-2 gap-1">
+                          {r.splits.map((sp, k) => (
+                            <div key={k} className="flex justify-between bg-card rounded-md px-2 py-1 text-[11px]">
+                              <span className="font-mono font-semibold">{sp.pace}</span>
+                              <span className="text-muted-foreground">{sp.rate}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
-        </div>
-        <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 flex items-start gap-2.5">
-          <Coffee size={16} className="text-amber-600 shrink-0 mt-0.5" />
-          <div>
-            <div className="text-xs font-semibold mb-0.5">{isZh ? "咖啡因策略" : "Caffeine Strategy"}</div>
-            <p className="text-[11px] text-muted-foreground leading-relaxed">
-              {isZh
-                ? "目標 3–6 mg/kg 體重。賽前 30–45 分鐘或最後 1/3 段使用咖啡因果膠效果最佳。"
-                : "Aim 3–6 mg per kg bodyweight. Take caffeine 30–45 min pre-race or in the final third."}
-            </p>
-          </div>
-        </div>
-      </div>
+        </Section>
 
-      {/* Disclaimer */}
-      <div className="flex items-start gap-2 bg-muted/50 border border-border rounded-xl p-3">
-        <AlertTriangle size={14} className="text-warning shrink-0 mt-0.5" />
-        <p className="text-[11px] text-muted-foreground leading-relaxed">
-          {isZh
-            ? "本指南整合多項運動營養研究，僅作教育用途。請在訓練中試用補給策略，比賽前勿嘗試新產品。如有特殊醫療狀況請諮詢專業人士。"
-            : "Based on general sports-nutrition research. Educational reference only — always test fueling in training, never try anything new on race day. Consult a professional for medical concerns."}
-        </p>
+        {/* === Hydration === */}
+        <Section title={isZh ? "水分與電解質" : "Hydration & Electrolytes"} icon={Droplet} iconColor="text-sky-500">
+          <p className="text-[11px] text-muted-foreground leading-relaxed">
+            {isZh
+              ? "炎熱潮濕時每小時 500–750 ml 水並加電解質。深色尿液 = 補水不足。每包果膠搭配 150–200 ml 水，避免腸胃不適。"
+              : "In heat/humidity: 500–750 ml/h with electrolytes. Dark urine = under-hydrated. Take each gel with 150–200 ml water to prevent GI issues."}
+          </p>
+        </Section>
+
+        {/* === Caffeine === */}
+        <Section title={isZh ? "咖啡因策略" : "Caffeine Strategy"} icon={Coffee} iconColor="text-amber-600">
+          <p className="text-[11px] text-muted-foreground leading-relaxed">
+            {isZh
+              ? "目標 3–6 mg/kg 體重。賽前 30–45 分鐘或最後 1/3 段使用咖啡因果膠效果最佳。長距離可分次攝取避免心悸。"
+              : "Aim 3–6 mg per kg bodyweight. Take caffeine 30–45 min pre-race or in the final third. Split doses across long races to avoid jitters."}
+          </p>
+        </Section>
+
+        {/* === Disclaimer === */}
+        <div className="flex items-start gap-2 bg-muted/50 border border-border rounded-xl p-3">
+          <AlertTriangle size={14} className="text-warning shrink-0 mt-0.5" />
+          <p className="text-[11px] text-muted-foreground leading-relaxed">
+            {isZh
+              ? "本指南整合多項運動營養研究，僅作教育用途。請在訓練中試用補給策略，比賽前勿嘗試新產品。如有特殊醫療狀況請諮詢專業人士。"
+              : "Based on general sports-nutrition research. Educational reference only — always test fueling in training, never try anything new on race day. Consult a professional for medical concerns."}
+          </p>
+        </div>
       </div>
     </div>
   );

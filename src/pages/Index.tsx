@@ -295,11 +295,15 @@ const Index = () => {
           </Suspense>
         )}
       </div>
-      {activeTab === "activities" && (
-        <div className="flex-1 overflow-y-auto relative" style={{ paddingBottom: 'calc(5rem + var(--safe-area-bottom, 0px))' }}>
-          <ActivitiesTab lang={lang} />
-        </div>
-      )}
+      <div
+        className="flex-1 overflow-y-auto relative"
+        style={{
+          paddingBottom: 'calc(5rem + var(--safe-area-bottom, 0px))',
+          display: activeTab === "activities" ? "block" : "none",
+        }}
+      >
+        <ActivitiesTab lang={lang} />
+      </div>
 
       <div className="fixed bottom-0 left-0 right-0 bg-card border-t border-border" style={{ paddingBottom: 'var(--safe-area-bottom, 0px)' }}>
         <div className="relative flex justify-around items-center h-16 max-w-lg mx-auto">

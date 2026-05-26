@@ -1296,22 +1296,29 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
   useEffect(() => {
     if (!user) return;
 
+    let initializedWeekIdx = false;
     const applyPlan = (p: any) => {
       if (!p) return;
       if (p.goal === "custom") {
         setCustomExistingPlan(p);
         setCustomPlan(p.plan_data || []);
         setCustomStep("calendar");
-        const today = new Date().toISOString().split("T")[0];
-        const idx = (p.plan_data || []).findIndex((w: WeekPlan) => w.days.some((d: DayPlan) => d.date >= today));
-        setCustomWeekIdx(Math.max(0, idx));
+        if (!initializedWeekIdx) {
+          const today = new Date().toISOString().split("T")[0];
+          const idx = (p.plan_data || []).findIndex((w: WeekPlan) => w.days.some((d: DayPlan) => d.date >= today));
+          setCustomWeekIdx(Math.max(0, idx));
+          initializedWeekIdx = true;
+        }
       } else {
         setExistingPlan(p);
         setPlan(p.plan_data || []);
         setProgramStep("calendar");
-        const today = new Date().toISOString().split("T")[0];
-        const idx = (p.plan_data || []).findIndex((w: WeekPlan) => w.days.some((d: DayPlan) => d.date >= today));
-        setCurrentWeekIdx(Math.max(0, idx));
+        if (!initializedWeekIdx) {
+          const today = new Date().toISOString().split("T")[0];
+          const idx = (p.plan_data || []).findIndex((w: WeekPlan) => w.days.some((d: DayPlan) => d.date >= today));
+          setCurrentWeekIdx(Math.max(0, idx));
+          initializedWeekIdx = true;
+        }
       }
     };
 
@@ -1337,6 +1344,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
     const unsub = subscribePlanChanged(() => { void load(); });
     return () => { unsub(); };
   }, [user, online]);
+
 
   // Load free plans for selected distance (cache-then-network)
   useEffect(() => {

@@ -91,7 +91,7 @@ const lineVariants = {
   hidden: { scaleY: 0, originY: 0 },
   visible: {
     scaleY: 1,
-    transition: { duration: 0.8, ease: "easeOut", delay: 0.1 },
+    transition: { duration: 0.8, ease: "easeOut" as const, delay: 0.1 },
   },
 };
 
@@ -101,7 +101,7 @@ const itemVariants = {
     opacity: 1,
     x: 0,
     scale: 1,
-    transition: { type: "spring", stiffness: 300, damping: 24 },
+    transition: { type: "spring" as const, stiffness: 300, damping: 24 },
   },
 };
 

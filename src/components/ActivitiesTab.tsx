@@ -1043,7 +1043,6 @@ const ActivitiesTab = ({ lang }: Props) => {
       <div className="pb-4">
         <div className="flex items-center justify-between mb-2">
           <h2 className="text-sm font-semibold text-foreground">{lang === "zh" ? "月曆" : "Monthly Overview"}</h2>
-          <BulkFitExportButton lang={lang} activities={activities} isPremium={isPremium} />
         </div>
         <ActivityCalendar
           lang={lang}

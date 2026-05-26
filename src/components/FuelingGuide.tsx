@@ -510,6 +510,15 @@ const RaceFuelCalculator = ({ isZh }: { isZh: boolean }) => {
               ? `賽前 30 分鐘先吞 1 包（含咖啡因更佳）— 它的碳水會在起跑時剛好進入血液，等於幫你「延後」第一包賽中果膠。${stations.length > 0 ? "💧 表示已對齊到你輸入的水站。" : "賽中果膠均勻分布於 30 分後至 92% 賽程。"}每包搭配 150–200 ml 水。`
               : `Take 1 gel 30 min before the gun (caffeinated is ideal) — its carbs hit your bloodstream as you start, so you can delay your first in-race gel. ${stations.length > 0 ? "💧 = aligned to your water station. " : "In-race gels are spaced from the 30-min mark to ~92% of the race. "}Wash each down with 150–200 ml water.`}
           </p>
+
+          <div className="mt-3 flex items-start gap-2 bg-amber-500/10 border border-amber-500/20 rounded-lg p-2.5">
+            <AlertTriangle size={14} className="text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+            <p className="text-[10px] text-amber-800 dark:text-amber-300 leading-relaxed">
+              {isZh
+                ? "此計算器僅供粗略參考，依據公開運動營養指南推算。每位跑者體質不同 — 流汗量、腸胃耐受度與賽日狀況皆會影響實際需求。務必在賽前長跑訓練中反覆測試此計劃，切勿在比賽當天才首次嘗試新的補給策略。"
+                : "This calculator is a rough estimate based on published sports-nutrition guidelines. Every runner is different — sweat rate, gut tolerance, and race-day conditions all change your needs. Test this plan on multiple long runs before race day. Never try a brand-new fueling strategy for the first time in a race."}
+            </p>
+          </div>
         </div>
       )}
 

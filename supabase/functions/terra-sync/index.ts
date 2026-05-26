@@ -547,9 +547,6 @@ Deno.serve(async (req) => {
               }
             }
           }
-              }
-            }
-          }
         }
         const terraReference = r.headers.get("terra-reference");
         const itemIds = items.map((it: any) => String(it?.metadata?.summary_id ?? it?.metadata?.upload_id ?? it?.metadata?.start_time ?? "")).filter(Boolean);

@@ -324,19 +324,34 @@ const RaceFuelCalculator = ({ isZh }: { isZh: boolean }) => {
     if (!totalMin || !gelCarbs || gelCarbs <= 0) return null;
     const { rate, bracket } = carbsPerHourForFinishTime(distance, totalMin);
     const totalCarbsNeeded = (rate * totalMin) / 60;
-    const numGels = Math.max(1, Math.ceil(totalCarbsNeeded / gelCarbs));
-    // ideal evenly-spaced km marks (skip start, ensure within race)
+
+    // Revamped logic:
+    // 1) Always take 1 gel 30 min pre-race. Its carbs hit the bloodstream right at the
+    //    gun and effectively cover the first ~30 min of running — so subtract it from
+    //    the in-race carb requirement before sizing the in-race gel count.
+    // 2) Size in-race gels to top up the remaining carb need.
+    // 3) Start in-race gels around the 30-min mark (when pre-race fuel runs out),
+    //    and finish by ~92% of the race so the last gel still has time to absorb.
+    const preRaceGelCarbs = gelCarbs;
+    const inRaceCarbsNeeded = Math.max(0, totalCarbsNeeded - preRaceGelCarbs);
+    const numInRaceGels = Math.max(1, Math.ceil(inRaceCarbsNeeded / gelCarbs));
+
+    // Time window for in-race gels: ~30 min in → 92% of finish time.
+    const firstMin = Math.min(30, totalMin * 0.18);
+    const lastMin = totalMin * 0.92;
     const idealKm: number[] = [];
-    for (let i = 1; i <= numGels; i++) {
-      idealKm.push((i * totalKm) / (numGels + 1));
+    for (let i = 0; i < numInRaceGels; i++) {
+      const t = numInRaceGels === 1
+        ? (firstMin + lastMin) / 2
+        : firstMin + ((lastMin - firstMin) * i) / (numInRaceGels - 1);
+      idealKm.push((t / totalMin) * totalKm);
     }
     // align to water stations if provided
     const usedStations = new Set<number>();
-    const schedule = idealKm.map((target) => {
+    const inRaceSchedule = idealKm.map((target) => {
       let km = target;
       let aligned = false;
       if (stations.length) {
-        // find nearest unused water station within 2 km
         let best: number | null = null;
         let bestDist = Infinity;
         for (const st of stations) {
@@ -347,9 +362,14 @@ const RaceFuelCalculator = ({ isZh }: { isZh: boolean }) => {
         if (best !== null) { km = best; usedStations.add(best); aligned = true; }
       }
       const min = paceMin ? km * paceMin : (km / totalKm) * totalMin;
-      return { targetKm: target, km, aligned, min };
+      return { targetKm: target, km, aligned, min, preRace: false as const };
     });
-    return { rate, bracket, totalCarbsNeeded, numGels, schedule };
+    const schedule = [
+      { targetKm: 0, km: 0, aligned: false, min: -30, preRace: true as const },
+      ...inRaceSchedule,
+    ];
+    const numGels = numInRaceGels + 1;
+    return { rate, bracket, totalCarbsNeeded, numGels, numInRaceGels, schedule };
   }, [totalMin, gelCarbs, distance, totalKm, stations, paceMin]);
 
   return (

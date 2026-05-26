@@ -77,6 +77,18 @@ const MILESTONES = [
     text: "text-sky-400",
     iconBg: "from-sky-400 to-sky-500",
   },
+  {
+    icon: Route,
+    en: "AI Trail Program",
+    zh: "AI 越野路線規劃",
+    descEn: "AI-generated trail running routes tailored to you",
+    descZh: "AI 為你量身打造越野跑路線",
+    accent: "from-violet-400/20 to-violet-500/5",
+    glow: "shadow-[0_0_20px_rgba(167,139,250,0.3)]",
+    border: "hover:border-violet-400/40",
+    text: "text-violet-400",
+    iconBg: "from-violet-400 to-violet-500",
+  },
 ];
 
 const containerVariants = {

@@ -2,13 +2,18 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-async function callVertexAI(opts: { apiKey: string; model?: string; messages: Array<{ role: string; content: any }> }): Promise<Response> {
+async function callVertexAI(opts: {
+  apiKey: string;
+  model?: string;
+  messages: Array<{ role: string; content: any }>;
+}): Promise<Response> {
   const VERTEX_MODEL_MAP: Record<string, string> = {
     "google/gemini-3.1-pro-preview": "gemini-3.1-pro-preview",
-    "google/gemini-2.5-flash": "gemini-2.5-flash",
+    "google/gemini-3.1-flash-preview": "gemini-3-flash-preview",
     "google/gemini-3.1-flash-lite-preview": "gemini-3.1-flash-lite-preview",
     "google/gemini-3-flash-preview": "gemini-3-flash-preview",
   };
@@ -43,20 +48,11 @@ async function callVertexAI(opts: { apiKey: string; model?: string; messages: Ar
   }
   const body: any = { contents };
   if (systemParts.length) body.systemInstruction = { parts: systemParts };
-  const ac = new AbortController();
-  const timer = setTimeout(() => ac.abort(), 140_000);
-  const t0 = Date.now();
-  console.log(`[analyze-posture] vertex call start model=${model} contents=${contents.length}`);
-  let vRes: Response;
-  try {
-    vRes = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body), signal: ac.signal });
-  } catch (e) {
-    clearTimeout(timer);
-    console.error(`[analyze-posture] vertex fetch failed/aborted after ${Date.now() - t0}ms model=${model}`, e);
-    return new Response(JSON.stringify({ error: "Upstream timeout" }), { status: 504, headers: { "Content-Type": "application/json" } });
-  }
-  clearTimeout(timer);
-  console.log(`[analyze-posture] vertex responded in ${Date.now() - t0}ms status=${vRes.status} model=${model}`);
+  const vRes = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
   if (!vRes.ok) {
     const errBody = await vRes.text();
     console.error("Vertex error:", vRes.status, "model:", model, "body:", errBody.slice(0, 1000));
@@ -64,31 +60,14 @@ async function callVertexAI(opts: { apiKey: string; model?: string; messages: Ar
   }
   const vData = await vRes.json();
   const text = vData?.candidates?.[0]?.content?.parts?.map((p: any) => p.text || "").join("") || "";
-  return new Response(JSON.stringify({ choices: [{ message: { content: text } }] }), { status: 200, headers: { "Content-Type": "application/json" } });
+  return new Response(JSON.stringify({ choices: [{ message: { content: text } }] }), {
+    status: 200,
+    headers: { "Content-Type": "application/json" },
+  });
 }
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
-
-  // Require authenticated user
-  const authHeader = req.headers.get("Authorization");
-  const token = authHeader?.replace("Bearer ", "");
-  if (!token) {
-    return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-  }
-  try {
-    const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2.49.4");
-    const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, { global: { headers: { Authorization: `Bearer ${token}` } } });
-    const { data: userData, error } = await sb.auth.getUser(token);
-    if (error || !userData?.user) {
-      console.error("[analyze-posture] auth.getUser failed:", error?.message);
-      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
-  } catch (e) {
-    console.error("[analyze-posture] auth check threw:", (e as Error).message);
-    return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-  }
-
 
   try {
     const { frames, lang, translate, existingResult } = await req.json();
@@ -106,10 +85,8 @@ ${JSON.stringify(existingResult)}`;
 
       const tlResp = await callVertexAI({
         apiKey: VERTEX_API_KEY,
-        model: "google/gemini-2.5-flash",
-        messages: [
-          { role: "user", content: translatePrompt },
-        ],
+        model: "google/gemini-3.1-flash-preview",
+        messages: [{ role: "user", content: translatePrompt }],
       });
 
       if (!tlResp.ok) {
@@ -125,7 +102,12 @@ ${JSON.stringify(existingResult)}`;
       const tlContent = tlData.choices?.[0]?.message?.content || "";
       let tlParsed;
       try {
-        tlParsed = JSON.parse(tlContent.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim());
+        tlParsed = JSON.parse(
+          tlContent
+            .replace(/```json\n?/g, "")
+            .replace(/```\n?/g, "")
+            .trim(),
+        );
       } catch {
         console.error("Failed to parse translation:", tlContent);
         return new Response(JSON.stringify({ error: "Failed to parse translation" }), {
@@ -192,16 +174,20 @@ Scores should be objective based on actual posture observed. Be specific in feed
       image_url: { url: frame },
     }));
 
-    console.log(`[analyze-posture] analyze start frames=${frames.length} lang=${lang}`);
     const response = await callVertexAI({
       apiKey: VERTEX_API_KEY,
-      model: "google/gemini-3.1-flash-lite-preview",
+      model: "google/gemini-3.1-flash-preview",
       messages: [
         { role: "system", content: systemPrompt },
         {
           role: "user",
           content: [
-            { type: "text", text: isZh ? "請分析這些跑步姿勢截圖並以 JSON 格式回覆：" : "Analyze these running form frames and respond in JSON format:" },
+            {
+              type: "text",
+              text: isZh
+                ? "請分析這些跑步姿勢截圖並以 JSON 格式回覆："
+                : "Analyze these running form frames and respond in JSON format:",
+            },
             ...imageContent,
           ],
         },
@@ -210,16 +196,22 @@ Scores should be objective based on actual posture observed. Be specific in feed
 
     if (!response.ok) {
       if (response.status === 429) {
-        return new Response(JSON.stringify({ error: isZh ? "請求過於頻繁，請稍後再試" : "Rate limited, please try again later." }), {
-          status: 429,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        return new Response(
+          JSON.stringify({ error: isZh ? "請求過於頻繁，請稍後再試" : "Rate limited, please try again later." }),
+          {
+            status: 429,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        );
       }
       if (response.status === 402) {
-        return new Response(JSON.stringify({ error: isZh ? "額度不足，請充值" : "Payment required, please add credits." }), {
-          status: 402,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        return new Response(
+          JSON.stringify({ error: isZh ? "額度不足，請充值" : "Payment required, please add credits." }),
+          {
+            status: 402,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        );
       }
       const t = await response.text();
       console.error("AI gateway error:", response.status, t);
@@ -231,10 +223,13 @@ Scores should be objective based on actual posture observed. Be specific in feed
 
     const data = await response.json();
     const content = data.choices?.[0]?.message?.content || "";
-    
+
     let parsed;
     try {
-      const jsonMatch = content.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+      const jsonMatch = content
+        .replace(/```json\n?/g, "")
+        .replace(/```\n?/g, "")
+        .trim();
       parsed = JSON.parse(jsonMatch);
     } catch {
       console.error("Failed to parse AI JSON response:", content);

@@ -449,12 +449,14 @@ Deno.serve(async (req) => {
     end.setDate(end.getDate() + 1);
     const start = new Date();
     if (dayOnly) {
-      // Today only — but Terra filters by activity date in UTC, so a late-evening
-      // local run (e.g. 21:38 HKT = 13:38 UTC the previous day) lands on the
-      // previous UTC date page. Widen the lower bound by 1 day so those runs
-      // are still returned; dedup on (provider, terra_activity_id) makes any
-      // already-ingested rows a no-op.
-      start.setDate(start.getDate() - 1);
+      // Terra's range endpoint behaves inconsistently on narrow windows
+      // (likely dedups items it has previously delivered). The 7-day window
+      // reliably returns recent activities including ones whose UTC date is
+      // the previous day relative to the user's local "today" (e.g. a
+      // 21:38 HKT run = 13:38 UTC the day before). Use the same width here
+      // and rely on (provider, terra_activity_id) dedup to make repeat
+      // ingests a no-op.
+      start.setDate(start.getDate() - 7);
     } else {
       start.setDate(start.getDate() - 30);
     }

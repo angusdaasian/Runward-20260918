@@ -23,6 +23,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import ActivityCalendar from "@/components/activities/ActivityCalendar";
 import MonthlyRoadQuest from "@/components/activities/MonthlyRoadQuest";
+import BulkFitExportButton from "@/components/activities/BulkFitExportButton";
 
 // Heavy: pulls in leaflet + leaflet.css. Only needed when an activity card has a polyline.
 const ActivityMap = lazy(() => import("@/components/activities/ActivityMap"));
@@ -1039,7 +1040,10 @@ const ActivitiesTab = ({ lang }: Props) => {
 
       {/* Monthly Calendar */}
       <div className="pb-4">
-        <h2 className="text-sm font-semibold text-foreground mb-2">{lang === "zh" ? "月曆" : "Monthly Overview"}</h2>
+        <div className="flex items-center justify-between mb-2">
+          <h2 className="text-sm font-semibold text-foreground">{lang === "zh" ? "月曆" : "Monthly Overview"}</h2>
+          <BulkFitExportButton lang={lang} activities={activities} isPremium={isPremium} />
+        </div>
         <ActivityCalendar
           lang={lang}
           activities={activities}

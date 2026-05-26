@@ -15,6 +15,7 @@ import {
   Lightbulb,
   ArrowRight,
   Zap,
+  Route,
 } from "lucide-react";
 import { Lang } from "@/lib/i18n";
 import { supabase } from "@/integrations/supabase/client";
@@ -75,6 +76,18 @@ const MILESTONES = [
     border: "hover:border-sky-400/40",
     text: "text-sky-400",
     iconBg: "from-sky-400 to-sky-500",
+  },
+  {
+    icon: Route,
+    en: "AI Trail Program",
+    zh: "AI 越野路線規劃",
+    descEn: "AI-generated trail running routes tailored to you",
+    descZh: "AI 為你量身打造越野跑路線",
+    accent: "from-violet-400/20 to-violet-500/5",
+    glow: "shadow-[0_0_20px_rgba(167,139,250,0.3)]",
+    border: "hover:border-violet-400/40",
+    text: "text-violet-400",
+    iconBg: "from-violet-400 to-violet-500",
   },
 ];
 
@@ -170,12 +183,12 @@ const RoadmapDialog = ({ open, onOpenChange, lang }: RoadmapDialogProps) => {
             </DialogTitle>
           </motion.div>
           <motion.p
-            className="text-xs text-muted-foreground"
+            className="text-xs text-muted-foreground text-left"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.2, duration: 0.4 }}
           >
-            {lang === "zh" ? "我們正在全力開發的新功能" : "Features we're building for Runward"}
+            {lang === "zh" ? "我們正在全力開發的新功能" : "We are developing new features"}
           </motion.p>
         </DialogHeader>
 
@@ -188,7 +201,7 @@ const RoadmapDialog = ({ open, onOpenChange, lang }: RoadmapDialogProps) => {
         >
           {/* Animated vertical line */}
           <motion.div
-            className="absolute left-[1.1rem] top-3 bottom-4 w-0.5 bg-gradient-to-b from-emerald-400/60 via-orange-400/40 to-sky-400/20 rounded-full"
+            className="absolute left-[1.1rem] top-3 bottom-4 w-0.5 bg-gradient-to-b from-emerald-400/60 via-orange-400/40 via-amber-400/30 via-sky-400/20 to-violet-400/10 rounded-full"
             variants={lineVariants}
           />
 

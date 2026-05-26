@@ -973,32 +973,7 @@ const ActivitiesTab = ({ lang }: Props) => {
             {lang === "zh" ? "最近活動" : "Recent Activity"}
           </h2>
           <div className="flex items-center gap-3">
-            {fitnessAppConnected && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button
-                    disabled={fetchingToday}
-                    className="flex items-center gap-1 text-xs font-medium text-primary hover:text-primary/80 transition-colors disabled:opacity-50"
-                    aria-label={lang === "zh" ? "同步活動" : "Sync activities"}
-                  >
-                    <RefreshCw size={14} className={fetchingToday ? "animate-spin" : ""} />
-                    {lang === "zh" ? "同步" : "Sync"}
-                    <ChevronDown size={12} />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="min-w-[180px]">
-                  <DropdownMenuItem onClick={handleFetchLatest} disabled={fetchingToday}>
-                    {lang === "zh" ? "同步最新活動" : "Sync latest activity"}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={handleFetchTodayOnly} disabled={fetchingToday}>
-                    {lang === "zh" ? "同步今日活動" : "Sync today's activities"}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={handleFetchTodayTerra} disabled={fetchingToday}>
-                    {lang === "zh" ? "同步過去 7 天" : "Sync last 7 days"}
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
+            {/* Sync controls hidden — moved to Admin Panel for testing before production rollout */}
             {(latestActivity || activities.length > 0) && (
               <button
                 onClick={() => { setWarmupReady(true); setShowAllActivities(true); }}

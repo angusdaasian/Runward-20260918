@@ -18,6 +18,7 @@ import {
   Flag,
   ClipboardList,
   MessageSquare,
+  RefreshCw,
 } from "lucide-react";
 import {
   Sidebar,
@@ -39,6 +40,7 @@ import RaceManager from "@/components/admin/RaceManager";
 import PendingRaceManager from "@/components/admin/PendingRaceManager";
 import RewardCodeManager from "@/components/admin/RewardCodeManager";
 import NotificationManager from "@/components/admin/NotificationManager";
+import TerraSyncTester from "@/components/admin/TerraSyncTester";
 
 interface UserRow {
   user_id: string;
@@ -62,7 +64,8 @@ type TabKey =
   | "rewards"
   | "races"
   | "pending"
-  | "feedback";
+  | "feedback"
+  | "terra";
 
 const TABS: { key: TabKey; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { key: "users", label: "Users", icon: Users },
@@ -73,7 +76,9 @@ const TABS: { key: TabKey; label: string; icon: React.ComponentType<{ className?
   { key: "races", label: "Races", icon: Flag },
   { key: "pending", label: "Pending Races", icon: ClipboardList },
   { key: "feedback", label: "Feedback", icon: MessageSquare },
+  { key: "terra", label: "Terra Sync", icon: RefreshCw },
 ];
+
 
 const AdminPanel = () => {
   const { isAdmin, loading: adminLoading } = useAdmin();
@@ -309,6 +314,8 @@ const AdminPanel = () => {
         return <PendingRaceManager />;
       case "feedback":
         return <FeedbackManager />;
+      case "terra":
+        return <TerraSyncTester />;
     }
   };
 

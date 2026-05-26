@@ -18,6 +18,7 @@ import {
   Flag,
   ClipboardList,
   MessageSquare,
+  RefreshCw,
 } from "lucide-react";
 import {
   Sidebar,

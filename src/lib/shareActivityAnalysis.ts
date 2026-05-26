@@ -63,16 +63,28 @@ export async function shareActivityAnalysis(input: ShareActivityAnalysisInput): 
     ctx.fillStyle = "#FC4C02";
     ctx.fillRect(cardX + 44, ty + 4, 64, 5);
 
-    // Analysis body
+    // Analysis body — auto-fit font size so the full text stays inside the card
     const bodyY = ty + 40;
     const bodyBottom = H - 160;
-    const lineHeight = 38;
+    const availableH = bodyBottom - bodyY;
 
     ctx.fillStyle = "#1F2937";
-    ctx.font = `500 26px ${FONT_TEXT}`;
-    const maxLines = Math.max(1, Math.floor((bodyBottom - bodyY) / lineHeight));
     const text = stripMarkdown(input.analysis || "");
-    const lines = wrapText(ctx, text, cardW - 88).slice(0, maxLines);
+
+    let fontSize = 26;
+    let lineHeight = 38;
+    let lines: string[] = [];
+    const minFontSize = 16;
+    while (fontSize >= minFontSize) {
+      ctx.font = `500 ${fontSize}px ${FONT_TEXT}`;
+      lineHeight = Math.round(fontSize * 1.46);
+      lines = wrapText(ctx, text, cardW - 88);
+      if (lines.length * lineHeight <= availableH) break;
+      fontSize -= 1;
+    }
+    const maxLines = Math.max(1, Math.floor(availableH / lineHeight));
+    if (lines.length > maxLines) lines = lines.slice(0, maxLines);
+
     let cy = bodyY;
     for (const ln of lines) {
       ctx.fillText(ln, cardX + 44, cy);

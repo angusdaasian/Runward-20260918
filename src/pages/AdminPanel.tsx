@@ -221,10 +221,26 @@ const AdminPanel = () => {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Users</CardTitle>
-          <Button size="sm" variant="outline" onClick={handleRestoreRC} disabled={restoring}>
-            <Crown className="h-4 w-4 mr-2" />
-            {restoring ? "Restoring..." : "Restore RC Subscribers"}
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                localStorage.removeItem("posture_used_date");
+                localStorage.removeItem("posture_last_result");
+                localStorage.removeItem("posture_last_lang");
+                toast.success("Posture daily limit reset. Reloading...");
+                setTimeout(() => window.location.reload(), 600);
+              }}
+            >
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Reset Posture Limit
+            </Button>
+            <Button size="sm" variant="outline" onClick={handleRestoreRC} disabled={restoring}>
+              <Crown className="h-4 w-4 mr-2" />
+              {restoring ? "Restoring..." : "Restore RC Subscribers"}
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           {loading ? (

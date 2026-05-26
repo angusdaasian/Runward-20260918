@@ -28,6 +28,7 @@ const PlanComparisonDialog = ({ open, onOpenChange, lang }: Props) => {
     { label: tx("Activity sharing", "活動分享"), free: tx("Basic", "基本"), premium: tx("All functions", "全部功能") },
     { label: tx("AI activity share posters", "AI 活動分享海報"), free: false, premium: true },
     { label: tx("Weekly plan reviews", "每週計劃回顧"), free: false, premium: true },
+    { label: tx("Export .fit files", "匯出 .fit 檔案"), free: tx("Per activity", "單個活動"), premium: tx("Bulk export", "批量匯出") },
     // Text on both sides
     { label: tx("Training plans", "訓練計劃"), free: tx("Basic", "基本"), premium: tx("Personalized AI", "AI 個人化") },
     { label: tx("Race predictor", "比賽預測"), free: tx("5K only", "僅 5K"), premium: tx("All distances", "全距離") },

@@ -570,6 +570,7 @@ const AllActivitiesView = ({
             {lang === "zh" ? "所有活動" : "All Activities"}
           </h1>
         </div>
+        <BulkFitExportButton lang={lang} activities={activities} isPremium={isPremium} />
       </div>
       {loading && activities.length === 0 && (
         <div className="flex items-center justify-center py-6 text-xs text-muted-foreground gap-2">

@@ -275,10 +275,6 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps }: Props
               <Crown size={20} className="text-warning" />
               <div>
                 <span className="font-medium text-foreground block">{t("upgradePremium", lang)}</span>
-                <span className="text-xs text-muted-foreground flex items-center gap-1">
-                  <ScanEye size={12} />
-                  {t("unlockPosture", lang)}
-                </span>
               </div>
             </div>
             {isPremium ? (
@@ -305,7 +301,7 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps }: Props
               </div>
             ) : (
               <button
-                onClick={handleUpgradeClick}
+                onClick={() => setShowPlanCompare(true)}
                 className="bg-primary text-primary-foreground px-4 py-1.5 rounded-lg text-sm font-semibold"
               >
                 {t("upgrade", lang)}
@@ -314,19 +310,6 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps }: Props
           </div>
         </div>
 
-        {/* Compare Plans — independent section */}
-        <button
-          onClick={() => setShowPlanCompare(true)}
-          className="w-full bg-card border border-border rounded-xl p-4 flex items-center justify-between"
-        >
-          <div className="flex items-center gap-3">
-            <Info size={20} className="text-primary" />
-            <span className="font-medium text-foreground">
-              {lang === "zh" ? "比較免費版與 Premium" : "Compare Free vs Premium"}
-            </span>
-          </div>
-          <ChevronRight size={18} className="text-muted-foreground" />
-        </button>
 
         {/* Current Entitlement */}
         {isPremium && rcEntitlement && (

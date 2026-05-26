@@ -1204,12 +1204,27 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
                   <Tooltip contentStyle={{ backgroundColor: "#FFFFFF", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 12, color: "#0F172A" }}
                     formatter={(value: number) => [Math.round(value), "bpm"]} labelFormatter={(v) => `${v} km`} />
                   <defs>
-                    <linearGradient id="hrGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#EF4444" stopOpacity={0.35} />
-                      <stop offset="95%" stopColor="#EF4444" stopOpacity={0} />
+                    <linearGradient id="hrGradient" x1="0" y1="0" x2="1" y2="0">
+                      {hrGradientStops
+                        ? hrGradientStops.map((s, i) => (
+                            <stop key={i} offset={`${s.offset}%`} stopColor={s.color} stopOpacity={0.45} />
+                          ))
+                        : (
+                          <>
+                            <stop offset="5%" stopColor="#EF4444" stopOpacity={0.35} />
+                            <stop offset="95%" stopColor="#EF4444" stopOpacity={0} />
+                          </>
+                        )}
+                    </linearGradient>
+                    <linearGradient id="hrStrokeGradient" x1="0" y1="0" x2="1" y2="0">
+                      {hrGradientStops
+                        ? hrGradientStops.map((s, i) => (
+                            <stop key={i} offset={`${s.offset}%`} stopColor={s.color} stopOpacity={1} />
+                          ))
+                        : <stop offset="0%" stopColor="#EF4444" stopOpacity={1} />}
                     </linearGradient>
                   </defs>
-                  <Area type="monotone" dataKey="heartrate" stroke="#EF4444" fill="url(#hrGradient)" strokeWidth={2.5} dot={false} />
+                  <Area type="monotone" dataKey="heartrate" stroke="url(#hrStrokeGradient)" fill="url(#hrGradient)" strokeWidth={2.5} dot={false} />
                 </AreaChart>
               ) : activeChart === "altitude" ? (
                 <AreaChart data={chartData}>

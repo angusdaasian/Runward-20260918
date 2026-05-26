@@ -487,13 +487,18 @@ const RaceFuelCalculator = ({ isZh }: { isZh: boolean }) => {
               </thead>
               <tbody>
                 {plan.schedule.map((s, i) => (
-                  <tr key={i} className="border-t border-border">
-                    <td className="px-2 py-1.5 font-semibold">#{i + 1}</td>
-                    <td className="px-2 py-1.5 font-mono">
-                      {s.km.toFixed(1)}
-                      {s.aligned && <span className="ml-1 text-sky-500" title={isZh ? "對齊水站" : "Aligned to water station"}>💧</span>}
+                  <tr key={i} className={`border-t border-border ${s.preRace ? "bg-amber-500/5" : ""}`}>
+                    <td className="px-2 py-1.5 font-semibold">
+                      {s.preRace ? <span className="text-amber-600 dark:text-amber-400">{isZh ? "賽前" : "Pre"}</span> : `#${i}`}
                     </td>
-                    <td className="px-2 py-1.5 font-mono text-muted-foreground">{fmtMin(s.min)}</td>
+                    <td className="px-2 py-1.5 font-mono">
+                      {s.preRace
+                        ? <span className="text-muted-foreground">{isZh ? "起跑線" : "Start line"}</span>
+                        : <>{s.km.toFixed(1)}{s.aligned && <span className="ml-1 text-sky-500" title={isZh ? "對齊水站" : "Aligned to water station"}>💧</span>}</>}
+                    </td>
+                    <td className="px-2 py-1.5 font-mono text-muted-foreground">
+                      {s.preRace ? (isZh ? "起跑前 30 分" : "−30 min") : fmtMin(s.min)}
+                    </td>
                     <td className="px-2 py-1.5 text-muted-foreground">{Math.round((i + 1) * gelCarbs)} g</td>
                   </tr>
                 ))}
@@ -501,9 +506,9 @@ const RaceFuelCalculator = ({ isZh }: { isZh: boolean }) => {
             </table>
           </div>
           <p className="text-[10px] text-muted-foreground mt-2 leading-relaxed">
-            {stations.length > 0
-              ? (isZh ? "💧 表示已對齊到你輸入的水站。建議每包果膠搭配 150–200 ml 水。" : "💧 = aligned to your water station. Take each gel with 150–200 ml water.")
-              : (isZh ? "果膠均勻分配於賽程。建議每包搭配 150–200 ml 水（在水站取水）。" : "Gels evenly spaced across the race. Take each with 150–200 ml water (grab at stations).")}
+            {isZh
+              ? `賽前 30 分鐘先吞 1 包（含咖啡因更佳）— 它的碳水會在起跑時剛好進入血液，等於幫你「延後」第一包賽中果膠。${stations.length > 0 ? "💧 表示已對齊到你輸入的水站。" : "賽中果膠均勻分布於 30 分後至 92% 賽程。"}每包搭配 150–200 ml 水。`
+              : `Take 1 gel 30 min before the gun (caffeinated is ideal) — its carbs hit your bloodstream as you start, so you can delay your first in-race gel. ${stations.length > 0 ? "💧 = aligned to your water station. " : "In-race gels are spaced from the 30-min mark to ~92% of the race. "}Wash each down with 150–200 ml water.`}
           </p>
         </div>
       )}

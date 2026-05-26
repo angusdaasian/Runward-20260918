@@ -720,6 +720,58 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
     return null;
   }, [activity.hr_samples, profileMaxHr, profileAge, profileRestingHr, profileCustomZones, streams]);
 
+  // Per-point HR zone color stops for the HR chart gradient, so the curve
+  // visually matches the zone distribution (Z1 grey, Z2 blue, Z3 green, ...).
+  const hrGradientStops = useMemo(() => {
+    const pts = chartData.filter((d: any) => typeof d.heartrate === "number" && d.heartrate > 0);
+    if (pts.length < 2) return null;
+    const maxHr = estimateMaxHr(profileAge ?? null, profileMaxHr ?? null);
+    const restHr = estimateRestingHr(profileRestingHr ?? null);
+    const custom = profileCustomZones ?? null;
+    const bounds = zoneBoundaries(maxHr, restHr, custom);
+    const useCustom = custom && isValidCustomZones(custom);
+    const colorFor = (bpm: number): string => {
+      let key: "z1" | "z2" | "z3" | "z4" | "z5" = "z1";
+      if (useCustom) {
+        if (bpm >= custom![4]) key = "z5";
+        else if (bpm >= custom![3]) key = "z4";
+        else if (bpm >= custom![2]) key = "z3";
+        else if (bpm >= custom![1]) key = "z2";
+        else key = "z1";
+      } else {
+        const reserve = Math.max(1, maxHr - restHr);
+        const pct = (bpm - restHr) / reserve;
+        if (pct >= 0.9) key = "z5";
+        else if (pct >= 0.8) key = "z4";
+        else if (pct >= 0.7) key = "z3";
+        else if (pct >= 0.6) key = "z2";
+        else key = "z1";
+      }
+      return ZONE_LABELS.find(z => z.key === key)!.color;
+    };
+    const xs = pts.map((p: any) => p.distance_km);
+    const minX = xs[0];
+    const maxX = xs[xs.length - 1];
+    const span = Math.max(1e-6, maxX - minX);
+    const stops: Array<{ offset: number; color: string }> = [];
+    let prevColor = "";
+    for (let i = 0; i < pts.length; i++) {
+      const offset = ((pts[i].distance_km - minX) / span) * 100;
+      const color = colorFor(pts[i].heartrate);
+      if (color !== prevColor) {
+        if (prevColor && i > 0) {
+          // hard boundary: duplicate previous color at this offset
+          stops.push({ offset, color: prevColor });
+        }
+        stops.push({ offset, color });
+        prevColor = color;
+      }
+    }
+    // ensure trailing stop
+    stops.push({ offset: 100, color: prevColor });
+    return stops;
+  }, [chartData, profileAge, profileMaxHr, profileRestingHr, profileCustomZones]);
+
   const dateStr = new Date(activity.start_date).toLocaleDateString(
     lang === "zh" ? "zh-TW" : "en-US",
     { year: "numeric", month: "long", day: "numeric", weekday: "long" }

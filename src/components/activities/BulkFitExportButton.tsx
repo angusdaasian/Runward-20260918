@@ -3,7 +3,7 @@ import { Download, Lock, Loader2 } from "lucide-react";
 import { Lang } from "@/lib/i18n";
 import { toast } from "sonner";
 import JSZip from "jszip";
-import { buildFitFile, fetchStravaStreams, fitFilenameFor, triggerDownload } from "@/lib/fitExport";
+import { buildFitFile, fetchStravaStreams, fitFilenameFor, shareOrDownloadFile } from "@/lib/fitExport";
 import type { StravaActivity } from "@/hooks/use-activities";
 
 interface Props {

@@ -64,7 +64,20 @@ type TabKey =
   | "rewards"
   | "races"
   | "pending"
-  | "feedback";
+  | "feedback"
+  | "terra";
+
+const TABS: { key: TabKey; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
+  { key: "users", label: "Users", icon: Users },
+  { key: "notifications", label: "Notifications", icon: Bell },
+  { key: "announcements", label: "Announcements", icon: Megaphone },
+  { key: "promo", label: "Promo Banners", icon: ImageIcon },
+  { key: "rewards", label: "Reward Codes", icon: Gift },
+  { key: "races", label: "Races", icon: Flag },
+  { key: "pending", label: "Pending Races", icon: ClipboardList },
+  { key: "feedback", label: "Feedback", icon: MessageSquare },
+  { key: "terra", label: "Terra Sync", icon: RefreshCw },
+];
 
 const TABS: { key: TabKey; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { key: "users", label: "Users", icon: Users },

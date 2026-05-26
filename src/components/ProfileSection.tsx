@@ -71,7 +71,7 @@ interface PB {
   seconds: number;
 }
 
-export type ProfileSubpage = "main" | "hr-zones" | "personal-bests" | "edit-profile" | "badges";
+export type ProfileSubpage = "main" | "hr-zones" | "personal-bests" | "edit-profile" /* | "badges" */;
 
 interface ProfileSectionProps {
   lang: Lang;
@@ -610,10 +610,10 @@ const ProfileSection = ({ lang, subpage = "main", onNavigate }: ProfileSectionPr
     );
   }
 
-  // ── Subpage: Badges ──
-  if (subpage === "badges") {
-    return <BadgesPage lang={lang} onBack={() => onNavigate?.("main")} />;
-  }
+  // ── Subpage: Badges (commented out for later release) ──
+  // if (subpage === "badges") {
+  //   return <BadgesPage lang={lang} onBack={() => onNavigate?.("main")} />;
+  // }
 
   // ── Subpage: Edit Profile ──
   if (subpage === "edit-profile") {
@@ -817,8 +817,8 @@ const ProfileSection = ({ lang, subpage = "main", onNavigate }: ProfileSectionPr
         </button>
       </div>
 
-      {/* Badges — navigation row */}
-      <button
+      {/* Badges — navigation row (commented out for later release) */}
+      {/* <button
         onClick={() => onNavigate?.("badges")}
         className="w-full bg-card border border-border rounded-xl p-4 flex items-center justify-between"
       >
@@ -831,7 +831,7 @@ const ProfileSection = ({ lang, subpage = "main", onNavigate }: ProfileSectionPr
           </div>
         </div>
         <ChevronRight size={18} className="text-muted-foreground" />
-      </button>
+      </button> */}
 
       {/* Heart Rate Zones — navigation row */}
       <button

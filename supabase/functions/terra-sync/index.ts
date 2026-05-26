@@ -489,12 +489,38 @@ Deno.serve(async (req) => {
         const j = await r.json();
         let items: any[] = Array.isArray(j?.data) ? j.data : [];
         if (latestWithSamples) {
+          // Pick the TRULY latest activity by start_time, regardless of whether
+          // Terra's range endpoint included HR samples (it often returns 0
+          // samples for activities it already delivered via webhook).
           items = items
-            .map((item) => ({ item, hrSampleCount: extractHrSamples(item).length }))
-            .filter(({ hrSampleCount }) => hrSampleCount > 0)
-            .sort((a, b) => Date.parse(b.item?.metadata?.start_time ?? "") - Date.parse(a.item?.metadata?.start_time ?? ""))
-            .slice(0, 1)
-            .map(({ item }) => item);
+            .slice()
+            .sort((a, b) => Date.parse(b?.metadata?.start_time ?? "") - Date.parse(a?.metadata?.start_time ?? ""))
+            .slice(0, 1);
+          // If the latest item is missing HR samples, hydrate via the
+          // per-activity endpoint which reads from Terra's S3 payload store
+          // and reliably returns the full sample arrays.
+          if (items.length > 0 && extractHrSamples(items[0]).length === 0) {
+            const meta = items[0]?.metadata ?? {};
+            const summaryId = String(meta.summary_id ?? meta.upload_id ?? "");
+            if (summaryId) {
+              try {
+                const hurl = `https://api.tryterra.co/v2/activity/${encodeURIComponent(summaryId)}?user_id=${c.terra_user_id}&with_samples=true`;
+                console.log(`[terra-sync] latestWithSamples hydrate ${c.provider} summary=${summaryId} url=${hurl}`);
+                const hr = await fetch(hurl, { headers });
+                const hj = await hr.json();
+                const hydrated = Array.isArray(hj?.data) ? hj.data[0] : hj?.data;
+                if (hydrated) {
+                  const hydratedHr = extractHrSamples(hydrated).length;
+                  console.log(`[terra-sync] latestWithSamples hydrated ${c.provider} summary=${summaryId} status=${hr.status} hrSamples=${hydratedHr}`);
+                  items[0] = hydrated;
+                } else {
+                  console.warn(`[terra-sync] latestWithSamples hydrate ${c.provider} summary=${summaryId} no data status=${hr.status}`);
+                }
+              } catch (e) {
+                console.error(`[terra-sync] latestWithSamples hydrate failed ${c.provider} summary=${summaryId}`, e);
+              }
+            }
+          }
         }
         const terraReference = r.headers.get("terra-reference");
         const itemIds = items.map((it: any) => String(it?.metadata?.summary_id ?? it?.metadata?.upload_id ?? it?.metadata?.start_time ?? "")).filter(Boolean);

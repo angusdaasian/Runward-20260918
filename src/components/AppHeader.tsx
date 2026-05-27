@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Settings, Bell, Megaphone, Menu, Cloud, HelpCircle, Headset, Rocket } from "lucide-react";
+import { Settings, Bell, Megaphone, Menu, Cloud, HelpCircle, Headset, Rocket, Users } from "lucide-react";
 import AppGuideDialog from "@/components/AppGuideDialog";
 import RoadmapDialog from "@/components/RoadmapDialog";
 import { Lang } from "@/lib/i18n";

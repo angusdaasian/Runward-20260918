@@ -283,7 +283,7 @@ function fmtPace(minPerKm: number): string {
 // ============================================================
 // Calculator
 // ============================================================
-const RaceFuelCalculator = ({ isZh }: { isZh: boolean }) => {
+export const RaceFuelCalculator = ({ isZh }: { isZh: boolean }) => {
   const [distance, setDistance] = useState<"HM" | "FM">("HM");
   const [brand, setBrand] = useState<string>("Maurten");
   const [flavor, setFlavor] = useState<string>("Gel 100");

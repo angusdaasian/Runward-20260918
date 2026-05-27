@@ -77,6 +77,35 @@ Deno.serve(async (req) => {
       connUserId = targetUserId;
     }
 
+    // Rate limit: max 1 call per UTC day per user (admins syncing another user bypass).
+    const isAdminCall = targetUserId && targetUserId !== user.id;
+    if (!isAdminCall) {
+      const startOfDay = new Date();
+      startOfDay.setUTCHours(0, 0, 0, 0);
+      const { count } = await admin
+        .from("terra_sync_usage")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", user.id)
+        .eq("function_name", "terra-sync-week")
+        .gte("called_at", startOfDay.toISOString());
+      if ((count ?? 0) >= 1) {
+        return new Response(
+          JSON.stringify({
+            ok: false,
+            rateLimited: true,
+            activities: 0,
+            message_en: "You've already synced the past 7 days today. Please try again later.",
+            message_zh: "您今天已同步過過去 7 天的活動，請稍後再試。",
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+      await admin.from("terra_sync_usage").insert({
+        user_id: user.id,
+        function_name: "terra-sync-week",
+      });
+    }
+
     const q = admin.from("terra_connections").select("*").eq("user_id", connUserId).eq("active", true);
     const { data: conns } = providerFilter ? await q.eq("provider", providerFilter) : await q;
     if (!conns || conns.length === 0) {
@@ -85,6 +114,7 @@ Deno.serve(async (req) => {
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
+
 
     const forceProd = body.forceEnv === "prod" || body.useProd === true;
     const resolvedEnv = forceProd ? "prod" : pickEnvFromRequest(req);

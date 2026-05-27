@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Droplet, Zap, Flame, Timer, Trophy, Mountain, Coffee, Apple, AlertTriangle, Info, Beaker, ChevronDown, Calculator, Plus, X } from "lucide-react";
 import { Lang } from "@/lib/i18n";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";

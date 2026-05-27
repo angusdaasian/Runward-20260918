@@ -326,18 +326,18 @@ export const RaceFuelCalculator = ({ isZh }: { isZh: boolean }) => {
     const totalCarbsNeeded = (rate * totalMin) / 60;
 
     // Revamped logic:
-    // 1) Always take 1 gel 30 min pre-race. Its carbs hit the bloodstream right at the
-    //    gun and effectively cover the first ~30 min of running — so subtract it from
-    //    the in-race carb requirement before sizing the in-race gel count.
+    // 1) Always take 1 gel 15 min pre-race. Its carbs hit the bloodstream within
+    //    ~15 min, so they peak right around the gun — subtract it from the in-race
+    //    carb requirement before sizing the in-race gel count.
     // 2) Size in-race gels to top up the remaining carb need.
-    // 3) Start in-race gels around the 30-min mark (when pre-race fuel runs out),
+    // 3) Start in-race gels at the 30-min mark (when the pre-race fuel runs out),
     //    and finish by ~92% of the race so the last gel still has time to absorb.
     const preRaceGelCarbs = gelCarbs;
     const inRaceCarbsNeeded = Math.max(0, totalCarbsNeeded - preRaceGelCarbs);
     const numInRaceGels = Math.max(1, Math.ceil(inRaceCarbsNeeded / gelCarbs));
 
-    // Time window for in-race gels: ~30 min in → 92% of finish time.
-    const firstMin = Math.min(30, totalMin * 0.18);
+    // Time window for in-race gels: 30 min in → 92% of finish time.
+    const firstMin = 30;
     const lastMin = totalMin * 0.92;
     const idealKm: number[] = [];
     for (let i = 0; i < numInRaceGels; i++) {
@@ -365,7 +365,7 @@ export const RaceFuelCalculator = ({ isZh }: { isZh: boolean }) => {
       return { targetKm: target, km, aligned, min, preRace: false as const };
     });
     const schedule = [
-      { targetKm: 0, km: 0, aligned: false, min: -30, preRace: true as const },
+      { targetKm: 0, km: 0, aligned: false, min: -15, preRace: true as const },
       ...inRaceSchedule,
     ];
     const numGels = numInRaceGels + 1;
@@ -497,7 +497,7 @@ export const RaceFuelCalculator = ({ isZh }: { isZh: boolean }) => {
                         : <>{s.km.toFixed(1)}{s.aligned && <span className="ml-1 text-sky-500" title={isZh ? "對齊水站" : "Aligned to water station"}>💧</span>}</>}
                     </td>
                     <td className="px-2 py-1.5 font-mono text-muted-foreground">
-                      {s.preRace ? (isZh ? "起跑前 30 分" : "−30 min") : fmtMin(s.min)}
+                      {s.preRace ? (isZh ? "起跑前 15 分" : "−15 min") : fmtMin(s.min)}
                     </td>
                     <td className="px-2 py-1.5 text-muted-foreground">{Math.round((i + 1) * gelCarbs)} g</td>
                   </tr>
@@ -507,8 +507,8 @@ export const RaceFuelCalculator = ({ isZh }: { isZh: boolean }) => {
           </div>
           <p className="text-[10px] text-muted-foreground mt-2 leading-relaxed">
             {isZh
-              ? `賽前 30 分鐘先吞 1 包（含咖啡因更佳）— 它的碳水會在起跑時剛好進入血液，等於幫你「延後」第一包賽中果膠。${stations.length > 0 ? "💧 表示已對齊到你輸入的水站。" : "賽中果膠均勻分布於 30 分後至 92% 賽程。"}每包搭配 150–200 ml 水。`
-              : `Take 1 gel 30 min before the gun (caffeinated is ideal) — its carbs hit your bloodstream as you start, so you can delay your first in-race gel. ${stations.length > 0 ? "💧 = aligned to your water station. " : "In-race gels are spaced from the 30-min mark to ~92% of the race. "}Wash each down with 150–200 ml water.`}
+              ? `賽前 15 分鐘先吞 1 包（含咖啡因更佳）— 它的碳水會在起跑時剛好進入血液，等於幫你「延後」第一包賽中果膠。${stations.length > 0 ? "💧 表示已對齊到你輸入的水站。" : "賽中果膠均勻分布於 30 分後至 92% 賽程。"}每包搭配 150–200 ml 水。`
+              : `Take 1 gel 15 min before the gun (caffeinated is ideal) — its carbs hit your bloodstream as you start, so you can delay your first in-race gel. ${stations.length > 0 ? "💧 = aligned to your water station. " : "In-race gels are spaced from the 30-min mark to ~92% of the race. "}Wash each down with 150–200 ml water.`}
           </p>
 
           <div className="mt-3 flex items-start gap-2 bg-amber-500/10 border border-amber-500/20 rounded-lg p-2.5">

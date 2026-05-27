@@ -79,6 +79,13 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps }: Props
 
   // Open HR zones subpage when navigated via #hr-zones (e.g. from ActivityDetail).
   useEffect(() => {
+    if (sessionStorage.getItem("open_fueling_guide") === "1") {
+      sessionStorage.removeItem("open_fueling_guide");
+      setShowFuelGuide(true);
+    }
+  }, []);
+
+  useEffect(() => {
     const checkHash = () => {
       if (window.location.hash === "#hr-zones") {
         setProfileSubpage("hr-zones");

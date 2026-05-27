@@ -293,6 +293,13 @@ export const RaceFuelCalculator = ({ isZh }: { isZh: boolean }) => {
   const [stationsStr, setStationsStr] = useState<string>("");
 
   const totalKm = distance === "HM" ? 21.0975 : 42.195;
+
+  // When distance changes, recompute time from the existing pace so the plan re-renders.
+  useEffect(() => {
+    const pm = parseTimeToMin(paceStr);
+    if (pm && pm > 0) setTimeStr(fmtMin(pm * totalKm));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [distance]);
   const brandGels = GEL_DB[brand] || [];
   const selectedGel = brandGels.find((g) => g.name === flavor);
   const gelCarbs = customCarbs ? Number(customCarbs) : selectedGel?.carbs ?? 0;

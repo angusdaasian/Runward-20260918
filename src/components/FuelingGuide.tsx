@@ -510,8 +510,8 @@ export const RaceFuelCalculator = ({ isZh }: { isZh: boolean }) => {
           </div>
           <p className="text-[10px] text-muted-foreground mt-2 leading-relaxed">
             {isZh
-              ? `賽前 15 分鐘先吞 1 包（含咖啡因更佳）— 它的碳水會在起跑時剛好進入血液，等於幫你「延後」第一包賽中果膠。${stations.length > 0 ? "💧 表示已對齊到你輸入的水站。" : "賽中果膠均勻分布於 30 分後至 92% 賽程。"}每包搭配 150–200 ml 水。`
-              : `Take 1 gel 15 min before the gun (caffeinated is ideal) — its carbs hit your bloodstream as you start, so you can delay your first in-race gel. ${stations.length > 0 ? "💧 = aligned to your water station. " : "In-race gels are spaced from the 30-min mark to ~92% of the race. "}Wash each down with 150–200 ml water.`}
+              ? `賽前 15 分鐘先吞 1 包（含咖啡因更佳）— 它的碳水會在起跑時剛好進入血液，等於幫你「延後」第一包賽中果膠。${stations.length > 0 ? "💧 表示已對齊到你輸入的水站。" : "賽中果膠均勻分布於 30 分後至「終點前 30 分鐘」之間 — 終點前才吞的果膠來不及吸收。"}每包搭配 150–200 ml 水。`
+              : `Take 1 gel 15 min before the gun (caffeinated is ideal) — its carbs hit your bloodstream as you start, so you can delay your first in-race gel. ${stations.length > 0 ? "💧 = aligned to your water station. " : "In-race gels are spaced from the 30-min mark to ~30 min before the finish — gels taken any later won't absorb in time. "}Wash each down with 150–200 ml water.`}
           </p>
 
           <div className="mt-3 flex items-start gap-2 bg-amber-500/10 border border-amber-500/20 rounded-lg p-2.5">

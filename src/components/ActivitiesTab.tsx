@@ -890,11 +890,15 @@ const ActivitiesTab = ({ lang }: Props) => {
       invalidateAll();
       const providers = Array.isArray(result?.providers) ? result.providers : [];
       const ingested = providers.reduce((s: number, p: any) => s + (p?.ingested ?? 0), 0);
-      if (ingested > 0) {
+      const msg = lang === "zh" ? result?.message_zh : result?.message_en;
+      if (result?.rateLimited) {
+        toast.info(msg ?? (lang === "zh" ? "請稍後再試" : "Please try again later"));
+      } else if (ingested > 0) {
         toast.success(lang === "zh" ? `已同步 ${ingested} 個近 7 天活動` : `Synced ${ingested} activities from past 7 days`);
       } else {
         toast.info(lang === "zh" ? "過去 7 天暫無新活動" : "No new activities in the past 7 days");
       }
+
     } catch (err) {
       console.error("Fetch week terra error:", err);
       toast.error(lang === "zh" ? "同步失敗" : "Sync failed");

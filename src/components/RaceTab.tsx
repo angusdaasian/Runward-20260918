@@ -564,8 +564,8 @@ const RaceTab = ({ lang }: Props) => {
           <button
             type="button"
             onClick={() => {
+              sessionStorage.setItem("open_fueling_guide", "1");
               navigate("/?tab=more");
-              setTimeout(() => window.dispatchEvent(new CustomEvent("open-fueling-guide")), 50);
             }}
             className="w-full flex items-center justify-between gap-2 rounded-xl border border-border bg-card hover:bg-muted/60 transition-colors px-4 py-3 text-left"
           >

@@ -189,10 +189,21 @@ Deno.serve(async (req) => {
         .eq("id", c.id);
     }
 
+    const noData = activityCount === 0;
     return new Response(
-      JSON.stringify({ ok: true, activities: activityCount, window: { startStr, endStr }, providers: perProvider }),
+      JSON.stringify({
+        ok: true,
+        activities: activityCount,
+        window: { startStr, endStr },
+        providers: perProvider,
+        ...(noData ? {
+          message_en: "Your activity data hasn't arrived from our provider yet. Please try again shortly.",
+          message_zh: "您的活動資料尚未從我們的供應商傳來，請稍後再試。",
+        } : {}),
+      }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
+
   } catch (e) {
     console.error("[terra-sync-today] error", e);
     return new Response(JSON.stringify({ error: String(e) }), {

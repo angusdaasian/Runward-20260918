@@ -242,7 +242,7 @@ const translations = {
     skipAll: "跳過",
     activities: "活動",
     community: "競技場",
-    races: "賽事",
+    races: "比賽",
     connectFitnessApps: "連結健身應用",
     connectStrava: "連結 Strava",
     comingSoon: "即將推出",

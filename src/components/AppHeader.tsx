@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Settings, Bell, Megaphone, Menu, Cloud, HelpCircle, Headset, Rocket } from "lucide-react";
+import { Settings, Bell, Megaphone, Menu, Cloud, HelpCircle, Headset, Rocket, Users } from "lucide-react";
 import AppGuideDialog from "@/components/AppGuideDialog";
 import RoadmapDialog from "@/components/RoadmapDialog";
 import { Lang } from "@/lib/i18n";
@@ -236,27 +236,53 @@ const AppHeader = ({ lang, onNavigateSettings, onOpenPromoBanner, isGuest }: App
         >
           <Rocket size={18} className="text-primary group-hover:-translate-y-0.5 group-hover:translate-x-0.5 transition-transform" />
         </button>
-        <a
-          href="https://instagram.com/runward.app"
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label="Instagram"
-          className="w-10 h-10 rounded-full bg-gradient-to-br from-pink-500/20 to-purple-500/5 flex items-center justify-center hover:from-pink-500/30 hover:to-purple-500/10 active:scale-90 transition-all duration-150 group"
-        >
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="w-[18px] h-[18px] text-pink-500 group-hover:scale-110 transition-transform"
-          >
-            <rect width="20" height="20" x="2" y="2" rx="5" ry="5" />
-            <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
-            <line x1="17.5" x2="17.51" y1="6.5" y2="6.5" />
-          </svg>
-        </a>
+        <Popover>
+          <PopoverTrigger asChild>
+            <button
+              aria-label="Social"
+              className="w-10 h-10 rounded-full bg-gradient-to-br from-pink-500/20 to-purple-500/5 flex items-center justify-center hover:from-pink-500/30 hover:to-purple-500/10 active:scale-90 transition-all duration-150 group"
+            >
+              <Users size={18} className="text-pink-500 group-hover:scale-110 transition-transform" />
+            </button>
+          </PopoverTrigger>
+          <PopoverContent align="end" className="w-56 p-2">
+            <div className="flex flex-col gap-1">
+              <a
+                href="https://instagram.com/runward.app"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-3 px-2 py-2 rounded-md hover:bg-muted/60 transition-colors active:scale-[0.98]"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5 text-pink-500 shrink-0">
+                  <rect width="20" height="20" x="2" y="2" rx="5" ry="5" />
+                  <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
+                  <line x1="17.5" x2="17.51" y1="6.5" y2="6.5" />
+                </svg>
+                <div className="flex flex-col">
+                  <span className="text-sm font-medium text-foreground leading-tight">Instagram</span>
+                  <span className="text-[11px] text-muted-foreground leading-tight">@runward.app</span>
+                </div>
+              </a>
+              <a
+                href="https://threads.net/@runward_official"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-3 px-2 py-2 rounded-md hover:bg-muted/60 transition-colors active:scale-[0.98]"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5 text-foreground shrink-0">
+                  <path d="M4.52 9.92a7.91 7.91 0 0 1 15.8.64c.05 1.15-.1 2.24-.43 3.25" />
+                  <path d="M12 12c0-2.21-1.79-4-4-4s-4 1.79-4 4 1.79 4 4 4c1.1 0 2.1-.44 2.83-1.17" />
+                  <path d="M19.89 13.46a7.91 7.91 0 0 1-15.8-.64c-.05-1.15.1-2.24.43-3.25" />
+                  <path d="M12 12c0 2.21 1.79 4 4 4s4-1.79 4-4-1.79-4-4-4c-1.1 0-2.1.44-2.83 1.17" />
+                </svg>
+                <div className="flex flex-col">
+                  <span className="text-sm font-medium text-foreground leading-tight">Threads</span>
+                  <span className="text-[11px] text-muted-foreground leading-tight">@runward_official</span>
+                </div>
+              </a>
+            </div>
+          </PopoverContent>
+        </Popover>
         <Popover>
           <PopoverTrigger asChild>
             <button

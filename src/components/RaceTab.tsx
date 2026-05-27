@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { Search, X, MapPin, Calendar, Filter, ChevronDown, ChevronUp, Plus, Loader2, BookmarkPlus, Trash2, Bookmark, Timer, Pencil, Check } from "lucide-react";
+import { Search, X, MapPin, Calendar, Filter, ChevronDown, ChevronUp, Plus, Loader2, BookmarkPlus, Trash2, Bookmark, Timer, Pencil, Check, Beaker, ArrowRight } from "lucide-react";
+import { RaceFuelCalculator } from "@/components/FuelingGuide";
 import { supabase } from "@/integrations/supabase/client";
 import { Lang } from "@/lib/i18n";
 import FadeIn from "@/components/ui/FadeIn";
@@ -10,6 +11,7 @@ import { useOnlineStatus } from "@/hooks/use-online-status";
 import { getCached, setCached, CacheKeys } from "@/lib/offlineCache";
 import { WifiOff } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { useNavigate } from "react-router-dom";
 import { underlineTabsListClass, underlineTabsTriggerClass } from "@/components/ui/underline-tabs";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/hooks/use-toast";
@@ -227,7 +229,8 @@ interface UserRaceRow {
 const RaceTab = ({ lang }: Props) => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<"calendar" | "my">("calendar");
+  const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState<"calendar" | "my" | "fueling">("calendar");
   const [races, setRaces] = useState<Race[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -530,7 +533,7 @@ const RaceTab = ({ lang }: Props) => {
 
   return (
     <FadeIn className="px-5 pt-6 max-w-lg mx-auto pb-24">
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "calendar" | "my")} className="mb-3">
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "calendar" | "my" | "fueling")} className="mb-3">
         <TabsList className={underlineTabsListClass}>
           <TabsTrigger value="calendar" className={underlineTabsTriggerClass}>{lang === "zh" ? "賽事日曆" : "Race Calendar"}</TabsTrigger>
           <TabsTrigger value="my" className={underlineTabsTriggerClass}>
@@ -541,11 +544,43 @@ const RaceTab = ({ lang }: Props) => {
               </span>
             )}
           </TabsTrigger>
+          <TabsTrigger value="fueling" className={underlineTabsTriggerClass}>{lang === "zh" ? "補給" : "Fueling"}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="my" className="mt-4">
           {renderMyRaces()}
         </TabsContent>
+
+        <TabsContent value="fueling" className="mt-4 space-y-4">
+          <div className="rounded-xl border border-border bg-card p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Beaker size={16} className="text-primary" />
+              <h3 className="text-sm font-bold">
+                {lang === "zh" ? "比賽補給計算器 (HM/FM)" : "Race Fuel Calculator (HM/FM)"}
+              </h3>
+            </div>
+            <RaceFuelCalculator isZh={lang === "zh"} />
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              sessionStorage.setItem("open_fueling_guide", "1");
+              navigate("/?tab=more");
+            }}
+            className="w-full flex items-center justify-between gap-2 rounded-xl border border-border bg-card hover:bg-muted/60 transition-colors px-4 py-3 text-left"
+          >
+            <div>
+              <div className="text-sm font-semibold">
+                {lang === "zh" ? "查看完整補給指南" : "View full fueling guide"}
+              </div>
+              <div className="text-[11px] text-muted-foreground mt-0.5">
+                {lang === "zh" ? "前往設定中的跑者補給指南" : "Opens the Runner Fueling Guide in Settings"}
+              </div>
+            </div>
+            <ArrowRight size={16} className="text-muted-foreground shrink-0" />
+          </button>
+        </TabsContent>
+
 
         <TabsContent value="calendar" className="mt-4">
       {(!online || servedFromCache) && (

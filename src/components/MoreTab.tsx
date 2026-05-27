@@ -79,6 +79,13 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps }: Props
 
   // Open HR zones subpage when navigated via #hr-zones (e.g. from ActivityDetail).
   useEffect(() => {
+    if (sessionStorage.getItem("open_fueling_guide") === "1") {
+      sessionStorage.removeItem("open_fueling_guide");
+      setShowFuelGuide(true);
+    }
+  }, []);
+
+  useEffect(() => {
     const checkHash = () => {
       if (window.location.hash === "#hr-zones") {
         setProfileSubpage("hr-zones");
@@ -88,11 +95,14 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps }: Props
     checkHash();
     const onHash = () => checkHash();
     const onCustom = () => setProfileSubpage("hr-zones");
+    const onOpenFuel = () => setShowFuelGuide(true);
     window.addEventListener("hashchange", onHash);
     window.addEventListener("focus-hr-zones", onCustom);
+    window.addEventListener("open-fueling-guide", onOpenFuel);
     return () => {
       window.removeEventListener("hashchange", onHash);
       window.removeEventListener("focus-hr-zones", onCustom);
+      window.removeEventListener("open-fueling-guide", onOpenFuel);
     };
   }, []);
   const [countdown, setCountdown] = useState("");

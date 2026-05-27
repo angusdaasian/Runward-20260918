@@ -1421,6 +1421,27 @@ export type Database = {
         }
         Relationships: []
       }
+      terra_sync_usage: {
+        Row: {
+          called_at: string
+          function_name: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          called_at?: string
+          function_name: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          called_at?: string
+          function_name?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       terra_today_oneoff_queue: {
         Row: {
           attempted_at: string | null

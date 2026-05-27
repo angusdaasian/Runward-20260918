@@ -1008,8 +1008,31 @@ const ActivitiesTab = ({ lang }: Props) => {
           <h2 className="font-display text-lg font-bold text-foreground">
             {lang === "zh" ? "最近活動" : "Recent Activity"}
           </h2>
-          <div className="flex items-center gap-3">
-            {/* Sync controls hidden — moved to Admin Panel for testing before production rollout */}
+          <div className="flex items-center gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  disabled={fetchingToday}
+                  className="flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+                  aria-label={lang === "zh" ? "同步" : "Sync"}
+                >
+                  {fetchingToday ? (
+                    <RefreshCw size={14} className="animate-spin" />
+                  ) : (
+                    <RefreshCw size={14} />
+                  )}
+                  <ChevronDown size={12} />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuItem onClick={handleFetchTodayOnly} disabled={fetchingToday}>
+                  {lang === "zh" ? "同步今日活動" : "Sync today's activities"}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleFetchWeekOnly} disabled={fetchingToday}>
+                  {lang === "zh" ? "同步近 7 天活動" : "Sync past 7 days"}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             {(latestActivity || activities.length > 0) && (
               <button
                 onClick={() => { setWarmupReady(true); setShowAllActivities(true); }}
@@ -1020,6 +1043,7 @@ const ActivitiesTab = ({ lang }: Props) => {
               </button>
             )}
           </div>
+
         </div>
 
 

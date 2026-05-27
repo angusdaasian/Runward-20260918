@@ -33,3 +33,9 @@ verify_jwt = false
 
 [functions.analyze-posture]
 verify_jwt = false
+
+[functions.coros-health]
+verify_jwt = false
+
+[functions.coros-workout-webhook]
+verify_jwt = false

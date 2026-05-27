@@ -865,6 +865,40 @@ const ActivitiesTab = ({ lang }: Props) => {
     setFetchingToday(false);
   }, [user, fetchingToday, invalidateAll, lang]);
 
+  const handleFetchWeekOnly = useCallback(async () => {
+    if (!user || fetchingToday) return;
+    setFetchingToday(true);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData?.session?.access_token;
+      if (!accessToken) throw new Error("Not authenticated");
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/terra-sync-week`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        },
+        body: JSON.stringify({ daysBack: 7, forceEnv: "prod" }),
+      });
+      const result = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(result?.error ?? `Sync failed (${response.status})`);
+      invalidateAll();
+      const providers = Array.isArray(result?.providers) ? result.providers : [];
+      const ingested = providers.reduce((s: number, p: any) => s + (p?.ingested ?? 0), 0);
+      if (ingested > 0) {
+        toast.success(lang === "zh" ? `已同步 ${ingested} 個近 7 天活動` : `Synced ${ingested} activities from past 7 days`);
+      } else {
+        toast.info(lang === "zh" ? "過去 7 天暫無新活動" : "No new activities in the past 7 days");
+      }
+    } catch (err) {
+      console.error("Fetch week terra error:", err);
+      toast.error(lang === "zh" ? "同步失敗" : "Sync failed");
+    }
+    setFetchingToday(false);
+  }, [user, fetchingToday, invalidateAll, lang]);
+
+
 
 
 
@@ -974,8 +1008,31 @@ const ActivitiesTab = ({ lang }: Props) => {
           <h2 className="font-display text-lg font-bold text-foreground">
             {lang === "zh" ? "最近活動" : "Recent Activity"}
           </h2>
-          <div className="flex items-center gap-3">
-            {/* Sync controls hidden — moved to Admin Panel for testing before production rollout */}
+          <div className="flex items-center gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  disabled={fetchingToday}
+                  className="flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+                  aria-label={lang === "zh" ? "同步" : "Sync"}
+                >
+                  {fetchingToday ? (
+                    <RefreshCw size={14} className="animate-spin" />
+                  ) : (
+                    <RefreshCw size={14} />
+                  )}
+                  <ChevronDown size={12} />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuItem onClick={handleFetchTodayOnly} disabled={fetchingToday}>
+                  {lang === "zh" ? "同步今日活動" : "Sync today's activities"}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleFetchWeekOnly} disabled={fetchingToday}>
+                  {lang === "zh" ? "同步近 7 天活動" : "Sync past 7 days"}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             {(latestActivity || activities.length > 0) && (
               <button
                 onClick={() => { setWarmupReady(true); setShowAllActivities(true); }}
@@ -986,6 +1043,7 @@ const ActivitiesTab = ({ lang }: Props) => {
               </button>
             )}
           </div>
+
         </div>
 
 

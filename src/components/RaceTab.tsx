@@ -531,7 +531,7 @@ const RaceTab = ({ lang }: Props) => {
 
   return (
     <FadeIn className="px-5 pt-6 max-w-lg mx-auto pb-24">
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "calendar" | "my")} className="mb-3">
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "calendar" | "my" | "fueling")} className="mb-3">
         <TabsList className={underlineTabsListClass}>
           <TabsTrigger value="calendar" className={underlineTabsTriggerClass}>{lang === "zh" ? "賽事日曆" : "Race Calendar"}</TabsTrigger>
           <TabsTrigger value="my" className={underlineTabsTriggerClass}>
@@ -542,11 +542,42 @@ const RaceTab = ({ lang }: Props) => {
               </span>
             )}
           </TabsTrigger>
+          <TabsTrigger value="fueling" className={underlineTabsTriggerClass}>{lang === "zh" ? "補給" : "Fueling"}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="my" className="mt-4">
           {renderMyRaces()}
         </TabsContent>
+
+        <TabsContent value="fueling" className="mt-4 space-y-4">
+          <div className="rounded-xl border border-border bg-card p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Beaker size={16} className="text-primary" />
+              <h3 className="text-sm font-bold">
+                {lang === "zh" ? "比賽補給計算器 (HM/FM)" : "Race Fuel Calculator (HM/FM)"}
+              </h3>
+            </div>
+            <RaceFuelCalculator isZh={lang === "zh"} />
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              window.dispatchEvent(new CustomEvent("open-fueling-guide"));
+            }}
+            className="w-full flex items-center justify-between gap-2 rounded-xl border border-border bg-card hover:bg-muted/60 transition-colors px-4 py-3 text-left"
+          >
+            <div>
+              <div className="text-sm font-semibold">
+                {lang === "zh" ? "查看完整補給指南" : "View full fueling guide"}
+              </div>
+              <div className="text-[11px] text-muted-foreground mt-0.5">
+                {lang === "zh" ? "前往設定中的跑者補給指南" : "Opens the Runner Fueling Guide in Settings"}
+              </div>
+            </div>
+            <ArrowRight size={16} className="text-muted-foreground shrink-0" />
+          </button>
+        </TabsContent>
+
 
         <TabsContent value="calendar" className="mt-4">
       {(!online || servedFromCache) && (

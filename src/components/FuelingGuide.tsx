@@ -596,15 +596,7 @@ const FuelingGuide = ({ lang, onBack }: Props) => {
       </div>
 
       <div className="space-y-2.5">
-        {/* === Calculator (open by default) === */}
-        <Section
-          title={isZh ? "比賽補給計算器 (HM/FM)" : "Race Fuel Calculator (HM/FM)"}
-          icon={Calculator}
-          iconColor="text-primary"
-          defaultOpen
-        >
-          <RaceFuelCalculator isZh={isZh} />
-        </Section>
+
 
         {/* === What's in a gel === */}
         <Section title={isZh ? "果膠裡有什麼？" : "What's in a Sports Gel?"} icon={Beaker}>

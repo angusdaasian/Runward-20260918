@@ -80,7 +80,7 @@ const MILESTONES = [
   {
     icon: Route,
     en: "AI Trail Program",
-    zh: "AI 越野路線規劃",
+    zh: "AI越野課表規劃",
     descEn: "AI-generated trail race training program tailored to you",
     descZh: "度身打造越野跑課表",
     accent: "from-violet-400/20 to-violet-500/5",

@@ -229,6 +229,7 @@ interface UserRaceRow {
 const RaceTab = ({ lang }: Props) => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<"calendar" | "my" | "fueling">("calendar");
   const [races, setRaces] = useState<Race[]>([]);
   const [loading, setLoading] = useState(true);

@@ -236,6 +236,27 @@ const AppHeader = ({ lang, onNavigateSettings, onOpenPromoBanner, isGuest }: App
         >
           <Rocket size={18} className="text-primary group-hover:-translate-y-0.5 group-hover:translate-x-0.5 transition-transform" />
         </button>
+        <a
+          href="https://instagram.com/runward.app"
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="Instagram"
+          className="w-10 h-10 rounded-full bg-gradient-to-br from-pink-500/20 to-purple-500/5 flex items-center justify-center hover:from-pink-500/30 hover:to-purple-500/10 active:scale-90 transition-all duration-150 group"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="w-[18px] h-[18px] text-pink-500 group-hover:scale-110 transition-transform"
+          >
+            <rect width="20" height="20" x="2" y="2" rx="5" ry="5" />
+            <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
+            <line x1="17.5" x2="17.51" y1="6.5" y2="6.5" />
+          </svg>
+        </a>
         <Popover>
           <PopoverTrigger asChild>
             <button

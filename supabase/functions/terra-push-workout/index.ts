@@ -47,9 +47,8 @@ async function pushOne(opts: {
   const conn = conns[0];
 
   const payload = buildPlannedWorkout(day, { provider: conn.provider, lang });
-  if (!payload) return { ok: false, code: "not_pushable", reason: "Rest day or missing distance" };
 
-  // If we already pushed this exact day, delete the old one first.
+  // Always try to delete the prior push first (handles rest-day conversion + edits).
   const { data: existing } = await admin
     .from("pushed_workouts")
     .select("id, terra_log_id, provider")
@@ -68,6 +67,9 @@ async function pushOne(opts: {
     }
     await admin.from("pushed_workouts").delete().eq("id", existing.id);
   }
+
+  if (!payload) return { ok: false, code: "not_pushable", reason: "Rest day or missing distance" };
+
 
   // POST to Terra.
   const url = `https://api.tryterra.co/v2/plannedWorkout?user_id=${conn.terra_user_id}`;

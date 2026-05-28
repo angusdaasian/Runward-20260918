@@ -1298,6 +1298,21 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
       setPushingIdx(null);
     }
   };
+
+  // Silently re-push a day if it was already pushed to the watch.
+  // The terra-push-workout function deletes the prior workout before sending the new one,
+  // so this won't create duplicates.
+  const repushIfPushed = async (dayIdx: number) => {
+    if (!existingPlan?.id || !user || !watchProvider || !isPremium) return;
+    if (!pushedSet.has(dayIdx)) return;
+    try {
+      await supabase.functions.invoke("terra-push-workout", {
+        body: { plan_id: existingPlan.id, week: currentWeekIdx, day_index: dayIdx, lang },
+      });
+    } catch (e) {
+      console.warn("[repushIfPushed] failed:", e);
+    }
+  };
   const pushWeekToWatch = async () => {
     if (!existingPlan?.id) return;
     if (!isPremium) { toast({ title: lang === "zh" ? "Premium 功能" : "Premium feature" }); return; }

@@ -1298,6 +1298,28 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
       setPushingIdx(null);
     }
   };
+
+  // Silently re-push a day if it was already pushed to the watch.
+  // The terra-push-workout function deletes the prior workout before sending the new one,
+  // so this won't create duplicates.
+  const repushIfPushed = async (dayIdx: number) => {
+    if (!existingPlan?.id || !user || !watchProvider || !isPremium) return;
+    if (!pushedSet.has(dayIdx)) return;
+    try {
+      const { data } = await supabase.functions.invoke("terra-push-workout", {
+        body: { plan_id: existingPlan.id, week: currentWeekIdx, day_index: dayIdx, lang },
+      });
+      const d = data as any;
+      if (d?.ok) {
+        // still pushed (now with updated content) – keep in set
+      } else if (d?.code === "not_pushable") {
+        // day became Rest – removed from watch
+        setPushedSet((prev) => { const n = new Set(prev); n.delete(dayIdx); return n; });
+      }
+    } catch (e) {
+      console.warn("[repushIfPushed] failed:", e);
+    }
+  };
   const pushWeekToWatch = async () => {
     if (!existingPlan?.id) return;
     if (!isPremium) { toast({ title: lang === "zh" ? "Premium 功能" : "Premium feature" }); return; }
@@ -1550,6 +1572,9 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
       return next;
     });
     setPlanDirty(true);
+    // Auto re-push affected days if previously pushed
+    void repushIfPushed(fromIdx);
+    void repushIfPushed(toIdx);
   };
 
   const savePlanEdits = async () => {
@@ -3131,22 +3156,23 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                                 <button onClick={() => setCurrentWeekIdx(Math.min(plan.length - 1, currentWeekIdx + 1))} disabled={currentWeekIdx === plan.length - 1} className="p-1 rounded hover:bg-accent disabled:opacity-30"><ChevronRight size={16} /></button>
                               </div>
                             </div>
-                            <p className="text-xs text-muted-foreground">{lang === "zh" ? "總計" : "Total"}: {totalKm.toFixed(1)} km</p>
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="text-xs text-muted-foreground">{lang === "zh" ? "總計" : "Total"}: {totalKm.toFixed(1)} km</p>
+                              {watchProvider && isPremium && (
+                                <button
+                                  type="button"
+                                  onClick={pushWeekToWatch}
+                                  disabled={pushingWeek}
+                                  className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full bg-primary/10 text-primary hover:bg-primary/20 disabled:opacity-50"
+                                >
+                                  {pushingWeek ? <Loader2 size={12} className="animate-spin" /> : <Watch size={12} />}
+                                  {lang === "zh" ? `推送整週到 ${watchProvider}` : `Push week to ${watchProvider}`}
+                                </button>
+                              )}
+                            </div>
                           </div>
 
-                          {watchProvider && isPremium && (
-                            <div className="mb-2 flex justify-end">
-                              <button
-                                type="button"
-                                onClick={pushWeekToWatch}
-                                disabled={pushingWeek}
-                                className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-full bg-primary/10 text-primary hover:bg-primary/20 disabled:opacity-50"
-                              >
-                                {pushingWeek ? <Loader2 size={12} className="animate-spin" /> : <Watch size={12} />}
-                                {lang === "zh" ? `推送整週到 ${watchProvider}` : `Push week to ${watchProvider}`}
-                              </button>
-                            </div>
-                          )}
+
                           <CalendarDayList
                             days={currentWeek.days}
                             weekIdx={currentWeekIdx}
@@ -3445,6 +3471,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
             if (user && existingPlan) await supabase.from("training_plans" as any).update({ plan_data: updatedPlan } as any).eq("id", existingPlan.id);
             notifyPlanChanged();
             toast({ title: lang === "zh" ? "已更新訓練" : "Workout Updated" });
+            void repushIfPushed(editingDayIdx);
           }}
           onDelete={async () => {
             if (editingDayIdx === null) return;
@@ -3454,6 +3481,8 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
             if (user && existingPlan) await supabase.from("training_plans" as any).update({ plan_data: updatedPlan } as any).eq("id", existingPlan.id);
             notifyPlanChanged();
             toast({ title: lang === "zh" ? "已刪除訓練" : "Workout Deleted" });
+            // Day is now Rest — delete from watch if previously pushed
+            void repushIfPushed(editingDayIdx);
           }}
         />
       )}

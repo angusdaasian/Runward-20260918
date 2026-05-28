@@ -3134,6 +3134,19 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                             <p className="text-xs text-muted-foreground">{lang === "zh" ? "總計" : "Total"}: {totalKm.toFixed(1)} km</p>
                           </div>
 
+                          {watchProvider && isPremium && (
+                            <div className="mb-2 flex justify-end">
+                              <button
+                                type="button"
+                                onClick={pushWeekToWatch}
+                                disabled={pushingWeek}
+                                className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-full bg-primary/10 text-primary hover:bg-primary/20 disabled:opacity-50"
+                              >
+                                {pushingWeek ? <Loader2 size={12} className="animate-spin" /> : <Watch size={12} />}
+                                {lang === "zh" ? `推送整週到 ${watchProvider}` : `Push week to ${watchProvider}`}
+                              </button>
+                            </div>
+                          )}
                           <CalendarDayList
                             days={currentWeek.days}
                             weekIdx={currentWeekIdx}
@@ -3142,7 +3155,12 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                             onSwap={(from, to) => swapDays(currentWeekIdx, from, to)}
                             onAddClick={(i) => { setAddingDayIdx(i); setAddRunType(null); setAddDistance(""); setAddElevation(""); setAddEph(""); }}
                             onEditClick={(i, day) => { setEditingDayIdx(i); setEditDistance(day.distance_km?.toString() || ""); setEditPace(day.pace || ""); setEditDescription(day.description || ""); }}
+                            pushedSet={pushedSet}
+                            pushingIdx={pushingIdx}
+                            onPushDay={isPremium && watchProvider ? pushDayToWatch : undefined}
+                            watchProvider={watchProvider}
                           />
+
 
                           <div className="flex items-center justify-center gap-1 mt-6">
                             {plan.map((_, i) => (

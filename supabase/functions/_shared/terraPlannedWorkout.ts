@@ -136,16 +136,15 @@ export function buildPlannedWorkout(
     if (parsed) {
       const warmupM = 1000;
       const cooldownM = 1000;
-      steps = [
+      const intervalSteps: any[] = [
         repeatOnce(distanceStep(warmupM, 1, "Warm Up", easyPaceTarget, 0), "Warm Up BASIC", order++),
-        repeatOnce(distanceStep(cooldownM, 2, "Cool Down", easyPaceTarget, 0), "Cool Down BASIC", order++),
       ];
-      const intervalSteps = [];
       for (let i = 1; i <= parsed.reps; i++) {
-        intervalSteps.push(repeatOnce(distanceStep(parsed.distM, 4, `Work ${i}`, tightPaceTarget, 0), `Work ${i} BASIC`, 0));
-        if (i < parsed.reps) intervalSteps.push(repeatOnce(timeStep(parsed.restSec, 3, `Recovery ${i}`, easyPaceTarget, 0), `Recovery ${i} BASIC`, 0));
+        intervalSteps.push(repeatOnce(distanceStep(parsed.distM, 4, `Work ${i}`, tightPaceTarget, 0), `Work ${i} BASIC`, order++));
+        if (i < parsed.reps) intervalSteps.push(repeatOnce(timeStep(parsed.restSec, 3, `Recovery ${i}`, easyPaceTarget, 0), `Recovery ${i} BASIC`, order++));
       }
-      steps.splice(1, 0, ...intervalSteps.map((step) => ({ ...step, order: order++ })));
+      intervalSteps.push(repeatOnce(distanceStep(cooldownM, 2, "Cool Down", easyPaceTarget, 0), "Cool Down BASIC", order++));
+      steps = intervalSteps;
     } else {
       steps = [repeatOnce(distanceStep(totalKm * 1000, 5, type, mainTarget, 0), `${type} BASIC`, order++)];
     }

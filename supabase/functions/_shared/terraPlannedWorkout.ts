@@ -207,7 +207,7 @@ export function buildPlannedWorkout(
 
   const d = L[lang];
   const localizedType = typeLabel(type, lang);
-  const name = watchText(day.title, localizedType);
+  const name = watchText(lang === "zh" ? localizedType : day.title, localizedType);
   const basePaceSec = paceSecPerKm(day.pace);
   const estimatedSec = basePaceSec ? Math.round(basePaceSec * totalKm) : Math.round(totalKm * 360);
 
@@ -250,7 +250,7 @@ export function buildPlannedWorkout(
       intervalSteps.push(repeatOnce(distanceStep(cooldownM, 2, cooldownDesc, warmCooldownTarget, 0), cooldownDesc, order++));
       steps = intervalSteps;
     } else {
-      const dsc = stepDesc(localizedType, day.pace);
+      const dsc = paceFallbackDesc;
       steps = [repeatOnce(distanceStep(totalKm * 1000, 5, dsc, mainTarget, 0), dsc, order++)];
     }
   } else if (type === "Tempo" && totalKm > 4) {
@@ -264,7 +264,7 @@ export function buildPlannedWorkout(
       repeatOnce(distanceStep(cooldownM, 2, cooldownDesc, easyPaceTarget, 0), cooldownDesc, order++),
     ];
   } else {
-    const dsc = stepDesc(localizedType, day.pace);
+    const dsc = paceFallbackDesc;
     steps = [repeatOnce(distanceStep(totalKm * 1000, 5, dsc, mainTarget, 0), dsc, order++)];
   }
 

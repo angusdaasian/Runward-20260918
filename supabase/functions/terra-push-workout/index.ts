@@ -61,7 +61,7 @@ async function pushOne(opts: {
 
   if (existing?.terra_log_id) {
     try {
-      const delUrl = `https://api.tryterra.co/v2/athlete/plannedWorkout?user_id=${conn.terra_user_id}&workout_id=${existing.terra_log_id}`;
+      const delUrl = `https://api.tryterra.co/v2/plannedWorkout?user_id=${conn.terra_user_id}&workout_id=${existing.terra_log_id}`;
       await fetch(delUrl, { method: "DELETE", headers: { "dev-id": devId, "x-api-key": apiKey } });
     } catch (e) {
       console.warn("[terra-push-workout] delete prior failed (continuing):", e);
@@ -70,7 +70,7 @@ async function pushOne(opts: {
   }
 
   // POST to Terra.
-  const url = `https://api.tryterra.co/v2/athlete/plannedWorkout?user_id=${conn.terra_user_id}`;
+  const url = `https://api.tryterra.co/v2/plannedWorkout?user_id=${conn.terra_user_id}`;
   const r = await fetch(url, {
     method: "POST",
     headers: { "dev-id": devId, "x-api-key": apiKey, "Content-Type": "application/json" },

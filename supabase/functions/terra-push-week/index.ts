@@ -101,7 +101,7 @@ Deno.serve(async (req) => {
 
     let pushed = 0, skipped = 0, failed = 0;
     for (let di = 0; di < days.length; di++) {
-      const payload = buildPlannedWorkout(days[di], lang);
+      const payload = buildPlannedWorkout(days[di], { provider: conn.provider, lang });
       if (!payload) { skipped++; continue; }
       try {
         const r = await fetch(

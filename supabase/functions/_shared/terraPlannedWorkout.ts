@@ -5,7 +5,7 @@
 //   step.type         0 = single step, 1 = repeat wrapper
 //   duration_type     0 = TIME (seconds), 1 = DISTANCE_METERS (distance_meters), 9 = REPS (reps)
 //   target_type       11 = PACE { speed_meters_per_second(_low|_high) }
-//   intensity         1 = warmup, 2 = active, 4 = recovery, 5 = cooldown
+//   intensity         1 = warmup, 2 = cooldown, 3 = recovery, 4 = interval, 5 = active
 //   metadata.type     1 = Running (PlannedWorkoutActivityType)
 //
 // Note: distance duration uses `distance_meters`, NOT `distance`.
@@ -22,10 +22,27 @@ export interface PlanDay {
 
 function paceSecPerKm(pace?: string | null): number | null {
   if (!pace) return null;
-  const m = /^(\d+):(\d{1,2})$/.exec(pace.trim());
+  const m = /^(\d+)\s*[:']\s*(\d{1,2})(?:\s*(?:\/\s*k(?:m)?|min\s*\/\s*k(?:m)?))?$/i.exec(pace.trim());
   if (!m) return null;
   const s = Number(m[1]) * 60 + Number(m[2]);
   return s > 0 ? s : null;
+}
+
+function normalizeType(type?: string | null): string {
+  const t = (type ?? "").toString().trim().toLowerCase();
+  if (t.includes("interval")) return "Intervals";
+  if (t.includes("tempo")) return "Tempo";
+  if (t.includes("recovery")) return "Recovery Run";
+  if (t.includes("long")) return "Long Run";
+  if (t.includes("trail")) return "Trail Run";
+  if (t.includes("easy")) return "Easy Run";
+  if (t === "rest") return "Rest";
+  return type?.trim() || "Run";
+}
+
+function watchText(value: string | null | undefined, fallback: string): string {
+  const text = (value || "").replace(/[^\x20-\x7E]/g, "").trim();
+  return (text || fallback).slice(0, 60);
 }
 
 /** Build a pace-band target ±bandSec/km around base pace. target_type=11 (PACE). */
@@ -53,6 +70,16 @@ function distanceStep(meters: number, intensity: number, desc: string, target: a
   };
 }
 
+function repeatOnce(step: any, description: string, order: number) {
+  return {
+    type: 1,
+    order,
+    description,
+    durations: [{ duration_type: 9, reps: 1 }],
+    steps: [{ ...step, order: 0 }],
+  };
+}
+
 function timeStep(seconds: number, intensity: number, desc: string, target: any, order: number) {
   return {
     type: 0,
@@ -64,15 +91,19 @@ function timeStep(seconds: number, intensity: number, desc: string, target: any,
   };
 }
 
-function parseIntervals(desc?: string | null): { reps: number; distM: number } | null {
+function parseIntervals(desc?: string | null): { reps: number; distM: number; restSec: number } | null {
   if (!desc) return null;
-  const m = /(\d+)\s*[x×]\s*(\d+(?:\.\d+)?)\s*(m|km)\b/i.exec(desc);
-  if (!m) return null;
-  const reps = parseInt(m[1], 10);
-  const val = parseFloat(m[2]);
-  const distM = m[3].toLowerCase() === "km" ? val * 1000 : val;
+  const repsFirst = /(\d+)\s*[x×]\s*(\d+(?:\.\d+)?)\s*(m|km)\b/i.exec(desc);
+  const distFirst = /(\d+(?:\.\d+)?)\s*(m|km)\s*[x×]\s*(\d+)\b/i.exec(desc);
+  if (!repsFirst && !distFirst) return null;
+  const reps = repsFirst ? parseInt(repsFirst[1], 10) : parseInt(distFirst![3], 10);
+  const val = parseFloat(repsFirst ? repsFirst[2] : distFirst![1]);
+  const unit = (repsFirst ? repsFirst[3] : distFirst![2]).toLowerCase();
+  const distM = unit === "km" ? val * 1000 : val;
   if (reps < 2 || reps > 30 || distM < 100 || distM > 10000) return null;
-  return { reps, distM };
+  const rest = /rest\s+(\d+)(?::(\d{1,2}))?/i.exec(desc);
+  const restSec = rest ? Number(rest[1]) * (rest[2] ? 60 : 1) + Number(rest[2] ?? 0) : 90;
+  return { reps, distM, restSec: Math.max(15, Math.min(restSec, 600)) };
 }
 
 /** Build the full Terra planned-workout object (single workout) for one plan day. */
@@ -81,7 +112,7 @@ export function buildPlannedWorkout(
   opts: { provider: string; lang?: "en" | "zh" },
 ): { steps: any[]; metadata: Record<string, unknown> } | null {
   if (!day) return null;
-  const type = (day.type ?? "").toString();
+  const type = normalizeType(day.type);
   if (type === "Rest") return null;
   const totalKm = Number(day.distance_km);
   if (!Number.isFinite(totalKm) || totalKm <= 0) return null;
@@ -92,8 +123,8 @@ export function buildPlannedWorkout(
   const tightPaceTarget = paceTarget(day.pace, 5);
   const mainTarget = isTrail ? null : (type === "Intervals" || type === "Tempo" ? tightPaceTarget : easyPaceTarget);
 
-  const name = (day.title || type || (lang === "zh" ? "訓練" : "Workout")).slice(0, 60);
-  const description = (day.description || name).split("\n")[0].slice(0, 200);
+  const name = watchText(day.title, type || (lang === "zh" ? "Workout" : "Workout"));
+  const description = watchText((day.description || name).split("\n")[0], name).slice(0, 200);
   const basePaceSec = paceSecPerKm(day.pace);
   const estimatedSec = basePaceSec ? Math.round(basePaceSec * totalKm) : Math.round(totalKm * 360);
 
@@ -105,35 +136,29 @@ export function buildPlannedWorkout(
     if (parsed) {
       const warmupM = 1000;
       const cooldownM = 1000;
-      const restSec = 90;
-      steps = [
-        distanceStep(warmupM, 1, "Warm Up", easyPaceTarget, order++),
-        {
-          type: 1,
-          order: order++,
-          description: `Intervals ${parsed.reps}x${parsed.distM}m`,
-          durations: [{ duration_type: 9, reps: parsed.reps }],
-          steps: [
-            distanceStep(parsed.distM, 2, "Work", tightPaceTarget, 0),
-            timeStep(restSec, 4, "Recovery jog", easyPaceTarget, 1),
-          ],
-        },
-        distanceStep(cooldownM, 5, "Cool Down", easyPaceTarget, order++),
+      const intervalSteps: any[] = [
+        repeatOnce(distanceStep(warmupM, 1, "Warm Up", easyPaceTarget, 0), "Warm Up BASIC", order++),
       ];
+      for (let i = 1; i <= parsed.reps; i++) {
+        intervalSteps.push(repeatOnce(distanceStep(parsed.distM, 4, `Work ${i}`, tightPaceTarget, 0), `Work ${i} BASIC`, order++));
+        if (i < parsed.reps) intervalSteps.push(repeatOnce(timeStep(parsed.restSec, 3, `Recovery ${i}`, easyPaceTarget, 0), `Recovery ${i} BASIC`, order++));
+      }
+      intervalSteps.push(repeatOnce(distanceStep(cooldownM, 2, "Cool Down", easyPaceTarget, 0), "Cool Down BASIC", order++));
+      steps = intervalSteps;
     } else {
-      steps = [distanceStep(totalKm * 1000, 2, type, mainTarget, order++)];
+      steps = [repeatOnce(distanceStep(totalKm * 1000, 5, type, mainTarget, 0), `${type} BASIC`, order++)];
     }
   } else if (type === "Tempo" && totalKm > 4) {
     const warmupM = 1000;
     const cooldownM = 1000;
     const tempoM = Math.max(1000, totalKm * 1000 - warmupM - cooldownM);
     steps = [
-      distanceStep(warmupM, 1, "Warm Up", easyPaceTarget, order++),
-      distanceStep(tempoM, 2, "Tempo", tightPaceTarget, order++),
-      distanceStep(cooldownM, 5, "Cool Down", easyPaceTarget, order++),
+      repeatOnce(distanceStep(warmupM, 1, "Warm Up", easyPaceTarget, 0), "Warm Up BASIC", order++),
+      repeatOnce(distanceStep(tempoM, 5, "Tempo", tightPaceTarget, 0), "Tempo BASIC", order++),
+      repeatOnce(distanceStep(cooldownM, 2, "Cool Down", easyPaceTarget, 0), "Cool Down BASIC", order++),
     ];
   } else {
-    steps = [distanceStep(totalKm * 1000, 2, type || "Run", mainTarget, order++)];
+    steps = [repeatOnce(distanceStep(totalKm * 1000, 5, type || "Run", mainTarget, 0), `${type || "Run"} BASIC`, order++)];
   }
 
   const metadata: Record<string, unknown> = {
@@ -143,6 +168,8 @@ export function buildPlannedWorkout(
     provider: opts.provider,
     estimated_duration_seconds: estimatedSec,
     estimated_distance_meters: Math.round(totalKm * 1000),
+    estimated_speed_meters_per_second: Number((Math.round(totalKm * 1000) / Math.max(estimatedSec, 1)).toFixed(3)),
+    created_date: new Date().toISOString().slice(0, 10),
   };
   if (day.date) metadata.planned_date = day.date;
 

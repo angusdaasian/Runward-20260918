@@ -1243,6 +1243,90 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
   const [planDirty, setPlanDirty] = useState(false);
   const [savingPlan, setSavingPlan] = useState(false);
 
+  // ─── Watch sync (Terra planned workouts → Garmin/Coros) ───
+  const [watchProvider, setWatchProvider] = useState<string | null>(null);
+  const [pushedSet, setPushedSet] = useState<Set<number>>(new Set());
+  const [pushingIdx, setPushingIdx] = useState<number | null>(null);
+  const [pushingWeek, setPushingWeek] = useState(false);
+  useEffect(() => {
+    if (!user) { setWatchProvider(null); return; }
+    (async () => {
+      const { data } = await supabase
+        .from("terra_connections")
+        .select("provider")
+        .eq("user_id", user.id)
+        .eq("active", true)
+        .in("provider", ["GARMIN", "COROS"]);
+      setWatchProvider(data && data.length > 0 ? data[0].provider : null);
+    })();
+  }, [user]);
+  useEffect(() => {
+    if (!user || !existingPlan?.id) { setPushedSet(new Set()); return; }
+    (async () => {
+      const { data } = await supabase
+        .from("pushed_workouts" as any)
+        .select("day_index")
+        .eq("user_id", user.id)
+        .eq("plan_id", existingPlan.id)
+        .eq("week", currentWeekIdx);
+      setPushedSet(new Set(((data as any[]) || []).map((r) => r.day_index)));
+    })();
+  }, [user, existingPlan?.id, currentWeekIdx]);
+  const pushDayToWatch = async (dayIdx: number) => {
+    if (!existingPlan?.id) return;
+    if (!isPremium) { toast({ title: lang === "zh" ? "Premium 功能" : "Premium feature" }); return; }
+    if (!watchProvider) {
+      toast({ title: lang === "zh" ? "請先連接 Garmin 或 Coros" : "Connect Garmin or Coros first", variant: "destructive" });
+      return;
+    }
+    setPushingIdx(dayIdx);
+    try {
+      const { data, error } = await supabase.functions.invoke("terra-push-workout", {
+        body: { plan_id: existingPlan.id, week: currentWeekIdx, day_index: dayIdx, lang },
+      });
+      if (error) throw error;
+      if (!(data as any)?.ok) {
+        const msg = lang === "zh" ? (data as any)?.message_zh : (data as any)?.message_en;
+        toast({ title: msg || (lang === "zh" ? "同步失敗" : "Sync failed"), variant: "destructive" });
+      } else {
+        setPushedSet((prev) => new Set(prev).add(dayIdx));
+        toast({ title: lang === "zh" ? `已同步到 ${(data as any).provider}` : `Sent to ${(data as any).provider}` });
+      }
+    } catch (e) {
+      toast({ title: lang === "zh" ? "同步失敗" : "Sync failed", variant: "destructive" });
+    } finally {
+      setPushingIdx(null);
+    }
+  };
+  const pushWeekToWatch = async () => {
+    if (!existingPlan?.id) return;
+    if (!isPremium) { toast({ title: lang === "zh" ? "Premium 功能" : "Premium feature" }); return; }
+    if (!watchProvider) {
+      toast({ title: lang === "zh" ? "請先連接 Garmin 或 Coros" : "Connect Garmin or Coros first", variant: "destructive" });
+      return;
+    }
+    setPushingWeek(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("terra-push-week", {
+        body: { plan_id: existingPlan.id, week: currentWeekIdx, lang },
+      });
+      if (error) throw error;
+      const d = data as any;
+      const msg = lang === "zh" ? d?.message_zh : d?.message_en;
+      toast({ title: msg || (d?.ok ? "Done" : "Failed"), variant: d?.ok ? "default" : "destructive" });
+      if (d?.ok) {
+        const w = (existingPlan.plan_data?.[currentWeekIdx]?.days || []) as any[];
+        const next = new Set<number>();
+        w.forEach((day, i) => { if (day?.type !== "Rest" && day?.distance_km) next.add(i); });
+        setPushedSet(next);
+      }
+    } catch (e) {
+      toast({ title: lang === "zh" ? "同步失敗" : "Sync failed", variant: "destructive" });
+    } finally {
+      setPushingWeek(false);
+    }
+  };
+
   // Add/Edit workout
   const [addingDayIdx, setAddingDayIdx] = useState<number | null>(null);
   const [addRunType, setAddRunType] = useState<string | null>(null);

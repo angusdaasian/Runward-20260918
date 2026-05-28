@@ -40,11 +40,11 @@ function normalizeType(type?: string | null): string {
   return type?.trim() || "Run";
 }
 
-function watchText(value: string | null | undefined, fallback: string): string {
+function watchText(value: string | null | undefined, fallback: string, maxLen = 60): string {
   // Garmin/Coros both accept UTF-8 (incl. CJK) in workout names/descriptions.
   // Strip only control characters; keep ASCII printable + extended Unicode.
   const text = (value || "").replace(/[\x00-\x1F\x7F]/g, "").trim();
-  return (text || fallback).slice(0, 60);
+  return (text || fallback).slice(0, maxLen);
 }
 
 // Localized step labels.
@@ -205,7 +205,8 @@ export function buildPlannedWorkout(
       ? `${warmupDesc}. ${intervalMainDesc}. ${cooldownDesc}`
       : mainDesc,
     paceFallbackDesc,
-  ).slice(0, 200);
+    200,
+  );
 
   let steps: any[];
   let order = 0;

@@ -271,7 +271,7 @@ export function buildPlannedWorkout(
   }
 
   const metadata: Record<string, unknown> = {
-    type: 1, // Running
+    type: 8, // Running (Terra ActivityType: 1=Cycling, 8=Running)
     name,
     description,
     provider: opts.provider,

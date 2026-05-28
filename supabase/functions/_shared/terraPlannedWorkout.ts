@@ -97,18 +97,6 @@ function stepDesc(label: string, pace?: string | null, distanceKm?: number | nul
   return [label, dist, p ? `@ ${p}` : ""].filter(Boolean).join(" ");
 }
 
-function canonicalWorkoutText(value?: string | null): string {
-  return (value || "")
-    .replace(/[\s@/:：,，.。()（）-]+/g, "")
-    .trim()
-    .toLowerCase();
-}
-
-function isOnlyWorkoutName(text: string, candidates: Array<string | null | undefined>): boolean {
-  const normalized = canonicalWorkoutText(text);
-  return !!normalized && candidates.some((candidate) => canonicalWorkoutText(candidate) === normalized);
-}
-
 /** Build a pace-band target ±bandSec/km around base pace. target_type=11 (PACE). */
 function paceTarget(basePace?: string | null, bandSec = 8) {
   const sec = paceSecPerKm(basePace);

@@ -89,7 +89,7 @@ Deno.serve(async (req) => {
       if (row.terra_log_id) {
         try {
           await fetch(
-            `https://api.tryterra.co/v2/athlete/plannedWorkout?user_id=${conn.terra_user_id}&workout_id=${row.terra_log_id}`,
+            `https://api.tryterra.co/v2/plannedWorkout?user_id=${conn.terra_user_id}&workout_id=${row.terra_log_id}`,
             { method: "DELETE", headers: { "dev-id": devId, "x-api-key": apiKey } },
           );
         } catch (e) { console.warn("[terra-push-week] delete prior failed:", e); }
@@ -105,7 +105,7 @@ Deno.serve(async (req) => {
       if (!payload) { skipped++; continue; }
       try {
         const r = await fetch(
-          `https://api.tryterra.co/v2/athlete/plannedWorkout?user_id=${conn.terra_user_id}`,
+          `https://api.tryterra.co/v2/plannedWorkout?user_id=${conn.terra_user_id}`,
           { method: "POST", headers, body: JSON.stringify({ data: [payload] }) },
         );
         const respText = await r.text();

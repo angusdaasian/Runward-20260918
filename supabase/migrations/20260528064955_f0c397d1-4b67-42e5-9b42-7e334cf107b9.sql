@@ -1,0 +1,4 @@
+DELETE FROM public.terra_sync_usage
+WHERE user_id = 'c7a7d1ca-c7bf-4288-bb9d-794006a04087'
+  AND function_name = 'terra-push-week'
+  AND called_at >= date_trunc('day', now() at time zone 'utc');

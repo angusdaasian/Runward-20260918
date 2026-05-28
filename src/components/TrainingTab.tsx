@@ -398,6 +398,7 @@ const WorkoutDetails = ({ day, lang, hrBounds }: { day: DayPlan; lang: Lang; hrB
 const DraggableDay = ({
   id, idx, day, lang, isToday, dayNum, hrBounds,
   onEditClick, onAddClick,
+  isPushed, isPushing, onPushDay, watchProvider,
 }: {
   id: string;
   idx: number;
@@ -408,6 +409,10 @@ const DraggableDay = ({
   hrBounds: HrBounds | null;
   onEditClick: () => void;
   onAddClick: () => void;
+  isPushed?: boolean;
+  isPushing?: boolean;
+  onPushDay?: (idx: number) => void;
+  watchProvider?: string | null;
 }) => {
   const { attributes, listeners, setNodeRef: setDragRef, isDragging, transform } = useDraggable({ id });
   const { setNodeRef: setDropRef, isOver } = useDroppable({ id });
@@ -469,6 +474,20 @@ const DraggableDay = ({
               >
                 <ChevronDown size={16} className={`transition-transform ${expanded ? "rotate-180" : ""}`} />
               </button>
+              {onPushDay && (
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); onPushDay(idx); }}
+                  disabled={isPushing}
+                  className={`p-1 rounded hover:bg-accent disabled:opacity-50 ${isPushed ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground hover:text-foreground"}`}
+                  aria-label={lang === "zh" ? "同步到手錶" : "Send to watch"}
+                  title={isPushed
+                    ? (lang === "zh" ? `已同步到 ${watchProvider ?? "手錶"}` : `Synced to ${watchProvider ?? "watch"}`)
+                    : (lang === "zh" ? "同步到手錶" : "Send to watch")}
+                >
+                  {isPushing ? <Loader2 size={14} className="animate-spin" /> : isPushed ? <Check size={14} /> : <Watch size={14} />}
+                </button>
+              )}
               <button
                 type="button"
                 onClick={(e) => { e.stopPropagation(); onEditClick(); }}

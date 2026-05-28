@@ -197,8 +197,8 @@ Deno.serve(async (req) => {
         window: { startStr, endStr },
         providers: perProvider,
         ...(noData ? {
-          message_en: "Your activity data hasn't arrived from our provider yet. Please try again shortly.",
-          message_zh: "您的活動資料尚未從我們的供應商傳來，請稍後再試。",
+          message_en: "Your data hasn't reached our service provider yet, or you don't have any latest activity today. Please try again shortly.",
+          message_zh: "您的資料尚未傳到我們的供應商，或者您今天沒有任何最新活動。請稍後再試。",
         } : {}),
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },

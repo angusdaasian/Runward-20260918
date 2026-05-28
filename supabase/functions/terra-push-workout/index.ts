@@ -34,9 +34,6 @@ async function pushOne(opts: {
   const day: PlanDay | undefined = weekObj?.days?.[dayIndex];
   if (!day) return { ok: false, code: "day_not_found", reason: "Day not found" };
 
-  const payload = buildPlannedWorkout(day, lang);
-  if (!payload) return { ok: false, code: "not_pushable", reason: "Rest day or missing distance" };
-
   // Find writable connection (Garmin / Coros).
   const { data: conns } = await admin
     .from("terra_connections")
@@ -48,6 +45,9 @@ async function pushOne(opts: {
     return { ok: false, code: "no_connection", reason: "No Garmin/Coros connection" };
   }
   const conn = conns[0];
+
+  const payload = buildPlannedWorkout(day, { provider: conn.provider, lang });
+  if (!payload) return { ok: false, code: "not_pushable", reason: "Rest day or missing distance" };
 
   // If we already pushed this exact day, delete the old one first.
   const { data: existing } = await admin

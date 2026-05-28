@@ -223,15 +223,15 @@ export function buildPlannedWorkout(
   const basePaceSec = paceSecPerKm(day.pace);
   const estimatedSec = basePaceSec ? Math.round(basePaceSec * totalKm) : Math.round(totalKm * 360);
 
-  const warmupDesc = stepDesc(d.warmup, day.pace);
-  const cooldownDesc = stepDesc(d.cooldown, day.pace);
   const parsedIntervals = type === "Intervals" ? parseIntervals(day.description) : null;
-  const paceFallbackDesc = stepDesc(localizedType, day.pace);
+  const warmCooldownKm = intervalWarmCooldownKm(totalKm, parsedIntervals);
+  const warmCooldownPace = adjustPace(day.pace, 1.4) ?? day.pace;
+  const warmupDesc = stepDesc(d.warmup, warmCooldownPace, warmCooldownKm, lang);
+  const cooldownDesc = stepDesc(d.cooldown, warmCooldownPace, warmCooldownKm, lang);
+  const paceFallbackDesc = formatRunDescription(localizedType, totalKm, day.pace, lang);
   const rawFirstDesc = (day.description || "").split("\n")[0]?.trim() || "";
   const workoutNameCandidates = [day.title, localizedType, typeLabel(type, "en"), typeLabel(type, "zh"), normalizeType(day.type)];
-  const mainDesc = rawFirstDesc && !isOnlyWorkoutName(rawFirstDesc, workoutNameCandidates)
-    ? rawFirstDesc
-    : paceFallbackDesc;
+  const mainDesc = paceFallbackDesc;
   const intervalMainDesc = parsedIntervals ? formatIntervalDescription(parsedIntervals, day.pace, lang) : mainDesc;
   const description = watchText(
     type === "Intervals" && parsedIntervals

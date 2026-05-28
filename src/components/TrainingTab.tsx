@@ -3464,6 +3464,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
             if (user && existingPlan) await supabase.from("training_plans" as any).update({ plan_data: updatedPlan } as any).eq("id", existingPlan.id);
             notifyPlanChanged();
             toast({ title: lang === "zh" ? "已更新訓練" : "Workout Updated" });
+            void repushIfPushed(editingDayIdx);
           }}
           onDelete={async () => {
             if (editingDayIdx === null) return;
@@ -3473,6 +3474,8 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
             if (user && existingPlan) await supabase.from("training_plans" as any).update({ plan_data: updatedPlan } as any).eq("id", existingPlan.id);
             notifyPlanChanged();
             toast({ title: lang === "zh" ? "已刪除訓練" : "Workout Deleted" });
+            // Day is now Rest — delete from watch if previously pushed
+            void repushIfPushed(editingDayIdx);
           }}
         />
       )}

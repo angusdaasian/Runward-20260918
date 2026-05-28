@@ -1565,6 +1565,9 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
       return next;
     });
     setPlanDirty(true);
+    // Auto re-push affected days if previously pushed
+    void repushIfPushed(fromIdx);
+    void repushIfPushed(toIdx);
   };
 
   const savePlanEdits = async () => {

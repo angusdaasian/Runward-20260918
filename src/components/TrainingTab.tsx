@@ -3131,22 +3131,23 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                                 <button onClick={() => setCurrentWeekIdx(Math.min(plan.length - 1, currentWeekIdx + 1))} disabled={currentWeekIdx === plan.length - 1} className="p-1 rounded hover:bg-accent disabled:opacity-30"><ChevronRight size={16} /></button>
                               </div>
                             </div>
-                            <p className="text-xs text-muted-foreground">{lang === "zh" ? "總計" : "Total"}: {totalKm.toFixed(1)} km</p>
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="text-xs text-muted-foreground">{lang === "zh" ? "總計" : "Total"}: {totalKm.toFixed(1)} km</p>
+                              {watchProvider && isPremium && (
+                                <button
+                                  type="button"
+                                  onClick={pushWeekToWatch}
+                                  disabled={pushingWeek}
+                                  className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full bg-primary/10 text-primary hover:bg-primary/20 disabled:opacity-50"
+                                >
+                                  {pushingWeek ? <Loader2 size={12} className="animate-spin" /> : <Watch size={12} />}
+                                  {lang === "zh" ? `推送整週到 ${watchProvider}` : `Push week to ${watchProvider}`}
+                                </button>
+                              )}
+                            </div>
                           </div>
 
-                          {watchProvider && isPremium && (
-                            <div className="mb-2 flex justify-end">
-                              <button
-                                type="button"
-                                onClick={pushWeekToWatch}
-                                disabled={pushingWeek}
-                                className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-full bg-primary/10 text-primary hover:bg-primary/20 disabled:opacity-50"
-                              >
-                                {pushingWeek ? <Loader2 size={12} className="animate-spin" /> : <Watch size={12} />}
-                                {lang === "zh" ? `推送整週到 ${watchProvider}` : `Push week to ${watchProvider}`}
-                              </button>
-                            </div>
-                          )}
+
                           <CalendarDayList
                             days={currentWeek.days}
                             weekIdx={currentWeekIdx}

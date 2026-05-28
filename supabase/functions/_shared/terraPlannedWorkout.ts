@@ -79,6 +79,18 @@ function stepDesc(label: string, pace?: string | null): string {
   return p ? `${label} @ ${p}` : label;
 }
 
+function canonicalWorkoutText(value?: string | null): string {
+  return (value || "")
+    .replace(/[\s@/:：,，.。()（）-]+/g, "")
+    .trim()
+    .toLowerCase();
+}
+
+function isOnlyWorkoutName(text: string, candidates: Array<string | null | undefined>): boolean {
+  const normalized = canonicalWorkoutText(text);
+  return !!normalized && candidates.some((candidate) => canonicalWorkoutText(candidate) === normalized);
+}
+
 /** Build a pace-band target ±bandSec/km around base pace. target_type=11 (PACE). */
 function paceTarget(basePace?: string | null, bandSec = 8) {
   const sec = paceSecPerKm(basePace);
@@ -138,6 +150,21 @@ function parseIntervals(desc?: string | null): { reps: number; distM: number; re
   const rest = /rest\s+(\d+)(?::(\d{1,2}))?/i.exec(desc);
   const restSec = rest ? Number(rest[1]) * (rest[2] ? 60 : 1) + Number(rest[2] ?? 0) : 90;
   return { reps, distM, restSec: Math.max(15, Math.min(restSec, 600)) };
+}
+
+function formatRest(restSec: number): string {
+  const mm = Math.floor(restSec / 60);
+  const ss = String(restSec % 60).padStart(2, "0");
+  return `${mm}:${ss}`;
+}
+
+function formatIntervalDescription(parsed: { reps: number; distM: number; restSec: number }, pace: string | null | undefined, lang: "en" | "zh"): string {
+  const dist = parsed.distM >= 1000 && parsed.distM % 1000 === 0 ? `${parsed.distM / 1000}km` : `${Math.round(parsed.distM)}m`;
+  const p = paceLabel(pace);
+  if (lang === "zh") {
+    return `${dist} x ${parsed.reps}${p ? ` 以 ${p}` : ""}，組間恢復 ${formatRest(parsed.restSec)}`;
+  }
+  return `${dist} x ${parsed.reps}${p ? ` at ${p}` : ""}, rest ${formatRest(parsed.restSec)} between sets`;
 }
 
 /** Build the full Terra planned-workout object (single workout) for one plan day. */

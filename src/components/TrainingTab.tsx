@@ -19,7 +19,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   Loader2, Lock, ChevronLeft, ChevronRight, Plus, Calendar, Target, Trophy,
   Repeat, Route, HelpCircle, X, WifiOff, Sparkles, GripVertical, Save,
-  ChevronDown, Pencil, Share2
+  ChevronDown, Pencil, Share2, Watch, Check
 } from "lucide-react";
 import { shareTrainingWeek } from "@/lib/sharePlanWeek";
 import { estimateMaxHr, estimateRestingHr, zoneBoundaries, isValidCustomZones } from "@/lib/hrZones";
@@ -398,6 +398,7 @@ const WorkoutDetails = ({ day, lang, hrBounds }: { day: DayPlan; lang: Lang; hrB
 const DraggableDay = ({
   id, idx, day, lang, isToday, dayNum, hrBounds,
   onEditClick, onAddClick,
+  isPushed, isPushing, onPushDay, watchProvider,
 }: {
   id: string;
   idx: number;
@@ -408,6 +409,10 @@ const DraggableDay = ({
   hrBounds: HrBounds | null;
   onEditClick: () => void;
   onAddClick: () => void;
+  isPushed?: boolean;
+  isPushing?: boolean;
+  onPushDay?: (idx: number) => void;
+  watchProvider?: string | null;
 }) => {
   const { attributes, listeners, setNodeRef: setDragRef, isDragging, transform } = useDraggable({ id });
   const { setNodeRef: setDropRef, isOver } = useDroppable({ id });
@@ -469,6 +474,20 @@ const DraggableDay = ({
               >
                 <ChevronDown size={16} className={`transition-transform ${expanded ? "rotate-180" : ""}`} />
               </button>
+              {onPushDay && (
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); onPushDay(idx); }}
+                  disabled={isPushing}
+                  className={`p-1 rounded hover:bg-accent disabled:opacity-50 ${isPushed ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground hover:text-foreground"}`}
+                  aria-label={lang === "zh" ? "同步到手錶" : "Send to watch"}
+                  title={isPushed
+                    ? (lang === "zh" ? `已同步到 ${watchProvider ?? "手錶"}` : `Synced to ${watchProvider ?? "watch"}`)
+                    : (lang === "zh" ? "同步到手錶" : "Send to watch")}
+                >
+                  {isPushing ? <Loader2 size={14} className="animate-spin" /> : isPushed ? <Check size={14} /> : <Watch size={14} />}
+                </button>
+              )}
               <button
                 type="button"
                 onClick={(e) => { e.stopPropagation(); onEditClick(); }}
@@ -489,6 +508,7 @@ const DraggableDay = ({
 // Calendar day list with long-press drag-to-swap (within a week)
 const CalendarDayList = ({
   days, weekIdx, lang, hrBounds, onSwap, onAddClick, onEditClick,
+  pushedSet, pushingIdx, onPushDay, watchProvider,
 }: {
   days: DayPlan[];
   weekIdx: number;
@@ -497,6 +517,10 @@ const CalendarDayList = ({
   onSwap: (fromIdx: number, toIdx: number) => void;
   onAddClick: (idx: number) => void;
   onEditClick: (idx: number, day: DayPlan) => void;
+  pushedSet?: Set<number>;
+  pushingIdx?: number | null;
+  onPushDay?: (idx: number) => void;
+  watchProvider?: string | null;
 }) => {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { delay: 250, tolerance: 5 } }),
@@ -533,6 +557,10 @@ const CalendarDayList = ({
               hrBounds={hrBounds}
               onEditClick={() => onEditClick(i, day)}
               onAddClick={() => onAddClick(i)}
+              isPushed={pushedSet?.has(i)}
+              isPushing={pushingIdx === i}
+              onPushDay={onPushDay}
+              watchProvider={watchProvider}
             />
           );
         })}
@@ -1214,6 +1242,90 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
   const [showWeeklyReview, setShowWeeklyReview] = useState(false);
   const [planDirty, setPlanDirty] = useState(false);
   const [savingPlan, setSavingPlan] = useState(false);
+
+  // ─── Watch sync (Terra planned workouts → Garmin/Coros) ───
+  const [watchProvider, setWatchProvider] = useState<string | null>(null);
+  const [pushedSet, setPushedSet] = useState<Set<number>>(new Set());
+  const [pushingIdx, setPushingIdx] = useState<number | null>(null);
+  const [pushingWeek, setPushingWeek] = useState(false);
+  useEffect(() => {
+    if (!user) { setWatchProvider(null); return; }
+    (async () => {
+      const { data } = await supabase
+        .from("terra_connections")
+        .select("provider")
+        .eq("user_id", user.id)
+        .eq("active", true)
+        .in("provider", ["GARMIN", "COROS"]);
+      setWatchProvider(data && data.length > 0 ? data[0].provider : null);
+    })();
+  }, [user]);
+  useEffect(() => {
+    if (!user || !existingPlan?.id) { setPushedSet(new Set()); return; }
+    (async () => {
+      const { data } = await supabase
+        .from("pushed_workouts" as any)
+        .select("day_index")
+        .eq("user_id", user.id)
+        .eq("plan_id", existingPlan.id)
+        .eq("week", currentWeekIdx);
+      setPushedSet(new Set(((data as any[]) || []).map((r) => r.day_index)));
+    })();
+  }, [user, existingPlan?.id, currentWeekIdx]);
+  const pushDayToWatch = async (dayIdx: number) => {
+    if (!existingPlan?.id) return;
+    if (!isPremium) { toast({ title: lang === "zh" ? "Premium 功能" : "Premium feature" }); return; }
+    if (!watchProvider) {
+      toast({ title: lang === "zh" ? "請先連接 Garmin 或 Coros" : "Connect Garmin or Coros first", variant: "destructive" });
+      return;
+    }
+    setPushingIdx(dayIdx);
+    try {
+      const { data, error } = await supabase.functions.invoke("terra-push-workout", {
+        body: { plan_id: existingPlan.id, week: currentWeekIdx, day_index: dayIdx, lang },
+      });
+      if (error) throw error;
+      if (!(data as any)?.ok) {
+        const msg = lang === "zh" ? (data as any)?.message_zh : (data as any)?.message_en;
+        toast({ title: msg || (lang === "zh" ? "同步失敗" : "Sync failed"), variant: "destructive" });
+      } else {
+        setPushedSet((prev) => new Set(prev).add(dayIdx));
+        toast({ title: lang === "zh" ? `已同步到 ${(data as any).provider}` : `Sent to ${(data as any).provider}` });
+      }
+    } catch (e) {
+      toast({ title: lang === "zh" ? "同步失敗" : "Sync failed", variant: "destructive" });
+    } finally {
+      setPushingIdx(null);
+    }
+  };
+  const pushWeekToWatch = async () => {
+    if (!existingPlan?.id) return;
+    if (!isPremium) { toast({ title: lang === "zh" ? "Premium 功能" : "Premium feature" }); return; }
+    if (!watchProvider) {
+      toast({ title: lang === "zh" ? "請先連接 Garmin 或 Coros" : "Connect Garmin or Coros first", variant: "destructive" });
+      return;
+    }
+    setPushingWeek(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("terra-push-week", {
+        body: { plan_id: existingPlan.id, week: currentWeekIdx, lang },
+      });
+      if (error) throw error;
+      const d = data as any;
+      const msg = lang === "zh" ? d?.message_zh : d?.message_en;
+      toast({ title: msg || (d?.ok ? "Done" : "Failed"), variant: d?.ok ? "default" : "destructive" });
+      if (d?.ok) {
+        const w = (existingPlan.plan_data?.[currentWeekIdx]?.days || []) as any[];
+        const next = new Set<number>();
+        w.forEach((day, i) => { if (day?.type !== "Rest" && day?.distance_km) next.add(i); });
+        setPushedSet(next);
+      }
+    } catch (e) {
+      toast({ title: lang === "zh" ? "同步失敗" : "Sync failed", variant: "destructive" });
+    } finally {
+      setPushingWeek(false);
+    }
+  };
 
   // Add/Edit workout
   const [addingDayIdx, setAddingDayIdx] = useState<number | null>(null);
@@ -3022,6 +3134,19 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                             <p className="text-xs text-muted-foreground">{lang === "zh" ? "總計" : "Total"}: {totalKm.toFixed(1)} km</p>
                           </div>
 
+                          {watchProvider && isPremium && (
+                            <div className="mb-2 flex justify-end">
+                              <button
+                                type="button"
+                                onClick={pushWeekToWatch}
+                                disabled={pushingWeek}
+                                className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-full bg-primary/10 text-primary hover:bg-primary/20 disabled:opacity-50"
+                              >
+                                {pushingWeek ? <Loader2 size={12} className="animate-spin" /> : <Watch size={12} />}
+                                {lang === "zh" ? `推送整週到 ${watchProvider}` : `Push week to ${watchProvider}`}
+                              </button>
+                            </div>
+                          )}
                           <CalendarDayList
                             days={currentWeek.days}
                             weekIdx={currentWeekIdx}
@@ -3030,7 +3155,12 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                             onSwap={(from, to) => swapDays(currentWeekIdx, from, to)}
                             onAddClick={(i) => { setAddingDayIdx(i); setAddRunType(null); setAddDistance(""); setAddElevation(""); setAddEph(""); }}
                             onEditClick={(i, day) => { setEditingDayIdx(i); setEditDistance(day.distance_km?.toString() || ""); setEditPace(day.pace || ""); setEditDescription(day.description || ""); }}
+                            pushedSet={pushedSet}
+                            pushingIdx={pushingIdx}
+                            onPushDay={isPremium && watchProvider ? pushDayToWatch : undefined}
+                            watchProvider={watchProvider}
                           />
+
 
                           <div className="flex items-center justify-center gap-1 mt-6">
                             {plan.map((_, i) => (

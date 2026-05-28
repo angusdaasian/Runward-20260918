@@ -74,9 +74,27 @@ function paceLabel(pace?: string | null): string {
   return `${mm}:${ss}/km`;
 }
 
-function stepDesc(label: string, pace?: string | null): string {
+function adjustPace(pace: string | null | undefined, mult: number): string | null {
+  const sec = paceSecPerKm(pace);
+  if (sec == null) return null;
+  const adjusted = Math.round(sec * mult);
+  const mm = Math.floor(adjusted / 60);
+  const ss = String(adjusted % 60).padStart(2, "0");
+  return `${mm}:${ss}/km`;
+}
+
+function distanceLabel(kmOrMeters?: number | null, unit: "km" | "m" = "km"): string {
+  const value = Number(kmOrMeters);
+  if (!Number.isFinite(value) || value <= 0) return "";
+  if (unit === "m") return value >= 1000 && value % 1000 === 0 ? `${value / 1000}km` : `${Math.round(value)}m`;
+  return `${Number(value.toFixed(1))}km`;
+}
+
+function stepDesc(label: string, pace?: string | null, distanceKm?: number | null, lang: "en" | "zh" = "en"): string {
   const p = paceLabel(pace);
-  return p ? `${label} @ ${p}` : label;
+  const dist = distanceLabel(distanceKm);
+  if (lang === "zh") return [label, dist, p ? `配速 ${p}` : ""].filter(Boolean).join(" ");
+  return [label, dist, p ? `@ ${p}` : ""].filter(Boolean).join(" ");
 }
 
 function canonicalWorkoutText(value?: string | null): string {

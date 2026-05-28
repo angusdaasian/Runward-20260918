@@ -185,6 +185,21 @@ function formatIntervalDescription(parsed: { reps: number; distM: number; restSe
   return `${dist} x ${parsed.reps}${p ? ` at ${p}` : ""}, rest ${formatRest(parsed.restSec)} between sets`;
 }
 
+function formatRunDescription(typeLabelText: string, distanceKm: number, pace: string | null | undefined, lang: "en" | "zh"): string {
+  const dist = distanceLabel(distanceKm);
+  const p = paceLabel(pace);
+  if (lang === "zh") return [typeLabelText, dist, p ? `配速 ${p}` : ""].filter(Boolean).join(" ");
+  return [typeLabelText, dist, p ? `@ ${p}` : ""].filter(Boolean).join(" ");
+}
+
+function intervalWarmCooldownKm(totalKm: number, parsed: { reps: number; distM: number } | null): number {
+  if (!parsed) return totalKm >= 6 ? 1.5 : 1;
+  const remainingKm = totalKm - (parsed.reps * parsed.distM / 1000);
+  if (remainingKm >= 3) return 1.5;
+  if (remainingKm >= 2) return 1;
+  return totalKm >= 6 ? 1.5 : 1;
+}
+
 /** Build the full Terra planned-workout object (single workout) for one plan day. */
 export function buildPlannedWorkout(
   day: PlanDay,

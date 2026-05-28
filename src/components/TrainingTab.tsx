@@ -508,6 +508,7 @@ const DraggableDay = ({
 // Calendar day list with long-press drag-to-swap (within a week)
 const CalendarDayList = ({
   days, weekIdx, lang, hrBounds, onSwap, onAddClick, onEditClick,
+  pushedSet, pushingIdx, onPushDay, watchProvider,
 }: {
   days: DayPlan[];
   weekIdx: number;
@@ -516,6 +517,10 @@ const CalendarDayList = ({
   onSwap: (fromIdx: number, toIdx: number) => void;
   onAddClick: (idx: number) => void;
   onEditClick: (idx: number, day: DayPlan) => void;
+  pushedSet?: Set<number>;
+  pushingIdx?: number | null;
+  onPushDay?: (idx: number) => void;
+  watchProvider?: string | null;
 }) => {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { delay: 250, tolerance: 5 } }),
@@ -552,6 +557,10 @@ const CalendarDayList = ({
               hrBounds={hrBounds}
               onEditClick={() => onEditClick(i, day)}
               onAddClick={() => onAddClick(i)}
+              isPushed={pushedSet?.has(i)}
+              isPushing={pushingIdx === i}
+              onPushDay={onPushDay}
+              watchProvider={watchProvider}
             />
           );
         })}

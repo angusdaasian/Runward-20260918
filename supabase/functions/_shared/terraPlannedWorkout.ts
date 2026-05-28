@@ -187,19 +187,31 @@ export function buildPlannedWorkout(
   const d = L[lang];
   const localizedType = typeLabel(type, lang);
   const name = watchText(day.title, localizedType);
-  const baseDesc = (day.description || "").split("\n")[0] || stepDesc(localizedType, day.pace);
-  const description = watchText(baseDesc, stepDesc(localizedType, day.pace)).slice(0, 200);
   const basePaceSec = paceSecPerKm(day.pace);
   const estimatedSec = basePaceSec ? Math.round(basePaceSec * totalKm) : Math.round(totalKm * 360);
 
   const warmupDesc = stepDesc(d.warmup, day.pace);
   const cooldownDesc = stepDesc(d.cooldown, day.pace);
+  const parsedIntervals = type === "Intervals" ? parseIntervals(day.description) : null;
+  const paceFallbackDesc = stepDesc(localizedType, day.pace);
+  const rawFirstDesc = (day.description || "").split("\n")[0]?.trim() || "";
+  const workoutNameCandidates = [day.title, localizedType, typeLabel(type, "en"), typeLabel(type, "zh"), normalizeType(day.type)];
+  const mainDesc = rawFirstDesc && !isOnlyWorkoutName(rawFirstDesc, workoutNameCandidates)
+    ? rawFirstDesc
+    : paceFallbackDesc;
+  const intervalMainDesc = parsedIntervals ? formatIntervalDescription(parsedIntervals, day.pace, lang) : mainDesc;
+  const description = watchText(
+    type === "Intervals" && parsedIntervals
+      ? `${warmupDesc}. ${intervalMainDesc}. ${cooldownDesc}`
+      : mainDesc,
+    paceFallbackDesc,
+  ).slice(0, 200);
 
   let steps: any[];
   let order = 0;
 
   if (type === "Intervals") {
-    const parsed = parseIntervals(day.description);
+    const parsed = parsedIntervals;
     if (parsed) {
       const warmupM = 1000;
       const cooldownM = 1000;

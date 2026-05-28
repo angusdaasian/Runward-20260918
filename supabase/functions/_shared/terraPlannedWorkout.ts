@@ -40,11 +40,11 @@ function normalizeType(type?: string | null): string {
   return type?.trim() || "Run";
 }
 
-function watchText(value: string | null | undefined, fallback: string): string {
+function watchText(value: string | null | undefined, fallback: string, maxLen = 60): string {
   // Garmin/Coros both accept UTF-8 (incl. CJK) in workout names/descriptions.
   // Strip only control characters; keep ASCII printable + extended Unicode.
   const text = (value || "").replace(/[\x00-\x1F\x7F]/g, "").trim();
-  return (text || fallback).slice(0, 60);
+  return (text || fallback).slice(0, maxLen);
 }
 
 // Localized step labels.
@@ -77,6 +77,18 @@ function paceLabel(pace?: string | null): string {
 function stepDesc(label: string, pace?: string | null): string {
   const p = paceLabel(pace);
   return p ? `${label} @ ${p}` : label;
+}
+
+function canonicalWorkoutText(value?: string | null): string {
+  return (value || "")
+    .replace(/[\s@/:：,，.。()（）-]+/g, "")
+    .trim()
+    .toLowerCase();
+}
+
+function isOnlyWorkoutName(text: string, candidates: Array<string | null | undefined>): boolean {
+  const normalized = canonicalWorkoutText(text);
+  return !!normalized && candidates.some((candidate) => canonicalWorkoutText(candidate) === normalized);
 }
 
 /** Build a pace-band target ±bandSec/km around base pace. target_type=11 (PACE). */
@@ -140,6 +152,21 @@ function parseIntervals(desc?: string | null): { reps: number; distM: number; re
   return { reps, distM, restSec: Math.max(15, Math.min(restSec, 600)) };
 }
 
+function formatRest(restSec: number): string {
+  const mm = Math.floor(restSec / 60);
+  const ss = String(restSec % 60).padStart(2, "0");
+  return `${mm}:${ss}`;
+}
+
+function formatIntervalDescription(parsed: { reps: number; distM: number; restSec: number }, pace: string | null | undefined, lang: "en" | "zh"): string {
+  const dist = parsed.distM >= 1000 && parsed.distM % 1000 === 0 ? `${parsed.distM / 1000}km` : `${Math.round(parsed.distM)}m`;
+  const p = paceLabel(pace);
+  if (lang === "zh") {
+    return `${dist} x ${parsed.reps}${p ? ` 以 ${p}` : ""}，組間恢復 ${formatRest(parsed.restSec)}`;
+  }
+  return `${dist} x ${parsed.reps}${p ? ` at ${p}` : ""}, rest ${formatRest(parsed.restSec)} between sets`;
+}
+
 /** Build the full Terra planned-workout object (single workout) for one plan day. */
 export function buildPlannedWorkout(
   day: PlanDay,
@@ -160,19 +187,32 @@ export function buildPlannedWorkout(
   const d = L[lang];
   const localizedType = typeLabel(type, lang);
   const name = watchText(day.title, localizedType);
-  const baseDesc = (day.description || "").split("\n")[0] || stepDesc(localizedType, day.pace);
-  const description = watchText(baseDesc, stepDesc(localizedType, day.pace)).slice(0, 200);
   const basePaceSec = paceSecPerKm(day.pace);
   const estimatedSec = basePaceSec ? Math.round(basePaceSec * totalKm) : Math.round(totalKm * 360);
 
   const warmupDesc = stepDesc(d.warmup, day.pace);
   const cooldownDesc = stepDesc(d.cooldown, day.pace);
+  const parsedIntervals = type === "Intervals" ? parseIntervals(day.description) : null;
+  const paceFallbackDesc = stepDesc(localizedType, day.pace);
+  const rawFirstDesc = (day.description || "").split("\n")[0]?.trim() || "";
+  const workoutNameCandidates = [day.title, localizedType, typeLabel(type, "en"), typeLabel(type, "zh"), normalizeType(day.type)];
+  const mainDesc = rawFirstDesc && !isOnlyWorkoutName(rawFirstDesc, workoutNameCandidates)
+    ? rawFirstDesc
+    : paceFallbackDesc;
+  const intervalMainDesc = parsedIntervals ? formatIntervalDescription(parsedIntervals, day.pace, lang) : mainDesc;
+  const description = watchText(
+    type === "Intervals" && parsedIntervals
+      ? `${warmupDesc}. ${intervalMainDesc}. ${cooldownDesc}`
+      : mainDesc,
+    paceFallbackDesc,
+    200,
+  );
 
   let steps: any[];
   let order = 0;
 
   if (type === "Intervals") {
-    const parsed = parseIntervals(day.description);
+    const parsed = parsedIntervals;
     if (parsed) {
       const warmupM = 1000;
       const cooldownM = 1000;

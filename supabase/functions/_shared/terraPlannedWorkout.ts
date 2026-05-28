@@ -234,20 +234,20 @@ export function buildPlannedWorkout(
   if (type === "Intervals") {
     const parsed = parsedIntervals;
     if (parsed) {
-      const warmupM = 1000;
-      const cooldownM = 1000;
+      const warmupM = warmCooldownKm * 1000;
+      const cooldownM = warmCooldownKm * 1000;
       const intervalSteps: any[] = [
-        repeatOnce(distanceStep(warmupM, 1, warmupDesc, easyPaceTarget, 0), warmupDesc, order++),
+        repeatOnce(distanceStep(warmupM, 1, warmupDesc, warmCooldownTarget, 0), warmupDesc, order++),
       ];
       for (let i = 1; i <= parsed.reps; i++) {
-        const workDesc = stepDesc(`${d.work} ${i}`, day.pace);
+        const workDesc = stepDesc(`${d.work} ${i}`, day.pace, parsed.distM / 1000, lang);
         intervalSteps.push(repeatOnce(distanceStep(parsed.distM, 4, workDesc, tightPaceTarget, 0), workDesc, order++));
         if (i < parsed.reps) {
           const recDesc = `${d.recovery} ${i}`;
-          intervalSteps.push(repeatOnce(timeStep(parsed.restSec, 3, recDesc, easyPaceTarget, 0), recDesc, order++));
+          intervalSteps.push(repeatOnce(timeStep(parsed.restSec, 3, recDesc, warmCooldownTarget, 0), recDesc, order++));
         }
       }
-      intervalSteps.push(repeatOnce(distanceStep(cooldownM, 2, cooldownDesc, easyPaceTarget, 0), cooldownDesc, order++));
+      intervalSteps.push(repeatOnce(distanceStep(cooldownM, 2, cooldownDesc, warmCooldownTarget, 0), cooldownDesc, order++));
       steps = intervalSteps;
     } else {
       const dsc = stepDesc(localizedType, day.pace);

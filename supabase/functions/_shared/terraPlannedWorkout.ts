@@ -213,7 +213,7 @@ export function buildPlannedWorkout(
 
   const parsedIntervals = type === "Intervals" ? parseIntervals(day.description) : null;
   const warmCooldownKm = type === "Intervals" ? intervalWarmCooldownKm(totalKm, parsedIntervals) : 1;
-  const warmCooldownPace = adjustPace(day.pace, 1.4) ?? day.pace;
+  const warmCooldownPace = type === "Intervals" ? (adjustPace(day.pace, 1.4) ?? day.pace) : day.pace;
   const warmCooldownTarget = isTrail ? null : paceTarget(warmCooldownPace, 10);
   const warmupDesc = stepDesc(d.warmup, warmCooldownPace, warmCooldownKm, lang);
   const cooldownDesc = stepDesc(d.cooldown, warmCooldownPace, warmCooldownKm, lang);

@@ -222,7 +222,9 @@ export function buildPlannedWorkout(
   const intervalMainDesc = parsedIntervals ? formatIntervalDescription(parsedIntervals, day.pace, lang) : mainDesc;
   const description = watchText(
     type === "Intervals" && parsedIntervals
-      ? `${warmupDesc}. ${intervalMainDesc}. ${cooldownDesc}`
+      ? (lang === "zh"
+        ? `${warmupDesc}。${intervalMainDesc}。${cooldownDesc}`
+        : `${warmupDesc}. ${intervalMainDesc}. ${cooldownDesc}`)
       : mainDesc,
     paceFallbackDesc,
     200,
@@ -257,7 +259,7 @@ export function buildPlannedWorkout(
     const warmupM = 1000;
     const cooldownM = 1000;
     const tempoM = Math.max(1000, totalKm * 1000 - warmupM - cooldownM);
-    const tempoDesc = stepDesc(d.tempo, day.pace);
+    const tempoDesc = stepDesc(d.tempo, day.pace, tempoM / 1000, lang);
     steps = [
       repeatOnce(distanceStep(warmupM, 1, warmupDesc, easyPaceTarget, 0), warmupDesc, order++),
       repeatOnce(distanceStep(tempoM, 5, tempoDesc, tightPaceTarget, 0), tempoDesc, order++),

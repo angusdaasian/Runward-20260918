@@ -212,13 +212,12 @@ export function buildPlannedWorkout(
   const estimatedSec = basePaceSec ? Math.round(basePaceSec * totalKm) : Math.round(totalKm * 360);
 
   const parsedIntervals = type === "Intervals" ? parseIntervals(day.description) : null;
-  const warmCooldownKm = intervalWarmCooldownKm(totalKm, parsedIntervals);
+  const warmCooldownKm = type === "Intervals" ? intervalWarmCooldownKm(totalKm, parsedIntervals) : 1;
   const warmCooldownPace = adjustPace(day.pace, 1.4) ?? day.pace;
+  const warmCooldownTarget = isTrail ? null : paceTarget(warmCooldownPace, 10);
   const warmupDesc = stepDesc(d.warmup, warmCooldownPace, warmCooldownKm, lang);
   const cooldownDesc = stepDesc(d.cooldown, warmCooldownPace, warmCooldownKm, lang);
   const paceFallbackDesc = formatRunDescription(localizedType, totalKm, day.pace, lang);
-  const rawFirstDesc = (day.description || "").split("\n")[0]?.trim() || "";
-  const workoutNameCandidates = [day.title, localizedType, typeLabel(type, "en"), typeLabel(type, "zh"), normalizeType(day.type)];
   const mainDesc = paceFallbackDesc;
   const intervalMainDesc = parsedIntervals ? formatIntervalDescription(parsedIntervals, day.pace, lang) : mainDesc;
   const description = watchText(

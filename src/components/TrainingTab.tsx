@@ -1306,9 +1306,16 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
     if (!existingPlan?.id || !user || !watchProvider || !isPremium) return;
     if (!pushedSet.has(dayIdx)) return;
     try {
-      await supabase.functions.invoke("terra-push-workout", {
+      const { data } = await supabase.functions.invoke("terra-push-workout", {
         body: { plan_id: existingPlan.id, week: currentWeekIdx, day_index: dayIdx, lang },
       });
+      const d = data as any;
+      if (d?.ok) {
+        // still pushed (now with updated content) – keep in set
+      } else if (d?.code === "not_pushable") {
+        // day became Rest – removed from watch
+        setPushedSet((prev) => { const n = new Set(prev); n.delete(dayIdx); return n; });
+      }
     } catch (e) {
       console.warn("[repushIfPushed] failed:", e);
     }

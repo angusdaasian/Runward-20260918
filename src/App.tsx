@@ -18,6 +18,7 @@ const AdminPanel = lazy(() => import("./pages/AdminPanel.tsx"));
 const AppleCallback = lazy(() => import("./pages/AppleCallback.tsx"));
 const Support = lazy(() => import("./pages/Support.tsx"));
 const Privacy = lazy(() => import("./pages/Privacy.tsx"));
+const DeleteAccount = lazy(() => import("./pages/DeleteAccount.tsx"));
 const TerraReturn = lazy(() => import("./pages/TerraReturn.tsx"));
 
 const queryClient = new QueryClient();
@@ -64,6 +65,7 @@ const App = () => (
                 <Route path="/admin" element={<AdminPanel />} />
                 <Route path="/support" element={<Support />} />
                 <Route path="/privacy" element={<Privacy />} />
+                <Route path="/delete-account" element={<DeleteAccount />} />
                 <Route path="/terra-return" element={<TerraReturn />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>

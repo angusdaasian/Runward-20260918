@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Lang } from "@/lib/i18n";
 
@@ -42,6 +42,7 @@ interface Props {
     planned: PlannedWorkout | null;
     races?: UserRaceLite[];
   }) => void;
+  onMonthChange?: (year: number, month: number) => void;
 }
 
 const WEEKDAY_LABELS_EN = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -103,12 +104,18 @@ function formatDateKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-const ActivityCalendar = ({ lang, activities, plannedWorkouts, userRaces = [], onSelectDate }: Props) => {
+const ActivityCalendar = ({ lang, activities, plannedWorkouts, userRaces = [], onSelectDate, onMonthChange }: Props) => {
   const today = new Date();
   const [viewYear, setViewYear] = useState(today.getFullYear());
   const [viewMonth, setViewMonth] = useState(today.getMonth());
 
   const days = useMemo(() => getMonthDays(viewYear, viewMonth), [viewYear, viewMonth]);
+
+  // Notify parent on month/year change (after mount + every change).
+  useEffect(() => {
+    onMonthChange?.(viewYear, viewMonth);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewYear, viewMonth]);
 
   // Build lookup: date string -> total km from Strava
   const kmByDate = useMemo(() => {

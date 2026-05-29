@@ -97,12 +97,16 @@ const NotificationManager = () => {
       let externalUserIds: string | string[];
 
       if (mode === "all") {
-        if (!users.length) {
+        const pool =
+          audience === "free" ? users.filter((u) => !u.isPremium)
+          : audience === "premium" ? users.filter((u) => u.isPremium)
+          : users;
+        if (!pool.length) {
           toast({ title: "No users found", variant: "destructive" });
           setSending(false);
           return;
         }
-        externalUserIds = users.map((u) => u.user_id);
+        externalUserIds = pool.map((u) => u.user_id);
       } else {
         externalUserIds = targetUserId.trim();
       }

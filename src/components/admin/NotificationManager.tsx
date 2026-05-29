@@ -41,6 +41,7 @@ const NotificationManager = () => {
   const [targetUserId, setTargetUserId] = useState("");
   const [sending, setSending] = useState(false);
   const [mode, setMode] = useState<"all" | "specific">("all");
+  const [audience, setAudience] = useState<"all" | "free" | "premium">("all");
 
   const [users, setUsers] = useState<UserOption[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);

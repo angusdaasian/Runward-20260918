@@ -2123,6 +2123,7 @@ export type Database = {
         Returns: boolean
       }
       invoke_reset_season: { Args: { p_month_year?: string }; Returns: number }
+      unschedule_cron_job: { Args: { job_name: string }; Returns: undefined }
       unschedule_terra_today_oneoff: { Args: never; Returns: undefined }
       unschedule_terra_webhook_cleanup: { Args: never; Returns: undefined }
       unschedule_terra_webhook_drain: { Args: never; Returns: undefined }

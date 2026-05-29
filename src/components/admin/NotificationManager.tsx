@@ -117,7 +117,8 @@ const NotificationManager = () => {
 
       if (error) throw error;
 
-      toast({ title: "Notification sent!", description: `Sent to ${mode === "all" ? "all users" : selectedUser?.display_name || "user"}.` });
+      const audienceLabel = audience === "free" ? "all free users" : audience === "premium" ? "all premium users" : "all users";
+      toast({ title: "Notification sent!", description: `Sent to ${mode === "all" ? audienceLabel : selectedUser?.display_name || "user"}.` });
       setTitle("");
       setMessage("");
       setTargetUserId("");

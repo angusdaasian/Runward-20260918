@@ -41,6 +41,7 @@ const NotificationManager = () => {
   const [targetUserId, setTargetUserId] = useState("");
   const [sending, setSending] = useState(false);
   const [mode, setMode] = useState<"all" | "specific">("all");
+  const [audience, setAudience] = useState<"all" | "free" | "premium">("all");
 
   const [users, setUsers] = useState<UserOption[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
@@ -96,12 +97,16 @@ const NotificationManager = () => {
       let externalUserIds: string | string[];
 
       if (mode === "all") {
-        if (!users.length) {
+        const pool =
+          audience === "free" ? users.filter((u) => !u.isPremium)
+          : audience === "premium" ? users.filter((u) => u.isPremium)
+          : users;
+        if (!pool.length) {
           toast({ title: "No users found", variant: "destructive" });
           setSending(false);
           return;
         }
-        externalUserIds = users.map((u) => u.user_id);
+        externalUserIds = pool.map((u) => u.user_id);
       } else {
         externalUserIds = targetUserId.trim();
       }
@@ -112,7 +117,8 @@ const NotificationManager = () => {
 
       if (error) throw error;
 
-      toast({ title: "Notification sent!", description: `Sent to ${mode === "all" ? "all users" : selectedUser?.display_name || "user"}.` });
+      const audienceLabel = audience === "free" ? "all free users" : audience === "premium" ? "all premium users" : "all users";
+      toast({ title: "Notification sent!", description: `Sent to ${mode === "all" ? audienceLabel : selectedUser?.display_name || "user"}.` });
       setTitle("");
       setMessage("");
       setTargetUserId("");
@@ -140,6 +146,21 @@ const NotificationManager = () => {
               <User className="h-4 w-4" /> Specific User
             </TabsTrigger>
           </TabsList>
+
+          <TabsContent value="all" className="mt-4 space-y-2">
+            <Label>Audience</Label>
+            <Select value={audience} onValueChange={(v) => setAudience(v as any)}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All users ({users.length})</SelectItem>
+                <SelectItem value="free">Free users only ({users.filter((u) => !u.isPremium).length})</SelectItem>
+                <SelectItem value="premium">Premium users only ({users.filter((u) => u.isPremium).length})</SelectItem>
+              </SelectContent>
+            </Select>
+          </TabsContent>
+
 
           <TabsContent value="specific" className="mt-4 space-y-3">
             <div className="space-y-2">

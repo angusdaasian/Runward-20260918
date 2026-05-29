@@ -18,6 +18,7 @@ const AdminPanel = lazy(() => import("./pages/AdminPanel.tsx"));
 const AppleCallback = lazy(() => import("./pages/AppleCallback.tsx"));
 const Support = lazy(() => import("./pages/Support.tsx"));
 const Privacy = lazy(() => import("./pages/Privacy.tsx"));
+const DeleteAccount = lazy(() => import("./pages/DeleteAccount.tsx"));
 const TerraReturn = lazy(() => import("./pages/TerraReturn.tsx"));
 
 const queryClient = new QueryClient();

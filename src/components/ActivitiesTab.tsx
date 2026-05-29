@@ -1108,7 +1108,7 @@ const ActivitiesTab = ({ lang }: Props) => {
                 <DropdownMenuItem onClick={handleFetchWeekOnly} disabled={fetchingToday}>
                   {lang === "zh" ? "同步近 7 天活動" : "Sync past 7 days"}
                 </DropdownMenuItem>
-                {isPremium && !year2026Used && (
+                {false && isPremium && !year2026Used && (
                   <DropdownMenuItem onClick={handleFetchYear2026} disabled={fetchingToday}>
                     {lang === "zh" ? "同步 2026 全年活動" : "Sync all 2026 activities"}
                   </DropdownMenuItem>

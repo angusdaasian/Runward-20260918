@@ -58,7 +58,8 @@ Deno.serve(async (req) => {
     }
 
     const VERTEX_API_KEY = Deno.env.get("GOOGLE_VERTEX_API_KEY");
-    if (!VERTEX_API_KEY) throw new Error("GOOGLE_VERTEX_API_KEY not configured");
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    if (!VERTEX_API_KEY && !LOVABLE_API_KEY) throw new Error("No AI provider configured");
 
     const prompt = `Verify if the following is a real, official running race event:
 
@@ -81,18 +82,40 @@ If you cannot confirm it exists or it seems made up, set verified to false.
 Extract the city and country from the place provided.
 Return ONLY the JSON object.`;
 
-    const res = await callVertexAI({
-      apiKey: VERTEX_API_KEY,
-      model: "google/gemini-3.1-flash-lite-preview",
-      messages: [
-        { role: "system", content: "You are a running race verification assistant. Return only valid JSON." },
-        { role: "user", content: prompt },
-      ],
-    });
+    const messages = [
+      { role: "system", content: "You are a running race verification assistant. Return only valid JSON." },
+      { role: "user", content: prompt },
+    ];
 
-    if (!res.ok) {
-      const t = await res.text();
-      throw new Error(`AI call failed: ${res.status} ${t}`);
+    async function callLovableGateway(): Promise<Response> {
+      const gwRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${LOVABLE_API_KEY}` },
+        body: JSON.stringify({ model: "google/gemini-2.5-flash", messages }),
+      });
+      return gwRes;
+    }
+
+    let res: Response | null = null;
+    let lastErr = "";
+
+    if (VERTEX_API_KEY) {
+      const vRes = await callVertexAI({ apiKey: VERTEX_API_KEY, model: "google/gemini-3.1-flash-lite-preview", messages });
+      if (vRes.ok) {
+        res = vRes;
+      } else {
+        lastErr = `Vertex ${vRes.status}: ${await vRes.text()}`;
+        console.warn("verify-race vertex failed, falling back to gateway:", lastErr);
+      }
+    }
+
+    if (!res && LOVABLE_API_KEY) {
+      res = await callLovableGateway();
+    }
+
+    if (!res || !res.ok) {
+      const t = res ? await res.text() : lastErr;
+      throw new Error(`AI call failed: ${res?.status ?? "no-response"} ${t}`);
     }
 
     const data = await res.json();

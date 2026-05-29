@@ -166,23 +166,23 @@ Deno.serve(async (req) => {
           const terraReference = r.headers.get("terra-reference");
           const j = await r.json();
           const items: any[] = Array.isArray(j?.data) ? j.data : [];
-          providerReturned += items.length;
+          const returned = items.length;
+          providerReturned += returned;
 
           let ingestedHere = 0;
           let skippedHere = 0;
-          for (const a of items) {
-            const envelope = {
-              type: "activity",
-              user: { user_id: c.terra_user_id, reference_id: c.reference_id, provider: c.provider },
-              data: [a],
-            };
+          // Drain items one at a time so the parsed JSON can be GC'd progressively.
+          while (items.length) {
+            const a = items.shift();
             const aid = String(a?.metadata?.summary_id ?? a?.metadata?.upload_id ?? "");
             try {
-              const ing = await ingestTrustedTerraPayload(
-                JSON.stringify(envelope),
-                "prod",
-                "manual_sync_year",
-              );
+              const envelope = {
+                type: "activity",
+                user: { user_id: c.terra_user_id, reference_id: c.reference_id, provider: c.provider },
+                data: [a],
+              };
+              const payload = JSON.stringify(envelope);
+              const ing = await ingestTrustedTerraPayload(payload, "prod", "manual_sync_year");
               if (ing.ok) { activityCount++; ingestedHere++; providerIngested++; }
               else { skippedHere++; providerSkipped++; console.warn(`[terra-sync-year] ingest err ${c.provider} id=${aid}: ${ing.error}`); }
             } catch (e) {
@@ -193,11 +193,11 @@ Deno.serve(async (req) => {
           }
           chunkSummaries.push({
             start: ch.start, end: ch.end,
-            status: r.status, returned: items.length,
+            status: r.status, returned,
             ingested: ingestedHere, skipped: skippedHere,
             terraReference,
           });
-          console.log(`[terra-sync-year] ${c.provider} ${ch.start}->${ch.end} status=${r.status} returned=${items.length} ingested=${ingestedHere}`);
+          console.log(`[terra-sync-year] ${c.provider} ${ch.start}->${ch.end} status=${r.status} returned=${returned} ingested=${ingestedHere}`);
         } catch (e) {
           console.error(`[terra-sync-year] fetch failed ${c.provider} ${ch.start}->${ch.end}`, e);
           chunkSummaries.push({ start: ch.start, end: ch.end, error: String(e) });

@@ -744,6 +744,23 @@ const ActivitiesTab = ({ lang }: Props) => {
 
   const [resyncing, setResyncing] = useState(false);
   const [fetchingToday, setFetchingToday] = useState(false);
+  const [year2026Used, setYear2026Used] = useState(false);
+
+  useEffect(() => {
+    if (!user || !isPremium) return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from("terra_sync_usage")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("function_name", "terra-sync-year")
+        .limit(1)
+        .maybeSingle();
+      if (!cancelled && data) setYear2026Used(true);
+    })();
+    return () => { cancelled = true; };
+  }, [user, isPremium]);
 
   const handleFetchTodayTerra = useCallback(async () => {
     if (!user || fetchingToday) return;

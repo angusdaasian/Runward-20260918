@@ -1,79 +1,55 @@
-# Push AI plans to the user's watch (Terra Planned Workouts)
+Send a one-off OneSignal push **today at 12:00 HKT (04:00 UTC, ~15 min away)** to free users only, using copy variant B.
 
-Premium users will be able to send their AI-generated training plan to their connected Garmin/Coros watch, both per-day and as a full upcoming week. Pace bands will be used as the on-watch target.
+Current UTC: `2026-05-29 03:45`. Target cron: `0 4 29 5 *` (fires once today; will fire again same day next year — we'll unschedule right after it runs).
 
-## Scope (confirmed)
-- **Both** per-day "Send to watch" button **and** "Push week to watch" bulk button
-- **Pace bands** as the watch target (±5–10 sec/km around the planned pace)
-- **Premium only**
-- Providers covered: **Garmin, Coros** (Terra only supports write-back to these + Hammerhead/TodaysPlan). Other providers show a tooltip "Connect Garmin or Coros to sync to watch".
+## What gets built
 
-## Backend
+### 1. New edge function: `send-broadcast-notification`
+Why a new one (not reusing `send-notification`): the existing function requires an admin JWT, which a cron job doesn't have. This new one is gated by the existing `WEBHOOK_AUTH_KEY` secret (already used elsewhere) and runs with service role.
 
-### 1. New table `pushed_workouts`
-Tracks which plan-days were pushed so we can update/delete cleanly when the plan changes.
+Behavior:
+- Verifies `x-webhook-key` header against `WEBHOOK_AUTH_KEY`.
+- Body: `{ title, message, audience: "all" | "free" }`.
+- Loads all `profiles.user_id`.
+- If `audience === "free"`, loads `premium_subscriptions` where `expires_at > now()` and filters those user_ids out.
+- POSTs to OneSignal `include_external_user_ids` in chunks of 2000 (OneSignal limit).
+- Returns count of recipients.
 
-| column | type | notes |
-|---|---|---|
-| id | uuid pk | |
-| user_id | uuid | |
-| plan_id | uuid | FK to training_plans |
-| week_idx, day_idx | int | location in plan_data |
-| terra_user_id | text | which connection it was pushed to |
-| provider | text | GARMIN / COROS |
-| log_id | text | returned by Terra (used for DELETE) |
-| pushed_at | timestamptz | |
-| day_signature | text | hash of distance/pace/type — lets us detect "stale" pushes |
+### 2. One-off pg_cron job
+Schedule via `cron.schedule('one-off-earlybird-push-20260529', '0 4 29 5 *', $$ net.http_post(...) $$)`:
+- URL: `https://kbghvclwhxnjeskdodeh.supabase.co/functions/v1/send-broadcast-notification`
+- Headers: `Content-Type: application/json`, `apikey: <anon>`, `x-webhook-key: <WEBHOOK_AUTH_KEY value>`
+- Body:
+  ```json
+  {
+    "title": "早鳥優惠剩 2 日",
+    "message": "把握最後 2 日，以早鳥價升級 Premium，價格永久鎖定，日後加價都不受影響。",
+    "audience": "free"
+  }
+  ```
 
-RLS: user can read/delete own rows; edge functions use service role.
-Includes GRANTs per project convention.
+The `WEBHOOK_AUTH_KEY` value will need to be inlined into the cron SQL (it's not accessible from `net.http_post` headers via env). This is fine — the cron SQL only lives in Supabase, not in repo. I'll fetch it via vault or ask you to paste it during the migration step if needed. (Preferred: store under vault `webhook_auth_key` is already there per `invoke_reset_season` — I'll read it the same way.)
 
-### 2. Edge function `terra-push-workout`
-Input: `{ plan_id, week_idx, day_idx }` (or array for bulk).
+Actually cleanest: write the cron SQL as a DO block that pulls `webhook_auth_key` from `vault.decrypted_secrets` (already used by `invoke_reset_season`) and builds the headers jsonb at schedule time. No secret leaks into cron.job table in plaintext beyond what's already there.
 
-Steps:
-1. Auth user, load plan_data + day
-2. Skip if `type === "Rest"` or `distance_km` missing
-3. Look up active Terra connection where `provider in ('GARMIN','COROS')`
-4. **Translate plan day → Terra steps**:
-   - Easy/Long/Recovery: 1 step, `duration_type=1` (distance, meters), `target_type=6` pace band (±8 sec/km)
-   - Tempo: warmup 1km easy + tempo block at pace + cooldown 1km easy
-   - Intervals (parse `description` for `N×Dm @pace`): warmup + repeat wrapper (`type=1`, `reps=N`) with work step (distance target, pace target) + recovery step (time/distance, easy pace) + cooldown
-   - Trail run: distance only, no pace target
-   - Workout name = `title`, description = first line of `description`
-5. `POST https://api.tryterra.co/v2/athlete/plannedWorkout?user_id=...` with headers `dev-id`, `x-api-key`, body `{ data: [{ name, description, steps }] }`
-6. If a previous `pushed_workouts` row exists for that day with different signature → DELETE old `log_id` first
-7. Insert/update `pushed_workouts` row with new `log_id`
-8. Return `{ ok, log_id, provider }`
+### 3. Self-cleanup
+Right after the cron fires, the edge function will call `cron.unschedule('one-off-earlybird-push-20260529')` via a small SQL RPC so it never runs again. (Falls back gracefully if already unscheduled.)
 
-Rate-limit via existing `terra_sync_usage` table: max 20 pushes/day/user.
+## Files
 
-### 3. Edge function `terra-delete-workout`
-Input: `{ pushed_id }`. Calls `DELETE /v2/athlete/plannedWorkout?user_id=...&workout_id=<log_id>`, then deletes the row.
+- `supabase/functions/send-broadcast-notification/index.ts` — new
+- Migration: create `unschedule_one_off_push(job_name text)` SECURITY DEFINER function (so edge function can clean itself up), and `cron.schedule(...)` the one-off job
 
-### 4. Edge function `terra-push-week`
-Input: `{ plan_id, week_idx }`. Iterates non-rest days, calls the same translator + Terra POST in a loop (single Terra call per day — Terra accepts array but per-day failure isolation is cleaner). Returns `{ pushed: n, skipped: n, failed: n }`.
+## Sequence after you approve
 
-## Frontend (`TrainingTab.tsx`)
+1. Migration runs (creates unschedule helper + schedules the cron).
+2. Edge function deploys automatically.
+3. At 04:00 UTC, cron hits the function → free users get the push → function unschedules itself.
 
-### Per-day card
-Add a small **"📲 Send to watch"** button next to the existing Edit button on each day row. States:
-- Default: outline button
-- Pushed: green check + "Synced to {provider}" + click to re-push (if day_signature changed) or remove
-- Loading: spinner
-- Non-premium: button hidden, lock badge with upgrade link
-- No supported connection: disabled with tooltip
+## Confirm before I build
 
-### Week header
-Add **"Push week to watch"** button next to the existing week navigation. Confirms in a small dialog ("Push 5 workouts to Garmin?"), shows progress toast.
-
-### Auto-cleanup
-When user edits a day → existing edit flow + automatically re-push if it was previously pushed (so watch stays in sync).
-When plan is regenerated → bulk delete all `pushed_workouts` for that plan, user re-pushes manually.
-
-## Technical notes
-
-- Terra payload uses fixed integer enums (`duration_type=1` distance, `target_type=6` pace, `intensity` 1=warmup/2=active/4=recovery/5=cooldown). I'll add a small `terraWorkoutEnums.ts` shared file documenting these.
-- Pace target encoding: Terra expects `pace_low`/`pace_high` in **meters/second**. Convert from `mm:ss/km` → `1000 / (mm*60+ss)`. Add ±8 s/km band by default; tighter for intervals.
-- Coros/Garmin can take up to a few minutes to sync to the watch after Terra accepts the payload (depends on the user opening the companion app). Mention this once in a tooltip.
-- The plan is your complete response — implementation begins after approval.
+- Copy variant B with slight tightening — final text I'll send:
+  - **Title:** 早鳥優惠剩 2 日
+  - **Body:** 把握最後 2 日，以早鳥價升級 Premium，價格永久鎖定，日後加價都不受影響。
+- "Free users" = users with **no active premium subscription** (expired or never subscribed). OK?
+- Time budget: it's 03:45 UTC now. If approval + migration + deploy takes >15 min we'll miss 04:00. Want me to push the cron to **04:15 UTC (12:15 HKT)** to give a safety margin, or keep 04:00 and risk missing?

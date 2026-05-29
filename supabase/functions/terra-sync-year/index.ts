@@ -16,7 +16,9 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const CHUNK_DAYS = 10;
+const CHUNK_DAYS = 7;
+const CHUNK_REST_MS = 2500;
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 function ymd(d: Date): string {
@@ -159,7 +161,9 @@ Deno.serve(async (req) => {
       let providerReturned = 0;
       const chunkSummaries: any[] = [];
 
-      for (const ch of chunks) {
+      for (let ci = 0; ci < chunks.length; ci++) {
+        const ch = chunks[ci];
+        if (ci > 0) await sleep(CHUNK_REST_MS);
         const url = `https://api.tryterra.co/v2/activity?user_id=${c.terra_user_id}&start_date=${ch.start}&end_date=${ch.end}&to_webhook=false&with_samples=true`;
         try {
           const r = await fetch(url, { headers });

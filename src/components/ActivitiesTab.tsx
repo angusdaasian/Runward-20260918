@@ -909,6 +909,12 @@ const ActivitiesTab = ({ lang }: Props) => {
   const handleFetchYear2026 = useCallback(async () => {
     if (!user || fetchingToday) return;
     setFetchingToday(true);
+    toast.info(
+      lang === "zh"
+        ? "正在同步 2026 全年活動，最多可能需要 3 分鐘，請稍候..."
+        : "Syncing all 2026 activities — this can take up to 3 minutes, please wait...",
+      { duration: 8000 },
+    );
     try {
       const { data: sessionData } = await supabase.auth.getSession();
       const accessToken = sessionData?.session?.access_token;

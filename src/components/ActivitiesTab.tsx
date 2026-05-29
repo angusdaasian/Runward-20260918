@@ -906,6 +906,44 @@ const ActivitiesTab = ({ lang }: Props) => {
     setFetchingToday(false);
   }, [user, fetchingToday, invalidateAll, lang]);
 
+  const handleFetchYear2026 = useCallback(async () => {
+    if (!user || fetchingToday) return;
+    setFetchingToday(true);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData?.session?.access_token;
+      if (!accessToken) throw new Error("Not authenticated");
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/terra-sync-year`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        },
+        body: JSON.stringify({ year: 2026, forceEnv: "prod" }),
+      });
+      const result = await response.json().catch(() => null);
+      if (!response.ok && response.status !== 402) {
+        throw new Error(result?.error ?? `Sync failed (${response.status})`);
+      }
+      invalidateAll();
+      const providers = Array.isArray(result?.providers) ? result.providers : [];
+      const ingested = providers.reduce((s: number, p: any) => s + (p?.ingested ?? 0), 0);
+      const msg = lang === "zh" ? result?.message_zh : result?.message_en;
+      if (result?.rateLimited || result?.error === "premium_required") {
+        toast.info(msg ?? (lang === "zh" ? "請稍後再試" : "Please try again later"));
+      } else if (ingested > 0) {
+        toast.success(lang === "zh" ? `已同步 ${ingested} 個 2026 年活動` : `Synced ${ingested} activities from 2026`);
+      } else {
+        toast.info(lang === "zh" ? "2026 年暫無新活動" : "No new activities in 2026");
+      }
+    } catch (err) {
+      console.error("Fetch year terra error:", err);
+      toast.error(lang === "zh" ? "同步失敗" : "Sync failed");
+    }
+    setFetchingToday(false);
+  }, [user, fetchingToday, invalidateAll, lang]);
+
 
 
 

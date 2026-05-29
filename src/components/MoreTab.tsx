@@ -1,4 +1,14 @@
-import { ChevronRight, Crown, Globe, BookOpen, Check, ScanEye, Lock, KeyRound, Clock, Shield, Info, LifeBuoy, Mail, ShieldCheck, Smartphone, Moon, Sun, LogOut, Gift, Ticket, Bell, Footprints, Flame } from "lucide-react";
+import { ChevronRight, Crown, Globe, BookOpen, Check, ScanEye, Lock, KeyRound, Clock, Shield, Info, LifeBuoy, Mail, ShieldCheck, Smartphone, Moon, Sun, LogOut, Gift, Ticket, Bell, Footprints, Flame, Trash2 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Lang, t } from "@/lib/i18n";
 import { useToast } from "@/hooks/use-toast";
 import despia from "despia-native";
@@ -76,6 +86,30 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps }: Props
   const [offerCode, setOfferCode] = useState("");
   const [profileSubpage, setProfileSubpage] = useState<"main" | "hr-zones" | "personal-bests" | "edit-profile" /* | "badges" */>("main");
   const [aiChatDisabled, setAiChatDisabled] = useState(() => localStorage.getItem("ai_chat_disabled") === "true");
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  const handleDeleteAccount = async () => {
+    if (!user || deleting) return;
+    setDeleting(true);
+    try {
+      const { error } = await supabase.functions.invoke("delete-account");
+      if (error) throw error;
+      toast({
+        title: lang === "zh" ? "帳號已刪除" : "Account deleted",
+        description: lang === "zh" ? "您的帳號及資料已永久刪除。" : "Your account and data have been permanently removed.",
+      });
+      await signOut();
+    } catch (e: any) {
+      toast({
+        title: lang === "zh" ? "刪除失敗" : "Delete failed",
+        description: e?.message ?? String(e),
+        variant: "destructive",
+      });
+      setDeleting(false);
+      setShowDeleteDialog(false);
+    }
+  };
 
   // Open HR zones subpage when navigated via #hr-zones (e.g. from ActivityDetail).
   useEffect(() => {
@@ -528,6 +562,20 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps }: Props
             <span className="font-medium">{lang === "zh" ? "登出" : "Sign Out"}</span>
           </button>
         )}
+
+        {/* Delete Account */}
+        {user && (
+          <button
+            onClick={() => setShowDeleteDialog(true)}
+            className="w-full bg-card border border-destructive/40 rounded-xl p-4 flex items-center justify-between text-destructive"
+          >
+            <div className="flex items-center gap-3">
+              <Trash2 size={20} />
+              <span className="font-medium">{lang === "zh" ? "刪除帳號" : "Delete Account"}</span>
+            </div>
+            <ChevronRight size={18} className="opacity-60" />
+          </button>
+        )}
       </div>
 
       {/* Login Prompt Dialog */}
@@ -587,6 +635,36 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps }: Props
 
       <PlanComparisonDialog open={showPlanCompare} onOpenChange={setShowPlanCompare} lang={lang} />
 
+      {/* Delete Account Confirmation */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={(o) => !deleting && setShowDeleteDialog(o)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+              <Trash2 size={18} />
+              {lang === "zh" ? "刪除帳號" : "Delete Account"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {lang === "zh"
+                ? "此操作將永久刪除您的帳號、活動、訓練計劃及所有相關資料。此操作無法復原。"
+                : "This will permanently delete your account, activities, training plans and all related data. This action cannot be undone."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>
+              {lang === "zh" ? "取消" : "Cancel"}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteAccount}
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting
+                ? (lang === "zh" ? "刪除中..." : "Deleting...")
+                : (lang === "zh" ? "永久刪除" : "Permanently Delete")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

@@ -656,6 +656,11 @@ const ActivitiesTab = ({ lang }: Props) => {
     } | null;
     races?: { id: string; race_name: string; race_name_zh?: string | null; category: string }[];
   } | null>(null);
+  const todayDate = new Date();
+  const [calendarView, setCalendarView] = useState<{ year: number; month: number }>({
+    year: todayDate.getFullYear(),
+    month: todayDate.getMonth(),
+  });
 
   // Start fetching Apple Health stats immediately (even during skeleton loading)
   const appleHealth = useAppleHealth(lang);
@@ -1190,6 +1195,7 @@ const ActivitiesTab = ({ lang }: Props) => {
           activities={activities}
           plannedWorkouts={plannedWorkouts}
           userRaces={userRaces}
+          onMonthChange={(year, month) => setCalendarView({ year, month })}
           onSelectDate={({ date, activity, extraActivities, planned, races }) => {
             const d = new Date(date + "T00:00:00");
             const dateLabel = d.toLocaleDateString(lang === "zh" ? "zh-TW" : "en-US", {
@@ -1217,6 +1223,21 @@ const ActivitiesTab = ({ lang }: Props) => {
             });
           }}
         />
+
+        <div className="mt-3">
+          <MonthlyStatsCard
+            lang={lang}
+            year={calendarView.year}
+            month={calendarView.month}
+            activities={activities as any}
+            classifierCtx={{
+              age: (profile as any)?.age ?? null,
+              profileMaxHr: (profile as any)?.max_heartrate ?? null,
+              profileRestingHr: (profile as any)?.resting_heartrate ?? null,
+              customZones: (profile as any)?.custom_hr_zones ?? null,
+            }}
+          />
+        </div>
       </div>
 
       {/* Date detail bottom sheet */}

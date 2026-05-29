@@ -68,7 +68,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // user-dependent effects re-run, profile re-check fires, skeleton shows)
     // — which the user perceives as a "refresh / flicker" on app resume.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, newSession) => {
+      (event, newSession) => {
         setSession((prev) => {
           const sameUser = prev?.user?.id === newSession?.user?.id;
           const sameToken = prev?.access_token === newSession?.access_token;
@@ -86,6 +86,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             despia(`setonesignalplayerid://?user_id=${newSession.user.id}`);
           } catch (e) {
             console.warn("[Push] Failed to set OneSignal player ID:", e);
+          }
+          // Stamp last_login ONLY on real sign-in (not TOKEN_REFRESHED / USER_UPDATED),
+          // so the 30-day inactivity job can trust this column.
+          if (event === "SIGNED_IN") {
+            const uid = newSession.user.id;
+            setTimeout(() => {
+              supabase
+                .from("profiles")
+                .update({ last_login: new Date().toISOString() })
+                .eq("user_id", uid)
+                .then(({ error }) => {
+                  if (error) console.warn("[Auth] last_login update failed:", error.message);
+                });
+            }, 0);
           }
         }
       }

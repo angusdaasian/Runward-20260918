@@ -89,12 +89,18 @@ Deno.serve(async (req) => {
         if (existing && existing.user_id !== user.id) {
           console.warn(`[terra-auth-init] terra_user_id=${terraUserId} already linked to another user, skipping eager upsert`);
         } else {
+          // IMPORTANT: do NOT mark active here. Terra returns a user_id as soon
+          // as the auth URL is minted — before the user has entered any Garmin
+          // credentials. Marking active:true here makes the UI show "connected"
+          // even if the user abandons the OAuth flow. The `auth` webhook and
+          // terra-confirm (on success redirect) are the only sources of truth
+          // that flip active:true.
           const { error: upsertErr } = await admin.from("terra_connections").upsert({
             user_id: user.id,
             terra_user_id: terraUserId,
             provider: resolvedProvider,
             reference_id: user.id,
-            active: true,
+            active: false,
           }, { onConflict: "user_id,provider" });
           if (upsertErr) {
             console.error("[terra-auth-init] eager upsert failed", upsertErr);

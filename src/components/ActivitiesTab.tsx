@@ -911,8 +911,8 @@ const ActivitiesTab = ({ lang }: Props) => {
     setFetchingToday(true);
     toast.info(
       lang === "zh"
-        ? "正在同步 2026 全年活動，最多可能需要 3 分鐘，請稍候..."
-        : "Syncing all 2026 activities — this can take up to 3 minutes, please wait...",
+        ? "已開始同步 2026 全年活動，活動將於 5–10 分鐘內陸續送達。"
+        : "2026 sync started — activities will arrive over the next 5–10 minutes.",
       { duration: 8000 },
     );
     try {

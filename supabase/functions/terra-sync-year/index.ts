@@ -16,7 +16,9 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const CHUNK_DAYS = 10;
+const CHUNK_DAYS = 7;
+const CHUNK_REST_MS = 2500;
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 function ymd(d: Date): string {

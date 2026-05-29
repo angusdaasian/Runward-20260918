@@ -100,7 +100,7 @@ Deno.serve(async (req) => {
           terra_user_id: terraUserId,
           reference_id: referenceId,
           signature_valid: true,
-          payload: { provider, source: "terra-confirm", env, activity_window_days: 0, daily_date: today, results: summary } as any,
+          payload: { provider, source: "terra-confirm", env, activity_window_days: 7, daily_date: today, results: summary } as any,
         });
       } catch (e) {
         console.error("[terra-confirm] backfill log insert failed", e);

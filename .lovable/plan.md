@@ -1,55 +1,50 @@
-Send a one-off OneSignal push **today at 12:00 HKT (04:00 UTC, ~15 min away)** to free users only, using copy variant B.
+## Goal
 
-Current UTC: `2026-05-29 03:45`. Target cron: `0 4 29 5 *` (fires once today; will fire again same day next year — we'll unschedule right after it runs).
+Add a fancy, shareable **Monthly Stats** card below the Monthly Overview calendar in the Activities tab. It shows the headline numbers for the currently-viewed month and a small typed-run breakdown derived from each activity's HR profile.
 
-## What gets built
+## Card contents
 
-### 1. New edge function: `send-broadcast-notification`
-Why a new one (not reusing `send-notification`): the existing function requires an admin JWT, which a cron job doesn't have. This new one is gated by the existing `WEBHOOK_AUTH_KEY` secret (already used elsewhere) and runs with service role.
+**Top — 4 stat tiles (for the viewed month):**
+- Total distance (km)
+- Number of runs
+- Total time running (h m)
+- Average weekly distance (km) — total / number of ISO weeks that overlap the month
 
-Behavior:
-- Verifies `x-webhook-key` header against `WEBHOOK_AUTH_KEY`.
-- Body: `{ title, message, audience: "all" | "free" }`.
-- Loads all `profiles.user_id`.
-- If `audience === "free"`, loads `premium_subscriptions` where `expires_at > now()` and filters those user_ids out.
-- POSTs to OneSignal `include_external_user_ids` in chunks of 2000 (OneSignal limit).
-- Returns count of recipients.
+**Bottom — Run-type breakdown** (fancy list, e.g. `5 × Easy`, `2 × Tempo`, `1 × Interval`, `1 × Long`):
+Derived per running activity from the data already on `StravaActivity` (`distance`, `moving_time`, `average_heartrate`, `max_heartrate`) plus the user's HR zones from `profiles` (`max_heartrate`, `resting_heartrate`, `custom_hr_zones`, `age`) via existing `zoneBoundaries()` in `src/lib/hrZones.ts`.
 
-### 2. One-off pg_cron job
-Schedule via `cron.schedule('one-off-earlybird-push-20260529', '0 4 29 5 *', $$ net.http_post(...) $$)`:
-- URL: `https://kbghvclwhxnjeskdodeh.supabase.co/functions/v1/send-broadcast-notification`
-- Headers: `Content-Type: application/json`, `apikey: <anon>`, `x-webhook-key: <WEBHOOK_AUTH_KEY value>`
-- Body:
-  ```json
-  {
-    "title": "早鳥優惠剩 2 日",
-    "message": "把握最後 2 日，以早鳥價升級 Premium，價格永久鎖定，日後加價都不受影響。",
-    "audience": "free"
-  }
-  ```
+Classification heuristic (no per-second samples needed — uses avg & max HR only):
 
-The `WEBHOOK_AUTH_KEY` value will need to be inlined into the cron SQL (it's not accessible from `net.http_post` headers via env). This is fine — the cron SQL only lives in Supabase, not in repo. I'll fetch it via vault or ask you to paste it during the migration step if needed. (Preferred: store under vault `webhook_auth_key` is already there per `invoke_reset_season` — I'll read it the same way.)
+```text
+let maxZone   = zone bucket of max_heartrate
+let avgZone   = zone bucket of average_heartrate
+let durMin    = moving_time / 60
+let km        = distance / 1000
+let longestKm = max km across the month's runs
 
-Actually cleanest: write the cron SQL as a DO block that pulls `webhook_auth_key` from `vault.decrypted_secrets` (already used by `invoke_reset_season`) and builds the headers jsonb at schedule time. No secret leaks into cron.job table in plaintext beyond what's already there.
+if (maxZone >= 5 || (maxZone === 4 && (max - avg) >= 25 bpm))     → Interval
+else if (avgZone >= 4)                                            → Tempo
+else if (km >= max(15, 0.75 * longestKm) && avgZone <= 3)         → Long
+else if (avgZone <= 1 || (km < 4 && avgZone <= 2))                → Recovery
+else                                                              → Easy
+```
 
-### 3. Self-cleanup
-Right after the cron fires, the edge function will call `cron.unschedule('one-off-earlybird-push-20260529')` via a small SQL RPC so it never runs again. (Falls back gracefully if already unscheduled.)
+Fallback when HR is missing: classify by distance/pace only (Long if ≥ 75% of longest, Easy otherwise).
+
+Render the list as colored chips using the existing zone palette from `ZONE_LABELS`, sorted by count desc.
+
+## Sharing
+
+Use the existing canvas helpers (`shareCanvasHelpers.ts`, `shareActivity.distributeImageBlob`) to add a `shareMonthlyStats.ts` that renders a portrait PNG mirroring the weekly-review look. Share button on the card triggers it.
 
 ## Files
 
-- `supabase/functions/send-broadcast-notification/index.ts` — new
-- Migration: create `unschedule_one_off_push(job_name text)` SECURITY DEFINER function (so edge function can clean itself up), and `cron.schedule(...)` the one-off job
+- **New** `src/components/activities/MonthlyStatsCard.tsx` — UI card with the 4 tiles + chip list + share button.
+- **New** `src/lib/runClassifier.ts` — `classifyRun(activity, ctx)` + `summarizeRunTypes(activities, ctx)`.
+- **New** `src/lib/shareMonthlyStats.ts` — canvas-based PNG share.
+- **Edit** `src/components/activities/ActivityCalendar.tsx` — hoist the viewed-month state up via a small `onMonthChange?(year, month)` callback so the card stays in sync.
+- **Edit** `src/components/ActivitiesTab.tsx` — track viewed month, render `<MonthlyStatsCard>` directly under `<ActivityCalendar>`, pass profile HR fields already loaded.
 
-## Sequence after you approve
-
-1. Migration runs (creates unschedule helper + schedules the cron).
-2. Edge function deploys automatically.
-3. At 04:00 UTC, cron hits the function → free users get the push → function unschedules itself.
-
-## Confirm before I build
-
-- Copy variant B with slight tightening — final text I'll send:
-  - **Title:** 早鳥優惠剩 2 日
-  - **Body:** 把握最後 2 日，以早鳥價升級 Premium，價格永久鎖定，日後加價都不受影響。
-- "Free users" = users with **no active premium subscription** (expired or never subscribed). OK?
-- Time budget: it's 03:45 UTC now. If approval + migration + deploy takes >15 min we'll miss 04:00. Want me to push the cron to **04:15 UTC (12:15 HKT)** to give a safety margin, or keep 04:00 and risk missing?
+## Out of scope
+- Per-second HR sample re-fetching for higher classification accuracy.
+- New translations beyond the basic EN/ZH strings used in the card.

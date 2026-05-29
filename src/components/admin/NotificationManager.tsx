@@ -146,6 +146,21 @@ const NotificationManager = () => {
             </TabsTrigger>
           </TabsList>
 
+          <TabsContent value="all" className="mt-4 space-y-2">
+            <Label>Audience</Label>
+            <Select value={audience} onValueChange={(v) => setAudience(v as any)}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All users ({users.length})</SelectItem>
+                <SelectItem value="free">Free users only ({users.filter((u) => !u.isPremium).length})</SelectItem>
+                <SelectItem value="premium">Premium users only ({users.filter((u) => u.isPremium).length})</SelectItem>
+              </SelectContent>
+            </Select>
+          </TabsContent>
+
+
           <TabsContent value="specific" className="mt-4 space-y-3">
             <div className="space-y-2">
               <Label>Filter</Label>

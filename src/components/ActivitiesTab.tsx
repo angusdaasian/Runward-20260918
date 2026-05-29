@@ -949,6 +949,8 @@ const ActivitiesTab = ({ lang }: Props) => {
       if (!response.ok && response.status !== 402) {
         throw new Error(result?.error ?? `Sync failed (${response.status})`);
       }
+      // Lifetime one-shot for premium: hide button once invoked successfully.
+      if (response.ok) setYear2026Used(true);
       invalidateAll();
       const providers = Array.isArray(result?.providers) ? result.providers : [];
       const ingested = providers.reduce((s: number, p: any) => s + (p?.ingested ?? 0), 0);

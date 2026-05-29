@@ -73,17 +73,19 @@ Deno.serve(async (req) => {
       return json({ error: upsertErr.message }, 500);
     }
 
-    // Kick off today's health backfill only (fire-and-forget). Avoid activity
-    // backfill via webhook: sampled historical activity payloads are huge and
-    // inflate Terra dashboard response time.
+    // Kick off today's health backfill + 7-day activity backfill (fire-and-forget).
+    // to_webhook=true so results flow through the normal webhook → worker pipeline.
     const env = pickEnvFromRequest(req);
     const { devId, apiKey } = getTerraCreds(env);
     const today = new Date().toISOString().slice(0, 10);
+    const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
     const headers = { "dev-id": devId, "x-api-key": apiKey };
     const calls = [
+      { ep: "activity", url: `https://api.tryterra.co/v2/activity?user_id=${terraUserId}&start_date=${weekAgo}&end_date=${today}&to_webhook=true&with_samples=true` },
       { ep: "daily",    url: `https://api.tryterra.co/v2/daily?user_id=${terraUserId}&start_date=${today}&end_date=${today}&to_webhook=true&with_samples=false` },
       { ep: "sleep",    url: `https://api.tryterra.co/v2/sleep?user_id=${terraUserId}&start_date=${today}&end_date=${today}&to_webhook=true&with_samples=false` },
     ];
+
 
     (async () => {
       const results = await Promise.allSettled(
@@ -98,7 +100,7 @@ Deno.serve(async (req) => {
           terra_user_id: terraUserId,
           reference_id: referenceId,
           signature_valid: true,
-          payload: { provider, source: "terra-confirm", env, activity_window_days: 0, daily_date: today, results: summary } as any,
+          payload: { provider, source: "terra-confirm", env, activity_window_days: 7, daily_date: today, results: summary } as any,
         });
       } catch (e) {
         console.error("[terra-confirm] backfill log insert failed", e);

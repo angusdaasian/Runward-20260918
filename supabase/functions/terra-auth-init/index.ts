@@ -107,36 +107,12 @@ Deno.serve(async (req) => {
           } else {
             console.log(`[terra-auth-init] eager-linked provider=${provider} terra_user_id=${terraUserId}`);
 
-            // Fire-and-forget: today's daily/sleep + 7-day activity backfill.
-            // Activity payloads can be large but are now offloaded to S3
-            // (s3_payload) so they no longer bloat the Terra webhook response.
-            const today = new Date().toISOString().slice(0, 10);
-            const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-            const headers = { "dev-id": devId, "x-api-key": apiKey };
-            const calls = [
-              { ep: "activity", url: `https://api.tryterra.co/v2/activity?user_id=${terraUserId}&start_date=${weekAgo}&end_date=${today}&to_webhook=true&with_samples=true` },
-              { ep: "daily",    url: `https://api.tryterra.co/v2/daily?user_id=${terraUserId}&start_date=${today}&end_date=${today}&to_webhook=true&with_samples=false` },
-              { ep: "sleep",    url: `https://api.tryterra.co/v2/sleep?user_id=${terraUserId}&start_date=${today}&end_date=${today}&to_webhook=true&with_samples=false` },
-            ];
-            (async () => {
-              const results = await Promise.allSettled(
-                calls.map((c) => fetch(c.url, { headers }).then((r) => ({ ep: c.ep, status: r.status }))),
-              );
-              const summary = results.map((r, i) =>
-                r.status === "fulfilled" ? r.value : { ep: calls[i].ep, error: String((r as any).reason) }
-              );
-              try {
-                await admin.from("terra_webhook_events").insert({
-                  type: "terra_auth_init_backfill",
-                  terra_user_id: terraUserId,
-                  reference_id: user.id,
-                  signature_valid: true,
-                  payload: { provider, source: "terra-auth-init", env, activity_window_days: 7, daily_date: today, results: summary } as any,
-                });
-              } catch (e) {
-                console.error("[terra-auth-init] backfill log insert failed", e);
-              }
-            })();
+            // NOTE: do NOT trigger backfill here. terra-auth-init runs before
+            // the user has actually authenticated with the provider, so Terra
+            // has no data to return yet. The 7-day activity + today's
+            // daily/sleep backfill is fired from terra-confirm (on success
+            // redirect) and/or the `auth` webhook handler.
+
           }
         }
       } catch (e) {

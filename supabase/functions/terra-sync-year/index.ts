@@ -79,23 +79,20 @@ Deno.serve(async (req) => {
         );
       }
 
-      // Rate limit: 1 call per UTC day per user.
-      const startOfDay = new Date();
-      startOfDay.setUTCHours(0, 0, 0, 0);
+      // Lifetime limit: 1 call per premium user, ever.
       const { count } = await admin
         .from("terra_sync_usage")
         .select("id", { count: "exact", head: true })
         .eq("user_id", user.id)
-        .eq("function_name", "terra-sync-year")
-        .gte("called_at", startOfDay.toISOString());
+        .eq("function_name", "terra-sync-year");
       if ((count ?? 0) >= 1) {
         return new Response(
           JSON.stringify({
             ok: false,
             rateLimited: true,
             activities: 0,
-            message_en: `You've already synced ${targetYear} today. Please try again tomorrow.`,
-            message_zh: `您今天已同步過 ${targetYear} 年活動，請明天再試。`,
+            message_en: `You've already used your one-time ${targetYear} sync.`,
+            message_zh: `您已使用過一次 ${targetYear} 年活動同步。`,
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } },
         );

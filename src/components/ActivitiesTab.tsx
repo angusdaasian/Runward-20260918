@@ -744,6 +744,23 @@ const ActivitiesTab = ({ lang }: Props) => {
 
   const [resyncing, setResyncing] = useState(false);
   const [fetchingToday, setFetchingToday] = useState(false);
+  const [year2026Used, setYear2026Used] = useState(false);
+
+  useEffect(() => {
+    if (!user || !isPremium) return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from("terra_sync_usage")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("function_name", "terra-sync-year")
+        .limit(1)
+        .maybeSingle();
+      if (!cancelled && data) setYear2026Used(true);
+    })();
+    return () => { cancelled = true; };
+  }, [user, isPremium]);
 
   const handleFetchTodayTerra = useCallback(async () => {
     if (!user || fetchingToday) return;
@@ -932,6 +949,8 @@ const ActivitiesTab = ({ lang }: Props) => {
       if (!response.ok && response.status !== 402) {
         throw new Error(result?.error ?? `Sync failed (${response.status})`);
       }
+      // Lifetime one-shot for premium: hide button once invoked successfully.
+      if (response.ok) setYear2026Used(true);
       invalidateAll();
       const providers = Array.isArray(result?.providers) ? result.providers : [];
       const ingested = providers.reduce((s: number, p: any) => s + (p?.ingested ?? 0), 0);
@@ -1089,7 +1108,7 @@ const ActivitiesTab = ({ lang }: Props) => {
                 <DropdownMenuItem onClick={handleFetchWeekOnly} disabled={fetchingToday}>
                   {lang === "zh" ? "同步近 7 天活動" : "Sync past 7 days"}
                 </DropdownMenuItem>
-                {isPremium && (
+                {isPremium && !year2026Used && (
                   <DropdownMenuItem onClick={handleFetchYear2026} disabled={fetchingToday}>
                     {lang === "zh" ? "同步 2026 全年活動" : "Sync all 2026 activities"}
                   </DropdownMenuItem>

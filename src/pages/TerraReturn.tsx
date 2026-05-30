@@ -5,7 +5,7 @@ export default function TerraReturn() {
   const params = new URLSearchParams(window.location.search);
   const status = (params.get("status") ?? params.get("terra") ?? "success").toLowerCase();
   const ok = status === "success";
-  const provider = (params.get("provider") ?? params.get("resource") ?? "").toUpperCase();
+  const provider = (params.get("provider") ?? params.get("resource") ?? localStorage.getItem("terra_pending_provider") ?? "").toUpperCase();
   const terraUserId = params.get("terra_user_id") ?? params.get("user_id") ?? "";
   const referenceId = params.get("reference_id") ?? "";
   const deeplinkScheme = params.get("deeplink_scheme") ?? "";

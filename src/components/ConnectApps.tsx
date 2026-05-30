@@ -307,6 +307,12 @@ const ConnectApps = ({ lang, onBack }: Props) => {
       const { error } = await supabase.functions.invoke("terra-disconnect", { body: { provider } });
       if (error) throw error;
       toast.success(lang === "zh" ? "已中斷連結" : "Disconnected");
+      // Explicitly drop this provider so any optimistic entry is cleared too.
+      setTerraConns((prev) => {
+        const next = { ...prev };
+        delete next[provider];
+        return next;
+      });
       await loadTerraConns();
     } catch (e: any) {
       toast.error((lang === "zh" ? "中斷失敗: " : "Disconnect failed: ") + (e?.message ?? ""));

@@ -163,12 +163,13 @@ const ConnectApps = ({ lang, onBack }: Props) => {
   ];
   const [terraConns, setTerraConns] = useState<Record<string, { id: string; last_synced_at: string | null }>>({});
   const [terraBusy, setTerraBusy] = useState<string | null>(null);
+  const TERRA_PENDING_PROVIDER_KEY = "terra_pending_provider";
 
   const applyTerraReturnUrl = useCallback(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get("terra") !== "success") return null;
 
-    const urlProvider = (params.get("provider") ?? params.get("resource") ?? "").toUpperCase();
+    const urlProvider = (params.get("provider") ?? params.get("resource") ?? localStorage.getItem(TERRA_PENDING_PROVIDER_KEY) ?? "").toUpperCase();
     const urlTerraUserId = params.get("terra_user_id") ?? params.get("user_id") ?? "";
     const urlReferenceId = params.get("reference_id") ?? "";
     if (!urlProvider || (!urlTerraUserId && !urlReferenceId)) return null;
@@ -179,7 +180,7 @@ const ConnectApps = ({ lang, onBack }: Props) => {
       [urlProvider]: prev[urlProvider] ?? { id: urlTerraUserId || urlReferenceId, last_synced_at: null },
     }));
     return { provider: urlProvider, terraUserId: urlTerraUserId, referenceId: urlReferenceId };
-  }, []);
+  }, [TERRA_PENDING_PROVIDER_KEY]);
 
   const loadTerraConns = useCallback(async () => {
     if (!user) return;
@@ -251,7 +252,7 @@ const ConnectApps = ({ lang, onBack }: Props) => {
       url.searchParams.delete("resource");
       window.history.replaceState({}, "", url.toString());
     }
-  }, [lang, loadTerraConns, location.search, user]);
+  }, [applyTerraReturnUrl, lang, loadTerraConns, location.search, user]);
 
   const handleTerraConnect = async (provider: TerraProvider) => {
     if (!user) return;
@@ -260,6 +261,7 @@ const ConnectApps = ({ lang, onBack }: Props) => {
       return;
     }
     setTerraBusy(provider);
+    localStorage.setItem(TERRA_PENDING_PROVIDER_KEY, provider);
     try {
       // Use the existing /terra-return route as Terra's redirect (already
       // whitelisted). On native (Despia), TerraReturn detects deeplink_scheme

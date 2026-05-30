@@ -9,23 +9,48 @@ export default function TerraReturn() {
   const provider = params.get("provider") ?? params.get("resource") ?? "";
   const terraUserId = params.get("user_id") ?? "";
   const referenceId = params.get("reference_id") ?? "";
+  const deeplinkScheme = params.get("deeplink_scheme") ?? "";
 
-  const [confirmState, setConfirmState] = useState<"idle" | "running" | "done" | "error">("idle");
+  // If deeplink_scheme is present, this page is running inside the in-app
+  // secure browser (ASWebAuthenticationSession / Chrome Custom Tabs).
+  // We bounce to <scheme>://oauth/terra-return?... which makes Despia close
+  // the secure browser and re-open /terra-return in the main WebView
+  // *without* deeplink_scheme — that second pass is where terra-confirm runs.
+  const isBounce = !!deeplinkScheme;
+
+  const [confirmState, setConfirmState] = useState<"idle" | "running" | "done">(
+    isBounce ? "idle" : "running"
+  );
   const native = typeof window !== "undefined" && isDespiaUA();
 
+  // Bounce pass: fire the deep link as soon as the page mounts.
   useEffect(() => {
+    if (!isBounce) return;
+    const forwarded = new URLSearchParams();
+    params.forEach((value, key) => {
+      if (key === "deeplink_scheme") return;
+      forwarded.set(key, value);
+    });
+    forwarded.set("terra", ok ? "success" : "failure");
+    const deepLink = `${deeplinkScheme}://oauth/terra-return?${forwarded.toString()}`;
+    // Small delay so the user sees the success UI briefly.
+    const t = setTimeout(() => {
+      window.location.href = deepLink;
+    }, 250);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isBounce]);
+
+  // Confirm pass: only runs when we're NOT bouncing (i.e. main WebView or web).
+  useEffect(() => {
+    if (isBounce) return;
     if (!ok) return;
     let cancelled = false;
     (async () => {
-      // Only call terra-confirm when we actually have the Terra user_id in the
-      // URL. On the in-app deep-link path we have it (forwarded by
-      // terra-callback.html). If it's missing, the `auth` webhook will
-      // reconcile in the background — no need to error.
       if (!provider || !terraUserId) {
         setConfirmState("done");
         return;
       }
-      setConfirmState("running");
       try {
         const { data, error } = await supabase.functions.invoke("terra-confirm", {
           body: { provider, terra_user_id: terraUserId, reference_id: referenceId },
@@ -33,30 +58,28 @@ export default function TerraReturn() {
         if (cancelled) return;
         if (error) throw error;
         if ((data as any)?.error) throw new Error((data as any).error);
-        setConfirmState("done");
       } catch (e: any) {
-        if (cancelled) return;
-        console.error("[terra-return] confirm failed", e);
-        // The connection is already eagerly linked by terra-auth-init and the
-        // `auth` webhook will flip active=true once Terra delivers it. So
-        // treat confirm errors as "still connected, just finalizing".
-        setConfirmState("done");
+        // terra-auth-init already eager-linked; the `auth` webhook will flip
+        // active=true. Treat confirm errors as still-successful.
+        console.error("[terra-return] confirm failed (non-fatal)", e);
       }
+      if (!cancelled) setConfirmState("done");
     })();
     return () => { cancelled = true; };
-  }, [ok, provider, terraUserId, referenceId]);
+  }, [isBounce, ok, provider, terraUserId, referenceId]);
 
-  // In the native WebView the user is already back in the app — bounce them
-  // home automatically so they don't have to tap.
+  // After confirm, bounce the user back home in the native WebView so they
+  // don't get stuck on this stub page.
   useEffect(() => {
+    if (isBounce) return;
     if (!native) return;
     if (!ok) return;
     if (confirmState !== "done") return;
     const t = setTimeout(() => {
       window.location.replace(`/?terra=${ok ? "success" : "failure"}`);
-    }, 600);
+    }, 500);
     return () => clearTimeout(t);
-  }, [native, ok, confirmState]);
+  }, [isBounce, native, ok, confirmState]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-6">
@@ -66,8 +89,9 @@ export default function TerraReturn() {
           {ok ? "Connected" : "Connection failed"}
         </h1>
         <p className="text-sm text-muted-foreground">
-          {ok && confirmState === "running" && "Finalizing your connection…"}
-          {ok && confirmState !== "running" && (native
+          {ok && isBounce && "Returning to the app…"}
+          {ok && !isBounce && confirmState === "running" && "Finalizing your connection…"}
+          {ok && !isBounce && confirmState === "done" && (native
             ? "Returning to the app…"
             : "You may now close this browser.")}
           {!ok && "Please return to the app and try again."}

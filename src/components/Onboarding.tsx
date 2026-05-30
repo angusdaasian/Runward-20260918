@@ -291,7 +291,7 @@ const Onboarding = ({
   );
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [onboardingUserId, setOnboardingUserId] = useState<string | null>(user?.id ?? null);
+  const [onboardingUserId, setOnboardingUserId] = useState<string | null>(null);
 
   // Form data
   const [displayName, setDisplayName] = useState("");

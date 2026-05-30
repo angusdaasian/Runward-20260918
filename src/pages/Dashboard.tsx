@@ -46,7 +46,7 @@ const DashboardCommunity = lazy(() => import("@/components/dashboard/DashboardCo
 const DashboardAnalytics = lazy(() => import("@/components/dashboard/DashboardAnalytics"));
 const DashboardConnect = lazy(() => import("@/components/dashboard/DashboardConnect"));
 const DashboardSettings = lazy(() => import("@/components/dashboard/DashboardSettings"));
-const Onboarding = lazy(() => import("@/components/Onboarding"));
+const DashboardAuth = lazy(() => import("@/components/dashboard/DashboardAuth"));
 
 type View =
   | "overview"
@@ -292,43 +292,29 @@ const Dashboard = () => {
           </Suspense>
         )}
 
-        {/* Auth overlay — reuses mobile Onboarding flow for sign-in/register */}
+        {/* Desktop-only auth overlay — independent from mobile Onboarding flow */}
         {showAuth && (
-          <div className="fixed inset-0 z-[100] bg-background overflow-y-auto">
-            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-background/90 backdrop-blur px-4 py-3">
-              <span className="font-display font-semibold text-sm">
-                {zh ? "登入 / 註冊" : "Sign In / Register"}
-              </span>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => {
-                  setShowAuth(false);
-                  setSearchParams(
-                    (prev) => {
-                      const next = new URLSearchParams(prev);
-                      next.delete("auth");
-                      return next;
-                    },
-                    { replace: true }
-                  );
-                }}
-              >
-                {zh ? "關閉" : "Close"}
-              </Button>
-            </div>
-            <Suspense fallback={<TabPageSkeleton />}>
-              <Onboarding
-                lang={lang}
-                setLang={setLang}
-                onComplete={() => setShowAuth(false)}
-                onGuest={() => {
-                  localStorage.setItem("guest_mode", "true");
-                  setShowAuth(false);
-                }}
-              />
-            </Suspense>
-          </div>
+          <Suspense fallback={<TabPageSkeleton />}>
+            <DashboardAuth
+              lang={lang}
+              onSuccess={() => setShowAuth(false)}
+              onGuest={() => {
+                localStorage.setItem("guest_mode", "true");
+                setShowAuth(false);
+              }}
+              onClose={() => {
+                setShowAuth(false);
+                setSearchParams(
+                  (prev) => {
+                    const next = new URLSearchParams(prev);
+                    next.delete("auth");
+                    return next;
+                  },
+                  { replace: true }
+                );
+              }}
+            />
+          </Suspense>
         )}
       </div>
     </SidebarProvider>

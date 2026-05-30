@@ -186,7 +186,7 @@ export default function DashboardSettings({
           title={zh ? "個人資料" : "Profile"}
           subtitle={zh ? "管理您的跑步資料" : "Manage your runner profile"}
           icon={<SettingsIcon className="h-5 w-5" />}
-          action={
+          actions={
             <Button variant="outline" size="sm" onClick={() => setProfileSubpage("main")}>
               {zh ? "返回設定" : "Back to settings"}
             </Button>

@@ -7,7 +7,7 @@
  * then closes when the page fires `runward://oauth/...`.
  *
  * Flow:
- *   1. UA-detect Despia
+ *   1. Detect the Despia/native wrapper
  *   2. Build a Supabase OAuth URL whose redirect_to is /native-callback.html
  *      (implicit flow so tokens land in the URL hash)
  *   3. Call `despia('oauth://?url=' + encoded)`
@@ -15,15 +15,22 @@
  *   5. Despia closes the browser, navigates the WebView to /auth?access_token=...
  *   6. /auth route calls supabase.auth.setSession()
  *
- * Web (non-Despia) keeps the standard signInWithOAuth() redirect.
+ * Web keeps the standard signInWithOAuth() redirect.
  */
+
+import despia from "despia-native";
 
 const DEEPLINK_SCHEME = "runward";
 const SUPABASE_URL = "https://kbghvclwhxnjeskdodeh.supabase.co";
 
 export function isDespiaUA(): boolean {
   if (typeof navigator === "undefined") return false;
-  return (navigator.userAgent || "").toLowerCase().includes("despia");
+  const ua = navigator.userAgent || "";
+  return (
+    ua.toLowerCase().includes("despia") ||
+    (navigator as any).standalone === true ||
+    typeof (window as any).despia !== "undefined"
+  );
 }
 
 type SupportedProvider = "google" | "apple";
@@ -34,12 +41,6 @@ type SupportedProvider = "google" | "apple";
  */
 export function startDespiaOAuth(provider: SupportedProvider): boolean {
   if (!isDespiaUA()) return false;
-
-  const despia = (window as any).despia;
-  if (typeof despia !== "function") {
-    // Despia UA present but bridge missing — fall back to web flow.
-    return false;
-  }
 
   const origin = window.location.origin;
   const redirectUrl =

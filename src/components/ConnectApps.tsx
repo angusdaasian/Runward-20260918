@@ -211,23 +211,30 @@ const ConnectApps = ({ lang, onBack }: Props) => {
       const status = params.get("terra");
       const urlProvider = params.get("provider");
       const urlTerraUserId = params.get("terra_user_id") ?? params.get("user_id");
+      const urlReferenceId = params.get("reference_id") ?? "";
       if (status === "success") {
         toast.success(lang === "zh" ? "Terra 連接成功" : "Terra connected");
-        // Optimistically mark connected from URL params so the UI flips
-        // immediately, without waiting for the Terra `auth` webhook to flip
-        // active=true in the DB.
+        // Optimistically flip ✓ right away from URL params — no waiting on
+        // the webhook or terra-confirm.
         if (urlProvider) {
           setTerraConns((prev) => ({
             ...prev,
             [urlProvider]: prev[urlProvider] ?? { id: urlTerraUserId ?? "pending", last_synced_at: null },
           }));
         }
+        // Fire terra-confirm in the background to upsert active=true and
+        // kick off backfill. We don't block on it.
+        if (urlProvider && urlTerraUserId) {
+          (supabase as any).functions.invoke("terra-confirm", {
+            body: { provider: urlProvider, terra_user_id: urlTerraUserId, reference_id: urlReferenceId },
+          }).then(() => loadTerraConns()).catch((e: any) => {
+            console.error("[connect-apps] terra-confirm failed (non-fatal)", e);
+          });
+        }
       } else {
         toast.error(lang === "zh" ? "Terra 連接失敗" : "Terra connection failed");
       }
       loadTerraConns();
-      let n = 0;
-      const t = setInterval(() => { loadTerraConns(); if (++n >= 6) clearInterval(t); }, 2000);
       const url = new URL(window.location.href);
       url.searchParams.delete("terra");
       url.searchParams.delete("provider");

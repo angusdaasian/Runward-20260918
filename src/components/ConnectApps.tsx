@@ -171,7 +171,16 @@ const ConnectApps = ({ lang, onBack }: Props) => {
       .eq("active", true);
     const map: Record<string, { id: string; last_synced_at: string | null }> = {};
     (data ?? []).forEach((r: any) => { map[r.provider] = { id: r.id, last_synced_at: r.last_synced_at }; });
-    setTerraConns(map);
+    // Merge: preserve optimistic entries (from return URL) that the DB hasn't
+    // reflected yet (auth webhook hasn't flipped active=true). They'll be
+    // overwritten by the real row once the webhook lands.
+    setTerraConns((prev) => {
+      const merged = { ...map };
+      for (const [prov, val] of Object.entries(prev)) {
+        if (!merged[prov]) merged[prov] = val;
+      }
+      return merged;
+    });
   }, [user]);
 
   const hasTerraConn = Object.keys(terraConns).length > 0;

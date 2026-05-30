@@ -46,7 +46,7 @@ const DashboardCommunity = lazy(() => import("@/components/dashboard/DashboardCo
 const DashboardAnalytics = lazy(() => import("@/components/dashboard/DashboardAnalytics"));
 const DashboardConnect = lazy(() => import("@/components/dashboard/DashboardConnect"));
 const DashboardSettings = lazy(() => import("@/components/dashboard/DashboardSettings"));
-const Onboarding = lazy(() => import("@/components/Onboarding"));
+const DashboardAuth = lazy(() => import("@/components/dashboard/DashboardAuth"));
 
 type View =
   | "overview"

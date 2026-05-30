@@ -3,13 +3,14 @@ import { Activity as ActivityIcon, Calendar as CalendarIcon, TrendingUp, MapPin 
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Lang } from "@/lib/i18n";
-import { useActivities } from "@/hooks/use-activities";
+import { useActivities, type StravaActivity } from "@/hooks/use-activities";
 import DesktopPageHeader from "./DesktopPageHeader";
 import ActivityCalendar from "@/components/activities/ActivityCalendar";
 import ActivityYearHeatmap from "@/components/activities/ActivityYearHeatmap";
 import TrendsCard from "@/components/activities/TrendsCard";
 import TrainingLoadChart from "@/components/activities/TrainingLoadChart";
-import MonthlyRoadQuest from "@/components/activities/MonthlyRoadQuest";
+import DashboardMonthlyChallenge from "./DashboardMonthlyChallenge";
+import DashboardActivityDetail from "./DashboardActivityDetail";
 
 interface Props {
   lang: Lang;

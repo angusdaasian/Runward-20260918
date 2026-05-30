@@ -34,6 +34,7 @@ const hadOAuthHash =
   initialHash.includes("access_token=") ||
   initialHash.includes("refresh_token=") ||
   initialHash.includes("type=recovery");
+const hadOAuthReturn = hadOAuthHash || initialParams.has("code") || initialParams.has("error");
 const hadInAppParams = initialParams.has("tab") || initialParams.has("page");
 
 const RouteFallback = () => (
@@ -45,7 +46,7 @@ const RouteFallback = () => (
 const RootRoute = () => {
   const { session, loading } = useAuth();
   if (native) return <Index />;
-  if (hadInAppParams || hadOAuthHash) return <Index />;
+  if (hadInAppParams || hadOAuthReturn) return <Index />;
   if (loading) return <Index />;
   if (session?.user) return <Index />;
   return <Landing />;

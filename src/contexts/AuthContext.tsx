@@ -36,6 +36,21 @@ function markActive() {
   localStorage.setItem(LAST_ACTIVE_KEY, String(Date.now()));
 }
 
+function hasOAuthReturnParams() {
+  const hash = window.location.hash || "";
+  const search = window.location.search || "";
+  return (
+    search.includes("code=") ||
+    search.includes("error=") ||
+    hash.includes("access_token=") ||
+    hash.includes("refresh_token=")
+  );
+}
+
+function clearOAuthReturnUrl() {
+  window.history.replaceState(window.history.state, document.title, window.location.pathname || "/");
+}
+
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
@@ -105,7 +120,52 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     );
 
-    supabase.auth.getSession().then(({ data: { session: initialSession } }) => {
+    const finishOAuthReturn = async () => {
+      if (!hasOAuthReturnParams()) return null;
+
+      const params = new URLSearchParams(window.location.search);
+      const code = params.get("code");
+      const error = params.get("error") || params.get("error_description");
+      if (error) {
+        console.warn("[Auth] OAuth returned an error:", error);
+        clearOAuthReturnUrl();
+        return null;
+      }
+
+      if (code) {
+        const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+        if (exchangeError) {
+          console.warn("[Auth] OAuth code exchange failed:", exchangeError.message);
+          return null;
+        }
+        clearOAuthReturnUrl();
+        return data.session;
+      }
+
+      const hashParams = new URLSearchParams((window.location.hash || "").replace(/^#/, ""));
+      const accessToken = hashParams.get("access_token");
+      const refreshToken = hashParams.get("refresh_token");
+      if (accessToken && refreshToken) {
+        const { data, error: sessionError } = await supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken,
+        });
+        if (sessionError) {
+          console.warn("[Auth] OAuth token session restore failed:", sessionError.message);
+          return null;
+        }
+        clearOAuthReturnUrl();
+        return data.session;
+      }
+
+      const { data } = await supabase.auth.getSession();
+      clearOAuthReturnUrl();
+      return data.session;
+    };
+
+    finishOAuthReturn().then((oauthSession) => {
+      return supabase.auth.getSession().then(({ data: { session: storedSession } }) => {
+        const initialSession = oauthSession ?? storedSession;
       setSession((prev) => {
         const sameUser = prev?.user?.id === initialSession?.user?.id;
         const sameToken = prev?.access_token === initialSession?.access_token;
@@ -121,6 +181,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
       }
       // Resolve immediately — getSession() has already restored from storage.
+      setLoading(false);
+      });
+    }).catch((error) => {
+      console.warn("[Auth] Failed to restore OAuth session:", error);
       setLoading(false);
     });
 

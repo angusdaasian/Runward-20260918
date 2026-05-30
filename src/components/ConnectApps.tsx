@@ -248,6 +248,7 @@ const ConnectApps = ({ lang, onBack }: Props) => {
   }, []);
 
   const handleTerraConnect = async (provider: TerraProvider) => {
+    if (!user) return;
     if (hasTerraConn) {
       toast.error(lang === "zh" ? "請先中斷現有裝置連結" : "Please disconnect the current device first");
       return;
@@ -264,6 +265,7 @@ const ConnectApps = ({ lang, onBack }: Props) => {
       const successUrl = new URL("https://pacecalculator.fun/terra-return");
       successUrl.searchParams.set("status", "success");
       successUrl.searchParams.set("provider", provider);
+      successUrl.searchParams.set("reference_id", user.id);
       if (native) {
         successUrl.searchParams.set("native", "true");
         successUrl.searchParams.set("deeplink_scheme", "runward");
@@ -271,6 +273,7 @@ const ConnectApps = ({ lang, onBack }: Props) => {
       const failureUrl = new URL("https://pacecalculator.fun/terra-return");
       failureUrl.searchParams.set("status", "failure");
       failureUrl.searchParams.set("provider", provider);
+      failureUrl.searchParams.set("reference_id", user.id);
       if (native) {
         failureUrl.searchParams.set("native", "true");
         failureUrl.searchParams.set("deeplink_scheme", "runward");

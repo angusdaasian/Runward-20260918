@@ -57,7 +57,7 @@ Deno.serve(async (req) => {
         .eq("terra_user_id", resolvedTerraUserId)
         .maybeSingle();
 
-      if (existing && existing.user_id !== user.id) {
+      if (existing && existing.user_id !== ownerUserId) {
         return json({ error: "terra_user_id already linked to another account" }, 409);
       }
     } else {

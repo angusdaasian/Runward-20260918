@@ -20,6 +20,7 @@ const Support = lazy(() => import("./pages/Support.tsx"));
 const Privacy = lazy(() => import("./pages/Privacy.tsx"));
 const DeleteAccount = lazy(() => import("./pages/DeleteAccount.tsx"));
 const TerraReturn = lazy(() => import("./pages/TerraReturn.tsx"));
+const Dashboard = lazy(() => import("./pages/Dashboard.tsx"));
 
 const queryClient = new QueryClient();
 const native = isNativeApp();
@@ -67,6 +68,7 @@ const App = () => (
                 <Route path="/privacy" element={<Privacy />} />
                 <Route path="/delete-account" element={<DeleteAccount />} />
                 <Route path="/terra-return" element={<TerraReturn />} />
+                <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </Suspense>

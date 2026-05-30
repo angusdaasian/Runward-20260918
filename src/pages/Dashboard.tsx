@@ -113,6 +113,21 @@ const Dashboard = () => {
 
   const isGuest = !user;
 
+  // Auto-close auth overlay once user is authenticated
+  useEffect(() => {
+    if (user && showAuth) {
+      setShowAuth(false);
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          next.delete("auth");
+          return next;
+        },
+        { replace: true }
+      );
+    }
+  }, [user, showAuth, setSearchParams]);
+
   const currentLabel =
     [...VIEWS, ...TOOLS].find((v) => v.id === view)?.[zh ? "labelZh" : "labelEn"] ?? "";
 

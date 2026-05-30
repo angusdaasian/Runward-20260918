@@ -1,13 +1,12 @@
 import { useEffect } from "react";
 import { isDespiaUA } from "@/lib/despiaOAuth";
-import { supabase } from "@/integrations/supabase/client";
 
 export default function TerraReturn() {
   const params = new URLSearchParams(window.location.search);
   const status = (params.get("status") ?? params.get("terra") ?? "success").toLowerCase();
   const ok = status === "success";
-  const provider = params.get("provider") ?? params.get("resource") ?? "";
-  const terraUserId = params.get("user_id") ?? "";
+  const provider = (params.get("provider") ?? params.get("resource") ?? "").toUpperCase();
+  const terraUserId = params.get("terra_user_id") ?? params.get("user_id") ?? "";
   const referenceId = params.get("reference_id") ?? "";
   const deeplinkScheme = params.get("deeplink_scheme") ?? "";
 
@@ -17,15 +16,6 @@ export default function TerraReturn() {
   // to ✓ immediately and run terra-confirm in the background.
   const isBounce = !!deeplinkScheme;
   const native = typeof window !== "undefined" && isDespiaUA();
-
-  useEffect(() => {
-    if (!ok || !provider || !referenceId) return;
-    (supabase as any).functions.invoke("terra-confirm", {
-      body: { provider, terra_user_id: terraUserId, reference_id: referenceId },
-    }).catch((e: any) => {
-      console.error("[terra-return] terra-confirm failed", e);
-    });
-  }, [ok, provider, terraUserId, referenceId]);
 
   useEffect(() => {
     if (!isBounce) return;
@@ -40,11 +30,10 @@ export default function TerraReturn() {
     return () => clearTimeout(t);
   }, [isBounce, deeplinkScheme, ok, provider, terraUserId, referenceId]);
 
-  // Non-bounce native pass: redirect straight into the app's ConnectApps
-  // tab — no waiting on terra-confirm here, ConnectApps handles it.
+  // Non-bounce pass: redirect straight into ConnectApps with the Terra return
+  // params. ConnectApps flips the tick from these params immediately.
   useEffect(() => {
     if (isBounce) return;
-    if (!native) return;
     const qs = new URLSearchParams();
     qs.set("page", "connect-apps");
     qs.set("terra", ok ? "success" : "failure");
@@ -53,9 +42,9 @@ export default function TerraReturn() {
     if (referenceId) qs.set("reference_id", referenceId);
     const t = setTimeout(() => {
       window.location.replace(`/?${qs.toString()}`);
-    }, 200);
+    }, 50);
     return () => clearTimeout(t);
-  }, [isBounce, native, ok, provider, terraUserId, referenceId]);
+  }, [isBounce, ok, provider, terraUserId, referenceId]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-6">

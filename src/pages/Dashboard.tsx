@@ -12,6 +12,7 @@ import {
   Globe,
   LogOut,
   Home,
+  LayoutDashboard,
 } from "lucide-react";
 import {
   Sidebar,
@@ -44,8 +45,10 @@ const RewardsTab = lazy(() => import("@/components/RewardsTab"));
 const MoreTab = lazy(() => import("@/components/MoreTab"));
 const ConnectApps = lazy(() => import("@/components/ConnectApps"));
 const FloatingChatButton = lazy(() => import("@/components/coach/FloatingChatButton"));
+const DashboardOverview = lazy(() => import("@/components/dashboard/DashboardOverview"));
 
 type View =
+  | "overview"
   | "activities"
   | "training"
   | "races"
@@ -55,6 +58,7 @@ type View =
   | "settings";
 
 const VIEWS: { id: View; icon: typeof Activity; labelEn: string; labelZh: string }[] = [
+  { id: "overview", icon: LayoutDashboard, labelEn: "Overview", labelZh: "總覽" },
   { id: "activities", icon: Activity, labelEn: "Activities", labelZh: "活動" },
   { id: "training", icon: Dumbbell, labelEn: "Training", labelZh: "訓練" },
   { id: "races", icon: Trophy, labelEn: "Races", labelZh: "比賽" },
@@ -74,7 +78,7 @@ const Dashboard = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [runningScore, setRunningScore] = useState<number | null>(null);
 
-  const initialView = (searchParams.get("view") as View) || "activities";
+  const initialView = (searchParams.get("view") as View) || "overview";
   const [view, setViewState] = useState<View>(initialView);
 
   const setView = (v: View) => {
@@ -231,7 +235,21 @@ const Dashboard = () => {
           </header>
 
           <main className="flex-1 overflow-y-auto">
-            <div className="max-w-5xl mx-auto py-4">
+            <div
+              className={
+                view === "overview"
+                  ? "max-w-[1600px] mx-auto px-6 py-6"
+                  : "max-w-5xl mx-auto py-4"
+              }
+            >
+              {view === "overview" && (
+                <Suspense fallback={<TabPageSkeleton />}>
+                  <DashboardOverview
+                    lang={lang}
+                    onNavigate={(v) => setView(v)}
+                  />
+                </Suspense>
+              )}
               {view === "activities" && <ActivitiesTab lang={lang} />}
               {view === "training" && (
                 <Suspense fallback={<TabPageSkeleton />}>
@@ -260,7 +278,7 @@ const Dashboard = () => {
               )}
               {view === "connect" && (
                 <Suspense fallback={<TabPageSkeleton />}>
-                  <ConnectApps lang={lang} onBack={() => setView("activities")} />
+                  <ConnectApps lang={lang} onBack={() => setView("overview")} />
                 </Suspense>
               )}
               {view === "settings" && (

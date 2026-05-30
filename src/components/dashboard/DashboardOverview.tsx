@@ -317,6 +317,17 @@ export default function DashboardOverview({ lang, onNavigate }: Props) {
           </Card>
         </div>
       </div>
+
+      <DashboardActivityDetail
+        activity={selectedActivity}
+        lang={lang}
+        open={!!selectedActivity}
+        onClose={() => setSelectedActivity(null)}
+        profileAge={(profile as any)?.age ?? null}
+        profileMaxHr={(profile as any)?.max_heartrate ?? null}
+        profileRestingHr={(profile as any)?.resting_heartrate ?? null}
+        profileCustomZones={(profile as any)?.custom_hr_zones ?? null}
+      />
     </div>
   );
 }

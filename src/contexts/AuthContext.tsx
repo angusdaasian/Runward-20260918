@@ -6,6 +6,7 @@ import despia from "despia-native";
 
 const LAST_ACTIVE_KEY = "runward_last_active";
 const WARM_RESUME_MS = 5 * 60 * 1000; // 5 minutes
+const OAUTH_RETURN_PATH_KEY = "runward_oauth_return_path";
 
 interface AuthContextType {
   session: Session | null;
@@ -34,6 +35,22 @@ function detectWarmResume(): boolean {
 /** Update last active timestamp */
 function markActive() {
   localStorage.setItem(LAST_ACTIVE_KEY, String(Date.now()));
+}
+
+function hasOAuthReturnParams() {
+  const hash = window.location.hash || "";
+  const search = window.location.search || "";
+  return (
+    search.includes("code=") ||
+    search.includes("error=") ||
+    hash.includes("access_token=") ||
+    hash.includes("refresh_token=")
+  );
+}
+
+function clearOAuthReturnUrl() {
+  const cleanUrl = `${window.location.pathname}${window.location.hash ? "" : ""}`;
+  window.history.replaceState(window.history.state, document.title, cleanUrl || "/");
 }
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
@@ -105,7 +122,36 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     );
 
-    supabase.auth.getSession().then(({ data: { session: initialSession } }) => {
+    const finishOAuthReturn = async () => {
+      if (!hasOAuthReturnParams()) return null;
+
+      const params = new URLSearchParams(window.location.search);
+      const code = params.get("code");
+      const error = params.get("error") || params.get("error_description");
+      if (error) {
+        console.warn("[Auth] OAuth returned an error:", error);
+        clearOAuthReturnUrl();
+        return null;
+      }
+
+      if (code) {
+        const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+        if (exchangeError) {
+          console.warn("[Auth] OAuth code exchange failed:", exchangeError.message);
+          return null;
+        }
+        clearOAuthReturnUrl();
+        return data.session;
+      }
+
+      const { data } = await supabase.auth.getSession();
+      clearOAuthReturnUrl();
+      return data.session;
+    };
+
+    finishOAuthReturn().then((oauthSession) => {
+      return supabase.auth.getSession().then(({ data: { session: storedSession } }) => {
+        const initialSession = oauthSession ?? storedSession;
       setSession((prev) => {
         const sameUser = prev?.user?.id === initialSession?.user?.id;
         const sameToken = prev?.access_token === initialSession?.access_token;
@@ -121,6 +167,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
       }
       // Resolve immediately — getSession() has already restored from storage.
+      setLoading(false);
+      });
+    }).catch((error) => {
+      console.warn("[Auth] Failed to restore OAuth session:", error);
       setLoading(false);
     });
 

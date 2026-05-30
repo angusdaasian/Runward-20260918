@@ -81,6 +81,8 @@ const Dashboard = () => {
 
   const initialView = (searchParams.get("view") as View) || "overview";
   const [view, setViewState] = useState<View>(initialView);
+  const [showAuth, setShowAuth] = useState<boolean>(() => searchParams.get("auth") === "1");
+  const openAuth = () => setShowAuth(true);
 
   const setView = (v: View) => {
     setViewState(v);

@@ -164,6 +164,23 @@ const ConnectApps = ({ lang, onBack }: Props) => {
   const [terraConns, setTerraConns] = useState<Record<string, { id: string; last_synced_at: string | null }>>({});
   const [terraBusy, setTerraBusy] = useState<string | null>(null);
 
+  const applyTerraReturnUrl = useCallback(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("terra") !== "success") return null;
+
+    const urlProvider = (params.get("provider") ?? params.get("resource") ?? "").toUpperCase();
+    const urlTerraUserId = params.get("terra_user_id") ?? params.get("user_id") ?? "";
+    const urlReferenceId = params.get("reference_id") ?? "";
+    if (!urlProvider || (!urlTerraUserId && !urlReferenceId)) return null;
+
+    setTerraBusy(null);
+    setTerraConns((prev) => ({
+      ...prev,
+      [urlProvider]: prev[urlProvider] ?? { id: urlTerraUserId || urlReferenceId, last_synced_at: null },
+    }));
+    return { provider: urlProvider, terraUserId: urlTerraUserId, referenceId: urlReferenceId };
+  }, []);
+
   const loadTerraConns = useCallback(async () => {
     if (!user) return;
     const { data } = await (supabase as any)
@@ -173,9 +190,6 @@ const ConnectApps = ({ lang, onBack }: Props) => {
       .eq("active", true);
     const map: Record<string, { id: string; last_synced_at: string | null }> = {};
     (data ?? []).forEach((r: any) => { map[r.provider] = { id: r.id, last_synced_at: r.last_synced_at }; });
-    // Merge: preserve optimistic entries (from return URL) that the DB hasn't
-    // reflected yet (auth webhook hasn't flipped active=true). They'll be
-    // overwritten by the real row once the webhook lands.
     setTerraConns((prev) => {
       const merged = { ...map };
       for (const [prov, val] of Object.entries(prev)) {
@@ -187,7 +201,10 @@ const ConnectApps = ({ lang, onBack }: Props) => {
 
   const hasTerraConn = Object.keys(terraConns).length > 0;
 
-  useEffect(() => { loadTerraConns(); }, [loadTerraConns]);
+  useEffect(() => {
+    applyTerraReturnUrl();
+    loadTerraConns();
+  }, [applyTerraReturnUrl, loadTerraConns]);
 
   // When user returns from external OAuth browser, clear any stuck "busy" state
   // and refresh connections so the button flips from spinner to ✓.
@@ -211,25 +228,13 @@ const ConnectApps = ({ lang, onBack }: Props) => {
     const params = new URLSearchParams(window.location.search);
     if (params.get("terra")) {
       const status = params.get("terra");
-      const urlProvider = params.get("provider");
-      const urlTerraUserId = params.get("terra_user_id") ?? params.get("user_id");
-      const urlReferenceId = params.get("reference_id") ?? "";
       if (status === "success") {
-        // Optimistically flip ✓ right away from URL params — no waiting on
-        // the webhook or terra-confirm.
-        if (urlProvider) {
-          setTerraConns((prev) => ({
-            ...prev,
-            [urlProvider]: prev[urlProvider] ?? { id: urlTerraUserId ?? "pending", last_synced_at: null },
-          }));
-        }
+        const returned = applyTerraReturnUrl();
         if (!user) return;
         toast.success(lang === "zh" ? "Terra 連接成功" : "Terra connected");
-        // Fire terra-confirm in the background to mark the eager row active
-        // and kick off backfill. We don't block the UI tick on it.
-        if (urlProvider) {
+        if (returned) {
           (supabase as any).functions.invoke("terra-confirm", {
-            body: { provider: urlProvider, terra_user_id: urlTerraUserId, reference_id: urlReferenceId },
+            body: { provider: returned.provider, terra_user_id: returned.terraUserId, reference_id: returned.referenceId },
           }).then(() => loadTerraConns()).catch((e: any) => {
             console.error("[connect-apps] terra-confirm failed (non-fatal)", e);
           });
@@ -237,7 +242,6 @@ const ConnectApps = ({ lang, onBack }: Props) => {
       } else {
         toast.error(lang === "zh" ? "Terra 連接失敗" : "Terra connection failed");
       }
-      loadTerraConns();
       const url = new URL(window.location.href);
       url.searchParams.delete("terra");
       url.searchParams.delete("provider");

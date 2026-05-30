@@ -45,6 +45,26 @@ export default function AuthCallback() {
           setError(setErr.message);
           return;
         }
+        // iOS WebView fix: after returning from ASWebAuthenticationSession,
+        // the WebView's viewport / safe-area insets don't recalc on their
+        // own — leaving a green status-bar strip and a shrunk layout until
+        // the app is restarted. Poke the layout engine before navigating.
+        try {
+          // Force reflow + dispatch resize so anything reading
+          // window.innerHeight / visualViewport / env(safe-area-*) updates.
+          document.body.style.minHeight = "100vh";
+          void document.body.offsetHeight;
+          window.dispatchEvent(new Event("resize"));
+          window.scrollTo(0, 1);
+          window.scrollTo(0, 0);
+          // Second pass after iOS finishes its own layout pass
+          setTimeout(() => {
+            window.dispatchEvent(new Event("resize"));
+            window.scrollTo(0, 0);
+          }, 150);
+        } catch {
+          // best-effort
+        }
         navigate("/", { replace: true });
       })
       .catch((e: unknown) => {

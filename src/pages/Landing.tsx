@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Globe, Smartphone, ChevronRight, CheckCircle2, Check, X, Crown, Sparkles, Target } from "lucide-react";
+import { Globe, Smartphone, ChevronRight, CheckCircle2, Check, X, Crown, Sparkles, Target, KeyRound } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import appStoreBadge from "@/assets/app-store-badge.png";
@@ -113,6 +113,13 @@ const Landing = () => {
               <Globe size={14} />
               {lang === "en" ? "中文" : "EN"}
             </button>
+            <Link
+              to="/dashboard?auth=1"
+              className="hidden sm:inline-flex items-center gap-2 px-4 py-2 rounded-full bg-card border border-border text-sm font-semibold text-foreground hover:bg-muted transition-colors"
+            >
+              <KeyRound size={14} />
+              {zh ? "登入 / 註冊" : "Sign In"}
+            </Link>
             <Link
               to="/dashboard"
               className="hidden sm:inline-flex items-center gap-2 px-4 py-2 rounded-full bg-card border border-border text-sm font-semibold text-foreground hover:bg-muted transition-colors"

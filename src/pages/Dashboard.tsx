@@ -46,6 +46,7 @@ const DashboardCommunity = lazy(() => import("@/components/dashboard/DashboardCo
 const DashboardAnalytics = lazy(() => import("@/components/dashboard/DashboardAnalytics"));
 const DashboardConnect = lazy(() => import("@/components/dashboard/DashboardConnect"));
 const DashboardSettings = lazy(() => import("@/components/dashboard/DashboardSettings"));
+const Onboarding = lazy(() => import("@/components/Onboarding"));
 
 type View =
   | "overview"
@@ -80,6 +81,8 @@ const Dashboard = () => {
 
   const initialView = (searchParams.get("view") as View) || "overview";
   const [view, setViewState] = useState<View>(initialView);
+  const [showAuth, setShowAuth] = useState<boolean>(() => searchParams.get("auth") === "1");
+  const openAuth = () => setShowAuth(true);
 
   const setView = (v: View) => {
     setViewState(v);
@@ -109,6 +112,21 @@ const Dashboard = () => {
   const zh = lang === "zh";
 
   const isGuest = !user;
+
+  // Auto-close auth overlay once user is authenticated
+  useEffect(() => {
+    if (user && showAuth) {
+      setShowAuth(false);
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          next.delete("auth");
+          return next;
+        },
+        { replace: true }
+      );
+    }
+  }, [user, showAuth, setSearchParams]);
 
   const currentLabel =
     [...VIEWS, ...TOOLS].find((v) => v.id === view)?.[zh ? "labelZh" : "labelEn"] ?? "";
@@ -227,8 +245,8 @@ const Dashboard = () => {
             <h1 className="font-display font-semibold text-base">{currentLabel}</h1>
             <div className="ml-auto flex items-center gap-2">
               {isGuest && (
-                <Button size="sm" variant="default" onClick={() => navigate("/")}>
-                  {zh ? "登入" : "Sign in"}
+                <Button size="sm" variant="default" onClick={openAuth}>
+                  {zh ? "登入 / 註冊" : "Sign in / Register"}
                 </Button>
               )}
             </div>
@@ -246,7 +264,7 @@ const Dashboard = () => {
                     lang={lang}
                     score={runningScore}
                     setScore={setRunningScore}
-                    onLoginRequest={() => navigate("/")}
+                    onLoginRequest={openAuth}
                   />
                 )}
                 {view === "races" && <DashboardRaces lang={lang} />}
@@ -259,7 +277,7 @@ const Dashboard = () => {
                   <DashboardSettings
                     lang={lang}
                     setLang={setLang}
-                    onLoginRequest={() => navigate("/")}
+                    onLoginRequest={openAuth}
                     onNavigateConnectApps={() => setView("connect")}
                   />
                 )}
@@ -272,6 +290,45 @@ const Dashboard = () => {
           <Suspense fallback={null}>
             <FloatingChatButton lang={lang} />
           </Suspense>
+        )}
+
+        {/* Auth overlay — reuses mobile Onboarding flow for sign-in/register */}
+        {showAuth && (
+          <div className="fixed inset-0 z-[100] bg-background overflow-y-auto">
+            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-background/90 backdrop-blur px-4 py-3">
+              <span className="font-display font-semibold text-sm">
+                {zh ? "登入 / 註冊" : "Sign In / Register"}
+              </span>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => {
+                  setShowAuth(false);
+                  setSearchParams(
+                    (prev) => {
+                      const next = new URLSearchParams(prev);
+                      next.delete("auth");
+                      return next;
+                    },
+                    { replace: true }
+                  );
+                }}
+              >
+                {zh ? "關閉" : "Close"}
+              </Button>
+            </div>
+            <Suspense fallback={<TabPageSkeleton />}>
+              <Onboarding
+                lang={lang}
+                setLang={setLang}
+                onComplete={() => setShowAuth(false)}
+                onGuest={() => {
+                  localStorage.setItem("guest_mode", "true");
+                  setShowAuth(false);
+                }}
+              />
+            </Suspense>
+          </div>
         )}
       </div>
     </SidebarProvider>

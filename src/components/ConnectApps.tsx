@@ -26,6 +26,14 @@ interface Props {
 
 const TERRA_PENDING_PROVIDER_KEY = "terra_pending_provider";
 
+type TerraConnRow = {
+  id: string;
+  provider: string;
+  last_synced_at: string | null;
+};
+
+const errorMessage = (error: unknown) => error instanceof Error ? error.message : String(error ?? "");
+
 const ConnectApps = ({ lang, onBack }: Props) => {
   const { user } = useAuth();
   const location = useLocation();
@@ -186,13 +194,13 @@ const ConnectApps = ({ lang, onBack }: Props) => {
 
   const loadTerraConns = useCallback(async () => {
     if (!user) return;
-    const { data } = await (supabase as any)
+    const { data } = await supabase
       .from("terra_connections")
       .select("id, provider, last_synced_at, active")
       .eq("user_id", user.id)
       .eq("active", true);
     const map: Record<string, { id: string; last_synced_at: string | null }> = {};
-    (data ?? []).forEach((r: any) => { map[r.provider] = { id: r.id, last_synced_at: r.last_synced_at }; });
+    ((data ?? []) as TerraConnRow[]).forEach((r) => { map[r.provider] = { id: r.id, last_synced_at: r.last_synced_at }; });
     setTerraConns((prev) => {
       const merged = { ...map };
       for (const [prov, val] of Object.entries(prev)) {
@@ -236,9 +244,9 @@ const ConnectApps = ({ lang, onBack }: Props) => {
         if (!user) return;
         toast.success(lang === "zh" ? "Terra 連接成功" : "Terra connected");
         if (returned) {
-          (supabase as any).functions.invoke("terra-confirm", {
+          supabase.functions.invoke("terra-confirm", {
             body: { provider: returned.provider, terra_user_id: returned.terraUserId, reference_id: returned.referenceId },
-          }).then(() => loadTerraConns()).catch((e: any) => {
+          }).then(() => loadTerraConns()).catch((e: unknown) => {
             console.error("[connect-apps] terra-confirm failed (non-fatal)", e);
           });
         }

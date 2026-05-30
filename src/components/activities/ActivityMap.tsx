@@ -68,9 +68,10 @@ function renderRoute(map: L.Map, coords: [number, number][], padding: [number, n
 
 interface Props {
   polyline: string;
+  className?: string;
 }
 
-const ActivityMap = ({ polyline }: Props) => {
+const ActivityMap = ({ polyline, className }: Props) => {
   const previewRef = useRef<HTMLDivElement>(null);
   const previewMapRef = useRef<L.Map | null>(null);
   const fullRef = useRef<HTMLDivElement>(null);
@@ -165,7 +166,7 @@ const ActivityMap = ({ polyline }: Props) => {
       >
         <div
           ref={previewRef}
-          className="w-full h-32 rounded-lg overflow-hidden"
+          className={`w-full rounded-lg overflow-hidden ${className || "h-32"}`}
           style={{ zIndex: 0 }}
         />
         <div className="absolute top-2 right-2 bg-background/90 backdrop-blur-sm rounded-md p-1.5 shadow-md opacity-80 group-hover:opacity-100 transition-opacity">

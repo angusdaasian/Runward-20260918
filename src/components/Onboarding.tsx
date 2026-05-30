@@ -569,6 +569,11 @@ const Onboarding = ({
   };
 
   const handleGoogleSignIn = async () => {
+    // Despia native: route through the oauth:// bridge so the secure
+    // browser closes and the WebView gets the session.
+    const { startDespiaOAuth } = await import("@/lib/despiaOAuth");
+    if (startDespiaOAuth("google")) return;
+
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: { redirectTo: window.location.origin },

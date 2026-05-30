@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { isDespiaUA } from "@/lib/despiaOAuth";
+import { supabase } from "@/integrations/supabase/client";
 
 export default function TerraReturn() {
   const params = new URLSearchParams(window.location.search);
@@ -16,6 +17,15 @@ export default function TerraReturn() {
   // to ✓ immediately and run terra-confirm in the background.
   const isBounce = !!deeplinkScheme;
   const native = typeof window !== "undefined" && isDespiaUA();
+
+  useEffect(() => {
+    if (!ok || !provider || !referenceId) return;
+    (supabase as any).functions.invoke("terra-confirm", {
+      body: { provider, terra_user_id: terraUserId, reference_id: referenceId },
+    }).catch((e: any) => {
+      console.error("[terra-return] terra-confirm failed", e);
+    });
+  }, [ok, provider, terraUserId, referenceId]);
 
   useEffect(() => {
     if (!isBounce) return;

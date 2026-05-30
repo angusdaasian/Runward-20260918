@@ -37,15 +37,15 @@ import { supabase } from "@/integrations/supabase/client";
 import { TabPageSkeleton } from "@/components/ui/PageSkeleton";
 import appIcon from "@/assets/app-icon.png";
 
-import ActivitiesTab from "@/components/ActivitiesTab";
-const TrainingTab = lazy(() => import("@/components/TrainingTab"));
-const AnalyticsTab = lazy(() => import("@/components/AnalyticsTab"));
-const RaceTab = lazy(() => import("@/components/RaceTab"));
-const RewardsTab = lazy(() => import("@/components/RewardsTab"));
-const MoreTab = lazy(() => import("@/components/MoreTab"));
-const ConnectApps = lazy(() => import("@/components/ConnectApps"));
 const FloatingChatButton = lazy(() => import("@/components/coach/FloatingChatButton"));
 const DashboardOverview = lazy(() => import("@/components/dashboard/DashboardOverview"));
+const DashboardActivities = lazy(() => import("@/components/dashboard/DashboardActivities"));
+const DashboardTraining = lazy(() => import("@/components/dashboard/DashboardTraining"));
+const DashboardRaces = lazy(() => import("@/components/dashboard/DashboardRaces"));
+const DashboardCommunity = lazy(() => import("@/components/dashboard/DashboardCommunity"));
+const DashboardAnalytics = lazy(() => import("@/components/dashboard/DashboardAnalytics"));
+const DashboardConnect = lazy(() => import("@/components/dashboard/DashboardConnect"));
+const DashboardSettings = lazy(() => import("@/components/dashboard/DashboardSettings"));
 
 type View =
   | "overview"

@@ -264,7 +264,7 @@ const Dashboard = () => {
                     lang={lang}
                     score={runningScore}
                     setScore={setRunningScore}
-                    onLoginRequest={() => navigate("/")}
+                    onLoginRequest={openAuth}
                   />
                 )}
                 {view === "races" && <DashboardRaces lang={lang} />}
@@ -277,7 +277,7 @@ const Dashboard = () => {
                   <DashboardSettings
                     lang={lang}
                     setLang={setLang}
-                    onLoginRequest={() => navigate("/")}
+                    onLoginRequest={openAuth}
                     onNavigateConnectApps={() => setView("connect")}
                   />
                 )}
@@ -290,6 +290,45 @@ const Dashboard = () => {
           <Suspense fallback={null}>
             <FloatingChatButton lang={lang} />
           </Suspense>
+        )}
+
+        {/* Auth overlay — reuses mobile Onboarding flow for sign-in/register */}
+        {showAuth && (
+          <div className="fixed inset-0 z-[100] bg-background overflow-y-auto">
+            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-background/90 backdrop-blur px-4 py-3">
+              <span className="font-display font-semibold text-sm">
+                {zh ? "登入 / 註冊" : "Sign In / Register"}
+              </span>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => {
+                  setShowAuth(false);
+                  setSearchParams(
+                    (prev) => {
+                      const next = new URLSearchParams(prev);
+                      next.delete("auth");
+                      return next;
+                    },
+                    { replace: true }
+                  );
+                }}
+              >
+                {zh ? "關閉" : "Close"}
+              </Button>
+            </div>
+            <Suspense fallback={<TabPageSkeleton />}>
+              <Onboarding
+                lang={lang}
+                setLang={setLang}
+                onComplete={() => setShowAuth(false)}
+                onGuest={() => {
+                  localStorage.setItem("guest_mode", "true");
+                  setShowAuth(false);
+                }}
+              />
+            </Suspense>
+          </div>
         )}
       </div>
     </SidebarProvider>

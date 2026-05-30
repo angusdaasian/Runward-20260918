@@ -36,7 +36,6 @@ Deno.serve(async (req) => {
     const referenceId = String(body.reference_id ?? user.id).trim();
 
     if (!provider) return json({ error: "missing provider" }, 400);
-    if (!terraUserId) return json({ error: "missing terra_user_id" }, 400);
 
     // Caller must own the reference_id they're confirming.
     if (referenceId !== user.id) {
@@ -48,20 +47,32 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
 
-    // If a webhook beat us to it for this terra_user_id, treat as success.
-    const { data: existing } = await admin
-      .from("terra_connections")
-      .select("id, user_id, terra_user_id")
-      .eq("terra_user_id", terraUserId)
-      .maybeSingle();
+    let resolvedTerraUserId = terraUserId;
+    if (resolvedTerraUserId) {
+      // If a webhook beat us to it for this terra_user_id, treat as success.
+      const { data: existing } = await admin
+        .from("terra_connections")
+        .select("id, user_id, terra_user_id")
+        .eq("terra_user_id", resolvedTerraUserId)
+        .maybeSingle();
 
-    if (existing && existing.user_id !== user.id) {
-      return json({ error: "terra_user_id already linked to another account" }, 409);
+      if (existing && existing.user_id !== user.id) {
+        return json({ error: "terra_user_id already linked to another account" }, 409);
+      }
+    } else {
+      const { data: eagerConn } = await admin
+        .from("terra_connections")
+        .select("terra_user_id")
+        .eq("user_id", user.id)
+        .eq("provider", provider)
+        .maybeSingle();
+      resolvedTerraUserId = String(eagerConn?.terra_user_id ?? "").trim();
+      if (!resolvedTerraUserId) return json({ error: "missing terra_user_id" }, 400);
     }
 
     const { error: upsertErr } = await admin.from("terra_connections").upsert({
       user_id: user.id,
-      terra_user_id: terraUserId,
+      terra_user_id: resolvedTerraUserId,
       provider,
       reference_id: referenceId,
       active: true,
@@ -81,9 +92,9 @@ Deno.serve(async (req) => {
     const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
     const headers = { "dev-id": devId, "x-api-key": apiKey };
     const calls = [
-      { ep: "activity", url: `https://api.tryterra.co/v2/activity?user_id=${terraUserId}&start_date=${weekAgo}&end_date=${today}&to_webhook=true&with_samples=true` },
-      { ep: "daily",    url: `https://api.tryterra.co/v2/daily?user_id=${terraUserId}&start_date=${today}&end_date=${today}&to_webhook=true&with_samples=false` },
-      { ep: "sleep",    url: `https://api.tryterra.co/v2/sleep?user_id=${terraUserId}&start_date=${today}&end_date=${today}&to_webhook=true&with_samples=false` },
+      { ep: "activity", url: `https://api.tryterra.co/v2/activity?user_id=${resolvedTerraUserId}&start_date=${weekAgo}&end_date=${today}&to_webhook=true&with_samples=true` },
+      { ep: "daily",    url: `https://api.tryterra.co/v2/daily?user_id=${resolvedTerraUserId}&start_date=${today}&end_date=${today}&to_webhook=true&with_samples=false` },
+      { ep: "sleep",    url: `https://api.tryterra.co/v2/sleep?user_id=${resolvedTerraUserId}&start_date=${today}&end_date=${today}&to_webhook=true&with_samples=false` },
     ];
 
 
@@ -97,7 +108,7 @@ Deno.serve(async (req) => {
       try {
         await admin.from("terra_webhook_events").insert({
           type: "terra_confirm_backfill",
-          terra_user_id: terraUserId,
+          terra_user_id: resolvedTerraUserId,
           reference_id: referenceId,
           signature_valid: true,
           payload: { provider, source: "terra-confirm", env, activity_window_days: 7, daily_date: today, results: summary } as any,
@@ -107,8 +118,8 @@ Deno.serve(async (req) => {
       }
     })();
 
-    console.log(`[terra-confirm] linked provider=${provider} terra_user_id=${terraUserId} user_id=${user.id} env=${env}`);
-    return json({ ok: true, provider, terra_user_id: terraUserId });
+    console.log(`[terra-confirm] linked provider=${provider} terra_user_id=${resolvedTerraUserId} user_id=${user.id} env=${env}`);
+    return json({ ok: true, provider, terra_user_id: resolvedTerraUserId });
   } catch (e) {
     console.error("[terra-confirm] error", e);
     return json({ error: String(e) }, 500);

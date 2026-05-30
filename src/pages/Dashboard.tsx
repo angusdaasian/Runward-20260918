@@ -78,7 +78,7 @@ const Dashboard = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [runningScore, setRunningScore] = useState<number | null>(null);
 
-  const initialView = (searchParams.get("view") as View) || "activities";
+  const initialView = (searchParams.get("view") as View) || "overview";
   const [view, setViewState] = useState<View>(initialView);
 
   const setView = (v: View) => {

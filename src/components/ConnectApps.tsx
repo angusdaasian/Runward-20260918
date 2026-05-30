@@ -221,24 +221,27 @@ const ConnectApps = ({ lang, onBack }: Props) => {
     }
     setTerraBusy(provider);
     try {
-      // Terra redirects to https://pacecalculator.fun/terra-callback.html on
-      // completion. On native (Despia), that page bounces to
-      // runward://oauth/terra-return?... which (a) tells Despia to close the
-      // in-app secure browser and (b) navigates the WebView to /terra-return
-      // where we run terra-confirm. On web, the page just shows
-      // "you may close this browser".
+      // Use the existing /terra-return route as Terra's redirect (already
+      // whitelisted). On native (Despia), TerraReturn detects deeplink_scheme
+      // and bounces to runward://oauth/terra-return?... which makes Despia
+      // close the secure browser and re-open /terra-return in the main
+      // WebView (without deeplink_scheme this time) where we run
+      // terra-confirm. On web, /terra-return just shows the close-browser UI.
       const native = isDespiaUA();
-      const callbackBase = "https://pacecalculator.fun/terra-callback.html";
-
-      const successUrl = new URL(callbackBase);
+      const successUrl = new URL("https://pacecalculator.fun/terra-return");
       successUrl.searchParams.set("status", "success");
       successUrl.searchParams.set("provider", provider);
-      if (native) successUrl.searchParams.set("deeplink_scheme", "runward");
-
-      const failureUrl = new URL(callbackBase);
+      if (native) {
+        successUrl.searchParams.set("native", "true");
+        successUrl.searchParams.set("deeplink_scheme", "runward");
+      }
+      const failureUrl = new URL("https://pacecalculator.fun/terra-return");
       failureUrl.searchParams.set("status", "failure");
       failureUrl.searchParams.set("provider", provider);
-      if (native) failureUrl.searchParams.set("deeplink_scheme", "runward");
+      if (native) {
+        failureUrl.searchParams.set("native", "true");
+        failureUrl.searchParams.set("deeplink_scheme", "runward");
+      }
 
       const { data, error } = await supabase.functions.invoke("terra-auth-init", {
         body: { provider, success_url: successUrl.toString(), failure_url: failureUrl.toString() },
@@ -257,6 +260,7 @@ const ConnectApps = ({ lang, onBack }: Props) => {
       setTerraBusy(null);
     }
   };
+
 
 
   const handleTerraSync = async (provider: TerraProvider) => {

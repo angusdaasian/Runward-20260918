@@ -166,7 +166,7 @@ const ActivityMap = ({ polyline, className }: Props) => {
       >
         <div
           ref={previewRef}
-          className="w-full h-32 rounded-lg overflow-hidden"
+          className={`w-full rounded-lg overflow-hidden ${className || "h-32"}`}
           style={{ zIndex: 0 }}
         />
         <div className="absolute top-2 right-2 bg-background/90 backdrop-blur-sm rounded-md p-1.5 shadow-md opacity-80 group-hover:opacity-100 transition-opacity">

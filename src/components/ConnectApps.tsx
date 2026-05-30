@@ -25,6 +25,7 @@ interface Props {
 }
 
 const TERRA_PENDING_PROVIDER_KEY = "terra_pending_provider";
+const TERRA_PROVIDER_IDS = ["GARMIN", "POLAR", "SUUNTO", "COROS", "ZEPP"] as const;
 
 type TerraConnRow = {
   id: string;
@@ -179,6 +180,17 @@ const ConnectApps = ({ lang, onBack }: Props) => {
   const [terraConns, setTerraConns] = useState<Record<string, { id: string; last_synced_at: string | null }>>({});
   const [terraBusy, setTerraBusy] = useState<string | null>(null);
 
+  const applyPendingTerraProvider = useCallback(() => {
+    const pendingProvider = (localStorage.getItem(TERRA_PENDING_PROVIDER_KEY) ?? "").toUpperCase();
+    if (!TERRA_PROVIDER_IDS.includes(pendingProvider as typeof TERRA_PROVIDER_IDS[number])) return null;
+
+    setTerraConns((prev) => ({
+      ...prev,
+      [pendingProvider]: prev[pendingProvider] ?? { id: "pending", last_synced_at: null },
+    }));
+    return pendingProvider;
+  }, []);
+
   const applyTerraReturnUrl = useCallback(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get("terra") !== "success") return null;
@@ -218,15 +230,17 @@ const ConnectApps = ({ lang, onBack }: Props) => {
   const hasTerraConn = Object.keys(terraConns).length > 0;
 
   useEffect(() => {
+    applyPendingTerraProvider();
     applyTerraReturnUrl();
     loadTerraConns();
-  }, [applyTerraReturnUrl, loadTerraConns]);
+  }, [applyPendingTerraProvider, applyTerraReturnUrl, loadTerraConns]);
 
   // When user returns from external OAuth browser, clear any stuck "busy" state
   // and refresh connections so the button flips from spinner to ✓.
   useEffect(() => {
     const onFocus = () => {
       setTerraBusy(null);
+      applyPendingTerraProvider();
       loadTerraConns();
     };
     const onVisibility = () => {
@@ -238,7 +252,7 @@ const ConnectApps = ({ lang, onBack }: Props) => {
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [loadTerraConns]);
+  }, [applyPendingTerraProvider, loadTerraConns]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -279,6 +293,10 @@ const ConnectApps = ({ lang, onBack }: Props) => {
     }
     setTerraBusy(provider);
     localStorage.setItem(TERRA_PENDING_PROVIDER_KEY, provider);
+    setTerraConns((prev) => ({
+      ...prev,
+      [provider]: prev[provider] ?? { id: "pending", last_synced_at: null },
+    }));
     try {
       const native = isDespiaUA();
       const iosNative = native && isIOSRuntime();

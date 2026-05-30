@@ -200,12 +200,28 @@ const ConnectApps = ({ lang, onBack }: Props) => {
     const params = new URLSearchParams(window.location.search);
     if (params.get("terra")) {
       const status = params.get("terra");
-      if (status === "success") toast.success(lang === "zh" ? "Terra 連接成功" : "Terra connected");
-      else toast.error(lang === "zh" ? "Terra 連接失敗" : "Terra connection failed");
+      const urlProvider = params.get("provider");
+      const urlTerraUserId = params.get("terra_user_id") ?? params.get("user_id");
+      if (status === "success") {
+        toast.success(lang === "zh" ? "Terra 連接成功" : "Terra connected");
+        // Optimistically mark connected from URL params so the UI flips
+        // immediately, without waiting for the Terra `auth` webhook to flip
+        // active=true in the DB.
+        if (urlProvider) {
+          setTerraConns((prev) => ({
+            ...prev,
+            [urlProvider]: prev[urlProvider] ?? { id: urlTerraUserId ?? "pending", last_synced_at: null },
+          }));
+        }
+      } else {
+        toast.error(lang === "zh" ? "Terra 連接失敗" : "Terra connection failed");
+      }
       let n = 0;
       const t = setInterval(() => { loadTerraConns(); if (++n >= 6) clearInterval(t); }, 2000);
       const url = new URL(window.location.href);
       url.searchParams.delete("terra");
+      url.searchParams.delete("provider");
+      url.searchParams.delete("terra_user_id");
       url.searchParams.delete("user_id");
       url.searchParams.delete("reference_id");
       url.searchParams.delete("resource");

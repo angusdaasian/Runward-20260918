@@ -1,0 +1,1 @@
+UPDATE public.terra_connections SET active = true WHERE id = 'bf63c8cb-5250-4643-a190-c271751ea28c';

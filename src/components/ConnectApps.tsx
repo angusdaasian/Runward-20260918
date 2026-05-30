@@ -10,6 +10,7 @@ import { useGarmin } from "@/hooks/use-garmin";
 import { getAppEnvironment } from "@/lib/environment";
 import despia from "despia-native";
 import { isDespiaUA } from "@/lib/despiaOAuth";
+import { useLocation } from "react-router-dom";
 
 import GarminCredentialDialog from "@/components/GarminCredentialDialog";
 import corosIcon from "@/assets/brands/coros.png";
@@ -25,6 +26,7 @@ interface Props {
 
 const ConnectApps = ({ lang, onBack }: Props) => {
   const { user } = useAuth();
+  const location = useLocation();
   const [stravaConnected, setStravaConnected] = useState(false);
   const [appleHealthConnected, setAppleHealthConnected] = useState(false);
   const [garminConnected, setGarminConnected] = useState(false);
@@ -206,7 +208,7 @@ const ConnectApps = ({ lang, onBack }: Props) => {
   }, [loadTerraConns]);
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
+    const params = new URLSearchParams(location.search || window.location.search);
     if (params.get("terra")) {
       const status = params.get("terra");
       const urlProvider = params.get("provider");
@@ -244,8 +246,7 @@ const ConnectApps = ({ lang, onBack }: Props) => {
       url.searchParams.delete("resource");
       window.history.replaceState({}, "", url.toString());
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [lang, loadTerraConns, location.search]);
 
   const handleTerraConnect = async (provider: TerraProvider) => {
     if (!user) return;

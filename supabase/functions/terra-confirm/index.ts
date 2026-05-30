@@ -37,6 +37,7 @@ Deno.serve(async (req) => {
 
     if (!provider) return json({ error: "missing provider" }, 400);
     if (!ownerUserId) return json({ error: "missing reference_id" }, 400);
+    if (!user && terraUserId && terraUserId !== "pending") return json({ error: "unauthorized" }, 401);
 
     // Authenticated callers must own the reference_id they're confirming.
     if (user && referenceId !== user.id) {

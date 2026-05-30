@@ -24,6 +24,16 @@ interface Props {
   onBack: () => void;
 }
 
+const TERRA_PENDING_PROVIDER_KEY = "terra_pending_provider";
+
+type TerraConnRow = {
+  id: string;
+  provider: string;
+  last_synced_at: string | null;
+};
+
+const errorMessage = (error: unknown) => error instanceof Error ? error.message : String(error ?? "");
+
 const ConnectApps = ({ lang, onBack }: Props) => {
   const { user } = useAuth();
   const location = useLocation();
@@ -164,18 +174,33 @@ const ConnectApps = ({ lang, onBack }: Props) => {
   const [terraConns, setTerraConns] = useState<Record<string, { id: string; last_synced_at: string | null }>>({});
   const [terraBusy, setTerraBusy] = useState<string | null>(null);
 
+  const applyTerraReturnUrl = useCallback(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("terra") !== "success") return null;
+
+    const urlProvider = (params.get("provider") ?? params.get("resource") ?? localStorage.getItem(TERRA_PENDING_PROVIDER_KEY) ?? "").toUpperCase();
+    const urlTerraUserId = params.get("terra_user_id") ?? params.get("user_id") ?? "";
+    const urlReferenceId = params.get("reference_id") ?? "";
+    if (!urlProvider || (!urlTerraUserId && !urlReferenceId)) return null;
+
+    setTerraBusy(null);
+    setTerraConns((prev) => ({
+      ...prev,
+      [urlProvider]: prev[urlProvider] ?? { id: urlTerraUserId || urlReferenceId, last_synced_at: null },
+    }));
+    localStorage.removeItem(TERRA_PENDING_PROVIDER_KEY);
+    return { provider: urlProvider, terraUserId: urlTerraUserId, referenceId: urlReferenceId };
+  }, []);
+
   const loadTerraConns = useCallback(async () => {
     if (!user) return;
-    const { data } = await (supabase as any)
+    const { data } = await supabase
       .from("terra_connections")
       .select("id, provider, last_synced_at, active")
       .eq("user_id", user.id)
       .eq("active", true);
     const map: Record<string, { id: string; last_synced_at: string | null }> = {};
-    (data ?? []).forEach((r: any) => { map[r.provider] = { id: r.id, last_synced_at: r.last_synced_at }; });
-    // Merge: preserve optimistic entries (from return URL) that the DB hasn't
-    // reflected yet (auth webhook hasn't flipped active=true). They'll be
-    // overwritten by the real row once the webhook lands.
+    ((data ?? []) as TerraConnRow[]).forEach((r) => { map[r.provider] = { id: r.id, last_synced_at: r.last_synced_at }; });
     setTerraConns((prev) => {
       const merged = { ...map };
       for (const [prov, val] of Object.entries(prev)) {
@@ -187,7 +212,10 @@ const ConnectApps = ({ lang, onBack }: Props) => {
 
   const hasTerraConn = Object.keys(terraConns).length > 0;
 
-  useEffect(() => { loadTerraConns(); }, [loadTerraConns]);
+  useEffect(() => {
+    applyTerraReturnUrl();
+    loadTerraConns();
+  }, [applyTerraReturnUrl, loadTerraConns]);
 
   // When user returns from external OAuth browser, clear any stuck "busy" state
   // and refresh connections so the button flips from spinner to ✓.
@@ -211,33 +239,21 @@ const ConnectApps = ({ lang, onBack }: Props) => {
     const params = new URLSearchParams(window.location.search);
     if (params.get("terra")) {
       const status = params.get("terra");
-      const urlProvider = params.get("provider");
-      const urlTerraUserId = params.get("terra_user_id") ?? params.get("user_id");
-      const urlReferenceId = params.get("reference_id") ?? "";
       if (status === "success") {
-        // Optimistically flip ✓ right away from URL params — no waiting on
-        // the webhook or terra-confirm.
-        if (urlProvider) {
-          setTerraConns((prev) => ({
-            ...prev,
-            [urlProvider]: prev[urlProvider] ?? { id: urlTerraUserId ?? "pending", last_synced_at: null },
-          }));
-        }
+        const returned = applyTerraReturnUrl();
         if (!user) return;
         toast.success(lang === "zh" ? "Terra 連接成功" : "Terra connected");
-        // Fire terra-confirm in the background to mark the eager row active
-        // and kick off backfill. We don't block the UI tick on it.
-        if (urlProvider) {
-          (supabase as any).functions.invoke("terra-confirm", {
-            body: { provider: urlProvider, terra_user_id: urlTerraUserId, reference_id: urlReferenceId },
-          }).then(() => loadTerraConns()).catch((e: any) => {
+        if (returned) {
+          supabase.functions.invoke("terra-confirm", {
+            body: { provider: returned.provider, terra_user_id: returned.terraUserId, reference_id: returned.referenceId },
+          }).then(() => loadTerraConns()).catch((e: unknown) => {
             console.error("[connect-apps] terra-confirm failed (non-fatal)", e);
           });
         }
       } else {
+        localStorage.removeItem(TERRA_PENDING_PROVIDER_KEY);
         toast.error(lang === "zh" ? "Terra 連接失敗" : "Terra connection failed");
       }
-      loadTerraConns();
       const url = new URL(window.location.href);
       url.searchParams.delete("terra");
       url.searchParams.delete("provider");
@@ -245,9 +261,10 @@ const ConnectApps = ({ lang, onBack }: Props) => {
       url.searchParams.delete("user_id");
       url.searchParams.delete("reference_id");
       url.searchParams.delete("resource");
+      url.searchParams.delete("status");
       window.history.replaceState({}, "", url.toString());
     }
-  }, [lang, loadTerraConns, location.search, user]);
+  }, [applyTerraReturnUrl, lang, loadTerraConns, location.search, user]);
 
   const handleTerraConnect = async (provider: TerraProvider) => {
     if (!user) return;
@@ -256,6 +273,7 @@ const ConnectApps = ({ lang, onBack }: Props) => {
       return;
     }
     setTerraBusy(provider);
+    localStorage.setItem(TERRA_PENDING_PROVIDER_KEY, provider);
     try {
       // Use the existing /terra-return route as Terra's redirect (already
       // whitelisted). On native (Despia), TerraReturn detects deeplink_scheme
@@ -293,8 +311,9 @@ const ConnectApps = ({ lang, onBack }: Props) => {
       } else {
         window.location.href = data.auth_url;
       }
-    } catch (e: any) {
-      toast.error((lang === "zh" ? "Terra 啟動失敗: " : "Terra init failed: ") + (e?.message ?? ""));
+    } catch (e: unknown) {
+      localStorage.removeItem(TERRA_PENDING_PROVIDER_KEY);
+      toast.error((lang === "zh" ? "Terra 啟動失敗: " : "Terra init failed: ") + errorMessage(e));
       setTerraBusy(null);
     }
   };
@@ -308,8 +327,8 @@ const ConnectApps = ({ lang, onBack }: Props) => {
       if (error) throw error;
       toast.success(lang === "zh" ? `已同步 ${data?.activities ?? 0} 個活動` : `Synced ${data?.activities ?? 0} activities`);
       await loadTerraConns();
-    } catch (e: any) {
-      toast.error((lang === "zh" ? "同步失敗: " : "Sync failed: ") + (e?.message ?? ""));
+    } catch (e: unknown) {
+      toast.error((lang === "zh" ? "同步失敗: " : "Sync failed: ") + errorMessage(e));
     } finally { setTerraBusy(null); }
   };
 
@@ -319,6 +338,7 @@ const ConnectApps = ({ lang, onBack }: Props) => {
       const { error } = await supabase.functions.invoke("terra-disconnect", { body: { provider } });
       if (error) throw error;
       toast.success(lang === "zh" ? "已中斷連結" : "Disconnected");
+      localStorage.removeItem(TERRA_PENDING_PROVIDER_KEY);
       // Explicitly drop this provider so any optimistic entry is cleared too.
       setTerraConns((prev) => {
         const next = { ...prev };
@@ -326,8 +346,8 @@ const ConnectApps = ({ lang, onBack }: Props) => {
         return next;
       });
       await loadTerraConns();
-    } catch (e: any) {
-      toast.error((lang === "zh" ? "中斷失敗: " : "Disconnect failed: ") + (e?.message ?? ""));
+    } catch (e: unknown) {
+      toast.error((lang === "zh" ? "中斷失敗: " : "Disconnect failed: ") + errorMessage(e));
     } finally { setTerraBusy(null); }
   };
 

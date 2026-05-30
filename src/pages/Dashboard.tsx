@@ -235,7 +235,21 @@ const Dashboard = () => {
           </header>
 
           <main className="flex-1 overflow-y-auto">
-            <div className="max-w-5xl mx-auto py-4">
+            <div
+              className={
+                view === "overview"
+                  ? "max-w-[1600px] mx-auto px-6 py-6"
+                  : "max-w-5xl mx-auto py-4"
+              }
+            >
+              {view === "overview" && (
+                <Suspense fallback={<TabPageSkeleton />}>
+                  <DashboardOverview
+                    lang={lang}
+                    onNavigate={(v) => setView(v)}
+                  />
+                </Suspense>
+              )}
               {view === "activities" && <ActivitiesTab lang={lang} />}
               {view === "training" && (
                 <Suspense fallback={<TabPageSkeleton />}>
@@ -264,7 +278,7 @@ const Dashboard = () => {
               )}
               {view === "connect" && (
                 <Suspense fallback={<TabPageSkeleton />}>
-                  <ConnectApps lang={lang} onBack={() => setView("activities")} />
+                  <ConnectApps lang={lang} onBack={() => setView("overview")} />
                 </Suspense>
               )}
               {view === "settings" && (

@@ -6,7 +6,6 @@ import despia from "despia-native";
 
 const LAST_ACTIVE_KEY = "runward_last_active";
 const WARM_RESUME_MS = 5 * 60 * 1000; // 5 minutes
-const OAUTH_RETURN_PATH_KEY = "runward_oauth_return_path";
 
 interface AuthContextType {
   session: Session | null;
@@ -49,8 +48,7 @@ function hasOAuthReturnParams() {
 }
 
 function clearOAuthReturnUrl() {
-  const cleanUrl = `${window.location.pathname}${window.location.hash ? "" : ""}`;
-  window.history.replaceState(window.history.state, document.title, cleanUrl || "/");
+  window.history.replaceState(window.history.state, document.title, window.location.pathname || "/");
 }
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
@@ -138,6 +136,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
         if (exchangeError) {
           console.warn("[Auth] OAuth code exchange failed:", exchangeError.message);
+          return null;
+        }
+        clearOAuthReturnUrl();
+        return data.session;
+      }
+
+      const hashParams = new URLSearchParams((window.location.hash || "").replace(/^#/, ""));
+      const accessToken = hashParams.get("access_token");
+      const refreshToken = hashParams.get("refresh_token");
+      if (accessToken && refreshToken) {
+        const { data, error: sessionError } = await supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken,
+        });
+        if (sessionError) {
+          console.warn("[Auth] OAuth token session restore failed:", sessionError.message);
           return null;
         }
         clearOAuthReturnUrl();

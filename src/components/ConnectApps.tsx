@@ -208,14 +208,13 @@ const ConnectApps = ({ lang, onBack }: Props) => {
   }, [loadTerraConns]);
 
   useEffect(() => {
-    const params = new URLSearchParams(location.search || window.location.search);
+    const params = new URLSearchParams(window.location.search);
     if (params.get("terra")) {
       const status = params.get("terra");
       const urlProvider = params.get("provider");
       const urlTerraUserId = params.get("terra_user_id") ?? params.get("user_id");
       const urlReferenceId = params.get("reference_id") ?? "";
       if (status === "success") {
-        toast.success(lang === "zh" ? "Terra 連接成功" : "Terra connected");
         // Optimistically flip ✓ right away from URL params — no waiting on
         // the webhook or terra-confirm.
         if (urlProvider) {
@@ -224,6 +223,8 @@ const ConnectApps = ({ lang, onBack }: Props) => {
             [urlProvider]: prev[urlProvider] ?? { id: urlTerraUserId ?? "pending", last_synced_at: null },
           }));
         }
+        if (!user) return;
+        toast.success(lang === "zh" ? "Terra 連接成功" : "Terra connected");
         // Fire terra-confirm in the background to mark the eager row active
         // and kick off backfill. We don't block the UI tick on it.
         if (urlProvider) {
@@ -246,7 +247,7 @@ const ConnectApps = ({ lang, onBack }: Props) => {
       url.searchParams.delete("resource");
       window.history.replaceState({}, "", url.toString());
     }
-  }, [lang, loadTerraConns, location.search]);
+  }, [lang, loadTerraConns, location.search, user]);
 
   const handleTerraConnect = async (provider: TerraProvider) => {
     if (!user) return;

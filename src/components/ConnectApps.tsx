@@ -311,9 +311,9 @@ const ConnectApps = ({ lang, onBack }: Props) => {
       } else {
         window.location.href = data.auth_url;
       }
-    } catch (e: any) {
+    } catch (e: unknown) {
       localStorage.removeItem(TERRA_PENDING_PROVIDER_KEY);
-      toast.error((lang === "zh" ? "Terra 啟動失敗: " : "Terra init failed: ") + (e?.message ?? ""));
+      toast.error((lang === "zh" ? "Terra 啟動失敗: " : "Terra init failed: ") + errorMessage(e));
       setTerraBusy(null);
     }
   };
@@ -327,8 +327,8 @@ const ConnectApps = ({ lang, onBack }: Props) => {
       if (error) throw error;
       toast.success(lang === "zh" ? `已同步 ${data?.activities ?? 0} 個活動` : `Synced ${data?.activities ?? 0} activities`);
       await loadTerraConns();
-    } catch (e: any) {
-      toast.error((lang === "zh" ? "同步失敗: " : "Sync failed: ") + (e?.message ?? ""));
+    } catch (e: unknown) {
+      toast.error((lang === "zh" ? "同步失敗: " : "Sync failed: ") + errorMessage(e));
     } finally { setTerraBusy(null); }
   };
 
@@ -346,8 +346,8 @@ const ConnectApps = ({ lang, onBack }: Props) => {
         return next;
       });
       await loadTerraConns();
-    } catch (e: any) {
-      toast.error((lang === "zh" ? "中斷失敗: " : "Disconnect failed: ") + (e?.message ?? ""));
+    } catch (e: unknown) {
+      toast.error((lang === "zh" ? "中斷失敗: " : "Disconnect failed: ") + errorMessage(e));
     } finally { setTerraBusy(null); }
   };
 

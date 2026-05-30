@@ -179,6 +179,7 @@ const ConnectApps = ({ lang, onBack }: Props) => {
       ...prev,
       [urlProvider]: prev[urlProvider] ?? { id: urlTerraUserId || urlReferenceId, last_synced_at: null },
     }));
+    localStorage.removeItem(TERRA_PENDING_PROVIDER_KEY);
     return { provider: urlProvider, terraUserId: urlTerraUserId, referenceId: urlReferenceId };
   }, [TERRA_PENDING_PROVIDER_KEY]);
 
@@ -250,6 +251,7 @@ const ConnectApps = ({ lang, onBack }: Props) => {
       url.searchParams.delete("user_id");
       url.searchParams.delete("reference_id");
       url.searchParams.delete("resource");
+      url.searchParams.delete("status");
       window.history.replaceState({}, "", url.toString());
     }
   }, [applyTerraReturnUrl, lang, loadTerraConns, location.search, user]);
@@ -325,6 +327,7 @@ const ConnectApps = ({ lang, onBack }: Props) => {
       const { error } = await supabase.functions.invoke("terra-disconnect", { body: { provider } });
       if (error) throw error;
       toast.success(lang === "zh" ? "已中斷連結" : "Disconnected");
+      localStorage.removeItem(TERRA_PENDING_PROVIDER_KEY);
       // Explicitly drop this provider so any optimistic entry is cleared too.
       setTerraConns((prev) => {
         const next = { ...prev };

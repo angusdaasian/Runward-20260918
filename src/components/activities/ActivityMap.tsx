@@ -68,9 +68,10 @@ function renderRoute(map: L.Map, coords: [number, number][], padding: [number, n
 
 interface Props {
   polyline: string;
+  className?: string;
 }
 
-const ActivityMap = ({ polyline }: Props) => {
+const ActivityMap = ({ polyline, className }: Props) => {
   const previewRef = useRef<HTMLDivElement>(null);
   const previewMapRef = useRef<L.Map | null>(null);
   const fullRef = useRef<HTMLDivElement>(null);

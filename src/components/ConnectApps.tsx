@@ -34,6 +34,11 @@ type TerraConnRow = {
 
 const errorMessage = (error: unknown) => error instanceof Error ? error.message : String(error ?? "");
 
+const isIOSRuntime = () => {
+  const ua = navigator.userAgent || "";
+  return /iPad|iPhone|iPod/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+};
+
 const ConnectApps = ({ lang, onBack }: Props) => {
   const { user } = useAuth();
   const location = useLocation();
@@ -275,26 +280,29 @@ const ConnectApps = ({ lang, onBack }: Props) => {
     setTerraBusy(provider);
     localStorage.setItem(TERRA_PENDING_PROVIDER_KEY, provider);
     try {
-      // Use the existing /terra-return route as Terra's redirect (already
-      // whitelisted). On native (Despia), TerraReturn detects deeplink_scheme
-      // and bounces to runward://oauth/terra-return?... which makes Despia
-      // close the secure browser and re-open /terra-return in the main
-      // WebView (without deeplink_scheme this time) where we run
-      // terra-confirm. On web, /terra-return just shows the close-browser UI.
       const native = isDespiaUA();
+      const iosNative = native && isIOSRuntime();
       const successUrl = new URL("https://pacecalculator.fun/terra-return");
       successUrl.searchParams.set("status", "success");
       successUrl.searchParams.set("provider", provider);
-      successUrl.searchParams.set("reference_id", user.id);
-      if (native) {
+      if (iosNative) {
+        successUrl.searchParams.set("native", "true");
+      } else {
+        successUrl.searchParams.set("reference_id", user.id);
+      }
+      if (native && !iosNative) {
         successUrl.searchParams.set("native", "true");
         successUrl.searchParams.set("deeplink_scheme", "runward");
       }
       const failureUrl = new URL("https://pacecalculator.fun/terra-return");
       failureUrl.searchParams.set("status", "failure");
       failureUrl.searchParams.set("provider", provider);
-      failureUrl.searchParams.set("reference_id", user.id);
-      if (native) {
+      if (iosNative) {
+        failureUrl.searchParams.set("native", "true");
+      } else {
+        failureUrl.searchParams.set("reference_id", user.id);
+      }
+      if (native && !iosNative) {
         failureUrl.searchParams.set("native", "true");
         failureUrl.searchParams.set("deeplink_scheme", "runward");
       }

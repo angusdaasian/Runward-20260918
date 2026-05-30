@@ -271,6 +271,13 @@ const ConnectApps = ({ lang, onBack }: Props) => {
         }
       } else {
         localStorage.removeItem(TERRA_PENDING_PROVIDER_KEY);
+        setTerraConns((prev) => {
+          const pendingProvider = (localStorage.getItem(TERRA_PENDING_PROVIDER_KEY) ?? "").toUpperCase();
+          if (!pendingProvider) return prev;
+          const next = { ...prev };
+          delete next[pendingProvider];
+          return next;
+        });
         toast.error(lang === "zh" ? "Terra 連接失敗" : "Terra connection failed");
       }
       const url = new URL(window.location.href);

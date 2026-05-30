@@ -150,7 +150,8 @@ export default function DashboardActivities({ lang }: Props) {
                   {visible.map((a) => (
                     <tr
                       key={a.id}
-                      className="border-b border-border/40 hover:bg-muted/40 transition-colors"
+                      onClick={() => setSelectedActivity(a)}
+                      className="border-b border-border/40 hover:bg-muted/40 transition-colors cursor-pointer"
                     >
                       <td className="py-2.5 pr-3 max-w-xs">
                         <div className="font-medium truncate">{a.name}</div>

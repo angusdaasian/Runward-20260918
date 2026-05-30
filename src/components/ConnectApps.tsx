@@ -205,7 +205,6 @@ const ConnectApps = ({ lang, onBack }: Props) => {
       ...prev,
       [urlProvider]: prev[urlProvider] ?? { id: urlTerraUserId || urlReferenceId, last_synced_at: null },
     }));
-    localStorage.removeItem(TERRA_PENDING_PROVIDER_KEY);
     return { provider: urlProvider, terraUserId: urlTerraUserId, referenceId: urlReferenceId };
   }, []);
 
@@ -270,9 +269,9 @@ const ConnectApps = ({ lang, onBack }: Props) => {
           });
         }
       } else {
+        const pendingProvider = (localStorage.getItem(TERRA_PENDING_PROVIDER_KEY) ?? "").toUpperCase();
         localStorage.removeItem(TERRA_PENDING_PROVIDER_KEY);
         setTerraConns((prev) => {
-          const pendingProvider = (localStorage.getItem(TERRA_PENDING_PROVIDER_KEY) ?? "").toUpperCase();
           if (!pendingProvider) return prev;
           const next = { ...prev };
           delete next[pendingProvider];
@@ -346,6 +345,11 @@ const ConnectApps = ({ lang, onBack }: Props) => {
       }
     } catch (e: unknown) {
       localStorage.removeItem(TERRA_PENDING_PROVIDER_KEY);
+      setTerraConns((prev) => {
+        const next = { ...prev };
+        delete next[provider];
+        return next;
+      });
       toast.error((lang === "zh" ? "Terra 啟動失敗: " : "Terra init failed: ") + errorMessage(e));
       setTerraBusy(null);
     }

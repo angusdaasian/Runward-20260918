@@ -242,6 +242,7 @@ const ConnectApps = ({ lang, onBack }: Props) => {
           });
         }
       } else {
+        localStorage.removeItem(TERRA_PENDING_PROVIDER_KEY);
         toast.error(lang === "zh" ? "Terra 連接失敗" : "Terra connection failed");
       }
       const url = new URL(window.location.href);
@@ -302,6 +303,7 @@ const ConnectApps = ({ lang, onBack }: Props) => {
         window.location.href = data.auth_url;
       }
     } catch (e: any) {
+      localStorage.removeItem(TERRA_PENDING_PROVIDER_KEY);
       toast.error((lang === "zh" ? "Terra 啟動失敗: " : "Terra init failed: ") + (e?.message ?? ""));
       setTerraBusy(null);
     }

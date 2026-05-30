@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   Activity as ActivityIcon,
@@ -13,8 +13,10 @@ import {
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { useActivities } from "@/hooks/use-activities";
+import { useActivities, type StravaActivity } from "@/hooks/use-activities";
 import type { Lang } from "@/lib/i18n";
+import DashboardMonthlyChallenge from "./DashboardMonthlyChallenge";
+import DashboardActivityDetail from "./DashboardActivityDetail";
 
 type Props = {
   lang: Lang;

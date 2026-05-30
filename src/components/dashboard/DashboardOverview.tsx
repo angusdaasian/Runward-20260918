@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   Activity as ActivityIcon,
@@ -13,8 +13,10 @@ import {
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { useActivities } from "@/hooks/use-activities";
+import { useActivities, type StravaActivity } from "@/hooks/use-activities";
 import type { Lang } from "@/lib/i18n";
+import DashboardMonthlyChallenge from "./DashboardMonthlyChallenge";
+import DashboardActivityDetail from "./DashboardActivityDetail";
 
 type Props = {
   lang: Lang;
@@ -41,6 +43,7 @@ function fmtPace(metersPerSec: number) {
 export default function DashboardOverview({ lang, onNavigate }: Props) {
   const zh = lang === "zh";
   const { activities, plannedWorkouts, userRaces, profile } = useActivities();
+  const [selectedActivity, setSelectedActivity] = useState<StravaActivity | null>(null);
 
   const stats = useMemo(() => {
     const now = new Date();
@@ -184,9 +187,10 @@ export default function DashboardOverview({ lang, onNavigate }: Props) {
           ) : (
             <div className="divide-y divide-border -mx-2">
               {recent.map((a) => (
-                <div
+                <button
                   key={a.id}
-                  className="grid grid-cols-12 gap-3 items-center px-2 py-3 hover:bg-muted/40 rounded-md transition-colors"
+                  onClick={() => setSelectedActivity(a)}
+                  className="w-full text-left grid grid-cols-12 gap-3 items-center px-2 py-3 hover:bg-muted/40 rounded-md transition-colors cursor-pointer"
                 >
                   <div className="col-span-5 min-w-0">
                     <div className="font-medium text-sm truncate">{a.name}</div>
@@ -215,7 +219,7 @@ export default function DashboardOverview({ lang, onNavigate }: Props) {
                       {zh ? "配速" : "pace"}
                     </div>
                   </div>
-                </div>
+                </button>
               ))}
             </div>
           )}
@@ -223,6 +227,11 @@ export default function DashboardOverview({ lang, onNavigate }: Props) {
 
         {/* Right column */}
         <div className="space-y-4">
+          <DashboardMonthlyChallenge
+            lang={lang}
+            activities={activities || []}
+            plannedWorkouts={plannedWorkouts || []}
+          />
           {/* Next race */}
           <Card className="p-5">
             <div className="flex items-center justify-between mb-3">
@@ -308,6 +317,17 @@ export default function DashboardOverview({ lang, onNavigate }: Props) {
           </Card>
         </div>
       </div>
+
+      <DashboardActivityDetail
+        activity={selectedActivity}
+        lang={lang}
+        open={!!selectedActivity}
+        onClose={() => setSelectedActivity(null)}
+        profileAge={(profile as any)?.age ?? null}
+        profileMaxHr={(profile as any)?.max_heartrate ?? null}
+        profileRestingHr={(profile as any)?.resting_heartrate ?? null}
+        profileCustomZones={(profile as any)?.custom_hr_zones ?? null}
+      />
     </div>
   );
 }

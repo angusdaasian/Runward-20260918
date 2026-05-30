@@ -225,6 +225,7 @@ const ConnectApps = ({ lang, onBack }: Props) => {
       } else {
         toast.error(lang === "zh" ? "Terra 連接失敗" : "Terra connection failed");
       }
+      loadTerraConns();
       let n = 0;
       const t = setInterval(() => { loadTerraConns(); if (++n >= 6) clearInterval(t); }, 2000);
       const url = new URL(window.location.href);

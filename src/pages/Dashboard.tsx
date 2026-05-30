@@ -12,6 +12,7 @@ import {
   Globe,
   LogOut,
   Home,
+  LayoutDashboard,
 } from "lucide-react";
 import {
   Sidebar,

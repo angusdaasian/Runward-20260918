@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import { useAppleHealth } from "@/hooks/use-apple-health";
 import { useGarmin } from "@/hooks/use-garmin";
 import { getAppEnvironment } from "@/lib/environment";
-import despia from "despia-native";
+
 import GarminCredentialDialog from "@/components/GarminCredentialDialog";
 import corosIcon from "@/assets/brands/coros.png";
 import polarIcon from "@/assets/brands/polar.png";

@@ -37,15 +37,15 @@ import { supabase } from "@/integrations/supabase/client";
 import { TabPageSkeleton } from "@/components/ui/PageSkeleton";
 import appIcon from "@/assets/app-icon.png";
 
-import ActivitiesTab from "@/components/ActivitiesTab";
-const TrainingTab = lazy(() => import("@/components/TrainingTab"));
-const AnalyticsTab = lazy(() => import("@/components/AnalyticsTab"));
-const RaceTab = lazy(() => import("@/components/RaceTab"));
-const RewardsTab = lazy(() => import("@/components/RewardsTab"));
-const MoreTab = lazy(() => import("@/components/MoreTab"));
-const ConnectApps = lazy(() => import("@/components/ConnectApps"));
 const FloatingChatButton = lazy(() => import("@/components/coach/FloatingChatButton"));
 const DashboardOverview = lazy(() => import("@/components/dashboard/DashboardOverview"));
+const DashboardActivities = lazy(() => import("@/components/dashboard/DashboardActivities"));
+const DashboardTraining = lazy(() => import("@/components/dashboard/DashboardTraining"));
+const DashboardRaces = lazy(() => import("@/components/dashboard/DashboardRaces"));
+const DashboardCommunity = lazy(() => import("@/components/dashboard/DashboardCommunity"));
+const DashboardAnalytics = lazy(() => import("@/components/dashboard/DashboardAnalytics"));
+const DashboardConnect = lazy(() => import("@/components/dashboard/DashboardConnect"));
+const DashboardSettings = lazy(() => import("@/components/dashboard/DashboardSettings"));
 
 type View =
   | "overview"
@@ -235,62 +235,35 @@ const Dashboard = () => {
           </header>
 
           <main className="flex-1 overflow-y-auto">
-            <div
-              className={
-                view === "overview"
-                  ? "max-w-[1600px] mx-auto px-6 py-6"
-                  : "max-w-5xl mx-auto py-4"
-              }
-            >
-              {view === "overview" && (
-                <Suspense fallback={<TabPageSkeleton />}>
-                  <DashboardOverview
+            <div className="max-w-[1600px] mx-auto px-6 py-6">
+              <Suspense fallback={<TabPageSkeleton />}>
+                {view === "overview" && (
+                  <DashboardOverview lang={lang} onNavigate={(v) => setView(v)} />
+                )}
+                {view === "activities" && <DashboardActivities lang={lang} />}
+                {view === "training" && (
+                  <DashboardTraining
                     lang={lang}
-                    onNavigate={(v) => setView(v)}
-                  />
-                </Suspense>
-              )}
-              {view === "activities" && <ActivitiesTab lang={lang} />}
-              {view === "training" && (
-                <Suspense fallback={<TabPageSkeleton />}>
-                  <TrainingTab
                     score={runningScore}
                     setScore={setRunningScore}
-                    lang={lang}
                     onLoginRequest={() => navigate("/")}
                   />
-                </Suspense>
-              )}
-              {view === "races" && (
-                <Suspense fallback={<TabPageSkeleton />}>
-                  <RaceTab lang={lang} />
-                </Suspense>
-              )}
-              {view === "community" && (
-                <Suspense fallback={<TabPageSkeleton />}>
-                  <RewardsTab lang={lang} />
-                </Suspense>
-              )}
-              {view === "analytics" && (
-                <Suspense fallback={<TabPageSkeleton />}>
-                  <AnalyticsTab lang={lang} />
-                </Suspense>
-              )}
-              {view === "connect" && (
-                <Suspense fallback={<TabPageSkeleton />}>
-                  <ConnectApps lang={lang} onBack={() => setView("overview")} />
-                </Suspense>
-              )}
-              {view === "settings" && (
-                <Suspense fallback={<TabPageSkeleton />}>
-                  <MoreTab
+                )}
+                {view === "races" && <DashboardRaces lang={lang} />}
+                {view === "community" && <DashboardCommunity lang={lang} />}
+                {view === "analytics" && <DashboardAnalytics lang={lang} />}
+                {view === "connect" && (
+                  <DashboardConnect lang={lang} onBack={() => setView("overview")} />
+                )}
+                {view === "settings" && (
+                  <DashboardSettings
                     lang={lang}
                     setLang={setLang}
                     onLoginRequest={() => navigate("/")}
                     onNavigateConnectApps={() => setView("connect")}
                   />
-                </Suspense>
-              )}
+                )}
+              </Suspense>
             </div>
           </main>
         </SidebarInset>

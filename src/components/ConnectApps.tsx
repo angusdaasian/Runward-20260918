@@ -222,9 +222,9 @@ const ConnectApps = ({ lang, onBack }: Props) => {
             [urlProvider]: prev[urlProvider] ?? { id: urlTerraUserId ?? "pending", last_synced_at: null },
           }));
         }
-        // Fire terra-confirm in the background to upsert active=true and
-        // kick off backfill. We don't block on it.
-        if (urlProvider && urlTerraUserId) {
+        // Fire terra-confirm in the background to mark the eager row active
+        // and kick off backfill. We don't block the UI tick on it.
+        if (urlProvider) {
           (supabase as any).functions.invoke("terra-confirm", {
             body: { provider: urlProvider, terra_user_id: urlTerraUserId, reference_id: urlReferenceId },
           }).then(() => loadTerraConns()).catch((e: any) => {

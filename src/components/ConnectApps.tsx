@@ -24,6 +24,8 @@ interface Props {
   onBack: () => void;
 }
 
+const TERRA_PENDING_PROVIDER_KEY = "terra_pending_provider";
+
 const ConnectApps = ({ lang, onBack }: Props) => {
   const { user } = useAuth();
   const location = useLocation();
@@ -163,7 +165,6 @@ const ConnectApps = ({ lang, onBack }: Props) => {
   ];
   const [terraConns, setTerraConns] = useState<Record<string, { id: string; last_synced_at: string | null }>>({});
   const [terraBusy, setTerraBusy] = useState<string | null>(null);
-  const TERRA_PENDING_PROVIDER_KEY = "terra_pending_provider";
 
   const applyTerraReturnUrl = useCallback(() => {
     const params = new URLSearchParams(window.location.search);
@@ -181,7 +182,7 @@ const ConnectApps = ({ lang, onBack }: Props) => {
     }));
     localStorage.removeItem(TERRA_PENDING_PROVIDER_KEY);
     return { provider: urlProvider, terraUserId: urlTerraUserId, referenceId: urlReferenceId };
-  }, [TERRA_PENDING_PROVIDER_KEY]);
+  }, []);
 
   const loadTerraConns = useCallback(async () => {
     if (!user) return;

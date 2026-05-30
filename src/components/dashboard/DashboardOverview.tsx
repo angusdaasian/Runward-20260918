@@ -187,9 +187,10 @@ export default function DashboardOverview({ lang, onNavigate }: Props) {
           ) : (
             <div className="divide-y divide-border -mx-2">
               {recent.map((a) => (
-                <div
+                <button
                   key={a.id}
-                  className="grid grid-cols-12 gap-3 items-center px-2 py-3 hover:bg-muted/40 rounded-md transition-colors"
+                  onClick={() => setSelectedActivity(a)}
+                  className="w-full text-left grid grid-cols-12 gap-3 items-center px-2 py-3 hover:bg-muted/40 rounded-md transition-colors cursor-pointer"
                 >
                   <div className="col-span-5 min-w-0">
                     <div className="font-medium text-sm truncate">{a.name}</div>
@@ -218,7 +219,7 @@ export default function DashboardOverview({ lang, onNavigate }: Props) {
                       {zh ? "配速" : "pace"}
                     </div>
                   </div>
-                </div>
+                </button>
               ))}
             </div>
           )}

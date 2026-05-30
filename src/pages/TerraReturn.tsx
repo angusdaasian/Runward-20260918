@@ -76,7 +76,7 @@ export default function TerraReturn() {
     if (!ok) return;
     if (confirmState !== "done") return;
     const t = setTimeout(() => {
-      window.location.replace(`/?terra=${ok ? "success" : "failure"}`);
+      window.location.replace(`/?page=connect-apps&terra=${ok ? "success" : "failure"}`);
     }, 500);
     return () => clearTimeout(t);
   }, [isBounce, native, ok, confirmState]);

@@ -75,11 +75,17 @@ export default function TerraReturn() {
     if (!native) return;
     if (!ok) return;
     if (confirmState !== "done") return;
+    const qs = new URLSearchParams();
+    qs.set("page", "connect-apps");
+    qs.set("terra", ok ? "success" : "failure");
+    if (provider) qs.set("provider", provider);
+    if (terraUserId) qs.set("terra_user_id", terraUserId);
+    if (referenceId) qs.set("reference_id", referenceId);
     const t = setTimeout(() => {
-      window.location.replace(`/?page=connect-apps&terra=${ok ? "success" : "failure"}`);
+      window.location.replace(`/?${qs.toString()}`);
     }, 500);
     return () => clearTimeout(t);
-  }, [isBounce, native, ok, confirmState]);
+  }, [isBounce, native, ok, confirmState, provider, terraUserId, referenceId]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-6">

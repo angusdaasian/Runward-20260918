@@ -73,6 +73,10 @@ export default function DashboardAuth({ lang, onSuccess, onGuest, onClose }: Pro
   };
 
   const oauth = async (provider: "google" | "apple") => {
+    if (provider === "google") {
+      const { startDespiaOAuth } = await import("@/lib/despiaOAuth");
+      if (startDespiaOAuth("google")) return;
+    }
     const { error } = await supabase.auth.signInWithOAuth({
       provider,
       options: { redirectTo: window.location.origin + "/dashboard" },

@@ -73,8 +73,8 @@ const TOOLS: { id: View; icon: typeof Activity; labelEn: string; labelZh: string
 ];
 
 const Dashboard = () => {
-  const { user, signOut } = useAuth();
-  const { isAdmin } = useAdmin();
+  const { user, signOut, loading: authLoading } = useAuth();
+  const { isAdmin, loading: adminLoading } = useAdmin();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [runningScore, setRunningScore] = useState<number | null>(null);
@@ -83,6 +83,37 @@ const Dashboard = () => {
   const [view, setViewState] = useState<View>(initialView);
   const [showAuth, setShowAuth] = useState<boolean>(() => searchParams.get("auth") === "1");
   const openAuth = () => setShowAuth(true);
+
+  const gateLang: Lang = (localStorage.getItem("app_lang") as Lang) || "en";
+  const gateZh = gateLang === "zh";
+
+  // Temporary gate: dashboard restricted to admins while in beta.
+  if (authLoading || (user && adminLoading)) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-background">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+      </div>
+    );
+  }
+  if (!isAdmin) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center px-6 text-center">
+        <div className="h-14 w-14 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mb-6">
+          <LayoutDashboard className="h-7 w-7" />
+        </div>
+        <h1 className="font-display font-bold text-3xl tracking-tight mb-3">
+          {gateZh ? "桌面控制台即將推出" : "Dashboard coming soon"}
+        </h1>
+        <p className="text-muted-foreground max-w-md mb-8">
+          {gateZh
+            ? "我們正在打磨桌面體驗。請在手機 App 中繼續使用 Runward。"
+            : "We're polishing the desktop experience. In the meantime, keep training in the Runward mobile app."}
+        </p>
+        <Button onClick={() => navigate("/")}>{gateZh ? "返回首頁" : "Back to home"}</Button>
+      </div>
+    );
+  }
+
 
   const setView = (v: View) => {
     setViewState(v);

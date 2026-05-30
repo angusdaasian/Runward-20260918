@@ -245,8 +245,8 @@ const Dashboard = () => {
             <h1 className="font-display font-semibold text-base">{currentLabel}</h1>
             <div className="ml-auto flex items-center gap-2">
               {isGuest && (
-                <Button size="sm" variant="default" onClick={() => navigate("/")}>
-                  {zh ? "登入" : "Sign in"}
+                <Button size="sm" variant="default" onClick={openAuth}>
+                  {zh ? "登入 / 註冊" : "Sign in / Register"}
                 </Button>
               )}
             </div>

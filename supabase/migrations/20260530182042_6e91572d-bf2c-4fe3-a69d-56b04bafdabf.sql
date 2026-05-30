@@ -1,0 +1,1 @@
+UPDATE public.terra_connections SET active = true, updated_at = now() WHERE terra_user_id = '13c086cd-af02-496e-bac7-b5ed0caf4c29';

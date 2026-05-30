@@ -43,6 +43,7 @@ function fmtPace(metersPerSec: number) {
 export default function DashboardOverview({ lang, onNavigate }: Props) {
   const zh = lang === "zh";
   const { activities, plannedWorkouts, userRaces, profile } = useActivities();
+  const [selectedActivity, setSelectedActivity] = useState<StravaActivity | null>(null);
 
   const stats = useMemo(() => {
     const now = new Date();

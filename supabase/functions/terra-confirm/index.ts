@@ -28,17 +28,18 @@ Deno.serve(async (req) => {
       { global: { headers: { Authorization: auth } } },
     );
     const { data: { user } } = await userClient.auth.getUser();
-    if (!user) return json({ error: "unauthorized" }, 401);
 
     const body = await req.json().catch(() => ({}));
     const provider = String(body.provider ?? "").toUpperCase().trim();
     const terraUserId = String(body.terra_user_id ?? "").trim();
-    const referenceId = String(body.reference_id ?? user.id).trim();
+    const referenceId = String(body.reference_id ?? user?.id ?? "").trim();
+    const ownerUserId = user?.id ?? referenceId;
 
     if (!provider) return json({ error: "missing provider" }, 400);
+    if (!ownerUserId) return json({ error: "missing reference_id" }, 400);
 
-    // Caller must own the reference_id they're confirming.
-    if (referenceId !== user.id) {
+    // Authenticated callers must own the reference_id they're confirming.
+    if (user && referenceId !== user.id) {
       return json({ error: "reference_id mismatch" }, 403);
     }
 
@@ -63,7 +64,7 @@ Deno.serve(async (req) => {
       const { data: eagerConn } = await admin
         .from("terra_connections")
         .select("terra_user_id")
-        .eq("user_id", user.id)
+        .eq("user_id", ownerUserId)
         .eq("provider", provider)
         .maybeSingle();
       resolvedTerraUserId = String(eagerConn?.terra_user_id ?? "").trim();
@@ -71,7 +72,7 @@ Deno.serve(async (req) => {
     }
 
     const { error: upsertErr } = await admin.from("terra_connections").upsert({
-      user_id: user.id,
+      user_id: ownerUserId,
       terra_user_id: resolvedTerraUserId,
       provider,
       reference_id: referenceId,
@@ -118,7 +119,7 @@ Deno.serve(async (req) => {
       }
     })();
 
-    console.log(`[terra-confirm] linked provider=${provider} terra_user_id=${resolvedTerraUserId} user_id=${user.id} env=${env}`);
+    console.log(`[terra-confirm] linked provider=${provider} terra_user_id=${resolvedTerraUserId} user_id=${ownerUserId} env=${env}`);
     return json({ ok: true, provider, terra_user_id: resolvedTerraUserId });
   } catch (e) {
     console.error("[terra-confirm] error", e);

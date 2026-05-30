@@ -10,6 +10,7 @@ import { useGarmin } from "@/hooks/use-garmin";
 import { getAppEnvironment } from "@/lib/environment";
 import despia from "despia-native";
 import { isDespiaUA } from "@/lib/despiaOAuth";
+import { useLocation } from "react-router-dom";
 
 import GarminCredentialDialog from "@/components/GarminCredentialDialog";
 import corosIcon from "@/assets/brands/coros.png";
@@ -25,6 +26,7 @@ interface Props {
 
 const ConnectApps = ({ lang, onBack }: Props) => {
   const { user } = useAuth();
+  const location = useLocation();
   const [stravaConnected, setStravaConnected] = useState(false);
   const [appleHealthConnected, setAppleHealthConnected] = useState(false);
   const [garminConnected, setGarminConnected] = useState(false);
@@ -213,7 +215,6 @@ const ConnectApps = ({ lang, onBack }: Props) => {
       const urlTerraUserId = params.get("terra_user_id") ?? params.get("user_id");
       const urlReferenceId = params.get("reference_id") ?? "";
       if (status === "success") {
-        toast.success(lang === "zh" ? "Terra 連接成功" : "Terra connected");
         // Optimistically flip ✓ right away from URL params — no waiting on
         // the webhook or terra-confirm.
         if (urlProvider) {
@@ -222,9 +223,11 @@ const ConnectApps = ({ lang, onBack }: Props) => {
             [urlProvider]: prev[urlProvider] ?? { id: urlTerraUserId ?? "pending", last_synced_at: null },
           }));
         }
-        // Fire terra-confirm in the background to upsert active=true and
-        // kick off backfill. We don't block on it.
-        if (urlProvider && urlTerraUserId) {
+        if (!user) return;
+        toast.success(lang === "zh" ? "Terra 連接成功" : "Terra connected");
+        // Fire terra-confirm in the background to mark the eager row active
+        // and kick off backfill. We don't block the UI tick on it.
+        if (urlProvider) {
           (supabase as any).functions.invoke("terra-confirm", {
             body: { provider: urlProvider, terra_user_id: urlTerraUserId, reference_id: urlReferenceId },
           }).then(() => loadTerraConns()).catch((e: any) => {
@@ -244,10 +247,10 @@ const ConnectApps = ({ lang, onBack }: Props) => {
       url.searchParams.delete("resource");
       window.history.replaceState({}, "", url.toString());
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [lang, loadTerraConns, location.search, user]);
 
   const handleTerraConnect = async (provider: TerraProvider) => {
+    if (!user) return;
     if (hasTerraConn) {
       toast.error(lang === "zh" ? "請先中斷現有裝置連結" : "Please disconnect the current device first");
       return;
@@ -264,6 +267,7 @@ const ConnectApps = ({ lang, onBack }: Props) => {
       const successUrl = new URL("https://pacecalculator.fun/terra-return");
       successUrl.searchParams.set("status", "success");
       successUrl.searchParams.set("provider", provider);
+      successUrl.searchParams.set("reference_id", user.id);
       if (native) {
         successUrl.searchParams.set("native", "true");
         successUrl.searchParams.set("deeplink_scheme", "runward");
@@ -271,6 +275,7 @@ const ConnectApps = ({ lang, onBack }: Props) => {
       const failureUrl = new URL("https://pacecalculator.fun/terra-return");
       failureUrl.searchParams.set("status", "failure");
       failureUrl.searchParams.set("provider", provider);
+      failureUrl.searchParams.set("reference_id", user.id);
       if (native) {
         failureUrl.searchParams.set("native", "true");
         failureUrl.searchParams.set("deeplink_scheme", "runward");

@@ -34,6 +34,7 @@ const Index = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState<Tab>(() => {
+    if (searchParams.get("page") === "connect-apps") return "more";
     const tabParam = searchParams.get("tab");
     // Back-compat: redirect old `posture` deeplinks into `analytics`
     if (tabParam === "posture") return "analytics";
@@ -91,7 +92,9 @@ const Index = () => {
 
   useEffect(() => {
     const tabParam = searchParams.get("tab");
-    if (tabParam === "training" || tabParam === "analytics" || tabParam === "activities" || tabParam === "more" || tabParam === "community" || tabParam === "races") {
+    if (searchParams.get("page") === "connect-apps") {
+      setActiveTab("more");
+    } else if (tabParam === "training" || tabParam === "analytics" || tabParam === "activities" || tabParam === "more" || tabParam === "community" || tabParam === "races") {
       setActiveTab(tabParam);
     } else if (tabParam === "posture") {
       setActiveTab("analytics");

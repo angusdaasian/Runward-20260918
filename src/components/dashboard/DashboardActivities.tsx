@@ -78,9 +78,11 @@ export default function DashboardActivities({ lang }: Props) {
           />
         </Card>
 
-        <Card className="p-5">
-          <MonthlyRoadQuest lang={lang} activities={list} plannedWorkouts={plannedWorkouts || []} />
-        </Card>
+        <DashboardMonthlyChallenge
+          lang={lang}
+          activities={list}
+          plannedWorkouts={plannedWorkouts || []}
+        />
       </div>
 
       {/* Mid row: trends + training load */}

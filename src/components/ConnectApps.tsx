@@ -233,15 +233,13 @@ const ConnectApps = ({ lang, onBack }: Props) => {
         body: { provider, success_url: successUrl.toString(), failure_url: failureUrl.toString() },
       });
       if (error || !data?.auth_url) throw new Error(error?.message || "no auth url");
-      const isNativeRuntime =
-        navigator.userAgent.toLowerCase().includes("despia") ||
-        typeof (window as any).despia !== "undefined" ||
-        typeof (window as any).median !== "undefined";
-      if (isNativeRuntime) {
-        despia(`oauth://?url=${encodeURIComponent(data.auth_url)}`);
-      } else {
-        window.location.href = data.auth_url;
-      }
+      // Terra's hosted OAuth redirects back to https://pacecalculator.fun/terra-return
+      // (a normal https page), NOT a custom scheme. The Despia oauth:// bridge
+      // (Chrome Custom Tabs / ASWebAuthenticationSession) only auto-closes on a
+      // custom scheme like runward://, so using it here would strand the user
+      // in the in-app browser. Just navigate the WebView itself — the redirect
+      // back to /terra-return lands inside the app naturally.
+      window.location.href = data.auth_url;
     } catch (e: any) {
       toast.error((lang === "zh" ? "Terra 啟動失敗: " : "Terra init failed: ") + (e?.message ?? ""));
       setTerraBusy(null);

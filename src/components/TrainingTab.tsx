@@ -1825,7 +1825,9 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
   };
 
   const handleGenerate = async () => {
-    if (!distance || !targetTime || !raceDate || !startDate || !dateValid) return;
+    const isFitness = distance === "FT";
+    if (!distance) return;
+    if (!isFitness && (!targetTime || !raceDate || !startDate || !dateValid)) return;
     if (!isOnline()) {
       toast({
         title: lang === "zh" ? "離線中" : "You're offline",

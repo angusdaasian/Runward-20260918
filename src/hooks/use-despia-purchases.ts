@@ -82,9 +82,12 @@ export function useDespiaPurchases() {
       if (!user || !code.trim()) return;
 
       const trimmedCode = code.trim();
-      const redeemUrl = `https://apps.apple.com/redeem?ctx=offercodes&id=6761060757&code=${encodeURIComponent(trimmedCode)}`;
+      const isAndroid = /android/i.test(navigator.userAgent);
+      const redeemUrl = isAndroid
+        ? `https://play.google.com/redeem?code=${encodeURIComponent(trimmedCode)}`
+        : `https://apps.apple.com/redeem?ctx=offercodes&id=6761060757&code=${encodeURIComponent(trimmedCode)}`;
 
-      console.log("[Redeem] Opening App Store offer code URL for user:", user.id, "code:", trimmedCode);
+      console.log(`[Redeem] Opening ${isAndroid ? "Play Store" : "App Store"} offer code URL for user:`, user.id, "code:", trimmedCode);
 
       // Start polling BEFORE opening the link so we catch the entitlement change on return
       stopPolling(redeemPollingRef);

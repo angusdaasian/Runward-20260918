@@ -93,11 +93,10 @@ serve(async (req) => {
     if (userErr || !userData?.user) return json({ error: "Unauthorized" }, 401);
     const userId = userData.user.id;
 
-    const [{ data: rcSub }, { data: adminSub }] = await Promise.all([
-      admin.from("premium_subscriptions").select("expires_at").eq("user_id", userId).gt("expires_at", new Date().toISOString()).maybeSingle(),
-      admin.from("admin_granted_premium" as any).select("expires_at").eq("user_id", userId).gt("expires_at", new Date().toISOString()).maybeSingle(),
-    ]);
-    if (!rcSub && !adminSub) return json({ error: "Premium required", code: "PREMIUM_REQUIRED" }, 403);
+    const { data: sub } = await admin
+      .from("premium_subscriptions").select("expires_at")
+      .eq("user_id", userId).gt("expires_at", new Date().toISOString()).maybeSingle();
+    if (!sub) return json({ error: "Premium required", code: "PREMIUM_REQUIRED" }, 403);
 
     const body = await req.json().catch(() => ({}));
     const { plan_id, week_index, action = "analyze", adjusted_days, lang = "en" } = body as {

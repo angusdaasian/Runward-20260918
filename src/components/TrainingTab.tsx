@@ -3107,6 +3107,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                             }}
                             onRegenerateForRaces={() => handleRegeneratePlan({})}
                            />
+                           {!simpleMode && (
                            <Button
                              variant="outline"
                              className="w-full mb-4 border-primary/30 text-primary hover:bg-primary/10"
@@ -3115,6 +3116,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                              <Sparkles size={14} className="mr-2" />
                              {lang === "zh" ? "週訓練回顧" : "Weekly Review"}
                            </Button>
+                           )}
 
                            {/* ─── Race Time Predictor (HR-zone + VDOT, deterministic) ─── */}
                            {canPredictRaceTime && (() => {

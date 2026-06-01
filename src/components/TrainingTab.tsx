@@ -2771,7 +2771,20 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                           {d.id === "HM" ? (lang === "zh" ? "半馬" : "HM") : d.id === "FM" ? (lang === "zh" ? "全馬" : "FM") : d.id === "TR" ? (lang === "zh" ? "越野賽" : "Trail Race") : d.id}
                         </button>
                       ))}
+                      {simpleMode && (
+                        <button
+                          onClick={() => { setDistance("FT" as Distance); setTargetTime(""); setRaceDate(""); setStartDate(""); if (daysPerWeek < 2) setDaysPerWeek(3); }}
+                          className={`px-4 py-2 rounded-full text-sm font-medium transition-colors border ${distance === "FT" ? "bg-primary text-primary-foreground border-primary" : "bg-card text-foreground border-border hover:bg-accent"}`}
+                        >
+                          {lang === "zh" ? "強身健體" : "Fitness"}
+                        </button>
+                      )}
                     </div>
+                    {distance === "FT" && (
+                      <p className="text-xs text-muted-foreground mt-2">
+                        {lang === "zh" ? "持續的休閒跑步計劃，沒有比賽目標。AI 會根據你的入門資料與最近一週表現安排輕鬆訓練。" : "Ongoing casual running plan with no race goal. AI will set easy paces from your onboarding PB and last 7 days of activity."}
+                      </p>
+                    )}
                   </div>
 
                   {/* Trail Race custom km + elevation */}

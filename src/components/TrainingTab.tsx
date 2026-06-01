@@ -1164,6 +1164,7 @@ const ProgramHeader: React.FC<ProgramHeaderProps> = ({
 
 const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
   const { isPremium } = usePremium();
+  const [simpleMode] = useSimpleMode();
   const { user } = useAuth();
   const { toast } = useToast();
   const { online } = useOnlineStatus();

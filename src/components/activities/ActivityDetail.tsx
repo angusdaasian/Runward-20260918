@@ -159,6 +159,7 @@ const StatBox = ({ icon: Icon, label, value, unit, iconColor }: {
 );
 
 const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, trainingScore, profileAge, profileMaxHr, profileRestingHr, profileCustomZones }: Props) => {
+  const [simpleMode] = useSimpleMode();
   const isAppleHealth = activity.source === "Apple Health";
   const isTerraActivity = activity.provenance === "terra" || (activity.source?.startsWith("Terra") ?? false);
   const isGarmin = activity.provenance === "garmin" && activity.source === "Garmin";

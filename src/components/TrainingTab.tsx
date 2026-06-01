@@ -2811,7 +2811,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                   )}
 
                   {/* Target Time */}
-                  {distance && (
+                  {distance && distance !== "FT" && (
                     <div className="mb-5">
                       <label className="text-sm font-semibold text-foreground mb-2 block flex items-center gap-2"><Trophy size={14} />{lang === "zh" ? "目標完成時間" : "Target Finish Time"}</label>
                       <div className="flex items-center gap-2">
@@ -2852,7 +2852,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                   )}
 
                   {/* Weekly km */}
-                  {distance && (
+                  {distance && distance !== "FT" && (
                     <div className="mb-5">
                       <label className="text-sm font-semibold text-foreground mb-2 block flex items-center gap-2"><Route size={14} />{lang === "zh" ? "每週目標公里數" : "Preferred Weekly Km"}</label>
                       <select
@@ -2871,7 +2871,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                   )}
 
                   {/* Long Run Day */}
-                  {distance && (
+                  {distance && distance !== "FT" && (
                     <div className="mb-5">
                       <label className="text-sm font-semibold text-foreground mb-2 block flex items-center gap-2"><Route size={14} />{lang === "zh" ? "長跑日" : "Long Run Day"}</label>
                       <div className="flex flex-wrap gap-2">
@@ -2891,7 +2891,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                   )}
 
                   {/* Rest Days */}
-                  {distance && (
+                  {distance && distance !== "FT" && (
                     <div className="mb-5">
                       <label className="text-sm font-semibold text-foreground mb-2 block flex items-center gap-2">
                         <Calendar size={14} />{lang === "zh" ? "休息日" : "Rest Day(s)"}

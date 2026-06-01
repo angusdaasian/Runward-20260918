@@ -393,7 +393,7 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps }: Props
         )}
 
         {/* Redeem Offer Code */}
-        {user && !isPremium && !isAndroid && (
+        {user && !isPremium && (
           <button
             onClick={() => setShowRedeemDialog(true)}
             className="w-full bg-card border border-border rounded-xl p-4 flex items-center justify-between"

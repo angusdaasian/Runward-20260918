@@ -3246,6 +3246,27 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
 
                           </div>
 
+                          {/* Finetune based on HRV/RHR */}
+                          <div className="mb-4 flex flex-wrap items-center gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={runFinetune}
+                              disabled={!hasRecoveryData || finetuning}
+                              className="gap-1.5"
+                            >
+                              {finetuning ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+                              {lang === "zh" ? "依恢復數據微調本週" : "Finetune week from recovery"}
+                            </Button>
+                            <span className="text-[11px] text-muted-foreground">
+                              {hasRecoveryData
+                                ? (lang === "zh" ? "使用最近 14 天的 HRV/靜息心率" : "Uses your last 14 days of HRV/RHR")
+                                : (lang === "zh" ? "需有 HRV 或靜息心率資料" : "Only if HRV/RHR data is available")}
+                            </span>
+                          </div>
+
+
+
 
                           <CalendarDayList
                             days={currentWeek.days}

@@ -13,7 +13,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const ALLOWED = new Set(["GARMIN", "POLAR", "SUUNTO", "COROS", "ZEPP"]);
+const ALLOWED = new Set(["GARMIN", "POLAR", "SUUNTO", "COROS", "ZEPP", "FITBIT"]);
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });

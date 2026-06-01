@@ -40,35 +40,43 @@ async function callGemini(systemPrompt: string, userPrompt: string): Promise<str
   return data?.candidates?.[0]?.content?.parts?.map((p: any) => p.text || "").join("") || "";
 }
 
-async function fetchRecovery(admin: any, userId: string, days = 14) {
+async function fetchRecovery(admin: any, userId: string, days = 14, avgWindow = 7) {
   const since = new Date(Date.now() - days * 86400000).toISOString().slice(0, 10);
+  const avgSince = new Date(Date.now() - avgWindow * 86400000).toISOString().slice(0, 10);
   const [garmin, terra] = await Promise.all([
     admin.from("garmin_daily_health").select("date,resting_hr,sleep_score")
       .eq("user_id", userId).gte("date", since).order("date", { ascending: false }),
     admin.from("terra_daily_health").select("date,resting_hr,sleep_score,hrv")
       .eq("user_id", userId).gte("date", since).order("date", { ascending: false }),
   ]);
+  const pickPos = (a: any, b: any) => {
+    const av = typeof a === "number" && a > 0 ? a : null;
+    const bv = typeof b === "number" && b > 0 ? b : null;
+    return av ?? bv;
+  };
   const byDate = new Map<string, { date: string; rhr?: number | null; hrv?: number | null; sleep?: number | null }>();
   for (const r of (terra.data ?? [])) {
     byDate.set(r.date, {
       date: r.date,
-      rhr: r.resting_hr ?? null,
-      hrv: r.hrv ?? null,
-      sleep: r.sleep_score ?? null,
+      rhr: pickPos(r.resting_hr, null),
+      hrv: pickPos(r.hrv, null),
+      sleep: pickPos(r.sleep_score, null),
     });
   }
   for (const r of (garmin.data ?? [])) {
     const existing = byDate.get(r.date) ?? { date: r.date };
     byDate.set(r.date, {
       ...existing,
-      rhr: existing.rhr ?? r.resting_hr ?? null,
-      sleep: existing.sleep ?? r.sleep_score ?? null,
+      rhr: pickPos(existing.rhr, r.resting_hr),
+      hrv: existing.hrv ?? null,
+      sleep: pickPos(existing.sleep, r.sleep_score),
     });
   }
   const rows = Array.from(byDate.values()).sort((a, b) => b.date.localeCompare(a.date));
-  const rhrs = rows.map((r) => r.rhr).filter((v): v is number => typeof v === "number" && v > 0);
-  const hrvs = rows.map((r) => r.hrv).filter((v): v is number => typeof v === "number" && v > 0);
-  const sleeps = rows.map((r) => r.sleep).filter((v): v is number => typeof v === "number" && v > 0);
+  const recent = rows.filter((r) => r.date >= avgSince);
+  const rhrs = recent.map((r) => r.rhr).filter((v): v is number => typeof v === "number" && v > 0);
+  const hrvs = recent.map((r) => r.hrv).filter((v): v is number => typeof v === "number" && v > 0);
+  const sleeps = recent.map((r) => r.sleep).filter((v): v is number => typeof v === "number" && v > 0);
   const avg = (a: number[]) => a.length ? Math.round((a.reduce((s, v) => s + v, 0) / a.length) * 10) / 10 : null;
   return {
     rows: rows.slice(0, 14),

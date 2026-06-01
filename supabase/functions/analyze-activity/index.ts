@@ -245,6 +245,7 @@ serve(async (req) => {
       hrSamples, distanceSamples, elevationSamples, hrZones,
       cadenceSamples, avgCadence,
       summaryPolyline, startLat, startLon,
+      simpleMode,
     } = body;
     const isZh = lang === "zh";
 

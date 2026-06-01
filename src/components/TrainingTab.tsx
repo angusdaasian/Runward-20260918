@@ -3251,6 +3251,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                           </div>
 
                           {/* Finetune based on HRV/RHR */}
+                          {!simpleMode && (
                           <div className="mb-4 flex flex-wrap items-center gap-2">
                             <Button
                               size="sm"
@@ -3268,6 +3269,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                                 : (lang === "zh" ? "需有 HRV 或靜息心率資料" : "Only if HRV/RHR data is available")}
                             </span>
                           </div>
+                          )}
 
 
 

@@ -53,7 +53,7 @@ const FREE_PLAN_LABELS: Record<string, { en: string; zh: string }> = {
 
 // ─── Types ───
 type Goal = "race" | "distance" | "first5k" | "parkrun" | "general" | "postnatal" | "fitness" | "injury" | "postrace";
-type Distance = "5K" | "10K" | "HM" | "FM" | "TR";
+type Distance = "5K" | "10K" | "HM" | "FM" | "TR" | "FT";
 
 interface DayPlan {
   day: string; date: string; type: string; title: string;
@@ -106,8 +106,8 @@ const DISTANCES: { id: Distance; label: string }[] = [
   // { id: "TR", label: "Trail Race" },
 ];
 
-const MIN_WEEKS: Record<Distance, number> = { "5K": 4, "10K": 4, HM: 6, FM: 8, TR: 10 };
-const MIN_DAYS: Record<Distance, number> = { "5K": 2, "10K": 2, HM: 3, FM: 4, TR: 4 };
+const MIN_WEEKS: Record<Distance, number> = { "5K": 4, "10K": 4, HM: 6, FM: 8, TR: 10, FT: 4 };
+const MIN_DAYS: Record<Distance, number> = { "5K": 2, "10K": 2, HM: 3, FM: 4, TR: 4, FT: 2 };
 
 function localizeTitle(type: string, lang: Lang): string {
   return TYPE_LABELS[type]?.[lang] || type;

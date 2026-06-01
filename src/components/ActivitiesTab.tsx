@@ -604,7 +604,7 @@ const AllActivitiesView = ({
 const ActivitiesTab = ({ lang }: Props) => {
   const { user } = useAuth();
   const { isPremium } = usePremium();
-  const [simpleMode, setSimpleMode] = useSimpleMode();
+  const [simpleMode] = useSimpleMode();
   // Homepage shows ONLY the latest activity → tiny, fast query.
   // The full history is loaded in the background and used by the calendar,
   // monthly road quest, and the "All Activities" page — without ever

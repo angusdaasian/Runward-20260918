@@ -1243,6 +1243,78 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
   const [planDirty, setPlanDirty] = useState(false);
   const [savingPlan, setSavingPlan] = useState(false);
 
+  // ─── Recovery-based plan finetuning ───
+  const [hasRecoveryData, setHasRecoveryData] = useState<boolean | null>(null);
+  const [finetuneOpen, setFinetuneOpen] = useState(false);
+  const [finetuning, setFinetuning] = useState(false);
+  const [finetuneResult, setFinetuneResult] = useState<{
+    summary_en: string;
+    summary_zh: string;
+    adjusted_days: any[];
+    original_days: any[];
+    recovery?: { avg_rhr: number | null; avg_hrv: number | null; avg_sleep: number | null; sample_days: number };
+  } | null>(null);
+  const [confirmingFinetune, setConfirmingFinetune] = useState(false);
+
+  useEffect(() => {
+    if (!user || !isPremium) { setHasRecoveryData(false); return; }
+    (async () => {
+      const since = new Date(Date.now() - 14 * 86400000).toISOString().slice(0, 10);
+      const [g, t] = await Promise.all([
+        supabase.from("garmin_daily_health").select("resting_hr").eq("user_id", user.id).gte("date", since).gt("resting_hr", 0).limit(1),
+        supabase.from("terra_daily_health").select("resting_hr,hrv").eq("user_id", user.id).gte("date", since).or("resting_hr.gt.0,hrv.gt.0").limit(1),
+      ]);
+      setHasRecoveryData(((g.data?.length ?? 0) + (t.data?.length ?? 0)) > 0);
+    })();
+  }, [user, isPremium]);
+
+  const runFinetune = async () => {
+    if (!existingPlan?.id) return;
+    setFinetuning(true);
+    setFinetuneOpen(true);
+    setFinetuneResult(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("finetune-plan-week", {
+        body: { plan_id: existingPlan.id, week_index: currentWeekIdx, action: "analyze", lang },
+      });
+      if (error) throw error;
+      if (!data?.has_data) {
+        toast({ title: lang === "zh" ? "暫無 HRV/RHR 資料" : "No HRV/RHR data available", variant: "destructive" });
+        setFinetuneOpen(false);
+        return;
+      }
+      setFinetuneResult(data);
+    } catch (e: any) {
+      toast({ title: lang === "zh" ? "分析失敗" : "Analysis failed", description: e.message, variant: "destructive" });
+      setFinetuneOpen(false);
+    } finally {
+      setFinetuning(false);
+    }
+  };
+
+  const confirmFinetune = async () => {
+    if (!existingPlan?.id || !finetuneResult) return;
+    setConfirmingFinetune(true);
+    try {
+      const { error } = await supabase.functions.invoke("finetune-plan-week", {
+        body: { plan_id: existingPlan.id, week_index: currentWeekIdx, action: "confirm", adjusted_days: finetuneResult.adjusted_days },
+      });
+      if (error) throw error;
+      const newPlan = [...plan];
+      newPlan[currentWeekIdx] = { ...newPlan[currentWeekIdx], days: finetuneResult.adjusted_days };
+      setPlan(newPlan);
+      setExistingPlan({ ...existingPlan, plan_data: newPlan });
+      notifyPlanChanged();
+      toast({ title: lang === "zh" ? "本週計劃已更新" : "This week's plan updated" });
+      setFinetuneOpen(false);
+      setFinetuneResult(null);
+    } catch (e: any) {
+      toast({ title: lang === "zh" ? "更新失敗" : "Update failed", description: e.message, variant: "destructive" });
+    } finally {
+      setConfirmingFinetune(false);
+    }
+  };
+
   // ─── Watch sync (Terra planned workouts → Garmin/Coros) ───
   const [watchProvider, setWatchProvider] = useState<string | null>(null);
   const [pushedSet, setPushedSet] = useState<Set<number>>(new Set());
@@ -3174,6 +3246,27 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
 
                           </div>
 
+                          {/* Finetune based on HRV/RHR */}
+                          <div className="mb-4 flex flex-wrap items-center gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={runFinetune}
+                              disabled={!hasRecoveryData || finetuning}
+                              className="gap-1.5"
+                            >
+                              {finetuning ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+                              {lang === "zh" ? "依恢復數據微調本週" : "Finetune week from recovery"}
+                            </Button>
+                            <span className="text-[11px] text-muted-foreground">
+                              {hasRecoveryData
+                                ? (lang === "zh" ? "使用最近 14 天的 HRV/靜息心率" : "Uses your last 14 days of HRV/RHR")
+                                : (lang === "zh" ? "需有 HRV 或靜息心率資料" : "Only if HRV/RHR data is available")}
+                            </span>
+                          </div>
+
+
+
 
                           <CalendarDayList
                             days={currentWeek.days}
@@ -3672,7 +3765,99 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
         planId={section === "custom" ? (customExistingPlan?.id ?? null) : (existingPlan?.id ?? null)}
         currentWeekIdx={section === "custom" ? customWeekIdx : currentWeekIdx}
       />
+
+      {/* Finetune week dialog */}
+      <Dialog open={finetuneOpen} onOpenChange={(o) => { if (!o && !finetuning && !confirmingFinetune) { setFinetuneOpen(false); setFinetuneResult(null); } }}>
+        <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles size={18} className="text-primary" />
+              {lang === "zh" ? "依恢復數據微調本週" : "Finetune Week from Recovery"}
+            </DialogTitle>
+          </DialogHeader>
+
+          {finetuning || !finetuneResult ? (
+            <div className="py-10 flex flex-col items-center gap-3 text-sm text-muted-foreground">
+              <Loader2 className="animate-spin" size={20} />
+              {lang === "zh" ? "Gemini 正在分析你的 HRV/RHR 與本週計劃…" : "Gemini is analyzing your HRV/RHR vs this week's plan…"}
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {finetuneResult.recovery && (
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  <div className="bg-muted/40 rounded-lg p-2">
+                    <div className="text-[10px] text-muted-foreground uppercase">HRV</div>
+                    <div className="text-sm font-bold">{finetuneResult.recovery.avg_hrv ?? "—"}</div>
+                  </div>
+                  <div className="bg-muted/40 rounded-lg p-2">
+                    <div className="text-[10px] text-muted-foreground uppercase">RHR</div>
+                    <div className="text-sm font-bold">{finetuneResult.recovery.avg_rhr ?? "—"}</div>
+                  </div>
+                  <div className="bg-muted/40 rounded-lg p-2">
+                    <div className="text-[10px] text-muted-foreground uppercase">{lang === "zh" ? "睡眠" : "Sleep"}</div>
+                    <div className="text-sm font-bold">{finetuneResult.recovery.avg_sleep ?? "—"}</div>
+                  </div>
+                </div>
+              )}
+
+              <div className="bg-card border border-border rounded-xl p-3">
+                <div className="text-xs font-medium text-muted-foreground mb-1">{lang === "zh" ? "AI 建議" : "AI Recommendation"}</div>
+                <p className="text-sm whitespace-pre-line leading-relaxed">
+                  {(lang === "zh" ? finetuneResult.summary_zh : finetuneResult.summary_en) || finetuneResult.summary_en}
+                </p>
+              </div>
+
+              <div className="space-y-1.5">
+                <div className="text-xs font-medium text-muted-foreground">{lang === "zh" ? "建議調整" : "Proposed changes"}</div>
+                {finetuneResult.adjusted_days.map((adj: any, i: number) => {
+                  const orig = finetuneResult.original_days[i] || {};
+                  const changed =
+                    adj.type !== orig.type ||
+                    (adj.distance_km ?? null) !== (orig.distance_km ?? null) ||
+                    (adj.pace ?? null) !== (orig.pace ?? null);
+                  const d = adj.date ? new Date(adj.date + "T00:00:00") : null;
+                  const label = d ? d.toLocaleDateString(lang === "zh" ? "zh-HK" : "en", { weekday: "short", month: "short", day: "numeric" }) : `Day ${i + 1}`;
+                  return (
+                    <div key={i} className={`rounded-lg border p-2 text-xs ${changed ? "border-primary/50 bg-primary/5" : "border-border"}`}>
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium">{label}</span>
+                        {changed && <span className="text-[10px] font-bold uppercase text-primary">{lang === "zh" ? "已調整" : "Adjusted"}</span>}
+                      </div>
+                      {changed ? (
+                        <div className="mt-1 grid grid-cols-2 gap-2">
+                          <div className="text-muted-foreground line-through">
+                            {orig.type} {orig.distance_km ? `· ${orig.distance_km}km` : ""} {orig.pace ? `· ${orig.pace}` : ""}
+                          </div>
+                          <div className="text-foreground font-medium">
+                            {adj.type} {adj.distance_km ? `· ${adj.distance_km}km` : ""} {adj.pace ? `· ${adj.pace}` : ""}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="mt-0.5 text-muted-foreground">
+                          {adj.type} {adj.distance_km ? `· ${adj.distance_km}km` : ""} {adj.pace ? `· ${adj.pace}` : ""}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="flex gap-2">
+                <Button variant="outline" className="flex-1" onClick={() => { setFinetuneOpen(false); setFinetuneResult(null); }} disabled={confirmingFinetune}>
+                  {lang === "zh" ? "取消" : "Cancel"}
+                </Button>
+                <Button className="flex-1" onClick={confirmFinetune} disabled={confirmingFinetune}>
+                  {confirmingFinetune
+                    ? <><Loader2 className="animate-spin mr-2" size={14} />{lang === "zh" ? "更新中…" : "Updating…"}</>
+                    : (lang === "zh" ? "確認更新本週" : "Confirm & Update Week")}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
+
   );
 };
 

@@ -3765,7 +3765,99 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
         planId={section === "custom" ? (customExistingPlan?.id ?? null) : (existingPlan?.id ?? null)}
         currentWeekIdx={section === "custom" ? customWeekIdx : currentWeekIdx}
       />
+
+      {/* Finetune week dialog */}
+      <Dialog open={finetuneOpen} onOpenChange={(o) => { if (!o && !finetuning && !confirmingFinetune) { setFinetuneOpen(false); setFinetuneResult(null); } }}>
+        <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles size={18} className="text-primary" />
+              {lang === "zh" ? "依恢復數據微調本週" : "Finetune Week from Recovery"}
+            </DialogTitle>
+          </DialogHeader>
+
+          {finetuning || !finetuneResult ? (
+            <div className="py-10 flex flex-col items-center gap-3 text-sm text-muted-foreground">
+              <Loader2 className="animate-spin" size={20} />
+              {lang === "zh" ? "Gemini 正在分析你的 HRV/RHR 與本週計劃…" : "Gemini is analyzing your HRV/RHR vs this week's plan…"}
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {finetuneResult.recovery && (
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  <div className="bg-muted/40 rounded-lg p-2">
+                    <div className="text-[10px] text-muted-foreground uppercase">HRV</div>
+                    <div className="text-sm font-bold">{finetuneResult.recovery.avg_hrv ?? "—"}</div>
+                  </div>
+                  <div className="bg-muted/40 rounded-lg p-2">
+                    <div className="text-[10px] text-muted-foreground uppercase">RHR</div>
+                    <div className="text-sm font-bold">{finetuneResult.recovery.avg_rhr ?? "—"}</div>
+                  </div>
+                  <div className="bg-muted/40 rounded-lg p-2">
+                    <div className="text-[10px] text-muted-foreground uppercase">{lang === "zh" ? "睡眠" : "Sleep"}</div>
+                    <div className="text-sm font-bold">{finetuneResult.recovery.avg_sleep ?? "—"}</div>
+                  </div>
+                </div>
+              )}
+
+              <div className="bg-card border border-border rounded-xl p-3">
+                <div className="text-xs font-medium text-muted-foreground mb-1">{lang === "zh" ? "AI 建議" : "AI Recommendation"}</div>
+                <p className="text-sm whitespace-pre-line leading-relaxed">
+                  {(lang === "zh" ? finetuneResult.summary_zh : finetuneResult.summary_en) || finetuneResult.summary_en}
+                </p>
+              </div>
+
+              <div className="space-y-1.5">
+                <div className="text-xs font-medium text-muted-foreground">{lang === "zh" ? "建議調整" : "Proposed changes"}</div>
+                {finetuneResult.adjusted_days.map((adj: any, i: number) => {
+                  const orig = finetuneResult.original_days[i] || {};
+                  const changed =
+                    adj.type !== orig.type ||
+                    (adj.distance_km ?? null) !== (orig.distance_km ?? null) ||
+                    (adj.pace ?? null) !== (orig.pace ?? null);
+                  const d = adj.date ? new Date(adj.date + "T00:00:00") : null;
+                  const label = d ? d.toLocaleDateString(lang === "zh" ? "zh-HK" : "en", { weekday: "short", month: "short", day: "numeric" }) : `Day ${i + 1}`;
+                  return (
+                    <div key={i} className={`rounded-lg border p-2 text-xs ${changed ? "border-primary/50 bg-primary/5" : "border-border"}`}>
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium">{label}</span>
+                        {changed && <span className="text-[10px] font-bold uppercase text-primary">{lang === "zh" ? "已調整" : "Adjusted"}</span>}
+                      </div>
+                      {changed ? (
+                        <div className="mt-1 grid grid-cols-2 gap-2">
+                          <div className="text-muted-foreground line-through">
+                            {orig.type} {orig.distance_km ? `· ${orig.distance_km}km` : ""} {orig.pace ? `· ${orig.pace}` : ""}
+                          </div>
+                          <div className="text-foreground font-medium">
+                            {adj.type} {adj.distance_km ? `· ${adj.distance_km}km` : ""} {adj.pace ? `· ${adj.pace}` : ""}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="mt-0.5 text-muted-foreground">
+                          {adj.type} {adj.distance_km ? `· ${adj.distance_km}km` : ""} {adj.pace ? `· ${adj.pace}` : ""}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="flex gap-2">
+                <Button variant="outline" className="flex-1" onClick={() => { setFinetuneOpen(false); setFinetuneResult(null); }} disabled={confirmingFinetune}>
+                  {lang === "zh" ? "取消" : "Cancel"}
+                </Button>
+                <Button className="flex-1" onClick={confirmFinetune} disabled={confirmingFinetune}>
+                  {confirmingFinetune
+                    ? <><Loader2 className="animate-spin mr-2" size={14} />{lang === "zh" ? "更新中…" : "Updating…"}</>
+                    : (lang === "zh" ? "確認更新本週" : "Confirm & Update Week")}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
+
   );
 };
 

@@ -31,6 +31,7 @@ import {
 import { useDraggable, useDroppable } from "@dnd-kit/core";
 import WeeklyReviewModal from "@/components/training/WeeklyReviewModal";
 import EditWorkoutDialog from "@/components/training/EditWorkoutDialog";
+import { useSimpleMode } from "@/hooks/use-simple-mode";
 const CalculatorTab = lazy(() => import("@/components/CalculatorTab"));
 import freePlan5k from "@/assets/free-plan-5k.jpg";
 import freePlan10k from "@/assets/free-plan-10k.jpg";
@@ -1163,6 +1164,7 @@ const ProgramHeader: React.FC<ProgramHeaderProps> = ({
 
 const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
   const { isPremium } = usePremium();
+  const [simpleMode] = useSimpleMode();
   const { user } = useAuth();
   const { toast } = useToast();
   const { online } = useOnlineStatus();
@@ -3105,6 +3107,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                             }}
                             onRegenerateForRaces={() => handleRegeneratePlan({})}
                            />
+                           {!simpleMode && (
                            <Button
                              variant="outline"
                              className="w-full mb-4 border-primary/30 text-primary hover:bg-primary/10"
@@ -3113,6 +3116,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                              <Sparkles size={14} className="mr-2" />
                              {lang === "zh" ? "週訓練回顧" : "Weekly Review"}
                            </Button>
+                           )}
 
                            {/* ─── Race Time Predictor (HR-zone + VDOT, deterministic) ─── */}
                            {canPredictRaceTime && (() => {
@@ -3247,6 +3251,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                           </div>
 
                           {/* Finetune based on HRV/RHR */}
+                          {!simpleMode && (
                           <div className="mb-4 flex flex-wrap items-center gap-2">
                             <Button
                               size="sm"
@@ -3264,6 +3269,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                                 : (lang === "zh" ? "需有 HRV 或靜息心率資料" : "Only if HRV/RHR data is available")}
                             </span>
                           </div>
+                          )}
 
 
 
@@ -3451,6 +3457,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                   ))}
                 </div>
 
+                {!simpleMode && (
                 <Button
                   variant="outline"
                   className="w-full mt-6 border-primary/30 text-primary hover:bg-primary/10"
@@ -3459,6 +3466,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                   <Sparkles size={14} className="mr-2" />
                   {lang === "zh" ? "週訓練回顧" : "Weekly Review"}
                 </Button>
+                )}
 
                 <Button variant="outline" className="w-full mt-2 text-destructive border-destructive/30 hover:bg-destructive/10" onClick={() => setShowCustomCancelConfirm(true)}>
                   {lang === "zh" ? "取消計劃" : "Cancel Plan"}

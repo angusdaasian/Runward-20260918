@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { useSimpleMode } from "@/hooks/use-simple-mode";
 import { ArrowLeft, Clock, MapPin, Zap, Heart, TrendingUp, Mountain, Timer, Footprints, Trash2, Pencil, Sparkles, Lock, Gauge, AlertTriangle, Flame, Trophy, MessageSquare, RefreshCw, Share2, Copy, Check, Download } from "lucide-react";
 import { exportActivityFit } from "@/lib/fitExport";
 import { shareActivity, shareSplits, shareCharts } from "@/lib/shareActivity";
@@ -158,6 +159,7 @@ const StatBox = ({ icon: Icon, label, value, unit, iconColor }: {
 );
 
 const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, trainingScore, profileAge, profileMaxHr, profileRestingHr, profileCustomZones }: Props) => {
+  const [simpleMode] = useSimpleMode();
   const isAppleHealth = activity.source === "Apple Health";
   const isTerraActivity = activity.provenance === "terra" || (activity.source?.startsWith("Terra") ?? false);
   const isGarmin = activity.provenance === "garmin" && activity.source === "Garmin";
@@ -1592,7 +1594,29 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
             </p>
           </div>
         ) : needsRpe && !rpeSubmitted && !aiAnalysis ? (
-          /* RPE Input for Apple Health activities */
+          simpleMode ? (
+            <div className="py-2">
+              <label className="text-sm font-medium text-foreground mb-2 block">
+                {lang === "zh" ? "這次訓練感覺如何？" : "How did this workout feel?"}
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                {([
+                  { key: "easy", rpe: 2, en: "Easy", zh: "輕鬆", tone: "bg-emerald-500/10 text-emerald-600 border-emerald-500/30 hover:bg-emerald-500/20" },
+                  { key: "a_bit_hard", rpe: 5, en: "A bit hard", zh: "有點吃力", tone: "bg-amber-500/10 text-amber-600 border-amber-500/30 hover:bg-amber-500/20" },
+                  { key: "hard", rpe: 7, en: "Hard", zh: "吃力", tone: "bg-orange-500/10 text-orange-600 border-orange-500/30 hover:bg-orange-500/20" },
+                  { key: "very_hard", rpe: 9, en: "Very hard", zh: "非常吃力", tone: "bg-rose-500/10 text-rose-600 border-rose-500/30 hover:bg-rose-500/20" },
+                ] as const).map((opt) => (
+                  <button
+                    key={opt.key}
+                    onClick={() => { setRpeInput(String(opt.rpe)); setRpeSubmitted(true); runAiAnalysis(splits, opt.rpe); }}
+                    className={`px-3 py-3 rounded-xl text-sm font-semibold border transition-colors ${opt.tone}`}
+                  >
+                    {lang === "zh" ? opt.zh : opt.en}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : (
           <div className="py-2">
             <div className="bg-muted/50 rounded-lg p-3 mb-3">
               <div className="flex items-center gap-1.5 mb-1.5">
@@ -1630,6 +1654,7 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
               </button>
             </div>
           </div>
+          )
         ) : aiLoading ? (
           <div className="flex items-center justify-center py-8">
             <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />

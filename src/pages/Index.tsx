@@ -7,6 +7,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { confirmLeave } from "@/lib/unsavedGuard";
 import { TabPageSkeleton, SettingsSkeleton, CommunitySkeleton, PostureSkeleton, TrainingSkeleton } from "@/components/ui/PageSkeleton";
 import PullToRefreshContainer from "@/components/ui/PullToRefreshContainer";
+import { useSimpleMode } from "@/hooks/use-simple-mode";
 
 // Eagerly load the most common tab
 import ActivitiesTab from "@/components/ActivitiesTab";
@@ -30,6 +31,7 @@ const ONBOARDING_SIGNUP_IN_PROGRESS_KEY = "onboarding_signup_in_progress";
 
 const Index = () => {
   const { user, loading, isWarmResume } = useAuth();
+  const [simpleMode] = useSimpleMode();
   const { online } = useOnlineStatus();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -219,13 +221,19 @@ const Index = () => {
   };
 
   // 5 visible tabs (no "more" in nav bar — accessible via settings icon)
-  const tabs: { id: Tab; icon: typeof Activity; labelKey: string }[] = [
+  const allTabs: { id: Tab; icon: typeof Activity; labelKey: string }[] = [
     { id: "activities", icon: Activity, labelKey: "activities" },
     { id: "training", icon: Dumbbell, labelKey: "training" },
     { id: "races", icon: Trophy, labelKey: "races" },
     { id: "community", icon: Award, labelKey: "community" },
     { id: "analytics", icon: BarChart3, labelKey: "analytics" },
   ];
+  const tabs = simpleMode ? allTabs.filter(t => t.id !== "analytics") : allTabs;
+
+  // If user is on analytics tab when simple mode flips on, bounce to activities
+  if (simpleMode && activeTab === "analytics") {
+    setTimeout(() => setActiveTab("activities"), 0);
+  }
 
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-background">

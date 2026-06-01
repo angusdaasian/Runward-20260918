@@ -7,6 +7,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { confirmLeave } from "@/lib/unsavedGuard";
 import { TabPageSkeleton, SettingsSkeleton, CommunitySkeleton, PostureSkeleton, TrainingSkeleton } from "@/components/ui/PageSkeleton";
 import PullToRefreshContainer from "@/components/ui/PullToRefreshContainer";
+import { useSimpleMode } from "@/hooks/use-simple-mode";
 
 // Eagerly load the most common tab
 import ActivitiesTab from "@/components/ActivitiesTab";

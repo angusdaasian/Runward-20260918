@@ -245,6 +245,7 @@ serve(async (req) => {
       hrSamples, distanceSamples, elevationSamples, hrZones,
       cadenceSamples, avgCadence,
       summaryPolyline, startLat, startLon,
+      simpleMode,
     } = body;
     const isZh = lang === "zh";
 
@@ -1104,7 +1105,43 @@ You MUST:
 
     const hasRpe = typeof rpe === "number" && rpe >= 1 && rpe <= 10;
 
-    const systemPrompt = isZh
+    const systemPrompt = simpleMode
+      ? (isZh
+        ? `你是親切的跑步教練 AI，對象是新手。用簡單直白的繁體中文，避免術語（不要解釋步頻、心率區間、配速分析等細節）。重點只有兩個：今天做得好不好？下一次該怎樣跑？
+
+格式：嚴格使用兩個區塊，用 ===NEXT_WORKOUT=== 分隔。
+
+===ANALYSIS===
+## 今次表現
+2-3 句總結今天跑得好或不好，用日常用語（例如「節奏穩定，狀態不錯」或「後段有點吃力」）。如有比賽或天氣特殊，簡單帶過。
+
+## 下一步建議
+1-2 句，告訴跑者要注意甚麼（例如多休息、補水、保持節奏）。
+
+===NEXT_WORKOUT===
+## 下次建議練習
+- **類型**：（休息 / 輕鬆跑 / 稍快節奏 / 間歇）
+- **距離**：X 公里
+- **時長**：約 X 分鐘
+- **小提示**：一句話說明為甚麼。`
+        : `You are a friendly running coach AI for beginners. Use plain, simple English and avoid jargon (do NOT explain cadence, HR zones, pace analysis, stride details, etc.). Focus only on: did they do well today, and what should they do next?
+
+FORMAT — strictly use two sections separated by ===NEXT_WORKOUT===:
+
+===ANALYSIS===
+## How You Did
+2-3 short sentences in everyday language saying whether today went well or not (e.g. "Solid steady run, you held a good rhythm" or "The last few km got tough"). If it was a race or weather was rough, mention it briefly.
+
+## What To Watch
+1-2 short sentences with a simple takeaway (rest more, hydrate, keep it steady, etc.).
+
+===NEXT_WORKOUT===
+## Suggested Next Run
+- **Type**: (Rest / Easy run / Steady push / Intervals)
+- **Distance**: X km
+- **Duration**: ~X minutes
+- **Tip**: one short sentence on why.`)
+      : (isZh
       ? `你是一位專業跑步教練 AI。根據訓練計劃、活動數據、天氣和跑者主觀感受，給出深入分析和明日訓練建議。回覆請用繁體中文。
 
 格式要求：嚴格使用以下兩個區塊，並用 ===NEXT_WORKOUT=== 分隔。
@@ -1160,7 +1197,7 @@ Based on today's performance, the runner's subjective feel, training score, and 
 - **Duration**: ~X minutes
 - **Why**: brief reasoning (1-2 sentences)
 
-If the runner raced hard today or said they struggled, suggest rest or a very easy recovery run. If today was easy, you can suggest a harder session.${hasRpe ? " Use RPE to gauge today's intensity." : ""}`;
+If the runner raced hard today or said they struggled, suggest rest or a very easy recovery run. If today was easy, you can suggest a harder session.${hasRpe ? " Use RPE to gauge today's intensity." : ""}`);
 
     const userMessage = `${planContext}${raceContext}\n\n--- Activity Data ---\n${statsText}`;
 

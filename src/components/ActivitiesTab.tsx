@@ -39,7 +39,6 @@ import FadeIn from "@/components/ui/FadeIn";
 import { ActivityListSkeleton } from "@/components/ui/PageSkeleton";
 import { useAppleHealth, type HealthStats } from "@/hooks/use-apple-health";
 import { useSimpleMode } from "@/hooks/use-simple-mode";
-import { Sparkles } from "lucide-react";
 
 
 
@@ -605,7 +604,7 @@ const AllActivitiesView = ({
 const ActivitiesTab = ({ lang }: Props) => {
   const { user } = useAuth();
   const { isPremium } = usePremium();
-  const [simpleMode, setSimpleMode] = useSimpleMode();
+  const [simpleMode] = useSimpleMode();
   // Homepage shows ONLY the latest activity → tiny, fast query.
   // The full history is loaded in the background and used by the calendar,
   // monthly road quest, and the "All Activities" page — without ever
@@ -1077,25 +1076,6 @@ const ActivitiesTab = ({ lang }: Props) => {
 
   return (
     <FadeIn className="px-5 pt-6 max-w-lg mx-auto">
-      {/* Simple Mode toggle */}
-      <div className="flex justify-end mb-3">
-        <button
-          onClick={() => setSimpleMode(!simpleMode)}
-          aria-pressed={simpleMode}
-          className={`group inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold border transition-all ${
-            simpleMode
-              ? "bg-primary text-primary-foreground border-primary shadow-sm"
-              : "bg-card text-muted-foreground border-border hover:text-foreground hover:border-foreground/40"
-          }`}
-          title={lang === "zh" ? "切換簡易模式" : "Toggle Simple Mode"}
-        >
-          <Sparkles size={12} className={simpleMode ? "" : "opacity-60"} />
-          <span>{lang === "zh" ? "簡易模式" : "Simple Mode"}</span>
-          <span className={`ml-1 inline-flex items-center justify-center w-7 h-3.5 rounded-full transition-colors ${simpleMode ? "bg-primary-foreground/30" : "bg-muted"}`}>
-            <span className={`block w-3 h-3 rounded-full bg-background shadow transition-transform ${simpleMode ? "translate-x-1.5" : "-translate-x-1.5"}`} />
-          </span>
-        </button>
-      </div>
 
       {/* Today Stats from Apple HealthKit */}
       <TodayStats lang={lang} healthStats={ahConnected ? appleHealth.healthStats : null} />

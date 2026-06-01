@@ -280,6 +280,7 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
         ...(userComment.trim() ? { userComment: userComment.trim() } : {}),
         ...(opts?.forceRefresh ? { forceRefresh: true } : {}),
         ...(activity.summary_polyline ? { summaryPolyline: activity.summary_polyline } : {}),
+        ...(simpleMode ? { simpleMode: true } : {}),
       };
       if ((isGarmin || isTerraActivity) && activity.laps && Array.isArray(activity.laps) && activity.laps.length > 0) {
         bodyPayload.garminLaps = activity.laps;

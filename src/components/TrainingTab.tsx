@@ -2266,7 +2266,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
           { id: "training", label: lang === "zh" ? "配速" : "Paces" },
           { id: "free", label: lang === "zh" ? "免費" : "Free" },
           { id: "program", label: "AI", showLock: !isPremium },
-          { id: "custom", label: lang === "zh" ? "自訂" : "Custom" },
+          ...(simpleMode ? [] : [{ id: "custom" as const, label: lang === "zh" ? "自訂" : "Custom" }]),
         ] as const).map((s) => (
           <button
             key={s.id}

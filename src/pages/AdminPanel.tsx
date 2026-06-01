@@ -294,6 +294,7 @@ const AdminPanel = () => {
                     <TableHead>Method</TableHead>
                     <TableHead>Subscribed</TableHead>
                     <TableHead>Expires</TableHead>
+                    {canGrant && <TableHead>Grant</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>

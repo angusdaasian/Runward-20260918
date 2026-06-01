@@ -39,7 +39,7 @@ import FadeIn from "@/components/ui/FadeIn";
 import { ActivityListSkeleton } from "@/components/ui/PageSkeleton";
 import { useAppleHealth, type HealthStats } from "@/hooks/use-apple-health";
 import { useSimpleMode } from "@/hooks/use-simple-mode";
-import { Sparkles, Zap } from "lucide-react";
+import { Sparkles } from "lucide-react";
 
 
 

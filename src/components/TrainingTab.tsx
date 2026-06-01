@@ -3779,7 +3779,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
           {finetuning || !finetuneResult ? (
             <div className="py-10 flex flex-col items-center gap-3 text-sm text-muted-foreground">
               <Loader2 className="animate-spin" size={20} />
-              {lang === "zh" ? "Gemini 正在分析你的 HRV/RHR 與本週計劃…" : "Gemini is analyzing your HRV/RHR vs this week's plan…"}
+              {lang === "zh" ? "AI 正在分析你的 HRV/RHR 與本週計劃…" : "AI is analyzing your HRV/RHR vs this week's plan…"}
             </div>
           ) : (
             <div className="space-y-4">

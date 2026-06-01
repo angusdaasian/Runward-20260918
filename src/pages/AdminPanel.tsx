@@ -84,14 +84,42 @@ const TABS: { key: TabKey; label: string; icon: React.ComponentType<{ className?
 ];
 
 
+const GRANTOR_USER_ID = "c7a7d1ca-c7bf-4288-bb9d-794006a04087";
+
 const AdminPanel = () => {
   const { isAdmin, loading: adminLoading } = useAdmin();
-  const { loading: authLoading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [users, setUsers] = useState<UserRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabKey>("users");
   const [restoring, setRestoring] = useState(false);
+  const [grantTarget, setGrantTarget] = useState<UserRow | null>(null);
+  const [grantDuration, setGrantDuration] = useState<"1week" | "2week" | "1month">("1month");
+  const [grantSecret, setGrantSecret] = useState("");
+  const [granting, setGranting] = useState(false);
+  const canGrant = user?.id === GRANTOR_USER_ID;
+
+  const handleGrantPremium = async () => {
+    if (!grantTarget || !grantSecret) return;
+    setGranting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("admin-grant-premium", {
+        body: { targetUserId: grantTarget.user_id, duration: grantDuration, secret: grantSecret },
+      });
+      if (error || !(data as any)?.success) {
+        throw new Error((data as any)?.error || error?.message || "Grant failed");
+      }
+      toast.success(`Granted premium to ${grantTarget.display_name || grantTarget.user_id}`);
+      setGrantTarget(null);
+      setGrantSecret("");
+      fetchUsers();
+    } catch (e: any) {
+      toast.error(e?.message || "Failed to grant premium");
+    } finally {
+      setGranting(false);
+    }
+  };
 
   const AFFECTED_USER_IDS = [
     "0ed6a94b-1e42-479d-ad51-468c007310e8",

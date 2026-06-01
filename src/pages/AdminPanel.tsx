@@ -350,6 +350,45 @@ const AdminPanel = () => {
           )}
         </CardContent>
       </Card>
+
+      {canGrant && (
+        <Dialog open={!!grantTarget} onOpenChange={(o) => { if (!o) { setGrantTarget(null); setGrantSecret(""); } }}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Grant Premium to {grantTarget?.display_name || grantTarget?.user_id}</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-2">
+              <div className="space-y-2">
+                <Label>Duration</Label>
+                <Select value={grantDuration} onValueChange={(v) => setGrantDuration(v as any)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1week">1 Week</SelectItem>
+                    <SelectItem value="2week">2 Weeks</SelectItem>
+                    <SelectItem value="1month">1 Month</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Granting Secret</Label>
+                <Input
+                  type="password"
+                  value={grantSecret}
+                  onChange={(e) => setGrantSecret(e.target.value)}
+                  placeholder="Enter secret"
+                  autoComplete="off"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => { setGrantTarget(null); setGrantSecret(""); }}>Cancel</Button>
+              <Button onClick={handleGrantPremium} disabled={granting || !grantSecret}>
+                {granting ? "Granting..." : "Grant Premium"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 

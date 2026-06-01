@@ -1839,7 +1839,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
     setLoading(true);
     try {
       // Make sure the picked target race is the A-priority race in user_races so My Races stays in sync.
-      if (user && resolvedRaceName) {
+      if (!isFitness && user && resolvedRaceName) {
         try {
           const matching = (userRaces as any[] | undefined)?.find(
             (r) => r?.race_date === raceDate && (r.race_name === resolvedRaceName || r.race_name_zh === resolvedRaceName),
@@ -1865,9 +1865,9 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
         } catch (e) { console.warn("user_races sync failed", e); }
       }
 
-      // Refresh races snapshot for the plan window
+      // Refresh races snapshot for the plan window (skip for fitness mode)
       const freshRaces = await (async () => {
-        if (!user) return [] as any[];
+        if (isFitness || !user) return [] as any[];
         const { data } = await supabase
           .from("user_races" as any)
           .select("id,race_name,race_name_zh,race_date,category,priority")
@@ -1885,6 +1885,12 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
         priority: r.priority || "none",
       }));
 
+      // For fitness mode, default to today as start and 8 weeks
+      const todayIso = new Date().toISOString().split("T")[0];
+      const fitnessStart = isFitness ? todayIso : startDate;
+      const fitnessWeeks = isFitness ? 8 : weeksUntilRace;
+      const effectiveGoal = isFitness ? "fitness" : goal;
+
       const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-program`;
       const response = await fetch(url, {
         method: "POST",
@@ -1893,7 +1899,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
           apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
           Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
         },
-        body: JSON.stringify({ goal, distance, targetTime, raceDate, startDate, weeks: weeksUntilRace, daysPerWeek, weeklyKm, longRunDay, restDays, raceName: resolvedRaceName, raceCity: selectedRace?.city || null, raceCountry: selectedRace?.country || null, lang, races: racesPayloadFromSnapshot(snapshot), trailDistanceKm: distance === "TR" ? Number(trailDistanceKm) || null : null, trailElevationM: distance === "TR" ? Number(trailElevationM) || 0 : null, trailTargetEph: distance === "TR" ? Number(trailTargetEph) || null : null }),
+        body: JSON.stringify({ goal: effectiveGoal, distance, targetTime: isFitness ? "" : targetTime, raceDate: isFitness ? "" : raceDate, startDate: fitnessStart, weeks: fitnessWeeks, daysPerWeek, weeklyKm: isFitness ? null : weeklyKm, longRunDay: isFitness ? null : longRunDay, restDays: isFitness ? [] : restDays, raceName: isFitness ? null : resolvedRaceName, raceCity: selectedRace?.city || null, raceCountry: selectedRace?.country || null, lang, races: racesPayloadFromSnapshot(snapshot), trailDistanceKm: distance === "TR" ? Number(trailDistanceKm) || null : null, trailElevationM: distance === "TR" ? Number(trailElevationM) || 0 : null, trailTargetEph: distance === "TR" ? Number(trailTargetEph) || null : null }),
       });
       if (!response.ok) { const err = await response.json().catch(() => ({})); throw new Error(err.error || "Failed to generate"); }
       const result = await response.json();

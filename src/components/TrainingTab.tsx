@@ -53,7 +53,7 @@ const FREE_PLAN_LABELS: Record<string, { en: string; zh: string }> = {
 
 // ─── Types ───
 type Goal = "race" | "distance" | "first5k" | "parkrun" | "general" | "postnatal" | "fitness" | "injury" | "postrace";
-type Distance = "5K" | "10K" | "HM" | "FM" | "TR";
+type Distance = "5K" | "10K" | "HM" | "FM" | "TR" | "FT";
 
 interface DayPlan {
   day: string; date: string; type: string; title: string;
@@ -106,8 +106,8 @@ const DISTANCES: { id: Distance; label: string }[] = [
   // { id: "TR", label: "Trail Race" },
 ];
 
-const MIN_WEEKS: Record<Distance, number> = { "5K": 4, "10K": 4, HM: 6, FM: 8, TR: 10 };
-const MIN_DAYS: Record<Distance, number> = { "5K": 2, "10K": 2, HM: 3, FM: 4, TR: 4 };
+const MIN_WEEKS: Record<Distance, number> = { "5K": 4, "10K": 4, HM: 6, FM: 8, TR: 10, FT: 4 };
+const MIN_DAYS: Record<Distance, number> = { "5K": 2, "10K": 2, HM: 3, FM: 4, TR: 4, FT: 2 };
 
 function localizeTitle(type: string, lang: Lang): string {
   return TYPE_LABELS[type]?.[lang] || type;
@@ -1825,7 +1825,9 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
   };
 
   const handleGenerate = async () => {
-    if (!distance || !targetTime || !raceDate || !startDate || !dateValid) return;
+    const isFitness = distance === "FT";
+    if (!distance) return;
+    if (!isFitness && (!targetTime || !raceDate || !startDate || !dateValid)) return;
     if (!isOnline()) {
       toast({
         title: lang === "zh" ? "離線中" : "You're offline",
@@ -1837,7 +1839,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
     setLoading(true);
     try {
       // Make sure the picked target race is the A-priority race in user_races so My Races stays in sync.
-      if (user && resolvedRaceName) {
+      if (!isFitness && user && resolvedRaceName) {
         try {
           const matching = (userRaces as any[] | undefined)?.find(
             (r) => r?.race_date === raceDate && (r.race_name === resolvedRaceName || r.race_name_zh === resolvedRaceName),
@@ -1863,9 +1865,9 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
         } catch (e) { console.warn("user_races sync failed", e); }
       }
 
-      // Refresh races snapshot for the plan window
+      // Refresh races snapshot for the plan window (skip for fitness mode)
       const freshRaces = await (async () => {
-        if (!user) return [] as any[];
+        if (isFitness || !user) return [] as any[];
         const { data } = await supabase
           .from("user_races" as any)
           .select("id,race_name,race_name_zh,race_date,category,priority")
@@ -1883,6 +1885,12 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
         priority: r.priority || "none",
       }));
 
+      // For fitness mode, default to today as start and 8 weeks
+      const todayIso = new Date().toISOString().split("T")[0];
+      const fitnessStart = isFitness ? todayIso : startDate;
+      const fitnessWeeks = isFitness ? 8 : weeksUntilRace;
+      const effectiveGoal = isFitness ? "fitness" : goal;
+
       const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-program`;
       const response = await fetch(url, {
         method: "POST",
@@ -1891,7 +1899,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
           apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
           Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
         },
-        body: JSON.stringify({ goal, distance, targetTime, raceDate, startDate, weeks: weeksUntilRace, daysPerWeek, weeklyKm, longRunDay, restDays, raceName: resolvedRaceName, raceCity: selectedRace?.city || null, raceCountry: selectedRace?.country || null, lang, races: racesPayloadFromSnapshot(snapshot), trailDistanceKm: distance === "TR" ? Number(trailDistanceKm) || null : null, trailElevationM: distance === "TR" ? Number(trailElevationM) || 0 : null, trailTargetEph: distance === "TR" ? Number(trailTargetEph) || null : null }),
+        body: JSON.stringify({ goal: effectiveGoal, distance, targetTime: isFitness ? "" : targetTime, raceDate: isFitness ? "" : raceDate, startDate: fitnessStart, weeks: fitnessWeeks, daysPerWeek, weeklyKm: isFitness ? null : weeklyKm, longRunDay: isFitness ? null : longRunDay, restDays: isFitness ? [] : restDays, raceName: isFitness ? null : resolvedRaceName, raceCity: selectedRace?.city || null, raceCountry: selectedRace?.country || null, lang, races: racesPayloadFromSnapshot(snapshot), trailDistanceKm: distance === "TR" ? Number(trailDistanceKm) || null : null, trailElevationM: distance === "TR" ? Number(trailElevationM) || 0 : null, trailTargetEph: distance === "TR" ? Number(trailTargetEph) || null : null }),
       });
       if (!response.ok) { const err = await response.json().catch(() => ({})); throw new Error(err.error || "Failed to generate"); }
       const result = await response.json();
@@ -1904,9 +1912,10 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
       setProgramStep("calendar");
       if (user) {
         await supabase.from("training_plans" as any).delete().eq("user_id", user.id);
+        const lastDayDate = (planData[planData.length - 1]?.days?.slice(-1)?.[0]?.date) || fitnessStart;
         const inserted: any = {
-          user_id: user.id, goal: goal || "race", distance, target_time: targetTime,
-          race_date: raceDate, weeks: weeksUntilRace, plan_data: planData, raw_output: result.raw || "",
+          user_id: user.id, goal: effectiveGoal || "race", distance, target_time: isFitness ? "" : targetTime,
+          race_date: isFitness ? lastDayDate : raceDate, weeks: fitnessWeeks, plan_data: planData, raw_output: result.raw || "",
           race_schedule: snapshot,
         };
         const { data: saved } = await (supabase.from("training_plans" as any) as any).insert(inserted).select().single();
@@ -2771,7 +2780,20 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                           {d.id === "HM" ? (lang === "zh" ? "半馬" : "HM") : d.id === "FM" ? (lang === "zh" ? "全馬" : "FM") : d.id === "TR" ? (lang === "zh" ? "越野賽" : "Trail Race") : d.id}
                         </button>
                       ))}
+                      {simpleMode && (
+                        <button
+                          onClick={() => { setDistance("FT" as Distance); setTargetTime(""); setRaceDate(""); setStartDate(""); if (daysPerWeek < 2) setDaysPerWeek(3); }}
+                          className={`px-4 py-2 rounded-full text-sm font-medium transition-colors border ${distance === "FT" ? "bg-primary text-primary-foreground border-primary" : "bg-card text-foreground border-border hover:bg-accent"}`}
+                        >
+                          {lang === "zh" ? "強身健體" : "Fitness"}
+                        </button>
+                      )}
                     </div>
+                    {distance === "FT" && (
+                      <p className="text-xs text-muted-foreground mt-2">
+                        {lang === "zh" ? "持續的休閒跑步計劃，沒有比賽目標。AI 會根據你的入門資料與最近一週表現安排輕鬆訓練。" : "Ongoing casual running plan with no race goal. AI will set easy paces from your onboarding PB and last 7 days of activity."}
+                      </p>
+                    )}
                   </div>
 
                   {/* Trail Race custom km + elevation */}
@@ -2798,7 +2820,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                   )}
 
                   {/* Target Time */}
-                  {distance && (
+                  {distance && distance !== "FT" && (
                     <div className="mb-5">
                       <label className="text-sm font-semibold text-foreground mb-2 block flex items-center gap-2"><Trophy size={14} />{lang === "zh" ? "目標完成時間" : "Target Finish Time"}</label>
                       <div className="flex items-center gap-2">
@@ -2839,7 +2861,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                   )}
 
                   {/* Weekly km */}
-                  {distance && (
+                  {distance && distance !== "FT" && (
                     <div className="mb-5">
                       <label className="text-sm font-semibold text-foreground mb-2 block flex items-center gap-2"><Route size={14} />{lang === "zh" ? "每週目標公里數" : "Preferred Weekly Km"}</label>
                       <select
@@ -2858,7 +2880,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                   )}
 
                   {/* Long Run Day */}
-                  {distance && (
+                  {distance && distance !== "FT" && (
                     <div className="mb-5">
                       <label className="text-sm font-semibold text-foreground mb-2 block flex items-center gap-2"><Route size={14} />{lang === "zh" ? "長跑日" : "Long Run Day"}</label>
                       <div className="flex flex-wrap gap-2">
@@ -2878,7 +2900,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                   )}
 
                   {/* Rest Days */}
-                  {distance && (
+                  {distance && distance !== "FT" && (
                     <div className="mb-5">
                       <label className="text-sm font-semibold text-foreground mb-2 block flex items-center gap-2">
                         <Calendar size={14} />{lang === "zh" ? "休息日" : "Rest Day(s)"}
@@ -2905,112 +2927,118 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                     </div>
                   )}
 
-                  <div className="mb-5">
-                    <label className="text-sm font-semibold text-foreground mb-2 block flex items-center gap-2"><Calendar size={14} />{lang === "zh" ? "開始日期" : "Start Date"}</label>
-                    <input
-                      type="date"
-                      value={startDate}
-                      onChange={(e) => setStartDate(e.target.value)}
-                      min={new Date().toISOString().split("T")[0]}
-                      className="block w-full min-w-0 box-border appearance-none h-12 rounded-md border border-border bg-card px-3 py-3 text-sm text-foreground"
-                    />
-                    <p className="text-xs text-muted-foreground mt-1">{lang === "zh" ? "計劃從哪天開始？" : "When should the plan start?"}</p>
-                  </div>
+                  {distance !== "FT" && (
+                    <div className="mb-5">
+                      <label className="text-sm font-semibold text-foreground mb-2 block flex items-center gap-2"><Calendar size={14} />{lang === "zh" ? "開始日期" : "Start Date"}</label>
+                      <input
+                        type="date"
+                        value={startDate}
+                        onChange={(e) => setStartDate(e.target.value)}
+                        min={new Date().toISOString().split("T")[0]}
+                        className="block w-full min-w-0 box-border appearance-none h-12 rounded-md border border-border bg-card px-3 py-3 text-sm text-foreground"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">{lang === "zh" ? "計劃從哪天開始？" : "When should the plan start?"}</p>
+                    </div>
+                  )}
 
                   {/* Race Date */}
-                  <div className="mb-5">
-                    <label className="text-sm font-semibold text-foreground mb-2 block flex items-center gap-2"><Calendar size={14} />{lang === "zh" ? "比賽日期" : "Race Date"}</label>
-                    <input
-                      type="date"
-                      value={raceDate}
-                      onChange={(e) => setRaceDate(e.target.value)}
-                      min={startDate ? new Date(new Date(startDate + "T00:00:00").getTime() + minWeeks * 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0] : new Date(Date.now() + minWeeks * 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0]}
-                      className="block w-full min-w-0 box-border appearance-none h-12 rounded-md border border-border bg-card px-3 py-3 text-sm text-foreground"
-                    />
-                    {raceDate && startDate && !dateValid && <p className="text-xs text-destructive mt-1">{lang === "zh" ? `開始日期與比賽之間至少需要 ${minWeeks} 週` : `At least ${minWeeks} weeks needed between start and race date`}</p>}
-                    {raceDate && startDate && dateValid && <p className="text-xs text-muted-foreground mt-1">{weeksUntilRace} {lang === "zh" ? "週訓練計劃" : "weeks training plan"}</p>}
-                  </div>
+                  {distance !== "FT" && (
+                    <div className="mb-5">
+                      <label className="text-sm font-semibold text-foreground mb-2 block flex items-center gap-2"><Calendar size={14} />{lang === "zh" ? "比賽日期" : "Race Date"}</label>
+                      <input
+                        type="date"
+                        value={raceDate}
+                        onChange={(e) => setRaceDate(e.target.value)}
+                        min={startDate ? new Date(new Date(startDate + "T00:00:00").getTime() + minWeeks * 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0] : new Date(Date.now() + minWeeks * 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0]}
+                        className="block w-full min-w-0 box-border appearance-none h-12 rounded-md border border-border bg-card px-3 py-3 text-sm text-foreground"
+                      />
+                      {raceDate && startDate && !dateValid && <p className="text-xs text-destructive mt-1">{lang === "zh" ? `開始日期與比賽之間至少需要 ${minWeeks} 週` : `At least ${minWeeks} weeks needed between start and race date`}</p>}
+                      {raceDate && startDate && dateValid && <p className="text-xs text-muted-foreground mt-1">{weeksUntilRace} {lang === "zh" ? "週訓練計劃" : "weeks training plan"}</p>}
+                    </div>
+                  )}
 
                   {/* Optional: Race Selector */}
-                  <div className="mb-5">
-                    <label className="text-sm font-semibold text-foreground mb-2 block flex items-center gap-2">
-                      <Trophy size={14} />
-                      {lang === "zh" ? "選擇賽事" : "Select Race"}
-                      <span className="text-xs font-normal text-muted-foreground">({lang === "zh" ? "選填" : "optional"})</span>
-                    </label>
+                  {distance !== "FT" && (
+                    <div className="mb-5">
+                      <label className="text-sm font-semibold text-foreground mb-2 block flex items-center gap-2">
+                        <Trophy size={14} />
+                        {lang === "zh" ? "選擇賽事" : "Select Race"}
+                        <span className="text-xs font-normal text-muted-foreground">({lang === "zh" ? "選填" : "optional"})</span>
+                      </label>
 
-                    {selectedRace ? (
-                      <div className="flex items-center justify-between gap-2 rounded-md border border-border bg-card px-3 py-2">
-                        <div className="min-w-0 flex-1">
-                          <div className="text-sm font-medium text-foreground truncate">
-                            {lang === "zh" && selectedRace.name_zh ? selectedRace.name_zh : selectedRace.name}
+                      {selectedRace ? (
+                        <div className="flex items-center justify-between gap-2 rounded-md border border-border bg-card px-3 py-2">
+                          <div className="min-w-0 flex-1">
+                            <div className="text-sm font-medium text-foreground truncate">
+                              {lang === "zh" && selectedRace.name_zh ? selectedRace.name_zh : selectedRace.name}
+                            </div>
+                            <div className="text-xs text-muted-foreground truncate">
+                              {selectedRace.race_date} · {selectedRace.city}{selectedRace.country ? `, ${selectedRace.country}` : ""}
+                            </div>
                           </div>
-                          <div className="text-xs text-muted-foreground truncate">
-                            {selectedRace.race_date} · {selectedRace.city}{selectedRace.country ? `, ${selectedRace.country}` : ""}
-                          </div>
+                          <button
+                            type="button"
+                            onClick={() => { setSelectedRaceId(""); setRaceSearch(""); }}
+                            className="text-muted-foreground hover:text-foreground"
+                            aria-label="Clear race"
+                          >
+                            <X size={16} />
+                          </button>
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => { setSelectedRaceId(""); setRaceSearch(""); }}
-                          className="text-muted-foreground hover:text-foreground"
-                          aria-label="Clear race"
-                        >
-                          <X size={16} />
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="relative">
-                        <input
-                          type="text"
-                          value={raceSearch}
-                          onChange={(e) => { setRaceSearch(e.target.value); setShowRaceDropdown(true); }}
-                          onFocus={() => setShowRaceDropdown(true)}
-                          onBlur={() => setTimeout(() => setShowRaceDropdown(false), 150)}
-                          placeholder={lang === "zh" ? "搜尋賽事名稱…" : "Search race name…"}
-                          className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm text-foreground"
-                        />
-                        {showRaceDropdown && filteredRaces.length > 0 && (
-                          <div className="absolute z-20 mt-1 max-h-60 w-full overflow-y-auto rounded-md border border-border bg-card shadow-lg">
-                            {filteredRaces.map((r) => (
-                              <button
-                                type="button"
-                                key={r.id}
-                                onMouseDown={(e) => e.preventDefault()}
-                                onClick={() => {
-                                  setSelectedRaceId(r.id);
-                                  setRaceSearch("");
-                                  setCustomRaceName("");
-                                  setShowRaceDropdown(false);
-                                  if (!raceDate) setRaceDate(r.race_date);
-                                }}
-                                className="block w-full px-3 py-2 text-left text-sm text-foreground hover:bg-accent"
-                              >
-                                <div className="font-medium truncate">{lang === "zh" && r.name_zh ? r.name_zh : r.name}</div>
-                                <div className="text-xs text-muted-foreground truncate">{r.race_date} · {r.city}{r.country ? `, ${r.country}` : ""}</div>
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    )}
+                      ) : (
+                        <div className="relative">
+                          <input
+                            type="text"
+                            value={raceSearch}
+                            onChange={(e) => { setRaceSearch(e.target.value); setShowRaceDropdown(true); }}
+                            onFocus={() => setShowRaceDropdown(true)}
+                            onBlur={() => setTimeout(() => setShowRaceDropdown(false), 150)}
+                            placeholder={lang === "zh" ? "搜尋賽事名稱…" : "Search race name…"}
+                            className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm text-foreground"
+                          />
+                          {showRaceDropdown && filteredRaces.length > 0 && (
+                            <div className="absolute z-20 mt-1 max-h-60 w-full overflow-y-auto rounded-md border border-border bg-card shadow-lg">
+                              {filteredRaces.map((r) => (
+                                <button
+                                  type="button"
+                                  key={r.id}
+                                  onMouseDown={(e) => e.preventDefault()}
+                                  onClick={() => {
+                                    setSelectedRaceId(r.id);
+                                    setRaceSearch("");
+                                    setCustomRaceName("");
+                                    setShowRaceDropdown(false);
+                                    if (!raceDate) setRaceDate(r.race_date);
+                                  }}
+                                  className="block w-full px-3 py-2 text-left text-sm text-foreground hover:bg-accent"
+                                >
+                                  <div className="font-medium truncate">{lang === "zh" && r.name_zh ? r.name_zh : r.name}</div>
+                                  <div className="text-xs text-muted-foreground truncate">{r.race_date} · {r.city}{r.country ? `, ${r.country}` : ""}</div>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
 
-                    {!selectedRace && (
-                      <div className="mt-2">
-                        <input
-                          type="text"
-                          value={customRaceName}
-                          onChange={(e) => setCustomRaceName(e.target.value)}
-                          placeholder={lang === "zh" ? "找不到？輸入賽事名稱" : "Can't find it? Enter race name"}
-                          className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm text-foreground"
-                        />
-                      </div>
-                    )}
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {lang === "zh" ? "AI 將根據您的目標賽事個人化訓練計劃。" : "The AI will personalize the plan around your target race."}
-                    </p>
-                  </div>
+                      {!selectedRace && (
+                        <div className="mt-2">
+                          <input
+                            type="text"
+                            value={customRaceName}
+                            onChange={(e) => setCustomRaceName(e.target.value)}
+                            placeholder={lang === "zh" ? "找不到？輸入賽事名稱" : "Can't find it? Enter race name"}
+                            className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm text-foreground"
+                          />
+                        </div>
+                      )}
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {lang === "zh" ? "AI 將根據您的目標賽事個人化訓練計劃。" : "The AI will personalize the plan around your target race."}
+                      </p>
+                    </div>
+                  )}
 
-                  <Button onClick={handleGenerateClick} disabled={!distance || !targetTime || !raceDate || !startDate || !dateValid || loading || restDays.length !== 7 - daysPerWeek} className="w-full" size="lg">
+                  <Button onClick={handleGenerateClick} disabled={distance === "FT" ? (!distance || loading) : (!distance || !targetTime || !raceDate || !startDate || !dateValid || loading || restDays.length !== 7 - daysPerWeek)} className="w-full" size="lg">
                     {loading ? (<><Loader2 className="animate-spin mr-2" size={18} />{lang === "zh" ? "生成中，請耐心等候，最多需要一分鐘" : "Generating. Please be patient, it can take up to a minute"}</>) : (lang === "zh" ? "生成訓練計劃" : "Generate Training Plan")}
                   </Button>
                 </div>

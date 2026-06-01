@@ -62,6 +62,7 @@ serve(async (req) => {
 
   try {
     const { goal, distance, targetTime, raceDate, startDate, weeks, daysPerWeek, weeklyKm, longRunDay, restDays, raceName, raceCity, raceCountry, lang, races, trailDistanceKm, trailElevationM, trailTargetEph } = await req.json();
+    const isFitness = goal === "fitness" || distance === "FT";
 
     // Normalise race schedule. Expect [{name, race_date, category, priority}]
     const raceList: Array<{ name: string; race_date: string; category?: string; priority?: string }> =
@@ -395,6 +396,101 @@ serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    if (isFitness) {
+      // Fetch profile (training_score = VDOT from onboarding PB) and last 7-day activities
+      let trainingScore: number | null = null;
+      let recentSummary = "no recent activity";
+      try {
+        const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2.49.4");
+        const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, { global: { headers: { Authorization: `Bearer ${token}` } } });
+        const { data: claims } = await sb.auth.getClaims(token);
+        const uid = (claims as any)?.claims?.sub;
+        if (uid) {
+          const { data: prof } = await sb.from("profiles").select("training_score,age,sex").eq("user_id", uid).maybeSingle();
+          trainingScore = (prof as any)?.training_score ?? null;
+          const sevenAgo = new Date(Date.now() - 7 * 86400000).toISOString();
+          const { data: acts } = await sb.from("activities").select("distance,moving_time,start_date,average_heartrate").gte("start_date", sevenAgo).order("start_date", { ascending: false }).limit(20);
+          if (Array.isArray(acts) && acts.length > 0) {
+            const totalKm = acts.reduce((s: number, a: any) => s + (Number(a.distance) || 0) / 1000, 0);
+            const totalMin = acts.reduce((s: number, a: any) => s + (Number(a.moving_time) || 0) / 60, 0);
+            const avgPace = totalKm > 0 ? totalMin / totalKm : 0;
+            const avgPaceStr = avgPace > 0 ? `${Math.floor(avgPace)}:${String(Math.round((avgPace - Math.floor(avgPace)) * 60)).padStart(2, "0")}/km` : "n/a";
+            recentSummary = `${acts.length} runs, ${totalKm.toFixed(1)} km total, avg pace ${avgPaceStr}`;
+          }
+        }
+      } catch (e) {
+        console.warn("[fitness] profile/activities fetch failed", e);
+      }
+
+      const fitnessWeeks = Math.max(4, Math.min(12, Number(weeks) || 8));
+      const fitDaysPerWeek = Math.max(2, Math.min(7, Number(daysPerWeek) || 3));
+      const fitPrompt = `Create a ${fitnessWeeks}-week ONGOING CASUAL FITNESS running plan (no race goal).
+The runner wants to maintain and gradually improve fitness with relaxed, sustainable training.
+
+Runner data:
+- Running score (VDOT) from onboarding PB: ${trainingScore ?? "unknown"}
+- Last 7 days summary: ${recentSummary}
+- Preferred running days per week: ${fitDaysPerWeek}
+- Plan starts on ${startDate || "today"} (Monday-Sunday weeks)
+
+${langInstruction}
+
+CRITICAL FITNESS-MODE RULES (MUST follow):
+- DO NOT include any "Interval" or "Tempo Run" workouts. This is a casual improvement plan, not race prep.
+- Use ONLY these workout types: "Easy Run", "Long Run", "Recovery", "Progression Run" (optional, sparingly), "Cross Training" (optional), "Rest".
+- About 1 Long Run per week (~25-35% of weekly volume) at easy conversational pace.
+- All other runs are Easy Run at conversational pace based on the runner's VDOT easy pace (or last-7-day average pace if no VDOT).
+- Schedule exactly ${fitDaysPerWeek} run days per week and ${7 - fitDaysPerWeek} Rest days. Distribute rest days reasonably (e.g. one after the long run, one mid-week). You choose which days.
+- Weekly volume: start sensibly based on the runner's recent 7-day km (or ~15-25 km if no data) and grow by no more than 10% per week. Include a recovery week (~20% reduction) every 4th week.
+- Keep descriptions short, friendly, and encouraging — this is for a casual runner.
+- Pace fields: provide easy pace per km derived from the runner's VDOT/recent pace (e.g. "6:30/km"). Long Run pace slightly slower than Easy. Set pace null only for Rest/Cross Training.
+- Use color codes: #4CAF50 Easy, #2196F3 Long Run, #9C27B0 Recovery, #FF5722 Progression, #00BCD4 Cross Training, #607D8B Rest.
+
+Return JSON array of weeks: each week has "week" (number) and "days" (exactly 7 ordered Mon→Sun). Each day: "day" (Mon..Sun), "type", "title", "description", "distance_km" (number or null), "pace" (string or null), "color", "elevation_m": null, "eph": null. DO NOT include "date" or "startDate" — the system fills those in.
+
+Return ONLY valid JSON, no markdown.`;
+
+      const VERTEX_API_KEY = Deno.env.get("GOOGLE_VERTEX_API_KEY");
+      if (!VERTEX_API_KEY) throw new Error("GOOGLE_VERTEX_API_KEY not configured");
+      const fitResp = await callVertexAI({
+        apiKey: VERTEX_API_KEY,
+        model: "google/gemini-3.1-flash-lite-preview",
+        messages: [
+          { role: "system", content: "You are an expert running coach. Return ONLY valid JSON arrays. No markdown, no code fences, no explanation." },
+          { role: "user", content: fitPrompt },
+        ],
+      });
+      if (!fitResp.ok) {
+        const errText = await fitResp.text();
+        console.error("Fitness AI error:", fitResp.status, errText);
+        return new Response(JSON.stringify({ error: `AI gateway error: ${fitResp.status}` }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      const fitData = await fitResp.json();
+      let fitContent = fitData.choices?.[0]?.message?.content || "[]";
+      fitContent = fitContent.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+      let fitPlan: any[] = [];
+      try { fitPlan = JSON.parse(fitContent); } catch { fitPlan = []; }
+      if (!Array.isArray(fitPlan) || fitPlan.length === 0) {
+        return new Response(JSON.stringify({ error: "AI did not return a valid fitness plan" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      // Strip any intervals/tempo the AI may have leaked in
+      for (const w of fitPlan) {
+        if (!Array.isArray(w?.days)) continue;
+        for (const d of w.days) {
+          if (d?.type === "Interval" || d?.type === "Tempo Run") {
+            d.type = "Easy Run";
+            d.title = isZh ? "輕鬆跑" : "Easy Run";
+            d.color = "#4CAF50";
+          }
+        }
+      }
+      const finalized = finalizePlanData(fitPlan);
+      return new Response(JSON.stringify({ plan: finalized, raw: fitContent }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
 
     const trailBlock = isTrailRace
       ? `\nTRAIL RACE PROGRAM REQUIREMENTS (STRICT):\n- Target race: ${trailKm} km with ${trailEle} m of total elevation gain.\n- Every week MUST include at least ONE "Trail Run" day (rolling/hill terrain) — ideally the long run is run on trails, especially in build weeks.\n- Every 2nd week MUST include a hill/trail-specific quality session: hill repeats (e.g. 6-10 × 90 sec uphill hard, jog down), or a Trail Run with progressive vertical (target eph close to race eph). Alternate between hill repeats and a tempo on rolling trail.\n- Keep ONE weekly road interval session for VO2max/leg speed (e.g. 5×1km, 6×800m) — written as "Interval" with proper "{dist}m x {reps} at {pace}/km, rest {time} between sets" format.\n- Include "Easy Run" days on road or flat trail for recovery between hard/trail sessions.\n- Long trail runs should progressively build BOTH distance AND elevation week to week (still respecting the +10% volume rule on distance; vertical may grow ~15-20% per build week from a sensible base).\n- For each "Trail Run" and "Trail Race" day include numeric "elevation_m" and "eph" (EpH = distance_km + elevation_m/100 per hour). Target race EpH = ${trailKm + trailEle / 100} effort points over the goal finish time of ${targetTime} (use this to derive workout eph targets).\n- Peak long trail run distance ≈ 60-75% of race distance with proportional elevation; reach this 3-4 weeks before race day, then taper.\n- The final 2 weeks taper: reduce volume AND vertical sharply; keep short race-pace EpH efforts on trail to stay sharp.\n`

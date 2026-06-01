@@ -1243,6 +1243,78 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
   const [planDirty, setPlanDirty] = useState(false);
   const [savingPlan, setSavingPlan] = useState(false);
 
+  // ─── Recovery-based plan finetuning ───
+  const [hasRecoveryData, setHasRecoveryData] = useState<boolean | null>(null);
+  const [finetuneOpen, setFinetuneOpen] = useState(false);
+  const [finetuning, setFinetuning] = useState(false);
+  const [finetuneResult, setFinetuneResult] = useState<{
+    summary_en: string;
+    summary_zh: string;
+    adjusted_days: any[];
+    original_days: any[];
+    recovery?: { avg_rhr: number | null; avg_hrv: number | null; avg_sleep: number | null; sample_days: number };
+  } | null>(null);
+  const [confirmingFinetune, setConfirmingFinetune] = useState(false);
+
+  useEffect(() => {
+    if (!user || !isPremium) { setHasRecoveryData(false); return; }
+    (async () => {
+      const since = new Date(Date.now() - 14 * 86400000).toISOString().slice(0, 10);
+      const [g, t] = await Promise.all([
+        supabase.from("garmin_daily_health").select("resting_hr").eq("user_id", user.id).gte("date", since).gt("resting_hr", 0).limit(1),
+        supabase.from("terra_daily_health").select("resting_hr,hrv").eq("user_id", user.id).gte("date", since).or("resting_hr.gt.0,hrv.gt.0").limit(1),
+      ]);
+      setHasRecoveryData(((g.data?.length ?? 0) + (t.data?.length ?? 0)) > 0);
+    })();
+  }, [user, isPremium]);
+
+  const runFinetune = async () => {
+    if (!existingPlan?.id) return;
+    setFinetuning(true);
+    setFinetuneOpen(true);
+    setFinetuneResult(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("finetune-plan-week", {
+        body: { plan_id: existingPlan.id, week_index: currentWeekIdx, action: "analyze", lang },
+      });
+      if (error) throw error;
+      if (!data?.has_data) {
+        toast({ title: lang === "zh" ? "暫無 HRV/RHR 資料" : "No HRV/RHR data available", variant: "destructive" });
+        setFinetuneOpen(false);
+        return;
+      }
+      setFinetuneResult(data);
+    } catch (e: any) {
+      toast({ title: lang === "zh" ? "分析失敗" : "Analysis failed", description: e.message, variant: "destructive" });
+      setFinetuneOpen(false);
+    } finally {
+      setFinetuning(false);
+    }
+  };
+
+  const confirmFinetune = async () => {
+    if (!existingPlan?.id || !finetuneResult) return;
+    setConfirmingFinetune(true);
+    try {
+      const { error } = await supabase.functions.invoke("finetune-plan-week", {
+        body: { plan_id: existingPlan.id, week_index: currentWeekIdx, action: "confirm", adjusted_days: finetuneResult.adjusted_days },
+      });
+      if (error) throw error;
+      const newPlan = [...plan];
+      newPlan[currentWeekIdx] = { ...newPlan[currentWeekIdx], days: finetuneResult.adjusted_days };
+      setPlan(newPlan);
+      setExistingPlan({ ...existingPlan, plan_data: newPlan });
+      notifyPlanChanged();
+      toast({ title: lang === "zh" ? "本週計劃已更新" : "This week's plan updated" });
+      setFinetuneOpen(false);
+      setFinetuneResult(null);
+    } catch (e: any) {
+      toast({ title: lang === "zh" ? "更新失敗" : "Update failed", description: e.message, variant: "destructive" });
+    } finally {
+      setConfirmingFinetune(false);
+    }
+  };
+
   // ─── Watch sync (Terra planned workouts → Garmin/Coros) ───
   const [watchProvider, setWatchProvider] = useState<string | null>(null);
   const [pushedSet, setPushedSet] = useState<Set<number>>(new Set());

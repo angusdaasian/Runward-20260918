@@ -333,6 +333,14 @@ const AdminPanel = () => {
                         <TableCell>
                           {u.premium_expires ? new Date(u.premium_expires).toLocaleDateString() : "—"}
                         </TableCell>
+                        {canGrant && (
+                          <TableCell>
+                            <Button size="sm" variant="outline" onClick={() => setGrantTarget(u)}>
+                              <Crown className="h-3 w-3 mr-1" />
+                              Grant
+                            </Button>
+                          </TableCell>
+                        )}
                       </TableRow>
                     );
                   })}

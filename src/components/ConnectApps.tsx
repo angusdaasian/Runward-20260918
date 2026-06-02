@@ -482,7 +482,7 @@ const ConnectApps = ({ lang, onBack }: Props) => {
         {TERRA_PROVIDERS.map((p) => {
           const conn = terraConns[p.id];
           const busy = terraBusy === p.id;
-          const disabledByOther = hasTerraConn && !conn;
+          const disabledByOther = (hasTerraConn || hasFitnessApp) && !conn;
           return (
             <div key={p.id} className={`bg-card border border-border rounded-xl p-4 ${disabledByOther ? "opacity-50" : ""}`}>
               <div className="flex items-center justify-between">

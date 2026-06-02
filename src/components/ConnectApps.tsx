@@ -18,6 +18,7 @@ import polarIcon from "@/assets/brands/polar.png";
 import garminIcon from "@/assets/brands/garmin.png";
 import suuntoIcon from "@/assets/brands/suunto.png";
 import zeppIcon from "@/assets/brands/zepp.png";
+import fitbitIcon from "@/assets/brands/fitbit.png";
 
 interface Props {
   lang: Lang;

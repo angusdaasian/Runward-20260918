@@ -6,6 +6,7 @@ import { Lang } from "@/lib/i18n";
 import type { StravaActivity, PlannedWorkout } from "@/hooks/use-activities";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { isRunning } from "@/lib/trainingLoad";
 
 interface Props {
   lang: Lang;
@@ -65,6 +66,7 @@ export default function DashboardMonthlyChallenge({ lang, activities, plannedWor
     let total = 0;
     let runs = 0;
     for (const act of activities) {
+      if (!isRunning((act as any).sport_type)) continue;
       const d = new Date(act.start_date);
       if (d.getFullYear() === y && d.getMonth() === m) {
         total += (act.distance || 0) / 1000;

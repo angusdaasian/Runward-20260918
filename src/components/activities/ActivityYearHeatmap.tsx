@@ -71,10 +71,10 @@ const ActivityYearHeatmap = ({ lang, activities }: Props) => {
       const d = new Date(act.start_date);
       if (isNaN(d.getTime())) continue;
       if (d.getFullYear() !== year) continue;
+      if (!isRunning(act.sport_type)) continue;
       const key = fmtDate(d);
       const minutes = (act.moving_time ?? 0) / 60;
-      const runOnly = isRunning(act.sport_type);
-      const distKm = runOnly ? (act.distance ?? 0) / 1000 : 0;
+      const distKm = (act.distance ?? 0) / 1000;
       const cell = dayMap.get(key) ?? {
         date: key,
         dow: mondayDow(d),
@@ -207,11 +207,11 @@ const ActivityYearHeatmap = ({ lang, activities }: Props) => {
       const d = new Date(act.start_date);
       if (isNaN(d.getTime())) continue;
       if (d.getFullYear() !== year) continue;
+      if (!isRunning(act.sport_type)) continue;
       const diffDays = Math.floor((d.getTime() - gridStart.getTime()) / 86400000);
       const idx = Math.floor(diffDays / 7);
       if (idx < 0 || idx >= buckets.length) continue;
-      const runOnly = isRunning(act.sport_type);
-      buckets[idx].distanceKm += runOnly ? (act.distance ?? 0) / 1000 : 0;
+      buckets[idx].distanceKm += (act.distance ?? 0) / 1000;
       buckets[idx].minutes += (act.moving_time ?? 0) / 60;
     }
     return buckets;

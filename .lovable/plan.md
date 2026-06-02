@@ -1,85 +1,86 @@
 ## Goal
 
-Remove dev/prod branching and run Strava on **production credentials only**. Support **multiple Strava apps** (each capped at 10 athletes today, raisable to 999 once your API is approved) so when app #1 fills up, new athletes are auto-routed to app #2, then #3, etc. Start with **Client ID 215250** as app #1.
+Stop storing `client_secret` and `verify_token` as plaintext columns on `strava_apps`. Move both into **Supabase Vault** (`vault.secrets`, encrypted-at-rest with a project-managed key). The admin UI keeps the same UX, but the actual secret values are unreadable via direct Postgres SELECT or the Data API — only the service role (edge functions) can decrypt them.
 
 ## Architecture
 
-### 1. New table: `strava_apps` (admin-managed)
+### 1. Schema change on `strava_apps`
 
 ```text
-strava_apps
-  id               uuid pk
-  client_id        text unique     -- e.g. "215250"
-  client_secret    text            -- stored encrypted-at-rest in Supabase
-  verify_token     text            -- for webhook subscription
-  subscription_id  bigint nullable -- Strava webhook subscription id
-  max_athletes     int  default 10 -- you change to 999 when approved
-  priority         int  default 0  -- lower fills first
-  is_active        bool default true
-  created_at, updated_at
+-- new columns
+client_secret_vault_id    uuid     -- references vault.secrets.id
+verify_token_vault_id     uuid     -- references vault.secrets.id
+
+-- existing columns (deprecated, will be dropped after migration)
+client_secret  text   -- set to NULL after move
+verify_token   text   -- set to NULL after move
 ```
 
-RLS: only admins can read/write. Edge functions use service role.
+We don't FK-link to `vault.secrets` (Supabase discourages it); we just store the UUIDs.
 
-Why a table (not secrets/code): you said you'll keep adding apps and bump the cap later — a table lets you do it from the admin panel without redeploys or new secrets per app.
+### 2. Two SECURITY DEFINER SQL functions
 
-### 2. New column on `strava_connections`
+Vault tables are not exposed via PostgREST. We add two `security definer` Postgres functions, both restricted to `service_role` (called only from edge functions):
 
-```text
-strava_app_id  uuid references strava_apps(id)
-```
+- `public.get_strava_app_secrets(app_id uuid)` → returns `(client_secret text, verify_token text)` by joining `strava_apps` → `vault.decrypted_secrets`.
+- `public.set_strava_app_secret(app_id uuid, kind text, value text)` → upserts a vault secret (creates with `vault.create_secret` if no vault id yet, otherwise `vault.update_secret`), then writes the resulting `vault.secrets.id` back to `strava_apps.<kind>_vault_id`. `kind` is `'client_secret'` or `'verify_token'`.
 
-Every OAuth connection records which app it was created under, so token refresh and webhook events route to the correct client_id/secret. Existing rows backfilled to the prod app (215250).
+`GRANT EXECUTE` to `service_role` only — admins cannot call these directly.
 
-### 3. App selection logic (`_shared/strava-apps.ts`)
+### 3. New edge function: `strava-app-secret`
 
-- `pickAvailableApp()` — picks the active app with the lowest priority that still has `count(strava_connections where app_id = …) < max_athletes`. Throws `ALL_APPS_FULL` if none.
-- `getAppById(id)` — fetch credentials by app id (for refresh/sync/disconnect).
-- `getAppBySubscriptionId(sub_id)` — for webhook routing.
+Admin-only writer. Flow:
+1. Validate JWT via `getClaims()`, then check `has_role(user_id, 'admin')`.
+2. Validate body `{ app_id, kind, value }` with Zod.
+3. Call `set_strava_app_secret` via service-role client.
+4. Return 200.
 
-### 4. Edge function changes
+The admin UI calls this function instead of writing `client_secret` / `verify_token` directly to the table.
 
-| Function | Change |
+### 4. Update `_shared/strava-apps.ts`
+
+`hydrate(row)` no longer reads the plaintext columns. Instead, after fetching a row, it calls `get_strava_app_secrets(app_id)` via the service-role client and fills `client_secret` / `verify_token` from vault. Env-var fallback for legacy app 215250 stays as a safety net until vault is populated.
+
+### 5. Admin UI changes (`StravaAppsManager`)
+
+- Table list: replace plaintext columns with "Secret set ✓ / —" badges (we never load the value into the browser).
+- Edit dialog: `client_secret` / `verify_token` inputs save via `supabase.functions.invoke('strava-app-secret', { body: { app_id, kind, value } })` instead of `update().eq()`. All other fields (max_athletes, priority, is_active, subscription_id, notes) still update directly via the table.
+- Add app: first `insert()` the row to get an `id`, then call the secret edge function twice (client_secret + verify_token) if values were provided.
+
+### 6. Backfill + cleanup
+
+Migration steps:
+1. Add new vault-id columns.
+2. For every existing row that has a plaintext `client_secret` / `verify_token`, call `vault.create_secret(value, 'strava_app_<id>_<kind>')`, write the returned uuid into the new column, then `NULL` out the plaintext column.
+3. Keep the plaintext columns in place but always-NULL for one deploy cycle (rollback safety). A follow-up migration will `DROP` them.
+
+### 7. RLS / grants
+
+- `strava_apps` keeps the existing admin-only policy. The plaintext columns being `NULL` means even a leaked admin SELECT shows nothing.
+- The two SECURITY DEFINER functions are `REVOKE ALL FROM PUBLIC` + `GRANT EXECUTE TO service_role`. The admin client never has direct access to vault.
+- `vault` schema stays as Supabase ships it (no policy changes).
+
+## Files changed
+
+- `supabase/migrations/<new>.sql` — schema + functions + backfill.
+- `supabase/functions/strava-app-secret/index.ts` — new admin writer.
+- `supabase/functions/_shared/strava-apps.ts` — read secrets from vault.
+- `src/components/admin/StravaAppsManager.tsx` — invoke edge function for secret writes, hide values in UI.
+
+## Risk / threat model after migration
+
+| Attacker has | Can read client_secret? |
 |---|---|
-| `strava-auth` | Drop `environment` param. Call `pickAvailableApp()`. Embed `app_id` in OAuth `state`. If full → return error so UI can show "All slots full, try later." |
-| `strava-callback` | Drop env logic. Read `app_id` from `state`. Use that app's `client_secret` for token exchange. Store `strava_app_id` on the new connection row. |
-| `strava-sync`, `strava-activity-streams`, `strava-disconnect` | Drop env branching. Load the connection's `strava_app_id` → look up secret from `strava_apps`. |
-| `strava-webhook` | Drop dev/prod token logic. On `GET` verify, accept any active app's `verify_token`. On `POST`, find connection by `owner_id`, then load its app's credentials for the refresh call. |
+| Stolen admin user JWT | No (table columns are NULL) |
+| Stolen service role key | Yes (by design — edge functions need it) |
+| Direct Postgres connection (DB password) | Only with the project's Vault encryption key, which Supabase manages — practically no |
+| Read-only DB replica dump | No (vault stores ciphertext) |
 
-### 5. Admin UI: `StravaAppsManager`
+This matches the protection level of Supabase's recommended pattern for storing third-party API secrets.
 
-In Admin Panel → new tab "Strava Apps":
-- Table list: client_id, max_athletes, current usage (e.g. `7 / 10`), priority, active toggle.
-- "Add app" form: client_id, client_secret, verify_token, max_athletes (default 10), priority.
-- Edit row to update `max_athletes` (you set to 999 once approved) or `client_secret`.
-- "Register webhook" button per app → calls Strava `POST /push_subscriptions` and saves the returned `subscription_id`.
+## Rollout order
 
-### 6. Seed
-
-Insert app #1 row with `client_id=215250`, `max_athletes=10`, using the **new** `STRAVA_CLIENT_SECRET_PROD` value you'll provide. (Your existing `STRAVA_CLIENT_SECRET_PROD` secret matches whichever Strava app you originally created — confirm it matches 215250, or I'll request an update.)
-
-### 7. Cleanup
-
-- Remove `environment` column usage from Strava code paths (column itself can stay for now to not break historical activity rows; we'll filter by `user_id` instead of env).
-- `src/lib/environment.ts` stays for other features.
-- Old `STRAVA_CLIENT_ID` / `STRAVA_CLIENT_SECRET` (dev) secrets can be deleted after rollout.
-
-## Frontend impact
-
-- `ConnectApps.tsx` "Connect Strava" button: no more env param sent. If backend returns `ALL_APPS_FULL`, show a clear message.
-- New admin tab + manager component.
-
-## Migration / rollout order
-
-1. Create `strava_apps` table + RLS + grants + `strava_app_id` column.
-2. Confirm `STRAVA_CLIENT_SECRET_PROD` belongs to client_id 215250 (or request update).
-3. Seed app #1 row (Client ID 215250, max 10).
-4. Backfill `strava_connections.strava_app_id = <app#1 id>` for all existing prod rows.
-5. Deploy refactored edge functions + admin UI.
-6. You add app #2 / #3 via admin UI as needed; bump `max_athletes` to 999 when approved.
-
-## Open questions before I build
-
-1. Does your existing `STRAVA_CLIENT_SECRET_PROD` secret belong to **Client ID 215250**? If not, I'll request a fresh secret value.
-2. Should existing connections that were created under the **dev** app be force-disconnected (user must reconnect under prod app 215250), or kept as-is until they naturally re-auth? Reconnecting is cleaner but interrupts users.
-3. OK with storing `client_secret` and `verify_token` in the DB (admin-only RLS, service-role access from functions)? Alternative is one Supabase secret per app, but that doesn't scale to "add apps from the UI."
+1. Approve migration → vault columns + functions land, existing plaintext secrets are moved into vault and nulled.
+2. Edge functions auto-deploy (secret reads switch to vault).
+3. Admin UI deploys (writes go through `strava-app-secret`).
+4. After a week with no issues, follow-up migration drops the plaintext columns entirely.

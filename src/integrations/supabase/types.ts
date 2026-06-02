@@ -1066,6 +1066,48 @@ export type Database = {
         }
         Relationships: []
       }
+      strava_apps: {
+        Row: {
+          client_id: string
+          client_secret: string | null
+          created_at: string
+          id: string
+          is_active: boolean
+          max_athletes: number
+          notes: string | null
+          priority: number
+          subscription_id: number | null
+          updated_at: string
+          verify_token: string | null
+        }
+        Insert: {
+          client_id: string
+          client_secret?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          max_athletes?: number
+          notes?: string | null
+          priority?: number
+          subscription_id?: number | null
+          updated_at?: string
+          verify_token?: string | null
+        }
+        Update: {
+          client_id?: string
+          client_secret?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          max_athletes?: number
+          notes?: string | null
+          priority?: number
+          subscription_id?: number | null
+          updated_at?: string
+          verify_token?: string | null
+        }
+        Relationships: []
+      }
       strava_connections: {
         Row: {
           access_token: string
@@ -1074,6 +1116,7 @@ export type Database = {
           expires_at: number
           id: string
           refresh_token: string
+          strava_app_id: string | null
           strava_athlete_id: number
           updated_at: string
           user_id: string
@@ -1085,6 +1128,7 @@ export type Database = {
           expires_at: number
           id?: string
           refresh_token: string
+          strava_app_id?: string | null
           strava_athlete_id: number
           updated_at?: string
           user_id: string
@@ -1096,11 +1140,20 @@ export type Database = {
           expires_at?: number
           id?: string
           refresh_token?: string
+          strava_app_id?: string | null
           strava_athlete_id?: number
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "strava_connections_strava_app_id_fkey"
+            columns: ["strava_app_id"]
+            isOneToOne: false
+            referencedRelation: "strava_apps"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       support_feedback: {
         Row: {

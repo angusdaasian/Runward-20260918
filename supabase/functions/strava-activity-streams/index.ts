@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { getAppForConnection } from "../_shared/strava-apps.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -61,15 +62,7 @@ serve(async (req) => {
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
     const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const appEnv = Deno.env.get('APP_ENVIRONMENT') || 'dev';
-    const STRAVA_CLIENT_ID = appEnv === 'prod'
-      ? Deno.env.get('STRAVA_CLIENT_ID_PROD')!
-      : Deno.env.get('STRAVA_CLIENT_ID')!;
-    const STRAVA_CLIENT_SECRET = appEnv === 'prod'
-      ? Deno.env.get('STRAVA_CLIENT_SECRET_PROD')!
-      : Deno.env.get('STRAVA_CLIENT_SECRET')!;
 
-    // Get user from JWT
     const userClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
       global: { headers: { Authorization: authHeader } },
     });
@@ -91,7 +84,6 @@ serve(async (req) => {
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    // Get strava connection
     const { data: connection } = await supabase
       .from('strava_connections')
       .select('*')
@@ -105,11 +97,13 @@ serve(async (req) => {
       });
     }
 
+    const app = await getAppForConnection(supabase, connection);
+    if (!app.client_secret) throw new Error(`Strava app ${app.client_id} missing client_secret`);
+
     const accessToken = await refreshTokenIfNeeded(
-      connection, supabase, STRAVA_CLIENT_ID, STRAVA_CLIENT_SECRET
+      connection, supabase, app.client_id, app.client_secret
     );
 
-    // Fetch activity streams from Strava
     const streamsUrl = `https://www.strava.com/api/v3/activities/${strava_id}/streams?keys=time,distance,heartrate,altitude,velocity_smooth,cadence,latlng&key_type=time`;
     const streamsRes = await fetch(streamsUrl, {
       headers: { Authorization: `Bearer ${accessToken}` },
@@ -126,7 +120,6 @@ serve(async (req) => {
 
     const streamsData = await streamsRes.json();
 
-    // Also fetch the detailed activity for split data
     const activityRes = await fetch(
       `https://www.strava.com/api/v3/activities/${strava_id}?include_all_efforts=false`,
       { headers: { Authorization: `Bearer ${accessToken}` } }

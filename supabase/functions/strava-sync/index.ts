@@ -155,7 +155,7 @@ serve(async (req) => {
           average_heartrate: act.average_heartrate || null,
           max_heartrate: act.max_heartrate || null,
           summary_polyline: act.map?.summary_polyline || null,
-          environment: "prod",
+          environment,
         },
         { onConflict: "strava_id" },
       );

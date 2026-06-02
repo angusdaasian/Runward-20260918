@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Lang } from "@/lib/i18n";
+import { isRunning } from "@/lib/trainingLoad";
 
 interface StravaActivity {
   id: string;

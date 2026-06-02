@@ -20,6 +20,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Lang, t } from "@/lib/i18n";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { getAppEnvironment } from "@/lib/environment";
 import { toast } from "sonner";
 import ActivityCalendar from "@/components/activities/ActivityCalendar";
 import MonthlyRoadQuest from "@/components/activities/MonthlyRoadQuest";
@@ -908,7 +909,7 @@ const ActivitiesTab = ({ lang }: Props) => {
           },
           body: JSON.stringify({ forceEnv: "prod" }),
         }),
-        invokeStravaSync(accessToken, { after: afterSec, perPage: 30 }),
+        invokeStravaSync(accessToken, { after: afterSec, perPage: 30, environment: getAppEnvironment() }),
       ]);
       const result = await terraRes.json().catch(() => null);
       if (!terraRes.ok && terraRes.status !== 404) {
@@ -953,7 +954,7 @@ const ActivitiesTab = ({ lang }: Props) => {
           },
           body: JSON.stringify({ daysBack: 7, forceEnv: "prod" }),
         }),
-        invokeStravaSync(accessToken, { after: afterSec, perPage: 100 }),
+        invokeStravaSync(accessToken, { after: afterSec, perPage: 100, environment: getAppEnvironment() }),
       ]);
       const result = await terraRes.json().catch(() => null);
       if (!terraRes.ok && terraRes.status !== 404) {

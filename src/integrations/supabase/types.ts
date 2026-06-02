@@ -1070,6 +1070,7 @@ export type Database = {
         Row: {
           client_id: string
           client_secret: string | null
+          client_secret_vault_id: string | null
           created_at: string
           id: string
           is_active: boolean
@@ -1079,10 +1080,12 @@ export type Database = {
           subscription_id: number | null
           updated_at: string
           verify_token: string | null
+          verify_token_vault_id: string | null
         }
         Insert: {
           client_id: string
           client_secret?: string | null
+          client_secret_vault_id?: string | null
           created_at?: string
           id?: string
           is_active?: boolean
@@ -1092,10 +1095,12 @@ export type Database = {
           subscription_id?: number | null
           updated_at?: string
           verify_token?: string | null
+          verify_token_vault_id?: string | null
         }
         Update: {
           client_id?: string
           client_secret?: string | null
+          client_secret_vault_id?: string | null
           created_at?: string
           id?: string
           is_active?: boolean
@@ -1105,6 +1110,7 @@ export type Database = {
           subscription_id?: number | null
           updated_at?: string
           verify_token?: string | null
+          verify_token_vault_id?: string | null
         }
         Relationships: []
       }
@@ -2168,6 +2174,13 @@ export type Database = {
           total_count: number
         }[]
       }
+      get_strava_app_secrets: {
+        Args: { p_app_id: string }
+        Returns: {
+          client_secret: string
+          verify_token: string
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -2176,6 +2189,10 @@ export type Database = {
         Returns: boolean
       }
       invoke_reset_season: { Args: { p_month_year?: string }; Returns: number }
+      set_strava_app_secret: {
+        Args: { p_app_id: string; p_kind: string; p_value: string }
+        Returns: undefined
+      }
       unschedule_cron_job: { Args: { job_name: string }; Returns: undefined }
       unschedule_terra_today_oneoff: { Args: never; Returns: undefined }
       unschedule_terra_webhook_cleanup: { Args: never; Returns: undefined }

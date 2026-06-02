@@ -43,12 +43,28 @@ function envFallbackVerifyToken(clientId: string): string | null {
   return null;
 }
 
-function hydrate(row: any): StravaApp {
+async function hydrate(supabase: any, row: any): Promise<StravaApp> {
+  let client_secret: string | null = row.client_secret ?? null;
+  let verify_token: string | null = row.verify_token ?? null;
+
+  if (!client_secret || !verify_token) {
+    try {
+      const { data } = await supabase.rpc("get_strava_app_secrets", { p_app_id: row.id });
+      const rec = Array.isArray(data) ? data[0] : data;
+      if (rec) {
+        client_secret = client_secret ?? rec.client_secret ?? null;
+        verify_token = verify_token ?? rec.verify_token ?? null;
+      }
+    } catch (_) {
+      // fall through to env fallback
+    }
+  }
+
   return {
     id: row.id,
     client_id: row.client_id,
-    client_secret: row.client_secret ?? envFallbackSecret(row.client_id),
-    verify_token: row.verify_token ?? envFallbackVerifyToken(row.client_id),
+    client_secret: client_secret ?? envFallbackSecret(row.client_id),
+    verify_token: verify_token ?? envFallbackVerifyToken(row.client_id),
     subscription_id: row.subscription_id,
     max_athletes: row.max_athletes,
     priority: row.priority,
@@ -65,7 +81,7 @@ export async function getStravaAppById(supabase: any, id: string): Promise<Strav
   if (error || !data) {
     throw new StravaAppsError("APP_NOT_FOUND", `Strava app ${id} not found`);
   }
-  return hydrate(data);
+  return await hydrate(supabase, data);
 }
 
 export async function pickAvailableApp(supabase: any): Promise<StravaApp> {
@@ -84,7 +100,7 @@ export async function pickAvailableApp(supabase: any): Promise<StravaApp> {
       .select("id", { count: "exact", head: true })
       .eq("strava_app_id", row.id);
     if ((count ?? 0) < row.max_athletes) {
-      const app = hydrate(row);
+      const app = await hydrate(supabase, row);
       if (!app.client_secret) {
         throw new StravaAppsError(
           "APP_SECRET_MISSING",
@@ -106,7 +122,7 @@ export async function getActiveApps(supabase: any): Promise<StravaApp[]> {
     .select("*")
     .eq("is_active", true);
   if (error) throw error;
-  return (data ?? []).map(hydrate);
+  return await Promise.all((data ?? []).map((r: any) => hydrate(supabase, r)));
 }
 
 export async function getAppForConnection(
@@ -125,7 +141,7 @@ export async function getAppForConnection(
       .select("*")
       .eq("client_id", legacyId)
       .maybeSingle();
-    if (data) return hydrate(data);
+    if (data) return await hydrate(supabase, data);
   }
   throw new StravaAppsError("APP_NOT_FOUND", "No Strava app associated with this connection");
 }

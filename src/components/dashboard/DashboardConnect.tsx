@@ -148,8 +148,9 @@ export default function DashboardConnect({ lang }: Props) {
       return;
     }
     setBusy("STRAVA");
+    const redirect_uri = `${window.location.origin}/auth/callback`;
     const { data, error } = await supabase.functions.invoke("strava-auth", {
-      body: { environment: getAppEnvironment() },
+      body: { redirect_uri },
     });
     if (error || !data?.url) {
       toast.error(L("Failed to start Strava connection", "無法啟動 Strava 連結"));

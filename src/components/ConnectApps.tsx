@@ -7,7 +7,7 @@ import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 import { useAppleHealth } from "@/hooks/use-apple-health";
 import { useGarmin } from "@/hooks/use-garmin";
-import { getAppEnvironment } from "@/lib/environment";
+
 import despia from "despia-native";
 import { isDespiaUA } from "@/lib/despiaOAuth";
 import { useLocation } from "react-router-dom";

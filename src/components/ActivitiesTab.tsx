@@ -909,7 +909,7 @@ const ActivitiesTab = ({ lang }: Props) => {
           },
           body: JSON.stringify({ forceEnv: "prod" }),
         }),
-        invokeStravaSync(accessToken, { after: afterSec, perPage: 30 }),
+        invokeStravaSync(accessToken, { after: afterSec, perPage: 30, environment: getAppEnvironment() }),
       ]);
       const result = await terraRes.json().catch(() => null);
       if (!terraRes.ok && terraRes.status !== 404) {

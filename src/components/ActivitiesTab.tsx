@@ -20,6 +20,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Lang, t } from "@/lib/i18n";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { getAppEnvironment } from "@/lib/environment";
 import { toast } from "sonner";
 import ActivityCalendar from "@/components/activities/ActivityCalendar";
 import MonthlyRoadQuest from "@/components/activities/MonthlyRoadQuest";

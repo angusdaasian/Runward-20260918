@@ -153,6 +153,40 @@ const StravaAppsManager = () => {
     }
   };
 
+  const [subBusy, setSubBusy] = useState<string | null>(null);
+
+  const subscriptionAction = async (appId: string, action: "view" | "create" | "delete") => {
+    setSubBusy(appId + action);
+    try {
+      const { data, error } = await supabase.functions.invoke("strava-subscription-manage", {
+        body: { app_id: appId, action },
+      });
+      if (error) throw error;
+      if (action === "view") {
+        const subs = (data as any)?.subscriptions;
+        toast.message("Strava subscriptions", {
+          description: Array.isArray(subs) && subs.length
+            ? subs.map((s: any) => `#${s.id} → ${s.callback_url}`).join("\n")
+            : "No active subscription registered with Strava",
+        });
+      } else if (action === "create") {
+        if ((data as any)?.ok) {
+          toast.success(`Subscription created: #${(data as any).subscription_id}`);
+        } else {
+          toast.error(`Create failed: ${JSON.stringify((data as any)?.error ?? data)}`);
+        }
+        load();
+      } else if (action === "delete") {
+        toast.success("Subscription deleted");
+        load();
+      }
+    } catch (e: any) {
+      toast.error(e?.message ?? "Subscription action failed");
+    } finally {
+      setSubBusy(null);
+    }
+  };
+
   const secretBadge = (set: boolean) =>
     set ? (
       <Badge variant="secondary" className="gap-1">

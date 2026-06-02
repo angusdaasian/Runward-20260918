@@ -22,6 +22,7 @@ const DeleteAccount = lazy(() => import("./pages/DeleteAccount.tsx"));
 const TerraReturn = lazy(() => import("./pages/TerraReturn.tsx"));
 const Dashboard = lazy(() => import("./pages/Dashboard.tsx"));
 const AuthCallback = lazy(() => import("./pages/AuthCallback.tsx"));
+const StravaCallback = lazy(() => import("./pages/StravaCallback.tsx"));
 
 const queryClient = new QueryClient();
 const native = isNativeApp();

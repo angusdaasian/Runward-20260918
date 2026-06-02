@@ -15,13 +15,15 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Pencil, Plus } from "lucide-react";
+import { Pencil, Plus, ShieldCheck } from "lucide-react";
 
 interface StravaAppRow {
   id: string;
   client_id: string;
   client_secret: string | null;
   verify_token: string | null;
+  client_secret_vault_id: string | null;
+  verify_token_vault_id: string | null;
   subscription_id: number | null;
   max_athletes: number;
   priority: number;
@@ -88,8 +90,8 @@ const StravaAppsManager = () => {
     setEditingId(row.id);
     setForm({
       client_id: row.client_id,
-      client_secret: row.client_secret ?? "",
-      verify_token: row.verify_token ?? "",
+      client_secret: "",
+      verify_token: "",
       subscription_id: row.subscription_id?.toString() ?? "",
       max_athletes: row.max_athletes.toString(),
       priority: row.priority.toString(),
@@ -97,6 +99,13 @@ const StravaAppsManager = () => {
       notes: row.notes ?? "",
     });
     setDialogOpen(true);
+  };
+
+  const writeSecret = async (appId: string, kind: "client_secret" | "verify_token", value: string) => {
+    const { error } = await supabase.functions.invoke("strava-app-secret", {
+      body: { app_id: appId, kind, value },
+    });
+    if (error) throw new Error(`${kind}: ${error.message}`);
   };
 
   const save = async () => {
@@ -107,8 +116,6 @@ const StravaAppsManager = () => {
     setSaving(true);
     const payload: any = {
       client_id: form.client_id.trim(),
-      client_secret: form.client_secret.trim() || null,
-      verify_token: form.verify_token.trim() || null,
       subscription_id: form.subscription_id.trim() ? Number(form.subscription_id) : null,
       max_athletes: Number(form.max_athletes) || 10,
       priority: Number(form.priority) || 0,
@@ -116,19 +123,44 @@ const StravaAppsManager = () => {
       notes: form.notes.trim() || null,
     };
 
-    const { error } = editingId
-      ? await supabase.from("strava_apps").update(payload).eq("id", editingId)
-      : await supabase.from("strava_apps").insert(payload);
+    try {
+      let appId = editingId;
+      if (appId) {
+        const { error } = await supabase.from("strava_apps").update(payload).eq("id", appId);
+        if (error) throw error;
+      } else {
+        const { data, error } = await supabase
+          .from("strava_apps")
+          .insert(payload)
+          .select("id")
+          .single();
+        if (error) throw error;
+        appId = data.id;
+      }
 
-    setSaving(false);
-    if (error) {
-      toast.error(error.message);
-      return;
+      const cs = form.client_secret.trim();
+      const vt = form.verify_token.trim();
+      if (cs) await writeSecret(appId!, "client_secret", cs);
+      if (vt) await writeSecret(appId!, "verify_token", vt);
+
+      toast.success(editingId ? "Strava app updated" : "Strava app added");
+      setDialogOpen(false);
+      load();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Save failed");
+    } finally {
+      setSaving(false);
     }
-    toast.success(editingId ? "Strava app updated" : "Strava app added");
-    setDialogOpen(false);
-    load();
   };
+
+  const secretBadge = (set: boolean) =>
+    set ? (
+      <Badge variant="secondary" className="gap-1">
+        <ShieldCheck className="h-3 w-3" /> Vault
+      </Badge>
+    ) : (
+      <span className="text-muted-foreground">—</span>
+    );
 
   return (
     <Card>
@@ -141,8 +173,8 @@ const StravaAppsManager = () => {
       <CardContent>
         <p className="text-xs text-muted-foreground mb-4">
           Each Strava API app is capped at 10 athletes until your application is approved (then raise{" "}
-          <code>max_athletes</code> to 999). New OAuth connections are auto-routed to the lowest-priority active app
-          that still has capacity.
+          <code>max_athletes</code> to 999). Secrets are stored encrypted in Supabase Vault — they never leave the
+          server and cannot be read from the dashboard.
         </p>
 
         {loading ? (
@@ -179,8 +211,8 @@ const StravaAppsManager = () => {
                       </TableCell>
                       <TableCell>{app.max_athletes}</TableCell>
                       <TableCell>{app.priority}</TableCell>
-                      <TableCell>{app.client_secret ? "✓" : "—"}</TableCell>
-                      <TableCell>{app.verify_token ? "✓" : "—"}</TableCell>
+                      <TableCell>{secretBadge(!!app.client_secret_vault_id)}</TableCell>
+                      <TableCell>{secretBadge(!!app.verify_token_vault_id)}</TableCell>
                       <TableCell>{app.subscription_id ?? "—"}</TableCell>
                       <TableCell>
                         {app.is_active ? (
@@ -217,20 +249,23 @@ const StravaAppsManager = () => {
                 />
               </div>
               <div className="space-y-1">
-                <Label>Client Secret</Label>
+                <Label>Client Secret {editingId && <span className="text-xs text-muted-foreground">(leave blank to keep current)</span>}</Label>
                 <Input
                   type="password"
                   value={form.client_secret}
                   onChange={(e) => setForm({ ...form, client_secret: e.target.value })}
                   placeholder="From Strava → My API Application"
+                  autoComplete="new-password"
                 />
               </div>
               <div className="space-y-1">
-                <Label>Webhook Verify Token</Label>
+                <Label>Webhook Verify Token {editingId && <span className="text-xs text-muted-foreground">(leave blank to keep current)</span>}</Label>
                 <Input
+                  type="password"
                   value={form.verify_token}
                   onChange={(e) => setForm({ ...form, verify_token: e.target.value })}
                   placeholder="Random string you choose"
+                  autoComplete="new-password"
                 />
               </div>
               <div className="grid grid-cols-2 gap-3">

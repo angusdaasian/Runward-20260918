@@ -109,56 +109,63 @@ serve(async (req) => {
 
     const accessToken = await refreshTokenIfNeeded(connection, supabase, app.client_id, app.client_secret);
 
-    // Optional time window from request body: { after?: number, before?: number, perPage?: number }
-    // `after` and `before` are epoch seconds (Strava API contract).
+    // Optional time window from request body: { after?, before?, perPage?, maxPages? }
     let after: number | undefined;
     let before: number | undefined;
     let perPage = 30;
+    let maxPages = 1;
     let environment = "prod";
     try {
       const body = await req.json();
       if (typeof body?.after === "number") after = Math.floor(body.after);
       if (typeof body?.before === "number") before = Math.floor(body.before);
       if (typeof body?.perPage === "number") perPage = Math.min(200, Math.max(1, Math.floor(body.perPage)));
+      if (typeof body?.maxPages === "number") maxPages = Math.min(20, Math.max(1, Math.floor(body.maxPages)));
       if (body?.environment === "dev" || body?.environment === "prod") environment = body.environment;
     } catch (_) { /* no body is fine */ }
 
-    const params = new URLSearchParams({ per_page: String(perPage) });
-    if (after !== undefined) params.set("after", String(after));
-    if (before !== undefined) params.set("before", String(before));
+    let totalCount = 0;
+    for (let page = 1; page <= maxPages; page++) {
+      const params = new URLSearchParams({ per_page: String(perPage), page: String(page) });
+      if (after !== undefined) params.set("after", String(after));
+      if (before !== undefined) params.set("before", String(before));
 
-    console.log(`[strava-sync] fetching activities params=${params.toString()} user=${user.id}`);
-    const activitiesRes = await fetch(`https://www.strava.com/api/v3/athlete/activities?${params.toString()}`, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
+      console.log(`[strava-sync] fetching activities params=${params.toString()} user=${user.id}`);
+      const activitiesRes = await fetch(`https://www.strava.com/api/v3/athlete/activities?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
 
-    if (!activitiesRes.ok) {
-      throw new Error(`Strava API error [${activitiesRes.status}]: ${await activitiesRes.text()}`);
-    }
+      if (!activitiesRes.ok) {
+        throw new Error(`Strava API error [${activitiesRes.status}]: ${await activitiesRes.text()}`);
+      }
 
-    const activities = await activitiesRes.json();
+      const activities = await activitiesRes.json();
+      if (!Array.isArray(activities) || activities.length === 0) break;
 
-    for (const act of activities) {
-      await supabase.from("strava_activities").upsert(
-        {
-          user_id: user.id,
-          strava_id: act.id,
-          name: act.name,
-          sport_type: act.sport_type || act.type || "Run",
-          distance: act.distance,
-          moving_time: act.moving_time,
-          elapsed_time: act.elapsed_time,
-          total_elevation_gain: act.total_elevation_gain,
-          start_date: act.start_date,
-          average_speed: act.average_speed,
-          max_speed: act.max_speed,
-          average_heartrate: act.average_heartrate || null,
-          max_heartrate: act.max_heartrate || null,
-          summary_polyline: act.map?.summary_polyline || null,
-          environment,
-        },
-        { onConflict: "strava_id" },
-      );
+      for (const act of activities) {
+        await supabase.from("strava_activities").upsert(
+          {
+            user_id: user.id,
+            strava_id: act.id,
+            name: act.name,
+            sport_type: act.sport_type || act.type || "Run",
+            distance: act.distance,
+            moving_time: act.moving_time,
+            elapsed_time: act.elapsed_time,
+            total_elevation_gain: act.total_elevation_gain,
+            start_date: act.start_date,
+            average_speed: act.average_speed,
+            max_speed: act.max_speed,
+            average_heartrate: act.average_heartrate || null,
+            max_heartrate: act.max_heartrate || null,
+            summary_polyline: act.map?.summary_polyline || null,
+            environment,
+          },
+          { onConflict: "strava_id" },
+        );
+      }
+      totalCount += activities.length;
+      if (activities.length < perPage) break;
     }
 
     const [stravaRecent, ahRecent] = await Promise.all([
@@ -200,7 +207,7 @@ serve(async (req) => {
         .eq("user_id", user.id);
     }
 
-    return new Response(JSON.stringify({ success: true, count: activities.length }), {
+    return new Response(JSON.stringify({ success: true, count: totalCount }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error: unknown) {

@@ -1017,6 +1017,7 @@ const ActivitiesTab = ({ lang }: Props) => {
 
   const handleFetchStrava2026 = useCallback(async () => {
     if (!user || fetchingToday) return;
+    if (!isPremium) { setUpgradeOpen(true); return; }
     setFetchingToday(true);
     toast.info(
       lang === "zh" ? "已開始同步 2026 年 Strava 活動..." : "Syncing 2026 Strava activities...",
@@ -1033,6 +1034,8 @@ const ActivitiesTab = ({ lang }: Props) => {
       invalidateAll();
       if (count > 0) {
         toast.success(lang === "zh" ? `已同步 ${count} 個 2026 年 Strava 活動` : `Synced ${count} Strava activities from 2026`);
+        try { localStorage.setItem(strava2026Key, "true"); } catch {}
+        setStrava2026Used(true);
       } else {
         toast.info(lang === "zh" ? "2026 年暫無新 Strava 活動" : "No new Strava activities in 2026");
       }
@@ -1041,7 +1044,7 @@ const ActivitiesTab = ({ lang }: Props) => {
       toast.error(lang === "zh" ? "同步失敗" : "Sync failed");
     }
     setFetchingToday(false);
-  }, [user, fetchingToday, invalidateAll, lang, invokeStravaSync]);
+  }, [user, fetchingToday, invalidateAll, lang, invokeStravaSync, isPremium, strava2026Key]);
 
   const handleFetchYear2026 = useCallback(async () => {
     if (!user || fetchingToday) return;

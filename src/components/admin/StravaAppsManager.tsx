@@ -15,7 +15,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Pencil, Plus, ShieldCheck } from "lucide-react";
+import { Pencil, Plus, ShieldCheck, Webhook, Trash2 } from "lucide-react";
 
 interface StravaAppRow {
   id: string;

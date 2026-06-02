@@ -307,8 +307,8 @@ const ConnectApps = ({ lang, onBack }: Props) => {
 
   const handleTerraConnect = async (provider: TerraProvider) => {
     if (!user) return;
-    if (hasTerraConn) {
-      toast.error(lang === "zh" ? "請先中斷現有裝置連結" : "Please disconnect the current device first");
+    if (hasTerraConn || hasFitnessApp) {
+      toast.error(lang === "zh" ? "請先中斷現有健身應用再連接新的" : "Please disconnect the current fitness app first");
       return;
     }
     setTerraBusy(provider);

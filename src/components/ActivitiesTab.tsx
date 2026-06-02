@@ -755,6 +755,16 @@ const ActivitiesTab = ({ lang }: Props) => {
   const [resyncing, setResyncing] = useState(false);
   const [fetchingToday, setFetchingToday] = useState(false);
   const [year2026Used, setYear2026Used] = useState(false);
+  const strava2026Key = user ? `strava_2026_sync_used:${user.id}` : "";
+  const [strava2026Used, setStrava2026Used] = useState(() => {
+    if (typeof window === "undefined" || !user) return false;
+    return localStorage.getItem(`strava_2026_sync_used:${user.id}`) === "true";
+  });
+  useEffect(() => {
+    if (!user) return;
+    setStrava2026Used(localStorage.getItem(`strava_2026_sync_used:${user.id}`) === "true");
+  }, [user]);
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
 
   useEffect(() => {
     if (!user || !isPremium) return;

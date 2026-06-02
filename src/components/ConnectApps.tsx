@@ -523,27 +523,45 @@ const ConnectApps = ({ lang, onBack }: Props) => {
           );
         })}
 
-        {/* Strava — temporarily disabled */}
-        <div className="bg-card border border-border rounded-xl p-4 opacity-50">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-[#FC4C02]/10 flex items-center justify-center">
-                <svg viewBox="0 0 24 24" className="w-6 h-6" fill="#FC4C02">
-                  <path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7 13.828h4.169" />
-                </svg>
-              </div>
-              <div>
-                <span className="font-medium text-foreground block">Strava</span>
-                <span className="text-xs text-muted-foreground">
-                  {t("stravaConnectDesc", lang)}
-                </span>
+        {/* Strava */}
+        {(() => {
+          const stravaDisabledByOther = (garminConnected || hasTerraConn) && !stravaConnected;
+          return (
+            <div className={`bg-card border border-border rounded-xl p-4 ${stravaDisabledByOther ? "opacity-50" : ""}`}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-[#FC4C02]/10 flex items-center justify-center">
+                    <svg viewBox="0 0 24 24" className="w-6 h-6" fill="#FC4C02">
+                      <path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7 13.828h4.169" />
+                    </svg>
+                  </div>
+                  <div>
+                    <span className="font-medium text-foreground block">Strava</span>
+                    <span className="text-xs text-muted-foreground">
+                      {t("stravaConnectDesc", lang)}
+                    </span>
+                  </div>
+                </div>
+                {stravaConnected ? (
+                  <div className="flex items-center gap-2">
+                    <Check size={16} className="text-green-500" />
+                    <button onClick={handleDisconnectStrava} className="text-xs text-destructive hover:underline">
+                      {lang === "zh" ? "中斷" : "Disconnect"}
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={handleConnectStrava}
+                    disabled={stravaDisabledByOther}
+                    className={`text-xs font-medium px-3 py-1 rounded-full ${stravaDisabledByOther ? "bg-muted text-muted-foreground cursor-not-allowed" : "text-primary-foreground bg-primary"} disabled:opacity-50`}
+                  >
+                    {lang === "zh" ? "連結" : "Connect"}
+                  </button>
+                )}
               </div>
             </div>
-            <span className="text-xs text-muted-foreground bg-muted px-3 py-1 rounded-full">
-              {t("comingSoon", lang)}
-            </span>
-          </div>
-        </div>
+          );
+        })()}
 
       </div>
 

@@ -18,6 +18,7 @@ import polarIcon from "@/assets/brands/polar.png";
 import garminIcon from "@/assets/brands/garmin.png";
 import suuntoIcon from "@/assets/brands/suunto.png";
 import zeppIcon from "@/assets/brands/zepp.png";
+import fitbitIcon from "@/assets/brands/fitbit.png";
 
 interface Props {
   lang: Lang;
@@ -25,7 +26,7 @@ interface Props {
 }
 
 const TERRA_PENDING_PROVIDER_KEY = "terra_pending_provider";
-const TERRA_PROVIDER_IDS = ["GARMIN", "POLAR", "SUUNTO", "COROS", "ZEPP"] as const;
+const TERRA_PROVIDER_IDS = ["GARMIN", "POLAR", "SUUNTO", "COROS", "ZEPP", "FITBIT"] as const;
 
 type TerraConnRow = {
   id: string;
@@ -183,13 +184,14 @@ const ConnectApps = ({ lang, onBack }: Props) => {
     await garmin.syncActivities();
   };
 
-  type TerraProvider = "GARMIN" | "POLAR" | "SUUNTO" | "COROS" | "ZEPP";
+  type TerraProvider = "GARMIN" | "POLAR" | "SUUNTO" | "COROS" | "ZEPP" | "FITBIT";
   const TERRA_PROVIDERS: { id: TerraProvider; label: string; icon: string }[] = [
     { id: "GARMIN", label: "Garmin", icon: garminIcon },
     { id: "COROS", label: "COROS", icon: corosIcon },
     { id: "POLAR", label: "Polar", icon: polarIcon },
     { id: "SUUNTO", label: "Suunto", icon: suuntoIcon },
     { id: "ZEPP", label: "Zepp", icon: zeppIcon },
+    { id: "FITBIT", label: "Fitbit", icon: fitbitIcon },
   ];
   const [terraConns, setTerraConns] = useState<Record<string, { id: string; last_synced_at: string | null }>>({});
   const [terraBusy, setTerraBusy] = useState<string | null>(null);

@@ -22,6 +22,7 @@ const DeleteAccount = lazy(() => import("./pages/DeleteAccount.tsx"));
 const TerraReturn = lazy(() => import("./pages/TerraReturn.tsx"));
 const Dashboard = lazy(() => import("./pages/Dashboard.tsx"));
 const AuthCallback = lazy(() => import("./pages/AuthCallback.tsx"));
+const StravaCallback = lazy(() => import("./pages/StravaCallback.tsx"));
 
 const queryClient = new QueryClient();
 const native = isNativeApp();
@@ -72,6 +73,7 @@ const App = () => (
                 <Route path="/terra-return" element={<TerraReturn />} />
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/auth" element={<AuthCallback />} />
+                <Route path="/auth/callback" element={<StravaCallback />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </Suspense>

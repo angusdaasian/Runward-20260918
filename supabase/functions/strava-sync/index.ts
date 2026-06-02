@@ -109,7 +109,24 @@ serve(async (req) => {
 
     const accessToken = await refreshTokenIfNeeded(connection, supabase, app.client_id, app.client_secret);
 
-    const activitiesRes = await fetch("https://www.strava.com/api/v3/athlete/activities?per_page=30", {
+    // Optional time window from request body: { after?: number, before?: number, perPage?: number }
+    // `after` and `before` are epoch seconds (Strava API contract).
+    let after: number | undefined;
+    let before: number | undefined;
+    let perPage = 30;
+    try {
+      const body = await req.json();
+      if (typeof body?.after === "number") after = Math.floor(body.after);
+      if (typeof body?.before === "number") before = Math.floor(body.before);
+      if (typeof body?.perPage === "number") perPage = Math.min(200, Math.max(1, Math.floor(body.perPage)));
+    } catch (_) { /* no body is fine */ }
+
+    const params = new URLSearchParams({ per_page: String(perPage) });
+    if (after !== undefined) params.set("after", String(after));
+    if (before !== undefined) params.set("before", String(before));
+
+    console.log(`[strava-sync] fetching activities params=${params.toString()} user=${user.id}`);
+    const activitiesRes = await fetch(`https://www.strava.com/api/v3/athlete/activities?${params.toString()}`, {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
 

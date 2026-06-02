@@ -6,6 +6,7 @@ import { Lang } from "@/lib/i18n";
 import type { StravaActivity, PlannedWorkout } from "@/hooks/use-activities";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { isRunning } from "@/lib/trainingLoad";
 
 interface Props {
   lang: Lang;

@@ -954,7 +954,7 @@ const ActivitiesTab = ({ lang }: Props) => {
           },
           body: JSON.stringify({ daysBack: 7, forceEnv: "prod" }),
         }),
-        invokeStravaSync(accessToken, { after: afterSec, perPage: 100 }),
+        invokeStravaSync(accessToken, { after: afterSec, perPage: 100, environment: getAppEnvironment() }),
       ]);
       const result = await terraRes.json().catch(() => null);
       if (!terraRes.ok && terraRes.status !== 404) {

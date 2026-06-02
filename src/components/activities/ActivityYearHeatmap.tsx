@@ -71,10 +71,10 @@ const ActivityYearHeatmap = ({ lang, activities }: Props) => {
       const d = new Date(act.start_date);
       if (isNaN(d.getTime())) continue;
       if (d.getFullYear() !== year) continue;
+      if (!isRunning(act.sport_type)) continue;
       const key = fmtDate(d);
       const minutes = (act.moving_time ?? 0) / 60;
-      const runOnly = isRunning(act.sport_type);
-      const distKm = runOnly ? (act.distance ?? 0) / 1000 : 0;
+      const distKm = (act.distance ?? 0) / 1000;
       const cell = dayMap.get(key) ?? {
         date: key,
         dow: mondayDow(d),

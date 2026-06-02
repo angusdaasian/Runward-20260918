@@ -15,7 +15,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Pencil, Plus, ShieldCheck } from "lucide-react";
+import { Pencil, Plus, ShieldCheck, Webhook, Trash2 } from "lucide-react";
 
 interface StravaAppRow {
   id: string;
@@ -153,6 +153,40 @@ const StravaAppsManager = () => {
     }
   };
 
+  const [subBusy, setSubBusy] = useState<string | null>(null);
+
+  const subscriptionAction = async (appId: string, action: "view" | "create" | "delete") => {
+    setSubBusy(appId + action);
+    try {
+      const { data, error } = await supabase.functions.invoke("strava-subscription-manage", {
+        body: { app_id: appId, action },
+      });
+      if (error) throw error;
+      if (action === "view") {
+        const subs = (data as any)?.subscriptions;
+        toast.message("Strava subscriptions", {
+          description: Array.isArray(subs) && subs.length
+            ? subs.map((s: any) => `#${s.id} → ${s.callback_url}`).join("\n")
+            : "No active subscription registered with Strava",
+        });
+      } else if (action === "create") {
+        if ((data as any)?.ok) {
+          toast.success(`Subscription created: #${(data as any).subscription_id}`);
+        } else {
+          toast.error(`Create failed: ${JSON.stringify((data as any)?.error ?? data)}`);
+        }
+        load();
+      } else if (action === "delete") {
+        toast.success("Subscription deleted");
+        load();
+      }
+    } catch (e: any) {
+      toast.error(e?.message ?? "Subscription action failed");
+    } finally {
+      setSubBusy(null);
+    }
+  };
+
   const secretBadge = (set: boolean) =>
     set ? (
       <Badge variant="secondary" className="gap-1">
@@ -222,9 +256,40 @@ const StravaAppsManager = () => {
                         )}
                       </TableCell>
                       <TableCell>
-                        <Button size="sm" variant="outline" onClick={() => openEdit(app)}>
-                          <Pencil className="h-3 w-3" />
-                        </Button>
+                        <div className="flex gap-1">
+                          <Button size="sm" variant="outline" onClick={() => openEdit(app)} title="Edit">
+                            <Pencil className="h-3 w-3" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => subscriptionAction(app.id, "view")}
+                            disabled={subBusy === app.id + "view"}
+                            title="View Strava-side subscription"
+                          >
+                            View
+                          </Button>
+                          <Button
+                            size="sm"
+                            onClick={() => subscriptionAction(app.id, "create")}
+                            disabled={subBusy === app.id + "create"}
+                            title="Register webhook subscription with Strava"
+                          >
+                            <Webhook className="h-3 w-3 mr-1" />
+                            {app.subscription_id ? "Re-register" : "Register"}
+                          </Button>
+                          {app.subscription_id && (
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => subscriptionAction(app.id, "delete")}
+                              disabled={subBusy === app.id + "delete"}
+                              title="Delete subscription"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   );

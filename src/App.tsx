@@ -73,6 +73,7 @@ const App = () => (
                 <Route path="/terra-return" element={<TerraReturn />} />
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/auth" element={<AuthCallback />} />
+                <Route path="/auth/callback" element={<StravaCallback />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </Suspense>

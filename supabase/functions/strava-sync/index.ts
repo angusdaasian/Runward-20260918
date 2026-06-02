@@ -114,11 +114,13 @@ serve(async (req) => {
     let after: number | undefined;
     let before: number | undefined;
     let perPage = 30;
+    let environment = "prod";
     try {
       const body = await req.json();
       if (typeof body?.after === "number") after = Math.floor(body.after);
       if (typeof body?.before === "number") before = Math.floor(body.before);
       if (typeof body?.perPage === "number") perPage = Math.min(200, Math.max(1, Math.floor(body.perPage)));
+      if (body?.environment === "dev" || body?.environment === "prod") environment = body.environment;
     } catch (_) { /* no body is fine */ }
 
     const params = new URLSearchParams({ per_page: String(perPage) });

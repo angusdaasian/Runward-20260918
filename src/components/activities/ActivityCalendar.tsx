@@ -105,7 +105,12 @@ function formatDateKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-const ActivityCalendar = ({ lang, activities, plannedWorkouts, userRaces = [], onSelectDate, onMonthChange }: Props) => {
+const ActivityCalendar = ({ lang, activities: allActivities, plannedWorkouts, userRaces = [], onSelectDate, onMonthChange }: Props) => {
+  // Run-only across the calendar (totals, day dots, click-through)
+  const activities = useMemo(
+    () => allActivities.filter((a) => isRunning(a.sport_type)),
+    [allActivities],
+  );
   const today = new Date();
   const [viewYear, setViewYear] = useState(today.getFullYear());
   const [viewMonth, setViewMonth] = useState(today.getMonth());

@@ -256,9 +256,40 @@ const StravaAppsManager = () => {
                         )}
                       </TableCell>
                       <TableCell>
-                        <Button size="sm" variant="outline" onClick={() => openEdit(app)}>
-                          <Pencil className="h-3 w-3" />
-                        </Button>
+                        <div className="flex gap-1">
+                          <Button size="sm" variant="outline" onClick={() => openEdit(app)} title="Edit">
+                            <Pencil className="h-3 w-3" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => subscriptionAction(app.id, "view")}
+                            disabled={subBusy === app.id + "view"}
+                            title="View Strava-side subscription"
+                          >
+                            View
+                          </Button>
+                          <Button
+                            size="sm"
+                            onClick={() => subscriptionAction(app.id, "create")}
+                            disabled={subBusy === app.id + "create"}
+                            title="Register webhook subscription with Strava"
+                          >
+                            <Webhook className="h-3 w-3 mr-1" />
+                            {app.subscription_id ? "Re-register" : "Register"}
+                          </Button>
+                          {app.subscription_id && (
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => subscriptionAction(app.id, "delete")}
+                              disabled={subBusy === app.id + "delete"}
+                              title="Delete subscription"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   );

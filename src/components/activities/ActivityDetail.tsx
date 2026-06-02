@@ -521,6 +521,43 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
         return;
       }
 
+      // Strava activity: fetch streams + splits/laps for charts
+      try {
+        const { data: streamsData } = await supabase.functions.invoke("strava-activity-streams", {
+          body: { strava_id: activity.strava_id },
+        });
+        if (Array.isArray(streamsData?.streams)) {
+          setStreams(streamsData.streams);
+        }
+        const rawSplits = streamsData?.splits;
+        const rawLaps = streamsData?.laps;
+        if (Array.isArray(rawSplits) && rawSplits.length > 0) {
+          const mapped: Split[] = rawSplits.map((s: any, idx: number) => ({
+            distance: Number(s.distance) || 0,
+            elapsed_time: Number(s.elapsed_time) || 0,
+            moving_time: Number(s.moving_time ?? s.elapsed_time) || 0,
+            average_speed: Number(s.average_speed) || 0,
+            average_heartrate: s.average_heartrate ?? undefined,
+            elevation_difference: Number(s.elevation_difference) || 0,
+            split: s.split ?? idx + 1,
+          }));
+          setSplits(mapped);
+        } else if (Array.isArray(rawLaps) && rawLaps.length > 0) {
+          const mapped: Split[] = rawLaps.map((lap: any, idx: number) => ({
+            distance: Number(lap.distance) || 0,
+            elapsed_time: Number(lap.elapsed_time) || 0,
+            moving_time: Number(lap.moving_time ?? lap.elapsed_time) || 0,
+            average_speed: Number(lap.average_speed) || 0,
+            average_heartrate: lap.average_heartrate ?? undefined,
+            elevation_difference: Number(lap.total_elevation_gain) || 0,
+            split: lap.lap_index ?? idx + 1,
+          }));
+          setSplits(mapped);
+        }
+      } catch (e) {
+        console.warn("Failed to fetch Strava streams", e);
+      }
+
       // Check for cached analysis (all sources). Only auto-load — do NOT auto-run a new analysis.
       // The user must click "Analyze" after optionally tagging a race / adding a comment / entering RPE.
       if (isPremium) {

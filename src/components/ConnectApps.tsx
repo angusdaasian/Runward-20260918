@@ -307,8 +307,8 @@ const ConnectApps = ({ lang, onBack }: Props) => {
 
   const handleTerraConnect = async (provider: TerraProvider) => {
     if (!user) return;
-    if (hasTerraConn) {
-      toast.error(lang === "zh" ? "請先中斷現有裝置連結" : "Please disconnect the current device first");
+    if (hasTerraConn || hasFitnessApp) {
+      toast.error(lang === "zh" ? "請先中斷現有健身應用再連接新的" : "Please disconnect the current fitness app first");
       return;
     }
     setTerraBusy(provider);
@@ -482,7 +482,7 @@ const ConnectApps = ({ lang, onBack }: Props) => {
         {TERRA_PROVIDERS.map((p) => {
           const conn = terraConns[p.id];
           const busy = terraBusy === p.id;
-          const disabledByOther = hasTerraConn && !conn;
+          const disabledByOther = (hasTerraConn || hasFitnessApp) && !conn;
           return (
             <div key={p.id} className={`bg-card border border-border rounded-xl p-4 ${disabledByOther ? "opacity-50" : ""}`}>
               <div className="flex items-center justify-between">

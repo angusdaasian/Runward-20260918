@@ -39,12 +39,15 @@ Deno.serve(async (req) => {
 
     const admin = createClient(supabaseUrl, serviceKey);
 
-    // Admin role check
-    const { data: isAdmin, error: roleErr } = await admin.rpc("has_role", {
-      _user_id: userData.user.id,
-      _role: "admin",
-    });
-    if (roleErr || !isAdmin) {
+    // Admin role check (direct table query via service role since has_role()
+    // requires auth.uid() which is null when called with the service-role key)
+    const { data: roleRow, error: roleErr } = await admin
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", userData.user.id)
+      .eq("role", "admin")
+      .maybeSingle();
+    if (roleErr || !roleRow) {
       return new Response(JSON.stringify({ error: "forbidden" }), {
         status: 403,
         headers: { ...corsHeaders, "Content-Type": "application/json" },

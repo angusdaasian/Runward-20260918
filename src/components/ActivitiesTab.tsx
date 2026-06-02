@@ -1218,6 +1218,12 @@ const ActivitiesTab = ({ lang }: Props) => {
                 <DropdownMenuItem onClick={handleFetchWeekOnly} disabled={fetchingToday}>
                   {lang === "zh" ? "同步近 7 天活動" : "Sync past 7 days"}
                 </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleFetchStrava30Days} disabled={fetchingToday}>
+                  {lang === "zh" ? "同步近 30 天 Strava 活動" : "Sync past 30 days (Strava only)"}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleFetchStrava2026} disabled={fetchingToday}>
+                  {lang === "zh" ? "同步 2026 年 Strava 活動" : "Sync 2026 activities (Strava only)"}
+                </DropdownMenuItem>
                 {false && isPremium && !year2026Used && (
                   <DropdownMenuItem onClick={handleFetchYear2026} disabled={fetchingToday}>
                     {lang === "zh" ? "同步 2026 全年活動" : "Sync all 2026 activities"}

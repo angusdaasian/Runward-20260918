@@ -980,6 +980,58 @@ const ActivitiesTab = ({ lang }: Props) => {
     setFetchingToday(false);
   }, [user, fetchingToday, invalidateAll, lang, invokeStravaSync]);
 
+  const handleFetchStrava30Days = useCallback(async () => {
+    if (!user || fetchingToday) return;
+    setFetchingToday(true);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData?.session?.access_token;
+      if (!accessToken) throw new Error("Not authenticated");
+      const afterSec = Math.floor(Date.now() / 1000) - 30 * 24 * 60 * 60;
+      const count = await invokeStravaSync(accessToken, {
+        after: afterSec, perPage: 100, maxPages: 3, environment: getAppEnvironment(),
+      });
+      invalidateAll();
+      if (count > 0) {
+        toast.success(lang === "zh" ? `已同步 ${count} 個近 30 天 Strava 活動` : `Synced ${count} Strava activities from past 30 days`);
+      } else {
+        toast.info(lang === "zh" ? "過去 30 天暫無新 Strava 活動" : "No new Strava activities in the past 30 days");
+      }
+    } catch (err) {
+      console.error("Fetch Strava 30 days error:", err);
+      toast.error(lang === "zh" ? "同步失敗" : "Sync failed");
+    }
+    setFetchingToday(false);
+  }, [user, fetchingToday, invalidateAll, lang, invokeStravaSync]);
+
+  const handleFetchStrava2026 = useCallback(async () => {
+    if (!user || fetchingToday) return;
+    setFetchingToday(true);
+    toast.info(
+      lang === "zh" ? "已開始同步 2026 年 Strava 活動..." : "Syncing 2026 Strava activities...",
+      { duration: 6000 },
+    );
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData?.session?.access_token;
+      if (!accessToken) throw new Error("Not authenticated");
+      const afterSec = Math.floor(new Date("2026-01-01T00:00:00Z").getTime() / 1000);
+      const count = await invokeStravaSync(accessToken, {
+        after: afterSec, perPage: 200, maxPages: 20, environment: getAppEnvironment(),
+      });
+      invalidateAll();
+      if (count > 0) {
+        toast.success(lang === "zh" ? `已同步 ${count} 個 2026 年 Strava 活動` : `Synced ${count} Strava activities from 2026`);
+      } else {
+        toast.info(lang === "zh" ? "2026 年暫無新 Strava 活動" : "No new Strava activities in 2026");
+      }
+    } catch (err) {
+      console.error("Fetch Strava 2026 error:", err);
+      toast.error(lang === "zh" ? "同步失敗" : "Sync failed");
+    }
+    setFetchingToday(false);
+  }, [user, fetchingToday, invalidateAll, lang, invokeStravaSync]);
+
   const handleFetchYear2026 = useCallback(async () => {
     if (!user || fetchingToday) return;
     setFetchingToday(true);

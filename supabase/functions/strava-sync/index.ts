@@ -1,5 +1,6 @@
 const serve = (handler: (req: Request) => Response | Promise<Response>) => Deno.serve(handler);
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { getAppForConnection } from "../_shared/strava-apps.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -64,17 +65,8 @@ serve(async (req) => {
   }
 
   try {
-    const appEnv = Deno.env.get("APP_ENVIRONMENT") || "dev";
-    const STRAVA_CLIENT_ID =
-      appEnv === "prod" ? Deno.env.get("STRAVA_CLIENT_ID_PROD")! : Deno.env.get("STRAVA_CLIENT_ID")!;
-    const STRAVA_CLIENT_SECRET =
-      appEnv === "prod" ? Deno.env.get("STRAVA_CLIENT_SECRET_PROD")! : Deno.env.get("STRAVA_CLIENT_SECRET")!;
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-
-    if (!STRAVA_CLIENT_ID || !STRAVA_CLIENT_SECRET) {
-      throw new Error("Strava credentials not configured");
-    }
 
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
@@ -112,8 +104,10 @@ serve(async (req) => {
       });
     }
 
-    const env = connection.environment || "dev";
-    const accessToken = await refreshTokenIfNeeded(connection, supabase, STRAVA_CLIENT_ID, STRAVA_CLIENT_SECRET);
+    const app = await getAppForConnection(supabase, connection);
+    if (!app.client_secret) throw new Error(`Strava app ${app.client_id} missing client_secret`);
+
+    const accessToken = await refreshTokenIfNeeded(connection, supabase, app.client_id, app.client_secret);
 
     const activitiesRes = await fetch("https://www.strava.com/api/v3/athlete/activities?per_page=30", {
       headers: { Authorization: `Bearer ${accessToken}` },
@@ -142,19 +136,17 @@ serve(async (req) => {
           average_heartrate: act.average_heartrate || null,
           max_heartrate: act.max_heartrate || null,
           summary_polyline: act.map?.summary_polyline || null,
-          environment: env,
+          environment: "prod",
         },
         { onConflict: "strava_id" },
       );
     }
 
-    // Compute VDOT-based training score from both Strava + Apple Health activities
     const [stravaRecent, ahRecent] = await Promise.all([
       supabase
         .from("strava_activities")
         .select("moving_time, distance, sport_type, start_date")
         .eq("user_id", user.id)
-        .eq("environment", env)
         .order("start_date", { ascending: false })
         .limit(50),
       supabase

@@ -17,7 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import DesktopPageHeader from "./DesktopPageHeader";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
-import { getAppEnvironment } from "@/lib/environment";
+
 import { useGarmin } from "@/hooks/use-garmin";
 import { toast } from "sonner";
 import GarminCredentialDialog from "@/components/GarminCredentialDialog";
@@ -148,8 +148,9 @@ export default function DashboardConnect({ lang }: Props) {
       return;
     }
     setBusy("STRAVA");
+    const redirect_uri = `${window.location.origin}/auth/callback`;
     const { data, error } = await supabase.functions.invoke("strava-auth", {
-      body: { environment: getAppEnvironment() },
+      body: { redirect_uri },
     });
     if (error || !data?.url) {
       toast.error(L("Failed to start Strava connection", "無法啟動 Strava 連結"));

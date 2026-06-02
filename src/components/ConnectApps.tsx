@@ -7,7 +7,7 @@ import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 import { useAppleHealth } from "@/hooks/use-apple-health";
 import { useGarmin } from "@/hooks/use-garmin";
-import { getAppEnvironment } from "@/lib/environment";
+
 import despia from "despia-native";
 import { isDespiaUA } from "@/lib/despiaOAuth";
 import { useLocation } from "react-router-dom";
@@ -102,9 +102,23 @@ const ConnectApps = ({ lang, onBack }: Props) => {
       toast.error(lang === "zh" ? "請先中斷現有健身應用再連接新的" : "Please disconnect the current fitness app before connecting a new one");
       return;
     }
+    const redirect_uri = `${window.location.origin}/auth/callback`;
     const { data, error } = await supabase.functions.invoke("strava-auth", {
-      body: { environment: getAppEnvironment() },
+      body: { redirect_uri },
     });
+    const errCode = (data as any)?.code ?? (error as any)?.context?.code;
+    if (errCode === "ALL_APPS_FULL") {
+      toast.error(lang === "zh"
+        ? "Strava 名額已滿,請稍後再試"
+        : "All Strava slots are currently full — please try again later");
+      return;
+    }
+    if (errCode === "APP_SECRET_MISSING" || errCode === "NO_APPS_CONFIGURED") {
+      toast.error(lang === "zh"
+        ? "Strava 尚未設定,請聯絡管理員"
+        : "Strava is not configured yet — contact the admin");
+      return;
+    }
     if (error || !data?.url) {
       toast.error(lang === "zh" ? "無法啟動 Strava 連結" : "Failed to start Strava connection");
       return;

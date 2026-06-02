@@ -26,6 +26,7 @@ import ActivityCalendar from "@/components/activities/ActivityCalendar";
 import MonthlyRoadQuest from "@/components/activities/MonthlyRoadQuest";
 import MonthlyStatsCard from "@/components/activities/MonthlyStatsCard";
 import BulkFitExportButton from "@/components/activities/BulkFitExportButton";
+import UpgradeModal from "@/components/coach/UpgradeModal";
 
 // Heavy: pulls in leaflet + leaflet.css. Only needed when an activity card has a polyline.
 const ActivityMap = lazy(() => import("@/components/activities/ActivityMap"));
@@ -754,6 +755,16 @@ const ActivitiesTab = ({ lang }: Props) => {
   const [resyncing, setResyncing] = useState(false);
   const [fetchingToday, setFetchingToday] = useState(false);
   const [year2026Used, setYear2026Used] = useState(false);
+  const strava2026Key = user ? `strava_2026_sync_used:${user.id}` : "";
+  const [strava2026Used, setStrava2026Used] = useState(() => {
+    if (typeof window === "undefined" || !user) return false;
+    return localStorage.getItem(`strava_2026_sync_used:${user.id}`) === "true";
+  });
+  useEffect(() => {
+    if (!user) return;
+    setStrava2026Used(localStorage.getItem(`strava_2026_sync_used:${user.id}`) === "true");
+  }, [user]);
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
 
   useEffect(() => {
     if (!user || !isPremium) return;
@@ -1006,6 +1017,7 @@ const ActivitiesTab = ({ lang }: Props) => {
 
   const handleFetchStrava2026 = useCallback(async () => {
     if (!user || fetchingToday) return;
+    if (!isPremium) { setUpgradeOpen(true); return; }
     setFetchingToday(true);
     toast.info(
       lang === "zh" ? "已開始同步 2026 年 Strava 活動..." : "Syncing 2026 Strava activities...",
@@ -1022,6 +1034,8 @@ const ActivitiesTab = ({ lang }: Props) => {
       invalidateAll();
       if (count > 0) {
         toast.success(lang === "zh" ? `已同步 ${count} 個 2026 年 Strava 活動` : `Synced ${count} Strava activities from 2026`);
+        try { localStorage.setItem(strava2026Key, "true"); } catch {}
+        setStrava2026Used(true);
       } else {
         toast.info(lang === "zh" ? "2026 年暫無新 Strava 活動" : "No new Strava activities in 2026");
       }
@@ -1030,7 +1044,7 @@ const ActivitiesTab = ({ lang }: Props) => {
       toast.error(lang === "zh" ? "同步失敗" : "Sync failed");
     }
     setFetchingToday(false);
-  }, [user, fetchingToday, invalidateAll, lang, invokeStravaSync]);
+  }, [user, fetchingToday, invalidateAll, lang, invokeStravaSync, isPremium, strava2026Key]);
 
   const handleFetchYear2026 = useCallback(async () => {
     if (!user || fetchingToday) return;
@@ -1221,9 +1235,11 @@ const ActivitiesTab = ({ lang }: Props) => {
                 <DropdownMenuItem onClick={handleFetchStrava30Days} disabled={fetchingToday}>
                   {lang === "zh" ? "同步近 30 天 Strava 活動" : "Sync past 30 days (Strava only)"}
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleFetchStrava2026} disabled={fetchingToday}>
-                  {lang === "zh" ? "同步 2026 年 Strava 活動" : "Sync 2026 activities (Strava only)"}
-                </DropdownMenuItem>
+                {isPremium && !strava2026Used && (
+                  <DropdownMenuItem onClick={handleFetchStrava2026} disabled={fetchingToday}>
+                    {lang === "zh" ? "同步 2026 年 Strava 活動 ✨" : "Sync 2026 activities (Strava only) ✨"}
+                  </DropdownMenuItem>
+                )}
                 {false && isPremium && !year2026Used && (
                   <DropdownMenuItem onClick={handleFetchYear2026} disabled={fetchingToday}>
                     {lang === "zh" ? "同步 2026 全年活動" : "Sync all 2026 activities"}
@@ -1551,6 +1567,7 @@ const ActivitiesTab = ({ lang }: Props) => {
           )}
         </SheetContent>
       </Sheet>
+      <UpgradeModal open={upgradeOpen} onOpenChange={setUpgradeOpen} lang={lang} />
     </FadeIn>
   );
 };

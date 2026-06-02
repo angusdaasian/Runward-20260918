@@ -184,13 +184,14 @@ const ConnectApps = ({ lang, onBack }: Props) => {
     await garmin.syncActivities();
   };
 
-  type TerraProvider = "GARMIN" | "POLAR" | "SUUNTO" | "COROS" | "ZEPP";
+  type TerraProvider = "GARMIN" | "POLAR" | "SUUNTO" | "COROS" | "ZEPP" | "FITBIT";
   const TERRA_PROVIDERS: { id: TerraProvider; label: string; icon: string }[] = [
     { id: "GARMIN", label: "Garmin", icon: garminIcon },
     { id: "COROS", label: "COROS", icon: corosIcon },
     { id: "POLAR", label: "Polar", icon: polarIcon },
     { id: "SUUNTO", label: "Suunto", icon: suuntoIcon },
     { id: "ZEPP", label: "Zepp", icon: zeppIcon },
+    { id: "FITBIT", label: "Fitbit", icon: fitbitIcon },
   ];
   const [terraConns, setTerraConns] = useState<Record<string, { id: string; last_synced_at: string | null }>>({});
   const [terraBusy, setTerraBusy] = useState<string | null>(null);

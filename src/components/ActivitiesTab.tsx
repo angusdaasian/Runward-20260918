@@ -26,6 +26,7 @@ import ActivityCalendar from "@/components/activities/ActivityCalendar";
 import MonthlyRoadQuest from "@/components/activities/MonthlyRoadQuest";
 import MonthlyStatsCard from "@/components/activities/MonthlyStatsCard";
 import BulkFitExportButton from "@/components/activities/BulkFitExportButton";
+import UpgradeModal from "@/components/coach/UpgradeModal";
 
 // Heavy: pulls in leaflet + leaflet.css. Only needed when an activity card has a polyline.
 const ActivityMap = lazy(() => import("@/components/activities/ActivityMap"));

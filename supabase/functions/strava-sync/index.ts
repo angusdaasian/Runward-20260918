@@ -207,7 +207,7 @@ serve(async (req) => {
         .eq("user_id", user.id);
     }
 
-    return new Response(JSON.stringify({ success: true, count: activities.length }), {
+    return new Response(JSON.stringify({ success: true, count: totalCount }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error: unknown) {

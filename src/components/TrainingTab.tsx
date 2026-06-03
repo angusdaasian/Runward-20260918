@@ -1916,7 +1916,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
         const lastDayDate = (planData[planData.length - 1]?.days?.slice(-1)?.[0]?.date) || fitnessStart;
         const inserted: any = {
           user_id: user.id, goal: effectiveGoal || "race", distance, target_time: isFitness ? "" : targetTime,
-          race_date: isFitness ? lastDayDate : raceDate, weeks: fitnessWeeks, plan_data: planData, raw_output: result.raw || "",
+          race_date: isFitness ? null : raceDate, weeks: fitnessWeeks, plan_data: planData, raw_output: result.raw || "",
           race_schedule: snapshot,
         };
         const { data: saved } = await (supabase.from("training_plans" as any) as any).insert(inserted).select().single();

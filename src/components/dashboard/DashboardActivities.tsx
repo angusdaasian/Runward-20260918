@@ -39,6 +39,7 @@ export default function DashboardActivities({ lang }: Props) {
   const { activities, plannedWorkouts, userRaces, profile } = useActivities();
   const [pageSize, setPageSize] = useState(20);
   const [selectedActivity, setSelectedActivity] = useState<StravaActivity | null>(null);
+  const [simpleMode] = useSimpleMode();
 
   const list = activities || [];
   const visible = list.slice(0, pageSize);

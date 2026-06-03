@@ -148,6 +148,7 @@ serve(async (req) => {
     const workoutType: string = typeof body?.workoutType === "string" ? body.workoutType : "auto";
     const workoutTypeLabel: string = typeof body?.workoutTypeLabel === "string" ? body.workoutTypeLabel : workoutType;
     const weather: any = body?.weather ?? null;
+    const simple: boolean = body?.simple === true;
     const isZh = lang === "zh";
 
     // ── Translate-only mode: take an existing suggestion and translate it ──

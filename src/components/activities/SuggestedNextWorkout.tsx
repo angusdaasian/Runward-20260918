@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import EditWorkoutDialog, { EditableWorkout } from "@/components/training/EditWorkoutDialog";
 import { notifyPlanChanged, subscribePlanChanged } from "@/lib/planEvents";
+import { useSimpleMode } from "@/hooks/use-simple-mode";
 
 interface Props {
   lang: Lang;

@@ -42,3 +42,10 @@ verify_jwt = false
 
 [functions.coros-workout-webhook]
 verify_jwt = false
+
+[functions.terra-inactivity-sweep]
+verify_jwt = false
+
+[functions.terra-admin-deauth]
+verify_jwt = false
+

@@ -11,6 +11,7 @@ import TrendsCard from "@/components/activities/TrendsCard";
 import TrainingLoadChart from "@/components/activities/TrainingLoadChart";
 import DashboardMonthlyChallenge from "./DashboardMonthlyChallenge";
 import DashboardActivityDetail from "./DashboardActivityDetail";
+import { useSimpleMode } from "@/hooks/use-simple-mode";
 
 interface Props {
   lang: Lang;
@@ -38,6 +39,7 @@ export default function DashboardActivities({ lang }: Props) {
   const { activities, plannedWorkouts, userRaces, profile } = useActivities();
   const [pageSize, setPageSize] = useState(20);
   const [selectedActivity, setSelectedActivity] = useState<StravaActivity | null>(null);
+  const [simpleMode] = useSimpleMode();
 
   const list = activities || [];
   const visible = list.slice(0, pageSize);
@@ -78,11 +80,13 @@ export default function DashboardActivities({ lang }: Props) {
           />
         </Card>
 
-        <DashboardMonthlyChallenge
-          lang={lang}
-          activities={list}
-          plannedWorkouts={plannedWorkouts || []}
-        />
+        {!simpleMode && (
+          <DashboardMonthlyChallenge
+            lang={lang}
+            activities={list}
+            plannedWorkouts={plannedWorkouts || []}
+          />
+        )}
       </div>
 
       {/* Mid row: trends + training load */}

@@ -1,0 +1,1 @@
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS simple_mode boolean NOT NULL DEFAULT false;

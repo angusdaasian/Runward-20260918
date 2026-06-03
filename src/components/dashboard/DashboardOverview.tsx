@@ -17,6 +17,7 @@ import { useActivities, type StravaActivity } from "@/hooks/use-activities";
 import type { Lang } from "@/lib/i18n";
 import DashboardMonthlyChallenge from "./DashboardMonthlyChallenge";
 import DashboardActivityDetail from "./DashboardActivityDetail";
+import { useSimpleMode } from "@/hooks/use-simple-mode";
 
 type Props = {
   lang: Lang;
@@ -44,6 +45,7 @@ export default function DashboardOverview({ lang, onNavigate }: Props) {
   const zh = lang === "zh";
   const { activities, plannedWorkouts, userRaces, profile } = useActivities();
   const [selectedActivity, setSelectedActivity] = useState<StravaActivity | null>(null);
+  const [simpleMode] = useSimpleMode();
 
   const stats = useMemo(() => {
     const now = new Date();
@@ -227,11 +229,13 @@ export default function DashboardOverview({ lang, onNavigate }: Props) {
 
         {/* Right column */}
         <div className="space-y-4">
-          <DashboardMonthlyChallenge
-            lang={lang}
-            activities={activities || []}
-            plannedWorkouts={plannedWorkouts || []}
-          />
+          {!simpleMode && (
+            <DashboardMonthlyChallenge
+              lang={lang}
+              activities={activities || []}
+              plannedWorkouts={plannedWorkouts || []}
+            />
+          )}
           {/* Next race */}
           <Card className="p-5">
             <div className="flex items-center justify-between mb-3">

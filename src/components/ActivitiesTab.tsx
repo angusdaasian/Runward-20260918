@@ -1308,8 +1308,10 @@ const ActivitiesTab = ({ lang }: Props) => {
         latestActivityDate={latestActivity?.start_date ?? null}
       />
 
-      {/* Monthly Road Quest */}
-      <MonthlyRoadQuest lang={lang} activities={activities} plannedWorkouts={plannedWorkouts} />
+      {/* Monthly Road Quest - hidden in simple mode */}
+      {!simpleMode && (
+        <MonthlyRoadQuest lang={lang} activities={activities} plannedWorkouts={plannedWorkouts} />
+      )}
 
       {/* Monthly Calendar */}
       <div className="pb-4">

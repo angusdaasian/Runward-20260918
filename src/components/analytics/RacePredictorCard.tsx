@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useActivities } from "@/hooks/use-activities";
 import { usePremium } from "@/contexts/PremiumContext";
-import UpgradeModal from "@/components/coach/UpgradeModal";
+import PlanComparisonDialog from "@/components/PlanComparisonDialog";
 import { formatTime, formatPace } from "@/lib/vdot";
 import {
   bestPbScore,
@@ -222,7 +222,7 @@ const RacePredictorCard = ({ lang }: Props) => {
         </button>
       )}
 
-      <UpgradeModal open={showUpgrade} onOpenChange={setShowUpgrade} lang={lang} />
+      <PlanComparisonDialog open={showUpgrade} onOpenChange={setShowUpgrade} lang={lang} />
     </div>
   );
 };

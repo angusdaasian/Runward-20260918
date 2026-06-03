@@ -80,11 +80,13 @@ export default function DashboardActivities({ lang }: Props) {
           />
         </Card>
 
-        <DashboardMonthlyChallenge
-          lang={lang}
-          activities={list}
-          plannedWorkouts={plannedWorkouts || []}
-        />
+        {!simpleMode && (
+          <DashboardMonthlyChallenge
+            lang={lang}
+            activities={list}
+            plannedWorkouts={plannedWorkouts || []}
+          />
+        )}
       </div>
 
       {/* Mid row: trends + training load */}

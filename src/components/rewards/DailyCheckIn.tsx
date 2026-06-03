@@ -220,8 +220,8 @@ const DailyCheckIn = ({ lang, userId, lastLogin, currentXp, onXpGain }: Props) =
         </AnimatePresence>
       </div>
 
-      {/* 7-Day Streak Circles */}
-      <div className="bg-card border border-border rounded-xl p-4">
+      {/* 7-Day Streak Circles - locked to default text size so circles never overflow */}
+      <div className="bg-card border border-border rounded-xl p-4 streak-bar-fixed">
         <div className="flex items-center gap-2 mb-3">
           <Flame size={16} className="text-orange-500" />
           <span className="text-xs font-bold text-foreground">

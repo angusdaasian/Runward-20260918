@@ -180,3 +180,17 @@
 .app-header-fixed .text-base { font-size: 16px !important; line-height: 24px !important; }
 .app-header-fixed .text-lg { font-size: 18px !important; line-height: 28px !important; }
 
+
+/* Streak bar — locked to default sizing so the 7-day row never overflows
+   when the user picks a larger text scale. */
+.streak-bar-fixed { font-size: 16px; }
+.streak-bar-fixed .text-\[9px\] { font-size: 9px !important; line-height: 1 !important; }
+.streak-bar-fixed .text-\[10px\] { font-size: 10px !important; }
+.streak-bar-fixed .text-xs { font-size: 12px !important; line-height: 16px !important; }
+.streak-bar-fixed .w-9 { width: 36px !important; }
+.streak-bar-fixed .h-9 { height: 36px !important; }
+.streak-bar-fixed .w-4 { width: 16px !important; }
+.streak-bar-fixed .h-4 { height: 16px !important; }
+.streak-bar-fixed .gap-1 { gap: 4px !important; }
+.streak-bar-fixed .gap-1\.5 { gap: 6px !important; }
+.streak-bar-fixed .gap-2 { gap: 8px !important; }

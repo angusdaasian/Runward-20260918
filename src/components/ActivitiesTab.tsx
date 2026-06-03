@@ -1204,49 +1204,51 @@ const ActivitiesTab = ({ lang }: Props) => {
             {lang === "zh" ? "最近活動" : "Recent Activity"}
           </h2>
           <div className="flex items-center gap-2">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  disabled={fetchingToday}
-                  className="flex items-center gap-1.5 text-xs font-medium text-primary bg-primary/10 px-2.5 py-1.5 rounded-full hover:bg-primary/20 transition-colors disabled:opacity-50"
-                  aria-label={lang === "zh" ? "同步" : "Sync"}
-                >
-                  {fetchingToday ? (
-                    <>
-                      <span className="text-xs font-medium">{lang === "zh" ? "同步中..." : "Syncing..."}</span>
-                      <RefreshCw size={14} className="animate-spin" />
-                    </>
-                  ) : (
-                    <>
-                      <span className="text-xs font-medium">{lang === "zh" ? "同步" : "Sync"}</span>
-                      <RefreshCw size={14} />
-                    </>
+            {fitnessAppConnected && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    disabled={fetchingToday}
+                    className="flex items-center gap-1.5 text-xs font-medium text-primary bg-primary/10 px-2.5 py-1.5 rounded-full hover:bg-primary/20 transition-colors disabled:opacity-50"
+                    aria-label={lang === "zh" ? "同步" : "Sync"}
+                  >
+                    {fetchingToday ? (
+                      <>
+                        <span className="text-xs font-medium">{lang === "zh" ? "同步中..." : "Syncing..."}</span>
+                        <RefreshCw size={14} className="animate-spin" />
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-xs font-medium">{lang === "zh" ? "同步" : "Sync"}</span>
+                        <RefreshCw size={14} />
+                      </>
+                    )}
+                    <ChevronDown size={12} />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuItem onClick={handleFetchTodayOnly} disabled={fetchingToday}>
+                    {lang === "zh" ? "同步今日活動" : "Sync today's activities"}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleFetchWeekOnly} disabled={fetchingToday}>
+                    {lang === "zh" ? "同步近 7 天活動" : "Sync past 7 days"}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleFetchStrava30Days} disabled={fetchingToday}>
+                    {lang === "zh" ? "同步近 30 天 Strava 活動" : "Sync past 30 days (Strava only)"}
+                  </DropdownMenuItem>
+                  {isPremium && !strava2026Used && (
+                    <DropdownMenuItem onClick={handleFetchStrava2026} disabled={fetchingToday}>
+                      {lang === "zh" ? "同步 2026 年 Strava 活動 ✨" : "Sync 2026 activities (Strava only) ✨"}
+                    </DropdownMenuItem>
                   )}
-                  <ChevronDown size={12} />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuItem onClick={handleFetchTodayOnly} disabled={fetchingToday}>
-                  {lang === "zh" ? "同步今日活動" : "Sync today's activities"}
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleFetchWeekOnly} disabled={fetchingToday}>
-                  {lang === "zh" ? "同步近 7 天活動" : "Sync past 7 days"}
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleFetchStrava30Days} disabled={fetchingToday}>
-                  {lang === "zh" ? "同步近 30 天 Strava 活動" : "Sync past 30 days (Strava only)"}
-                </DropdownMenuItem>
-                {isPremium && !strava2026Used && (
-                  <DropdownMenuItem onClick={handleFetchStrava2026} disabled={fetchingToday}>
-                    {lang === "zh" ? "同步 2026 年 Strava 活動 ✨" : "Sync 2026 activities (Strava only) ✨"}
-                  </DropdownMenuItem>
-                )}
-                {false && isPremium && !year2026Used && (
-                  <DropdownMenuItem onClick={handleFetchYear2026} disabled={fetchingToday}>
-                    {lang === "zh" ? "同步 2026 全年活動" : "Sync all 2026 activities"}
-                  </DropdownMenuItem>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
+                  {false && isPremium && !year2026Used && (
+                    <DropdownMenuItem onClick={handleFetchYear2026} disabled={fetchingToday}>
+                      {lang === "zh" ? "同步 2026 全年活動" : "Sync all 2026 activities"}
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
             {(latestActivity || activities.length > 0) && (
               <button
                 onClick={() => { setWarmupReady(true); setShowAllActivities(true); }}

@@ -213,6 +213,7 @@ const ProgramsTab = ({ lang, onLoginRequest }: Props) => {
 
   // Questionnaire state
   const [step, setStep] = useState<"goal" | "details" | "calendar">("goal");
+  const [showPlanCompare, setShowPlanCompare] = useState(false);
   const [goal, setGoal] = useState<Goal | null>(null);
   const [distance, setDistance] = useState<Distance | null>(null);
   const [targetTime, setTargetTime] = useState("");

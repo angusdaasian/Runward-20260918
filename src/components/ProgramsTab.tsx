@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { notifyPlanChanged, subscribePlanChanged } from "@/lib/planEvents";
 import EditWorkoutDialog from "@/components/training/EditWorkoutDialog";
+import PlanComparisonDialog from "@/components/PlanComparisonDialog";
 import { useActivities } from "@/hooks/use-activities";
 
 type Goal = "race" | "distance" | "first5k" | "parkrun" | "general" | "postnatal" | "fitness" | "injury" | "postrace";
@@ -212,6 +213,7 @@ const ProgramsTab = ({ lang, onLoginRequest }: Props) => {
 
   // Questionnaire state
   const [step, setStep] = useState<"goal" | "details" | "calendar">("goal");
+  const [showPlanCompare, setShowPlanCompare] = useState(false);
   const [goal, setGoal] = useState<Goal | null>(null);
   const [distance, setDistance] = useState<Distance | null>(null);
   const [targetTime, setTargetTime] = useState("");
@@ -502,10 +504,11 @@ const ProgramsTab = ({ lang, onLoginRequest }: Props) => {
             {lang === "zh" ? "登入 / 註冊" : "Sign In / Sign Up"}
           </Button>
         ) : (
-          <p className="text-xs text-muted-foreground">
-            {lang === "zh" ? "前往「更多」分頁升級" : "Go to the More tab to upgrade"}
-          </p>
+          <Button onClick={() => setShowPlanCompare(true)}>
+            {lang === "zh" ? "升級至高級版" : "Upgrade to Premium"}
+          </Button>
         )}
+        <PlanComparisonDialog open={showPlanCompare} onOpenChange={setShowPlanCompare} lang={lang} />
       </div>
     );
   }

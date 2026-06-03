@@ -140,55 +140,28 @@
   }
 }
 
-/* Text-size scaling: keep bottom nav fixed so layout/safe-area math is stable. */
-.bottom-nav,
-.bottom-nav * {
-  font-size: 11px;
+/* Text-size scaling: the html root font-size is what scales the app.
+   Lock the header so it stays the same size regardless of the user's choice.
+   Everything else (content + bottom nav + dropdowns) scales naturally. */
+.app-header-fixed {
+  font-size: 16px;
 }
-.bottom-nav svg {
-  width: 22px;
-  height: 22px;
+.app-header-fixed h1,
+.app-header-fixed h2,
+.app-header-fixed h3,
+.app-header-fixed span,
+.app-header-fixed p,
+.app-header-fixed button,
+.app-header-fixed a,
+.app-header-fixed div {
+  font-size: revert;
 }
+/* Re-pin Tailwind text-* utilities inside the header to fixed px so the
+   rem-based classes can't grow with the root. */
+.app-header-fixed .text-\[10px\] { font-size: 10px !important; }
+.app-header-fixed .text-\[11px\] { font-size: 11px !important; }
+.app-header-fixed .text-xs   { font-size: 12px !important; }
+.app-header-fixed .text-sm   { font-size: 14px !important; }
+.app-header-fixed .text-base { font-size: 16px !important; }
+.app-header-fixed .text-lg   { font-size: 18px !important; }
 
-/* Text-size scaling is scoped to dropdown / popover content only.
-   The app header and main layout stay at their default size.
-   Tailwind text-* classes use rem (tied to the html root, which we no longer
-   change), so we have to override the common ones explicitly with !important
-   inside the popover wrapper. */
-[data-radix-popper-content-wrapper] {
-  --popover-text-scale: 1;
-}
-html[data-text-scale="lg"] [data-radix-popper-content-wrapper] {
-  --popover-text-scale: 1.18;
-}
-html[data-text-scale="xl"] [data-radix-popper-content-wrapper] {
-  --popover-text-scale: 1.35;
-}
-
-html[data-text-scale="lg"] [data-radix-popper-content-wrapper],
-html[data-text-scale="xl"] [data-radix-popper-content-wrapper] {
-  font-size: calc(1rem * var(--popover-text-scale));
-}
-html[data-text-scale="lg"] [data-radix-popper-content-wrapper] .text-xs,
-html[data-text-scale="xl"] [data-radix-popper-content-wrapper] .text-xs {
-  font-size: calc(0.75rem * var(--popover-text-scale)) !important;
-  line-height: 1.4 !important;
-}
-html[data-text-scale="lg"] [data-radix-popper-content-wrapper] .text-sm,
-html[data-text-scale="xl"] [data-radix-popper-content-wrapper] .text-sm {
-  font-size: calc(0.875rem * var(--popover-text-scale)) !important;
-  line-height: 1.4 !important;
-}
-html[data-text-scale="lg"] [data-radix-popper-content-wrapper] .text-base,
-html[data-text-scale="xl"] [data-radix-popper-content-wrapper] .text-base {
-  font-size: calc(1rem * var(--popover-text-scale)) !important;
-  line-height: 1.4 !important;
-}
-html[data-text-scale="lg"] [data-radix-popper-content-wrapper] .text-\[10px\],
-html[data-text-scale="xl"] [data-radix-popper-content-wrapper] .text-\[10px\] {
-  font-size: calc(10px * var(--popover-text-scale)) !important;
-}
-html[data-text-scale="lg"] [data-radix-popper-content-wrapper] .text-\[11px\],
-html[data-text-scale="xl"] [data-radix-popper-content-wrapper] .text-\[11px\] {
-  font-size: calc(11px * var(--popover-text-scale)) !important;
-}

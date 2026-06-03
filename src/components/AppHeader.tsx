@@ -188,7 +188,7 @@ const AppHeader = ({ lang, onNavigateSettings, onOpenPromoBanner, isGuest }: App
   const initials = name[0].toUpperCase();
 
   return (
-    <div className="flex items-center justify-between px-5 pt-4 pb-2 w-full max-w-lg mx-auto">
+    <div className="app-header-fixed flex items-center justify-between px-5 pt-4 pb-2 w-full max-w-lg mx-auto">
       <button
         onClick={onNavigateSettings}
         aria-label={lang === "zh" ? "個人檔案" : "Profile"}

@@ -181,6 +181,7 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
   const displayScore = activityScore ?? trainingScore ?? null;
 
   const [streams, setStreams] = useState<any[]>([]);
+  const [showPlanCompare, setShowPlanCompare] = useState(false);
   const [splits, setSplits] = useState<Split[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeChart, setActiveChart] = useState<"pace" | "heartrate" | "altitude" | "cadence">("pace");

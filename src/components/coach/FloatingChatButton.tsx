@@ -186,7 +186,7 @@ const FloatingChatButton = ({ lang }: Props) => {
       </button>
 
       <ChatModal open={open} onClose={() => setOpen(false)} lang={lang} />
-      <UpgradeModal open={showUpgrade} onOpenChange={setShowUpgrade} lang={lang} />
+      <PlanComparisonDialog open={showUpgrade} onOpenChange={setShowUpgrade} lang={lang} />
     </>
   );
 };

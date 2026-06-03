@@ -27,6 +27,7 @@ interface CachedGenerated {
   /** ISO date of the latest activity at the time of generation, or null if none. */
   basisActivityDate: string | null;
   workoutType?: string;
+  simple?: boolean;
   cacheVersion?: number;
 }
 

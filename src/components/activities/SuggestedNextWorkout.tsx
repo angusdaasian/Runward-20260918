@@ -56,7 +56,7 @@ const WORKOUT_TYPE_LABELS: Record<WorkoutType, { en: string; zh: string }> = {
   race_pace: { en: "Race-pace workout", zh: "比賽配速訓練" },
 };
 
-const GENERATED_SUGGESTION_CACHE_VERSION = 2;
+const GENERATED_SUGGESTION_CACHE_VERSION = 3;
 
 function readCachedGenerated(userId: string): CachedGenerated | null {
   try {

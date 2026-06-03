@@ -222,7 +222,7 @@ const RacePredictorCard = ({ lang }: Props) => {
         </button>
       )}
 
-      <UpgradeModal open={showUpgrade} onOpenChange={setShowUpgrade} lang={lang} />
+      <PlanComparisonDialog open={showUpgrade} onOpenChange={setShowUpgrade} lang={lang} />
     </div>
   );
 };

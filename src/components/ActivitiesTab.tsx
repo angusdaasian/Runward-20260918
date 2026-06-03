@@ -1569,7 +1569,7 @@ const ActivitiesTab = ({ lang }: Props) => {
           )}
         </SheetContent>
       </Sheet>
-      <UpgradeModal open={upgradeOpen} onOpenChange={setUpgradeOpen} lang={lang} />
+      <PlanComparisonDialog open={upgradeOpen} onOpenChange={setUpgradeOpen} lang={lang} />
     </FadeIn>
   );
 };

@@ -1914,7 +1914,7 @@ export type Database = {
           goal: string
           id: string
           plan_data: Json
-          race_date: string
+          race_date: string | null
           race_schedule: Json
           raw_output: string | null
           target_time: string
@@ -1928,7 +1928,7 @@ export type Database = {
           goal: string
           id?: string
           plan_data?: Json
-          race_date: string
+          race_date?: string | null
           race_schedule?: Json
           raw_output?: string | null
           target_time: string
@@ -1942,7 +1942,7 @@ export type Database = {
           goal?: string
           id?: string
           plan_data?: Json
-          race_date?: string
+          race_date?: string | null
           race_schedule?: Json
           raw_output?: string | null
           target_time?: string

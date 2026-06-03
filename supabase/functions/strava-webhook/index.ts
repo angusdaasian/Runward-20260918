@@ -300,12 +300,14 @@ serve(async (req) => {
         });
       }
 
-      const { data: connection } = await supabase
+      const { data: connections } = await supabase
         .from('strava_connections')
         .select('*')
         .eq('strava_athlete_id', event.owner_id)
-        .single();
+        .order('updated_at', { ascending: false })
+        .limit(1);
 
+      const connection = connections?.[0];
       if (!connection) {
         console.log('No connection found for athlete:', event.owner_id);
         return new Response(JSON.stringify({ ok: true }), {

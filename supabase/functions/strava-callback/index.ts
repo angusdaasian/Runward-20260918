@@ -71,6 +71,13 @@ serve(async (req) => {
       throw new Error(`Strava token exchange failed: ${JSON.stringify(tokenData)}`);
     }
 
+    // Remove any stale connection rows for this athlete that belong to other users
+    await supabase
+      .from('strava_connections')
+      .delete()
+      .eq('strava_athlete_id', tokenData.athlete.id)
+      .neq('user_id', user.id);
+
     const { error: dbError } = await supabase
       .from('strava_connections')
       .upsert({

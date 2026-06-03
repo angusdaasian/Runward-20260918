@@ -12,6 +12,7 @@ import {
 import { Lang, t } from "@/lib/i18n";
 import { useToast } from "@/hooks/use-toast";
 import despia from "despia-native";
+import { useTextScale, type TextScale } from "@/hooks/use-text-scale";
 import { useState, useEffect } from "react";
 import { SettingsSkeleton } from "@/components/ui/PageSkeleton";
 import { supabase } from "@/integrations/supabase/client";
@@ -89,6 +90,7 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps }: Props
   const [aiChatDisabled, setAiChatDisabled] = useState(() => localStorage.getItem("ai_chat_disabled") === "true");
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [textScale, setTextScale] = useTextScale();
 
   const handleDeleteAccount = async () => {
     if (!user || deleting) return;
@@ -426,6 +428,44 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps }: Props
             >
               {t("chinese", lang)}
             </button>
+          </div>
+        </div>
+        {/* Text Size */}
+        <div className="bg-card border border-border rounded-xl p-4">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-3">
+              <span aria-hidden className="font-display font-semibold text-primary text-lg leading-none w-5 text-center">A</span>
+              <span className="font-medium text-foreground">
+                {lang === "zh" ? "文字大小" : "Text Size"}
+              </span>
+            </div>
+            <span className="text-xs text-muted-foreground">
+              {textScale === "default"
+                ? (lang === "zh" ? "預設" : "Default")
+                : textScale === "lg"
+                ? (lang === "zh" ? "大" : "Large")
+                : (lang === "zh" ? "特大" : "Extra Large")}
+            </span>
+          </div>
+          <div className="flex gap-2">
+            {([
+              { v: "default" as TextScale, label: "A", sub: lang === "zh" ? "預設" : "Default" },
+              { v: "lg" as TextScale, label: "A", sub: lang === "zh" ? "大" : "Large", size: "text-lg" },
+              { v: "xl" as TextScale, label: "A", sub: lang === "zh" ? "特大" : "X-Large", size: "text-xl" },
+            ]).map((opt) => {
+              const active = textScale === opt.v;
+              return (
+                <button
+                  key={opt.v}
+                  onClick={() => setTextScale(opt.v)}
+                  aria-pressed={active}
+                  className={`flex-1 py-3 rounded-lg flex flex-col items-center justify-center gap-1 transition-all ${active ? "bg-primary text-primary-foreground" : "bg-accent text-foreground"}`}
+                >
+                  <span className={`font-display font-semibold leading-none ${opt.size ?? "text-base"}`}>{opt.label}</span>
+                  <span className="text-[11px] opacity-80 leading-none">{opt.sub}</span>
+                </button>
+              );
+            })}
           </div>
         </div>
         {/* Connect to Fitness Apps */}

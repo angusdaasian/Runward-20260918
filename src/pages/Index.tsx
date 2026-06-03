@@ -316,7 +316,7 @@ const Index = () => {
         <ActivitiesTab lang={lang} />
       </div>
 
-      <div className="fixed bottom-0 left-0 right-0 bg-card border-t border-border" style={{ paddingBottom: 'var(--safe-area-bottom, 0px)' }}>
+      <div className="bottom-nav fixed bottom-0 left-0 right-0 bg-card border-t border-border" style={{ paddingBottom: 'var(--safe-area-bottom, 0px)' }}>
         <div className="relative flex justify-around items-center h-16 max-w-lg mx-auto">
           {/* Sliding active indicator */}
           <div

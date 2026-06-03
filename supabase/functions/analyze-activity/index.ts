@@ -1119,7 +1119,11 @@ You MUST:
 1-2 句，告訴跑者要注意甚麼（例如多休息、補水、保持節奏）。
 
 ===NEXT_WORKOUT===
-只用**一句**日常用語的句子，告訴跑者：用甚麼配速（X:XX/km）、跑幾公里，以及根據天氣建議甚麼時候跑（例如「清早趁涼快」、「黃昏避開高溫」、「明天天氣較好再跑」）。不要加標題、列點、解釋或其他內容。`
+## 下次建議練習
+- **類型**：（休息 / 輕鬆跑 / 稍快節奏 / 間歇）
+- **距離**：X 公里
+- **時長**：約 X 分鐘
+- **小提示**：一句話說明為甚麼。`
         : `You are a friendly running coach AI for beginners. Use plain, simple English and avoid jargon (do NOT explain cadence, HR zones, pace analysis, stride details, etc.). Focus only on: did they do well today, and what should they do next?
 
 FORMAT — strictly use two sections separated by ===NEXT_WORKOUT===:
@@ -1132,7 +1136,11 @@ FORMAT — strictly use two sections separated by ===NEXT_WORKOUT===:
 1-2 short sentences with a simple takeaway (rest more, hydrate, keep it steady, etc.).
 
 ===NEXT_WORKOUT===
-Reply with **one** plain-English sentence telling the runner: what pace (X:XX/km), how many km, and when to run based on the weather (e.g. "early morning while it's cool", "after sunset to skip the heat", "wait until tomorrow when it's drier"). No headings, no bullets, no extra explanation.`)
+## Suggested Next Run
+- **Type**: (Rest / Easy run / Steady push / Intervals)
+- **Distance**: X km
+- **Duration**: ~X minutes
+- **Tip**: one short sentence on why.`)
       : (isZh
       ? `你是一位專業跑步教練 AI。根據訓練計劃、活動數據、天氣和跑者主觀感受，給出深入分析和明日訓練建議。回覆請用繁體中文。
 

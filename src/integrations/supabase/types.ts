@@ -732,6 +732,7 @@ export type Database = {
           resting_heartrate: number | null
           runs_per_week: number | null
           sex: string | null
+          simple_mode: boolean
           training_score: number | null
           trial_used: boolean
           updated_at: string
@@ -761,6 +762,7 @@ export type Database = {
           resting_heartrate?: number | null
           runs_per_week?: number | null
           sex?: string | null
+          simple_mode?: boolean
           training_score?: number | null
           trial_used?: boolean
           updated_at?: string
@@ -790,6 +792,7 @@ export type Database = {
           resting_heartrate?: number | null
           runs_per_week?: number | null
           sex?: string | null
+          simple_mode?: boolean
           training_score?: number | null
           trial_used?: boolean
           updated_at?: string

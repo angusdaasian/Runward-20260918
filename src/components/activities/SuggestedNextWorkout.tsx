@@ -284,7 +284,7 @@ const SuggestedNextWorkout = ({ lang, latestActivityId, latestActivityDate }: Pr
 
     // Otherwise, always offer to generate a custom workout (even if no activities at all).
     return { kind: "prompt" };
-  }, [user, analysisLoaded, analysisWorkout, latestActivityDate, generated, isZh]);
+  }, [user, analysisLoaded, analysisWorkout, latestActivityDate, generated, isZh, simple]);
 
   // Auto-translate cached suggestion when language changes if target lang is missing.
   useEffect(() => {

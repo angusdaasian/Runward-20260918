@@ -1,86 +1,67 @@
 ## Goal
 
-Stop storing `client_secret` and `verify_token` as plaintext columns on `strava_apps`. Move both into **Supabase Vault** (`vault.secrets`, encrypted-at-rest with a project-managed key). The admin UI keeps the same UX, but the actual secret values are unreadable via direct Postgres SELECT or the Data API — only the service role (edge functions) can decrypt them.
+Add a Text Size control (Default / Large / Extra Large) to the **Settings page** (`MoreTab.tsx`), and make the UI absorb larger text gracefully so nothing clips or breaks.
 
-## Architecture
+## Where it lives
 
-### 1. Schema change on `strava_apps`
+In `src/components/MoreTab.tsx` — a new "Display / 顯示" section (or appended to the existing preferences section). Three-segment pill labeled "Text size / 文字大小" with A · A+ · A++ samples so users see the change at a glance. No change to `AppHeader`'s popover.
 
-```text
--- new columns
-client_secret_vault_id    uuid     -- references vault.secrets.id
-verify_token_vault_id     uuid     -- references vault.secrets.id
+## How it works
 
--- existing columns (deprecated, will be dropped after migration)
-client_secret  text   -- set to NULL after move
-verify_token   text   -- set to NULL after move
+Scale via the root `<html>` `font-size`. All Tailwind sizing is rem-based, so one change cleanly scales the whole app.
+
+- **Default** — `16px`
+- **Large** — `18px` (+12.5%)
+- **Extra Large** — `20px` (+25%)
+
+Persist in `localStorage`, mirror the `useSimpleMode` pattern (cross-tab event sync, instant updates).
+
+## UI hardening for larger text
+
+1. **Tab/header bars** — swap fixed `h-12`/`h-14` for `min-h-*` + `py-*` so they grow with text.
+2. **Truncations** — audit `truncate` on activity titles and stat labels; switch safe spots to `line-clamp-2`. Add `min-w-0` to flex parents so big numbers don't overflow.
+3. **Buttons/inputs** — scoped CSS on `html[data-text-scale="lg"|"xl"]` bumps shadcn `h-9`/`h-10` to `h-10`/`h-11` and widens horizontal padding.
+4. **Bottom nav** — opt out of scaling (fixed `text-[11px]`, 22px icons) so nav height stays stable and safe-area math doesn't reflow every page.
+5. **Charts** — Recharts tick fonts read a new CSS var `--chart-tick-size` (12 / 13 / 14 px) that tracks the scale.
+6. **Headlines** — clamp a few onboarding/hero classes with `clamp()` to avoid absurd display sizes on small phones at XL.
+7. **Cards** — slightly larger `gap`/`p-*` at lg/xl via a `.ui-scale-pad` utility, so layout breathes proportionally.
+
+## Technical details
+
+### New hook `src/hooks/use-text-scale.ts`
+
+Mirror `use-simple-mode`. Stores `"default" | "lg" | "xl"` in `localStorage` (`text_scale`), fires `text-scale-change`, exposes `[scale, setScale]`. On mount/change:
+```ts
+const map = { default: "16px", lg: "18px", xl: "20px" };
+document.documentElement.style.fontSize = map[scale];
+document.documentElement.dataset.textScale = scale;
 ```
 
-We don't FK-link to `vault.secrets` (Supabase discourages it); we just store the UUIDs.
+### `src/index.css`
+```css
+:root { --chart-tick-size: 12px; }
+html[data-text-scale="lg"] { --chart-tick-size: 13px; }
+html[data-text-scale="xl"] { --chart-tick-size: 14px; }
 
-### 2. Two SECURITY DEFINER SQL functions
+html[data-text-scale="lg"] .ui-scale-pad { padding: 0.875rem; }
+html[data-text-scale="xl"] .ui-scale-pad { padding: 1rem; }
 
-Vault tables are not exposed via PostgREST. We add two `security definer` Postgres functions, both restricted to `service_role` (called only from edge functions):
+.bottom-nav, .bottom-nav * { font-size: 11px !important; }
+```
 
-- `public.get_strava_app_secrets(app_id uuid)` → returns `(client_secret text, verify_token text)` by joining `strava_apps` → `vault.decrypted_secrets`.
-- `public.set_strava_app_secret(app_id uuid, kind text, value text)` → upserts a vault secret (creates with `vault.create_secret` if no vault id yet, otherwise `vault.update_secret`), then writes the resulting `vault.secrets.id` back to `strava_apps.<kind>_vault_id`. `kind` is `'client_secret'` or `'verify_token'`.
+### `MoreTab.tsx`
+New "Display" card with a 3-segment toggle (same pill styling as existing toggles in the file). i18n EN/ZH. `aria-pressed` on each segment.
 
-`GRANT EXECUTE` to `service_role` only — admins cannot call these directly.
+### `index.html`
+Inline pre-paint `<script>` reads `text_scale` from localStorage and applies `html.style.fontSize` + `dataset.textScale` before first render — prevents FOUC.
 
-### 3. New edge function: `strava-app-secret`
+### Files touched
+- new `src/hooks/use-text-scale.ts`
+- `src/index.css` — vars + nav opt-out + scale-aware paddings
+- `src/components/MoreTab.tsx` — new Display section with the control
+- `index.html` — pre-paint script
+- `src/components/AppHeader.tsx` bottom nav — add `.bottom-nav` class
+- Targeted polish on charts (read `--chart-tick-size`) and a small `truncate` → `line-clamp-2` sweep on activity/stat cards
 
-Admin-only writer. Flow:
-1. Validate JWT via `getClaims()`, then check `has_role(user_id, 'admin')`.
-2. Validate body `{ app_id, kind, value }` with Zod.
-3. Call `set_strava_app_secret` via service-role client.
-4. Return 200.
-
-The admin UI calls this function instead of writing `client_secret` / `verify_token` directly to the table.
-
-### 4. Update `_shared/strava-apps.ts`
-
-`hydrate(row)` no longer reads the plaintext columns. Instead, after fetching a row, it calls `get_strava_app_secrets(app_id)` via the service-role client and fills `client_secret` / `verify_token` from vault. Env-var fallback for legacy app 215250 stays as a safety net until vault is populated.
-
-### 5. Admin UI changes (`StravaAppsManager`)
-
-- Table list: replace plaintext columns with "Secret set ✓ / —" badges (we never load the value into the browser).
-- Edit dialog: `client_secret` / `verify_token` inputs save via `supabase.functions.invoke('strava-app-secret', { body: { app_id, kind, value } })` instead of `update().eq()`. All other fields (max_athletes, priority, is_active, subscription_id, notes) still update directly via the table.
-- Add app: first `insert()` the row to get an `id`, then call the secret edge function twice (client_secret + verify_token) if values were provided.
-
-### 6. Backfill + cleanup
-
-Migration steps:
-1. Add new vault-id columns.
-2. For every existing row that has a plaintext `client_secret` / `verify_token`, call `vault.create_secret(value, 'strava_app_<id>_<kind>')`, write the returned uuid into the new column, then `NULL` out the plaintext column.
-3. Keep the plaintext columns in place but always-NULL for one deploy cycle (rollback safety). A follow-up migration will `DROP` them.
-
-### 7. RLS / grants
-
-- `strava_apps` keeps the existing admin-only policy. The plaintext columns being `NULL` means even a leaked admin SELECT shows nothing.
-- The two SECURITY DEFINER functions are `REVOKE ALL FROM PUBLIC` + `GRANT EXECUTE TO service_role`. The admin client never has direct access to vault.
-- `vault` schema stays as Supabase ships it (no policy changes).
-
-## Files changed
-
-- `supabase/migrations/<new>.sql` — schema + functions + backfill.
-- `supabase/functions/strava-app-secret/index.ts` — new admin writer.
-- `supabase/functions/_shared/strava-apps.ts` — read secrets from vault.
-- `src/components/admin/StravaAppsManager.tsx` — invoke edge function for secret writes, hide values in UI.
-
-## Risk / threat model after migration
-
-| Attacker has | Can read client_secret? |
-|---|---|
-| Stolen admin user JWT | No (table columns are NULL) |
-| Stolen service role key | Yes (by design — edge functions need it) |
-| Direct Postgres connection (DB password) | Only with the project's Vault encryption key, which Supabase manages — practically no |
-| Read-only DB replica dump | No (vault stores ciphertext) |
-
-This matches the protection level of Supabase's recommended pattern for storing third-party API secrets.
-
-## Rollout order
-
-1. Approve migration → vault columns + functions land, existing plaintext secrets are moved into vault and nulled.
-2. Edge functions auto-deploy (secret reads switch to vault).
-3. Admin UI deploys (writes go through `strava-app-secret`).
-4. After a week with no issues, follow-up migration drops the plaintext columns entirely.
+## Out of scope
+- Per-screen overrides, font-family change, server-side persistence

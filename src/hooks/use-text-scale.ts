@@ -5,12 +5,6 @@ export type TextScale = "default" | "lg" | "xl";
 const KEY = "text_scale";
 const EVT = "text-scale-change";
 
-const SIZE_MAP: Record<TextScale, string> = {
-  default: "16px",
-  lg: "18px",
-  xl: "20px",
-};
-
 function read(): TextScale {
   try {
     const v = localStorage.getItem(KEY);
@@ -20,9 +14,10 @@ function read(): TextScale {
 }
 
 export function applyTextScale(scale: TextScale) {
-  const el = document.documentElement;
-  el.style.fontSize = SIZE_MAP[scale];
-  el.dataset.textScale = scale;
+  // Do NOT change html root font-size — that would scale the header & whole app.
+  // Only set the data attribute; CSS rules in index.css target specific
+  // surfaces (the dropdown menu popovers) so the header stays the same size.
+  document.documentElement.dataset.textScale = scale;
 }
 
 export function useTextScale(): [TextScale, (v: TextScale) => void] {

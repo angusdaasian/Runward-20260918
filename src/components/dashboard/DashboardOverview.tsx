@@ -229,11 +229,13 @@ export default function DashboardOverview({ lang, onNavigate }: Props) {
 
         {/* Right column */}
         <div className="space-y-4">
-          <DashboardMonthlyChallenge
-            lang={lang}
-            activities={activities || []}
-            plannedWorkouts={plannedWorkouts || []}
-          />
+          {!simpleMode && (
+            <DashboardMonthlyChallenge
+              lang={lang}
+              activities={activities || []}
+              plannedWorkouts={plannedWorkouts || []}
+            />
+          )}
           {/* Next race */}
           <Card className="p-5">
             <div className="flex items-center justify-between mb-3">

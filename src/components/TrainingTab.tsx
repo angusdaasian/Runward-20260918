@@ -1885,10 +1885,11 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
         priority: r.priority || "none",
       }));
 
-      // For fitness mode, default to today as start and 8 weeks
+      // For fitness mode, default to today as start. Plan is ONGOING (no end date) —
+      // we generate a rolling 4-week block that the user can regenerate to extend.
       const todayIso = new Date().toISOString().split("T")[0];
       const fitnessStart = isFitness ? todayIso : startDate;
-      const fitnessWeeks = isFitness ? 8 : weeksUntilRace;
+      const fitnessWeeks = isFitness ? 4 : weeksUntilRace;
       const effectiveGoal = isFitness ? "fitness" : goal;
 
       const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-program`;

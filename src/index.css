@@ -140,15 +140,30 @@
   }
 }
 
-/* Text-size scaling: keep bottom nav fixed so layout/safe-area math is stable. */
-.bottom-nav,
-.bottom-nav * {
-  font-size: 11px;
+/* Text-size scaling: the html root font-size is what scales the app.
+   Lock the header so it stays the same size regardless of the user's choice.
+   Everything else (content + bottom nav + dropdowns) scales naturally. */
+.app-header-fixed {
+  font-size: 16px;
 }
-.bottom-nav svg {
-  width: 22px;
-  height: 22px;
+.app-header-fixed h1,
+.app-header-fixed h2,
+.app-header-fixed h3,
+.app-header-fixed span,
+.app-header-fixed p,
+.app-header-fixed button,
+.app-header-fixed a,
+.app-header-fixed div {
+  font-size: revert;
 }
+/* Re-pin Tailwind text-* utilities inside the header to fixed px so the
+   rem-based classes can't grow with the root. */
+.app-header-fixed .text-\[10px\] { font-size: 10px !important; }
+.app-header-fixed .text-\[11px\] { font-size: 11px !important; }
+.app-header-fixed .text-xs   { font-size: 12px !important; }
+.app-header-fixed .text-sm   { font-size: 14px !important; }
+.app-header-fixed .text-base { font-size: 16px !important; }
+.app-header-fixed .text-lg   { font-size: 18px !important; }
 
 /* Text-size scaling is scoped to dropdown / popover content only.
    The app header and main layout stay at their default size.

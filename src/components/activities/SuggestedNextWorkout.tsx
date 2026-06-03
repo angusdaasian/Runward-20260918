@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import EditWorkoutDialog, { EditableWorkout } from "@/components/training/EditWorkoutDialog";
 import { notifyPlanChanged, subscribePlanChanged } from "@/lib/planEvents";
+import { useSimpleMode } from "@/hooks/use-simple-mode";
 
 interface Props {
   lang: Lang;
@@ -26,6 +27,7 @@ interface CachedGenerated {
   /** ISO date of the latest activity at the time of generation, or null if none. */
   basisActivityDate: string | null;
   workoutType?: string;
+  simple?: boolean;
   cacheVersion?: number;
 }
 
@@ -54,7 +56,7 @@ const WORKOUT_TYPE_LABELS: Record<WorkoutType, { en: string; zh: string }> = {
   race_pace: { en: "Race-pace workout", zh: "比賽配速訓練" },
 };
 
-const GENERATED_SUGGESTION_CACHE_VERSION = 2;
+const GENERATED_SUGGESTION_CACHE_VERSION = 3;
 
 function readCachedGenerated(userId: string): CachedGenerated | null {
   try {
@@ -104,6 +106,7 @@ const SuggestedNextWorkout = ({ lang, latestActivityId, latestActivityDate }: Pr
   const { user } = useAuth();
   const { isPremium } = usePremium();
   const isZh = lang === "zh";
+  const [simple] = useSimpleMode();
 
   const [analysisWorkout, setAnalysisWorkout] = useState<string | null>(null);
   const [analysisLoaded, setAnalysisLoaded] = useState(false);
@@ -272,7 +275,8 @@ const SuggestedNextWorkout = ({ lang, latestActivityId, latestActivityDate }: Pr
         (latestActivityDate &&
           generated.basisActivityDate &&
           Math.abs(new Date(latestActivityDate).getTime() - new Date(generated.basisActivityDate).getTime()) < 1000);
-      if (sameBasis) {
+      const sameSimple = (!!generated.simple) === simple;
+      if (sameBasis && sameSimple) {
         const text = (isZh ? generated.suggestion_zh : generated.suggestion_en) || generated.suggestion;
         return { kind: "generated", text };
       }
@@ -280,7 +284,7 @@ const SuggestedNextWorkout = ({ lang, latestActivityId, latestActivityDate }: Pr
 
     // Otherwise, always offer to generate a custom workout (even if no activities at all).
     return { kind: "prompt" };
-  }, [user, analysisLoaded, analysisWorkout, latestActivityDate, generated, isZh]);
+  }, [user, analysisLoaded, analysisWorkout, latestActivityDate, generated, isZh, simple]);
 
   // Auto-translate cached suggestion when language changes if target lang is missing.
   useEffect(() => {
@@ -351,6 +355,7 @@ const SuggestedNextWorkout = ({ lang, latestActivityId, latestActivityDate }: Pr
           workoutType,
           workoutTypeLabel: WORKOUT_TYPE_LABELS[workoutType].en,
           weather,
+          simple,
         },
       });
       if (error) throw error;
@@ -365,6 +370,7 @@ const SuggestedNextWorkout = ({ lang, latestActivityId, latestActivityDate }: Pr
         generatedAt: new Date().toISOString(),
         basisActivityDate: latestActivityDate,
         workoutType,
+        simple,
         cacheVersion: GENERATED_SUGGESTION_CACHE_VERSION,
       };
       writeCachedGenerated(user.id, cached);

@@ -1132,11 +1132,7 @@ FORMAT — strictly use two sections separated by ===NEXT_WORKOUT===:
 1-2 short sentences with a simple takeaway (rest more, hydrate, keep it steady, etc.).
 
 ===NEXT_WORKOUT===
-## Suggested Next Run
-- **Type**: (Rest / Easy run / Steady push / Intervals)
-- **Distance**: X km
-- **Duration**: ~X minutes
-- **Tip**: one short sentence on why.`)
+Reply with **one** plain-English sentence telling the runner: what pace (X:XX/km), how many km, and when to run based on the weather (e.g. "early morning while it's cool", "after sunset to skip the heat", "wait until tomorrow when it's drier"). No headings, no bullets, no extra explanation.`)
       : (isZh
       ? `你是一位專業跑步教練 AI。根據訓練計劃、活動數據、天氣和跑者主觀感受，給出深入分析和明日訓練建議。回覆請用繁體中文。
 

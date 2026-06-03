@@ -1415,6 +1415,33 @@ export type Database = {
           },
         ]
       }
+      terra_inactivity_notifications: {
+        Row: {
+          created_at: string
+          days_inactive: number
+          id: string
+          provider: string
+          sent_on: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          days_inactive: number
+          id?: string
+          provider: string
+          sent_on: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          days_inactive?: number
+          id?: string
+          provider?: string
+          sent_on?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       terra_misc_payloads: {
         Row: {
           created_at: string | null

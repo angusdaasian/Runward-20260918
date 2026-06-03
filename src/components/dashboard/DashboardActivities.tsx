@@ -11,6 +11,7 @@ import TrendsCard from "@/components/activities/TrendsCard";
 import TrainingLoadChart from "@/components/activities/TrainingLoadChart";
 import DashboardMonthlyChallenge from "./DashboardMonthlyChallenge";
 import DashboardActivityDetail from "./DashboardActivityDetail";
+import { useSimpleMode } from "@/hooks/use-simple-mode";
 
 interface Props {
   lang: Lang;

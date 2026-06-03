@@ -17,6 +17,7 @@ import { useActivities, type StravaActivity } from "@/hooks/use-activities";
 import type { Lang } from "@/lib/i18n";
 import DashboardMonthlyChallenge from "./DashboardMonthlyChallenge";
 import DashboardActivityDetail from "./DashboardActivityDetail";
+import { useSimpleMode } from "@/hooks/use-simple-mode";
 
 type Props = {
   lang: Lang;

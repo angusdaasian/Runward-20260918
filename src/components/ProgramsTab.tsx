@@ -504,10 +504,11 @@ const ProgramsTab = ({ lang, onLoginRequest }: Props) => {
             {lang === "zh" ? "登入 / 註冊" : "Sign In / Sign Up"}
           </Button>
         ) : (
-          <p className="text-xs text-muted-foreground">
-            {lang === "zh" ? "前往「更多」分頁升級" : "Go to the More tab to upgrade"}
-          </p>
+          <Button onClick={() => setShowPlanCompare(true)}>
+            {lang === "zh" ? "升級至高級版" : "Upgrade to Premium"}
+          </Button>
         )}
+        <PlanComparisonDialog open={showPlanCompare} onOpenChange={setShowPlanCompare} lang={lang} />
       </div>
     );
   }

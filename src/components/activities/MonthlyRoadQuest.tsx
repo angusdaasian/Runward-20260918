@@ -92,20 +92,20 @@ const MonthlyRoadQuest = ({ lang, activities, plannedWorkouts }: Props) => {
   return (
     <div className="bg-card border border-border rounded-xl p-4 mb-4">
       {/* Header */}
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
+      <div className="mb-3">
+        <div className="flex items-center gap-2 mb-2">
           <span className="text-lg">🏃</span>
           <h3 className="font-display font-bold text-foreground text-sm">
             {lang === "zh" ? "每月挑戰" : "Monthly Challenge"}
           </h3>
         </div>
-        {/* Goal toggle */}
-        <div className="flex bg-muted rounded-lg p-0.5">
+        {/* Goal toggle — on its own line */}
+        <div className="flex bg-muted rounded-lg p-0.5 w-full">
           {GOAL_OPTIONS.map((g) => (
             <button
               key={g}
               onClick={() => handleGoalChange(g)}
-              className={`px-2 py-0.5 rounded-md text-[10px] font-semibold transition-colors ${
+              className={`flex-1 px-2 py-1 rounded-md text-[11px] font-semibold transition-colors ${
                 goalKm === g
                   ? "bg-primary text-primary-foreground"
                   : "text-muted-foreground hover:text-foreground"

@@ -150,9 +150,15 @@
   height: 22px;
 }
 
-html[data-text-scale="lg"] .truncate,
-html[data-text-scale="xl"] .truncate {
-  overflow: visible;
-  white-space: normal;
-  word-break: break-word;
+/* Text-size scaling is scoped to dropdown / popover content only.
+   The app header and main layout stay at their default size. */
+html[data-text-scale="lg"] [data-radix-popper-content-wrapper] {
+  font-size: 17px;
+}
+html[data-text-scale="xl"] [data-radix-popper-content-wrapper] {
+  font-size: 19px;
+}
+html[data-text-scale="lg"] [data-radix-popper-content-wrapper] .text-\[11px\],
+html[data-text-scale="xl"] [data-radix-popper-content-wrapper] .text-\[11px\] {
+  font-size: 0.85em;
 }

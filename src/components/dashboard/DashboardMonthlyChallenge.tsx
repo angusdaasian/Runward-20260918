@@ -103,22 +103,21 @@ export default function DashboardMonthlyChallenge({ lang, activities, plannedWor
         <div className="absolute -top-12 -right-12 w-64 h-64 rounded-full bg-primary blur-3xl" />
       </div>
 
-      <div className="relative flex items-start justify-between gap-4 mb-4">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <Trophy className="h-4 w-4 text-amber-500" />
-            <h3 className="font-display font-bold text-base">
-              {zh ? "每月挑戰" : "Monthly Challenge"}
-            </h3>
-          </div>
-          <p className="text-xs text-muted-foreground">{monthLabel}</p>
+      <div className="relative mb-4">
+        <div className="flex items-center gap-2 mb-1">
+          <Trophy className="h-4 w-4 text-amber-500" />
+          <h3 className="font-display font-bold text-base">
+            {zh ? "每月挑戰" : "Monthly Challenge"}
+          </h3>
         </div>
-        <div className="flex bg-muted rounded-lg p-0.5">
+        <p className="text-xs text-muted-foreground mb-3">{monthLabel}</p>
+        {/* Goal toggle — on its own line so it never crowds the title */}
+        <div className="flex bg-muted rounded-lg p-0.5 w-full">
           {GOAL_OPTIONS.map((g) => (
             <button
               key={g}
               onClick={() => handleGoalChange(g)}
-              className={`px-2 py-1 rounded-md text-[11px] font-semibold transition-colors ${
+              className={`flex-1 px-2 py-1 rounded-md text-[11px] font-semibold transition-colors ${
                 goalKm === g
                   ? "bg-primary text-primary-foreground"
                   : "text-muted-foreground hover:text-foreground"

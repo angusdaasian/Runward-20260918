@@ -355,6 +355,7 @@ const SuggestedNextWorkout = ({ lang, latestActivityId, latestActivityDate }: Pr
           workoutType,
           workoutTypeLabel: WORKOUT_TYPE_LABELS[workoutType].en,
           weather,
+          simple,
         },
       });
       if (error) throw error;
@@ -369,6 +370,7 @@ const SuggestedNextWorkout = ({ lang, latestActivityId, latestActivityDate }: Pr
         generatedAt: new Date().toISOString(),
         basisActivityDate: latestActivityDate,
         workoutType,
+        simple,
         cacheVersion: GENERATED_SUGGESTION_CACHE_VERSION,
       };
       writeCachedGenerated(user.id, cached);

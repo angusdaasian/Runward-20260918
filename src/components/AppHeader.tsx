@@ -293,6 +293,30 @@ const AppHeader = ({ lang, onNavigateSettings, onOpenPromoBanner, isGuest }: App
           </PopoverTrigger>
           <PopoverContent align="end" className="w-64 p-2">
             <div className="flex flex-col">
+              {/* Simple Mode toggle — first item */}
+              <button
+                onClick={() => setSimpleMode(!simpleMode)}
+                aria-pressed={simpleMode}
+                className="flex items-center gap-3 px-2 py-1.5 rounded-md hover:bg-muted/60 transition-colors text-left active:scale-[0.98] w-full"
+              >
+                <span className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${simpleMode ? "bg-primary text-primary-foreground" : "bg-muted text-foreground"}`}>
+                  <Sparkles size={18} />
+                </span>
+                <div className="flex flex-col flex-1">
+                  <span className="text-sm font-medium text-foreground leading-tight">
+                    {lang === "zh" ? "簡易模式" : "Simple Mode"}
+                  </span>
+                  <span className="text-[11px] text-muted-foreground leading-tight">
+                    {simpleMode
+                      ? (lang === "zh" ? "已開啟 — 精簡介面" : "On — streamlined UI")
+                      : (lang === "zh" ? "關閉 — 顯示全部功能" : "Off — show all features")}
+                  </span>
+                </div>
+                <span className={`inline-flex items-center w-9 h-5 rounded-full transition-colors ${simpleMode ? "bg-primary" : "bg-muted"}`}>
+                  <span className={`block w-4 h-4 rounded-full bg-background shadow transition-transform ${simpleMode ? "translate-x-[18px]" : "translate-x-[2px]"}`} />
+                </span>
+              </button>
+
               {/* Weather — authenticated users only */}
               {!isGuest && user && (
                 <Popover>

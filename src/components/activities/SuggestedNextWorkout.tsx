@@ -106,6 +106,7 @@ const SuggestedNextWorkout = ({ lang, latestActivityId, latestActivityDate }: Pr
   const { user } = useAuth();
   const { isPremium } = usePremium();
   const isZh = lang === "zh";
+  const [simple] = useSimpleMode();
 
   const [analysisWorkout, setAnalysisWorkout] = useState<string | null>(null);
   const [analysisLoaded, setAnalysisLoaded] = useState(false);

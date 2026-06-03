@@ -139,3 +139,20 @@
     transform-origin: center bottom;
   }
 }
+
+/* Text-size scaling: keep bottom nav fixed so layout/safe-area math is stable. */
+.bottom-nav,
+.bottom-nav * {
+  font-size: 11px;
+}
+.bottom-nav svg {
+  width: 22px;
+  height: 22px;
+}
+
+html[data-text-scale="lg"] .truncate,
+html[data-text-scale="xl"] .truncate {
+  overflow: visible;
+  white-space: normal;
+  word-break: break-word;
+}

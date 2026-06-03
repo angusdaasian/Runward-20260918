@@ -49,6 +49,16 @@
 </head>
 
   <body>
+    <script>
+      (function () {
+        try {
+          var v = localStorage.getItem('text_scale');
+          var map = { default: '16px', lg: '18px', xl: '20px' };
+          document.documentElement.style.fontSize = map[v] || '16px';
+          document.documentElement.dataset.textScale = v || 'default';
+        } catch (e) {}
+      })();
+    </script>
     <div id="root"></div>
     <!-- Despia native bridge (exposes window.despia for oauth://, iap://, etc.) -->
     <script src="https://cdn.jsdelivr.net/npm/despia-native/index.min.js"></script>

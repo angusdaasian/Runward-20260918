@@ -275,7 +275,8 @@ const SuggestedNextWorkout = ({ lang, latestActivityId, latestActivityDate }: Pr
         (latestActivityDate &&
           generated.basisActivityDate &&
           Math.abs(new Date(latestActivityDate).getTime() - new Date(generated.basisActivityDate).getTime()) < 1000);
-      if (sameBasis) {
+      const sameSimple = (!!generated.simple) === simple;
+      if (sameBasis && sameSimple) {
         const text = (isZh ? generated.suggestion_zh : generated.suggestion_en) || generated.suggestion;
         return { kind: "generated", text };
       }

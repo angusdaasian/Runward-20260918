@@ -1629,9 +1629,17 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
         {!isPremium ? (
           <div className="text-center py-6">
             <Lock size={24} className="mx-auto text-muted-foreground mb-2" />
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-muted-foreground mb-3">
               {lang === "zh" ? "升級 Premium 以解鎖 AI 訓練分析" : "Upgrade to Premium to unlock AI Workout Analysis"}
             </p>
+            <button
+              onClick={() => setShowPlanCompare(true)}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity"
+            >
+              <Sparkles size={14} />
+              {lang === "zh" ? "升級至高級版" : "Upgrade to Premium"}
+            </button>
+            <PlanComparisonDialog open={showPlanCompare} onOpenChange={setShowPlanCompare} lang={lang} />
           </div>
         ) : needsRpe && !rpeSubmitted && !aiAnalysis ? (
           simpleMode ? (

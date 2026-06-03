@@ -1,0 +1,1 @@
+ALTER TABLE public.training_plans ALTER COLUMN race_date DROP NOT NULL;

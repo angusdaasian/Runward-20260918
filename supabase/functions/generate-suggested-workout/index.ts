@@ -378,7 +378,11 @@ serve(async (req) => {
       context += `\nUse this weather to recommend the BEST TIME OF DAY to run today (a specific hour or short window), considering temperature, humidity, rain chance, UV, wind, and daylight. If conditions are dangerous (heavy rain/thunderstorm/extreme heat), advise indoor/treadmill or postponing.\n`;
     }
 
-    const systemPrompt = isZh
+    const systemPrompt = simple
+      ? (isZh
+        ? `你是專業跑步教練 AI。根據跑者最近表現、今日天氣，給出**一句**極簡訓練建議。只說：建議距離（公里）+ 配速 + 今日最佳跑步時段（根據天氣）。**只輸出一句句子**，不要 Markdown、不要列表、不要標題、不要理由說明。例子：「今日建議 5 公里、配速約 6:00 /km，傍晚 6 點左右天氣較涼最適合。」`
+        : `You are a professional running coach AI. Based on the runner's recent runs and today's weather, give a **single concise sentence** of advice. Only state: distance (km) + pace + best time today to run (based on weather). **Output ONE sentence only** — no Markdown, no bullets, no headings, no rationale. Example: "Run 5 km today at ~6:00 /km, ideally around 6pm when it's coolest."`)
+      : (isZh
       ? `你是專業跑步教練 AI。根據跑者的訓練計劃（最高優先級）、最近七天表現、他們今天指定的訓練類型，以及今日天氣，給出**今日**具體訓練建議（不是明日）。回覆繁體中文 Markdown。
 
 優先順序：
@@ -416,7 +420,7 @@ Format:
 - **Duration**: ~X min
 - **Warm-up / Cool-down**: short note
 - **Best time to run**: around HH:MM today (1 short reason citing weather, e.g. "cooler temps, lower humidity"; if weather is hazardous, recommend indoor/treadmill or postponing)
-- **Why**: 1-2 sentences (tie back to plan or recent recovery)`;
+- **Why**: 1-2 sentences (tie back to plan or recent recovery)`);
 
     const aiResp = await callVertexAI({
       apiKey: VERTEX_API_KEY,

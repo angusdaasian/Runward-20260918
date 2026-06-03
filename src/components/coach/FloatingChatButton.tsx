@@ -3,7 +3,7 @@ import { MessageCircle, X, Lock } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePremium } from "@/contexts/PremiumContext";
 import ChatModal from "./ChatModal";
-import UpgradeModal from "./UpgradeModal";
+import PlanComparisonDialog from "@/components/PlanComparisonDialog";
 
 interface Props {
   lang: "en" | "zh";

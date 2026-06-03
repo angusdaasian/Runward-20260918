@@ -423,9 +423,10 @@ serve(async (req) => {
         console.warn("[fitness] profile/activities fetch failed", e);
       }
 
-      const fitnessWeeks = Math.max(4, Math.min(12, Number(weeks) || 8));
+      const fitnessWeeks = Math.max(2, Math.min(8, Number(weeks) || 4));
       const fitDaysPerWeek = Math.max(2, Math.min(7, Number(daysPerWeek) || 3));
-      const fitPrompt = `Create a ${fitnessWeeks}-week ONGOING CASUAL FITNESS running plan (no race goal).
+      const fitPrompt = `Create a ${fitnessWeeks}-week rolling block of an ONGOING CASUAL FITNESS running plan with NO END DATE and NO RACE GOAL.
+The plan is open-ended — the runner will regenerate to extend it. Do not taper, do not peak, do not reference any race. Ignore any race calendar entirely.
 The runner wants to maintain and gradually improve fitness with relaxed, sustainable training.
 
 Runner data:

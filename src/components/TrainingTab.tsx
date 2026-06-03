@@ -1885,10 +1885,11 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
         priority: r.priority || "none",
       }));
 
-      // For fitness mode, default to today as start and 8 weeks
+      // For fitness mode, default to today as start. Plan is ONGOING (no end date) —
+      // we generate a rolling 4-week block that the user can regenerate to extend.
       const todayIso = new Date().toISOString().split("T")[0];
       const fitnessStart = isFitness ? todayIso : startDate;
-      const fitnessWeeks = isFitness ? 8 : weeksUntilRace;
+      const fitnessWeeks = isFitness ? 4 : weeksUntilRace;
       const effectiveGoal = isFitness ? "fitness" : goal;
 
       const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-program`;
@@ -1915,7 +1916,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
         const lastDayDate = (planData[planData.length - 1]?.days?.slice(-1)?.[0]?.date) || fitnessStart;
         const inserted: any = {
           user_id: user.id, goal: effectiveGoal || "race", distance, target_time: isFitness ? "" : targetTime,
-          race_date: isFitness ? lastDayDate : raceDate, weeks: fitnessWeeks, plan_data: planData, raw_output: result.raw || "",
+          race_date: isFitness ? null : raceDate, weeks: fitnessWeeks, plan_data: planData, raw_output: result.raw || "",
           race_schedule: snapshot,
         };
         const { data: saved } = await (supabase.from("training_plans" as any) as any).insert(inserted).select().single();
@@ -3115,26 +3116,28 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                             onRegenerate={handleRegeneratePlan}
                             regenerating={regeneratingTime}
                           />
-                          <RaceSchedulePanel
-                            lang={lang}
-                            races={savedSnap as any}
-                            currentRaces={currentSnap as any}
-                            racesDrift={racesDrift}
-                            regenerating={regeneratingTime}
-                            onUpdateRacePriority={async (raceId, priority) => {
-                              if (!user) return;
-                              await (supabase.from("user_races" as any) as any).update({ priority }).eq("id", raceId).eq("user_id", user.id);
-                              await queryClient.invalidateQueries({ queryKey: ["user-races"] });
-                              await handleRegeneratePlan({});
-                            }}
-                            onRemoveRace={async (raceId) => {
-                              if (!user) return;
-                              await supabase.from("user_races" as any).delete().eq("id", raceId).eq("user_id", user.id);
-                              await queryClient.invalidateQueries({ queryKey: ["user-races"] });
-                              await handleRegeneratePlan({});
-                            }}
-                            onRegenerateForRaces={() => handleRegeneratePlan({})}
-                           />
+                          {existingPlan.goal !== "fitness" && existingPlan.distance !== "FT" && (
+                            <RaceSchedulePanel
+                              lang={lang}
+                              races={savedSnap as any}
+                              currentRaces={currentSnap as any}
+                              racesDrift={racesDrift}
+                              regenerating={regeneratingTime}
+                              onUpdateRacePriority={async (raceId, priority) => {
+                                if (!user) return;
+                                await (supabase.from("user_races" as any) as any).update({ priority }).eq("id", raceId).eq("user_id", user.id);
+                                await queryClient.invalidateQueries({ queryKey: ["user-races"] });
+                                await handleRegeneratePlan({});
+                              }}
+                              onRemoveRace={async (raceId) => {
+                                if (!user) return;
+                                await supabase.from("user_races" as any).delete().eq("id", raceId).eq("user_id", user.id);
+                                await queryClient.invalidateQueries({ queryKey: ["user-races"] });
+                                await handleRegeneratePlan({});
+                              }}
+                              onRegenerateForRaces={() => handleRegeneratePlan({})}
+                            />
+                          )}
                            {!simpleMode && (
                            <Button
                              variant="outline"

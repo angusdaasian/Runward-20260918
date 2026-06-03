@@ -3138,6 +3138,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                               onRegenerateForRaces={() => handleRegeneratePlan({})}
                             />
                           )}
+                           {!simpleMode && (
                            <Button
                              variant="outline"
                              className="w-full mb-4 border-primary/30 text-primary hover:bg-primary/10"

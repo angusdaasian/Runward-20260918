@@ -140,28 +140,43 @@
   }
 }
 
-/* Text-size scaling: the html root font-size is what scales the app.
-   Lock the header so it stays the same size regardless of the user's choice.
-   Everything else (content + bottom nav + dropdowns) scales naturally. */
+/* Text-size scaling: the html root font-size scales content, footer, and
+   popover/dropdown text. The visible header is pinned in px so the avatar,
+   name, rank, action buttons, and EXP bar never grow with the root rem size. */
 .app-header-fixed {
   font-size: 16px;
 }
-.app-header-fixed h1,
-.app-header-fixed h2,
-.app-header-fixed h3,
-.app-header-fixed span,
-.app-header-fixed p,
-.app-header-fixed button,
-.app-header-fixed a,
-.app-header-fixed div {
-  font-size: revert;
+
+.app-header-fixed.max-w-lg { max-width: 512px !important; }
+.app-header-fixed.px-5 {
+  padding-left: 20px !important;
+  padding-right: 20px !important;
 }
-/* Re-pin Tailwind text-* utilities inside the header to fixed px so the
-   rem-based classes can't grow with the root. */
+.app-header-fixed.pt-4 { padding-top: 16px !important; }
+.app-header-fixed.pb-2 { padding-bottom: 8px !important; }
+
+.app-header-fixed .gap-1\.5 { gap: 6px !important; }
+.app-header-fixed .gap-2 { gap: 8px !important; }
+.app-header-fixed .gap-3 { gap: 12px !important; }
+.app-header-fixed .mt-0\.5 { margin-top: 2px !important; }
+
+.app-header-fixed .w-4 { width: 16px !important; }
+.app-header-fixed .h-4 { height: 16px !important; }
+.app-header-fixed .w-5 { width: 20px !important; }
+.app-header-fixed .h-5 { height: 20px !important; }
+.app-header-fixed .w-10 { width: 40px !important; }
+.app-header-fixed .h-10 { height: 40px !important; }
+.app-header-fixed .w-12 { width: 48px !important; }
+.app-header-fixed .h-12 { height: 48px !important; }
+.app-header-fixed .w-16 { width: 64px !important; }
+.app-header-fixed .h-1\.5 { height: 6px !important; }
+.app-header-fixed .w-24 { width: 96px !important; }
+
+.app-header-fixed .leading-tight { line-height: 1.25 !important; }
 .app-header-fixed .text-\[10px\] { font-size: 10px !important; }
 .app-header-fixed .text-\[11px\] { font-size: 11px !important; }
-.app-header-fixed .text-xs   { font-size: 12px !important; }
-.app-header-fixed .text-sm   { font-size: 14px !important; }
-.app-header-fixed .text-base { font-size: 16px !important; }
-.app-header-fixed .text-lg   { font-size: 18px !important; }
+.app-header-fixed .text-xs { font-size: 12px !important; line-height: 16px !important; }
+.app-header-fixed .text-sm { font-size: 14px !important; line-height: 20px !important; }
+.app-header-fixed .text-base { font-size: 16px !important; line-height: 24px !important; }
+.app-header-fixed .text-lg { font-size: 18px !important; line-height: 28px !important; }
 

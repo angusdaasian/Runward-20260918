@@ -49,3 +49,10 @@ verify_jwt = false
 [functions.terra-admin-deauth]
 verify_jwt = false
 
+[functions.suunto-callback]
+verify_jwt = false
+
+[functions.suunto-auth]
+verify_jwt = false
+
+

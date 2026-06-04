@@ -72,24 +72,38 @@ const SuuntoSyncTester = () => {
     return () => window.removeEventListener("message", onMessage);
   }, []);
 
-  const handleConnect = async () => {
-    // Match the Terra ConnectApps pattern: get the auth URL, then open it in
-    // a new tab. No `noopener` because we rely on window.opener.postMessage
-    // from the returned /admin?code=... page to complete the exchange.
-    setBusy("connect");
-    try {
-      const redirect_uri = `${window.location.origin}/admin`;
-      const { data, error } = await supabase.functions.invoke("suunto-auth", {
-        body: { redirect_uri },
-      });
-      if (error || !(data as any)?.url) {
-        throw new Error((data as any)?.error || error?.message || "Auth init failed");
-      }
-      window.open((data as any).url as string, "_blank");
-    } catch (e: any) {
-      toast.error(e?.message || "Failed to start Suunto auth");
-      setBusy(null);
+  const handleConnect = () => {
+    // Open the tab SYNCHRONOUSLY inside the click handler so browsers don't
+    // block it, then navigate it once the auth URL comes back.
+    const tab = window.open("about:blank", "_blank");
+    if (!tab) {
+      toast.error("Popup blocked — please allow popups for this site and try again.");
+      return;
     }
+    try {
+      tab.document.write(
+        "<title>Connecting to Suunto…</title><body style=\"font-family:system-ui;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;color:#555\">Connecting to Suunto…</body>",
+      );
+    } catch (_) { /* ignore */ }
+
+    setBusy("connect");
+    (async () => {
+      try {
+        const redirect_uri = `${window.location.origin}/admin`;
+        const { data, error } = await supabase.functions.invoke("suunto-auth", {
+          body: { redirect_uri },
+        });
+        if (error || !(data as any)?.url) {
+          throw new Error((data as any)?.error || error?.message || "Auth init failed");
+        }
+        if (tab.closed) { setBusy(null); return; }
+        tab.location.href = (data as any).url as string;
+      } catch (e: any) {
+        try { tab.close(); } catch (_) { /* ignore */ }
+        toast.error(e?.message || "Failed to start Suunto auth");
+        setBusy(null);
+      }
+    })();
   };
 
 

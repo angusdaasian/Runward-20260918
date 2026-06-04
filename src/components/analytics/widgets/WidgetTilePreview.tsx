@@ -100,7 +100,7 @@ const Tile = ({ id, lang, onOpen }: Props) => {
           subtitle={zh(lang) ? "最新" : "Latest"}
           icon={<HeartPulse size={16} className="text-rose-500" />}
           onClick={onOpen}
-          locked={hrZonesLocked}
+          readonly
           lang={lang}
         >
           <Big value={rhr != null ? String(rhr) : "—"} unit="bpm" sub={rhr == null ? (zh(lang) ? "尚無資料" : "No data") : undefined} />
@@ -109,17 +109,31 @@ const Tile = ({ id, lang, onOpen }: Props) => {
     }
     case "sleep_last_night": {
       const s = latestOf("sleep_seconds") as number | null;
-      const score = latestOf("sleep_score") as number | null;
       return (
         <WidgetTile
           title={zh(lang) ? "睡眠" : "Sleep"}
           subtitle={zh(lang) ? "昨晚" : "Last night"}
           icon={<Moon size={16} className="text-indigo-400" />}
           onClick={onOpen}
-          locked={hrZonesLocked}
+          readonly
           lang={lang}
         >
-          <Big value={fmtSleep(s) ?? "—"} sub={score != null ? `${zh(lang) ? "分數" : "Score"} ${score}` : (zh(lang) ? "尚無資料" : "No data")} />
+          <Big value={fmtSleep(s) ?? "—"} sub={s == null ? (zh(lang) ? "尚無資料" : "No data") : undefined} />
+        </WidgetTile>
+      );
+    }
+    case "sleep_score": {
+      const score = latestOf("sleep_score") as number | null;
+      return (
+        <WidgetTile
+          title={zh(lang) ? "睡眠分數" : "Sleep Score"}
+          subtitle={zh(lang) ? "昨晚" : "Last night"}
+          icon={<Moon size={16} className="text-indigo-400" />}
+          onClick={onOpen}
+          readonly
+          lang={lang}
+        >
+          <Big value={score != null ? String(score) : "—"} sub={score == null ? (zh(lang) ? "尚無資料" : "No data") : undefined} />
         </WidgetTile>
       );
     }
@@ -132,7 +146,7 @@ const Tile = ({ id, lang, onOpen }: Props) => {
           subtitle={zh(lang) ? "今日" : "Today"}
           icon={<Footprints size={16} className="text-sky-500" />}
           onClick={onOpen}
-          locked={hrZonesLocked}
+          readonly
           lang={lang}
         >
           <Big value={steps != null ? steps.toLocaleString() : "—"} sub={steps == null ? (zh(lang) ? "尚無資料" : "No data") : undefined} />
@@ -150,7 +164,7 @@ const Tile = ({ id, lang, onOpen }: Props) => {
           subtitle={zh(lang) ? "今日活動" : "Today's activities"}
           icon={<Flame size={16} className="text-orange-500" />}
           onClick={onOpen}
-          locked={hrZonesLocked}
+          readonly
           lang={lang}
         >
           <Big value={cal > 0 ? Math.round(cal).toLocaleString() : "—"} unit="kcal" sub={cal === 0 ? (zh(lang) ? "尚無活動" : "No activity yet") : undefined} />

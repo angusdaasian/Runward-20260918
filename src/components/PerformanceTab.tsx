@@ -65,7 +65,8 @@ const PerformanceTab = ({ lang }: Props) => {
   }
 
   return (
-    <div className="px-5 pt-2 pb-4">
+    <div className="pt-2 pb-4">
+
       {/* All charts free for everyone */}
       <ActivityYearHeatmap lang={lang} activities={loadActivities} />
 

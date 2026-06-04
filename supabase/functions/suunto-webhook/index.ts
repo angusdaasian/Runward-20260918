@@ -88,6 +88,7 @@ serve(async (req) => {
         .from('suunto_activities')
         .upsert(workoutRow(conn.user_id, w), { onConflict: 'suunto_workout_key' });
       console.log('[suunto-webhook] saved workout', w.workoutKey, 'for', conn.user_id);
+      await sendActivityUploadedNotification(supabase, conn.user_id, `suunto:${w.workoutKey}`);
     }
   } catch (err) {
     console.error('[suunto-webhook] error:', err);

@@ -1,13 +1,30 @@
-import { useState, lazy, Suspense } from "react";
-import { ScanEye, LineChart } from "lucide-react";
+import { useEffect, useMemo, useState, lazy, Suspense } from "react";
+import { ScanEye, LineChart, Pencil, Loader2 } from "lucide-react";
 import { Lang } from "@/lib/i18n";
 import { PostureSkeleton } from "@/components/ui/PageSkeleton";
+import { useAuth } from "@/contexts/AuthContext";
+import { useActivities } from "@/hooks/use-activities";
+import {
+  AnalyticsWidgetPrefs,
+  DEFAULT_PREFS,
+  WidgetId,
+  loadPrefs,
+  savePrefs,
+} from "@/lib/analyticsWidgets";
+import WidgetTilePreview from "@/components/analytics/widgets/WidgetTilePreview";
+import WidgetDetailDialog from "@/components/analytics/WidgetDetailDialog";
+import CustomizeWidgetsDialog from "@/components/analytics/CustomizeWidgetsDialog";
+
 import HealthStatsCard from "@/components/analytics/HealthStatsCard";
 import HRVReadinessCard from "@/components/analytics/HRVReadinessCard";
-
+import HrZonesWeekCard from "@/components/analytics/HrZonesWeekCard";
+import RacePredictorCard from "@/components/analytics/RacePredictorCard";
+import TrainingLoadChart from "@/components/activities/TrainingLoadChart";
+import TrendsCard from "@/components/activities/TrendsCard";
+import ActivityYearHeatmap from "@/components/activities/ActivityYearHeatmap";
+import { useTerraDailyHealth } from "@/hooks/use-terra-daily-health";
 
 const PostureTab = lazy(() => import("@/components/PostureTab"));
-const PerformanceTab = lazy(() => import("@/components/PerformanceTab"));
 
 interface Props {
   lang: Lang;
@@ -15,20 +32,126 @@ interface Props {
 
 type SubTab = "performance" | "posture";
 
+const widgetLabel = (id: WidgetId, lang: Lang): string => {
+  const zh = lang === "zh";
+  switch (id) {
+    case "hrv": return zh ? "HRV 與訓練準備度" : "HRV & Readiness";
+    case "health": return zh ? "每日健康" : "Daily Health";
+    case "hr_zones": return zh ? "心率區間" : "Heart rate zones";
+    case "race_predictor": return zh ? "比賽預測" : "Race predictor";
+    case "training_load": return zh ? "訓練負荷" : "Training load";
+    case "trends": return zh ? "趨勢" : "Trends";
+    case "year_heatmap": return zh ? "年度熱力圖" : "Year heatmap";
+    case "steps_today": return zh ? "步數 (今日)" : "Steps (today)";
+    case "calories_today": return zh ? "卡路里 (今日)" : "Calories (today)";
+    case "sleep_last_night": return zh ? "睡眠 (昨晚)" : "Sleep (last night)";
+    case "rhr": return zh ? "靜息心率" : "Resting HR";
+    case "duration_week": return zh ? "運動時數 (本週)" : "Duration (week)";
+  }
+};
+
 const AnalyticsTab = ({ lang }: Props) => {
+  const { user } = useAuth();
+  const { activities, profile } = useActivities();
+  const { data: terraHistory } = useTerraDailyHealth();
   const [sub, setSub] = useState<SubTab>(() => {
     return (sessionStorage.getItem("analytics_subtab") as SubTab) || "performance";
   });
-
   const setSubTab = (s: SubTab) => {
     sessionStorage.setItem("analytics_subtab", s);
     setSub(s);
   };
 
+  const [prefs, setPrefs] = useState<AnalyticsWidgetPrefs>(DEFAULT_PREFS);
+  const [prefsLoaded, setPrefsLoaded] = useState(false);
+  const [openWidget, setOpenWidget] = useState<WidgetId | null>(null);
+  const [customizing, setCustomizing] = useState(false);
+
+  useEffect(() => {
+    if (!user?.id) { setPrefsLoaded(true); return; }
+    let cancelled = false;
+    loadPrefs(user.id).then((p) => {
+      if (!cancelled) { setPrefs(p); setPrefsLoaded(true); }
+    });
+    return () => { cancelled = true; };
+  }, [user?.id]);
+
+  const handleSavePrefs = (next: AnalyticsWidgetPrefs) => {
+    setPrefs(next);
+    if (user?.id) void savePrefs(user.id, next);
+  };
+
+  const visibleWidgets = useMemo(
+    () => prefs.order.filter((id) => !prefs.hidden.includes(id)),
+    [prefs],
+  );
+
+  const labels = useMemo(() => {
+    const out: Record<WidgetId, string> = {} as any;
+    (["hrv","health","hr_zones","race_predictor","training_load","trends","year_heatmap","steps_today","calories_today","sleep_last_night","rhr","duration_week"] as WidgetId[]).forEach((id) => {
+      out[id] = widgetLabel(id, lang);
+    });
+    return out;
+  }, [lang]);
+
+  // Build details
+  const loadActivities = useMemo(
+    () =>
+      activities.map((a) => ({
+        start_date: a.start_date,
+        moving_time: a.moving_time,
+        average_heartrate: a.average_heartrate,
+        max_heartrate: a.max_heartrate,
+        sport_type: a.sport_type,
+        source: a.source,
+        garmin_training_load: (a as any).garmin_training_load ?? null,
+        distance: a.distance,
+        total_elevation_gain: a.total_elevation_gain,
+        average_speed: a.average_speed,
+      })),
+    [activities],
+  );
+
+  const renderDetail = (id: WidgetId) => {
+    switch (id) {
+      case "hrv":
+        return <HRVReadinessCard lang={lang} />;
+      case "health":
+      case "rhr":
+      case "sleep_last_night":
+      case "steps_today":
+        return <HealthStatsCard lang={lang} />;
+      case "hr_zones":
+        return <HrZonesWeekCard lang={lang} />;
+      case "race_predictor":
+        return <RacePredictorCard lang={lang} />;
+      case "training_load":
+        return (
+          <TrainingLoadChart
+            lang={lang}
+            activities={loadActivities}
+            profileAge={(profile as any)?.age ?? null}
+          />
+        );
+      case "trends":
+        return <TrendsCard lang={lang} activities={loadActivities} />;
+      case "year_heatmap":
+        return <ActivityYearHeatmap lang={lang} activities={loadActivities} />;
+      case "calories_today":
+      case "duration_week":
+        return (
+          <div className="text-sm text-muted-foreground">
+            {lang === "zh"
+              ? "請至『活動』分頁查看更多細節。"
+              : "Open the Activities tab for full details."}
+          </div>
+        );
+    }
+  };
+
   return (
     <div>
       <div className="px-5 pt-6 max-w-lg mx-auto">
-        {/* Sub-tab switcher (underline style) */}
         <div className="flex w-full border-b border-border mb-2">
           <button
             onClick={() => setSubTab("performance")}
@@ -56,14 +179,47 @@ const AnalyticsTab = ({ lang }: Props) => {
       </div>
 
       <div style={{ display: sub === "performance" ? "block" : "none" }}>
-        <div className="px-5 pt-4 max-w-lg mx-auto">
-          <HealthStatsCard lang={lang} />
-          <HRVReadinessCard lang={lang} />
+        <div className="px-4 pt-4 pb-8 max-w-lg mx-auto">
+          {!prefsLoaded ? (
+            <div className="flex justify-center py-12">
+              <Loader2 className="animate-spin text-muted-foreground" size={20} />
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 gap-3">
+                {visibleWidgets.map((id) => (
+                  <WidgetTilePreview key={id} id={id} lang={lang} onOpen={() => setOpenWidget(id)} />
+                ))}
+              </div>
+              <button
+                onClick={() => setCustomizing(true)}
+                className="mt-6 w-full flex items-center justify-center gap-2 py-3 text-sm font-semibold text-primary hover:bg-primary/5 rounded-lg transition-colors"
+              >
+                <Pencil size={14} />
+                {lang === "zh" ? "自訂儀表板" : "Customize dashboard"}
+              </button>
+            </>
+          )}
         </div>
-        <Suspense fallback={<div className="px-5 pt-4"><PostureSkeleton /></div>}>
-          <PerformanceTab lang={lang} />
-        </Suspense>
+
+        <WidgetDetailDialog
+          open={openWidget != null}
+          onOpenChange={(o) => !o && setOpenWidget(null)}
+          title={openWidget ? labels[openWidget] : ""}
+        >
+          {openWidget && renderDetail(openWidget)}
+        </WidgetDetailDialog>
+
+        <CustomizeWidgetsDialog
+          open={customizing}
+          onOpenChange={setCustomizing}
+          prefs={prefs}
+          onSave={handleSavePrefs}
+          lang={lang}
+          labels={labels}
+        />
       </div>
+
       <div style={{ display: sub === "posture" ? "block" : "none" }}>
         <Suspense fallback={<PostureSkeleton />}>
           <PostureTab lang={lang} />

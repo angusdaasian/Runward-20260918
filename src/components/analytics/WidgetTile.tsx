@@ -16,7 +16,7 @@ interface WidgetTileProps {
 /**
  * A single Suunto-style square widget tile. Click opens a detail dialog.
  */
-const WidgetTile = ({ title, subtitle, icon, onClick, children, accent }: WidgetTileProps) => {
+const WidgetTile = ({ title, subtitle, icon, onClick, children, accent, premiumOnly, lang }: WidgetTileProps) => {
   return (
     <button
       type="button"
@@ -35,6 +35,12 @@ const WidgetTile = ({ title, subtitle, icon, onClick, children, accent }: Widget
         </div>
         <div className="text-foreground">{children}</div>
         <ChevronRight size={14} className="absolute bottom-2 right-2 text-muted-foreground/40" />
+        {premiumOnly && (
+          <div className="absolute top-2 right-2 flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-warning/15 text-warning text-[9px] font-bold uppercase tracking-wide">
+            <Lock size={9} />
+            {lang === "zh" ? "Premium" : "Premium"}
+          </div>
+        )}
       </Card>
     </button>
   );

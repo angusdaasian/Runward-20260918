@@ -37,7 +37,7 @@ const PerformanceTab = ({ lang }: Props) => {
 
   if (!user) {
     return (
-      <div className="px-5 pt-6 max-w-lg mx-auto pb-4">
+      <div className="px-5 pt-6 pb-4">
         <p className="text-sm text-muted-foreground text-center py-12">
           {lang === "zh" ? "請先登入以查看表現分析" : "Sign in to view performance analytics"}
         </p>
@@ -51,7 +51,7 @@ const PerformanceTab = ({ lang }: Props) => {
 
   if (!hasActivities) {
     return (
-      <div className="px-5 pt-6 max-w-lg mx-auto pb-4">
+      <div className="px-5 pt-6 pb-4">
         <h2 className="font-display text-xl font-bold text-foreground mb-1">
           {lang === "zh" ? "表現分析" : "Performance"}
         </h2>
@@ -65,7 +65,7 @@ const PerformanceTab = ({ lang }: Props) => {
   }
 
   return (
-    <div className="px-5 pt-2 max-w-lg mx-auto pb-4">
+    <div className="px-5 pt-2 pb-4">
       {/* All charts free for everyone */}
       <ActivityYearHeatmap lang={lang} activities={loadActivities} />
 

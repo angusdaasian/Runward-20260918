@@ -34,6 +34,12 @@ export const ALL_WIDGETS: WidgetId[] = [
   "rhr",
 ];
 
+export const PREMIUM_WIDGETS: WidgetId[] = [
+  "hr_zones",
+  "race_predictor",
+  "training_load",
+];
+
 export const DEFAULT_PREFS: AnalyticsWidgetPrefs = {
   order: ALL_WIDGETS,
   hidden: ["year_heatmap"],

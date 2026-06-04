@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, lazy, Suspense } from "react";
-import { ScanEye, LineChart, Pencil, Loader2, MoveVertical } from "lucide-react";
+import { ScanEye, LineChart, Pencil, Loader2, MoveVertical, LayoutGrid, List } from "lucide-react";
 import ReorderableWidgetGrid from "@/components/analytics/ReorderableWidgetGrid";
 import { Lang } from "@/lib/i18n";
 import { PostureSkeleton } from "@/components/ui/PageSkeleton";
@@ -26,6 +26,7 @@ import ActivityYearHeatmap from "@/components/activities/ActivityYearHeatmap";
 import { useTerraDailyHealth } from "@/hooks/use-terra-daily-health";
 
 const PostureTab = lazy(() => import("@/components/PostureTab"));
+const PerformanceTab = lazy(() => import("@/components/PerformanceTab"));
 
 interface Props {
   lang: Lang;

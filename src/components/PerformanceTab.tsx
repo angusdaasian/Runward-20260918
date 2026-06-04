@@ -70,6 +70,10 @@ const PerformanceTab = ({ lang }: Props) => {
     <div className="pt-2 pb-4">
 
       {/* All charts free for everyone */}
+      <HealthStatsCard lang={lang} />
+
+      <HRVReadinessCard lang={lang} />
+
       <ActivityYearHeatmap lang={lang} activities={loadActivities} />
 
       <TrainingLoadChart

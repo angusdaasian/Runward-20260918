@@ -68,6 +68,14 @@ const AnalyticsTab = ({ lang }: Props) => {
   const [prefsLoaded, setPrefsLoaded] = useState(false);
   const [openWidget, setOpenWidget] = useState<WidgetId | null>(null);
   const [customizing, setCustomizing] = useState(false);
+  const [viewMode, setViewMode] = useState<"widgets" | "classic">(() => {
+    return (localStorage.getItem("analytics_view_mode") as "widgets" | "classic") || "widgets";
+  });
+  const toggleViewMode = () => {
+    const next = viewMode === "widgets" ? "classic" : "widgets";
+    localStorage.setItem("analytics_view_mode", next);
+    setViewMode(next);
+  };
 
   useEffect(() => {
     if (!user?.id) { setPrefsLoaded(true); return; }

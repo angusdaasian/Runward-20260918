@@ -37,13 +37,14 @@ const SuuntoSyncTester = () => {
     setBusy("connect");
     try {
       const native = isDespiaUA();
-      const redirectUrl = new URL(`${window.location.origin}/suunto-return`);
-      if (native) {
-        redirectUrl.searchParams.set("native", "true");
-        redirectUrl.searchParams.set("deeplink_scheme", "runward");
-      }
-      const redirect_uri = redirectUrl.toString();
+      // Suunto requires redirect_uri to EXACTLY match a registered value — keep it bare.
+      const redirect_uri = `${window.location.origin}/suunto-return`;
       localStorage.setItem(SUUNTO_PENDING_REDIRECT_KEY, redirect_uri);
+      if (native) {
+        localStorage.setItem("suunto_pending_native", "runward");
+      } else {
+        localStorage.removeItem("suunto_pending_native");
+      }
 
       const { data, error } = await supabase.functions.invoke("suunto-auth", {
         body: { redirect_uri },

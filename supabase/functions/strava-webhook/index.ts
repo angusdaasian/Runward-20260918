@@ -259,10 +259,7 @@ async function syncActivityById(
 
   if (!existing) {
     await awardActivityXP(supabase, userId, distance, movingTime, Math.round(trainingScore));
-    const km = distance / 1000;
-    const minutes = movingTime / 60;
-    const xpGained = Math.round(km * 20) + Math.round(minutes * 10) + Math.round(trainingScore * 5);
-    await sendActivityNotification(supabase, userId, distance, movingTime, xpGained, Math.round(trainingScore));
+    await sendActivityNotification(supabase, userId, `strava:${act.id}`);
   }
 }
 

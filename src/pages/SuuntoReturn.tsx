@@ -10,7 +10,7 @@ export default function SuuntoReturn() {
   const params = new URLSearchParams(window.location.search);
   const code = params.get("code") ?? "";
   const oauthError = params.get("error") ?? params.get("error_description") ?? "";
-  const deeplinkScheme = params.get("deeplink_scheme") ?? "";
+  const deeplinkScheme = params.get("deeplink_scheme") || localStorage.getItem("suunto_pending_native") || "";
   const isBounce = !!deeplinkScheme;
 
   useEffect(() => {
@@ -19,6 +19,7 @@ export default function SuuntoReturn() {
     if (code) forwarded.set("code", code);
     if (oauthError) forwarded.set("error", oauthError);
     const deepLink = `${deeplinkScheme}://oauth/suunto-return?${forwarded.toString()}`;
+    localStorage.removeItem("suunto_pending_native");
     const t = setTimeout(() => { window.location.href = deepLink; }, 200);
     return () => clearTimeout(t);
   }, [isBounce, deeplinkScheme, code, oauthError]);

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, lazy, Suspense } from "react";
-import { ScanEye, LineChart, Pencil, Loader2 } from "lucide-react";
+import { ScanEye, LineChart, Pencil, Loader2, MoveVertical } from "lucide-react";
+import ReorderableWidgetGrid from "@/components/analytics/ReorderableWidgetGrid";
 import { Lang } from "@/lib/i18n";
 import { PostureSkeleton } from "@/components/ui/PageSkeleton";
 import { useAuth } from "@/contexts/AuthContext";
@@ -186,11 +187,24 @@ const AnalyticsTab = ({ lang }: Props) => {
             </div>
           ) : (
             <>
-              <div className="grid grid-cols-2 gap-3">
-                {visibleWidgets.map((id) => (
-                  <WidgetTilePreview key={id} id={id} lang={lang} onOpen={() => setOpenWidget(id)} />
-                ))}
+              <div className="mb-3 flex items-center gap-2 px-1 text-[11px] text-muted-foreground">
+                <MoveVertical size={12} className="shrink-0" />
+                <span>
+                  {lang === "zh"
+                    ? "提示：長按小工具可拖曳重新排序"
+                    : "Tip: long-press a widget to drag and reorder"}
+                </span>
               </div>
+              <ReorderableWidgetGrid
+                order={visibleWidgets}
+                lang={lang}
+                onOpen={(id) => setOpenWidget(id)}
+                onReorder={(nextVisible) => {
+                  // Merge new visible order back with hidden widgets preserved at the end
+                  const hiddenInOrder = prefs.order.filter((id) => prefs.hidden.includes(id));
+                  handleSavePrefs({ order: [...nextVisible, ...hiddenInOrder], hidden: prefs.hidden });
+                }}
+              />
               <button
                 onClick={() => setCustomizing(true)}
                 className="mt-6 w-full flex items-center justify-center gap-2 py-3 text-sm font-semibold text-primary hover:bg-primary/5 rounded-lg transition-colors"
@@ -199,6 +213,7 @@ const AnalyticsTab = ({ lang }: Props) => {
                 {lang === "zh" ? "自訂儀表板" : "Customize dashboard"}
               </button>
             </>
+
           )}
         </div>
 

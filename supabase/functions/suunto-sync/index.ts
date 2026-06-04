@@ -16,6 +16,7 @@ serve(async (req) => {
     const ANON = Deno.env.get('SUPABASE_ANON_KEY')!;
     const clientId = Deno.env.get('SUUNTO_CLIENT_ID')!;
     const clientSecret = Deno.env.get('SUUNTO_CLIENT_SECRET')!;
+    const subKey = Deno.env.get('SUUNTO_SUBSCRIPTION_KEY') || clientId;
 
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {

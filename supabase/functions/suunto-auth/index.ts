@@ -26,7 +26,8 @@ serve(async (req) => {
     const url =
       `https://cloudapi-oauth.suunto.com/oauth/authorize?response_type=code` +
       `&client_id=${encodeURIComponent(clientId)}` +
-      `&redirect_uri=${encodeURIComponent(redirect_uri)}`;
+      `&redirect_uri=${encodeURIComponent(redirect_uri)}` +
+      `&scope=workout`;
 
     return new Response(JSON.stringify({ url }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

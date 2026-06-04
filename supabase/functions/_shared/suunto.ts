@@ -6,17 +6,21 @@ export const SUUNTO_API_BASE = 'https://cloudapi.suunto.com/v2';
 
 // Map Suunto activityId -> our sport_type label.
 // Reference: https://apizone.suunto.com/activitydefinitions
-const RUNNING_ACTIVITY_IDS = new Set([3, 4, 22, 46, 47, 49, 70]); // run / trail run / treadmill / orienteering
-const CYCLING_ACTIVITY_IDS = new Set([5, 6, 7, 22, 29, 39, 40]);
+// Reference: https://apizone.suunto.com/activitydefinitions
+// 1=Running, 2=Cycling, 3=MountainBiking... 11=Trekking, 12=Walking, 13=Trail running, 22=Treadmill running...
+const RUNNING_ACTIVITY_IDS = new Set([1, 13, 22, 46, 47, 49, 70]);
+const CYCLING_ACTIVITY_IDS = new Set([2, 3, 6, 7, 29, 39, 40]);
 const SWIMMING_ACTIVITY_IDS = new Set([15, 16, 32, 33]);
+const WALKING_ACTIVITY_IDS = new Set([12]);
+const HIKING_ACTIVITY_IDS = new Set([11]);
 
 export function mapSuuntoSport(activityId: number | null | undefined): string {
   if (activityId == null) return 'Run';
   if (RUNNING_ACTIVITY_IDS.has(activityId)) return 'Run';
   if (CYCLING_ACTIVITY_IDS.has(activityId)) return 'Ride';
   if (SWIMMING_ACTIVITY_IDS.has(activityId)) return 'Swim';
-  if (activityId === 1 || activityId === 11) return 'Walk';
-  if (activityId === 2) return 'Hike';
+  if (WALKING_ACTIVITY_IDS.has(activityId)) return 'Walk';
+  if (HIKING_ACTIVITY_IDS.has(activityId)) return 'Hike';
   return 'Workout';
 }
 
@@ -67,9 +71,12 @@ export type SuuntoWorkout = {
   totalAscent?: number; // meters
   maxSpeed?: number; // m/s
   averageSpeed?: number;
-  hrdata?: { avg?: number; max?: number };
+  avgSpeed?: number; // webhook payloads use avgSpeed
+  hrdata?: { avg?: number; max?: number; workoutAvgHR?: number; workoutMaxHR?: number };
   averageHeartRate?: number;
   maxHeartRate?: number;
+  energyConsumption?: number;
+  stepCount?: number;
   centerPosition?: { x: number; y: number };
 };
 
@@ -89,10 +96,10 @@ export function workoutRow(userId: string, w: SuuntoWorkout) {
     elapsed_time: duration,
     total_elevation_gain: w.totalAscent ?? null,
     start_date: startIso,
-    average_speed: w.averageSpeed ?? null,
+    average_speed: w.averageSpeed ?? w.avgSpeed ?? null,
     max_speed: w.maxSpeed ?? null,
-    average_heartrate: w.averageHeartRate ?? w.hrdata?.avg ?? null,
-    max_heartrate: w.maxHeartRate ?? w.hrdata?.max ?? null,
+    average_heartrate: w.averageHeartRate ?? w.hrdata?.avg ?? w.hrdata?.workoutAvgHR ?? null,
+    max_heartrate: w.maxHeartRate ?? w.hrdata?.max ?? w.hrdata?.workoutMaxHR ?? null,
     summary_polyline: null,
     environment: 'prod' as const,
   };

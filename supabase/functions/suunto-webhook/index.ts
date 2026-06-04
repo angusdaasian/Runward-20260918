@@ -7,6 +7,57 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+async function sendActivityUploadedNotification(supabase: any, userId: string, activityKey: string) {
+  try {
+    const { data: claim, error: claimErr } = await supabase
+      .from("activity_push_log")
+      .insert({ user_id: userId, activity_key: activityKey })
+      .select("id")
+      .maybeSingle();
+    if (claimErr || !claim) {
+      console.log(`[suunto-webhook] push already sent for ${userId} ${activityKey}, skipping`);
+      return;
+    }
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("activity_notifications")
+      .eq("user_id", userId)
+      .single();
+    if (!profile?.activity_notifications) return;
+
+    const onesignalAppId = Deno.env.get("ONESIGNAL_APP_ID");
+    const onesignalApiKey = Deno.env.get("ONESIGNAL_REST_API_KEY");
+    if (!onesignalAppId || !onesignalApiKey) return;
+
+    let lang: "zh" | "en" = "en";
+    try {
+      const { data } = await supabase.auth.admin.getUserById(userId);
+      const meta: any = (data?.user as any)?.user_metadata ?? {};
+      const raw = String(meta.lang ?? meta.language ?? meta.locale ?? "").toLowerCase();
+      if (raw.startsWith("zh")) lang = "zh";
+    } catch (_) { /* default en */ }
+
+    const title = lang === "zh" ? "新活動已同步" : "New activity synced";
+    const message = lang === "zh" ? "你的最新活動已上傳。" : "Your latest activity has been uploaded.";
+
+    await fetch("https://onesignal.com/api/v1/notifications", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Basic ${onesignalApiKey}`,
+      },
+      body: JSON.stringify({
+        app_id: onesignalAppId,
+        include_external_user_ids: [userId],
+        headings: { en: title },
+        contents: { en: message },
+      }),
+    });
+  } catch (e) {
+    console.error("[suunto-webhook] push notification failed", e);
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 

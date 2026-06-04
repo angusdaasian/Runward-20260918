@@ -11,13 +11,15 @@ interface WidgetTileProps {
   accent?: string; // tailwind ring/bg accent class
   premiumOnly?: boolean;
   locked?: boolean; // fully masked + non-clickable
+  readonly?: boolean; // non-clickable stat-only tile
   lang?: "en" | "zh";
 }
 
 /**
  * A single Suunto-style square widget tile. Click opens a detail dialog.
  */
-const WidgetTile = ({ title, subtitle, icon, onClick, children, accent, premiumOnly, locked, lang }: WidgetTileProps) => {
+const WidgetTile = ({ title, subtitle, icon, onClick, children, accent, premiumOnly, locked, readonly, lang }: WidgetTileProps) => {
+  const nonInteractive = locked || readonly;
   return (
     <button
       type="button"

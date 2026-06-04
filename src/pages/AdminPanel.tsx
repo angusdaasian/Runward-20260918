@@ -46,6 +46,7 @@ import RewardCodeManager from "@/components/admin/RewardCodeManager";
 import NotificationManager from "@/components/admin/NotificationManager";
 import TerraSyncTester from "@/components/admin/TerraSyncTester";
 import StravaAppsManager from "@/components/admin/StravaAppsManager";
+import SuuntoSyncTester from "@/components/admin/SuuntoSyncTester";
 
 interface UserRow {
   user_id: string;
@@ -71,7 +72,8 @@ type TabKey =
   | "pending"
   | "feedback"
   | "terra"
-  | "strava";
+  | "strava"
+  | "suunto";
 
 const TABS: { key: TabKey; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { key: "users", label: "Users", icon: Users },
@@ -84,6 +86,7 @@ const TABS: { key: TabKey; label: string; icon: React.ComponentType<{ className?
   { key: "feedback", label: "Feedback", icon: MessageSquare },
   { key: "terra", label: "Terra Sync", icon: RefreshCw },
   { key: "strava", label: "Strava Apps", icon: RefreshCw },
+  { key: "suunto", label: "Suunto Sync", icon: RefreshCw },
 ];
 
 
@@ -417,6 +420,8 @@ const AdminPanel = () => {
         return <TerraSyncTester />;
       case "strava":
         return <StravaAppsManager />;
+      case "suunto":
+        return <SuuntoSyncTester />;
     }
   };
 

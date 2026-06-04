@@ -152,12 +152,20 @@ async function awardActivityXP(supabase: any, userId: string, distanceMeters: nu
 async function sendActivityNotification(
   supabase: any,
   userId: string,
-  distanceMeters: number,
-  movingTimeSeconds: number,
-  xpGained: number,
-  trainingScore: number
+  activityKey: string,
 ) {
   try {
+    // Idempotency guard
+    const { data: claim, error: claimErr } = await supabase
+      .from("activity_push_log")
+      .insert({ user_id: userId, activity_key: activityKey })
+      .select("id")
+      .maybeSingle();
+    if (claimErr || !claim) {
+      console.log(`[strava-webhook] push already sent for ${userId} ${activityKey}, skipping`);
+      return;
+    }
+
     const { data: profile } = await supabase
       .from('profiles')
       .select('activity_notifications')
@@ -170,16 +178,18 @@ async function sendActivityNotification(
     const onesignalApiKey = Deno.env.get("ONESIGNAL_REST_API_KEY");
     if (!onesignalAppId || !onesignalApiKey) return;
 
-    const km = (distanceMeters / 1000).toFixed(2);
-    const totalMin = Math.floor(movingTimeSeconds / 60);
-    const hours = Math.floor(totalMin / 60);
-    const mins = totalMin % 60;
-    const secs = movingTimeSeconds % 60;
-    const timeStr = hours > 0
-      ? `${hours}h${String(mins).padStart(2, '0')}m${String(secs).padStart(2, '0')}s`
-      : `${mins}m${String(secs).padStart(2, '0')}s`;
+    let lang: "zh" | "en" = "en";
+    try {
+      const { data } = await supabase.auth.admin.getUserById(userId);
+      const meta: any = (data?.user as any)?.user_metadata ?? {};
+      const raw = String(meta.lang ?? meta.language ?? meta.locale ?? "").toLowerCase();
+      if (raw.startsWith("zh")) lang = "zh";
+    } catch (_) { /* default en */ }
 
-    const message = `You ran ${km}km in ${timeStr}. You earned ${xpGained} XP! Your Training Score: ${trainingScore}.`;
+    const title = lang === "zh" ? "新活動已同步" : "New activity synced";
+    const message = lang === "zh"
+      ? "你的最新活動已上傳。"
+      : "Your latest activity has been uploaded.";
 
     await fetch("https://onesignal.com/api/v1/notifications", {
       method: "POST",
@@ -190,7 +200,7 @@ async function sendActivityNotification(
       body: JSON.stringify({
         app_id: onesignalAppId,
         include_external_user_ids: [userId],
-        headings: { en: "Run Completed! 🏃‍♂️" },
+        headings: { en: title },
         contents: { en: message },
       }),
     });
@@ -249,10 +259,7 @@ async function syncActivityById(
 
   if (!existing) {
     await awardActivityXP(supabase, userId, distance, movingTime, Math.round(trainingScore));
-    const km = distance / 1000;
-    const minutes = movingTime / 60;
-    const xpGained = Math.round(km * 20) + Math.round(minutes * 10) + Math.round(trainingScore * 5);
-    await sendActivityNotification(supabase, userId, distance, movingTime, xpGained, Math.round(trainingScore));
+    await sendActivityNotification(supabase, userId, `strava:${act.id}`);
   }
 }
 

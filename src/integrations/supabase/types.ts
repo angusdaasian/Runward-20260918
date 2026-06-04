@@ -711,6 +711,7 @@ export type Database = {
         Row: {
           activity_notifications: boolean
           age: number | null
+          analytics_widgets: Json | null
           avatar_url: string | null
           check_in_streak: number
           created_at: string
@@ -741,6 +742,7 @@ export type Database = {
         Insert: {
           activity_notifications?: boolean
           age?: number | null
+          analytics_widgets?: Json | null
           avatar_url?: string | null
           check_in_streak?: number
           created_at?: string
@@ -771,6 +773,7 @@ export type Database = {
         Update: {
           activity_notifications?: boolean
           age?: number | null
+          analytics_widgets?: Json | null
           avatar_url?: string | null
           check_in_streak?: number
           created_at?: string

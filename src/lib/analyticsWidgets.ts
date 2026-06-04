@@ -11,6 +11,7 @@ export type WidgetId =
   | "steps_today"
   | "calories_today"
   | "sleep_last_night"
+  | "sleep_score"
   | "rhr"
   | "duration_week";
 
@@ -31,6 +32,7 @@ export const ALL_WIDGETS: WidgetId[] = [
   "calories_today",
   "duration_week",
   "sleep_last_night",
+  "sleep_score",
   "rhr",
 ];
 

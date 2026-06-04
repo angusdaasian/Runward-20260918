@@ -4,7 +4,7 @@ import { useActivities } from "@/hooks/use-activities";
 import { useTerraDailyHealth } from "@/hooks/use-terra-daily-health";
 import { Activity, Flame, Footprints, HeartPulse, Moon, Timer, Sparkles, Heart, LineChart, TrendingUp, CalendarDays, Trophy } from "lucide-react";
 import WidgetTile from "../WidgetTile";
-import { WidgetId, PREMIUM_WIDGETS } from "@/lib/analyticsWidgets";
+import { WidgetId } from "@/lib/analyticsWidgets";
 import {
   computeReadiness,
   getBandMeta,
@@ -44,7 +44,9 @@ const Tile = ({ id, lang, onOpen }: Props) => {
   const { data: conns } = useTerraConnections();
   const { isPremium } = usePremium();
 
-  const premiumOnly = !isPremium && PREMIUM_WIDGETS.includes(id);
+  const hrZonesLocked = !isPremium && id === "hr_zones";
+
+
 
   // Pick newest non-null helper
   const latestOf = <K extends keyof NonNullable<typeof history>[number]>(key: K) =>

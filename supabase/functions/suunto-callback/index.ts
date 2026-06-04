@@ -6,12 +6,24 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+function decodeJwtPayload(token: string): Record<string, unknown> {
+  const payload = token.split('.')[1];
+  if (!payload) return {};
+  const normalized = payload.replace(/-/g, '+').replace(/_/g, '/');
+  const padded = normalized.padEnd(normalized.length + ((4 - normalized.length % 4) % 4), '=');
+  try {
+    return JSON.parse(atob(padded));
+  } catch {
+    return {};
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
   try {
     const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
+    if (!authHeader?.startsWith('Bearer ')) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -64,8 +76,9 @@ serve(async (req) => {
       throw new Error(`Suunto token exchange failed: ${JSON.stringify(tokenData)}`);
     }
 
-    // Suunto returns access_token, refresh_token, expires_in, user (username)
-    const username = tokenData.user || tokenData.username;
+    const claims = decodeJwtPayload(String(tokenData.access_token ?? ''));
+    // Suunto returns the username in the JWT custom claim named "user".
+    const username = tokenData.user || tokenData.username || claims.user;
     if (!username) throw new Error('No username in Suunto token response');
 
     const expiresAt = Math.floor(Date.now() / 1000) + Number(tokenData.expires_in || 3600);
@@ -82,7 +95,7 @@ serve(async (req) => {
       .from('suunto_connections')
       .upsert({
         user_id: user.id,
-        suunto_username: username,
+        suunto_username: String(username),
         access_token: tokenData.access_token,
         refresh_token: tokenData.refresh_token,
         expires_at: expiresAt,

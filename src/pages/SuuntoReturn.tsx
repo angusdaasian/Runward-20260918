@@ -38,8 +38,14 @@ export default function SuuntoReturn() {
     const redirect_uri = localStorage.getItem(SUUNTO_PENDING_REDIRECT_KEY)
       ?? `${window.location.origin}/suunto/callback`;
 
-    supabase.functions.invoke("suunto-callback", {
-      body: { code, redirect_uri },
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session?.access_token) {
+        throw new Error("Please sign in again before connecting Suunto");
+      }
+      return supabase.functions.invoke("suunto-callback", {
+        body: { code, redirect_uri },
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
     }).then(({ data, error: invokeError }) => {
       if (invokeError || !(data as any)?.success) {
         throw new Error((data as any)?.error || invokeError?.message || "Callback failed");

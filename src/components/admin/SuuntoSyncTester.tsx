@@ -29,33 +29,47 @@ const SuuntoSyncTester = () => {
 
   useEffect(() => { loadConn(); }, [user]);
 
-  // Handle redirect back from Suunto OAuth: /admin?suunto_code=...
+  // If this window was opened as a Suunto OAuth popup, forward the code to the
+  // opener and close. Suunto returns ?code=... (and sometimes ?state=...).
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const code = params.get("suunto_code");
-    if (!code) return;
-    (async () => {
+    const code = params.get("code");
+    if (code && window.opener && window.opener !== window) {
+      try {
+        window.opener.postMessage(
+          { type: "suunto-oauth", code },
+          window.location.origin,
+        );
+      } catch (_) { /* ignore */ }
+      window.close();
+    }
+  }, []);
+
+  // Listen for the popup's postMessage and complete the callback exchange.
+  useEffect(() => {
+    const onMessage = async (e: MessageEvent) => {
+      if (e.origin !== window.location.origin) return;
+      const data: any = e.data;
+      if (!data || data.type !== "suunto-oauth" || !data.code) return;
       setBusy("connect");
       try {
         const redirect_uri = `${window.location.origin}/admin`;
-        const { data, error } = await supabase.functions.invoke("suunto-callback", {
-          body: { code, redirect_uri },
+        const { data: res, error } = await supabase.functions.invoke("suunto-callback", {
+          body: { code: data.code, redirect_uri },
         });
-        if (error || !(data as any)?.success) {
-          throw new Error((data as any)?.error || error?.message || "Callback failed");
+        if (error || !(res as any)?.success) {
+          throw new Error((res as any)?.error || error?.message || "Callback failed");
         }
-        toast.success(`Suunto connected: ${(data as any).username}`);
+        toast.success(`Suunto connected: ${(res as any).username}`);
         await loadConn();
-      } catch (e: any) {
-        toast.error(e?.message || "Suunto connect failed");
+      } catch (err: any) {
+        toast.error(err?.message || "Suunto connect failed");
       } finally {
-        const url = new URL(window.location.href);
-        url.searchParams.delete("suunto_code");
-        url.searchParams.delete("state");
-        window.history.replaceState({}, "", url.toString());
         setBusy(null);
       }
-    })();
+    };
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
   }, []);
 
   const handleConnect = async () => {
@@ -68,12 +82,33 @@ const SuuntoSyncTester = () => {
       if (error || !(data as any)?.url) {
         throw new Error((data as any)?.error || error?.message || "Auth init failed");
       }
-      window.location.href = (data as any).url;
+      const url = (data as any).url as string;
+      const w = 600, h = 720;
+      const left = window.screenX + (window.outerWidth - w) / 2;
+      const top = window.screenY + (window.outerHeight - h) / 2;
+      const popup = window.open(
+        url,
+        "suunto-oauth",
+        `popup=yes,width=${w},height=${h},left=${left},top=${top}`,
+      );
+      if (!popup) {
+        // Popup blocked — fall back to full-page redirect.
+        window.location.href = url;
+        return;
+      }
+      // Watch for popup close without completing.
+      const timer = setInterval(() => {
+        if (popup.closed) {
+          clearInterval(timer);
+          setBusy((b) => (b === "connect" ? null : b));
+        }
+      }, 500);
     } catch (e: any) {
       toast.error(e?.message || "Failed to start Suunto auth");
       setBusy(null);
     }
   };
+
 
   const handleDisconnect = async () => {
     setBusy("disconnect");

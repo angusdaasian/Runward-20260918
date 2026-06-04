@@ -23,7 +23,15 @@ serve(async (req) => {
   }
   console.log('[suunto-webhook] event:', JSON.stringify(event));
 
-  if (!event?.username || !event?.workoutid) {
+  // Suunto webhook payload shape:
+  // { type: "WORKOUT_CREATED", username: "...", workout: { workoutKey, ... } }
+  // Older/legacy: { username, workoutid }
+  const username: string | undefined = event?.username;
+  const inlineWorkout: SuuntoWorkout | undefined = event?.workout;
+  const workoutId: string | undefined = event?.workoutid || inlineWorkout?.workoutKey;
+
+  if (!username || !workoutId) {
+    console.log('[suunto-webhook] skipping, missing username/workoutid');
     return new Response(JSON.stringify({ ok: true }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
@@ -40,35 +48,40 @@ serve(async (req) => {
     const { data: conn } = await supabase
       .from('suunto_connections')
       .select('*')
-      .eq('suunto_username', event.username)
+      .eq('suunto_username', username)
       .order('updated_at', { ascending: false })
       .limit(1)
       .maybeSingle();
 
     if (!conn) {
-      console.log('[suunto-webhook] no connection for', event.username);
+      console.log('[suunto-webhook] no connection for', username);
       return new Response(JSON.stringify({ ok: true }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    const accessToken = await refreshSuuntoToken(conn, supabase, clientId, clientSecret);
+    let w: SuuntoWorkout | undefined = inlineWorkout;
 
-    const res = await fetch(`${SUUNTO_API_BASE}/workout/${event.workoutid}`, {
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Ocp-Apim-Subscription-Key': subKey,
-      },
-    });
-    const text = await res.text();
-    if (!res.ok) {
-      console.error('[suunto-webhook] fetch workout failed', res.status, text);
-      return new Response(JSON.stringify({ ok: true }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    // If the workout looks incomplete (e.g. missing activityId or distance), or wasn't inlined, fetch it
+    const needsFetch = !w || !w.workoutKey;
+    if (needsFetch) {
+      const accessToken = await refreshSuuntoToken(conn, supabase, clientId, clientSecret);
+      const res = await fetch(`${SUUNTO_API_BASE}/workout/${workoutId}`, {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Ocp-Apim-Subscription-Key': subKey,
+        },
       });
+      const text = await res.text();
+      if (!res.ok) {
+        console.error('[suunto-webhook] fetch workout failed', res.status, text);
+        return new Response(JSON.stringify({ ok: true }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      const payload = JSON.parse(text);
+      w = payload?.payload ?? payload;
     }
-    const payload = JSON.parse(text);
-    const w: SuuntoWorkout = payload?.payload ?? payload;
 
     if (w?.workoutKey) {
       await supabase

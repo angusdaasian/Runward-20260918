@@ -89,6 +89,11 @@ const TABS: { key: TabKey; label: string; icon: React.ComponentType<{ className?
   { key: "suunto", label: "Suunto Sync", icon: RefreshCw },
 ];
 
+const initialAdminTab = (): TabKey => {
+  const tab = new URLSearchParams(window.location.search).get("tab");
+  return TABS.some((item) => item.key === tab) ? (tab as TabKey) : "users";
+};
+
 
 const GRANTOR_USER_ID = "c7a7d1ca-c7bf-4288-bb9d-794006a04087";
 
@@ -98,7 +103,7 @@ const AdminPanel = () => {
   const navigate = useNavigate();
   const [users, setUsers] = useState<UserRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<TabKey>("users");
+  const [activeTab, setActiveTab] = useState<TabKey>(() => initialAdminTab());
   const [restoring, setRestoring] = useState(false);
   const [grantTarget, setGrantTarget] = useState<UserRow | null>(null);
   const [grantDuration, setGrantDuration] = useState<"1week" | "2week" | "1month">("1month");

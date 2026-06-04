@@ -7,8 +7,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { RefreshCw, Link as LinkIcon, Unlink } from "lucide-react";
+import despia from "despia-native";
+import { isDespiaUA } from "@/lib/despiaOAuth";
 
 type ConnRow = { suunto_username: string; expires_at: number; updated_at: string };
+
+const SUUNTO_PENDING_REDIRECT_KEY = "suunto_pending_redirect_uri";
 
 const SuuntoSyncTester = () => {
   const { user } = useAuth();
@@ -29,81 +33,36 @@ const SuuntoSyncTester = () => {
 
   useEffect(() => { loadConn(); }, [user]);
 
-  // If this window was opened as a Suunto OAuth popup, forward the code to the
-  // opener and close. Suunto returns ?code=... (and sometimes ?state=...).
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const code = params.get("code");
-    if (code && window.opener && window.opener !== window) {
-      try {
-        window.opener.postMessage(
-          { type: "suunto-oauth", code },
-          window.location.origin,
-        );
-      } catch (_) { /* ignore */ }
-      window.close();
-    }
-  }, []);
-
-  // Listen for the popup's postMessage and complete the callback exchange.
-  useEffect(() => {
-    const onMessage = async (e: MessageEvent) => {
-      if (e.origin !== window.location.origin) return;
-      const data: any = e.data;
-      if (!data || data.type !== "suunto-oauth" || !data.code) return;
-      setBusy("connect");
-      try {
-        const redirect_uri = `${window.location.origin}/admin`;
-        const { data: res, error } = await supabase.functions.invoke("suunto-callback", {
-          body: { code: data.code, redirect_uri },
-        });
-        if (error || !(res as any)?.success) {
-          throw new Error((res as any)?.error || error?.message || "Callback failed");
-        }
-        toast.success(`Suunto connected: ${(res as any).username}`);
-        await loadConn();
-      } catch (err: any) {
-        toast.error(err?.message || "Suunto connect failed");
-      } finally {
-        setBusy(null);
-      }
-    };
-    window.addEventListener("message", onMessage);
-    return () => window.removeEventListener("message", onMessage);
-  }, []);
-
-  const handleConnect = () => {
-    // Open the tab SYNCHRONOUSLY inside the click handler so browsers don't
-    // block it, then navigate it once the auth URL comes back.
-    const tab = window.open("about:blank", "_blank");
-    if (!tab) {
-      toast.error("Popup blocked — please allow popups for this site and try again.");
-      return;
-    }
-    try {
-      tab.document.write(
-        "<title>Connecting to Suunto…</title><body style=\"font-family:system-ui;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;color:#555\">Connecting to Suunto…</body>",
-      );
-    } catch (_) { /* ignore */ }
-
+  const handleConnect = async () => {
     setBusy("connect");
-    (async () => {
-      try {
-        const redirect_uri = `${window.location.origin}/admin`;
-        const { data, error } = await supabase.functions.invoke("suunto-auth", {
-          body: { redirect_uri },
-        });
-        if (error || !(data as any)?.url) {
-          throw new Error((data as any)?.error || error?.message || "Auth init failed");
-        }
-        if (tab.closed) { setBusy(null); return; }
-        tab.location.href = (data as any).url as string;
-      } catch (e: any) {
-        try { tab.close(); } catch (_) { /* ignore */ }
-        toast.error(e?.message || "Failed to start Suunto auth");
-        setBusy(null);
+    try {
+      const native = isDespiaUA();
+      const redirectUrl = new URL(`${window.location.origin}/suunto-return`);
+      if (native) {
+        redirectUrl.searchParams.set("native", "true");
+        redirectUrl.searchParams.set("deeplink_scheme", "runward");
       }
-    })();
+      const redirect_uri = redirectUrl.toString();
+      localStorage.setItem(SUUNTO_PENDING_REDIRECT_KEY, redirect_uri);
+
+      const { data, error } = await supabase.functions.invoke("suunto-auth", {
+        body: { redirect_uri },
+      });
+      if (error || !(data as any)?.url) {
+        throw new Error((data as any)?.error || error?.message || "Auth init failed");
+      }
+
+      if (native) {
+        despia(`oauth://?url=${encodeURIComponent((data as any).url as string)}`);
+        setBusy(null);
+      } else {
+        window.location.href = (data as any).url as string;
+      }
+    } catch (e: any) {
+      localStorage.removeItem(SUUNTO_PENDING_REDIRECT_KEY);
+      toast.error(e?.message || "Failed to start Suunto auth");
+      setBusy(null);
+    }
   };
 
 

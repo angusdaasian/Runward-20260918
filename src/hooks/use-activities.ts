@@ -434,6 +434,14 @@ export function useActivities(options?: { limit?: number; enabled?: boolean }) {
     gcTime: 10 * 60 * 1000,
   });
 
+  const suuntoQuery = useQuery({
+    queryKey: ["suunto-activities", user?.id, limit ?? "all"],
+    queryFn: () => fetchSuuntoActivities(user!.id, limit),
+    enabled: activityQueriesEnabled,
+    staleTime: 30 * 1000,
+    gcTime: 10 * 60 * 1000,
+  });
+
 
   const profileQuery = useQuery({
     queryKey: ["user-profile", user?.id],

@@ -37,8 +37,9 @@ const SuuntoSyncTester = () => {
     setBusy("connect");
     try {
       const native = isDespiaUA();
-      // Suunto requires redirect_uri to EXACTLY match a registered value — keep it bare.
-      const redirect_uri = `${window.location.origin}/suunto-return`;
+      // Suunto requires redirect_uri to EXACTLY match a registered value.
+      // The registered URI is /suunto/callback, not /suunto-return.
+      const redirect_uri = `${window.location.origin}/suunto/callback`;
       localStorage.setItem(SUUNTO_PENDING_REDIRECT_KEY, redirect_uri);
       if (native) {
         localStorage.setItem("suunto_pending_native", "runward");

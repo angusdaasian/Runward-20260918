@@ -36,7 +36,7 @@ export default function SuuntoReturn() {
     }
 
     const redirect_uri = localStorage.getItem(SUUNTO_PENDING_REDIRECT_KEY)
-      ?? `${window.location.origin}/suunto-return`;
+      ?? `${window.location.origin}/suunto/callback`;
 
     supabase.functions.invoke("suunto-callback", {
       body: { code, redirect_uri },

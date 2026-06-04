@@ -73,6 +73,7 @@ const App = () => (
                 <Route path="/delete-account" element={<DeleteAccount />} />
                 <Route path="/terra-return" element={<TerraReturn />} />
                 <Route path="/suunto-return" element={<SuuntoReturn />} />
+                <Route path="/suunto/callback" element={<SuuntoReturn />} />
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/auth" element={<AuthCallback />} />
                 <Route path="/auth/callback" element={<StravaCallback />} />

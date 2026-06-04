@@ -1206,6 +1206,102 @@ export type Database = {
         }
         Relationships: []
       }
+      suunto_activities: {
+        Row: {
+          activity_id: number | null
+          average_heartrate: number | null
+          average_speed: number | null
+          created_at: string
+          distance: number | null
+          elapsed_time: number | null
+          environment: string
+          id: string
+          max_heartrate: number | null
+          max_speed: number | null
+          moving_time: number | null
+          name: string | null
+          sport_type: string
+          start_date: string
+          summary_polyline: string | null
+          suunto_workout_key: string
+          total_elevation_gain: number | null
+          user_id: string
+        }
+        Insert: {
+          activity_id?: number | null
+          average_heartrate?: number | null
+          average_speed?: number | null
+          created_at?: string
+          distance?: number | null
+          elapsed_time?: number | null
+          environment?: string
+          id?: string
+          max_heartrate?: number | null
+          max_speed?: number | null
+          moving_time?: number | null
+          name?: string | null
+          sport_type?: string
+          start_date: string
+          summary_polyline?: string | null
+          suunto_workout_key: string
+          total_elevation_gain?: number | null
+          user_id: string
+        }
+        Update: {
+          activity_id?: number | null
+          average_heartrate?: number | null
+          average_speed?: number | null
+          created_at?: string
+          distance?: number | null
+          elapsed_time?: number | null
+          environment?: string
+          id?: string
+          max_heartrate?: number | null
+          max_speed?: number | null
+          moving_time?: number | null
+          name?: string | null
+          sport_type?: string
+          start_date?: string
+          summary_polyline?: string | null
+          suunto_workout_key?: string
+          total_elevation_gain?: number | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      suunto_connections: {
+        Row: {
+          access_token: string
+          created_at: string
+          expires_at: number
+          id: string
+          refresh_token: string
+          suunto_username: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          access_token: string
+          created_at?: string
+          expires_at: number
+          id?: string
+          refresh_token: string
+          suunto_username: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          access_token?: string
+          created_at?: string
+          expires_at?: number
+          id?: string
+          refresh_token?: string
+          suunto_username?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       terra_activities: {
         Row: {
           activity_name: string | null

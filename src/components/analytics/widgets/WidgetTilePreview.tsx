@@ -79,17 +79,16 @@ const Tile = ({ id, lang, onOpen }: Props) => {
     }
     case "health": {
       const vo2 = latestOf("vo2max") as number | null;
-      const rhr = latestOf("resting_hr") as number | null;
       return (
         <WidgetTile
-          title={zh(lang) ? "每日健康" : "Daily Health"}
-          subtitle={zh(lang) ? "今日" : "Today"}
+          title={zh(lang) ? "VO₂max" : "VO₂max"}
+          subtitle={zh(lang) ? "最新" : "Latest"}
           icon={<Heart size={16} className="text-rose-500" />}
           onClick={onOpen}
-          locked={hrZonesLocked}
+          readonly
           lang={lang}
         >
-          <Big value={vo2 != null ? Number(vo2).toFixed(1) : "—"} unit="VO₂max" sub={rhr != null ? `RHR ${rhr} bpm` : (zh(lang) ? "尚無資料" : "No data")} />
+          <Big value={vo2 != null ? Number(vo2).toFixed(1) : "—"} unit="ml/kg/min" sub={vo2 == null ? (zh(lang) ? "尚無資料" : "No data") : undefined} />
         </WidgetTile>
       );
     }

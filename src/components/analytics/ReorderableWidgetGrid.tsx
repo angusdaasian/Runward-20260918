@@ -31,7 +31,7 @@ const DraggableWidget = ({
   const style: React.CSSProperties = {
     transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
     opacity: isDragging ? 0.5 : 1,
-    touchAction: "none",
+    touchAction: "pan-y",
   };
 
   return (
@@ -52,8 +52,8 @@ const DraggableWidget = ({
 const ReorderableWidgetGrid = ({ order, lang, onOpen, onReorder }: Props) => {
   const [activeId, setActiveId] = useState<WidgetId | null>(null);
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { delay: 250, tolerance: 5 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } }),
+    useSensor(PointerSensor, { activationConstraint: { delay: 400, tolerance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 400, tolerance: 8 } }),
   );
 
   useEffect(() => {

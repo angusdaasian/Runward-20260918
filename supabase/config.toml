@@ -58,4 +58,7 @@ verify_jwt = false
 [functions.suunto-webhook]
 verify_jwt = false
 
+[functions.suunto-247-webhook]
+verify_jwt = false
+
 

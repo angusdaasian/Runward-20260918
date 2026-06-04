@@ -47,24 +47,28 @@ const ConnectApps = ({ lang, onBack }: Props) => {
   const [stravaConnected, setStravaConnected] = useState(false);
   const [appleHealthConnected, setAppleHealthConnected] = useState(false);
   const [garminConnected, setGarminConnected] = useState(false);
+  const [suuntoConnected, setSuuntoConnected] = useState(false);
   const [loading, setLoading] = useState(true);
   const appleHealth = useAppleHealth(lang);
   const garmin = useGarmin(lang);
   const [garminDialogOpen, setGarminDialogOpen] = useState(false);
 
-  // A fitness app is Strava, Garmin, or Coros
-  const hasFitnessApp = stravaConnected || garminConnected;
+  // A fitness app = Strava, Garmin, or native Suunto connection.
+  // Users can only have one of: Strava | native Suunto | Terra (any provider).
+  const hasFitnessApp = stravaConnected || garminConnected || suuntoConnected;
 
   const checkConnections = useCallback(async () => {
     if (!user) { setLoading(false); return; }
-    const [stravaRes, ahRes, garminRes] = await Promise.all([
+    const [stravaRes, ahRes, garminRes, suuntoRes] = await Promise.all([
       supabase.from("strava_connections").select("id").eq("user_id", user.id).maybeSingle(),
       supabase.from("apple_health_connections").select("id").eq("user_id", user.id).maybeSingle(),
       supabase.from("garmin_connections").select("id").eq("user_id", user.id).maybeSingle(),
+      supabase.from("suunto_connections").select("id").eq("user_id", user.id).maybeSingle(),
     ]);
     setStravaConnected(!!stravaRes.data);
     setAppleHealthConnected(!!ahRes.data);
     setGarminConnected(!!garminRes.data);
+    setSuuntoConnected(!!suuntoRes.data);
     setLoading(false);
   }, [user]);
 

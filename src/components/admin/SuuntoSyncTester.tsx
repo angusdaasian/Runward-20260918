@@ -72,58 +72,24 @@ const SuuntoSyncTester = () => {
     return () => window.removeEventListener("message", onMessage);
   }, []);
 
-  const handleConnect = () => {
-    // IMPORTANT: open the popup synchronously inside the click handler so
-    // browsers don't block it. We point it at about:blank first, then
-    // navigate it once the auth URL comes back from the edge function.
-    const w = 600, h = 720;
-    const left = window.screenX + (window.outerWidth - w) / 2;
-    const top = window.screenY + (window.outerHeight - h) / 2;
-    const popup = window.open(
-      "about:blank",
-      "suunto-oauth",
-      `popup=yes,width=${w},height=${h},left=${left},top=${top}`,
-    );
-    if (!popup) {
-      toast.error("Popup blocked — please allow popups for this site and try again.");
-      return;
-    }
-    try {
-      popup.document.write(
-        "<title>Connecting to Suunto…</title><body style=\"font-family:system-ui;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;color:#555\">Connecting to Suunto…</body>",
-      );
-    } catch (_) { /* cross-origin once navigated; ignore */ }
-
+  const handleConnect = async () => {
+    // Match the Terra ConnectApps pattern: get the auth URL, then open it in
+    // a new tab. No `noopener` because we rely on window.opener.postMessage
+    // from the returned /admin?code=... page to complete the exchange.
     setBusy("connect");
-    (async () => {
-      try {
-        const redirect_uri = `${window.location.origin}/admin`;
-        const { data, error } = await supabase.functions.invoke("suunto-auth", {
-          body: { redirect_uri },
-        });
-        if (error || !(data as any)?.url) {
-          throw new Error((data as any)?.error || error?.message || "Auth init failed");
-        }
-        const url = (data as any).url as string;
-        if (popup.closed) {
-          setBusy(null);
-          return;
-        }
-        popup.location.href = url;
-
-        // Watch for popup close without completing.
-        const timer = setInterval(() => {
-          if (popup.closed) {
-            clearInterval(timer);
-            setBusy((b) => (b === "connect" ? null : b));
-          }
-        }, 500);
-      } catch (e: any) {
-        try { popup.close(); } catch (_) { /* ignore */ }
-        toast.error(e?.message || "Failed to start Suunto auth");
-        setBusy(null);
+    try {
+      const redirect_uri = `${window.location.origin}/admin`;
+      const { data, error } = await supabase.functions.invoke("suunto-auth", {
+        body: { redirect_uri },
+      });
+      if (error || !(data as any)?.url) {
+        throw new Error((data as any)?.error || error?.message || "Auth init failed");
       }
-    })();
+      window.open((data as any).url as string, "_blank");
+    } catch (e: any) {
+      toast.error(e?.message || "Failed to start Suunto auth");
+      setBusy(null);
+    }
   };
 
 

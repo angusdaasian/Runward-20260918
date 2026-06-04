@@ -47,6 +47,7 @@ const widgetLabel = (id: WidgetId, lang: Lang): string => {
     case "steps_today": return zh ? "步數 (今日)" : "Steps (today)";
     case "calories_today": return zh ? "卡路里 (今日)" : "Calories (today)";
     case "sleep_last_night": return zh ? "睡眠 (昨晚)" : "Sleep (last night)";
+    case "sleep_score": return zh ? "睡眠分數" : "Sleep score";
     case "rhr": return zh ? "靜息心率" : "Resting HR";
     case "duration_week": return zh ? "運動時數 (本週)" : "Duration (week)";
   }

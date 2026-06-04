@@ -66,7 +66,7 @@ const Tile = ({ id, lang, onOpen }: Props) => {
           subtitle={zh(lang) ? "今日" : "Today"}
           icon={<Sparkles size={16} className="text-emerald-500" />}
           onClick={onOpen}
-          premiumOnly={premiumOnly}
+          locked={id === "hr_zones" && hrZonesLocked}
           lang={lang}
         >
           {v != null ? (
@@ -86,7 +86,7 @@ const Tile = ({ id, lang, onOpen }: Props) => {
           subtitle={zh(lang) ? "今日" : "Today"}
           icon={<Heart size={16} className="text-rose-500" />}
           onClick={onOpen}
-          premiumOnly={premiumOnly}
+          locked={id === "hr_zones" && hrZonesLocked}
           lang={lang}
         >
           <Big value={vo2 != null ? Number(vo2).toFixed(1) : "—"} unit="VO₂max" sub={rhr != null ? `RHR ${rhr} bpm` : (zh(lang) ? "尚無資料" : "No data")} />
@@ -101,7 +101,7 @@ const Tile = ({ id, lang, onOpen }: Props) => {
           subtitle={zh(lang) ? "最新" : "Latest"}
           icon={<HeartPulse size={16} className="text-rose-500" />}
           onClick={onOpen}
-          premiumOnly={premiumOnly}
+          locked={id === "hr_zones" && hrZonesLocked}
           lang={lang}
         >
           <Big value={rhr != null ? String(rhr) : "—"} unit="bpm" sub={rhr == null ? (zh(lang) ? "尚無資料" : "No data") : undefined} />
@@ -117,7 +117,7 @@ const Tile = ({ id, lang, onOpen }: Props) => {
           subtitle={zh(lang) ? "昨晚" : "Last night"}
           icon={<Moon size={16} className="text-indigo-400" />}
           onClick={onOpen}
-          premiumOnly={premiumOnly}
+          locked={id === "hr_zones" && hrZonesLocked}
           lang={lang}
         >
           <Big value={fmtSleep(s) ?? "—"} sub={score != null ? `${zh(lang) ? "分數" : "Score"} ${score}` : (zh(lang) ? "尚無資料" : "No data")} />
@@ -133,7 +133,7 @@ const Tile = ({ id, lang, onOpen }: Props) => {
           subtitle={zh(lang) ? "今日" : "Today"}
           icon={<Footprints size={16} className="text-sky-500" />}
           onClick={onOpen}
-          premiumOnly={premiumOnly}
+          locked={id === "hr_zones" && hrZonesLocked}
           lang={lang}
         >
           <Big value={steps != null ? steps.toLocaleString() : "—"} sub={steps == null ? (zh(lang) ? "尚無資料" : "No data") : undefined} />
@@ -151,7 +151,7 @@ const Tile = ({ id, lang, onOpen }: Props) => {
           subtitle={zh(lang) ? "今日活動" : "Today's activities"}
           icon={<Flame size={16} className="text-orange-500" />}
           onClick={onOpen}
-          premiumOnly={premiumOnly}
+          locked={id === "hr_zones" && hrZonesLocked}
           lang={lang}
         >
           <Big value={cal > 0 ? Math.round(cal).toLocaleString() : "—"} unit="kcal" sub={cal === 0 ? (zh(lang) ? "尚無活動" : "No activity yet") : undefined} />
@@ -171,7 +171,7 @@ const Tile = ({ id, lang, onOpen }: Props) => {
           subtitle={zh(lang) ? "本週" : "This week"}
           icon={<Timer size={16} className="text-emerald-500" />}
           onClick={onOpen}
-          premiumOnly={premiumOnly}
+          locked={id === "hr_zones" && hrZonesLocked}
           lang={lang}
         >
           <Big value={`${h}h ${m}m`} sub={zh(lang) ? "過去 7 天" : "Last 7 days"} />
@@ -185,7 +185,7 @@ const Tile = ({ id, lang, onOpen }: Props) => {
           subtitle={zh(lang) ? "本週" : "This week"}
           icon={<Activity size={16} className="text-amber-500" />}
           onClick={onOpen}
-          premiumOnly={premiumOnly}
+          locked={id === "hr_zones" && hrZonesLocked}
           lang={lang}
         >
           <ZonesPreview lang={lang} />
@@ -198,7 +198,7 @@ const Tile = ({ id, lang, onOpen }: Props) => {
           subtitle="5K · 10K · HM"
           icon={<Trophy size={16} className="text-yellow-500" />}
           onClick={onOpen}
-          premiumOnly={premiumOnly}
+          locked={id === "hr_zones" && hrZonesLocked}
           lang={lang}
         >
           <Big value={zh(lang) ? "查看" : "View"} sub={zh(lang) ? "點擊查看預測時間" : "Tap to see predicted times"} />
@@ -211,7 +211,7 @@ const Tile = ({ id, lang, onOpen }: Props) => {
           subtitle="CTL · ATL · TSB"
           icon={<LineChart size={16} className="text-primary" />}
           onClick={onOpen}
-          premiumOnly={premiumOnly}
+          locked={id === "hr_zones" && hrZonesLocked}
           lang={lang}
         >
           <TrainingLoadPreview lang={lang} />
@@ -224,7 +224,7 @@ const Tile = ({ id, lang, onOpen }: Props) => {
           subtitle={zh(lang) ? "本週 vs 上週" : "Week over week"}
           icon={<TrendingUp size={16} className="text-violet-500" />}
           onClick={onOpen}
-          premiumOnly={premiumOnly}
+          locked={id === "hr_zones" && hrZonesLocked}
           lang={lang}
         >
           <Big value={zh(lang) ? "查看" : "View"} sub={zh(lang) ? "距離、配速、心率" : "Distance, pace, HR"} />
@@ -237,7 +237,7 @@ const Tile = ({ id, lang, onOpen }: Props) => {
           subtitle={zh(lang) ? "活動紀錄" : "Activity history"}
           icon={<CalendarDays size={16} className="text-emerald-500" />}
           onClick={onOpen}
-          premiumOnly={premiumOnly}
+          locked={id === "hr_zones" && hrZonesLocked}
           lang={lang}
         >
           <Big value={zh(lang) ? "查看" : "View"} sub={zh(lang) ? "365 天熱力圖" : "365-day map"} />

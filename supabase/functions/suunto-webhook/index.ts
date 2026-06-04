@@ -34,6 +34,7 @@ serve(async (req) => {
     const SERVICE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const clientId = Deno.env.get('SUUNTO_CLIENT_ID')!;
     const clientSecret = Deno.env.get('SUUNTO_CLIENT_SECRET')!;
+    const subKey = Deno.env.get('SUUNTO_SUBSCRIPTION_KEY') || clientId;
     const supabase = createClient(SUPABASE_URL, SERVICE);
 
     const { data: conn } = await supabase
@@ -56,7 +57,7 @@ serve(async (req) => {
     const res = await fetch(`${SUUNTO_API_BASE}/workout/${event.workoutid}`, {
       headers: {
         'Authorization': `Bearer ${accessToken}`,
-        'Ocp-Apim-Subscription-Key': clientId,
+        'Ocp-Apim-Subscription-Key': subKey,
       },
     });
     const text = await res.text();

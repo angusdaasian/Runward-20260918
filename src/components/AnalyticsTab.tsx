@@ -47,6 +47,7 @@ const widgetLabel = (id: WidgetId, lang: Lang): string => {
     case "steps_today": return zh ? "步數 (今日)" : "Steps (today)";
     case "calories_today": return zh ? "卡路里 (今日)" : "Calories (today)";
     case "sleep_last_night": return zh ? "睡眠 (昨晚)" : "Sleep (last night)";
+    case "sleep_score": return zh ? "睡眠分數" : "Sleep score";
     case "rhr": return zh ? "靜息心率" : "Resting HR";
     case "duration_week": return zh ? "運動時數 (本週)" : "Duration (week)";
   }
@@ -98,7 +99,7 @@ const AnalyticsTab = ({ lang }: Props) => {
 
   const labels = useMemo(() => {
     const out: Record<WidgetId, string> = {} as any;
-    (["hrv","health","hr_zones","race_predictor","training_load","trends","year_heatmap","steps_today","calories_today","sleep_last_night","rhr","duration_week"] as WidgetId[]).forEach((id) => {
+    (["hrv","health","hr_zones","race_predictor","training_load","trends","year_heatmap","steps_today","calories_today","sleep_last_night","sleep_score","rhr","duration_week"] as WidgetId[]).forEach((id) => {
       out[id] = widgetLabel(id, lang);
     });
     return out;
@@ -129,6 +130,7 @@ const AnalyticsTab = ({ lang }: Props) => {
       case "health":
       case "rhr":
       case "sleep_last_night":
+      case "sleep_score":
       case "steps_today":
         return <HealthStatsCard lang={lang} />;
       case "hr_zones":

@@ -11,25 +11,27 @@ interface WidgetTileProps {
   accent?: string; // tailwind ring/bg accent class
   premiumOnly?: boolean;
   locked?: boolean; // fully masked + non-clickable
+  readonly?: boolean; // non-clickable stat-only tile
   lang?: "en" | "zh";
 }
 
 /**
  * A single Suunto-style square widget tile. Click opens a detail dialog.
  */
-const WidgetTile = ({ title, subtitle, icon, onClick, children, accent, premiumOnly, locked, lang }: WidgetTileProps) => {
+const WidgetTile = ({ title, subtitle, icon, onClick, children, accent, premiumOnly, locked, readonly, lang }: WidgetTileProps) => {
+  const nonInteractive = locked || readonly;
   return (
     <button
       type="button"
-      onClick={locked ? undefined : onClick}
-      disabled={locked}
-      aria-disabled={locked}
-      className={`block text-left w-full focus:outline-none focus:ring-2 focus:ring-primary/40 rounded-2xl ${
-        locked ? "cursor-not-allowed" : ""
+      onClick={nonInteractive ? undefined : onClick}
+      disabled={nonInteractive}
+      aria-disabled={nonInteractive}
+      className={`block text-left w-full focus:outline-none ${nonInteractive ? "" : "focus:ring-2 focus:ring-primary/40"} rounded-2xl ${
+        locked ? "cursor-not-allowed" : readonly ? "cursor-default" : ""
       }`}
     >
       <Card className={`relative p-3.5 h-full min-h-[148px] rounded-2xl border-border/60 ${
-        locked ? "" : "hover:border-primary/40 active:scale-[0.98]"
+        nonInteractive ? "" : "hover:border-primary/40 active:scale-[0.98]"
       } transition-all overflow-hidden ${accent ?? ""}`}>
         <div className="flex items-start justify-between mb-2">
           <div className="min-w-0">
@@ -43,7 +45,7 @@ const WidgetTile = ({ title, subtitle, icon, onClick, children, accent, premiumO
         <div className={`text-foreground ${locked ? "blur-sm select-none pointer-events-none" : ""}`}>
           {children}
         </div>
-        {!locked && (
+        {!nonInteractive && (
           <ChevronRight size={14} className="absolute bottom-2 right-2 text-muted-foreground/40" />
         )}
         {premiumOnly && !locked && (

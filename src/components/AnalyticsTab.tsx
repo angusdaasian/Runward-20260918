@@ -99,7 +99,7 @@ const AnalyticsTab = ({ lang }: Props) => {
 
   const labels = useMemo(() => {
     const out: Record<WidgetId, string> = {} as any;
-    (["hrv","health","hr_zones","race_predictor","training_load","trends","year_heatmap","steps_today","calories_today","sleep_last_night","rhr","duration_week"] as WidgetId[]).forEach((id) => {
+    (["hrv","health","hr_zones","race_predictor","training_load","trends","year_heatmap","steps_today","calories_today","sleep_last_night","sleep_score","rhr","duration_week"] as WidgetId[]).forEach((id) => {
       out[id] = widgetLabel(id, lang);
     });
     return out;

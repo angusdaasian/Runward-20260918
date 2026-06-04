@@ -605,6 +605,7 @@ export function useActivities(options?: { limit?: number; enabled?: boolean }) {
     queryClient.invalidateQueries({ queryKey: ["apple-health-activities", user?.id] });
     queryClient.invalidateQueries({ queryKey: ["garmin-activities", user?.id] });
     queryClient.invalidateQueries({ queryKey: ["terra-activities", user?.id] });
+    queryClient.invalidateQueries({ queryKey: ["suunto-activities", user?.id] });
     queryClient.invalidateQueries({ queryKey: ["user-profile", user?.id] });
     queryClient.invalidateQueries({ queryKey: ["planned-workouts", user?.id] });
     queryClient.invalidateQueries({ queryKey: ["fitness-connection", user?.id] });

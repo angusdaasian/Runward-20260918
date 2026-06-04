@@ -3,7 +3,7 @@ import { Lang } from "@/lib/i18n";
 import { useActivities } from "@/hooks/use-activities";
 import { useTerraDailyHealth } from "@/hooks/use-terra-daily-health";
 import { Activity, Flame, Footprints, HeartPulse, Moon, Timer, Sparkles, Heart, LineChart, TrendingUp, CalendarDays, Trophy } from "lucide-react";
-import WidgetTile from "./WidgetTile";
+import WidgetTile from "../WidgetTile";
 import { WidgetId } from "@/lib/analyticsWidgets";
 import {
   computeReadiness,
@@ -62,7 +62,7 @@ const Tile = ({ id, lang, onOpen }: Props) => {
           onClick={onOpen}
         >
           {v != null ? (
-            <Big value={String(v)} unit="ms" sub={band?.label ?? (zh(lang) ? "讀數" : "Reading")} cls={band?.colorClass ?? undefined} />
+            <Big value={String(v)} unit="ms" sub={band?.label ?? (zh(lang) ? "讀數" : "Reading")} cls={band?.color ?? undefined} />
           ) : (
             <Big value="—" sub={zh(lang) ? "尚無基線" : "No baseline"} />
           )}

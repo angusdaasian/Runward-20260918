@@ -7,6 +7,8 @@ import TrendsCard from "@/components/activities/TrendsCard";
 import ActivityYearHeatmap from "@/components/activities/ActivityYearHeatmap";
 import RacePredictorCard from "@/components/analytics/RacePredictorCard";
 import HrZonesWeekCard from "@/components/analytics/HrZonesWeekCard";
+import HealthStatsCard from "@/components/analytics/HealthStatsCard";
+import HRVReadinessCard from "@/components/analytics/HRVReadinessCard";
 import { ActivityListSkeleton } from "@/components/ui/PageSkeleton";
 
 interface Props {

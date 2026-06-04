@@ -534,7 +534,8 @@ export function useActivities(options?: { limit?: number; enabled?: boolean }) {
     } else {
       filteredGarmin = gm;
     }
-    const all = [...strava, ...ah, ...filteredGarmin, ...tr];
+    const su = suuntoQuery.data || [];
+    const all = [...strava, ...ah, ...filteredGarmin, ...tr, ...su];
     all.sort((a, b) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime());
     return all;
   }, [
@@ -542,6 +543,7 @@ export function useActivities(options?: { limit?: number; enabled?: boolean }) {
     appleHealthQuery.data,
     garminQuery.data,
     terraQuery.data,
+    suuntoQuery.data,
     garminQuery.isFetching,
     garminQuery.isFetched,
     limit,

@@ -196,35 +196,58 @@ const AnalyticsTab = ({ lang }: Props) => {
             </div>
           ) : (
             <>
-              <div className="mb-3 flex items-center gap-2 px-1 text-[11px] text-muted-foreground">
-                <MoveVertical size={12} className="shrink-0" />
-                <span>
-                  {lang === "zh"
-                    ? "提示：長按小工具可拖曳重新排序"
-                    : "Tip: long-press a widget to drag and reorder"}
-                </span>
+              <div className="mb-3 flex items-center justify-between gap-2 px-1">
+                <div className="flex items-center gap-2 text-[11px] text-muted-foreground min-w-0">
+                  {viewMode === "widgets" && <MoveVertical size={12} className="shrink-0" />}
+                  <span className="truncate">
+                    {viewMode === "widgets"
+                      ? lang === "zh"
+                        ? "提示：長按小工具可拖曳重新排序"
+                        : "Tip: long-press a widget to drag and reorder"
+                      : lang === "zh"
+                        ? "傳統檢視"
+                        : "Classic view"}
+                  </span>
+                </div>
+                <button
+                  onClick={toggleViewMode}
+                  className="shrink-0 flex items-center gap-1 px-2 py-1 rounded-md border border-border text-[11px] font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                >
+                  {viewMode === "widgets" ? <List size={12} /> : <LayoutGrid size={12} />}
+                  {viewMode === "widgets"
+                    ? lang === "zh" ? "傳統" : "Classic"
+                    : lang === "zh" ? "小工具" : "Widgets"}
+                </button>
               </div>
-              <ReorderableWidgetGrid
-                order={visibleWidgets}
-                lang={lang}
-                onOpen={(id) => setOpenWidget(id)}
-                onReorder={(nextVisible) => {
-                  // Merge new visible order back with hidden widgets preserved at the end
-                  const hiddenInOrder = prefs.order.filter((id) => prefs.hidden.includes(id));
-                  handleSavePrefs({ order: [...nextVisible, ...hiddenInOrder], hidden: prefs.hidden });
-                }}
-              />
-              <button
-                onClick={() => setCustomizing(true)}
-                className="mt-6 w-full flex items-center justify-center gap-2 py-3 text-sm font-semibold text-primary hover:bg-primary/5 rounded-lg transition-colors"
-              >
-                <Pencil size={14} />
-                {lang === "zh" ? "自訂儀表板" : "Customize dashboard"}
-              </button>
+              {viewMode === "widgets" ? (
+                <>
+                  <ReorderableWidgetGrid
+                    order={visibleWidgets}
+                    lang={lang}
+                    onOpen={(id) => setOpenWidget(id)}
+                    onReorder={(nextVisible) => {
+                      const hiddenInOrder = prefs.order.filter((id) => prefs.hidden.includes(id));
+                      handleSavePrefs({ order: [...nextVisible, ...hiddenInOrder], hidden: prefs.hidden });
+                    }}
+                  />
+                  <button
+                    onClick={() => setCustomizing(true)}
+                    className="mt-6 w-full flex items-center justify-center gap-2 py-3 text-sm font-semibold text-primary hover:bg-primary/5 rounded-lg transition-colors"
+                  >
+                    <Pencil size={14} />
+                    {lang === "zh" ? "自訂儀表板" : "Customize dashboard"}
+                  </button>
+                </>
+              ) : (
+                <Suspense fallback={<div className="flex justify-center py-12"><Loader2 className="animate-spin text-muted-foreground" size={20} /></div>}>
+                  <PerformanceTab lang={lang} />
+                </Suspense>
+              )}
             </>
 
           )}
         </div>
+
 
         <WidgetDetailDialog
           open={openWidget != null}

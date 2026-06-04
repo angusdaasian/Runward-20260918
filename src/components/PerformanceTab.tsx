@@ -37,7 +37,7 @@ const PerformanceTab = ({ lang }: Props) => {
 
   if (!user) {
     return (
-      <div className="px-5 pt-6 max-w-lg mx-auto pb-4">
+      <div className="px-5 pt-6 pb-4">
         <p className="text-sm text-muted-foreground text-center py-12">
           {lang === "zh" ? "請先登入以查看表現分析" : "Sign in to view performance analytics"}
         </p>

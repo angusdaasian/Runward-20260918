@@ -71,9 +71,12 @@ export type SuuntoWorkout = {
   totalAscent?: number; // meters
   maxSpeed?: number; // m/s
   averageSpeed?: number;
-  hrdata?: { avg?: number; max?: number };
+  avgSpeed?: number; // webhook payloads use avgSpeed
+  hrdata?: { avg?: number; max?: number; workoutAvgHR?: number; workoutMaxHR?: number };
   averageHeartRate?: number;
   maxHeartRate?: number;
+  energyConsumption?: number;
+  stepCount?: number;
   centerPosition?: { x: number; y: number };
 };
 
@@ -93,10 +96,10 @@ export function workoutRow(userId: string, w: SuuntoWorkout) {
     elapsed_time: duration,
     total_elevation_gain: w.totalAscent ?? null,
     start_date: startIso,
-    average_speed: w.averageSpeed ?? null,
+    average_speed: w.averageSpeed ?? w.avgSpeed ?? null,
     max_speed: w.maxSpeed ?? null,
-    average_heartrate: w.averageHeartRate ?? w.hrdata?.avg ?? null,
-    max_heartrate: w.maxHeartRate ?? w.hrdata?.max ?? null,
+    average_heartrate: w.averageHeartRate ?? w.hrdata?.avg ?? w.hrdata?.workoutAvgHR ?? null,
+    max_heartrate: w.maxHeartRate ?? w.hrdata?.max ?? w.hrdata?.workoutMaxHR ?? null,
     summary_polyline: null,
     environment: 'prod' as const,
   };

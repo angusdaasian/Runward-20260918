@@ -287,16 +287,45 @@ async function fetchTerraActivities(userId: string, limit?: number): Promise<Str
   });
 }
 
+async function fetchSuuntoActivities(userId: string, limit?: number): Promise<StravaActivity[]> {
+  let q = supabase
+    .from("suunto_activities")
+    .select("*")
+    .eq("user_id", userId)
+    .order("start_date", { ascending: false });
+  if (limit) q = q.limit(limit);
+  const { data } = await q;
+  return ((data as any[]) || []).map((a) => ({
+    id: a.id,
+    strava_id: 0,
+    name: a.name || "Suunto Activity",
+    sport_type: a.sport_type || "Run",
+    distance: a.distance || 0,
+    moving_time: a.moving_time || 0,
+    elapsed_time: a.elapsed_time || a.moving_time || 0,
+    total_elevation_gain: a.total_elevation_gain || 0,
+    start_date: a.start_date,
+    average_speed: a.average_speed || ((a.distance && a.moving_time) ? a.distance / a.moving_time : 0),
+    max_speed: a.max_speed || 0,
+    average_heartrate: a.average_heartrate ?? null,
+    max_heartrate: a.max_heartrate ?? null,
+    summary_polyline: a.summary_polyline ?? null,
+    source: "Suunto",
+    provenance: "terra" as const, // reuse existing literal; UI just reads `source`
+  }));
+}
+
 async function fetchConnection(userId: string) {
-  const [stravaRes, ahRes, garminRes, terraRes] = await Promise.all([
+  const [stravaRes, ahRes, garminRes, terraRes, suuntoRes] = await Promise.all([
     supabase.from("strava_connections").select("id").eq("user_id", userId).maybeSingle(),
     supabase.from("apple_health_connections").select("id").eq("user_id", userId).maybeSingle(),
     supabase.from("garmin_connections").select("id").eq("user_id", userId).maybeSingle(),
     supabase.from("terra_connections").select("id").eq("user_id", userId).eq("active", true).limit(1).maybeSingle(),
+    supabase.from("suunto_connections").select("id").eq("user_id", userId).maybeSingle(),
   ]);
   return {
-    any: !!(stravaRes.data || ahRes.data || garminRes.data || terraRes.data),
-    fitnessApp: !!(stravaRes.data || garminRes.data || terraRes.data),
+    any: !!(stravaRes.data || ahRes.data || garminRes.data || terraRes.data || suuntoRes.data),
+    fitnessApp: !!(stravaRes.data || garminRes.data || terraRes.data || suuntoRes.data),
   };
 }
 
@@ -405,6 +434,14 @@ export function useActivities(options?: { limit?: number; enabled?: boolean }) {
     gcTime: 10 * 60 * 1000,
   });
 
+  const suuntoQuery = useQuery({
+    queryKey: ["suunto-activities", user?.id, limit ?? "all"],
+    queryFn: () => fetchSuuntoActivities(user!.id, limit),
+    enabled: activityQueriesEnabled,
+    staleTime: 30 * 1000,
+    gcTime: 10 * 60 * 1000,
+  });
+
 
   const profileQuery = useQuery({
     queryKey: ["user-profile", user?.id],
@@ -497,7 +534,8 @@ export function useActivities(options?: { limit?: number; enabled?: boolean }) {
     } else {
       filteredGarmin = gm;
     }
-    const all = [...strava, ...ah, ...filteredGarmin, ...tr];
+    const su = suuntoQuery.data || [];
+    const all = [...strava, ...ah, ...filteredGarmin, ...tr, ...su];
     all.sort((a, b) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime());
     return all;
   }, [
@@ -505,6 +543,7 @@ export function useActivities(options?: { limit?: number; enabled?: boolean }) {
     appleHealthQuery.data,
     garminQuery.data,
     terraQuery.data,
+    suuntoQuery.data,
     garminQuery.isFetching,
     garminQuery.isFetched,
     limit,
@@ -566,6 +605,7 @@ export function useActivities(options?: { limit?: number; enabled?: boolean }) {
     queryClient.invalidateQueries({ queryKey: ["apple-health-activities", user?.id] });
     queryClient.invalidateQueries({ queryKey: ["garmin-activities", user?.id] });
     queryClient.invalidateQueries({ queryKey: ["terra-activities", user?.id] });
+    queryClient.invalidateQueries({ queryKey: ["suunto-activities", user?.id] });
     queryClient.invalidateQueries({ queryKey: ["user-profile", user?.id] });
     queryClient.invalidateQueries({ queryKey: ["planned-workouts", user?.id] });
     queryClient.invalidateQueries({ queryKey: ["fitness-connection", user?.id] });

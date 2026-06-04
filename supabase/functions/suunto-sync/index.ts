@@ -62,7 +62,7 @@ serve(async (req) => {
     const res = await fetch(url, {
       headers: {
         'Authorization': `Bearer ${accessToken}`,
-        'Ocp-Apim-Subscription-Key': clientId,
+        'Ocp-Apim-Subscription-Key': subKey,
       },
     });
     const text = await res.text();

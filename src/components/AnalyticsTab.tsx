@@ -130,6 +130,7 @@ const AnalyticsTab = ({ lang }: Props) => {
       case "health":
       case "rhr":
       case "sleep_last_night":
+      case "sleep_score":
       case "steps_today":
         return <HealthStatsCard lang={lang} />;
       case "hr_zones":

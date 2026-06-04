@@ -1,6 +1,6 @@
 import { ReactNode } from "react";
 import { Card } from "@/components/ui/card";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, Lock } from "lucide-react";
 
 interface WidgetTileProps {
   title: string;
@@ -9,6 +9,8 @@ interface WidgetTileProps {
   onClick: () => void;
   children: ReactNode;
   accent?: string; // tailwind ring/bg accent class
+  premiumOnly?: boolean;
+  lang?: "en" | "zh";
 }
 
 /**

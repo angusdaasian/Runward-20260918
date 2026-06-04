@@ -2326,6 +2326,10 @@ export type Database = {
       unschedule_terra_today_oneoff: { Args: never; Returns: undefined }
       unschedule_terra_webhook_cleanup: { Args: never; Returns: undefined }
       unschedule_terra_webhook_drain: { Args: never; Returns: undefined }
+      user_has_other_fitness_provider: {
+        Args: { _exclude: string; _user_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
       app_role: "admin" | "user"

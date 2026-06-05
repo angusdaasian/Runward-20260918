@@ -210,6 +210,7 @@ const ConnectApps = ({ lang, onBack }: Props) => {
     }
   };
 
+  const handleConnectGarmin = () => {
     if (hasFitnessApp) {
       toast.error(lang === "zh" ? "請先中斷現有健身應用再連接新的" : "Please disconnect the current fitness app before connecting a new one");
       return;

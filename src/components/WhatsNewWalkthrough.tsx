@@ -48,7 +48,7 @@ const SimpleModeIllustration = ({ lang }: { lang: Lang }) => (
       <ArrowRight size={12} className="text-primary" />
     </div>
 
-    <div className="ml-auto mt-2 w-[80%] rounded-lg bg-card border-2 border-primary shadow-lg p-2">
+    <div className="ml-auto mt-2 w-[80%] rounded-lg border-2 border-primary/40 shadow-lg p-2 bg-transparent backdrop-blur-sm">
       <div className="flex items-center gap-2 p-1.5 rounded-md bg-primary/10">
         <span className="w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center">
           <Sparkles size={14} />

@@ -1214,10 +1214,15 @@ export type Database = {
           activity_id: number | null
           average_heartrate: number | null
           average_speed: number | null
+          cadence_samples: Json | null
           created_at: string
           distance: number | null
+          distance_samples: Json | null
           elapsed_time: number | null
+          elevation_samples: Json | null
           environment: string
+          has_details: boolean
+          hr_samples: Json | null
           id: string
           max_heartrate: number | null
           max_speed: number | null
@@ -1234,10 +1239,15 @@ export type Database = {
           activity_id?: number | null
           average_heartrate?: number | null
           average_speed?: number | null
+          cadence_samples?: Json | null
           created_at?: string
           distance?: number | null
+          distance_samples?: Json | null
           elapsed_time?: number | null
+          elevation_samples?: Json | null
           environment?: string
+          has_details?: boolean
+          hr_samples?: Json | null
           id?: string
           max_heartrate?: number | null
           max_speed?: number | null
@@ -1254,10 +1264,15 @@ export type Database = {
           activity_id?: number | null
           average_heartrate?: number | null
           average_speed?: number | null
+          cadence_samples?: Json | null
           created_at?: string
           distance?: number | null
+          distance_samples?: Json | null
           elapsed_time?: number | null
+          elevation_samples?: Json | null
           environment?: string
+          has_details?: boolean
+          hr_samples?: Json | null
           id?: string
           max_heartrate?: number | null
           max_speed?: number | null

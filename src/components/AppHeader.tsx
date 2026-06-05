@@ -401,8 +401,24 @@ const AppHeader = ({ lang, onNavigateSettings, onOpenPromoBanner, isGuest }: App
                 </div>
               </button>
 
-              {/* Announcements — entire row triggers */}
-              <AnnouncementRow lang={lang} />
+              {/* What's New — opens the walkthrough */}
+              <button
+                onClick={() => setWhatsNewOpen(true)}
+                className="flex items-center gap-3 px-2 py-1.5 rounded-md hover:bg-muted/60 transition-colors text-left active:scale-[0.98] w-full"
+              >
+                <span className="w-10 h-10 rounded-full bg-muted flex items-center justify-center shrink-0">
+                  <Sparkles size={18} className="text-foreground" />
+                </span>
+                <div className="flex flex-col">
+                  <span className="text-sm font-medium text-foreground leading-tight">
+                    {lang === "zh" ? "新功能" : "What's New"}
+                  </span>
+                  <span className="text-[11px] text-muted-foreground leading-tight">
+                    {lang === "zh" ? "查看最近更新" : "See the latest updates"}
+                  </span>
+                </div>
+              </button>
+
 
               {/* Support */}
               <button

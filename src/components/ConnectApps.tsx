@@ -26,7 +26,7 @@ interface Props {
 }
 
 const TERRA_PENDING_PROVIDER_KEY = "terra_pending_provider";
-const TERRA_PROVIDER_IDS = ["GARMIN", "POLAR", "SUUNTO", "COROS", "ZEPP", "FITBIT"] as const;
+const TERRA_PROVIDER_IDS = ["GARMIN", "POLAR", "COROS", "ZEPP", "FITBIT"] as const;
 
 type TerraConnRow = {
   id: string;

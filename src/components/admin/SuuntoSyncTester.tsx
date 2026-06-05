@@ -41,6 +41,7 @@ const SuuntoSyncTester = () => {
       // The registered URI is /suunto/callback, not /suunto-return.
       const redirect_uri = `${window.location.origin}/suunto/callback`;
       localStorage.setItem(SUUNTO_PENDING_REDIRECT_KEY, redirect_uri);
+      localStorage.setItem("suunto_pending_origin", "admin");
       if (native) {
         localStorage.setItem("suunto_pending_native", "runward");
       } else {

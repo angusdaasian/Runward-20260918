@@ -897,6 +897,22 @@ const ActivitiesTab = ({ lang }: Props) => {
     [],
   );
 
+  const invokeSuuntoSync = useCallback(async (sinceDays: number): Promise<number> => {
+    try {
+      const { data, error } = await supabase.functions.invoke("suunto-sync", {
+        body: { sinceDays },
+      });
+      if (error) {
+        console.warn("Suunto sync failed:", error);
+        return 0;
+      }
+      return typeof (data as any)?.count === "number" ? (data as any).count : 0;
+    } catch (e) {
+      console.warn("Suunto sync error:", e);
+      return 0;
+    }
+  }, []);
+
   const handleFetchTodayOnly = useCallback(async () => {
     if (!user || fetchingToday) return;
     setFetchingToday(true);
@@ -910,7 +926,7 @@ const ActivitiesTab = ({ lang }: Props) => {
       startOfToday.setHours(0, 0, 0, 0);
       const afterSec = Math.floor(startOfToday.getTime() / 1000);
 
-      const [terraRes, stravaCount] = await Promise.all([
+      const [terraRes, stravaCount, suuntoCount] = await Promise.all([
         fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/terra-sync-today`, {
           method: "POST",
           headers: {
@@ -921,6 +937,7 @@ const ActivitiesTab = ({ lang }: Props) => {
           body: JSON.stringify({ forceEnv: "prod" }),
         }),
         invokeStravaSync(accessToken, { after: afterSec, perPage: 30, environment: getAppEnvironment() }),
+        invokeSuuntoSync(1),
       ]);
       const result = await terraRes.json().catch(() => null);
       if (!terraRes.ok && terraRes.status !== 404) {
@@ -928,9 +945,9 @@ const ActivitiesTab = ({ lang }: Props) => {
       }
       invalidateAll();
       const terraCount = result?.activities ?? 0;
-      const count = terraCount + stravaCount;
+      const count = terraCount + stravaCount + suuntoCount;
       const msg = lang === "zh" ? result?.message_zh : result?.message_en;
-      if (result?.rateLimited && stravaCount === 0) {
+      if (result?.rateLimited && stravaCount === 0 && suuntoCount === 0) {
         toast.info(msg ?? (lang === "zh" ? "請稍後再試" : "Please try again later"));
       } else if (count > 0) {
         toast.success(lang === "zh" ? `已同步 ${count} 個今日活動` : `Synced ${count} of today's activities`);
@@ -943,7 +960,7 @@ const ActivitiesTab = ({ lang }: Props) => {
     }
     setFetchingToday(false);
 
-  }, [user, fetchingToday, invalidateAll, lang, invokeStravaSync]);
+  }, [user, fetchingToday, invalidateAll, lang, invokeStravaSync, invokeSuuntoSync]);
 
   const handleFetchWeekOnly = useCallback(async () => {
     if (!user || fetchingToday) return;
@@ -955,7 +972,7 @@ const ActivitiesTab = ({ lang }: Props) => {
 
       const afterSec = Math.floor(Date.now() / 1000) - 7 * 24 * 60 * 60;
 
-      const [terraRes, stravaCount] = await Promise.all([
+      const [terraRes, stravaCount, suuntoCount] = await Promise.all([
         fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/terra-sync-week`, {
           method: "POST",
           headers: {
@@ -966,6 +983,7 @@ const ActivitiesTab = ({ lang }: Props) => {
           body: JSON.stringify({ daysBack: 7, forceEnv: "prod" }),
         }),
         invokeStravaSync(accessToken, { after: afterSec, perPage: 100, environment: getAppEnvironment() }),
+        invokeSuuntoSync(7),
       ]);
       const result = await terraRes.json().catch(() => null);
       if (!terraRes.ok && terraRes.status !== 404) {
@@ -974,9 +992,9 @@ const ActivitiesTab = ({ lang }: Props) => {
       invalidateAll();
       const providers = Array.isArray(result?.providers) ? result.providers : [];
       const terraIngested = providers.reduce((s: number, p: any) => s + (p?.ingested ?? 0), 0);
-      const ingested = terraIngested + stravaCount;
+      const ingested = terraIngested + stravaCount + suuntoCount;
       const msg = lang === "zh" ? result?.message_zh : result?.message_en;
-      if (result?.rateLimited && stravaCount === 0) {
+      if (result?.rateLimited && stravaCount === 0 && suuntoCount === 0) {
         toast.info(msg ?? (lang === "zh" ? "請稍後再試" : "Please try again later"));
       } else if (ingested > 0) {
         toast.success(lang === "zh" ? `已同步 ${ingested} 個近 7 天活動` : `Synced ${ingested} activities from past 7 days`);
@@ -989,7 +1007,7 @@ const ActivitiesTab = ({ lang }: Props) => {
       toast.error(lang === "zh" ? "同步失敗" : "Sync failed");
     }
     setFetchingToday(false);
-  }, [user, fetchingToday, invalidateAll, lang, invokeStravaSync]);
+  }, [user, fetchingToday, invalidateAll, lang, invokeStravaSync, invokeSuuntoSync]);
 
   const handleFetchStrava30Days = useCallback(async () => {
     if (!user || fetchingToday) return;

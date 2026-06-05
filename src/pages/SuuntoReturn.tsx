@@ -61,7 +61,13 @@ export default function SuuntoReturn() {
         }
         localStorage.removeItem(SUUNTO_PENDING_REDIRECT_KEY);
         localStorage.removeItem("suunto_pending_native");
-        navigate("/admin?tab=suunto", { replace: true });
+        const origin = localStorage.getItem("suunto_pending_origin");
+        localStorage.removeItem("suunto_pending_origin");
+        if (origin === "admin") {
+          navigate("/admin?tab=suunto", { replace: true });
+        } else {
+          navigate("/?page=connect-apps", { replace: true });
+        }
       } catch (e: unknown) {
         if (!cancelled) setError(e instanceof Error ? e.message : String(e));
       }

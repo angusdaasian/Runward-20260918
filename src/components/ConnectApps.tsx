@@ -142,7 +142,74 @@ const ConnectApps = ({ lang, onBack }: Props) => {
     }
   };
 
-  const handleConnectGarmin = () => {
+  const [suuntoBusy, setSuuntoBusy] = useState<string | null>(null);
+
+  const handleConnectSuunto = async () => {
+    if (!user) return;
+    if (hasFitnessApp || hasTerraConn) {
+      toast.error(lang === "zh" ? "請先中斷現有健身應用再連接新的" : "Please disconnect the current fitness app before connecting a new one");
+      return;
+    }
+    setSuuntoBusy("connect");
+    try {
+      const native = isDespiaUA();
+      const redirect_uri = `${window.location.origin}/suunto/callback`;
+      localStorage.setItem(SUUNTO_PENDING_REDIRECT_KEY, redirect_uri);
+      if (native) {
+        localStorage.setItem("suunto_pending_native", "runward");
+      } else {
+        localStorage.removeItem("suunto_pending_native");
+      }
+      const { data, error } = await supabase.functions.invoke("suunto-auth", {
+        body: { redirect_uri },
+      });
+      if (error || !(data as any)?.url) {
+        throw new Error((data as any)?.error || error?.message || "Auth init failed");
+      }
+      if (native) {
+        despia(`oauth://?url=${encodeURIComponent((data as any).url as string)}`);
+        setSuuntoBusy(null);
+      } else {
+        window.location.href = (data as any).url as string;
+      }
+    } catch (e: unknown) {
+      localStorage.removeItem(SUUNTO_PENDING_REDIRECT_KEY);
+      toast.error((lang === "zh" ? "Suunto 啟動失敗: " : "Failed to start Suunto: ") + errorMessage(e));
+      setSuuntoBusy(null);
+    }
+  };
+
+  const handleDisconnectSuunto = async () => {
+    setSuuntoBusy("disconnect");
+    try {
+      const { error } = await supabase.functions.invoke("suunto-disconnect");
+      if (error) throw error;
+      setSuuntoConnected(false);
+      toast.success(lang === "zh" ? "已中斷 Suunto 連結" : "Suunto disconnected");
+    } catch (e: unknown) {
+      toast.error((lang === "zh" ? "中斷失敗: " : "Disconnect failed: ") + errorMessage(e));
+    } finally {
+      setSuuntoBusy(null);
+    }
+  };
+
+  const handleSyncSuunto = async () => {
+    setSuuntoBusy("sync");
+    try {
+      const { data, error } = await supabase.functions.invoke("suunto-sync", {
+        body: { sinceDays: 30 },
+      });
+      if (error) throw error;
+      toast.success(lang === "zh"
+        ? `已同步 ${(data as any)?.count ?? 0} 個活動`
+        : `Synced ${(data as any)?.count ?? 0} activities`);
+    } catch (e: unknown) {
+      toast.error((lang === "zh" ? "同步失敗: " : "Sync failed: ") + errorMessage(e));
+    } finally {
+      setSuuntoBusy(null);
+    }
+  };
+
     if (hasFitnessApp) {
       toast.error(lang === "zh" ? "請先中斷現有健身應用再連接新的" : "Please disconnect the current fitness app before connecting a new one");
       return;

@@ -11,8 +11,11 @@ const STORAGE_KEY = "walkthrough_v2026_06_simple_widgets_seen";
 
 interface Props {
   lang: Lang;
-  /** Walkthrough only triggers when this is true (e.g. on the activities tab, signed-in). */
+  /** Walkthrough only auto-triggers when this is true (e.g. on the activities tab, signed-in). */
   enabled: boolean;
+  /** Manual control (e.g. from a menu). When true, opens the walkthrough without writing the "seen" flag. */
+  manualOpen?: boolean;
+  onManualOpenChange?: (open: boolean) => void;
 }
 
 const tx = (lang: Lang, en: string, zh: string) => (lang === "zh" ? zh : en);

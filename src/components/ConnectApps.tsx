@@ -194,22 +194,6 @@ const ConnectApps = ({ lang, onBack }: Props) => {
     }
   };
 
-  const handleSyncSuunto = async () => {
-    setSuuntoBusy("sync");
-    try {
-      const { data, error } = await supabase.functions.invoke("suunto-sync", {
-        body: { sinceDays: 30 },
-      });
-      if (error) throw error;
-      toast.success(lang === "zh"
-        ? `已同步 ${(data as any)?.count ?? 0} 個活動`
-        : `Synced ${(data as any)?.count ?? 0} activities`);
-    } catch (e: unknown) {
-      toast.error((lang === "zh" ? "同步失敗: " : "Sync failed: ") + errorMessage(e));
-    } finally {
-      setSuuntoBusy(null);
-    }
-  };
 
   const handleConnectGarmin = () => {
     if (hasFitnessApp) {
@@ -621,13 +605,6 @@ const ConnectApps = ({ lang, onBack }: Props) => {
                   <div className="flex items-center gap-2">
                     {suuntoBusy && <RefreshCw size={14} className="animate-spin text-muted-foreground" />}
                     <Check size={16} className="text-green-500" />
-                    <button
-                      onClick={handleSyncSuunto}
-                      disabled={!!suuntoBusy}
-                      className="text-xs text-primary hover:underline disabled:opacity-50"
-                    >
-                      {lang === "zh" ? "同步" : "Sync"}
-                    </button>
                     <button
                       onClick={handleDisconnectSuunto}
                       disabled={!!suuntoBusy}

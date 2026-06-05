@@ -341,7 +341,7 @@ const WhatsNewWalkthrough = ({ lang, enabled }: Props) => {
           <div
             style={{
               transform: `translateX(${dragX}px)`,
-              transition: isDragging ? "none" : "transform 200ms ease-out",
+              transition: isDragging ? "none" : "transform 500ms cubic-bezier(0.32, 0.72, 0, 1)",
             }}
           >
             <h2 className="font-display text-xl font-bold text-foreground mt-1">{current.title}</h2>

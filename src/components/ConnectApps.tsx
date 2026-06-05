@@ -132,13 +132,20 @@ const ConnectApps = ({ lang, onBack }: Props) => {
     window.location.href = data.url;
   };
 
+  const [stravaBusy, setStravaBusy] = useState(false);
+
   const handleDisconnectStrava = async () => {
-    const { error } = await supabase.functions.invoke("strava-disconnect");
-    if (error) {
-      toast.error(lang === "zh" ? "中斷連結失敗" : "Failed to disconnect");
-    } else {
-      setStravaConnected(false);
-      toast.success(lang === "zh" ? "已中斷 Strava 連結" : "Strava disconnected");
+    setStravaBusy(true);
+    try {
+      const { error } = await supabase.functions.invoke("strava-disconnect");
+      if (error) {
+        toast.error(lang === "zh" ? "中斷連結失敗" : "Failed to disconnect");
+      } else {
+        setStravaConnected(false);
+        toast.success(lang === "zh" ? "已中斷 Strava 連結" : "Strava disconnected");
+      }
+    } finally {
+      setStravaBusy(false);
     }
   };
 

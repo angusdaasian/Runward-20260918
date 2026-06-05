@@ -49,6 +49,7 @@ const ConnectApps = ({ lang, onBack }: Props) => {
   const [appleHealthConnected, setAppleHealthConnected] = useState(false);
   const [garminConnected, setGarminConnected] = useState(false);
   const [suuntoConnected, setSuuntoConnected] = useState(false);
+  const [stravaFull, setStravaFull] = useState(false);
   const [loading, setLoading] = useState(true);
   const appleHealth = useAppleHealth(lang);
   const garmin = useGarmin(lang);
@@ -74,6 +75,12 @@ const ConnectApps = ({ lang, onBack }: Props) => {
   }, [user]);
 
   useEffect(() => { checkConnections(); }, [checkConnections]);
+
+  useEffect(() => {
+    supabase.functions.invoke("strava-capacity")
+      .then(({ data }) => setStravaFull(!!(data as any)?.full))
+      .catch(() => setStravaFull(false));
+  }, []);
 
   useEffect(() => {
     if (appleHealthConnected && !appleHealth.syncing) {
@@ -670,13 +677,20 @@ const ConnectApps = ({ lang, onBack }: Props) => {
                 ) : (
                   <button
                     onClick={handleConnectStrava}
-                    disabled={stravaDisabledByOther}
-                    className={`text-xs font-medium px-3 py-1 rounded-full ${stravaDisabledByOther ? "bg-muted text-muted-foreground cursor-not-allowed" : "text-primary-foreground bg-primary"} disabled:opacity-50`}
+                    disabled={stravaDisabledByOther || stravaFull}
+                    className={`text-xs font-medium px-3 py-1 rounded-full ${(stravaDisabledByOther || stravaFull) ? "bg-muted text-muted-foreground cursor-not-allowed" : "text-primary-foreground bg-primary"} disabled:opacity-50`}
                   >
                     {lang === "zh" ? "連結" : "Connect"}
                   </button>
                 )}
               </div>
+              {!stravaConnected && stravaFull && (
+                <p className="text-xs text-muted-foreground mt-2">
+                  {lang === "zh"
+                    ? "Strava 名額已滿,我們正向 Strava 申請更多名額,請稍後再試。"
+                    : "Max athletes connected. We've requested more capacity from Strava — please check back soon."}
+                </p>
+              )}
             </div>
           );
         })()}

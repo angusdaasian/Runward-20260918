@@ -275,8 +275,8 @@ const WhatsNewWalkthrough = ({ lang, enabled }: Props) => {
       title: tx(lang, "Connect Strava", "連結 Strava"),
       desc: tx(
         lang,
-        "Sync runs automatically by linking your Strava account. Heads up: Strava currently limits us to about 20 connected athletes while our app awaits full approval — connect early to grab a spot.",
-        "連結 Strava 帳號即可自動同步跑步紀錄。注意：在 Strava 完成審核前，目前只開放約 20 位用戶連結，請盡早連結以保留名額。"
+        "Sync runs automatically by linking your Strava account. Heads up: Strava currently limits us to about 10 connected athletes while our app awaits full approval — connect early to grab a spot.",
+        "連結 Strava 帳號即可自動同步跑步紀錄。注意：在 Strava 完成審核前，目前只開放約 10 位用戶連結，請盡早連結以保留名額。"
       ),
       illustration: <StravaIllustration lang={lang} />,
     },

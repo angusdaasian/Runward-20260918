@@ -625,20 +625,12 @@ const Onboarding = ({
       return;
     }
 
-    if (authData.user && !authData.session) {
-      setSignupInProgress(false);
-      setSaving(false);
-      setIsAccountCreationInFlight(false);
-      setOnboardingUserId(authData.user.id);
-      localStorage.setItem("onboarding_show_plan_prompt", "true");
-      saveOnboardingDataToStorage();
-      setStep(12);
-      return;
-    }
-
+    // Email verification is disabled in Supabase — skip the OTP step entirely
+    // and proceed straight to finalizing the account on step 11.
     if (authData.user) {
       setOnboardingUserId(authData.user.id);
       localStorage.setItem("onboarding_show_plan_prompt", "true");
+      saveOnboardingDataToStorage();
     }
   };
 

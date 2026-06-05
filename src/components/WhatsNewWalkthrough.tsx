@@ -225,9 +225,9 @@ const WhatsNewWalkthrough = ({ lang, enabled }: Props) => {
   const [step, setStep] = useState(0);
   const [dragX, setDragX] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
-  const touchStartX = (typeof window !== "undefined") ? { current: 0 } : { current: 0 };
-  const touchStartY = { current: 0 };
-  const axisLock = { current: null as null | "x" | "y" };
+  const touchStartX = useRef(0);
+  const touchStartY = useRef(0);
+  const axisLock = useRef<null | "x" | "y">(null);
 
   useEffect(() => {
     if (!enabled) return;

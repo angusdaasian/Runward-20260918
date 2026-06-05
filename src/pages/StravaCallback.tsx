@@ -31,7 +31,18 @@ export default function StravaCallback() {
     (async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
-        setError("You must be signed in to connect Strava");
+        // We're in the external system browser opened by Despia's oauth://
+        // bridge — there's no Supabase session here. Bounce back into the
+        // in-app WebView via the runward:// deeplink so it can finish the
+        // token exchange (mirrors the Suunto flow).
+        const forwarded = new URLSearchParams();
+        forwarded.set("code", code);
+        if (state) forwarded.set("state", state);
+        const deepLink = `runward://oauth/auth/callback?${forwarded.toString()}`;
+        window.location.href = deepLink;
+        setTimeout(() => {
+          setError("Please sign in again before connecting Strava");
+        }, 3000);
         return;
       }
       const { error: fnErr } = await supabase.functions.invoke("strava-callback", {
@@ -43,8 +54,9 @@ export default function StravaCallback() {
         return;
       }
       toast.success("Strava connected");
-      navigate("/", { replace: true });
+      navigate("/?page=connect-apps", { replace: true });
     })();
+
   }, [searchParams, navigate]);
 
   return (

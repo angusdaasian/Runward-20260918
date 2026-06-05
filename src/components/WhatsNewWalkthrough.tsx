@@ -252,8 +252,8 @@ const WhatsNewWalkthrough = ({ lang, enabled }: Props) => {
       title: tx(lang, "New Widget Analytics", "全新小工具數據分析"),
       desc: tx(
         lang,
-        "Your Analytics tab is now a personalised widget board. Tap to open, long-press to rearrange, and use Customize to pick widgets or switch back to the classic view.",
-        "「數據分析」分頁現已升級為個人化小工具版面。點選查看、長按可拖曳排序，使用「自訂」選擇小工具或切換回經典版面。"
+        "Your Analytics tab now has a personalised Widgets view. Tap to open, long-press to rearrange, and use the Classic / Widgets toggle at the top to switch between the new widget board and the classic view.",
+        "「數據分析」分頁新增了個人化「小工具」版面。點選查看、長按可拖曳排序，並可透過頂部的「傳統 / 小工具」切換在新版小工具與傳統版面之間切換。"
       ),
       illustration: <WidgetsIllustration lang={lang} />,
     },

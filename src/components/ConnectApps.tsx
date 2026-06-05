@@ -649,7 +649,9 @@ const ConnectApps = ({ lang, onBack }: Props) => {
                   <div>
                     <span className="font-medium text-foreground block">Strava</span>
                     <span className="text-xs text-muted-foreground">
-                      {t("stravaConnectDesc", lang)}
+                      {lang === "zh"
+                        ? "同步跑步活動數據、配速、心率、海拔及訓練負荷"
+                        : "Sync running activity data, pace, heart rate, elevation & training load"}
                     </span>
                   </div>
                 </div>

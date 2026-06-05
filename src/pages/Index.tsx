@@ -352,6 +352,11 @@ const Index = () => {
 
       <PromoBanner lang={lang} userId={user?.id ?? null} triggerKey={promoTrigger} />
 
+      <WhatsNewWalkthrough
+        lang={lang}
+        enabled={!!user && !isGuest && !showOnboarding && activeTab === "activities"}
+      />
+
       {!isGuest && user && !aiChatDisabled && (
         <Suspense fallback={null}>
           <FloatingChatButton lang={lang} />

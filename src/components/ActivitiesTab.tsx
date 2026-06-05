@@ -913,6 +913,20 @@ const ActivitiesTab = ({ lang }: Props) => {
     }
   }, []);
 
+  const detectProviders = useCallback(async (): Promise<{ terra: boolean; strava: boolean; suunto: boolean }> => {
+    if (!user) return { terra: false, strava: false, suunto: false };
+    const [terraRes, stravaRes, suuntoRes] = await Promise.all([
+      supabase.from("terra_connections").select("user_id").eq("user_id", user.id).eq("active", true).limit(1).maybeSingle(),
+      supabase.from("strava_connections").select("user_id").eq("user_id", user.id).limit(1).maybeSingle(),
+      supabase.from("suunto_connections").select("user_id").eq("user_id", user.id).limit(1).maybeSingle(),
+    ]);
+    return {
+      terra: !!terraRes.data,
+      strava: !!stravaRes.data,
+      suunto: !!suuntoRes.data,
+    };
+  }, [user]);
+
   const handleFetchTodayOnly = useCallback(async () => {
     if (!user || fetchingToday) return;
     setFetchingToday(true);
@@ -921,26 +935,32 @@ const ActivitiesTab = ({ lang }: Props) => {
       const accessToken = sessionData?.session?.access_token;
       if (!accessToken) throw new Error("Not authenticated");
 
+      const providers = await detectProviders();
+
       // Today window in epoch seconds for Strava
       const startOfToday = new Date();
       startOfToday.setHours(0, 0, 0, 0);
       const afterSec = Math.floor(startOfToday.getTime() / 1000);
 
-      const [terraRes, stravaCount, suuntoCount] = await Promise.all([
-        fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/terra-sync-today`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${accessToken}`,
-            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-          },
-          body: JSON.stringify({ forceEnv: "prod" }),
-        }),
-        invokeStravaSync(accessToken, { after: afterSec, perPage: 30, environment: getAppEnvironment() }),
-        invokeSuuntoSync(1),
-      ]);
-      const result = await terraRes.json().catch(() => null);
-      if (!terraRes.ok && terraRes.status !== 404) {
+      const terraPromise = providers.terra
+        ? fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/terra-sync-today`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${accessToken}`,
+              apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+            },
+            body: JSON.stringify({ forceEnv: "prod" }),
+          })
+        : Promise.resolve(null);
+      const stravaPromise = providers.strava
+        ? invokeStravaSync(accessToken, { after: afterSec, perPage: 30, environment: getAppEnvironment() })
+        : Promise.resolve(0);
+      const suuntoPromise = providers.suunto ? invokeSuuntoSync(1) : Promise.resolve(0);
+
+      const [terraRes, stravaCount, suuntoCount] = await Promise.all([terraPromise, stravaPromise, suuntoPromise]);
+      const result = terraRes ? await terraRes.json().catch(() => null) : null;
+      if (terraRes && !terraRes.ok && terraRes.status !== 404) {
         throw new Error(result?.error ?? `Sync failed (${terraRes.status})`);
       }
       invalidateAll();
@@ -960,7 +980,7 @@ const ActivitiesTab = ({ lang }: Props) => {
     }
     setFetchingToday(false);
 
-  }, [user, fetchingToday, invalidateAll, lang, invokeStravaSync, invokeSuuntoSync]);
+  }, [user, fetchingToday, invalidateAll, lang, invokeStravaSync, invokeSuuntoSync, detectProviders]);
 
   const handleFetchWeekOnly = useCallback(async () => {
     if (!user || fetchingToday) return;
@@ -970,28 +990,34 @@ const ActivitiesTab = ({ lang }: Props) => {
       const accessToken = sessionData?.session?.access_token;
       if (!accessToken) throw new Error("Not authenticated");
 
+      const providers = await detectProviders();
+
       const afterSec = Math.floor(Date.now() / 1000) - 7 * 24 * 60 * 60;
 
-      const [terraRes, stravaCount, suuntoCount] = await Promise.all([
-        fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/terra-sync-week`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${accessToken}`,
-            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-          },
-          body: JSON.stringify({ daysBack: 7, forceEnv: "prod" }),
-        }),
-        invokeStravaSync(accessToken, { after: afterSec, perPage: 100, environment: getAppEnvironment() }),
-        invokeSuuntoSync(7),
-      ]);
-      const result = await terraRes.json().catch(() => null);
-      if (!terraRes.ok && terraRes.status !== 404) {
+      const terraPromise = providers.terra
+        ? fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/terra-sync-week`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${accessToken}`,
+              apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+            },
+            body: JSON.stringify({ daysBack: 7, forceEnv: "prod" }),
+          })
+        : Promise.resolve(null);
+      const stravaPromise = providers.strava
+        ? invokeStravaSync(accessToken, { after: afterSec, perPage: 100, environment: getAppEnvironment() })
+        : Promise.resolve(0);
+      const suuntoPromise = providers.suunto ? invokeSuuntoSync(7) : Promise.resolve(0);
+
+      const [terraRes, stravaCount, suuntoCount] = await Promise.all([terraPromise, stravaPromise, suuntoPromise]);
+      const result = terraRes ? await terraRes.json().catch(() => null) : null;
+      if (terraRes && !terraRes.ok && terraRes.status !== 404) {
         throw new Error(result?.error ?? `Sync failed (${terraRes.status})`);
       }
       invalidateAll();
-      const providers = Array.isArray(result?.providers) ? result.providers : [];
-      const terraIngested = providers.reduce((s: number, p: any) => s + (p?.ingested ?? 0), 0);
+      const providersResult = Array.isArray(result?.providers) ? result.providers : [];
+      const terraIngested = providersResult.reduce((s: number, p: any) => s + (p?.ingested ?? 0), 0);
       const ingested = terraIngested + stravaCount + suuntoCount;
       const msg = lang === "zh" ? result?.message_zh : result?.message_en;
       if (result?.rateLimited && stravaCount === 0 && suuntoCount === 0) {
@@ -1007,7 +1033,8 @@ const ActivitiesTab = ({ lang }: Props) => {
       toast.error(lang === "zh" ? "同步失敗" : "Sync failed");
     }
     setFetchingToday(false);
-  }, [user, fetchingToday, invalidateAll, lang, invokeStravaSync, invokeSuuntoSync]);
+  }, [user, fetchingToday, invalidateAll, lang, invokeStravaSync, invokeSuuntoSync, detectProviders]);
+
 
   const handleFetchStrava30Days = useCallback(async () => {
     if (!user || fetchingToday) return;

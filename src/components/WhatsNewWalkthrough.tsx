@@ -48,7 +48,7 @@ const SimpleModeIllustration = ({ lang }: { lang: Lang }) => (
       <ArrowRight size={12} className="text-primary" />
     </div>
 
-    <div className="ml-auto mt-2 w-[80%] rounded-lg bg-card border-2 border-primary shadow-lg p-2">
+    <div className="ml-auto mt-2 w-[80%] rounded-lg border-2 border-primary/40 shadow-lg p-2 bg-transparent backdrop-blur-sm">
       <div className="flex items-center gap-2 p-1.5 rounded-md bg-primary/10">
         <span className="w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center">
           <Sparkles size={14} />
@@ -77,9 +77,13 @@ const WidgetsIllustration = ({ lang }: { lang: Lang }) => (
   <div className="relative w-full rounded-xl bg-muted/40 border border-border p-3 overflow-hidden">
     <div className="flex items-center justify-between mb-2">
       <div className="h-2.5 w-20 rounded bg-foreground/40" />
-      <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-primary text-primary-foreground text-[10px] font-semibold ring-2 ring-primary/30">
-        <Settings2 size={11} />
-        {tx(lang, "Customize", "自訂")}
+      <div className="inline-flex items-center rounded-md border border-border bg-card p-0.5 ring-2 ring-primary/30">
+        <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold text-muted-foreground">
+          {tx(lang, "Classic", "傳統")}
+        </span>
+        <span className="px-1.5 py-0.5 rounded bg-primary text-primary-foreground text-[9px] font-semibold">
+          {tx(lang, "Widgets", "小工具")}
+        </span>
       </div>
     </div>
 
@@ -120,7 +124,7 @@ const WidgetsIllustration = ({ lang }: { lang: Lang }) => (
       <div className="flex items-center gap-1.5">
         <Settings2 size={12} className="text-primary shrink-0" />
         <span className="text-[10px] text-foreground/80">
-          {tx(lang, "Customize: pick widgets or switch to classic view", "自訂：選擇小工具或切換經典版面")}
+          {tx(lang, "Toggle between Classic and Widgets view", "在「傳統」與「小工具」版面間切換")}
         </span>
       </div>
     </div>
@@ -128,29 +132,33 @@ const WidgetsIllustration = ({ lang }: { lang: Lang }) => (
 );
 
 const TextSizeIllustration = ({ lang }: { lang: Lang }) => (
-  <div className="relative w-full rounded-xl bg-muted/40 border border-border p-4 overflow-hidden">
-    <div className="flex items-center gap-2 mb-3">
-      <Type size={14} className="text-primary" />
-      <span className="text-[11px] font-semibold uppercase tracking-wider text-foreground">
-        {tx(lang, "Text size", "文字大小")}
+  <div className="relative w-full rounded-xl bg-card border border-border p-4 overflow-hidden">
+    <div className="flex items-center justify-between mb-3">
+      <div className="flex items-center gap-2">
+        <span aria-hidden className="font-display font-semibold text-primary text-base leading-none w-4 text-center">A</span>
+        <span className="text-[12px] font-medium text-foreground">
+          {tx(lang, "Text Size", "文字大小")}
+        </span>
+      </div>
+      <span className="text-[10px] text-muted-foreground">
+        {tx(lang, "Large", "大")}
       </span>
     </div>
 
-    <div className="space-y-2">
+    <div className="flex gap-2">
       {[
-        { label: tx(lang, "Small", "小"), size: "text-[10px]", active: false },
-        { label: tx(lang, "Default", "預設"), size: "text-[13px]", active: false },
-        { label: tx(lang, "Large", "大"), size: "text-[16px]", active: true },
-        { label: tx(lang, "Extra large", "特大"), size: "text-[19px]", active: false },
+        { label: "A", sub: tx(lang, "Default", "預設"), size: "text-sm", active: false },
+        { label: "A", sub: tx(lang, "Large", "大"), size: "text-base", active: true },
+        { label: "A", sub: tx(lang, "X-Large", "特大"), size: "text-lg", active: false },
       ].map((opt, i) => (
         <div
           key={i}
-          className={`flex items-center justify-between rounded-md border px-3 py-2 ${
-            opt.active ? "border-primary bg-primary/10 ring-2 ring-primary/20" : "border-border bg-card"
+          className={`flex-1 py-2.5 rounded-lg flex flex-col items-center justify-center gap-1 ${
+            opt.active ? "bg-primary text-primary-foreground" : "bg-accent text-foreground"
           }`}
         >
-          <span className={`${opt.size} font-medium text-foreground`}>Aa</span>
-          <span className="text-[11px] text-muted-foreground">{opt.label}</span>
+          <span className={`font-display font-semibold leading-none ${opt.size}`}>{opt.label}</span>
+          <span className="text-[10px] opacity-80 leading-none">{opt.sub}</span>
         </div>
       ))}
     </div>
@@ -244,8 +252,8 @@ const WhatsNewWalkthrough = ({ lang, enabled }: Props) => {
       title: tx(lang, "New Widget Analytics", "全新小工具數據分析"),
       desc: tx(
         lang,
-        "Your Analytics tab is now a personalised widget board. Tap to open, long-press to rearrange, and use Customize to pick widgets or switch back to the classic view.",
-        "「數據分析」分頁現已升級為個人化小工具版面。點選查看、長按可拖曳排序，使用「自訂」選擇小工具或切換回經典版面。"
+        "Your Analytics tab now has a personalised Widgets view. Tap to open, long-press to rearrange, and use the Classic / Widgets toggle at the top to switch between the new widget board and the classic view.",
+        "「數據分析」分頁新增了個人化「小工具」版面。點選查看、長按可拖曳排序，並可透過頂部的「傳統 / 小工具」切換在新版小工具與傳統版面之間切換。"
       ),
       illustration: <WidgetsIllustration lang={lang} />,
     },

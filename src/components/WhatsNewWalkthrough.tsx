@@ -223,7 +223,7 @@ const StravaIllustration = ({ lang }: { lang: Lang }) => (
 
 /* -------------------- Component -------------------- */
 
-const WhatsNewWalkthrough = ({ lang, enabled }: Props) => {
+const WhatsNewWalkthrough = ({ lang, enabled, manualOpen, onManualOpenChange }: Props) => {
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState(0);
   const [dragX, setDragX] = useState(0);
@@ -241,10 +241,19 @@ const WhatsNewWalkthrough = ({ lang, enabled }: Props) => {
     return () => clearTimeout(t);
   }, [enabled]);
 
+  useEffect(() => {
+    if (manualOpen) {
+      setStep(0);
+      setOpen(true);
+    }
+  }, [manualOpen]);
+
   const close = () => {
     try { localStorage.setItem(STORAGE_KEY, "true"); } catch { /* ignore */ }
     setOpen(false);
+    onManualOpenChange?.(false);
   };
+
 
   const steps = [
     {

@@ -443,6 +443,12 @@ const AppHeader = ({ lang, onNavigateSettings, onOpenPromoBanner, isGuest }: App
         </Popover>
         <AppGuideDialog open={guideOpen} onOpenChange={setGuideOpen} lang={lang} />
         <RoadmapDialog open={roadmapOpen} onOpenChange={setRoadmapOpen} lang={lang} />
+        <WhatsNewWalkthrough
+          lang={lang}
+          enabled={false}
+          manualOpen={whatsNewOpen}
+          onManualOpenChange={setWhatsNewOpen}
+        />
       </div>
     </div>
   );

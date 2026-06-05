@@ -203,8 +203,8 @@ const StravaIllustration = ({ lang }: { lang: Lang }) => (
       <div className="text-[10px] text-foreground/80 leading-relaxed">
         {tx(
           lang,
-          "Strava currently limits us to ~20 connected athletes while our app awaits approval. Connect early to secure a slot.",
-          "Strava 在我們的應用程式審核期間，目前只允許約 20 位用戶連結。請盡早連結以保留名額。"
+          "Strava currently limits us to ~10 connected athletes while our app awaits approval. Connect early to secure a slot.",
+          "Strava 在我們的應用程式審核期間，目前只允許約 10 位用戶連結。請盡早連結以保留名額。"
         )}
       </div>
     </div>
@@ -275,8 +275,8 @@ const WhatsNewWalkthrough = ({ lang, enabled }: Props) => {
       title: tx(lang, "Connect Strava", "連結 Strava"),
       desc: tx(
         lang,
-        "Sync runs automatically by linking your Strava account. Heads up: Strava currently limits us to about 20 connected athletes while our app awaits full approval — connect early to grab a spot.",
-        "連結 Strava 帳號即可自動同步跑步紀錄。注意：在 Strava 完成審核前，目前只開放約 20 位用戶連結，請盡早連結以保留名額。"
+        "Sync runs automatically by linking your Strava account. Heads up: Strava currently limits us to about 10 connected athletes while our app awaits full approval — connect early to grab a spot.",
+        "連結 Strava 帳號即可自動同步跑步紀錄。注意：在 Strava 完成審核前，目前只開放約 10 位用戶連結，請盡早連結以保留名額。"
       ),
       illustration: <StravaIllustration lang={lang} />,
     },

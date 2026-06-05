@@ -26,7 +26,8 @@ interface Props {
 }
 
 const TERRA_PENDING_PROVIDER_KEY = "terra_pending_provider";
-const TERRA_PROVIDER_IDS = ["GARMIN", "POLAR", "SUUNTO", "COROS", "ZEPP", "FITBIT"] as const;
+const SUUNTO_PENDING_REDIRECT_KEY = "suunto_pending_redirect_uri";
+const TERRA_PROVIDER_IDS = ["GARMIN", "POLAR", "COROS", "ZEPP", "FITBIT"] as const;
 
 type TerraConnRow = {
   id: string;
@@ -141,6 +142,74 @@ const ConnectApps = ({ lang, onBack }: Props) => {
     }
   };
 
+  const [suuntoBusy, setSuuntoBusy] = useState<string | null>(null);
+
+  const handleConnectSuunto = async () => {
+    if (!user) return;
+    if (hasFitnessApp || hasTerraConn) {
+      toast.error(lang === "zh" ? "請先中斷現有健身應用再連接新的" : "Please disconnect the current fitness app before connecting a new one");
+      return;
+    }
+    setSuuntoBusy("connect");
+    try {
+      const native = isDespiaUA();
+      const redirect_uri = `${window.location.origin}/suunto/callback`;
+      localStorage.setItem(SUUNTO_PENDING_REDIRECT_KEY, redirect_uri);
+      if (native) {
+        localStorage.setItem("suunto_pending_native", "runward");
+      } else {
+        localStorage.removeItem("suunto_pending_native");
+      }
+      const { data, error } = await supabase.functions.invoke("suunto-auth", {
+        body: { redirect_uri },
+      });
+      if (error || !(data as any)?.url) {
+        throw new Error((data as any)?.error || error?.message || "Auth init failed");
+      }
+      if (native) {
+        despia(`oauth://?url=${encodeURIComponent((data as any).url as string)}`);
+        setSuuntoBusy(null);
+      } else {
+        window.location.href = (data as any).url as string;
+      }
+    } catch (e: unknown) {
+      localStorage.removeItem(SUUNTO_PENDING_REDIRECT_KEY);
+      toast.error((lang === "zh" ? "Suunto 啟動失敗: " : "Failed to start Suunto: ") + errorMessage(e));
+      setSuuntoBusy(null);
+    }
+  };
+
+  const handleDisconnectSuunto = async () => {
+    setSuuntoBusy("disconnect");
+    try {
+      const { error } = await supabase.functions.invoke("suunto-disconnect");
+      if (error) throw error;
+      setSuuntoConnected(false);
+      toast.success(lang === "zh" ? "已中斷 Suunto 連結" : "Suunto disconnected");
+    } catch (e: unknown) {
+      toast.error((lang === "zh" ? "中斷失敗: " : "Disconnect failed: ") + errorMessage(e));
+    } finally {
+      setSuuntoBusy(null);
+    }
+  };
+
+  const handleSyncSuunto = async () => {
+    setSuuntoBusy("sync");
+    try {
+      const { data, error } = await supabase.functions.invoke("suunto-sync", {
+        body: { sinceDays: 30 },
+      });
+      if (error) throw error;
+      toast.success(lang === "zh"
+        ? `已同步 ${(data as any)?.count ?? 0} 個活動`
+        : `Synced ${(data as any)?.count ?? 0} activities`);
+    } catch (e: unknown) {
+      toast.error((lang === "zh" ? "同步失敗: " : "Sync failed: ") + errorMessage(e));
+    } finally {
+      setSuuntoBusy(null);
+    }
+  };
+
   const handleConnectGarmin = () => {
     if (hasFitnessApp) {
       toast.error(lang === "zh" ? "請先中斷現有健身應用再連接新的" : "Please disconnect the current fitness app before connecting a new one");
@@ -188,12 +257,11 @@ const ConnectApps = ({ lang, onBack }: Props) => {
     await garmin.syncActivities();
   };
 
-  type TerraProvider = "GARMIN" | "POLAR" | "SUUNTO" | "COROS" | "ZEPP" | "FITBIT";
+  type TerraProvider = "GARMIN" | "POLAR" | "COROS" | "ZEPP" | "FITBIT";
   const TERRA_PROVIDERS: { id: TerraProvider; label: string; icon: string }[] = [
     { id: "GARMIN", label: "Garmin", icon: garminIcon },
     { id: "COROS", label: "COROS", icon: corosIcon },
     { id: "POLAR", label: "Polar", icon: polarIcon },
-    { id: "SUUNTO", label: "Suunto", icon: suuntoIcon },
     { id: "ZEPP", label: "Zepp", icon: zeppIcon },
     { id: "FITBIT", label: "Fitbit", icon: fitbitIcon },
   ];
@@ -528,6 +596,58 @@ const ConnectApps = ({ lang, onBack }: Props) => {
             </div>
           );
         })}
+
+        {/* Suunto (official Suunto Cloud API) */}
+        {(() => {
+          const suuntoDisabledByOther = (stravaConnected || garminConnected || hasTerraConn) && !suuntoConnected;
+          return (
+            <div className={`bg-card border border-border rounded-xl p-4 ${suuntoDisabledByOther ? "opacity-50" : ""}`}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center overflow-hidden">
+                    <img src={suuntoIcon} alt="Suunto" className="w-full h-full object-cover" />
+                  </div>
+                  <div>
+                    <span className="font-medium text-foreground block">Suunto</span>
+                    <span className="text-xs text-muted-foreground">
+                      {lang === "zh"
+                        ? "同步跑步活動數據、配速、心率、海拔及訓練負荷"
+                        : "Sync running activity data, pace, heart rate, elevation & training load"}
+                    </span>
+                  </div>
+                </div>
+                {suuntoConnected ? (
+                  <div className="flex items-center gap-2">
+                    {suuntoBusy && <RefreshCw size={14} className="animate-spin text-muted-foreground" />}
+                    <Check size={16} className="text-green-500" />
+                    <button
+                      onClick={handleSyncSuunto}
+                      disabled={!!suuntoBusy}
+                      className="text-xs text-primary hover:underline disabled:opacity-50"
+                    >
+                      {lang === "zh" ? "同步" : "Sync"}
+                    </button>
+                    <button
+                      onClick={handleDisconnectSuunto}
+                      disabled={!!suuntoBusy}
+                      className="text-xs text-destructive hover:underline disabled:opacity-50"
+                    >
+                      {lang === "zh" ? "中斷" : "Disconnect"}
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={handleConnectSuunto}
+                    disabled={!!suuntoBusy || suuntoDisabledByOther}
+                    className={`text-xs font-medium px-3 py-1 rounded-full ${suuntoDisabledByOther ? "bg-muted text-muted-foreground cursor-not-allowed" : "text-primary-foreground bg-primary"} disabled:opacity-50`}
+                  >
+                    {suuntoBusy === "connect" ? "..." : (lang === "zh" ? "連結" : "Connect")}
+                  </button>
+                )}
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Strava */}
         {(() => {

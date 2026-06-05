@@ -606,13 +606,6 @@ const ConnectApps = ({ lang, onBack }: Props) => {
                     {suuntoBusy && <RefreshCw size={14} className="animate-spin text-muted-foreground" />}
                     <Check size={16} className="text-green-500" />
                     <button
-                      onClick={handleSyncSuunto}
-                      disabled={!!suuntoBusy}
-                      className="text-xs text-primary hover:underline disabled:opacity-50"
-                    >
-                      {lang === "zh" ? "同步" : "Sync"}
-                    </button>
-                    <button
                       onClick={handleDisconnectSuunto}
                       disabled={!!suuntoBusy}
                       className="text-xs text-destructive hover:underline disabled:opacity-50"

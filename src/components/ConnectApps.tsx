@@ -597,6 +597,58 @@ const ConnectApps = ({ lang, onBack }: Props) => {
           );
         })}
 
+        {/* Suunto (official Suunto Cloud API) */}
+        {(() => {
+          const suuntoDisabledByOther = (stravaConnected || garminConnected || hasTerraConn) && !suuntoConnected;
+          return (
+            <div className={`bg-card border border-border rounded-xl p-4 ${suuntoDisabledByOther ? "opacity-50" : ""}`}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center overflow-hidden">
+                    <img src={suuntoIcon} alt="Suunto" className="w-full h-full object-cover" />
+                  </div>
+                  <div>
+                    <span className="font-medium text-foreground block">Suunto</span>
+                    <span className="text-xs text-muted-foreground">
+                      {lang === "zh"
+                        ? "同步跑步活動數據、配速、心率、海拔及訓練負荷"
+                        : "Sync running activity data, pace, heart rate, elevation & training load"}
+                    </span>
+                  </div>
+                </div>
+                {suuntoConnected ? (
+                  <div className="flex items-center gap-2">
+                    {suuntoBusy && <RefreshCw size={14} className="animate-spin text-muted-foreground" />}
+                    <Check size={16} className="text-green-500" />
+                    <button
+                      onClick={handleSyncSuunto}
+                      disabled={!!suuntoBusy}
+                      className="text-xs text-primary hover:underline disabled:opacity-50"
+                    >
+                      {lang === "zh" ? "同步" : "Sync"}
+                    </button>
+                    <button
+                      onClick={handleDisconnectSuunto}
+                      disabled={!!suuntoBusy}
+                      className="text-xs text-destructive hover:underline disabled:opacity-50"
+                    >
+                      {lang === "zh" ? "中斷" : "Disconnect"}
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={handleConnectSuunto}
+                    disabled={!!suuntoBusy || suuntoDisabledByOther}
+                    className={`text-xs font-medium px-3 py-1 rounded-full ${suuntoDisabledByOther ? "bg-muted text-muted-foreground cursor-not-allowed" : "text-primary-foreground bg-primary"} disabled:opacity-50`}
+                  >
+                    {suuntoBusy === "connect" ? "..." : (lang === "zh" ? "連結" : "Connect")}
+                  </button>
+                )}
+              </div>
+            </div>
+          );
+        })()}
+
         {/* Strava */}
         {(() => {
           const stravaDisabledByOther = (garminConnected || hasTerraConn) && !stravaConnected;

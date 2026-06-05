@@ -4,6 +4,7 @@ import { Settings, Bell, Megaphone, Menu, Cloud, HelpCircle, Headset, Rocket, Us
 import { useSimpleMode } from "@/hooks/use-simple-mode";
 import AppGuideDialog from "@/components/AppGuideDialog";
 import RoadmapDialog from "@/components/RoadmapDialog";
+import WhatsNewWalkthrough from "@/components/WhatsNewWalkthrough";
 import { Lang } from "@/lib/i18n";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";

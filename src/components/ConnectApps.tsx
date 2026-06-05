@@ -77,6 +77,12 @@ const ConnectApps = ({ lang, onBack }: Props) => {
   useEffect(() => { checkConnections(); }, [checkConnections]);
 
   useEffect(() => {
+    supabase.functions.invoke("strava-capacity")
+      .then(({ data }) => setStravaFull(!!(data as any)?.full))
+      .catch(() => setStravaFull(false));
+  }, []);
+
+  useEffect(() => {
     if (appleHealthConnected && !appleHealth.syncing) {
       appleHealth.syncHealthData();
     }

@@ -77,9 +77,13 @@ const WidgetsIllustration = ({ lang }: { lang: Lang }) => (
   <div className="relative w-full rounded-xl bg-muted/40 border border-border p-3 overflow-hidden">
     <div className="flex items-center justify-between mb-2">
       <div className="h-2.5 w-20 rounded bg-foreground/40" />
-      <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-primary text-primary-foreground text-[10px] font-semibold ring-2 ring-primary/30">
-        <Settings2 size={11} />
-        {tx(lang, "Customize", "自訂")}
+      <div className="inline-flex items-center rounded-md border border-border bg-card p-0.5 ring-2 ring-primary/30">
+        <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold text-muted-foreground">
+          {tx(lang, "Classic", "傳統")}
+        </span>
+        <span className="px-1.5 py-0.5 rounded bg-primary text-primary-foreground text-[9px] font-semibold">
+          {tx(lang, "Widgets", "小工具")}
+        </span>
       </div>
     </div>
 

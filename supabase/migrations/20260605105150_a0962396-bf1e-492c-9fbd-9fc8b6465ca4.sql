@@ -1,0 +1,1 @@
+CREATE POLICY "Admins can view all strava connections" ON public.strava_connections FOR SELECT TO authenticated USING (public.has_role(auth.uid(), 'admin'));

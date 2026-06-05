@@ -188,12 +188,11 @@ const ConnectApps = ({ lang, onBack }: Props) => {
     await garmin.syncActivities();
   };
 
-  type TerraProvider = "GARMIN" | "POLAR" | "SUUNTO" | "COROS" | "ZEPP" | "FITBIT";
+  type TerraProvider = "GARMIN" | "POLAR" | "COROS" | "ZEPP" | "FITBIT";
   const TERRA_PROVIDERS: { id: TerraProvider; label: string; icon: string }[] = [
     { id: "GARMIN", label: "Garmin", icon: garminIcon },
     { id: "COROS", label: "COROS", icon: corosIcon },
     { id: "POLAR", label: "Polar", icon: polarIcon },
-    { id: "SUUNTO", label: "Suunto", icon: suuntoIcon },
     { id: "ZEPP", label: "Zepp", icon: zeppIcon },
     { id: "FITBIT", label: "Fitbit", icon: fitbitIcon },
   ];

@@ -115,6 +115,7 @@ const ConnectApps = ({ lang, onBack }: Props) => {
       toast.error(lang === "zh" ? "請先中斷現有健身應用再連接新的" : "Please disconnect the current fitness app before connecting a new one");
       return;
     }
+    const native = isDespiaUA();
     const redirect_uri = `${window.location.origin}/auth/callback`;
     const { data, error } = await supabase.functions.invoke("strava-auth", {
       body: { redirect_uri },
@@ -136,7 +137,13 @@ const ConnectApps = ({ lang, onBack }: Props) => {
       toast.error(lang === "zh" ? "無法啟動 Strava 連結" : "Failed to start Strava connection");
       return;
     }
-    window.location.href = data.url;
+    if (native) {
+      // Open in system browser via Despia deeplink so Google sign-in works
+      // (Google blocks OAuth inside embedded webviews).
+      despia(`oauth://?url=${encodeURIComponent(data.url as string)}`);
+    } else {
+      window.location.href = data.url;
+    }
   };
 
   const [stravaBusy, setStravaBusy] = useState(false);

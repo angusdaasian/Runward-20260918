@@ -655,8 +655,13 @@ const ConnectApps = ({ lang, onBack }: Props) => {
                 </div>
                 {stravaConnected ? (
                   <div className="flex items-center gap-2">
+                    {stravaBusy && <RefreshCw size={14} className="animate-spin text-muted-foreground" />}
                     <Check size={16} className="text-green-500" />
-                    <button onClick={handleDisconnectStrava} className="text-xs text-destructive hover:underline">
+                    <button
+                      onClick={handleDisconnectStrava}
+                      disabled={stravaBusy}
+                      className="text-xs text-destructive hover:underline disabled:opacity-50"
+                    >
                       {lang === "zh" ? "中斷" : "Disconnect"}
                     </button>
                   </div>

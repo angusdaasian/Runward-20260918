@@ -3,7 +3,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import {
   Sparkles, Menu, ArrowRight, ChevronRight, Settings2, Hand,
-  Activity, BarChart3, Heart, Moon,
+  Activity, BarChart3, Heart, Moon, Type, Link2,
 } from "lucide-react";
 import { Lang } from "@/lib/i18n";
 
@@ -41,7 +41,6 @@ const SimpleModeIllustration = ({ lang }: { lang: Lang }) => (
       </div>
     </div>
 
-    {/* Arrow + label */}
     <div className="flex items-center justify-end gap-1 mt-1 pr-1">
       <span className="text-[10px] font-semibold text-primary uppercase tracking-wide">
         {tx(lang, "Tap menu", "點選選單")}
@@ -49,7 +48,6 @@ const SimpleModeIllustration = ({ lang }: { lang: Lang }) => (
       <ArrowRight size={12} className="text-primary" />
     </div>
 
-    {/* Mock menu popover */}
     <div className="ml-auto mt-2 w-[80%] rounded-lg bg-card border-2 border-primary shadow-lg p-2">
       <div className="flex items-center gap-2 p-1.5 rounded-md bg-primary/10">
         <span className="w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center">
@@ -77,7 +75,6 @@ const SimpleModeIllustration = ({ lang }: { lang: Lang }) => (
 
 const WidgetsIllustration = ({ lang }: { lang: Lang }) => (
   <div className="relative w-full rounded-xl bg-muted/40 border border-border p-3 overflow-hidden">
-    {/* Top bar with Customize button */}
     <div className="flex items-center justify-between mb-2">
       <div className="h-2.5 w-20 rounded bg-foreground/40" />
       <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-primary text-primary-foreground text-[10px] font-semibold ring-2 ring-primary/30">
@@ -86,7 +83,6 @@ const WidgetsIllustration = ({ lang }: { lang: Lang }) => (
       </div>
     </div>
 
-    {/* 2x2 widget grid */}
     <div className="grid grid-cols-2 gap-2">
       {[
         { icon: Activity, label: tx(lang, "VO₂max", "VO₂max"), value: "48" },
@@ -108,7 +104,6 @@ const WidgetsIllustration = ({ lang }: { lang: Lang }) => (
       ))}
     </div>
 
-    {/* Annotations */}
     <div className="mt-2.5 space-y-1.5">
       <div className="flex items-center gap-1.5">
         <ChevronRight size={12} className="text-primary shrink-0" />
@@ -128,6 +123,89 @@ const WidgetsIllustration = ({ lang }: { lang: Lang }) => (
           {tx(lang, "Customize: pick widgets or switch to classic view", "自訂：選擇小工具或切換經典版面")}
         </span>
       </div>
+    </div>
+  </div>
+);
+
+const TextSizeIllustration = ({ lang }: { lang: Lang }) => (
+  <div className="relative w-full rounded-xl bg-muted/40 border border-border p-4 overflow-hidden">
+    <div className="flex items-center gap-2 mb-3">
+      <Type size={14} className="text-primary" />
+      <span className="text-[11px] font-semibold uppercase tracking-wider text-foreground">
+        {tx(lang, "Text size", "文字大小")}
+      </span>
+    </div>
+
+    <div className="space-y-2">
+      {[
+        { label: tx(lang, "Small", "小"), size: "text-[10px]", active: false },
+        { label: tx(lang, "Default", "預設"), size: "text-[13px]", active: false },
+        { label: tx(lang, "Large", "大"), size: "text-[16px]", active: true },
+        { label: tx(lang, "Extra large", "特大"), size: "text-[19px]", active: false },
+      ].map((opt, i) => (
+        <div
+          key={i}
+          className={`flex items-center justify-between rounded-md border px-3 py-2 ${
+            opt.active ? "border-primary bg-primary/10 ring-2 ring-primary/20" : "border-border bg-card"
+          }`}
+        >
+          <span className={`${opt.size} font-medium text-foreground`}>Aa</span>
+          <span className="text-[11px] text-muted-foreground">{opt.label}</span>
+        </div>
+      ))}
+    </div>
+
+    <div className="mt-3 flex items-start gap-1.5">
+      <Settings2 size={11} className="text-primary shrink-0 mt-0.5" />
+      <span className="text-[10px] text-foreground/80">
+        {tx(
+          lang,
+          "Find it under Settings → Display preferences",
+          "前往「設定 → 顯示偏好」調整"
+        )}
+      </span>
+    </div>
+  </div>
+);
+
+const StravaIllustration = ({ lang }: { lang: Lang }) => (
+  <div className="relative w-full rounded-xl bg-muted/40 border border-border p-4 overflow-hidden">
+    <div className="rounded-lg bg-card border-2 border-primary p-3 shadow">
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 rounded-lg bg-[hsl(16,100%,50%)] flex items-center justify-center text-white font-bold text-sm shadow">
+          S
+        </div>
+        <div className="flex-1">
+          <div className="text-[12px] font-semibold text-foreground">Strava</div>
+          <div className="text-[10px] text-muted-foreground">
+            {tx(lang, "Auto-sync your runs", "自動同步你的跑步")}
+          </div>
+        </div>
+        <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-primary text-primary-foreground text-[10px] font-semibold">
+          <Link2 size={10} />
+          {tx(lang, "Connect", "連結")}
+        </div>
+      </div>
+    </div>
+
+    <div className="mt-3 rounded-md border border-amber-500/40 bg-amber-500/10 p-2.5">
+      <div className="text-[10px] font-semibold text-amber-600 dark:text-amber-400 uppercase tracking-wider mb-0.5">
+        {tx(lang, "Limited spots", "名額有限")}
+      </div>
+      <div className="text-[10px] text-foreground/80 leading-relaxed">
+        {tx(
+          lang,
+          "Strava currently limits us to ~20 connected athletes while our app awaits approval. Connect early to secure a slot.",
+          "Strava 在我們的應用程式審核期間，目前只允許約 20 位用戶連結。請盡早連結以保留名額。"
+        )}
+      </div>
+    </div>
+
+    <div className="mt-2 flex items-center gap-1.5">
+      <ChevronRight size={12} className="text-primary shrink-0" />
+      <span className="text-[10px] text-foreground/80">
+        {tx(lang, "Go to Connect Apps to link Strava", "前往「連結應用程式」連接 Strava")}
+      </span>
     </div>
   </div>
 );
@@ -157,8 +235,8 @@ const WhatsNewWalkthrough = ({ lang, enabled }: Props) => {
       title: tx(lang, "Meet Simple Mode", "認識簡易模式"),
       desc: tx(
         lang,
-        "Hide advanced tabs (like Analytics) for a cleaner experience. Toggle anytime from the menu in the top-right.",
-        "隱藏進階分頁（例如數據分析），介面更清爽。隨時可從右上角選單切換。"
+        "Built for runners who just want to run — without being overwhelmed by data. Simple Mode hides advanced tabs (like Analytics) and gives you cleaner, more concise workout suggestions. Toggle it anytime from the menu in the top-right.",
+        "為只想專心跑步、不想被太多數據淹沒的跑者而設。簡易模式會隱藏進階分頁（例如數據分析），並提供更精簡的訓練建議。隨時可從右上角選單切換。"
       ),
       illustration: <SimpleModeIllustration lang={lang} />,
     },
@@ -170,6 +248,24 @@ const WhatsNewWalkthrough = ({ lang, enabled }: Props) => {
         "「數據分析」分頁現已升級為個人化小工具版面。點選查看、長按可拖曳排序，使用「自訂」選擇小工具或切換回經典版面。"
       ),
       illustration: <WidgetsIllustration lang={lang} />,
+    },
+    {
+      title: tx(lang, "Adjustable text size", "可調整文字大小"),
+      desc: tx(
+        lang,
+        "Prefer bigger (or smaller) text? You can now scale the whole app's typography to your comfort from Settings → Display preferences.",
+        "想要更大（或更小）的字？現在可在「設定 → 顯示偏好」調整整個應用程式的文字大小，看得更舒適。"
+      ),
+      illustration: <TextSizeIllustration lang={lang} />,
+    },
+    {
+      title: tx(lang, "Connect Strava", "連結 Strava"),
+      desc: tx(
+        lang,
+        "Sync runs automatically by linking your Strava account. Heads up: Strava currently limits us to about 20 connected athletes while our app awaits full approval — connect early to grab a spot.",
+        "連結 Strava 帳號即可自動同步跑步紀錄。注意：在 Strava 完成審核前，目前只開放約 20 位用戶連結，請盡早連結以保留名額。"
+      ),
+      illustration: <StravaIllustration lang={lang} />,
     },
   ];
 
@@ -189,7 +285,6 @@ const WhatsNewWalkthrough = ({ lang, enabled }: Props) => {
 
           <div className="mt-4">{current.illustration}</div>
 
-          {/* Progress dots */}
           <div className="flex items-center justify-center gap-1.5 mt-4">
             {steps.map((_, i) => (
               <span

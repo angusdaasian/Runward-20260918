@@ -155,6 +155,7 @@ const ConnectApps = ({ lang, onBack }: Props) => {
       const native = isDespiaUA();
       const redirect_uri = `${window.location.origin}/suunto/callback`;
       localStorage.setItem(SUUNTO_PENDING_REDIRECT_KEY, redirect_uri);
+      localStorage.setItem("suunto_pending_origin", "connect-apps");
       if (native) {
         localStorage.setItem("suunto_pending_native", "runward");
       } else {

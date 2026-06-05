@@ -194,22 +194,6 @@ const ConnectApps = ({ lang, onBack }: Props) => {
     }
   };
 
-  const handleSyncSuunto = async () => {
-    setSuuntoBusy("sync");
-    try {
-      const { data, error } = await supabase.functions.invoke("suunto-sync", {
-        body: { sinceDays: 30 },
-      });
-      if (error) throw error;
-      toast.success(lang === "zh"
-        ? `已同步 ${(data as any)?.count ?? 0} 個活動`
-        : `Synced ${(data as any)?.count ?? 0} activities`);
-    } catch (e: unknown) {
-      toast.error((lang === "zh" ? "同步失敗: " : "Sync failed: ") + errorMessage(e));
-    } finally {
-      setSuuntoBusy(null);
-    }
-  };
 
   const handleConnectGarmin = () => {
     if (hasFitnessApp) {

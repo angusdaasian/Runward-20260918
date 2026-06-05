@@ -128,29 +128,33 @@ const WidgetsIllustration = ({ lang }: { lang: Lang }) => (
 );
 
 const TextSizeIllustration = ({ lang }: { lang: Lang }) => (
-  <div className="relative w-full rounded-xl bg-muted/40 border border-border p-4 overflow-hidden">
-    <div className="flex items-center gap-2 mb-3">
-      <Type size={14} className="text-primary" />
-      <span className="text-[11px] font-semibold uppercase tracking-wider text-foreground">
-        {tx(lang, "Text size", "文字大小")}
+  <div className="relative w-full rounded-xl bg-card border border-border p-4 overflow-hidden">
+    <div className="flex items-center justify-between mb-3">
+      <div className="flex items-center gap-2">
+        <span aria-hidden className="font-display font-semibold text-primary text-base leading-none w-4 text-center">A</span>
+        <span className="text-[12px] font-medium text-foreground">
+          {tx(lang, "Text Size", "文字大小")}
+        </span>
+      </div>
+      <span className="text-[10px] text-muted-foreground">
+        {tx(lang, "Large", "大")}
       </span>
     </div>
 
-    <div className="space-y-2">
+    <div className="flex gap-2">
       {[
-        { label: tx(lang, "Small", "小"), size: "text-[10px]", active: false },
-        { label: tx(lang, "Default", "預設"), size: "text-[13px]", active: false },
-        { label: tx(lang, "Large", "大"), size: "text-[16px]", active: true },
-        { label: tx(lang, "Extra large", "特大"), size: "text-[19px]", active: false },
+        { label: "A", sub: tx(lang, "Default", "預設"), size: "text-sm", active: false },
+        { label: "A", sub: tx(lang, "Large", "大"), size: "text-base", active: true },
+        { label: "A", sub: tx(lang, "X-Large", "特大"), size: "text-lg", active: false },
       ].map((opt, i) => (
         <div
           key={i}
-          className={`flex items-center justify-between rounded-md border px-3 py-2 ${
-            opt.active ? "border-primary bg-primary/10 ring-2 ring-primary/20" : "border-border bg-card"
+          className={`flex-1 py-2.5 rounded-lg flex flex-col items-center justify-center gap-1 ${
+            opt.active ? "bg-primary text-primary-foreground" : "bg-accent text-foreground"
           }`}
         >
-          <span className={`${opt.size} font-medium text-foreground`}>Aa</span>
-          <span className="text-[11px] text-muted-foreground">{opt.label}</span>
+          <span className={`font-display font-semibold leading-none ${opt.size}`}>{opt.label}</span>
+          <span className="text-[10px] opacity-80 leading-none">{opt.sub}</span>
         </div>
       ))}
     </div>

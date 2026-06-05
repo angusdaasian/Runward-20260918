@@ -282,8 +282,8 @@ const WhatsNewWalkthrough = ({ lang, enabled }: Props) => {
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) close(); }}>
-      <DialogContent className="max-w-sm p-0 overflow-hidden">
-        <div className="bg-gradient-to-br from-primary/10 via-background to-background p-5">
+      <DialogContent className="max-w-sm p-0 overflow-hidden rounded-2xl bg-muted/80 backdrop-blur-sm border-border">
+        <div className="p-5">
           <div className="flex items-center gap-2 text-primary text-[11px] font-semibold uppercase tracking-wider">
             <Sparkles size={14} />
             {tx(lang, "What's new", "新功能")}

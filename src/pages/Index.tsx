@@ -14,6 +14,7 @@ import ActivitiesTab from "@/components/ActivitiesTab";
 import Onboarding from "@/components/Onboarding";
 import AppHeader, { preloadHeaderProfile } from "@/components/AppHeader";
 import PromoBanner from "@/components/PromoBanner";
+import WhatsNewWalkthrough from "@/components/WhatsNewWalkthrough";
 
 // Lazy load less-visited tabs
 
@@ -350,6 +351,11 @@ const Index = () => {
       </div>
 
       <PromoBanner lang={lang} userId={user?.id ?? null} triggerKey={promoTrigger} />
+
+      <WhatsNewWalkthrough
+        lang={lang}
+        enabled={!!user && !isGuest && !showOnboarding && activeTab === "activities"}
+      />
 
       {!isGuest && user && !aiChatDisabled && (
         <Suspense fallback={null}>

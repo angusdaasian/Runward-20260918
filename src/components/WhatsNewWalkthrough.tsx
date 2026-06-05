@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import {
@@ -223,6 +223,11 @@ const StravaIllustration = ({ lang }: { lang: Lang }) => (
 const WhatsNewWalkthrough = ({ lang, enabled }: Props) => {
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState(0);
+  const [dragX, setDragX] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const touchStartX = useRef(0);
+  const touchStartY = useRef(0);
+  const axisLock = useRef<null | "x" | "y">(null);
 
   useEffect(() => {
     if (!enabled) return;
@@ -280,18 +285,70 @@ const WhatsNewWalkthrough = ({ lang, enabled }: Props) => {
   const isLast = step === steps.length - 1;
   const current = steps[step];
 
+  const SWIPE_THRESHOLD = 50;
+
+  const onTouchStart = (e: React.TouchEvent) => {
+    const t = e.touches[0];
+    touchStartX.current = t.clientX;
+    touchStartY.current = t.clientY;
+    axisLock.current = null;
+    setIsDragging(true);
+  };
+
+  const onTouchMove = (e: React.TouchEvent) => {
+    const t = e.touches[0];
+    const dx = t.clientX - touchStartX.current;
+    const dy = t.clientY - touchStartY.current;
+    if (axisLock.current === null) {
+      if (Math.abs(dx) > 8 || Math.abs(dy) > 8) {
+        axisLock.current = Math.abs(dx) > Math.abs(dy) ? "x" : "y";
+      }
+    }
+    if (axisLock.current === "x") {
+      // Resist at edges
+      let adj = dx;
+      if ((step === 0 && dx > 0) || (isLast && dx < 0)) adj = dx / 3;
+      setDragX(adj);
+    }
+  };
+
+  const onTouchEnd = () => {
+    if (axisLock.current === "x") {
+      if (dragX <= -SWIPE_THRESHOLD && !isLast) {
+        setStep((s) => s + 1);
+      } else if (dragX >= SWIPE_THRESHOLD && step > 0) {
+        setStep((s) => s - 1);
+      }
+    }
+    setDragX(0);
+    setIsDragging(false);
+    axisLock.current = null;
+  };
+
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) close(); }}>
       <DialogContent className="max-w-sm p-0 overflow-hidden rounded-2xl bg-muted/80 backdrop-blur-sm border-border">
-        <div className="p-5">
+        <div
+          className="p-5 touch-pan-y select-none"
+          onTouchStart={onTouchStart}
+          onTouchMove={onTouchMove}
+          onTouchEnd={onTouchEnd}
+        >
           <div className="flex items-center gap-2 text-primary text-[11px] font-semibold uppercase tracking-wider">
             <Sparkles size={14} />
             {tx(lang, "What's new", "新功能")}
           </div>
-          <h2 className="font-display text-xl font-bold text-foreground mt-1">{current.title}</h2>
-          <p className="text-sm text-muted-foreground mt-1.5 leading-relaxed">{current.desc}</p>
+          <div
+            style={{
+              transform: `translateX(${dragX}px)`,
+              transition: isDragging ? "none" : "transform 200ms ease-out",
+            }}
+          >
+            <h2 className="font-display text-xl font-bold text-foreground mt-1">{current.title}</h2>
+            <p className="text-sm text-muted-foreground mt-1.5 leading-relaxed">{current.desc}</p>
 
-          <div className="mt-4">{current.illustration}</div>
+            <div className="mt-4">{current.illustration}</div>
+          </div>
 
           <div className="flex items-center justify-center gap-1.5 mt-4">
             {steps.map((_, i) => (

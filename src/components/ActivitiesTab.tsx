@@ -897,6 +897,22 @@ const ActivitiesTab = ({ lang }: Props) => {
     [],
   );
 
+  const invokeSuuntoSync = useCallback(async (sinceDays: number): Promise<number> => {
+    try {
+      const { data, error } = await supabase.functions.invoke("suunto-sync", {
+        body: { sinceDays },
+      });
+      if (error) {
+        console.warn("Suunto sync failed:", error);
+        return 0;
+      }
+      return typeof (data as any)?.count === "number" ? (data as any).count : 0;
+    } catch (e) {
+      console.warn("Suunto sync error:", e);
+      return 0;
+    }
+  }, []);
+
   const handleFetchTodayOnly = useCallback(async () => {
     if (!user || fetchingToday) return;
     setFetchingToday(true);

@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { SUUNTO_API_BASE, refreshSuuntoToken, workoutRow, SuuntoWorkout } from "../_shared/suunto.ts";
+import { fetchSuuntoFit, parseFit } from "../_shared/suunto-fit.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -112,11 +113,12 @@ serve(async (req) => {
     }
 
     let w: SuuntoWorkout | undefined = inlineWorkout;
+    let accessToken: string | null = null;
 
     // If the workout looks incomplete (e.g. missing activityId or distance), or wasn't inlined, fetch it
     const needsFetch = !w || !w.workoutKey;
     if (needsFetch) {
-      const accessToken = await refreshSuuntoToken(conn, supabase, clientId, clientSecret);
+      accessToken = await refreshSuuntoToken(conn, supabase, clientId, clientSecret);
       const res = await fetch(`${SUUNTO_API_BASE}/workout/${workoutId}`, {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
@@ -138,7 +140,36 @@ serve(async (req) => {
       await supabase
         .from('suunto_activities')
         .upsert(workoutRow(conn.user_id, w), { onConflict: 'suunto_workout_key' });
-      console.log('[suunto-webhook] saved workout', w.workoutKey, 'for', conn.user_id);
+      console.log('[suunto-webhook] saved workout summary', w.workoutKey, 'for', conn.user_id);
+
+      // Fetch + parse FIT for detail samples (HR/distance/elevation/cadence + polyline).
+      try {
+        if (!accessToken) {
+          accessToken = await refreshSuuntoToken(conn, supabase, clientId, clientSecret);
+        }
+        const fitBuf = await fetchSuuntoFit(accessToken, subKey, w.workoutKey);
+        if (fitBuf) {
+          const details = await parseFit(fitBuf);
+          await supabase
+            .from('suunto_activities')
+            .update({
+              hr_samples: details.hr_samples,
+              distance_samples: details.distance_samples,
+              elevation_samples: details.elevation_samples,
+              cadence_samples: details.cadence_samples,
+              summary_polyline: details.summary_polyline,
+              has_details: true,
+            })
+            .eq('suunto_workout_key', String(w.workoutKey))
+            .eq('user_id', conn.user_id);
+          console.log('[suunto-webhook] saved FIT details', w.workoutKey,
+            'hr:', details.hr_samples?.length ?? 0,
+            'gps:', details.has_gps);
+        }
+      } catch (fitErr) {
+        console.error('[suunto-webhook] fit detail fetch/parse failed', fitErr);
+      }
+
       await sendActivityUploadedNotification(supabase, conn.user_id, `suunto:${w.workoutKey}`);
     }
   } catch (err) {

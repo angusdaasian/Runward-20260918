@@ -310,9 +310,13 @@ async function fetchSuuntoActivities(userId: string, limit?: number): Promise<St
     average_heartrate: a.average_heartrate ?? null,
     max_heartrate: a.max_heartrate ?? null,
     summary_polyline: a.summary_polyline ?? null,
+    hr_samples: a.hr_samples || null,
+    distance_samples: a.distance_samples || null,
+    elevation_samples: a.elevation_samples || null,
+    cadence_samples: a.cadence_samples || null,
     source: "Suunto",
     provenance: "terra" as const, // reuse existing literal; UI just reads `source`
-  }));
+  })) as StravaActivity[];
 }
 
 async function fetchConnection(userId: string) {

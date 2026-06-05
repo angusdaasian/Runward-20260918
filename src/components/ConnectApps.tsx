@@ -132,13 +132,20 @@ const ConnectApps = ({ lang, onBack }: Props) => {
     window.location.href = data.url;
   };
 
+  const [stravaBusy, setStravaBusy] = useState(false);
+
   const handleDisconnectStrava = async () => {
-    const { error } = await supabase.functions.invoke("strava-disconnect");
-    if (error) {
-      toast.error(lang === "zh" ? "中斷連結失敗" : "Failed to disconnect");
-    } else {
-      setStravaConnected(false);
-      toast.success(lang === "zh" ? "已中斷 Strava 連結" : "Strava disconnected");
+    setStravaBusy(true);
+    try {
+      const { error } = await supabase.functions.invoke("strava-disconnect");
+      if (error) {
+        toast.error(lang === "zh" ? "中斷連結失敗" : "Failed to disconnect");
+      } else {
+        setStravaConnected(false);
+        toast.success(lang === "zh" ? "已中斷 Strava 連結" : "Strava disconnected");
+      }
+    } finally {
+      setStravaBusy(false);
     }
   };
 
@@ -648,8 +655,13 @@ const ConnectApps = ({ lang, onBack }: Props) => {
                 </div>
                 {stravaConnected ? (
                   <div className="flex items-center gap-2">
+                    {stravaBusy && <RefreshCw size={14} className="animate-spin text-muted-foreground" />}
                     <Check size={16} className="text-green-500" />
-                    <button onClick={handleDisconnectStrava} className="text-xs text-destructive hover:underline">
+                    <button
+                      onClick={handleDisconnectStrava}
+                      disabled={stravaBusy}
+                      className="text-xs text-destructive hover:underline disabled:opacity-50"
+                    >
                       {lang === "zh" ? "中斷" : "Disconnect"}
                     </button>
                   </div>

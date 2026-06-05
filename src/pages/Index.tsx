@@ -14,6 +14,7 @@ import ActivitiesTab from "@/components/ActivitiesTab";
 import Onboarding from "@/components/Onboarding";
 import AppHeader, { preloadHeaderProfile } from "@/components/AppHeader";
 import PromoBanner from "@/components/PromoBanner";
+import WhatsNewWalkthrough from "@/components/WhatsNewWalkthrough";
 
 // Lazy load less-visited tabs
 

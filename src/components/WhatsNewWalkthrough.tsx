@@ -223,6 +223,11 @@ const StravaIllustration = ({ lang }: { lang: Lang }) => (
 const WhatsNewWalkthrough = ({ lang, enabled }: Props) => {
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState(0);
+  const [dragX, setDragX] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const touchStartX = (typeof window !== "undefined") ? { current: 0 } : { current: 0 };
+  const touchStartY = { current: 0 };
+  const axisLock = { current: null as null | "x" | "y" };
 
   useEffect(() => {
     if (!enabled) return;

@@ -49,6 +49,7 @@ const ConnectApps = ({ lang, onBack }: Props) => {
   const [appleHealthConnected, setAppleHealthConnected] = useState(false);
   const [garminConnected, setGarminConnected] = useState(false);
   const [suuntoConnected, setSuuntoConnected] = useState(false);
+  const [stravaFull, setStravaFull] = useState(false);
   const [loading, setLoading] = useState(true);
   const appleHealth = useAppleHealth(lang);
   const garmin = useGarmin(lang);

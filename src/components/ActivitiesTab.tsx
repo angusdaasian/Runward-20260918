@@ -926,7 +926,7 @@ const ActivitiesTab = ({ lang }: Props) => {
       startOfToday.setHours(0, 0, 0, 0);
       const afterSec = Math.floor(startOfToday.getTime() / 1000);
 
-      const [terraRes, stravaCount] = await Promise.all([
+      const [terraRes, stravaCount, suuntoCount] = await Promise.all([
         fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/terra-sync-today`, {
           method: "POST",
           headers: {
@@ -937,6 +937,7 @@ const ActivitiesTab = ({ lang }: Props) => {
           body: JSON.stringify({ forceEnv: "prod" }),
         }),
         invokeStravaSync(accessToken, { after: afterSec, perPage: 30, environment: getAppEnvironment() }),
+        invokeSuuntoSync(1),
       ]);
       const result = await terraRes.json().catch(() => null);
       if (!terraRes.ok && terraRes.status !== 404) {
@@ -944,9 +945,9 @@ const ActivitiesTab = ({ lang }: Props) => {
       }
       invalidateAll();
       const terraCount = result?.activities ?? 0;
-      const count = terraCount + stravaCount;
+      const count = terraCount + stravaCount + suuntoCount;
       const msg = lang === "zh" ? result?.message_zh : result?.message_en;
-      if (result?.rateLimited && stravaCount === 0) {
+      if (result?.rateLimited && stravaCount === 0 && suuntoCount === 0) {
         toast.info(msg ?? (lang === "zh" ? "請稍後再試" : "Please try again later"));
       } else if (count > 0) {
         toast.success(lang === "zh" ? `已同步 ${count} 個今日活動` : `Synced ${count} of today's activities`);
@@ -959,7 +960,7 @@ const ActivitiesTab = ({ lang }: Props) => {
     }
     setFetchingToday(false);
 
-  }, [user, fetchingToday, invalidateAll, lang, invokeStravaSync]);
+  }, [user, fetchingToday, invalidateAll, lang, invokeStravaSync, invokeSuuntoSync]);
 
   const handleFetchWeekOnly = useCallback(async () => {
     if (!user || fetchingToday) return;

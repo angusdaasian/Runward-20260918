@@ -650,7 +650,7 @@ const ConnectApps = ({ lang, onBack }: Props) => {
 
         {/* Strava */}
         {(() => {
-          const stravaDisabledByOther = (garminConnected || hasTerraConn) && !stravaConnected;
+          const stravaDisabledByOther = (garminConnected || suuntoConnected || hasTerraConn) && !stravaConnected;
           return (
             <div className={`bg-card border border-border rounded-xl p-4 ${stravaDisabledByOther ? "opacity-50" : ""}`}>
               <div className="flex items-center justify-between">

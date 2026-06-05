@@ -26,6 +26,7 @@ interface Props {
 }
 
 const TERRA_PENDING_PROVIDER_KEY = "terra_pending_provider";
+const SUUNTO_PENDING_REDIRECT_KEY = "suunto_pending_redirect_uri";
 const TERRA_PROVIDER_IDS = ["GARMIN", "POLAR", "COROS", "ZEPP", "FITBIT"] as const;
 
 type TerraConnRow = {

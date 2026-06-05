@@ -138,6 +138,7 @@ const AppHeader = ({ lang, onNavigateSettings, onOpenPromoBanner, isGuest }: App
   );
   const [guideOpen, setGuideOpen] = useState(false);
   const [roadmapOpen, setRoadmapOpen] = useState(false);
+  const [whatsNewOpen, setWhatsNewOpen] = useState(false);
   const [simpleMode, setSimpleMode] = useSimpleMode();
 
   useEffect(() => {

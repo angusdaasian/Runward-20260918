@@ -124,7 +124,7 @@ const WidgetsIllustration = ({ lang }: { lang: Lang }) => (
       <div className="flex items-center gap-1.5">
         <Settings2 size={12} className="text-primary shrink-0" />
         <span className="text-[10px] text-foreground/80">
-          {tx(lang, "Customize: pick widgets or switch to classic view", "自訂：選擇小工具或切換經典版面")}
+          {tx(lang, "Toggle between Classic and Widgets view", "在「傳統」與「小工具」版面間切換")}
         </span>
       </div>
     </div>

@@ -985,15 +985,19 @@ ${plannedWorkout ? `- ${plannedWorkout}` : ""}`;
       console.error("sample analysis failed", e);
     }
 
-    // --- Adjacent activities (±1h) for warmup/cooldown context ---
+    // --- Adjacent activities (±3h, same calendar day) for split-session / warmup-cooldown context ---
+    // Runners often split one training session into multiple activities (e.g. treadmill → outdoor,
+    // road → track, or warmup/main/cooldown saved separately). Pull anything within ±3h so the
+    // model can evaluate the COMBINED session against the planned/program workout.
     let adjacentContext = "";
     try {
       const mainStart = new Date(activity.start_date);
       const mainDurSec = Number(activity.elapsed_time || activity.moving_time || 0) || 0;
       const mainEnd = new Date(mainStart.getTime() + mainDurSec * 1000);
       if (isValidDate(mainStart)) {
-        const winStart = new Date(mainStart.getTime() - 60 * 60 * 1000).toISOString();
-        const winEnd = new Date(mainEnd.getTime() + 60 * 60 * 1000).toISOString();
+        const winStart = new Date(mainStart.getTime() - 3 * 60 * 60 * 1000).toISOString();
+        const winEnd = new Date(mainEnd.getTime() + 3 * 60 * 60 * 1000).toISOString();
+
 
         const [stravaR, garminR, terraR, appleR] = await Promise.all([
           serviceClient.from("strava_activities")
@@ -1047,7 +1051,11 @@ ${plannedWorkout ? `- ${plannedWorkout}` : ""}`;
         }
 
         if (deduped.length > 0) {
-          adjacentContext = `\n\n🔁 ADJACENT ACTIVITIES (logged separately within ±1h of this activity — treat them as part of the same training session, e.g. warmup or cooldown):`;
+          const totalKm = deduped.reduce((s, a) => s + a.distanceKm, 0) + (Number(activity.distance) || 0) / 1000;
+          const totalMin = Math.round(
+            (deduped.reduce((s, a) => s + a.durationSec, 0) + mainDurSec) / 60,
+          );
+          adjacentContext = `\n\n🔁 SPLIT / ADJACENT ACTIVITIES (logged separately within ±3h of this activity — treat them as part of the SAME training session). Runners commonly split one session across multiple recordings (e.g. treadmill → outdoor, road → track, or separate warmup / main / cooldown files):`;
           for (const a of deduped) {
             let position: "BEFORE" | "AFTER" | "OVERLAP";
             let offsetStr: string;
@@ -1063,12 +1071,14 @@ ${plannedWorkout ? `- ${plannedWorkout}` : ""}`;
               position = "OVERLAP";
               offsetStr = `overlaps main activity`;
             }
-            const hint = position === "BEFORE" ? " — likely warmup" : position === "AFTER" ? " — likely cooldown" : "";
+            const hint = position === "BEFORE" ? " — likely warmup or earlier segment" : position === "AFTER" ? " — likely cooldown or continuation" : "";
             const durMin = Math.round(a.durationSec / 60);
             adjacentContext += `\n  • [${position}, ${offsetStr}] "${a.name}" ${a.type} — ${a.distanceKm.toFixed(2)} km, ${durMin} min @ ${a.paceStr}${a.hr ? `, HR ${a.hr}` : ""}${hint}`;
           }
-          adjacentContext += `\n  → When evaluating warmup/cooldown adequacy and total session volume, INCLUDE these. Do NOT say the runner skipped warmup or cooldown if a BEFORE/AFTER entry plausibly served that role. You may sum distance/time across them when describing the full session.`;
+          adjacentContext += `\n  → COMBINED SESSION TOTAL (this activity + the entries above): ~${totalKm.toFixed(2)} km / ~${totalMin} min.`;
+          adjacentContext += `\n  → When comparing against the PLANNED workout / training program target, evaluate the COMBINED session as a whole — sum distance, time, and effort across all entries. Do NOT mark the planned workout as under-completed just because this single file is short; the runner may have split it across surfaces (treadmill ↔ road ↔ track). Only judge intervals on the file that actually contains the interval structure. Do NOT say the runner skipped warmup or cooldown if a BEFORE/AFTER entry plausibly served that role.`;
         }
+
       }
     } catch (e) {
       console.error("adjacent activity fetch failed", e);

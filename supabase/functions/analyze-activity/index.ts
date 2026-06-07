@@ -985,15 +985,19 @@ ${plannedWorkout ? `- ${plannedWorkout}` : ""}`;
       console.error("sample analysis failed", e);
     }
 
-    // --- Adjacent activities (±1h) for warmup/cooldown context ---
+    // --- Adjacent activities (±3h, same calendar day) for split-session / warmup-cooldown context ---
+    // Runners often split one training session into multiple activities (e.g. treadmill → outdoor,
+    // road → track, or warmup/main/cooldown saved separately). Pull anything within ±3h so the
+    // model can evaluate the COMBINED session against the planned/program workout.
     let adjacentContext = "";
     try {
       const mainStart = new Date(activity.start_date);
       const mainDurSec = Number(activity.elapsed_time || activity.moving_time || 0) || 0;
       const mainEnd = new Date(mainStart.getTime() + mainDurSec * 1000);
       if (isValidDate(mainStart)) {
-        const winStart = new Date(mainStart.getTime() - 60 * 60 * 1000).toISOString();
-        const winEnd = new Date(mainEnd.getTime() + 60 * 60 * 1000).toISOString();
+        const winStart = new Date(mainStart.getTime() - 3 * 60 * 60 * 1000).toISOString();
+        const winEnd = new Date(mainEnd.getTime() + 3 * 60 * 60 * 1000).toISOString();
+
 
         const [stravaR, garminR, terraR, appleR] = await Promise.all([
           serviceClient.from("strava_activities")

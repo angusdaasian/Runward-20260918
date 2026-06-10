@@ -477,9 +477,9 @@ const WorkoutDetails = ({ day, lang, hrBounds }: { day: DayPlan; lang: Lang; hrB
   const hr = hrRangeForZone(zone, hrBounds);
   const zoneLabel = ZONE_LABEL[zone][isZh ? "zh" : "en"];
 
-  const reps = parseIntervalReps(day.description);
-  const restStr = reps ? parseIntervalRest(day.description) : null;
-  const isInterval = !!reps || day.type === "Interval";
+  const isInterval = day.type === "Interval";
+  const reps = isInterval ? parseIntervalReps(day.description) : null;
+  const restStr = isInterval ? parseIntervalRest(day.description) : null;
   const easyHr = hrRangeForZone(2, hrBounds);
   const easyZoneLabel = ZONE_LABEL[2][isZh ? "zh" : "en"];
   const easyPace = adjustPace(day.pace, 1.4);

@@ -115,6 +115,25 @@ function typeColor(type: string): string {
   return TYPE_OPTIONS.find((o) => o.id === type)?.color ?? "#94a3b8";
 }
 
+const PACE_OPTIONS = Array.from({ length: 151 }, (_, i) => {
+  const seconds = 180 + i * 5;
+  const mm = Math.floor(seconds / 60);
+  const ss = String(seconds % 60).padStart(2, "0");
+  return `${mm}:${ss}/km`;
+});
+
+function normalizePace(pace?: string | null): string | null {
+  if (!pace) return null;
+  const m = String(pace).trim().match(/^(\d+)\s*[:']\s*(\d{1,2})/);
+  if (!m) return pace;
+  return `${Number(m[1])}:${String(Number(m[2])).padStart(2, "0")}/km`;
+}
+
+function paceSelectValue(pace?: string | null): string {
+  const normalized = normalizePace(pace);
+  return normalized && PACE_OPTIONS.includes(normalized) ? normalized : "";
+}
+
 function parseIntervalDesc(desc?: string | null): { reps: number; distM: number; rest: string | null } | null {
   if (!desc) return null;
   const a = /(\d+)\s*[x×]\s*(\d+(?:\.\d+)?)\s*(m|km)\b/i.exec(desc);

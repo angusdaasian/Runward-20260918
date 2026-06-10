@@ -68,7 +68,7 @@ function adjustPace(pace: string | null | undefined, mult: number): string | nul
   return `${mm}:${ss}/km`;
 }
 
-function parseIntervals(desc?: string | null): { reps: number; distM: number } | null {
+function parseIntervals(desc?: string | null): { reps: number; distM: number; rest: string | null } | null {
   if (!desc) return null;
   const repsFirst = /(\d+)\s*[x×]\s*(\d+(?:\.\d+)?)\s*(m|km)\b/i.exec(desc);
   const distFirst = /(\d+(?:\.\d+)?)\s*(m|km)\s*[x×]\s*(\d+)\b/i.exec(desc);
@@ -78,7 +78,9 @@ function parseIntervals(desc?: string | null): { reps: number; distM: number } |
   const unit = (repsFirst ? repsFirst[3] : distFirst![2]).toLowerCase();
   const distM = unit === "km" ? val * 1000 : val;
   if (reps < 2 || reps > 30 || distM < 100 || distM > 10000) return null;
-  return { reps, distM };
+  const restM = /(?:rest|recovery|jog|休息|恢復)\s*(?:of\s*)?([\d:]+\s*(?:s|sec|min|m)?|\d+\s*['′"″]?)/i.exec(desc);
+  const rest = restM ? restM[1].trim() : null;
+  return { reps, distM, rest };
 }
 
 /**

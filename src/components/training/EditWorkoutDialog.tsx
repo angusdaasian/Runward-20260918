@@ -217,6 +217,7 @@ const EditWorkoutDialog = ({
     return base;
   };
   const [sessions, setSessions] = useState<WorkoutSession[]>(initSessions);
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(() => initSessions()[0]?.id ?? null);
   const [expandedSteps, setExpandedSteps] = useState<Record<string, boolean>>({});
   const [validating, setValidating] = useState(false);
   const [verdict, setVerdict] = useState<Verdict | null>(null);
@@ -226,7 +227,9 @@ const EditWorkoutDialog = ({
 
   useEffect(() => {
     if (open) {
-      setSessions(initSessions());
+      const nextSessions = initSessions();
+      setSessions(nextSessions);
+      setActiveSessionId(nextSessions[0]?.id ?? null);
       // Auto-expand the steps panel — that's where the real structure lives now.
       setExpandedSteps({});
       setVerdict(null);
@@ -237,20 +240,29 @@ const EditWorkoutDialog = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, workout, appendNewSession]);
 
+  useEffect(() => {
+    if (sessions.length === 0) { setActiveSessionId(null); return; }
+    if (!activeSessionId || !sessions.some((s) => s.id === activeSessionId)) {
+      setActiveSessionId(sessions[0].id);
+    }
+  }, [sessions, activeSessionId]);
+
   const updateSession = (idx: number, patch: Partial<WorkoutSession>) => {
     setSessions((prev) => prev.map((s, i) => (i === idx ? { ...s, ...patch } : s)));
     setVerdict(null); setNeedsConfirm(false);
   };
 
   const addSession = () => {
+    const id = genSessionId();
     setSessions((prev) => [...prev, {
-      id: genSessionId(),
+      id,
       time_of_day: prev.length === 0 ? null : (prev.length === 1 ? "PM" : null),
       type: "Easy Run",
       distance_km: null, pace: null, description: null,
       color: typeColor("Easy Run"),
       steps: [],
     }]);
+    setActiveSessionId(id);
     setVerdict(null); setNeedsConfirm(false);
   };
 
@@ -303,13 +315,15 @@ const EditWorkoutDialog = ({
       ...s,
       type: normalizeType(s.type),
       color: typeColor(normalizeType(s.type)),
+      distance_km: sessionDistanceKm(s) || s.distance_km || null,
     }));
+    const keepStructuredSessions = cleanSessions.length > 1 || cleanSessions.some((s) => (s.steps?.length ?? 0) > 0);
     const summary = summarizeDay(cleanSessions);
     return {
       ...workout,
       ...summary,
-      sessions: cleanSessions.length > 1 ? cleanSessions : undefined,
-      // For single session, mirror to top-level fields so legacy readers work; drop sessions key.
+      sessions: keepStructuredSessions ? cleanSessions : undefined,
+      // Mirror to top-level fields so legacy readers work, but keep sessions when sequence exists.
     } as EditableWorkout;
   };
 

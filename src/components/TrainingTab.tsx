@@ -3913,7 +3913,9 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                 const updatedPlan = [...customPlan]; const week = { ...updatedPlan[customWeekIdx] }; const days = [...week.days];
                 const isTrail = customAddRunType === "Trail Run" || customAddRunType === "Trail Race";
                 const trailDesc = lang === "zh" ? `${customAddDistance}km · 爬升 ${Math.round(Number(customAddElevation) || 0)}m · 目標 EpH ${customAddEph}。以 EpH 控制越野強度。` : `${customAddDistance}km · ${Math.round(Number(customAddElevation) || 0)}m ascent · target EpH ${customAddEph}. Use EpH to control trail effort.`;
-                days[customAddingDayIdx] = { ...days[customAddingDayIdx], type: customAddRunType, title: lang === "zh" ? rt.zh : rt.en, description: isTrail ? trailDesc : "", distance_km: Number(customAddDistance), pace: null, color: rt.color, elevation_m: isTrail ? Number(customAddElevation) || null : null, eph: isTrail ? Number(customAddEph) || null : null };
+                const newSession: WorkoutSession = { id: genSessionId(), type: customAddRunType, title: lang === "zh" ? rt.zh : rt.en, description: isTrail ? trailDesc : "", distance_km: Number(customAddDistance), pace: null, color: rt.color, elevation_m: isTrail ? Number(customAddElevation) || null : null, eph: isTrail ? Number(customAddEph) || null : null, steps: [] };
+                const existingSessions = workoutSessionsForDay(days[customAddingDayIdx]);
+                days[customAddingDayIdx] = rebuildDayFromSessions(days[customAddingDayIdx], [...existingSessions, newSession], lang);
                 week.days = days; updatedPlan[customWeekIdx] = week; setCustomPlan(updatedPlan);
                 if (user && customExistingPlan) supabase.from("training_plans" as any).update({ plan_data: updatedPlan } as any).eq("id", customExistingPlan.id).then(() => { notifyPlanChanged(); });
                 setCustomAddingDayIdx(null);
@@ -3928,21 +3930,10 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
       {customEditingDayIdx !== null && customPlan[customWeekIdx]?.days[customEditingDayIdx] && (
         <EditWorkoutDialog
           open={customEditingDayIdx !== null}
-          onOpenChange={(o) => { if (!o) { setCustomEditingDayIdx(null); setCustomEditAppendNew(false); } }}
+          onOpenChange={(o) => { if (!o) { setCustomEditingDayIdx(null); setCustomEditingSessionIdx(0); } }}
           lang={lang}
-          workout={{
-            type: customPlan[customWeekIdx].days[customEditingDayIdx].type,
-            title: localizeTitle(customPlan[customWeekIdx].days[customEditingDayIdx].type, lang),
-            distance_km: customPlan[customWeekIdx].days[customEditingDayIdx].distance_km ?? null,
-            pace: customPlan[customWeekIdx].days[customEditingDayIdx].pace ?? "",
-            description: customPlan[customWeekIdx].days[customEditingDayIdx].description ?? "",
-            color: customPlan[customWeekIdx].days[customEditingDayIdx].color,
-            elevation_m: customPlan[customWeekIdx].days[customEditingDayIdx].elevation_m ?? null,
-            eph: customPlan[customWeekIdx].days[customEditingDayIdx].eph ?? null,
-            sessions: (customPlan[customWeekIdx].days[customEditingDayIdx] as any).sessions,
-          }}
+          workout={editableWorkoutForSession(customPlan[customWeekIdx].days[customEditingDayIdx], customEditingSessionIdx)}
           multiSession
-          appendNewSession={customEditAppendNew}
           recentActivities={recentRunActivities}
           profile={suggestProfile}
           targetTime={null}
@@ -3950,20 +3941,11 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
           onSave={async (next) => {
             if (customEditingDayIdx === null) return;
             const updatedPlan = [...customPlan]; const week = { ...updatedPlan[customWeekIdx] }; const days = [...week.days];
-            const nextType = next.type ?? days[customEditingDayIdx].type;
-            const isTrail = nextType === "Trail Run" || nextType === "Trail Race";
-            days[customEditingDayIdx] = {
-              ...days[customEditingDayIdx],
-              type: nextType,
-              title: next.title ?? days[customEditingDayIdx].title,
-              color: next.color ?? days[customEditingDayIdx].color,
-              distance_km: next.distance_km ?? days[customEditingDayIdx].distance_km,
-              pace: isTrail ? null : (next.pace || days[customEditingDayIdx].pace),
-              description: next.description ?? days[customEditingDayIdx].description,
-              elevation_m: isTrail ? (next.elevation_m ?? days[customEditingDayIdx].elevation_m ?? null) : null,
-              eph: isTrail ? (next.eph ?? days[customEditingDayIdx].eph ?? null) : null,
-              sessions: next.sessions,
-            } as any;
+            const sessions = workoutSessionsForDay(days[customEditingDayIdx]);
+            const editedSession = firstSessionFromEditedWorkout(next as DayPlan);
+            if (!editedSession) return;
+            sessions[Math.max(0, Math.min(customEditingSessionIdx, sessions.length - 1))] = editedSession;
+            days[customEditingDayIdx] = rebuildDayFromSessions(days[customEditingDayIdx], sessions, lang);
             week.days = days; updatedPlan[customWeekIdx] = week; setCustomPlan(updatedPlan);
             if (user && customExistingPlan) await supabase.from("training_plans" as any).update({ plan_data: updatedPlan } as any).eq("id", customExistingPlan.id);
             notifyPlanChanged();
@@ -3972,7 +3954,9 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
           onDelete={async () => {
             if (customEditingDayIdx === null) return;
             const updatedPlan = [...customPlan]; const week = { ...updatedPlan[customWeekIdx] }; const days = [...week.days];
-            days[customEditingDayIdx] = { ...days[customEditingDayIdx], type: "Rest", title: lang === "zh" ? "休息" : "Rest Day", description: "", distance_km: null, pace: null, color: "#607D8B", elevation_m: null, eph: null };
+            const sessions = workoutSessionsForDay(days[customEditingDayIdx]);
+            sessions.splice(Math.max(0, Math.min(customEditingSessionIdx, sessions.length - 1)), 1);
+            days[customEditingDayIdx] = rebuildDayFromSessions(days[customEditingDayIdx], sessions, lang);
             week.days = days; updatedPlan[customWeekIdx] = week; setCustomPlan(updatedPlan);
             if (user && customExistingPlan) await supabase.from("training_plans" as any).update({ plan_data: updatedPlan } as any).eq("id", customExistingPlan.id);
             notifyPlanChanged();

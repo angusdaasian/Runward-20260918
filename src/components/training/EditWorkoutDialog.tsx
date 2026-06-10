@@ -36,6 +36,8 @@ interface Props {
   title?: string;
   /** Enable multi-session + warmup/cooldown + auto-suggest (AI plan + Custom only). */
   multiSession?: boolean;
+  /** When true, open with one extra empty session appended (for "Add another" from calendar). */
+  appendNewSession?: boolean;
   /** Recent runs for auto-suggest (last 30 days). */
   recentActivities?: SuggestActivity[] | null;
   /** Profile for HR zones. */

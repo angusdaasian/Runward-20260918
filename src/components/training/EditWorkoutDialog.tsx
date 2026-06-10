@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, AlertTriangle, CheckCircle2, Info, Plus, X, Sparkles, ChevronDown, ChevronRight } from "lucide-react";
+import { Loader2, AlertTriangle, CheckCircle2, Info, Plus, X, Sparkles, ChevronDown, ChevronRight, ChevronUp } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -7,7 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Lang } from "@/lib/i18n";
 import { toast } from "sonner";
 import type { WorkoutSession, WorkoutStep, WorkoutStepKind, HrTarget } from "@/lib/planTypes";
-import { genSessionId, sessionDistanceKm, summarizeDay } from "@/lib/planTypes";
+import { genSessionId, sessionDistanceKm, sessionPace, summarizeDay } from "@/lib/planTypes";
 import { suggestPaceAndHr, type SuggestActivity, type SuggestProfile } from "@/lib/paceSuggest";
 import { splitIntervalDay } from "@/lib/splitIntervalSessions";
 

@@ -1839,7 +1839,8 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
         color: y.color,
         elevation_m: y.elevation_m ?? null,
         eph: y.eph ?? null,
-      });
+        sessions: (y as any).sessions,
+      } as DayPlan);
       week.days[fromIdx] = swap(a, b);
       week.days[toIdx] = swap(b, a);
       return next;

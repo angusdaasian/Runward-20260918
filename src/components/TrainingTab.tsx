@@ -3617,14 +3617,30 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
             color: plan[currentWeekIdx].days[editingDayIdx].color,
             elevation_m: plan[currentWeekIdx].days[editingDayIdx].elevation_m ?? null,
             eph: plan[currentWeekIdx].days[editingDayIdx].eph ?? null,
+            sessions: (plan[currentWeekIdx].days[editingDayIdx] as any).sessions,
           }}
+          multiSession
+          recentActivities={recentRunActivities}
+          profile={suggestProfile}
+          targetTime={aiTargetTime}
           planContext={existingPlan ? `Plan: ${existingPlan.goal} ${existingPlan.distance ?? ""} target ${existingPlan.target_time ?? ""}, week ${currentWeekIdx + 1}` : null}
           onSave={async (next) => {
             if (editingDayIdx === null) return;
             const updatedPlan = [...plan]; const week = { ...updatedPlan[currentWeekIdx] }; const days = [...week.days];
             const nextType = next.type ?? days[editingDayIdx].type;
             const isTrail = nextType === "Trail Run" || nextType === "Trail Race";
-            days[editingDayIdx] = { ...days[editingDayIdx], type: nextType, title: next.title ?? days[editingDayIdx].title, color: next.color ?? days[editingDayIdx].color, distance_km: next.distance_km ?? days[editingDayIdx].distance_km, pace: isTrail ? null : (next.pace || days[editingDayIdx].pace), description: next.description ?? days[editingDayIdx].description, elevation_m: isTrail ? (next.elevation_m ?? days[editingDayIdx].elevation_m ?? null) : null, eph: isTrail ? (next.eph ?? days[editingDayIdx].eph ?? null) : null };
+            days[editingDayIdx] = {
+              ...days[editingDayIdx],
+              type: nextType,
+              title: next.title ?? days[editingDayIdx].title,
+              color: next.color ?? days[editingDayIdx].color,
+              distance_km: next.distance_km ?? days[editingDayIdx].distance_km,
+              pace: isTrail ? null : (next.pace || days[editingDayIdx].pace),
+              description: next.description ?? days[editingDayIdx].description,
+              elevation_m: isTrail ? (next.elevation_m ?? days[editingDayIdx].elevation_m ?? null) : null,
+              eph: isTrail ? (next.eph ?? days[editingDayIdx].eph ?? null) : null,
+              sessions: next.sessions,
+            } as any;
             week.days = days; updatedPlan[currentWeekIdx] = week; setPlan(updatedPlan);
             if (user && existingPlan) await supabase.from("training_plans" as any).update({ plan_data: updatedPlan } as any).eq("id", existingPlan.id);
             notifyPlanChanged();

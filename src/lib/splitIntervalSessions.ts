@@ -2,6 +2,18 @@
 // Backward-compatible: legacy day-level fields are preserved so older readers keep working,
 // while new UI / Terra push consumes day.sessions when present.
 
+export type StepKind = "warmup" | "main" | "cooldown" | "recovery" | "interval";
+
+export interface StepLike {
+  kind: StepKind;
+  distance_km?: number | null;
+  distance_m?: number | null;
+  reps?: number | null;
+  rest?: string | null;
+  pace?: string | null;
+  note?: string | null;
+}
+
 export interface SessionLike {
   id: string;
   type: string;
@@ -13,6 +25,7 @@ export interface SessionLike {
   color?: string | null;
   elevation_m?: number | null;
   eph?: number | null;
+  steps?: StepLike[];
 }
 
 export interface DayLike {
@@ -55,7 +68,7 @@ function adjustPace(pace: string | null | undefined, mult: number): string | nul
   return `${mm}:${ss}/km`;
 }
 
-function parseIntervals(desc?: string | null): { reps: number; distM: number } | null {
+function parseIntervals(desc?: string | null): { reps: number; distM: number; rest: string | null } | null {
   if (!desc) return null;
   const repsFirst = /(\d+)\s*[x×]\s*(\d+(?:\.\d+)?)\s*(m|km)\b/i.exec(desc);
   const distFirst = /(\d+(?:\.\d+)?)\s*(m|km)\s*[x×]\s*(\d+)\b/i.exec(desc);
@@ -65,7 +78,9 @@ function parseIntervals(desc?: string | null): { reps: number; distM: number } |
   const unit = (repsFirst ? repsFirst[3] : distFirst![2]).toLowerCase();
   const distM = unit === "km" ? val * 1000 : val;
   if (reps < 2 || reps > 30 || distM < 100 || distM > 10000) return null;
-  return { reps, distM };
+  const restM = /(?:rest|recovery|jog|休息|恢復)\s*(?:of\s*)?([\d:]+\s*(?:s|sec|min|m)?|\d+\s*['′"″]?)/i.exec(desc);
+  const rest = restM ? restM[1].trim() : null;
+  return { reps, distM, rest };
 }
 
 /**
@@ -116,6 +131,7 @@ export function splitIntervalDay(day: DayLike, opts: { lang?: "en" | "zh" } = {}
       color: "#FFB74D",
       elevation_m: null,
       eph: null,
+      steps: [{ kind: "warmup", distance_km: wcKm, pace: wcPace }],
     },
     {
       id: genId(),
@@ -128,6 +144,15 @@ export function splitIntervalDay(day: DayLike, opts: { lang?: "en" | "zh" } = {}
       color: day.color ?? "#F44336",
       elevation_m: null,
       eph: null,
+      steps: parsed
+        ? [{
+            kind: "interval",
+            reps: parsed.reps,
+            distance_m: parsed.distM,
+            pace: day.pace ?? null,
+            rest: parsed.rest,
+          }]
+        : [{ kind: "interval", distance_km: intervalKm, pace: day.pace ?? null }],
     },
     {
       id: genId(),
@@ -140,6 +165,7 @@ export function splitIntervalDay(day: DayLike, opts: { lang?: "en" | "zh" } = {}
       color: "#90CAF9",
       elevation_m: null,
       eph: null,
+      steps: [{ kind: "cooldown", distance_km: wcKm, pace: wcPace }],
     },
   ];
 

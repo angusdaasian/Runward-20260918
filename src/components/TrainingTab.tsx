@@ -610,7 +610,7 @@ const DraggableDay = ({
             const sessionDay = dayForWorkoutSession(day, session);
             const sessionKm = sessionDistanceKm(session);
             const sessionPaceLabel = sessionPace(session);
-            const expanded = expandedSessionId === (session.id || String(sessionIdx));
+            const expanded = expandedIdx === sessionIdx;
             return (
           <div key={session.id || sessionIdx} className="bg-card border border-border rounded-lg p-3 hover:border-primary transition-colors">
             <div className="flex items-center gap-2">
@@ -630,7 +630,7 @@ const DraggableDay = ({
               </div>
               <button
                 type="button"
-                onClick={(e) => { e.stopPropagation(); setExpandedSessionId(expanded ? null : (session.id || String(sessionIdx))); }}
+                onClick={(e) => { e.stopPropagation(); setExpandedIdx(expanded ? null : sessionIdx); }}
                 className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground"
                 aria-expanded={expanded}
                 aria-label={lang === "zh" ? "展開" : "Expand"}

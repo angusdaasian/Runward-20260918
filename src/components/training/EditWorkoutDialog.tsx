@@ -342,7 +342,7 @@ const EditWorkoutDialog = ({
       return;
     }
     if (isUnchanged()) { onOpenChange(false); return; }
-    if (verdict === "ok" || needsConfirm) { await persist(); return; }
+    if (needsConfirm) { await persist(pendingDescription); return; }
     setValidating(true);
     try {
       const next = buildEdited();
@@ -355,11 +355,10 @@ const EditWorkoutDialog = ({
       const newDesc = (data as any)?.updatedDescription as string | undefined;
       setVerdict(v ?? "caution");
       setFeedback(fb ?? "");
-      if (v === "ok") {
-        await persist(newDesc?.trim() || undefined);
-      } else {
-        setNeedsConfirm(true);
-      }
+      setPendingDescription(newDesc?.trim() || undefined);
+      // Always show coach feedback and require a second click to confirm,
+      // regardless of verdict — users want to read the comment before saving.
+      setNeedsConfirm(true);
     } catch (e) {
       console.error("[EditWorkoutDialog] validate error:", e);
       // If validator is unavailable, fall back to direct save

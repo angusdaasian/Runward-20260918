@@ -489,7 +489,8 @@ const DraggableDay = ({
 }) => {
   const { attributes, listeners, setNodeRef: setDragRef, isDragging, transform } = useDraggable({ id });
   const { setNodeRef: setDropRef, isOver } = useDroppable({ id });
-  const sessionsCount = Array.isArray((day as any).sessions) ? (day as any).sessions.length : 0;
+  const sessions = Array.isArray((day as any).sessions) ? ((day as any).sessions as WorkoutSession[]) : [];
+  const sessionsCount = sessions.length;
   const [expanded, setExpanded] = useState(false);
 
   const setRefs = (node: HTMLDivElement | null) => {
@@ -539,9 +540,6 @@ const DraggableDay = ({
               <div className="flex-1 min-w-0 flex items-center justify-between gap-2 select-none">
                 <span className="font-medium text-sm text-foreground truncate">
                   {localizeTitle(day.type, lang)}
-                  {sessionsCount > 1 && (
-                    <span className="ml-1 text-[10px] font-bold text-muted-foreground">×{sessionsCount}</span>
-                  )}
                 </span>
               </div>
               <button
@@ -587,6 +585,19 @@ const DraggableDay = ({
                 </button>
               )}
             </div>
+            {!expanded && sessionsCount > 1 && (
+              <div className="mt-2 flex gap-1 overflow-x-auto">
+                {sessions.map((sess, si) => {
+                  const label = localizeTitle(sess.type || "Run", lang);
+                  const km = sessionDistanceKm(sess);
+                  return (
+                    <span key={sess.id || si} className="shrink-0 rounded-md border border-border bg-muted/40 px-2 py-1 text-[10px] text-foreground">
+                      {sess.time_of_day ? `${sess.time_of_day} · ` : ""}{label}{km ? ` · ${km} km` : ""}
+                    </span>
+                  );
+                })}
+              </div>
+            )}
             {expanded && <WorkoutDetails day={day} lang={lang} hrBounds={hrBounds} />}
           </div>
         </div>

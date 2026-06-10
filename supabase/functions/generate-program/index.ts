@@ -384,7 +384,9 @@ serve(async (req) => {
           }
         }
       }
-      return repairTrailRacePlan(planData);
+      const repaired = repairTrailRacePlan(planData);
+      // Split Interval days into Warmup + Intervals + Cooldown sub-sessions.
+      return splitIntervalsInPlan(repaired, { lang: isZh ? "zh" : "en" }).plan;
     };
 
     const langInstruction = isZh

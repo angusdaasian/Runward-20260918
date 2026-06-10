@@ -25,7 +25,7 @@ import { shareTrainingWeek } from "@/lib/sharePlanWeek";
 import { estimateMaxHr, estimateRestingHr, zoneBoundaries, isValidCustomZones } from "@/lib/hrZones";
 import { predictRaceFromActivities, typeLabel, type RunType } from "@/lib/racePredictionHr";
 import { targetTimeFromPlan, type SuggestProfile, type SuggestActivity } from "@/lib/paceSuggest";
-import { sessionDistanceKm, type WorkoutSession } from "@/lib/planTypes";
+import { genSessionId, sessionDistanceKm, summarizeDay, type WorkoutSession } from "@/lib/planTypes";
 import { splitIntervalsInPlan } from "@/lib/splitIntervalSessions";
 import {
   DndContext, PointerSensor, TouchSensor, useSensor, useSensors,
@@ -317,6 +317,76 @@ const labelForDay = (day: any, i: number): string => {
     if (!isNaN(dt.getTime())) return WEEKDAY_FROM_DATE[dt.getDay()];
   }
   return DAY_LABELS[i] || (day?.day?.substring(0, 3).toUpperCase() ?? "");
+};
+
+const isRestWorkoutDay = (day: DayPlan | null | undefined) => !day || day.type === "Rest" || (!day.type && !day.distance_km);
+
+const sessionFromLegacyDay = (day: DayPlan): WorkoutSession | null => {
+  if (isRestWorkoutDay(day)) return null;
+  return {
+    id: genSessionId(),
+    type: day.type || "Run",
+    title: day.title || day.type || "Run",
+    distance_km: day.distance_km ?? null,
+    pace: day.pace ?? null,
+    description: day.description ?? null,
+    color: day.color ?? null,
+    elevation_m: day.elevation_m ?? null,
+    eph: day.eph ?? null,
+    steps: (day as any).steps,
+  };
+};
+
+const workoutSessionsForDay = (day: DayPlan): WorkoutSession[] => {
+  const sessions = Array.isArray((day as any).sessions) ? ((day as any).sessions as WorkoutSession[]) : [];
+  if (sessions.length > 0) return sessions.map((s) => ({ ...s, id: s.id || genSessionId() }));
+  const legacy = sessionFromLegacyDay(day);
+  return legacy ? [legacy] : [];
+};
+
+const dayForWorkoutSession = (day: DayPlan, session: WorkoutSession): DayPlan => ({
+  ...day,
+  type: session.type,
+  title: session.title ?? session.type,
+  distance_km: sessionDistanceKm(session) || session.distance_km || null,
+  pace: session.pace ?? null,
+  description: session.description ?? null,
+  color: session.color ?? day.color,
+  elevation_m: session.elevation_m ?? null,
+  eph: session.eph ?? null,
+  sessions: [session],
+} as any);
+
+const restDayFrom = (day: DayPlan, lang: Lang): DayPlan => ({
+  ...day,
+  type: "Rest",
+  title: lang === "zh" ? "休息" : "Rest Day",
+  description: lang === "zh" ? "全日休息恢復。" : "Full rest day for recovery.",
+  distance_km: null,
+  pace: null,
+  color: "#607D8B",
+  elevation_m: null,
+  eph: null,
+  sessions: undefined,
+} as any);
+
+const rebuildDayFromSessions = (day: DayPlan, sessions: WorkoutSession[], lang: Lang): DayPlan => {
+  const clean = sessions.map((s) => ({
+    ...s,
+    id: s.id || genSessionId(),
+    distance_km: sessionDistanceKm(s) || s.distance_km || null,
+  }));
+  if (clean.length === 0) return restDayFrom(day, lang);
+  const summary = summarizeDay(clean);
+  return {
+    ...day,
+    ...summary,
+    type: summary.type ?? clean[0].type,
+    title: summary.title ?? clean[0].title ?? clean[0].type,
+    description: summary.description ?? clean[0].description ?? "",
+    color: summary.color ?? clean[0].color ?? day.color,
+    sessions: clean,
+  } as DayPlan;
 };
 
 // Render the structured details (paces, distance, HR, warmup/cooldown) for a workout

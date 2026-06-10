@@ -125,48 +125,28 @@ function statBlock(x: number, y: number, value: string, label: string, t: Theme)
 }
 
 async function renderProgramWeek(supabase: any, userId: string, t: Theme): Promise<string> {
-  // Look at this week (Mon-Sun)
-  const now = new Date();
-  const day = (now.getDay() + 6) % 7; // 0 = Monday
-  const weekStart = new Date(now); weekStart.setHours(0, 0, 0, 0); weekStart.setDate(now.getDate() - day);
-  const weekEnd = new Date(weekStart); weekEnd.setDate(weekStart.getDate() + 7);
-
-  // Try pushed workouts first
-  const { data: pushed } = await supabase
-    .from("pushed_workouts")
-    .select("scheduled_date, title, description, distance_km, workout_type")
+  // Latest training plan (AI or custom), pick current week from plan_data.weeks
+  const { data: plan } = await supabase
+    .from("training_plans")
+    .select("plan_data, created_at, weeks")
     .eq("user_id", userId)
-    .gte("scheduled_date", weekStart.toISOString().slice(0, 10))
-    .lt("scheduled_date", weekEnd.toISOString().slice(0, 10))
-    .order("scheduled_date");
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
 
   let items: { date: string; title: string }[] = [];
-  if (pushed && pushed.length) {
-    items = pushed.map((p: any) => ({
-      date: new Date(p.scheduled_date).toLocaleDateString("en-US", { weekday: "short" }),
-      title: p.title || p.workout_type || (p.distance_km ? `${p.distance_km}km` : "Run"),
+  const pd: any = plan?.plan_data;
+  if (pd && Array.isArray(pd.weeks) && pd.weeks.length) {
+    const weeksSince = plan?.created_at
+      ? Math.floor((Date.now() - new Date(plan.created_at).getTime()) / (7 * 86400000))
+      : 0;
+    const idx = Math.min(Math.max(0, weeksSince), pd.weeks.length - 1);
+    const wk = pd.weeks[idx];
+    const sessions: any[] = wk?.sessions || wk?.workouts || wk?.days || [];
+    items = sessions.slice(0, 4).map((s: any, i: number) => ({
+      date: s.day || s.day_name || ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"][i] || "",
+      title: s.title || s.name || s.type || s.workout || s.description || "Workout",
     }));
-  } else {
-    // Fall back: AI/custom training plan latest week
-    const { data: plan } = await supabase
-      .from("training_plans")
-      .select("plan_data, created_at, weeks")
-      .eq("user_id", userId)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    const pd: any = plan?.plan_data;
-    if (pd && Array.isArray(pd.weeks)) {
-      // Pick first week or current week index based on created_at
-      const weeksSince = plan?.created_at ? Math.floor((Date.now() - new Date(plan.created_at).getTime()) / (7 * 86400000)) : 0;
-      const idx = Math.min(Math.max(0, weeksSince), pd.weeks.length - 1);
-      const wk = pd.weeks[idx];
-      const sessions: any[] = wk?.sessions || wk?.workouts || [];
-      items = sessions.slice(0, 4).map((s: any, i: number) => ({
-        date: s.day || ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"][i] || "",
-        title: s.title || s.name || s.type || "Workout",
-      }));
-    }
   }
 
   if (!items.length) return emptyMsg("This Week's Plan", "No workouts scheduled", t);
@@ -175,11 +155,12 @@ async function renderProgramWeek(supabase: any, userId: string, t: Theme): Promi
     const y = 60 + i * 24;
     return `<circle cx="26" cy="${y - 4}" r="3" fill="${t.accent}"/>
 <text x="38" y="${y}" font-family="-apple-system,SF Pro,Helvetica,Arial" font-size="13" font-weight="600" fill="${t.fg}">${esc(it.date)}</text>
-<text x="78" y="${y}" font-family="-apple-system,SF Pro,Helvetica,Arial" font-size="13" fill="${t.fg}">${esc(it.title.slice(0, 30))}</text>`;
+<text x="78" y="${y}" font-family="-apple-system,SF Pro,Helvetica,Arial" font-size="13" fill="${t.fg}">${esc(String(it.title).slice(0, 30))}</text>`;
   }).join("\n");
 
   return svgWrap(header("This Week's Plan", t) + lines, t);
 }
+
 
 async function fetchTodayHealth(supabase: any, userId: string) {
   const today = new Date().toISOString().slice(0, 10);

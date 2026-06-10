@@ -7,7 +7,7 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { getTerraCreds, pickEnvFromRequest } from "../_shared/terraEnv.ts";
-import { buildPlannedWorkout, type PlanDay } from "../_shared/terraPlannedWorkout.ts";
+import { buildPlannedWorkout, expandSessions, type PlanDay } from "../_shared/terraPlannedWorkout.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -46,9 +46,12 @@ async function pushOne(opts: {
   }
   const conn = conns[0];
 
-  const payload = buildPlannedWorkout(day, { provider: conn.provider, lang });
+  const sessionDays = expandSessions(day);
+  const payloads = sessionDays
+    .map((sd) => buildPlannedWorkout(sd, { provider: conn.provider, lang }))
+    .filter((p): p is NonNullable<typeof p> => !!p);
 
-  // Always try to delete the prior push first (handles rest-day conversion + edits).
+  // Always try to delete the prior push(es) first.
   const { data: existing } = await admin
     .from("pushed_workouts")
     .select("id, terra_log_id, provider")
@@ -59,33 +62,40 @@ async function pushOne(opts: {
     .maybeSingle();
 
   if (existing?.terra_log_id) {
-    try {
-      const delUrl = `https://api.tryterra.co/v2/plannedWorkout?user_id=${conn.terra_user_id}&workout_id=${existing.terra_log_id}`;
-      await fetch(delUrl, { method: "DELETE", headers: { "dev-id": devId, "x-api-key": apiKey } });
-    } catch (e) {
-      console.warn("[terra-push-workout] delete prior failed (continuing):", e);
+    // terra_log_id may be a single id or a comma-separated list (multi-session).
+    const ids = existing.terra_log_id.split(",").map((s: string) => s.trim()).filter(Boolean);
+    for (const wid of ids) {
+      try {
+        const delUrl = `https://api.tryterra.co/v2/plannedWorkout?user_id=${conn.terra_user_id}&workout_id=${wid}`;
+        await fetch(delUrl, { method: "DELETE", headers: { "dev-id": devId, "x-api-key": apiKey } });
+      } catch (e) {
+        console.warn("[terra-push-workout] delete prior failed (continuing):", e);
+      }
     }
     await admin.from("pushed_workouts").delete().eq("id", existing.id);
   }
 
-  if (!payload) return { ok: false, code: "not_pushable", reason: "Rest day or missing distance" };
+  if (payloads.length === 0) return { ok: false, code: "not_pushable", reason: "Rest day or missing distance" };
 
-
-  // POST to Terra.
-  const url = `https://api.tryterra.co/v2/plannedWorkout?user_id=${conn.terra_user_id}`;
-  const r = await fetch(url, {
-    method: "POST",
-    headers: { "dev-id": devId, "x-api-key": apiKey, "Content-Type": "application/json" },
-    body: JSON.stringify({ data: [payload] }),
-  });
-  const respText = await r.text();
-  if (!r.ok) {
-    console.error("[terra-push-workout] terra error", r.status, respText);
-    return { ok: false, code: "terra_error", reason: `Terra ${r.status}: ${respText.slice(0, 200)}` };
+  // POST each session to Terra. Collect log_ids.
+  const logIds: string[] = [];
+  for (const payload of payloads) {
+    const url = `https://api.tryterra.co/v2/plannedWorkout?user_id=${conn.terra_user_id}`;
+    const r = await fetch(url, {
+      method: "POST",
+      headers: { "dev-id": devId, "x-api-key": apiKey, "Content-Type": "application/json" },
+      body: JSON.stringify({ data: [payload] }),
+    });
+    const respText = await r.text();
+    if (!r.ok) {
+      console.error("[terra-push-workout] terra error", r.status, respText);
+      return { ok: false, code: "terra_error", reason: `Terra ${r.status}: ${respText.slice(0, 200)}` };
+    }
+    let respJson: any = null;
+    try { respJson = JSON.parse(respText); } catch { /* ignore */ }
+    const id: string = respJson?.log_ids?.[0] ?? respJson?.log_id ?? "";
+    if (id) logIds.push(id);
   }
-  let respJson: any = null;
-  try { respJson = JSON.parse(respText); } catch { /* ignore */ }
-  const logId: string = respJson?.log_ids?.[0] ?? respJson?.log_id ?? "";
 
   await admin.from("pushed_workouts").insert({
     user_id: userId,
@@ -93,10 +103,10 @@ async function pushOne(opts: {
     week,
     day_index: dayIndex,
     provider: conn.provider,
-    terra_log_id: logId || null,
+    terra_log_id: logIds.length ? logIds.join(",") : null,
   });
 
-  return { ok: true, log_id: logId, provider: conn.provider };
+  return { ok: true, log_id: logIds[0] ?? "", provider: conn.provider };
 }
 
 Deno.serve(async (req) => {

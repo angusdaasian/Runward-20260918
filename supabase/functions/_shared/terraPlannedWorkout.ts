@@ -11,6 +11,18 @@
 // Note: distance duration uses `distance_meters`, NOT `distance`.
 // Pace target uses target_type 11 with speed_meters_per_second fields, NOT target_type 6.
 
+export interface PlanSession {
+  id?: string;
+  time_of_day?: string | null;
+  type?: string | null;
+  title?: string | null;
+  distance_km?: number | null;
+  pace?: string | null;
+  description?: string | null;
+  elevation_m?: number | null;
+  eph?: number | null;
+}
+
 export interface PlanDay {
   type?: string | null;
   title?: string | null;
@@ -18,6 +30,26 @@ export interface PlanDay {
   pace?: string | null;       // "5:30" mm:ss per km
   description?: string | null;
   date?: string | null;       // ISO YYYY-MM-DD
+  elevation_m?: number | null;
+  eph?: number | null;
+  sessions?: PlanSession[];
+}
+
+/** Expand a PlanDay into one or more session-day objects for Terra push. */
+export function expandSessions(day: PlanDay): PlanDay[] {
+  if (Array.isArray(day.sessions) && day.sessions.length > 0) {
+    return day.sessions.map((s) => ({
+      type: s.type ?? day.type,
+      title: s.title ?? s.type ?? day.title,
+      distance_km: s.distance_km ?? null,
+      pace: s.pace ?? null,
+      description: s.description ?? null,
+      date: day.date ?? null,
+      elevation_m: s.elevation_m ?? null,
+      eph: s.eph ?? null,
+    }));
+  }
+  return [day];
 }
 
 function paceSecPerKm(pace?: string | null): number | null {
@@ -30,6 +62,8 @@ function paceSecPerKm(pace?: string | null): number | null {
 
 function normalizeType(type?: string | null): string {
   const t = (type ?? "").toString().trim().toLowerCase();
+  if (t.includes("warm")) return "Warmup";
+  if (t.includes("cool")) return "Cooldown";
   if (t.includes("interval")) return "Intervals";
   if (t.includes("tempo")) return "Tempo";
   if (t.includes("recovery")) return "Recovery Run";
@@ -41,13 +75,10 @@ function normalizeType(type?: string | null): string {
 }
 
 function watchText(value: string | null | undefined, fallback: string, maxLen = 60): string {
-  // Garmin/Coros both accept UTF-8 (incl. CJK) in workout names/descriptions.
-  // Strip only control characters; keep ASCII printable + extended Unicode.
   const text = (value || "").replace(/[\x00-\x1F\x7F]/g, "").trim();
   return (text || fallback).slice(0, maxLen);
 }
 
-// Localized step labels.
 const L = {
   en: { warmup: "Warm Up", cooldown: "Cool Down", work: "Work", recovery: "Recovery", tempo: "Tempo", easy: "Easy Run", long: "Long Run", recoveryRun: "Recovery Run", trail: "Trail Run", run: "Run", intervals: "Intervals" },
   zh: { warmup: "熱身", cooldown: "緩和", work: "主項", recovery: "恢復", tempo: "節奏跑", easy: "輕鬆跑", long: "長距離跑", recoveryRun: "恢復跑", trail: "越野跑", run: "跑步", intervals: "間歇跑" },
@@ -56,6 +87,8 @@ const L = {
 function typeLabel(type: string, lang: "en" | "zh"): string {
   const d = L[lang];
   switch (type) {
+    case "Warmup": return d.warmup;
+    case "Cooldown": return d.cooldown;
     case "Intervals": return d.intervals;
     case "Tempo": return d.tempo;
     case "Easy Run": return d.easy;

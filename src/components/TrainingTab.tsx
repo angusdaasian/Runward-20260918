@@ -24,6 +24,7 @@ import {
 import { shareTrainingWeek } from "@/lib/sharePlanWeek";
 import { estimateMaxHr, estimateRestingHr, zoneBoundaries, isValidCustomZones } from "@/lib/hrZones";
 import { predictRaceFromActivities, typeLabel, type RunType } from "@/lib/racePredictionHr";
+import { targetTimeFromPlan, type SuggestProfile, type SuggestActivity } from "@/lib/paceSuggest";
 import {
   DndContext, PointerSensor, TouchSensor, useSensor, useSensors,
   closestCenter, type DragEndEvent
@@ -1460,8 +1461,9 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
 
   // User HR profile → zone bounds for showing HR ranges in the plan
   const [hrBounds, setHrBounds] = useState<HrBounds | null>(null);
+  const [suggestProfile, setSuggestProfile] = useState<SuggestProfile | null>(null);
   useEffect(() => {
-    if (!user) { setHrBounds(null); return; }
+    if (!user) { setHrBounds(null); setSuggestProfile(null); return; }
     let cancelled = false;
     (async () => {
       try {
@@ -1475,13 +1477,35 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
         const rest = estimateRestingHr(p.resting_heartrate);
         const custom = isValidCustomZones(p.custom_hr_zones) ? (p.custom_hr_zones as number[]) : null;
         const b = zoneBoundaries(max, rest, custom);
-        if (!cancelled) setHrBounds({ ...b, max });
+        if (!cancelled) {
+          setHrBounds({ ...b, max });
+          setSuggestProfile({ age: p.age ?? null, max_hr: p.max_heartrate ?? null, resting_hr: p.resting_heartrate ?? null, custom_zones: custom });
+        }
       } catch {
-        if (!cancelled) setHrBounds(null);
+        if (!cancelled) { setHrBounds(null); setSuggestProfile(null); }
       }
     })();
     return () => { cancelled = true; };
   }, [user]);
+
+  // Recent runs (last 30 days) for pace suggestion.
+  const recentRunActivities = useMemo<SuggestActivity[]>(() => {
+    if (!allActivities) return [];
+    const cutoff = Date.now() - 30 * 24 * 3600 * 1000;
+    return (allActivities as any[])
+      .filter((a) => a && (!a.sport_type || /run/i.test(a.sport_type)))
+      .filter((a) => a.start_date ? Date.parse(a.start_date) >= cutoff : true)
+      .map((a) => ({
+        distance: Number(a.distance) || 0,
+        moving_time: a.moving_time ?? null,
+        elapsed_time: a.elapsed_time ?? null,
+        sport_type: a.sport_type ?? null,
+        start_date: a.start_date ?? null,
+        average_heartrate: a.average_heartrate ?? null,
+      }));
+  }, [allActivities]);
+
+  const aiTargetTime = useMemo(() => targetTimeFromPlan(existingPlan?.distance ?? null, existingPlan?.target_time ?? null), [existingPlan?.distance, existingPlan?.target_time]);
 
   // Deterministic HR + VDOT race prediction over last 30 days.
   const racePrediction = useMemo(() => {
@@ -3593,14 +3617,30 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
             color: plan[currentWeekIdx].days[editingDayIdx].color,
             elevation_m: plan[currentWeekIdx].days[editingDayIdx].elevation_m ?? null,
             eph: plan[currentWeekIdx].days[editingDayIdx].eph ?? null,
+            sessions: (plan[currentWeekIdx].days[editingDayIdx] as any).sessions,
           }}
+          multiSession
+          recentActivities={recentRunActivities}
+          profile={suggestProfile}
+          targetTime={aiTargetTime}
           planContext={existingPlan ? `Plan: ${existingPlan.goal} ${existingPlan.distance ?? ""} target ${existingPlan.target_time ?? ""}, week ${currentWeekIdx + 1}` : null}
           onSave={async (next) => {
             if (editingDayIdx === null) return;
             const updatedPlan = [...plan]; const week = { ...updatedPlan[currentWeekIdx] }; const days = [...week.days];
             const nextType = next.type ?? days[editingDayIdx].type;
             const isTrail = nextType === "Trail Run" || nextType === "Trail Race";
-            days[editingDayIdx] = { ...days[editingDayIdx], type: nextType, title: next.title ?? days[editingDayIdx].title, color: next.color ?? days[editingDayIdx].color, distance_km: next.distance_km ?? days[editingDayIdx].distance_km, pace: isTrail ? null : (next.pace || days[editingDayIdx].pace), description: next.description ?? days[editingDayIdx].description, elevation_m: isTrail ? (next.elevation_m ?? days[editingDayIdx].elevation_m ?? null) : null, eph: isTrail ? (next.eph ?? days[editingDayIdx].eph ?? null) : null };
+            days[editingDayIdx] = {
+              ...days[editingDayIdx],
+              type: nextType,
+              title: next.title ?? days[editingDayIdx].title,
+              color: next.color ?? days[editingDayIdx].color,
+              distance_km: next.distance_km ?? days[editingDayIdx].distance_km,
+              pace: isTrail ? null : (next.pace || days[editingDayIdx].pace),
+              description: next.description ?? days[editingDayIdx].description,
+              elevation_m: isTrail ? (next.elevation_m ?? days[editingDayIdx].elevation_m ?? null) : null,
+              eph: isTrail ? (next.eph ?? days[editingDayIdx].eph ?? null) : null,
+              sessions: next.sessions,
+            } as any;
             week.days = days; updatedPlan[currentWeekIdx] = week; setPlan(updatedPlan);
             if (user && existingPlan) await supabase.from("training_plans" as any).update({ plan_data: updatedPlan } as any).eq("id", existingPlan.id);
             notifyPlanChanged();
@@ -3762,7 +3802,12 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
             color: customPlan[customWeekIdx].days[customEditingDayIdx].color,
             elevation_m: customPlan[customWeekIdx].days[customEditingDayIdx].elevation_m ?? null,
             eph: customPlan[customWeekIdx].days[customEditingDayIdx].eph ?? null,
+            sessions: (customPlan[customWeekIdx].days[customEditingDayIdx] as any).sessions,
           }}
+          multiSession
+          recentActivities={recentRunActivities}
+          profile={suggestProfile}
+          targetTime={null}
           planContext={customExistingPlan ? `Custom plan, week ${customWeekIdx + 1}` : null}
           onSave={async (next) => {
             if (customEditingDayIdx === null) return;
@@ -3779,7 +3824,8 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
               description: next.description ?? days[customEditingDayIdx].description,
               elevation_m: isTrail ? (next.elevation_m ?? days[customEditingDayIdx].elevation_m ?? null) : null,
               eph: isTrail ? (next.eph ?? days[customEditingDayIdx].eph ?? null) : null,
-            };
+              sessions: next.sessions,
+            } as any;
             week.days = days; updatedPlan[customWeekIdx] = week; setCustomPlan(updatedPlan);
             if (user && customExistingPlan) await supabase.from("training_plans" as any).update({ plan_data: updatedPlan } as any).eq("id", customExistingPlan.id);
             notifyPlanChanged();

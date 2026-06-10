@@ -3,7 +3,7 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { getTerraCreds, pickEnvFromRequest } from "../_shared/terraEnv.ts";
-import { buildPlannedWorkout, type PlanDay } from "../_shared/terraPlannedWorkout.ts";
+import { buildPlannedWorkout, expandSessions, type PlanDay } from "../_shared/terraPlannedWorkout.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -87,12 +87,15 @@ Deno.serve(async (req) => {
       .eq("user_id", user.id).eq("plan_id", planId).eq("week", week);
     for (const row of existing ?? []) {
       if (row.terra_log_id) {
-        try {
-          await fetch(
-            `https://api.tryterra.co/v2/plannedWorkout?user_id=${conn.terra_user_id}&workout_id=${row.terra_log_id}`,
-            { method: "DELETE", headers: { "dev-id": devId, "x-api-key": apiKey } },
-          );
-        } catch (e) { console.warn("[terra-push-week] delete prior failed:", e); }
+        const ids = String(row.terra_log_id).split(",").map((s) => s.trim()).filter(Boolean);
+        for (const wid of ids) {
+          try {
+            await fetch(
+              `https://api.tryterra.co/v2/plannedWorkout?user_id=${conn.terra_user_id}&workout_id=${wid}`,
+              { method: "DELETE", headers: { "dev-id": devId, "x-api-key": apiKey } },
+            );
+          } catch (e) { console.warn("[terra-push-week] delete prior failed:", e); }
+        }
       }
     }
     if (existing && existing.length > 0) {
@@ -101,25 +104,39 @@ Deno.serve(async (req) => {
 
     let pushed = 0, skipped = 0, failed = 0;
     for (let di = 0; di < days.length; di++) {
-      const payload = buildPlannedWorkout(days[di], { provider: conn.provider, lang });
-      if (!payload) { skipped++; continue; }
-      try {
-        const r = await fetch(
-          `https://api.tryterra.co/v2/plannedWorkout?user_id=${conn.terra_user_id}`,
-          { method: "POST", headers, body: JSON.stringify({ data: [payload] }) },
-        );
-        const respText = await r.text();
-        if (!r.ok) { console.error("[terra-push-week]", r.status, respText); failed++; continue; }
-        let respJson: any = null;
-        try { respJson = JSON.parse(respText); } catch { /* noop */ }
-        const logId: string = respJson?.log_ids?.[0] ?? respJson?.log_id ?? "";
+      const sessionDays = expandSessions(days[di]);
+      const payloads = sessionDays
+        .map((sd) => buildPlannedWorkout(sd, { provider: conn.provider, lang }))
+        .filter((p): p is NonNullable<typeof p> => !!p);
+      if (payloads.length === 0) { skipped++; continue; }
+      const logIds: string[] = [];
+      let anyFailed = false;
+      for (const payload of payloads) {
+        try {
+          const r = await fetch(
+            `https://api.tryterra.co/v2/plannedWorkout?user_id=${conn.terra_user_id}`,
+            { method: "POST", headers, body: JSON.stringify({ data: [payload] }) },
+          );
+          const respText = await r.text();
+          if (!r.ok) { console.error("[terra-push-week]", r.status, respText); anyFailed = true; continue; }
+          let respJson: any = null;
+          try { respJson = JSON.parse(respText); } catch { /* noop */ }
+          const id: string = respJson?.log_ids?.[0] ?? respJson?.log_id ?? "";
+          if (id) logIds.push(id);
+        } catch (e) {
+          console.error("[terra-push-week] push error:", e); anyFailed = true;
+        }
+      }
+      if (logIds.length > 0) {
         await admin.from("pushed_workouts").insert({
           user_id: user.id, plan_id: planId, week, day_index: di,
-          provider: conn.provider, terra_log_id: logId || null,
+          provider: conn.provider, terra_log_id: logIds.join(","),
         });
         pushed++;
-      } catch (e) {
-        console.error("[terra-push-week] push error:", e); failed++;
+      } else if (anyFailed) {
+        failed++;
+      } else {
+        skipped++;
       }
     }
 

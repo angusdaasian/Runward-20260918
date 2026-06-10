@@ -1,11 +1,14 @@
-import { useEffect, useState } from "react";
-import { Loader2, AlertTriangle, CheckCircle2, Info } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Loader2, AlertTriangle, CheckCircle2, Info, Plus, X, Sparkles, ChevronDown, ChevronRight } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { Lang } from "@/lib/i18n";
 import { toast } from "sonner";
+import type { WorkoutSession, WorkoutStep, WorkoutStepKind, HrTarget } from "@/lib/planTypes";
+import { genSessionId, summarizeDay } from "@/lib/planTypes";
+import { suggestPaceAndHr, type SuggestActivity, type SuggestProfile } from "@/lib/paceSuggest";
 
 export interface EditableWorkout {
   type?: string | null;
@@ -16,26 +19,36 @@ export interface EditableWorkout {
   color?: string | null;
   elevation_m?: number | null;
   eph?: number | null;
+  /** Optional multi-session day. When present, overrides the legacy single-workout fields. */
+  sessions?: WorkoutSession[];
+  hr_target?: HrTarget | null;
 }
 
 interface Props {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   lang: Lang;
-  /** Initial workout (also treated as the "original" the AI compares against). */
   workout: EditableWorkout;
-  /** Plain-text context for the validator (e.g. "free plan, week 3 long run day"). */
   planContext?: string | null;
-  /** Called with the saved (possibly-edited) workout when user confirms. */
   onSave: (next: EditableWorkout) => void | Promise<void>;
-  /** Optional delete handler (shows a destructive button). */
   onDelete?: () => void | Promise<void>;
   title?: string;
+  /** Enable multi-session + warmup/cooldown + auto-suggest (AI plan + Custom only). */
+  multiSession?: boolean;
+  /** Recent runs for auto-suggest (last 30 days). */
+  recentActivities?: SuggestActivity[] | null;
+  /** Profile for HR zones. */
+  profile?: SuggestProfile | null;
+  /** Plan target race time, used as fallback for pace suggestion. */
+  targetTime?: { distance_m: number; seconds: number } | null;
 }
 
 type Verdict = "ok" | "caution" | "risky";
 
 const TYPE_OPTIONS: { id: string; en: string; zh: string; color: string; descEn: string; descZh: string }[] = [
+  { id: "Warmup", en: "Warmup", zh: "熱身", color: "#fcd34d",
+    descEn: "Easy jog to raise heart rate and prime muscles before the main effort.",
+    descZh: "輕鬆慢跑提升心率，為主要訓練做好準備。" },
   { id: "Easy Run", en: "Easy Run", zh: "輕鬆跑", color: "#22c55e",
     descEn: "Comfortable, conversational pace. Keep it relaxed and aerobic to build endurance without fatigue.",
     descZh: "輕鬆、可交談的配速，保持放鬆有氧，建立耐力而不過度疲勞。" },
@@ -60,6 +73,9 @@ const TYPE_OPTIONS: { id: string; en: string; zh: string; color: string; descEn:
   { id: "Race Pace", en: "Race Pace", zh: "比賽配速", color: "#a855f7",
     descEn: "Run at your goal race pace to dial in effort and rhythm.",
     descZh: "以目標比賽配速跑，熟悉強度與節奏。" },
+  { id: "Cooldown", en: "Cooldown", zh: "緩和", color: "#7dd3fc",
+    descEn: "Easy jog after the main effort to flush legs and lower heart rate gradually.",
+    descZh: "主要訓練後輕鬆慢跑，幫助雙腿恢復並逐步降低心率。" },
   { id: "Trail Run", en: "Trail Run", zh: "越野跑", color: "#84cc16",
     descEn: "Off-road run with elevation. Effort guided by EpH (Effort per Hour) instead of flat pace.",
     descZh: "越野跑，包含爬升。以 EpH（每小時努力分數）替代平路配速。" },
@@ -71,6 +87,14 @@ const TYPE_OPTIONS: { id: string; en: string; zh: string; color: string; descEn:
     descZh: "完全休息日，讓身體吸收訓練並修復。" },
 ];
 
+const STEP_KINDS: { id: WorkoutStepKind; en: string; zh: string }[] = [
+  { id: "warmup", en: "Warmup", zh: "熱身" },
+  { id: "main", en: "Main", zh: "主項" },
+  { id: "interval", en: "Interval", zh: "間歇" },
+  { id: "recovery", en: "Recovery", zh: "恢復" },
+  { id: "cooldown", en: "Cooldown", zh: "緩和" },
+];
+
 const normalizeType = (t?: string | null): string => {
   if (!t) return "";
   const map: Record<string, string> = {
@@ -79,108 +103,168 @@ const normalizeType = (t?: string | null): string => {
     Long: "Long Run",
     Recovery: "Recovery Run",
     Progression: "Progression Run",
+    Intervals: "Interval",
+    "Warm Up": "Warmup",
+    "Cool Down": "Cooldown",
   };
   return map[t] || t;
 };
 
+function typeColor(type: string): string {
+  return TYPE_OPTIONS.find((o) => o.id === type)?.color ?? "#94a3b8";
+}
+
+function sessionsFromWorkout(w: EditableWorkout): WorkoutSession[] {
+  if (Array.isArray(w.sessions) && w.sessions.length > 0) {
+    return w.sessions.map((s) => ({ ...s, id: s.id || genSessionId(), type: normalizeType(s.type) }));
+  }
+  if (!w.type && !w.distance_km) return [];
+  return [{
+    id: genSessionId(),
+    type: normalizeType(w.type) || "Easy Run",
+    title: w.title ?? null,
+    distance_km: w.distance_km ?? null,
+    pace: w.pace ?? null,
+    description: w.description ?? null,
+    color: w.color ?? null,
+    elevation_m: w.elevation_m ?? null,
+    eph: w.eph ?? null,
+    hr_target: w.hr_target ?? null,
+    steps: [],
+  }];
+}
+
 const EditWorkoutDialog = ({
   open, onOpenChange, lang, workout, planContext, onSave, onDelete, title,
+  multiSession = false, recentActivities = null, profile = null, targetTime = null,
 }: Props) => {
   const isZh = lang === "zh";
-  const [type, setType] = useState<string>(normalizeType(workout.type));
-  const [distance, setDistance] = useState<string>(workout.distance_km != null ? String(workout.distance_km) : "");
-  const [pace, setPace] = useState<string>(workout.pace ?? "");
-  const [description, setDescription] = useState<string>(workout.description ?? "");
-  const [elevation, setElevation] = useState<string>(workout.elevation_m != null ? String(workout.elevation_m) : "");
-  const [eph, setEph] = useState<string>(workout.eph != null ? String(workout.eph) : "");
+  const [sessions, setSessions] = useState<WorkoutSession[]>(() => sessionsFromWorkout(workout));
+  const [expandedSteps, setExpandedSteps] = useState<Record<string, boolean>>({});
   const [validating, setValidating] = useState(false);
   const [verdict, setVerdict] = useState<Verdict | null>(null);
   const [feedback, setFeedback] = useState<string>("");
   const [needsConfirm, setNeedsConfirm] = useState(false);
-
-  const isTrailType = type === "Trail Run" || type === "Trail Race";
+  const [suggestSource, setSuggestSource] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (open) {
-      setType(normalizeType(workout.type));
-      setDistance(workout.distance_km != null ? String(workout.distance_km) : "");
-      setPace(workout.pace ?? "");
-      setDescription(workout.description ?? "");
-      setElevation(workout.elevation_m != null ? String(workout.elevation_m) : "");
-      setEph(workout.eph != null ? String(workout.eph) : "");
+      setSessions(sessionsFromWorkout(workout));
+      setExpandedSteps({});
       setVerdict(null);
       setFeedback("");
       setNeedsConfirm(false);
+      setSuggestSource({});
     }
   }, [open, workout]);
 
+  const updateSession = (idx: number, patch: Partial<WorkoutSession>) => {
+    setSessions((prev) => prev.map((s, i) => (i === idx ? { ...s, ...patch } : s)));
+    setVerdict(null); setNeedsConfirm(false);
+  };
+
+  const addSession = () => {
+    setSessions((prev) => [...prev, {
+      id: genSessionId(),
+      time_of_day: prev.length === 0 ? null : (prev.length === 1 ? "PM" : null),
+      type: "Easy Run",
+      distance_km: null, pace: null, description: null,
+      color: typeColor("Easy Run"),
+      steps: [],
+    }]);
+    setVerdict(null); setNeedsConfirm(false);
+  };
+
+  const removeSession = (idx: number) => {
+    setSessions((prev) => prev.filter((_, i) => i !== idx));
+    setVerdict(null); setNeedsConfirm(false);
+  };
+
+  const addStep = (sIdx: number) => {
+    const s = sessions[sIdx];
+    const steps = [...(s.steps ?? []), { kind: "main" as WorkoutStepKind }];
+    updateSession(sIdx, { steps });
+  };
+
+  const updateStep = (sIdx: number, stIdx: number, patch: Partial<WorkoutStep>) => {
+    const s = sessions[sIdx];
+    const steps = (s.steps ?? []).map((st, i) => (i === stIdx ? { ...st, ...patch } : st));
+    updateSession(sIdx, { steps });
+  };
+
+  const removeStep = (sIdx: number, stIdx: number) => {
+    const s = sessions[sIdx];
+    const steps = (s.steps ?? []).filter((_, i) => i !== stIdx);
+    updateSession(sIdx, { steps });
+  };
+
+  const doSuggest = (sIdx: number) => {
+    const s = sessions[sIdx];
+    const sug = suggestPaceAndHr({
+      type: s.type, profile, recentActivities, targetTime,
+    });
+    const patch: Partial<WorkoutSession> = {};
+    if (sug.pace) patch.pace = sug.pace;
+    if (sug.bpm_low && sug.bpm_high) patch.hr_target = { zone: sug.zone ?? undefined, bpm_low: sug.bpm_low, bpm_high: sug.bpm_high };
+    updateSession(sIdx, patch);
+    const label =
+      sug.source === "recent" ? (isZh ? "根據過去 30 天" : "from last 30 days") :
+      sug.source === "target" ? (isZh ? "根據目標時間" : "from target time") :
+      sug.source === "profile" ? (isZh ? "根據心率區間" : "from HR zones") :
+      (isZh ? "未能建議" : "no suggestion");
+    setSuggestSource((prev) => ({ ...prev, [s.id]: label }));
+    if (sug.source === "none") toast.message(isZh ? "未有足夠資料建議配速" : "Not enough data to suggest pace");
+  };
+
   const buildEdited = (): EditableWorkout => {
-    const opt = TYPE_OPTIONS.find((o) => o.id === type);
+    const cleanSessions = sessions.map((s) => ({
+      ...s,
+      type: normalizeType(s.type),
+      color: typeColor(normalizeType(s.type)),
+    }));
+    const summary = summarizeDay(cleanSessions);
     return {
       ...workout,
-      type: type || workout.type,
-      title: type || workout.title,
-      color: opt?.color ?? workout.color,
-      distance_km: distance ? Number(distance) : workout.distance_km,
-      pace: isTrailType ? null : (pace || workout.pace),
-      description: description || workout.description,
-      elevation_m: isTrailType ? (elevation ? Number(elevation) : null) : (workout.elevation_m ?? null),
-      eph: isTrailType ? (eph ? Number(eph) : null) : (workout.eph ?? null),
-    };
+      ...summary,
+      sessions: cleanSessions.length > 1 ? cleanSessions : undefined,
+      // For single session, mirror to top-level fields so legacy readers work; drop sessions key.
+    } as EditableWorkout;
   };
 
   const isUnchanged = (): boolean => {
     const next = buildEdited();
-    return (
-      (next.type ?? "") === (normalizeType(workout.type) ?? "") &&
-      (next.distance_km ?? null) === (workout.distance_km ?? null) &&
-      (next.pace ?? "") === (workout.pace ?? "") &&
-      (next.description ?? "") === (workout.description ?? "") &&
-      (next.elevation_m ?? null) === (workout.elevation_m ?? null) &&
-      (next.eph ?? null) === (workout.eph ?? null)
-    );
+    return JSON.stringify({ s: next.sessions, t: next.type, d: next.distance_km, p: next.pace, desc: next.description })
+      === JSON.stringify({ s: workout.sessions, t: workout.type, d: workout.distance_km, p: workout.pace, desc: workout.description });
   };
 
   const handleSaveClick = async () => {
-    if (isUnchanged()) {
-      onOpenChange(false);
+    if (sessions.length === 0) {
+      toast.error(isZh ? "請至少加入一個訓練" : "Add at least one workout");
       return;
     }
-    // If we already validated and either ok or user confirmed, just save.
-    if (verdict === "ok" || needsConfirm) {
-      await persist();
-      return;
-    }
-    // Run validation
+    if (isUnchanged()) { onOpenChange(false); return; }
+    if (verdict === "ok" || needsConfirm) { await persist(); return; }
     setValidating(true);
     try {
+      const next = buildEdited();
       const { data, error } = await supabase.functions.invoke("validate-workout-edit", {
-        body: {
-          lang,
-          original: workout,
-          edited: buildEdited(),
-          planContext: planContext ?? null,
-        },
+        body: { lang, original: workout, edited: next, planContext: planContext ?? null },
       });
       if (error) throw error;
       const v = (data as any)?.verdict as Verdict | undefined;
       const fb = (data as any)?.feedback as string | undefined;
       const newDesc = (data as any)?.updatedDescription as string | undefined;
-      if (newDesc && newDesc.trim()) {
-        setDescription(newDesc.trim());
-      }
       setVerdict(v ?? "caution");
       setFeedback(fb ?? "");
       if (v === "ok") {
-        // Auto-save on green light, using AI-rewritten description if provided
         await persist(newDesc?.trim() || undefined);
       } else {
-        // caution / risky → require explicit second click
         setNeedsConfirm(true);
       }
     } catch (e) {
       console.error("[EditWorkoutDialog] validate error:", e);
-      toast.error(isZh ? "AI 教練檢查失敗，請再試一次" : "Coach check failed, please try again");
+      // If validator is unavailable, fall back to direct save
+      await persist();
     } finally {
       setValidating(false);
     }
@@ -198,109 +282,227 @@ const EditWorkoutDialog = ({
     }
   };
 
+  const showMulti = multiSession;
+  const isTrailType = (t: string) => t === "Trail Run" || t === "Trail Race";
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-sm">
+      <DialogContent className="sm:max-w-md max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{title ?? (isZh ? "編輯訓練" : "Edit Workout")}</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">
-          <div>
-            <label className="text-sm font-medium text-foreground mb-1 block">
-              {isZh ? "活動類型" : "Activity Type"}
-            </label>
-            <div className="flex items-center gap-2">
-              {(() => {
-                const opt = TYPE_OPTIONS.find((o) => o.id === type);
-                return opt ? (
-                  <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: opt.color }} />
-                ) : null;
-              })()}
-              <select
-                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                value={type}
-                onChange={(e) => {
-                  const newType = e.target.value;
-                  setType(newType);
-                  const opt = TYPE_OPTIONS.find((o) => o.id === newType);
-                  if (opt) setDescription(isZh ? opt.descZh : opt.descEn);
-                  setVerdict(null);
-                  setNeedsConfirm(false);
-                }}
-              >
-                {!TYPE_OPTIONS.some((o) => o.id === type) && type && (
-                  <option value={type}>{type}</option>
+          {sessions.map((s, sIdx) => {
+            const trail = isTrailType(s.type);
+            const stepsExpanded = expandedSteps[s.id] ?? ((s.steps?.length ?? 0) > 0);
+            const sourceLabel = suggestSource[s.id];
+            return (
+              <div key={s.id} className="border border-border rounded-lg p-3 space-y-3 relative">
+                {showMulti && sessions.length > 1 && (
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: typeColor(s.type) }} />
+                      <span className="text-xs font-medium text-muted-foreground">
+                        {isZh ? `訓練 ${sIdx + 1}` : `Session ${sIdx + 1}`}
+                      </span>
+                      <select
+                        className="text-xs rounded border border-input bg-background px-1.5 py-0.5"
+                        value={s.time_of_day ?? ""}
+                        onChange={(e) => updateSession(sIdx, { time_of_day: e.target.value || null })}
+                      >
+                        <option value="">{isZh ? "全日" : "Any time"}</option>
+                        <option value="AM">AM</option>
+                        <option value="PM">PM</option>
+                      </select>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeSession(sIdx)}
+                      className="text-muted-foreground hover:text-destructive p-1"
+                      aria-label="Remove session"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
                 )}
-                {TYPE_OPTIONS.map((o) => (
-                  <option key={o.id} value={o.id}>{isZh ? o.zh : o.en}</option>
-                ))}
-              </select>
-            </div>
-          </div>
 
-          <div>
-            <label className="text-sm font-medium text-foreground mb-1 block">
-              {isZh ? "距離 (公里)" : "Distance (km)"}
-            </label>
-            <Input
-              type="number" min="0" step="0.5"
-              value={distance}
-              onChange={(e) => { setDistance(e.target.value); setVerdict(null); setNeedsConfirm(false); }}
-            />
-          </div>
+                <div>
+                  <label className="text-sm font-medium text-foreground mb-1 block">
+                    {isZh ? "活動類型" : "Activity Type"}
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: typeColor(s.type) }} />
+                    <select
+                      className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                      value={s.type}
+                      onChange={(e) => {
+                        const newType = e.target.value;
+                        const opt = TYPE_OPTIONS.find((o) => o.id === newType);
+                        updateSession(sIdx, {
+                          type: newType,
+                          color: opt?.color,
+                          description: opt ? (isZh ? opt.descZh : opt.descEn) : s.description,
+                        });
+                      }}
+                    >
+                      {!TYPE_OPTIONS.some((o) => o.id === s.type) && s.type && (
+                        <option value={s.type}>{s.type}</option>
+                      )}
+                      {TYPE_OPTIONS.map((o) => (
+                        <option key={o.id} value={o.id}>{isZh ? o.zh : o.en}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
 
-          {isTrailType ? (
-            <>
-              <div>
-                <label className="text-sm font-medium text-foreground mb-1 block">
-                  {isZh ? "爬升 (米)" : "Elevation Gain (m)"}
-                </label>
-                <Input
-                  type="number" min="0" step="10" placeholder="0"
-                  value={elevation}
-                  onChange={(e) => { setElevation(e.target.value); setVerdict(null); setNeedsConfirm(false); }}
-                />
+                <div>
+                  <label className="text-sm font-medium text-foreground mb-1 block">
+                    {isZh ? "距離 (公里)" : "Distance (km)"}
+                  </label>
+                  <Input
+                    type="number" min="0" step="0.5"
+                    value={s.distance_km != null ? String(s.distance_km) : ""}
+                    onChange={(e) => updateSession(sIdx, { distance_km: e.target.value ? Number(e.target.value) : null })}
+                  />
+                </div>
+
+                {trail ? (
+                  <>
+                    <div>
+                      <label className="text-sm font-medium text-foreground mb-1 block">
+                        {isZh ? "爬升 (米)" : "Elevation Gain (m)"}
+                      </label>
+                      <Input
+                        type="number" min="0" step="10"
+                        value={s.elevation_m != null ? String(s.elevation_m) : ""}
+                        onChange={(e) => updateSession(sIdx, { elevation_m: e.target.value ? Number(e.target.value) : null })}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-foreground mb-1 block">
+                        {isZh ? "EpH (每小時努力分數)" : "EpH (Effort per Hour)"}
+                      </label>
+                      <Input
+                        type="number" min="0" step="0.1"
+                        value={s.eph != null ? String(s.eph) : ""}
+                        onChange={(e) => updateSession(sIdx, { eph: e.target.value ? Number(e.target.value) : null })}
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-sm font-medium text-foreground">
+                        {isZh ? "配速 (例: 5:30/km)" : "Pace (e.g. 5:30/km)"}
+                      </label>
+                      {showMulti && (
+                        <button
+                          type="button"
+                          onClick={() => doSuggest(sIdx)}
+                          className="text-xs flex items-center gap-1 text-primary hover:underline"
+                        >
+                          <Sparkles size={12} /> {isZh ? "建議" : "Suggest"}
+                        </button>
+                      )}
+                    </div>
+                    <Input
+                      type="text" placeholder="5:30/km"
+                      value={s.pace ?? ""}
+                      onChange={(e) => updateSession(sIdx, { pace: e.target.value })}
+                    />
+                    {showMulti && s.hr_target?.bpm_low && s.hr_target?.bpm_high ? (
+                      <p className="text-[11px] text-muted-foreground mt-1">
+                        {isZh ? `心率 ${s.hr_target.bpm_low}-${s.hr_target.bpm_high} bpm` : `HR ${s.hr_target.bpm_low}-${s.hr_target.bpm_high} bpm`}
+                        {s.hr_target.zone ? ` · Z${s.hr_target.zone}` : ""}
+                      </p>
+                    ) : null}
+                    {sourceLabel && (
+                      <p className="text-[11px] text-muted-foreground mt-1">{sourceLabel}</p>
+                    )}
+                  </div>
+                )}
+
+                <div>
+                  <label className="text-sm font-medium text-foreground mb-1 block">
+                    {isZh ? "描述" : "Description"}
+                  </label>
+                  <textarea
+                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm min-h-[60px] resize-y"
+                    value={s.description ?? ""}
+                    onChange={(e) => updateSession(sIdx, { description: e.target.value })}
+                  />
+                </div>
+
+                {showMulti && (
+                  <div className="border-t border-border pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setExpandedSteps((p) => ({ ...p, [s.id]: !stepsExpanded }))}
+                      className="text-xs flex items-center gap-1 text-muted-foreground hover:text-foreground"
+                    >
+                      {stepsExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                      {isZh ? "步驟 (熱身/主項/緩和)" : "Steps (warmup / main / cooldown)"}
+                      {(s.steps?.length ?? 0) > 0 ? ` · ${s.steps!.length}` : ""}
+                    </button>
+                    {stepsExpanded && (
+                      <div className="mt-2 space-y-2">
+                        {(s.steps ?? []).map((st, stIdx) => (
+                          <div key={stIdx} className="grid grid-cols-12 gap-1 items-center">
+                            <select
+                              className="col-span-4 text-xs rounded border border-input bg-background px-1.5 py-1"
+                              value={st.kind}
+                              onChange={(e) => updateStep(sIdx, stIdx, { kind: e.target.value as WorkoutStepKind })}
+                            >
+                              {STEP_KINDS.map((k) => (
+                                <option key={k.id} value={k.id}>{isZh ? k.zh : k.en}</option>
+                              ))}
+                            </select>
+                            <Input
+                              className="col-span-3 h-8 text-xs"
+                              type="number" placeholder="km"
+                              value={st.distance_km != null ? String(st.distance_km) : ""}
+                              onChange={(e) => updateStep(sIdx, stIdx, { distance_km: e.target.value ? Number(e.target.value) : null })}
+                            />
+                            <Input
+                              className="col-span-4 h-8 text-xs"
+                              type="text" placeholder="pace"
+                              value={st.pace ?? ""}
+                              onChange={(e) => updateStep(sIdx, stIdx, { pace: e.target.value })}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => removeStep(sIdx, stIdx)}
+                              className="col-span-1 text-muted-foreground hover:text-destructive flex justify-center"
+                            >
+                              <X size={12} />
+                            </button>
+                          </div>
+                        ))}
+                        <button
+                          type="button"
+                          onClick={() => addStep(sIdx)}
+                          className="text-xs text-primary hover:underline flex items-center gap-1"
+                        >
+                          <Plus size={12} /> {isZh ? "新增步驟" : "Add step"}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
-              <div>
-                <label className="text-sm font-medium text-foreground mb-1 block">
-                  {isZh ? "EpH (每小時努力分數)" : "EpH (Effort per Hour)"}
-                </label>
-                <Input
-                  type="number" min="0" step="0.1" placeholder="8"
-                  value={eph}
-                  onChange={(e) => { setEph(e.target.value); setVerdict(null); setNeedsConfirm(false); }}
-                />
-                <p className="text-[11px] text-muted-foreground mt-1">
-                  {isZh ? "EpH = 距離(公里) + 爬升(米)/100 每小時" : "EpH = distance(km) + elevation(m)/100 per hour"}
-                </p>
-              </div>
-            </>
-          ) : (
-            <div>
-              <label className="text-sm font-medium text-foreground mb-1 block">
-                {isZh ? "配速 (例: 5:30/km)" : "Pace (e.g. 5:30/km)"}
-              </label>
-              <Input
-                type="text" placeholder="5:30/km"
-                value={pace}
-                onChange={(e) => { setPace(e.target.value); setVerdict(null); setNeedsConfirm(false); }}
-              />
-            </div>
+            );
+          })}
+
+          {showMulti && (
+            <Button
+              type="button" variant="outline" size="sm" className="w-full"
+              onClick={addSession}
+            >
+              <Plus size={14} className="mr-1" /> {isZh ? "新增同日訓練" : "Add another session this day"}
+            </Button>
           )}
 
-          <div>
-            <label className="text-sm font-medium text-foreground mb-1 block">
-              {isZh ? "描述" : "Description"}
-            </label>
-            <textarea
-              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm min-h-[60px] resize-y"
-              value={description}
-              onChange={(e) => { setDescription(e.target.value); setVerdict(null); setNeedsConfirm(false); }}
-            />
-          </div>
-
-          {/* Feedback panel */}
           {feedback && verdict && (
             <div
               className={`rounded-md p-3 text-sm flex items-start gap-2 border ${
@@ -344,8 +546,7 @@ const EditWorkoutDialog = ({
 
           {onDelete && (
             <Button
-              variant="destructive"
-              className="w-full"
+              variant="destructive" className="w-full"
               disabled={validating}
               onClick={async () => { await onDelete(); onOpenChange(false); }}
             >

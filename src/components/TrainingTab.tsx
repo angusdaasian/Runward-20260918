@@ -3636,50 +3636,27 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                   <p className="text-xs text-muted-foreground">{lang === "zh" ? "總計" : "Total"}: {totalKm.toFixed(1)} km</p>
                 </div>
 
-                <div className="space-y-1">
-                  {currentWeek.days.map((day, i) => {
-                    const dateObj = day.date ? new Date(day.date + "T00:00:00") : null;
-                    const dayNum = dateObj ? dateObj.getDate() : "";
-                    const isToday = day.date === new Date().toISOString().split("T")[0];
-                    return (
-                      <div key={i} className="flex items-stretch gap-2">
-                        <div className="w-10 flex-shrink-0 flex flex-col items-center pt-3">
-                          <span className="text-[10px] font-medium text-muted-foreground uppercase">{labelForDay(day, i)}</span>
-                          <span className={`text-sm font-bold ${isToday ? "text-primary" : "text-foreground"}`}>{dayNum}</span>
-                        </div>
-                        {day.type === "Rest" ? (
-                          <div className="flex-1 border-l-2 border-border pl-3 py-3 min-h-[48px] flex items-center">
-                            <button onClick={() => { setCustomAddingDayIdx(i); setCustomAddRunType(null); setCustomAddDistance(""); setCustomAddElevation(""); setCustomAddEph(""); }}
-                              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
-                              <Plus size={12} />{lang === "zh" ? "新增" : "Add"}
-                            </button>
-                          </div>
-                        ) : (
-                          <div className="flex-1 border-l-2 pl-3 py-2 cursor-pointer" style={{ borderColor: day.color || "hsl(var(--border))" }}
-                            onClick={() => { setCustomEditingDayIdx(i); setCustomEditDistance(day.distance_km?.toString() || ""); setCustomEditPace(day.pace || ""); setCustomEditDescription(day.description || ""); }}>
-                            <div className="bg-card border border-border rounded-lg p-3 hover:border-primary transition-colors">
-                              <div className="flex items-center justify-between">
-                                <span className="font-medium text-sm text-foreground">{localizeTitle(day.type, lang)}</span>
-                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                  {(day.type === "Trail Run" || day.type === "Trail Race") ? (
-                                    <>
-                                      {day.eph > 0 && <span>EpH {day.eph}</span>}
-                                      {day.elevation_m > 0 && <span>+{Math.round(day.elevation_m)}m</span>}
-                                    </>
-                                  ) : (
-                                    day.pace && <span>{day.pace}</span>
-                                  )}
-                                  {day.distance_km && <span>{day.distance_km} km</span>}
-                                </div>
-                              </div>
-                              {day.description && <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{day.description}</p>}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
+                <CalendarDayList
+                  days={currentWeek.days}
+                  weekIdx={customWeekIdx}
+                  lang={lang}
+                  hrBounds={hrBounds}
+                  onSwap={(from, to) => {
+                    if (from === to) return;
+                    setCustomPlan((prev) => {
+                      const next = prev.map((w) => ({ ...w, days: w.days.slice() }));
+                      const week = next[customWeekIdx];
+                      if (!week?.days[from] || !week?.days[to]) return prev;
+                      const a = week.days[from];
+                      const b = week.days[to];
+                      week.days[from] = { ...b, day: a.day, date: a.date };
+                      week.days[to] = { ...a, day: b.day, date: b.date };
+                      return next;
+                    });
+                  }}
+                  onAddClick={(i) => { setCustomAddingDayIdx(i); setCustomAddRunType(null); setCustomAddDistance(""); setCustomAddElevation(""); setCustomAddEph(""); }}
+                  onEditClick={(i, day, sessionIdx = 0) => { setCustomEditingSessionIdx(sessionIdx); setCustomEditingDayIdx(i); setCustomEditDistance(day.distance_km?.toString() || ""); setCustomEditPace(day.pace || ""); setCustomEditDescription(day.description || ""); }}
+                />
 
                 <div className="flex items-center justify-center gap-1 mt-6">
                   {customPlan.map((_, i) => (

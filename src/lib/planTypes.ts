@@ -69,6 +69,23 @@ export function genSessionId(): string {
   }
 }
 
+export function stepDistanceKm(step: WorkoutStep | null | undefined): number {
+  if (!step) return 0;
+  if (step.kind === "interval" && step.reps && step.distance_m) {
+    return (Number(step.reps) * Number(step.distance_m)) / 1000;
+  }
+  if (step.distance_km != null) return Number(step.distance_km) || 0;
+  if (step.distance_m != null) return (Number(step.distance_m) || 0) / 1000;
+  return 0;
+}
+
+export function sessionDistanceKm(session: WorkoutSession | null | undefined): number {
+  if (!session) return 0;
+  const stepTotal = (session.steps ?? []).reduce((acc, step) => acc + stepDistanceKm(step), 0);
+  if (stepTotal > 0) return Number(stepTotal.toFixed(2));
+  return Number(session.distance_km) || 0;
+}
+
 /** Return effective sessions for a day. When day.sessions is missing, synthesize a single
  *  session from the legacy fields so downstream code can treat both shapes uniformly. */
 export function effectiveSessions(day: PlanDay | null | undefined): WorkoutSession[] {
@@ -95,9 +112,10 @@ export function summarizeDay(sessions: WorkoutSession[]): Pick<PlanDayLegacy, "t
   }
   if (sessions.length === 1) {
     const s = sessions[0];
+    const totalKm = sessionDistanceKm(s);
     return {
       type: s.type, title: s.title ?? s.type,
-      distance_km: s.distance_km ?? null,
+      distance_km: totalKm > 0 ? totalKm : (s.distance_km ?? null),
       pace: s.pace ?? null,
       description: s.description ?? null,
       color: s.color ?? null,
@@ -105,12 +123,12 @@ export function summarizeDay(sessions: WorkoutSession[]): Pick<PlanDayLegacy, "t
       eph: s.eph ?? null,
     };
   }
-  const totalKm = sessions.reduce((acc, s) => acc + (Number(s.distance_km) || 0), 0);
+  const totalKm = sessions.reduce((acc, s) => acc + sessionDistanceKm(s), 0);
   // Pick the "primary" (longest, non warmup/cooldown) session for the summary type.
   const primary = [...sessions]
     .filter((s) => s.type !== "Warmup" && s.type !== "Cooldown")
-    .sort((a, b) => (Number(b.distance_km) || 0) - (Number(a.distance_km) || 0))[0] ?? sessions[0];
-  const desc = sessions.map((s) => `${s.time_of_day ? `[${s.time_of_day}] ` : ""}${s.type}${s.distance_km ? ` ${s.distance_km}km` : ""}`).join(" + ");
+    .sort((a, b) => sessionDistanceKm(b) - sessionDistanceKm(a))[0] ?? sessions[0];
+  const desc = sessions.map((s) => `${s.time_of_day ? `[${s.time_of_day}] ` : ""}${s.type}${sessionDistanceKm(s) ? ` ${sessionDistanceKm(s)}km` : ""}`).join(" + ");
   return {
     type: primary.type,
     title: primary.title ?? primary.type,

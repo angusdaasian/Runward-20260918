@@ -33,6 +33,7 @@ import { useDespiaPurchases } from "@/hooks/use-despia-purchases";
 import PlanComparisonDialog from "@/components/PlanComparisonDialog";
 import StartRunningGuide from "@/components/StartRunningGuide";
 import FuelingGuide from "@/components/FuelingGuide";
+import HomeWidgetDialog from "@/components/HomeWidgetDialog";
 
 interface Props {
   lang: Lang;

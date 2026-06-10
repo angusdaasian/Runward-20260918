@@ -389,6 +389,18 @@ const rebuildDayFromSessions = (day: DayPlan, sessions: WorkoutSession[], lang: 
   } as DayPlan;
 };
 
+const editableWorkoutForSession = (day: DayPlan, sessionIdx: number): DayPlan => {
+  const sessions = workoutSessionsForDay(day);
+  const safeIdx = Math.max(0, Math.min(sessionIdx, Math.max(0, sessions.length - 1)));
+  const session = sessions[safeIdx];
+  return session ? dayForWorkoutSession(day, session) : day;
+};
+
+const firstSessionFromEditedWorkout = (workout: DayPlan): WorkoutSession | null => {
+  const sessions = workoutSessionsForDay(workout);
+  return sessions[0] ?? sessionFromLegacyDay(workout);
+};
+
 // Render the structured details (paces, distance, HR, warmup/cooldown) for a workout
 const WorkoutDetails = ({ day, lang, hrBounds }: { day: DayPlan; lang: Lang; hrBounds: HrBounds | null }) => {
   const isZh = lang === "zh";

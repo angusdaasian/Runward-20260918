@@ -117,32 +117,94 @@ function typeColor(type: string): string {
   return TYPE_OPTIONS.find((o) => o.id === type)?.color ?? "#94a3b8";
 }
 
-function sessionsFromWorkout(w: EditableWorkout): WorkoutSession[] {
-  if (Array.isArray(w.sessions) && w.sessions.length > 0) {
-    return w.sessions.map((s) => ({ ...s, id: s.id || genSessionId(), type: normalizeType(s.type) }));
+function parseIntervalDesc(desc?: string | null): { reps: number; distM: number; rest: string | null } | null {
+  if (!desc) return null;
+  const a = /(\d+)\s*[x×]\s*(\d+(?:\.\d+)?)\s*(m|km)\b/i.exec(desc);
+  const b = /(\d+(?:\.\d+)?)\s*(m|km)\s*[x×]\s*(\d+)\b/i.exec(desc);
+  if (!a && !b) return null;
+  const reps = a ? parseInt(a[1], 10) : parseInt(b![3], 10);
+  const val = parseFloat(a ? a[2] : b![1]);
+  const unit = (a ? a[3] : b![2]).toLowerCase();
+  const distM = unit === "km" ? val * 1000 : val;
+  if (reps < 2 || reps > 30 || distM < 50 || distM > 10000) return null;
+  const r = /(?:rest|recovery|jog|休息|恢復)\s*(?:of\s*)?([\d:]+\s*(?:s|sec|min|m)?|\d+\s*['′"″]?)/i.exec(desc);
+  return { reps, distM, rest: r ? r[1].trim() : null };
+}
+
+function seedStepsForType(s: WorkoutSession): WorkoutSession {
+  if (s.steps && s.steps.length > 0) return s;
+  const t = normalizeType(s.type);
+  if (t === "Interval") {
+    const p = parseIntervalDesc(s.description);
+    const step: WorkoutStep = p
+      ? { kind: "interval", reps: p.reps, distance_m: p.distM, pace: s.pace ?? null, rest: p.rest }
+      : { kind: "interval", reps: 5, distance_m: 800, pace: s.pace ?? null, rest: "90s" };
+    return { ...s, steps: [step] };
   }
-  if (!w.type && !w.distance_km) return [];
-  return [{
-    id: genSessionId(),
-    type: normalizeType(w.type) || "Easy Run",
-    title: w.title ?? null,
-    distance_km: w.distance_km ?? null,
-    pace: w.pace ?? null,
-    description: w.description ?? null,
-    color: w.color ?? null,
-    elevation_m: w.elevation_m ?? null,
-    eph: w.eph ?? null,
-    hr_target: w.hr_target ?? null,
-    steps: [],
-  }];
+  if (t === "Warmup") return { ...s, steps: [{ kind: "warmup", distance_km: s.distance_km ?? 1.5, pace: s.pace ?? null }] };
+  if (t === "Cooldown") return { ...s, steps: [{ kind: "cooldown", distance_km: s.distance_km ?? 1.5, pace: s.pace ?? null }] };
+  return s;
+}
+
+function sessionsFromWorkout(w: EditableWorkout): WorkoutSession[] {
+  // If a legacy single-workout Interval is opened, auto-split into 3 sessions so the
+  // sequence shows Warmup + Intervals + Cooldown structured steps.
+  let base: WorkoutSession[] = [];
+  if (Array.isArray(w.sessions) && w.sessions.length > 0) {
+    base = w.sessions.map((s) => ({ ...s, id: s.id || genSessionId(), type: normalizeType(s.type) }));
+  } else if (w.type || w.distance_km) {
+    const t = normalizeType(w.type || "");
+    if ((t === "Interval") && w.distance_km) {
+      const split = splitIntervalDay({
+        type: "Interval",
+        title: w.title ?? null,
+        description: w.description ?? null,
+        distance_km: w.distance_km ?? null,
+        pace: w.pace ?? null,
+        color: w.color ?? null,
+      }, {});
+      if (Array.isArray(split.sessions) && split.sessions.length > 0) {
+        base = split.sessions.map((s: any) => ({ ...s, id: s.id || genSessionId(), type: normalizeType(s.type) }));
+      }
+    }
+    if (base.length === 0) {
+      base = [{
+        id: genSessionId(),
+        type: t || "Easy Run",
+        title: w.title ?? null,
+        distance_km: w.distance_km ?? null,
+        pace: w.pace ?? null,
+        description: w.description ?? null,
+        color: w.color ?? null,
+        elevation_m: w.elevation_m ?? null,
+        eph: w.eph ?? null,
+        hr_target: w.hr_target ?? null,
+        steps: [],
+      }];
+    }
+  }
+  return base.map(seedStepsForType);
 }
 
 const EditWorkoutDialog = ({
   open, onOpenChange, lang, workout, planContext, onSave, onDelete, title,
-  multiSession = false, recentActivities = null, profile = null, targetTime = null,
+  multiSession = false, appendNewSession = false,
+  recentActivities = null, profile = null, targetTime = null,
 }: Props) => {
   const isZh = lang === "zh";
-  const [sessions, setSessions] = useState<WorkoutSession[]>(() => sessionsFromWorkout(workout));
+  const initSessions = (): WorkoutSession[] => {
+    const base = sessionsFromWorkout(workout);
+    if (appendNewSession) {
+      base.push({
+        id: genSessionId(),
+        time_of_day: base.length === 1 ? "PM" : null,
+        type: "Easy Run", distance_km: null, pace: null, description: null,
+        color: typeColor("Easy Run"), steps: [],
+      });
+    }
+    return base;
+  };
+  const [sessions, setSessions] = useState<WorkoutSession[]>(initSessions);
   const [expandedSteps, setExpandedSteps] = useState<Record<string, boolean>>({});
   const [validating, setValidating] = useState(false);
   const [verdict, setVerdict] = useState<Verdict | null>(null);
@@ -152,14 +214,16 @@ const EditWorkoutDialog = ({
 
   useEffect(() => {
     if (open) {
-      setSessions(sessionsFromWorkout(workout));
+      setSessions(initSessions());
+      // Auto-expand the steps panel — that's where the real structure lives now.
       setExpandedSteps({});
       setVerdict(null);
       setFeedback("");
       setNeedsConfirm(false);
       setSuggestSource({});
     }
-  }, [open, workout]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, workout, appendNewSession]);
 
   const updateSession = (idx: number, patch: Partial<WorkoutSession>) => {
     setSessions((prev) => prev.map((s, i) => (i === idx ? { ...s, ...patch } : s)));

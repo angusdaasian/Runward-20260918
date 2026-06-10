@@ -25,7 +25,7 @@ import { shareTrainingWeek } from "@/lib/sharePlanWeek";
 import { estimateMaxHr, estimateRestingHr, zoneBoundaries, isValidCustomZones } from "@/lib/hrZones";
 import { predictRaceFromActivities, typeLabel, type RunType } from "@/lib/racePredictionHr";
 import { targetTimeFromPlan, type SuggestProfile, type SuggestActivity } from "@/lib/paceSuggest";
-import { sessionDistanceKm, type WorkoutSession } from "@/lib/planTypes";
+import { genSessionId, sessionDistanceKm, summarizeDay, type WorkoutSession } from "@/lib/planTypes";
 import { splitIntervalsInPlan } from "@/lib/splitIntervalSessions";
 import {
   DndContext, PointerSensor, TouchSensor, useSensor, useSensors,
@@ -319,6 +319,88 @@ const labelForDay = (day: any, i: number): string => {
   return DAY_LABELS[i] || (day?.day?.substring(0, 3).toUpperCase() ?? "");
 };
 
+const isRestWorkoutDay = (day: DayPlan | null | undefined) => !day || day.type === "Rest" || (!day.type && !day.distance_km);
+
+const sessionFromLegacyDay = (day: DayPlan): WorkoutSession | null => {
+  if (isRestWorkoutDay(day)) return null;
+  return {
+    id: genSessionId(),
+    type: day.type || "Run",
+    title: day.title || day.type || "Run",
+    distance_km: day.distance_km ?? null,
+    pace: day.pace ?? null,
+    description: day.description ?? null,
+    color: day.color ?? null,
+    elevation_m: day.elevation_m ?? null,
+    eph: day.eph ?? null,
+    steps: (day as any).steps,
+  };
+};
+
+const workoutSessionsForDay = (day: DayPlan): WorkoutSession[] => {
+  const sessions = Array.isArray((day as any).sessions) ? ((day as any).sessions as WorkoutSession[]) : [];
+  if (sessions.length > 0) return sessions.map((s) => ({ ...s, id: s.id || genSessionId() }));
+  const legacy = sessionFromLegacyDay(day);
+  return legacy ? [legacy] : [];
+};
+
+const dayForWorkoutSession = (day: DayPlan, session: WorkoutSession): DayPlan => ({
+  ...day,
+  type: session.type,
+  title: session.title ?? session.type,
+  distance_km: sessionDistanceKm(session) || session.distance_km || null,
+  pace: session.pace ?? null,
+  description: session.description ?? null,
+  color: session.color ?? day.color,
+  elevation_m: session.elevation_m ?? null,
+  eph: session.eph ?? null,
+  sessions: [session],
+} as any);
+
+const restDayFrom = (day: DayPlan, lang: Lang): DayPlan => ({
+  ...day,
+  type: "Rest",
+  title: lang === "zh" ? "休息" : "Rest Day",
+  description: lang === "zh" ? "全日休息恢復。" : "Full rest day for recovery.",
+  distance_km: null,
+  pace: null,
+  color: "#607D8B",
+  elevation_m: null,
+  eph: null,
+  sessions: undefined,
+} as any);
+
+const rebuildDayFromSessions = (day: DayPlan, sessions: WorkoutSession[], lang: Lang): DayPlan => {
+  const clean = sessions.map((s) => ({
+    ...s,
+    id: s.id || genSessionId(),
+    distance_km: sessionDistanceKm(s) || s.distance_km || null,
+  }));
+  if (clean.length === 0) return restDayFrom(day, lang);
+  const summary = summarizeDay(clean);
+  return {
+    ...day,
+    ...summary,
+    type: summary.type ?? clean[0].type,
+    title: summary.title ?? clean[0].title ?? clean[0].type,
+    description: summary.description ?? clean[0].description ?? "",
+    color: summary.color ?? clean[0].color ?? day.color,
+    sessions: clean,
+  } as DayPlan;
+};
+
+const editableWorkoutForSession = (day: DayPlan, sessionIdx: number): DayPlan => {
+  const sessions = workoutSessionsForDay(day);
+  const safeIdx = Math.max(0, Math.min(sessionIdx, Math.max(0, sessions.length - 1)));
+  const session = sessions[safeIdx];
+  return session ? dayForWorkoutSession(day, session) : day;
+};
+
+const firstSessionFromEditedWorkout = (workout: DayPlan): WorkoutSession | null => {
+  const sessions = workoutSessionsForDay(workout);
+  return sessions[0] ?? sessionFromLegacyDay(workout);
+};
+
 // Render the structured details (paces, distance, HR, warmup/cooldown) for a workout
 const WorkoutDetails = ({ day, lang, hrBounds }: { day: DayPlan; lang: Lang; hrBounds: HrBounds | null }) => {
   const isZh = lang === "zh";
@@ -469,7 +551,7 @@ const WorkoutDetails = ({ day, lang, hrBounds }: { day: DayPlan; lang: Lang; hrB
 // Draggable + droppable day row for the AI calendar (long-press to swap)
 const DraggableDay = ({
   id, idx, day, lang, isToday, dayNum, hrBounds,
-  onEditClick, onAddClick, onAddAnotherClick,
+  onEditClick, onAddClick,
   isPushed, isPushing, onPushDay, watchProvider,
 }: {
   id: string;
@@ -479,9 +561,8 @@ const DraggableDay = ({
   isToday: boolean;
   dayNum: number | string;
   hrBounds: HrBounds | null;
-  onEditClick: () => void;
+  onEditClick: (sessionIdx?: number) => void;
   onAddClick: () => void;
-  onAddAnotherClick?: () => void;
   isPushed?: boolean;
   isPushing?: boolean;
   onPushDay?: (idx: number) => void;
@@ -489,9 +570,8 @@ const DraggableDay = ({
 }) => {
   const { attributes, listeners, setNodeRef: setDragRef, isDragging, transform } = useDraggable({ id });
   const { setNodeRef: setDropRef, isOver } = useDroppable({ id });
-  const sessions = Array.isArray((day as any).sessions) ? ((day as any).sessions as WorkoutSession[]) : [];
-  const sessionsCount = sessions.length;
-  const [expanded, setExpanded] = useState(false);
+  const sessions = workoutSessionsForDay(day);
+  const [expandedSessionId, setExpandedSessionId] = useState<string | null>(null);
 
   const setRefs = (node: HTMLDivElement | null) => {
     setDragRef(node);
@@ -509,7 +589,7 @@ const DraggableDay = ({
         <span className="text-[10px] font-medium text-muted-foreground uppercase">{labelForDay(day, idx)}</span>
         <span className={`text-sm font-bold ${isToday ? "text-primary" : "text-foreground"}`}>{dayNum}</span>
       </div>
-      {day.type === "Rest" ? (
+      {isRestWorkoutDay(day) ? (
         <div className="flex-1 border-l-2 border-border pl-3 py-3 min-h-[48px] flex items-center gap-2">
           <button
             type="button"
@@ -525,8 +605,13 @@ const DraggableDay = ({
           </button>
         </div>
       ) : (
-        <div className="flex-1 border-l-2 pl-3 py-2" style={{ borderColor: day.color || "hsl(var(--border))" }}>
-          <div className="bg-card border border-border rounded-lg p-3 hover:border-primary transition-colors">
+        <div className="flex-1 border-l-2 pl-3 py-2 space-y-2" style={{ borderColor: day.color || "hsl(var(--border))" }}>
+          {sessions.map((session, sessionIdx) => {
+            const sessionDay = dayForWorkoutSession(day, session);
+            const sessionKm = sessionDistanceKm(session);
+            const expanded = expandedSessionId === (session.id || String(sessionIdx));
+            return (
+          <div key={session.id || sessionIdx} className="bg-card border border-border rounded-lg p-3 hover:border-primary transition-colors">
             <div className="flex items-center gap-2">
               <button
                 type="button"
@@ -539,12 +624,13 @@ const DraggableDay = ({
               </button>
               <div className="flex-1 min-w-0 flex items-center justify-between gap-2 select-none">
                 <span className="font-medium text-sm text-foreground truncate">
-                  {localizeTitle(day.type, lang)}
+                  {session.time_of_day ? `${session.time_of_day} · ` : ""}{localizeTitle(session.type || "Run", lang)}
                 </span>
+                {sessionKm > 0 && <span className="text-xs text-muted-foreground tabular-nums shrink-0">{sessionKm} km</span>}
               </div>
               <button
                 type="button"
-                onClick={(e) => { e.stopPropagation(); setExpanded((v) => !v); }}
+                onClick={(e) => { e.stopPropagation(); setExpandedSessionId(expanded ? null : (session.id || String(sessionIdx))); }}
                 className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground"
                 aria-expanded={expanded}
                 aria-label={lang === "zh" ? "展開" : "Expand"}
@@ -567,39 +653,20 @@ const DraggableDay = ({
               )}
               <button
                 type="button"
-                onClick={(e) => { e.stopPropagation(); onEditClick(); }}
+                onClick={(e) => { e.stopPropagation(); onEditClick(sessionIdx); }}
                 className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground"
                 aria-label={lang === "zh" ? "編輯訓練" : "Edit workout"}
               >
                 <Pencil size={14} />
               </button>
-              {onAddAnotherClick && (
-                <button
-                  type="button"
-                  onClick={(e) => { e.stopPropagation(); onAddAnotherClick(); }}
-                  className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground"
-                  aria-label={lang === "zh" ? "再新增訓練" : "Add another session"}
-                  title={lang === "zh" ? "再新增同日訓練" : "Add another session same day"}
-                >
-                  <Plus size={14} />
-                </button>
-              )}
             </div>
-            {!expanded && sessionsCount > 1 && (
-              <div className="mt-2 flex gap-1 overflow-x-auto">
-                {sessions.map((sess, si) => {
-                  const label = localizeTitle(sess.type || "Run", lang);
-                  const km = sessionDistanceKm(sess);
-                  return (
-                    <span key={sess.id || si} className="shrink-0 rounded-md border border-border bg-muted/40 px-2 py-1 text-[10px] text-foreground">
-                      {sess.time_of_day ? `${sess.time_of_day} · ` : ""}{label}{km ? ` · ${km} km` : ""}
-                    </span>
-                  );
-                })}
-              </div>
-            )}
-            {expanded && <WorkoutDetails day={day} lang={lang} hrBounds={hrBounds} />}
+            {expanded && <WorkoutDetails day={sessionDay} lang={lang} hrBounds={hrBounds} />}
           </div>
+            );
+          })}
+          <button onClick={onAddClick} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors px-1 py-1">
+            <Plus size={12} />{lang === "zh" ? "新增訓練" : "Add workout"}
+          </button>
         </div>
       )}
     </div>
@@ -608,7 +675,7 @@ const DraggableDay = ({
 
 // Calendar day list with long-press drag-to-swap (within a week)
 const CalendarDayList = ({
-  days, weekIdx, lang, hrBounds, onSwap, onAddClick, onEditClick, onAddAnotherClick,
+  days, weekIdx, lang, hrBounds, onSwap, onAddClick, onEditClick,
   pushedSet, pushingIdx, onPushDay, watchProvider,
 }: {
   days: DayPlan[];
@@ -617,8 +684,7 @@ const CalendarDayList = ({
   hrBounds: HrBounds | null;
   onSwap: (fromIdx: number, toIdx: number) => void;
   onAddClick: (idx: number) => void;
-  onEditClick: (idx: number, day: DayPlan) => void;
-  onAddAnotherClick?: (idx: number, day: DayPlan) => void;
+  onEditClick: (idx: number, day: DayPlan, sessionIdx?: number) => void;
   pushedSet?: Set<number>;
   pushingIdx?: number | null;
   onPushDay?: (idx: number) => void;
@@ -657,9 +723,8 @@ const CalendarDayList = ({
               isToday={isToday}
               dayNum={dayNum}
               hrBounds={hrBounds}
-              onEditClick={() => onEditClick(i, day)}
+              onEditClick={(sessionIdx) => onEditClick(i, day, sessionIdx)}
               onAddClick={() => onAddClick(i)}
-              onAddAnotherClick={onAddAnotherClick ? () => onAddAnotherClick(i, day) : undefined}
               isPushed={pushedSet?.has(i)}
               isPushing={pushingIdx === i}
               onPushDay={onPushDay}
@@ -1533,8 +1598,8 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
   const [addElevation, setAddElevation] = useState("");
   const [addEph, setAddEph] = useState("");
   const [editingDayIdx, setEditingDayIdx] = useState<number | null>(null);
-  const [editAppendNew, setEditAppendNew] = useState(false);
-  const [customEditAppendNew, setCustomEditAppendNew] = useState(false);
+  const [editingSessionIdx, setEditingSessionIdx] = useState<number>(0);
+  const [customEditingSessionIdx, setCustomEditingSessionIdx] = useState<number>(0);
   const [editDistance, setEditDistance] = useState("");
   const [editPace, setEditPace] = useState("");
   const [editDescription, setEditDescription] = useState("");
@@ -1774,7 +1839,8 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
         color: y.color,
         elevation_m: y.elevation_m ?? null,
         eph: y.eph ?? null,
-      });
+        sessions: (y as any).sessions,
+      } as DayPlan);
       week.days[fromIdx] = swap(a, b);
       week.days[toIdx] = swap(b, a);
       return next;
@@ -2635,8 +2701,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                       hrBounds={hrBounds}
                       onSwap={(from, to) => swapDays(currentWeekIdx, from, to)}
                       onAddClick={(i) => { setAddingDayIdx(i); setAddRunType(null); setAddDistance(""); setAddElevation(""); setAddEph(""); }}
-                      onEditClick={(i, day) => { setEditAppendNew(false); setEditingDayIdx(i); setEditDistance(day.distance_km?.toString() || ""); setEditPace(day.pace || ""); setEditDescription(day.description || ""); }}
-                      onAddAnotherClick={(i) => { setEditAppendNew(true); setEditingDayIdx(i); }}
+                      onEditClick={(i, day, sessionIdx = 0) => { setEditingSessionIdx(sessionIdx); setEditingDayIdx(i); setEditDistance(day.distance_km?.toString() || ""); setEditPace(day.pace || ""); setEditDescription(day.description || ""); }}
                     />
                     {planDirty && (
                       <Button onClick={savePlanEdits} disabled={savingPlan} className="w-full mt-4" size="lg">
@@ -3447,7 +3512,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                             hrBounds={hrBounds}
                             onSwap={(from, to) => swapDays(currentWeekIdx, from, to)}
                             onAddClick={(i) => { setAddingDayIdx(i); setAddRunType(null); setAddDistance(""); setAddElevation(""); setAddEph(""); }}
-                            onEditClick={(i, day) => { setEditAppendNew(false); setEditingDayIdx(i); setEditDistance(day.distance_km?.toString() || ""); setEditPace(day.pace || ""); setEditDescription(day.description || ""); }}
+                            onEditClick={(i, day, sessionIdx = 0) => { setEditingSessionIdx(sessionIdx); setEditingDayIdx(i); setEditDistance(day.distance_km?.toString() || ""); setEditPace(day.pace || ""); setEditDescription(day.description || ""); }}
                             pushedSet={pushedSet}
                             pushingIdx={pushingIdx}
                             onPushDay={isPremium && watchProvider ? pushDayToWatch : undefined}
@@ -3572,50 +3637,27 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                   <p className="text-xs text-muted-foreground">{lang === "zh" ? "總計" : "Total"}: {totalKm.toFixed(1)} km</p>
                 </div>
 
-                <div className="space-y-1">
-                  {currentWeek.days.map((day, i) => {
-                    const dateObj = day.date ? new Date(day.date + "T00:00:00") : null;
-                    const dayNum = dateObj ? dateObj.getDate() : "";
-                    const isToday = day.date === new Date().toISOString().split("T")[0];
-                    return (
-                      <div key={i} className="flex items-stretch gap-2">
-                        <div className="w-10 flex-shrink-0 flex flex-col items-center pt-3">
-                          <span className="text-[10px] font-medium text-muted-foreground uppercase">{labelForDay(day, i)}</span>
-                          <span className={`text-sm font-bold ${isToday ? "text-primary" : "text-foreground"}`}>{dayNum}</span>
-                        </div>
-                        {day.type === "Rest" ? (
-                          <div className="flex-1 border-l-2 border-border pl-3 py-3 min-h-[48px] flex items-center">
-                            <button onClick={() => { setCustomAddingDayIdx(i); setCustomAddRunType(null); setCustomAddDistance(""); setCustomAddElevation(""); setCustomAddEph(""); }}
-                              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
-                              <Plus size={12} />{lang === "zh" ? "新增" : "Add"}
-                            </button>
-                          </div>
-                        ) : (
-                          <div className="flex-1 border-l-2 pl-3 py-2 cursor-pointer" style={{ borderColor: day.color || "hsl(var(--border))" }}
-                            onClick={() => { setCustomEditingDayIdx(i); setCustomEditDistance(day.distance_km?.toString() || ""); setCustomEditPace(day.pace || ""); setCustomEditDescription(day.description || ""); }}>
-                            <div className="bg-card border border-border rounded-lg p-3 hover:border-primary transition-colors">
-                              <div className="flex items-center justify-between">
-                                <span className="font-medium text-sm text-foreground">{localizeTitle(day.type, lang)}</span>
-                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                  {(day.type === "Trail Run" || day.type === "Trail Race") ? (
-                                    <>
-                                      {day.eph > 0 && <span>EpH {day.eph}</span>}
-                                      {day.elevation_m > 0 && <span>+{Math.round(day.elevation_m)}m</span>}
-                                    </>
-                                  ) : (
-                                    day.pace && <span>{day.pace}</span>
-                                  )}
-                                  {day.distance_km && <span>{day.distance_km} km</span>}
-                                </div>
-                              </div>
-                              {day.description && <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{day.description}</p>}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
+                <CalendarDayList
+                  days={currentWeek.days}
+                  weekIdx={customWeekIdx}
+                  lang={lang}
+                  hrBounds={hrBounds}
+                  onSwap={(from, to) => {
+                    if (from === to) return;
+                    setCustomPlan((prev) => {
+                      const next = prev.map((w) => ({ ...w, days: w.days.slice() }));
+                      const week = next[customWeekIdx];
+                      if (!week?.days[from] || !week?.days[to]) return prev;
+                      const a = week.days[from];
+                      const b = week.days[to];
+                      week.days[from] = { ...b, day: a.day, date: a.date };
+                      week.days[to] = { ...a, day: b.day, date: b.date };
+                      return next;
+                    });
+                  }}
+                  onAddClick={(i) => { setCustomAddingDayIdx(i); setCustomAddRunType(null); setCustomAddDistance(""); setCustomAddElevation(""); setCustomAddEph(""); }}
+                  onEditClick={(i, day, sessionIdx = 0) => { setCustomEditingSessionIdx(sessionIdx); setCustomEditingDayIdx(i); setCustomEditDistance(day.distance_km?.toString() || ""); setCustomEditPace(day.pace || ""); setCustomEditDescription(day.description || ""); }}
+                />
 
                 <div className="flex items-center justify-center gap-1 mt-6">
                   {customPlan.map((_, i) => (
@@ -3703,7 +3745,9 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                 const updatedPlan = [...plan]; const week = { ...updatedPlan[currentWeekIdx] }; const days = [...week.days];
                 const isTrail = addRunType === "Trail Run" || addRunType === "Trail Race";
                 const trailDesc = lang === "zh" ? `${addDistance}km · 爬升 ${Math.round(Number(addElevation) || 0)}m · 目標 EpH ${addEph}。以 EpH 控制越野強度。` : `${addDistance}km · ${Math.round(Number(addElevation) || 0)}m ascent · target EpH ${addEph}. Use EpH to control trail effort.`;
-                days[addingDayIdx] = { ...days[addingDayIdx], type: addRunType, title: lang === "zh" ? rt.zh : rt.en, description: isTrail ? trailDesc : (lang === "zh" ? paceInfo.descZh : paceInfo.description), distance_km: Number(addDistance), pace: isTrail ? null : paceInfo.pace, color: rt.color, elevation_m: isTrail ? Number(addElevation) || null : null, eph: isTrail ? Number(addEph) || null : null };
+                const newSession: WorkoutSession = { id: genSessionId(), type: addRunType, title: lang === "zh" ? rt.zh : rt.en, description: isTrail ? trailDesc : (lang === "zh" ? paceInfo.descZh : paceInfo.description), distance_km: Number(addDistance), pace: isTrail ? null : paceInfo.pace, color: rt.color, elevation_m: isTrail ? Number(addElevation) || null : null, eph: isTrail ? Number(addEph) || null : null, steps: [] };
+                const existingSessions = workoutSessionsForDay(days[addingDayIdx]);
+                days[addingDayIdx] = rebuildDayFromSessions(days[addingDayIdx], [...existingSessions, newSession], lang);
                 week.days = days; updatedPlan[currentWeekIdx] = week; setPlan(updatedPlan);
                 if (user && existingPlan) supabase.from("training_plans" as any).update({ plan_data: updatedPlan } as any).eq("id", existingPlan.id).then(() => { notifyPlanChanged(); });
                 setAddingDayIdx(null);
@@ -3717,21 +3761,10 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
       {editingDayIdx !== null && plan[currentWeekIdx]?.days[editingDayIdx] && (
         <EditWorkoutDialog
           open={editingDayIdx !== null}
-          onOpenChange={(o) => { if (!o) { setEditingDayIdx(null); setEditAppendNew(false); } }}
+          onOpenChange={(o) => { if (!o) { setEditingDayIdx(null); setEditingSessionIdx(0); } }}
           lang={lang}
-          workout={{
-            type: plan[currentWeekIdx].days[editingDayIdx].type,
-            title: localizeTitle(plan[currentWeekIdx].days[editingDayIdx].type, lang),
-            distance_km: plan[currentWeekIdx].days[editingDayIdx].distance_km ?? null,
-            pace: plan[currentWeekIdx].days[editingDayIdx].pace ?? "",
-            description: plan[currentWeekIdx].days[editingDayIdx].description ?? "",
-            color: plan[currentWeekIdx].days[editingDayIdx].color,
-            elevation_m: plan[currentWeekIdx].days[editingDayIdx].elevation_m ?? null,
-            eph: plan[currentWeekIdx].days[editingDayIdx].eph ?? null,
-            sessions: (plan[currentWeekIdx].days[editingDayIdx] as any).sessions,
-          }}
+          workout={editableWorkoutForSession(plan[currentWeekIdx].days[editingDayIdx], editingSessionIdx)}
           multiSession
-          appendNewSession={editAppendNew}
           recentActivities={recentRunActivities}
           profile={suggestProfile}
           targetTime={aiTargetTime}
@@ -3739,20 +3772,11 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
           onSave={async (next) => {
             if (editingDayIdx === null) return;
             const updatedPlan = [...plan]; const week = { ...updatedPlan[currentWeekIdx] }; const days = [...week.days];
-            const nextType = next.type ?? days[editingDayIdx].type;
-            const isTrail = nextType === "Trail Run" || nextType === "Trail Race";
-            days[editingDayIdx] = {
-              ...days[editingDayIdx],
-              type: nextType,
-              title: next.title ?? days[editingDayIdx].title,
-              color: next.color ?? days[editingDayIdx].color,
-              distance_km: next.distance_km ?? days[editingDayIdx].distance_km,
-              pace: isTrail ? null : (next.pace || days[editingDayIdx].pace),
-              description: next.description ?? days[editingDayIdx].description,
-              elevation_m: isTrail ? (next.elevation_m ?? days[editingDayIdx].elevation_m ?? null) : null,
-              eph: isTrail ? (next.eph ?? days[editingDayIdx].eph ?? null) : null,
-              sessions: next.sessions,
-            } as any;
+            const sessions = workoutSessionsForDay(days[editingDayIdx]);
+            const editedSession = firstSessionFromEditedWorkout(next as DayPlan);
+            if (!editedSession) return;
+            sessions[Math.max(0, Math.min(editingSessionIdx, sessions.length - 1))] = editedSession;
+            days[editingDayIdx] = rebuildDayFromSessions(days[editingDayIdx], sessions, lang);
             week.days = days; updatedPlan[currentWeekIdx] = week; setPlan(updatedPlan);
             if (user && existingPlan) await supabase.from("training_plans" as any).update({ plan_data: updatedPlan } as any).eq("id", existingPlan.id);
             notifyPlanChanged();
@@ -3762,7 +3786,9 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
           onDelete={async () => {
             if (editingDayIdx === null) return;
             const updatedPlan = [...plan]; const week = { ...updatedPlan[currentWeekIdx] }; const days = [...week.days];
-            days[editingDayIdx] = { ...days[editingDayIdx], type: "Rest", title: lang === "zh" ? "休息" : "Rest Day", description: lang === "zh" ? "全日休息恢復。" : "Full rest day for recovery.", distance_km: null, pace: null, color: "#607D8B", elevation_m: null, eph: null };
+            const sessions = workoutSessionsForDay(days[editingDayIdx]);
+            sessions.splice(Math.max(0, Math.min(editingSessionIdx, sessions.length - 1)), 1);
+            days[editingDayIdx] = rebuildDayFromSessions(days[editingDayIdx], sessions, lang);
             week.days = days; updatedPlan[currentWeekIdx] = week; setPlan(updatedPlan);
             if (user && existingPlan) await supabase.from("training_plans" as any).update({ plan_data: updatedPlan } as any).eq("id", existingPlan.id);
             notifyPlanChanged();
@@ -3888,7 +3914,9 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                 const updatedPlan = [...customPlan]; const week = { ...updatedPlan[customWeekIdx] }; const days = [...week.days];
                 const isTrail = customAddRunType === "Trail Run" || customAddRunType === "Trail Race";
                 const trailDesc = lang === "zh" ? `${customAddDistance}km · 爬升 ${Math.round(Number(customAddElevation) || 0)}m · 目標 EpH ${customAddEph}。以 EpH 控制越野強度。` : `${customAddDistance}km · ${Math.round(Number(customAddElevation) || 0)}m ascent · target EpH ${customAddEph}. Use EpH to control trail effort.`;
-                days[customAddingDayIdx] = { ...days[customAddingDayIdx], type: customAddRunType, title: lang === "zh" ? rt.zh : rt.en, description: isTrail ? trailDesc : "", distance_km: Number(customAddDistance), pace: null, color: rt.color, elevation_m: isTrail ? Number(customAddElevation) || null : null, eph: isTrail ? Number(customAddEph) || null : null };
+                const newSession: WorkoutSession = { id: genSessionId(), type: customAddRunType, title: lang === "zh" ? rt.zh : rt.en, description: isTrail ? trailDesc : "", distance_km: Number(customAddDistance), pace: null, color: rt.color, elevation_m: isTrail ? Number(customAddElevation) || null : null, eph: isTrail ? Number(customAddEph) || null : null, steps: [] };
+                const existingSessions = workoutSessionsForDay(days[customAddingDayIdx]);
+                days[customAddingDayIdx] = rebuildDayFromSessions(days[customAddingDayIdx], [...existingSessions, newSession], lang);
                 week.days = days; updatedPlan[customWeekIdx] = week; setCustomPlan(updatedPlan);
                 if (user && customExistingPlan) supabase.from("training_plans" as any).update({ plan_data: updatedPlan } as any).eq("id", customExistingPlan.id).then(() => { notifyPlanChanged(); });
                 setCustomAddingDayIdx(null);
@@ -3903,21 +3931,10 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
       {customEditingDayIdx !== null && customPlan[customWeekIdx]?.days[customEditingDayIdx] && (
         <EditWorkoutDialog
           open={customEditingDayIdx !== null}
-          onOpenChange={(o) => { if (!o) { setCustomEditingDayIdx(null); setCustomEditAppendNew(false); } }}
+          onOpenChange={(o) => { if (!o) { setCustomEditingDayIdx(null); setCustomEditingSessionIdx(0); } }}
           lang={lang}
-          workout={{
-            type: customPlan[customWeekIdx].days[customEditingDayIdx].type,
-            title: localizeTitle(customPlan[customWeekIdx].days[customEditingDayIdx].type, lang),
-            distance_km: customPlan[customWeekIdx].days[customEditingDayIdx].distance_km ?? null,
-            pace: customPlan[customWeekIdx].days[customEditingDayIdx].pace ?? "",
-            description: customPlan[customWeekIdx].days[customEditingDayIdx].description ?? "",
-            color: customPlan[customWeekIdx].days[customEditingDayIdx].color,
-            elevation_m: customPlan[customWeekIdx].days[customEditingDayIdx].elevation_m ?? null,
-            eph: customPlan[customWeekIdx].days[customEditingDayIdx].eph ?? null,
-            sessions: (customPlan[customWeekIdx].days[customEditingDayIdx] as any).sessions,
-          }}
+          workout={editableWorkoutForSession(customPlan[customWeekIdx].days[customEditingDayIdx], customEditingSessionIdx)}
           multiSession
-          appendNewSession={customEditAppendNew}
           recentActivities={recentRunActivities}
           profile={suggestProfile}
           targetTime={null}
@@ -3925,20 +3942,11 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
           onSave={async (next) => {
             if (customEditingDayIdx === null) return;
             const updatedPlan = [...customPlan]; const week = { ...updatedPlan[customWeekIdx] }; const days = [...week.days];
-            const nextType = next.type ?? days[customEditingDayIdx].type;
-            const isTrail = nextType === "Trail Run" || nextType === "Trail Race";
-            days[customEditingDayIdx] = {
-              ...days[customEditingDayIdx],
-              type: nextType,
-              title: next.title ?? days[customEditingDayIdx].title,
-              color: next.color ?? days[customEditingDayIdx].color,
-              distance_km: next.distance_km ?? days[customEditingDayIdx].distance_km,
-              pace: isTrail ? null : (next.pace || days[customEditingDayIdx].pace),
-              description: next.description ?? days[customEditingDayIdx].description,
-              elevation_m: isTrail ? (next.elevation_m ?? days[customEditingDayIdx].elevation_m ?? null) : null,
-              eph: isTrail ? (next.eph ?? days[customEditingDayIdx].eph ?? null) : null,
-              sessions: next.sessions,
-            } as any;
+            const sessions = workoutSessionsForDay(days[customEditingDayIdx]);
+            const editedSession = firstSessionFromEditedWorkout(next as DayPlan);
+            if (!editedSession) return;
+            sessions[Math.max(0, Math.min(customEditingSessionIdx, sessions.length - 1))] = editedSession;
+            days[customEditingDayIdx] = rebuildDayFromSessions(days[customEditingDayIdx], sessions, lang);
             week.days = days; updatedPlan[customWeekIdx] = week; setCustomPlan(updatedPlan);
             if (user && customExistingPlan) await supabase.from("training_plans" as any).update({ plan_data: updatedPlan } as any).eq("id", customExistingPlan.id);
             notifyPlanChanged();
@@ -3947,7 +3955,9 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
           onDelete={async () => {
             if (customEditingDayIdx === null) return;
             const updatedPlan = [...customPlan]; const week = { ...updatedPlan[customWeekIdx] }; const days = [...week.days];
-            days[customEditingDayIdx] = { ...days[customEditingDayIdx], type: "Rest", title: lang === "zh" ? "休息" : "Rest Day", description: "", distance_km: null, pace: null, color: "#607D8B", elevation_m: null, eph: null };
+            const sessions = workoutSessionsForDay(days[customEditingDayIdx]);
+            sessions.splice(Math.max(0, Math.min(customEditingSessionIdx, sessions.length - 1)), 1);
+            days[customEditingDayIdx] = rebuildDayFromSessions(days[customEditingDayIdx], sessions, lang);
             week.days = days; updatedPlan[customWeekIdx] = week; setCustomPlan(updatedPlan);
             if (user && customExistingPlan) await supabase.from("training_plans" as any).update({ plan_data: updatedPlan } as any).eq("id", customExistingPlan.id);
             notifyPlanChanged();

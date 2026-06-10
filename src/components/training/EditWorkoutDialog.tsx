@@ -34,10 +34,8 @@ interface Props {
   onSave: (next: EditableWorkout) => void | Promise<void>;
   onDelete?: () => void | Promise<void>;
   title?: string;
-  /** Enable multi-session + warmup/cooldown + auto-suggest (AI plan + Custom only). */
+  /** Enable structured warmup/cooldown sequence + auto-suggest (AI plan + Custom only). */
   multiSession?: boolean;
-  /** When true, open with one extra empty session appended (for "Add another" from calendar). */
-  appendNewSession?: boolean;
   /** Recent runs for auto-suggest (last 30 days). */
   recentActivities?: SuggestActivity[] | null;
   /** Profile for HR zones. */
@@ -200,24 +198,15 @@ function sessionsFromWorkout(w: EditableWorkout): WorkoutSession[] {
 
 const EditWorkoutDialog = ({
   open, onOpenChange, lang, workout, planContext, onSave, onDelete, title,
-  multiSession = false, appendNewSession = false,
+  multiSession = false,
   recentActivities = null, profile = null, targetTime = null,
 }: Props) => {
   const isZh = lang === "zh";
   const initSessions = (): WorkoutSession[] => {
     const base = sessionsFromWorkout(workout);
-    if (appendNewSession) {
-      base.push({
-        id: genSessionId(),
-        time_of_day: base.length === 1 ? "PM" : null,
-        type: "Easy Run", distance_km: null, pace: null, description: null,
-        color: typeColor("Easy Run"), steps: [],
-      });
-    }
-    return base;
+    return base.length > 0 ? [base[0]] : [];
   };
   const [sessions, setSessions] = useState<WorkoutSession[]>(initSessions);
-  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [expandedSteps, setExpandedSteps] = useState<Record<string, boolean>>({});
   const [validating, setValidating] = useState(false);
   const [verdict, setVerdict] = useState<Verdict | null>(null);
@@ -229,7 +218,6 @@ const EditWorkoutDialog = ({
     if (open) {
       const nextSessions = initSessions();
       setSessions(nextSessions);
-      setActiveSessionId(nextSessions[0]?.id ?? null);
       // Auto-expand the steps panel — that's where the real structure lives now.
       setExpandedSteps({});
       setVerdict(null);
@@ -238,36 +226,10 @@ const EditWorkoutDialog = ({
       setSuggestSource({});
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, workout, appendNewSession]);
-
-  useEffect(() => {
-    if (sessions.length === 0) { setActiveSessionId(null); return; }
-    if (!activeSessionId || !sessions.some((s) => s.id === activeSessionId)) {
-      setActiveSessionId(sessions[0].id);
-    }
-  }, [sessions, activeSessionId]);
+  }, [open, workout]);
 
   const updateSession = (idx: number, patch: Partial<WorkoutSession>) => {
     setSessions((prev) => prev.map((s, i) => (i === idx ? { ...s, ...patch } : s)));
-    setVerdict(null); setNeedsConfirm(false);
-  };
-
-  const addSession = () => {
-    const id = genSessionId();
-    setSessions((prev) => [...prev, {
-      id,
-      time_of_day: prev.length === 0 ? null : (prev.length === 1 ? "PM" : null),
-      type: "Easy Run",
-      distance_km: null, pace: null, description: null,
-      color: typeColor("Easy Run"),
-      steps: [],
-    }]);
-    setActiveSessionId(id);
-    setVerdict(null); setNeedsConfirm(false);
-  };
-
-  const removeSession = (idx: number) => {
-    setSessions((prev) => prev.filter((_, i) => i !== idx));
     setVerdict(null); setNeedsConfirm(false);
   };
 
@@ -388,34 +350,8 @@ const EditWorkoutDialog = ({
           <DialogTitle>{title ?? (isZh ? "編輯訓練" : "Edit Workout")}</DialogTitle>
         </DialogHeader>
 
-        {showMulti && (
-          <div className="-mt-1 mb-1 space-y-2">
-            <div className="flex gap-1 overflow-x-auto border-b border-border">
-              {sessions.map((s, idx) => {
-                const opt = TYPE_OPTIONS.find((o) => o.id === normalizeType(s.type));
-                const label = normalizeType(s.type) === "Interval" ? (isZh ? "間歇跑" : "Interval Run") : (isZh ? (opt?.zh ?? s.type) : (opt?.en ?? s.type));
-                const active = activeSessionId === s.id;
-                return (
-                  <button
-                    key={s.id}
-                    type="button"
-                    onClick={() => setActiveSessionId(s.id)}
-                    className={`shrink-0 px-3 py-2 text-xs font-semibold border-b-2 transition-colors ${active ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
-                  >
-                    {s.time_of_day ? `${s.time_of_day} · ` : ""}{label || (isZh ? `訓練 ${idx + 1}` : `Workout ${idx + 1}`)}
-                  </button>
-                );
-              })}
-            </div>
-            <Button type="button" variant="outline" size="sm" className="w-full" onClick={addSession}>
-              <Plus size={14} className="mr-1" /> {isZh ? "新增另一個訓練" : "Add another workout"}
-            </Button>
-          </div>
-        )}
-
         <div className="space-y-4">
           {sessions.map((s, sIdx) => {
-            if (showMulti && activeSessionId && s.id !== activeSessionId) return null;
             const trail = isTrailType(s.type);
             const stepsExpanded = expandedSteps[s.id] ?? ((s.steps?.length ?? 0) > 0);
             const sourceLabel = suggestSource[s.id];
@@ -423,34 +359,6 @@ const EditWorkoutDialog = ({
             const computedDistance = sessionDistanceKm(s);
             return (
               <div key={s.id} className="border border-border rounded-lg p-3 space-y-3 relative">
-                {showMulti && sessions.length > 1 && (
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: typeColor(s.type) }} />
-                      <span className="text-xs font-medium text-muted-foreground">
-                        {isZh ? `訓練 ${sIdx + 1}` : `Session ${sIdx + 1}`}
-                      </span>
-                      <select
-                        className="text-xs rounded border border-input bg-background px-1.5 py-0.5"
-                        value={s.time_of_day ?? ""}
-                        onChange={(e) => updateSession(sIdx, { time_of_day: e.target.value || null })}
-                      >
-                        <option value="">{isZh ? "全日" : "Any time"}</option>
-                        <option value="AM">AM</option>
-                        <option value="PM">PM</option>
-                      </select>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => removeSession(sIdx)}
-                      className="text-muted-foreground hover:text-destructive p-1"
-                      aria-label="Remove session"
-                    >
-                      <X size={14} />
-                    </button>
-                  </div>
-                )}
-
                 <div>
                   <label className="text-sm font-medium text-foreground mb-1 block">
                     {isZh ? "活動類型" : "Activity Type"}

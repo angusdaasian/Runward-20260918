@@ -3802,7 +3802,12 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
             color: customPlan[customWeekIdx].days[customEditingDayIdx].color,
             elevation_m: customPlan[customWeekIdx].days[customEditingDayIdx].elevation_m ?? null,
             eph: customPlan[customWeekIdx].days[customEditingDayIdx].eph ?? null,
+            sessions: (customPlan[customWeekIdx].days[customEditingDayIdx] as any).sessions,
           }}
+          multiSession
+          recentActivities={recentRunActivities}
+          profile={suggestProfile}
+          targetTime={null}
           planContext={customExistingPlan ? `Custom plan, week ${customWeekIdx + 1}` : null}
           onSave={async (next) => {
             if (customEditingDayIdx === null) return;
@@ -3819,7 +3824,8 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
               description: next.description ?? days[customEditingDayIdx].description,
               elevation_m: isTrail ? (next.elevation_m ?? days[customEditingDayIdx].elevation_m ?? null) : null,
               eph: isTrail ? (next.eph ?? days[customEditingDayIdx].eph ?? null) : null,
-            };
+              sessions: next.sessions,
+            } as any;
             week.days = days; updatedPlan[customWeekIdx] = week; setCustomPlan(updatedPlan);
             if (user && customExistingPlan) await supabase.from("training_plans" as any).update({ plan_data: updatedPlan } as any).eq("id", customExistingPlan.id);
             notifyPlanChanged();

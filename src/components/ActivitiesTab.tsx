@@ -640,6 +640,7 @@ const ActivitiesTab = ({ lang }: Props) => {
       pace?: string | null;
       elevation_m?: number | null;
       eph?: number | null;
+      sessions?: any[];
     } | null;
     races?: { id: string; race_name: string; race_name_zh?: string | null; category: string }[];
   } | null>(null);
@@ -1367,6 +1368,7 @@ const ActivitiesTab = ({ lang }: Props) => {
                     pace: (planned as any).pace ?? null,
                     elevation_m: (planned as any).elevation_m ?? null,
                     eph: (planned as any).eph ?? null,
+                    sessions: (planned as any).sessions ?? undefined,
                   }
                 : null,
               races: races || [],
@@ -1540,27 +1542,69 @@ const ActivitiesTab = ({ lang }: Props) => {
                       {lang === "zh" ? "計劃" : "Planned"}
                     </span>
                   </div>
-                  <div className="mt-2 flex items-baseline gap-2 flex-wrap">
-                    <span className="text-base font-semibold text-foreground">
-                      {localizePlanTitle(dateSheet.planned, lang)}
-                    </span>
-                    {dateSheet.planned.distance_km && (
-                      <span className="text-sm text-muted-foreground">{dateSheet.planned.distance_km} km</span>
-                    )}
-                    {(dateSheet.planned.type === "Trail Run" || dateSheet.planned.type === "Trail Race") && dateSheet.planned.elevation_m != null && (
-                      <span className="text-sm text-muted-foreground">+{Math.round(dateSheet.planned.elevation_m)} m</span>
-                    )}
-                    {(dateSheet.planned.type === "Trail Run" || dateSheet.planned.type === "Trail Race") && dateSheet.planned.eph != null && (
-                      <span className="text-sm text-muted-foreground">EpH {dateSheet.planned.eph}</span>
-                    )}
-                    {dateSheet.planned.pace && dateSheet.planned.type !== "Trail Run" && dateSheet.planned.type !== "Trail Race" && (
-                      <span className="text-sm text-muted-foreground">@ {dateSheet.planned.pace}</span>
-                    )}
-                  </div>
-                  {dateSheet.planned.description && (
-                    <p className="mt-2 text-sm text-muted-foreground leading-relaxed whitespace-pre-line">
-                      {localizePlanDescription(dateSheet.planned, lang)}
-                    </p>
+                  {dateSheet.planned.sessions && dateSheet.planned.sessions.length > 0 ? (
+                    <div className="mt-2 space-y-3">
+                      {dateSheet.planned.sessions.map((s: any, idx: number) => {
+                        const sessKm = (() => {
+                          if (Array.isArray(s.steps) && s.steps.length > 0) {
+                            const t = s.steps.reduce((a: number, st: any) => {
+                              if (st.kind === "interval" && st.reps && st.distance_m) return a + (Number(st.reps) * Number(st.distance_m)) / 1000;
+                              if (st.distance_km != null) return a + Number(st.distance_km);
+                              if (st.distance_m != null) return a + Number(st.distance_m) / 1000;
+                              return a;
+                            }, 0);
+                            return t > 0 ? Number(t.toFixed(2)) : (s.distance_km ?? null);
+                          }
+                          return s.distance_km ?? null;
+                        })();
+                        return (
+                          <div key={s.id || idx}>
+                            <div className="flex items-baseline gap-2 flex-wrap">
+                              <span className="text-base font-semibold text-foreground">
+                                {localizePlanTitle({ type: s.type, title: s.title }, lang)}
+                              </span>
+                              {sessKm != null && sessKm > 0 && (
+                                <span className="text-sm text-muted-foreground">{sessKm} km</span>
+                              )}
+                              {s.pace && (
+                                <span className="text-sm text-muted-foreground">@ {s.pace}</span>
+                              )}
+                            </div>
+                            <p className="mt-1 text-sm text-muted-foreground leading-relaxed whitespace-pre-line">
+                              {localizePlanDescription(
+                                { type: s.type, distance_km: sessKm, pace: s.pace ?? null, description: s.description ?? null, elevation_m: s.elevation_m ?? null, eph: s.eph ?? null },
+                                lang,
+                              )}
+                            </p>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <>
+                      <div className="mt-2 flex items-baseline gap-2 flex-wrap">
+                        <span className="text-base font-semibold text-foreground">
+                          {localizePlanTitle(dateSheet.planned, lang)}
+                        </span>
+                        {dateSheet.planned.distance_km && (
+                          <span className="text-sm text-muted-foreground">{dateSheet.planned.distance_km} km</span>
+                        )}
+                        {(dateSheet.planned.type === "Trail Run" || dateSheet.planned.type === "Trail Race") && dateSheet.planned.elevation_m != null && (
+                          <span className="text-sm text-muted-foreground">+{Math.round(dateSheet.planned.elevation_m)} m</span>
+                        )}
+                        {(dateSheet.planned.type === "Trail Run" || dateSheet.planned.type === "Trail Race") && dateSheet.planned.eph != null && (
+                          <span className="text-sm text-muted-foreground">EpH {dateSheet.planned.eph}</span>
+                        )}
+                        {dateSheet.planned.pace && dateSheet.planned.type !== "Trail Run" && dateSheet.planned.type !== "Trail Race" && (
+                          <span className="text-sm text-muted-foreground">@ {dateSheet.planned.pace}</span>
+                        )}
+                      </div>
+                      {dateSheet.planned.description && (
+                        <p className="mt-2 text-sm text-muted-foreground leading-relaxed whitespace-pre-line">
+                          {localizePlanDescription(dateSheet.planned, lang)}
+                        </p>
+                      )}
+                    </>
                   )}
                 </div>
               )}

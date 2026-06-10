@@ -54,6 +54,7 @@ export interface PlannedWorkout {
   pace?: string | null;
   elevation_m?: number | null;
   eph?: number | null;
+  sessions?: import("@/lib/planTypes").WorkoutSession[];
 }
 
 export interface UserRace {
@@ -346,19 +347,40 @@ async function fetchPlannedWorkouts(userId: string): Promise<PlannedWorkout[]> {
   const workouts: PlannedWorkout[] = [];
   for (const week of planData) {
     for (const day of week.days || []) {
-      if (day.date && day.type !== "Rest") {
-        workouts.push({
-          date: day.date,
-          type: day.type,
-          distance_km: day.distance_km,
-          color: day.color || "#94a3b8",
-          title: day.title || null,
-          description: day.description || null,
-          pace: day.pace || null,
-          elevation_m: day.elevation_m ?? null,
-          eph: day.eph ?? null,
+      if (!day.date || day.type === "Rest") continue;
+      const sessions = Array.isArray(day.sessions) ? day.sessions : null;
+      // Exclude warmup/cooldown from the displayed distance summary.
+      let distance_km: number | null = day.distance_km ?? null;
+      if (sessions && sessions.length > 0) {
+        const main = sessions.filter((s: any) => {
+          const t = String(s.type || "").toLowerCase();
+          return t !== "warmup" && t !== "cooldown";
         });
+        const total = main.reduce((acc: number, s: any) => {
+          if (Array.isArray(s.steps) && s.steps.length > 0) {
+            return acc + s.steps.reduce((a: number, st: any) => {
+              if (st.kind === "interval" && st.reps && st.distance_m) return a + (Number(st.reps) * Number(st.distance_m)) / 1000;
+              if (st.distance_km != null) return a + Number(st.distance_km);
+              if (st.distance_m != null) return a + Number(st.distance_m) / 1000;
+              return a;
+            }, 0);
+          }
+          return acc + (Number(s.distance_km) || 0);
+        }, 0);
+        if (total > 0) distance_km = Number(total.toFixed(2));
       }
+      workouts.push({
+        date: day.date,
+        type: day.type,
+        distance_km,
+        color: day.color || "#94a3b8",
+        title: day.title || null,
+        description: day.description || null,
+        pace: day.pace || null,
+        elevation_m: day.elevation_m ?? null,
+        eph: day.eph ?? null,
+        sessions: sessions || undefined,
+      });
     }
   }
   return workouts;

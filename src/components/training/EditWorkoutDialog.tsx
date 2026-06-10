@@ -270,6 +270,19 @@ const EditWorkoutDialog = ({
     updateSession(sIdx, { steps });
   };
 
+  const moveStep = (sIdx: number, stIdx: number, direction: -1 | 1) => {
+    const s = sessions[sIdx];
+    const steps = [...(s.steps ?? [])];
+    const nextIdx = stIdx + direction;
+    if (nextIdx < 0 || nextIdx >= steps.length) return;
+    [steps[stIdx], steps[nextIdx]] = [steps[nextIdx], steps[stIdx]];
+    updateSession(sIdx, { steps });
+  };
+
+  const updateSessionPace = (sIdx: number, pace: string | null) => {
+    updateSession(sIdx, { pace: normalizePace(pace) });
+  };
+
   const removeStep = (sIdx: number, stIdx: number) => {
     const s = sessions[sIdx];
     const steps = (s.steps ?? []).filter((_, i) => i !== stIdx);
@@ -299,6 +312,8 @@ const EditWorkoutDialog = ({
       ...s,
       type: normalizeType(s.type),
       color: typeColor(normalizeType(s.type)),
+      pace: sessionPace(s) ?? normalizePace(s.pace) ?? null,
+      steps: (s.steps ?? []).map((step) => ({ ...step, pace: normalizePace(step.pace) })),
       distance_km: sessionDistanceKm(s) || s.distance_km || null,
     }));
     const keepStructuredSessions = cleanSessions.length > 1 || cleanSessions.some((s) => (s.steps?.length ?? 0) > 0);

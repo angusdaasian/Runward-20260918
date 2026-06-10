@@ -409,62 +409,80 @@ const WorkoutDetails = ({ day, lang, hrBounds }: { day: DayPlan; lang: Lang; hrB
   // ── NEW: when day has structured sessions[], render them directly ──
   const sessions = Array.isArray((day as any).sessions) ? (day as any).sessions as any[] : null;
   if (sessions && sessions.length > 0) {
+    const StepRow = ({ label, value }: { label: string; value: React.ReactNode }) => (
+      <div className="flex items-baseline justify-between gap-3 text-xs">
+        <span className="text-muted-foreground shrink-0">{label}</span>
+        <span className="text-foreground font-medium text-right tabular-nums">{value}</span>
+      </div>
+    );
     return (
       <div className="mt-2 space-y-2">
         {sessions.map((sess, si) => {
           const sZone = zoneForType(sess.type);
           const sHr = hrRangeForZone(sZone, hrBounds);
           const sZoneLabel = ZONE_LABEL[sZone][isZh ? "zh" : "en"];
-          const bg =
-            sess.type === "Warmup" ? "bg-amber-500/10 border-amber-500/20" :
-            sess.type === "Cooldown" ? "bg-sky-500/10 border-sky-500/20" :
-            sess.type === "Interval" || sess.type === "Intervals" ? "bg-primary/5 border-primary/20" :
-            "bg-muted/40";
-          const label = sess.title || sess.type;
           const steps: any[] = Array.isArray(sess.steps) ? sess.steps : [];
-          return (
-            <div key={si} className={`rounded-md p-2 space-y-1 border ${bg}`}>
-              <div className="flex items-center justify-between">
-                <div className="text-[11px] font-semibold text-foreground">
-                  {sess.time_of_day ? `[${sess.time_of_day}] ` : ""}{label}
-                </div>
-                {sess.distance_km != null && (
-                  <div className="text-[10px] text-muted-foreground tabular-nums">{sess.distance_km} km</div>
+          const hasWuCd = steps.some((st) => st && (st.kind === "warmup" || st.kind === "cooldown"));
+          const easyHr = hrRangeForZone(2, hrBounds);
+          const easyZoneLabel = ZONE_LABEL[2][isZh ? "zh" : "en"];
+          const easyPace = adjustPace(sess.pace, 1.4);
+
+          if (hasWuCd) {
+            // Render as Interval-style cards: Warm-up / Main / Cool-down, each with Distance, Pace, HR.
+            return (
+              <div key={si} className="space-y-2">
+                {(sess.time_of_day || sessions.length > 1) && (
+                  <div className="text-[11px] font-semibold text-foreground">
+                    {sess.time_of_day ? `[${sess.time_of_day}] ` : ""}{sess.title || localizeTitle(sess.type || "Run", lang)}
+                  </div>
                 )}
+                {steps.map((st, sti) => {
+                  const isWarm = st.kind === "warmup";
+                  const isCool = st.kind === "cooldown";
+                  const isInt = st.kind === "interval";
+                  const isMain = st.kind === "main";
+                  const bg = isWarm ? "bg-amber-500/10 border-amber-500/20"
+                    : isCool ? "bg-sky-500/10 border-sky-500/20"
+                    : (isInt || isMain) ? "bg-primary/5 border-primary/20"
+                    : "bg-muted/40";
+                  const title = isWarm ? (isZh ? "熱身" : "Warm-up")
+                    : isCool ? (isZh ? "緩和" : "Cool-down")
+                    : isInt ? (isZh ? "間歇" : "Intervals")
+                    : isMain ? (isZh ? "主項" : "Main Set")
+                    : st.kind === "recovery" ? (isZh ? "恢復" : "Recovery") : (isZh ? "主項" : "Main");
+                  const stepPace = paceFmt(st.pace) ?? (isWarm || isCool ? easyPace : null);
+                  const stepHr = (isWarm || isCool) ? easyHr : sHr;
+                  const stepHrLabel = (isWarm || isCool) ? easyZoneLabel : sZoneLabel;
+                  return (
+                    <div key={sti} className={`rounded-md p-2 space-y-1 border ${bg}`}>
+                      <div className="text-[11px] font-semibold text-foreground">{title}</div>
+                      {isInt && st.reps && st.distance_m ? (
+                        <StepRow label={isZh ? "組數" : "Reps"} value={`${st.reps} × ${st.distance_m}m${st.rest ? ` · ${isZh ? "休息" : "rest"} ${st.rest}` : ""}`} />
+                      ) : (
+                        (st.distance_km != null || st.distance_m != null) && (
+                          <StepRow label={isZh ? "距離" : "Distance"} value={st.distance_km != null ? `${st.distance_km} km` : `${st.distance_m} m`} />
+                        )
+                      )}
+                      {stepPace && <StepRow label={isZh ? "配速" : "Pace"} value={stepPace} />}
+                      <StepRow label={isZh ? "心率" : "HR"} value={stepHr ? `${stepHrLabel} · ${stepHr}` : stepHrLabel} />
+                    </div>
+                  );
+                })}
               </div>
-              {steps.length > 0 ? (
-                <div className="space-y-0.5">
-                  {steps.map((st, sti) => {
-                    const stepLabel = st.kind === "warmup" ? (isZh ? "熱身" : "Warm-up") : st.kind === "cooldown" ? (isZh ? "緩和" : "Cool-down") : st.kind === "recovery" ? (isZh ? "恢復" : "Recovery") : st.kind === "interval" ? (isZh ? "間歇" : "Interval") : (isZh ? "主項" : "Main");
-                    if (st.kind === "interval" && st.reps && st.distance_m) {
-                      const rest = st.rest ? ` · ${isZh ? "休息" : "rest"} ${st.rest}` : "";
-                      const pace = paceFmt(st.pace);
-                      return (
-                        <div key={sti} className="flex items-baseline justify-between gap-2 text-xs">
-                          <span className="text-foreground font-medium tabular-nums">{stepLabel}: {st.reps} × {st.distance_m}m{rest}</span>
-                          {pace && <span className="text-muted-foreground tabular-nums">@ {pace}</span>}
-                        </div>
-                      );
-                    }
-                    const pace = paceFmt(st.pace);
-                    const dist = st.distance_km != null ? `${st.distance_km} km` : (st.distance_m != null ? `${st.distance_m} m` : null);
-                    return (
-                      <div key={sti} className="flex items-baseline justify-between gap-2 text-xs">
-                        <span className="text-foreground tabular-nums">{stepLabel}: {dist || (isZh ? "—" : "—")}</span>
-                        {pace && <span className="text-muted-foreground tabular-nums">@ {pace}</span>}
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="flex items-baseline justify-between gap-2 text-xs">
-                  {paceFmt(sess.pace) && <span className="text-muted-foreground tabular-nums">@ {paceFmt(sess.pace)}</span>}
+            );
+          }
+
+          // No warmup/cooldown steps: fall back to legacy 3-row Distance/Pace/HR.
+          return (
+            <div key={si} className="space-y-1">
+              {(sess.time_of_day || sessions.length > 1) && (
+                <div className="text-[11px] font-semibold text-foreground">
+                  {sess.time_of_day ? `[${sess.time_of_day}] ` : ""}{sess.title || localizeTitle(sess.type || "Run", lang)}
                 </div>
               )}
-              <div className="flex items-baseline justify-between gap-2 text-[10px] text-muted-foreground">
-                <span>{isZh ? "心率" : "HR"}</span>
-                <span className="tabular-nums">{sHr ? `${sZoneLabel} · ${sHr}` : sZoneLabel}</span>
-              </div>
+              {sess.distance_km != null && <StepRow label={isZh ? "距離" : "Distance"} value={`${sess.distance_km} km`} />}
+              {paceFmt(sess.pace) && <StepRow label={isZh ? "配速" : "Pace"} value={paceFmt(sess.pace)!} />}
+              <StepRow label={isZh ? "心率" : "HR"} value={sHr ? `${sZoneLabel} · ${sHr}` : sZoneLabel} />
             </div>
           );
         })}

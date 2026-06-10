@@ -3698,7 +3698,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
       {editingDayIdx !== null && plan[currentWeekIdx]?.days[editingDayIdx] && (
         <EditWorkoutDialog
           open={editingDayIdx !== null}
-          onOpenChange={(o) => { if (!o) setEditingDayIdx(null); }}
+          onOpenChange={(o) => { if (!o) { setEditingDayIdx(null); setEditAppendNew(false); } }}
           lang={lang}
           workout={{
             type: plan[currentWeekIdx].days[editingDayIdx].type,
@@ -3712,6 +3712,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
             sessions: (plan[currentWeekIdx].days[editingDayIdx] as any).sessions,
           }}
           multiSession
+          appendNewSession={editAppendNew}
           recentActivities={recentRunActivities}
           profile={suggestProfile}
           targetTime={aiTargetTime}

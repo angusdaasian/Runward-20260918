@@ -260,10 +260,10 @@ async function renderDurationWeek(supabase: any, userId: string, t: Theme): Prom
   const iso = weekStart.toISOString();
   const queries = [
     supabase.from("strava_activities").select("moving_time,distance").eq("user_id", userId).gte("start_date", iso),
-    supabase.from("suunto_activities").select("duration,distance").eq("user_id", userId).gte("start_time", iso),
+    supabase.from("suunto_activities").select("moving_time,distance").eq("user_id", userId).gte("start_date", iso),
     supabase.from("garmin_activities").select("duration_seconds,distance_meters").eq("user_id", userId).gte("start_time", iso),
     supabase.from("terra_activities").select("duration_seconds,distance_meters").eq("user_id", userId).gte("start_time", iso),
-    supabase.from("apple_health_activities").select("duration,distance").eq("user_id", userId).gte("start_date", iso),
+    supabase.from("apple_health_activities").select("moving_time,distance").eq("user_id", userId).gte("start_date", iso),
   ];
   const results = await Promise.allSettled(queries);
   let totalSec = 0; let totalM = 0;

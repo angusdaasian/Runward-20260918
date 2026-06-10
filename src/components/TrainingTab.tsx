@@ -320,10 +320,77 @@ const labelForDay = (day: any, i: number): string => {
 // Render the structured details (paces, distance, HR, warmup/cooldown) for a workout
 const WorkoutDetails = ({ day, lang, hrBounds }: { day: DayPlan; lang: Lang; hrBounds: HrBounds | null }) => {
   const isZh = lang === "zh";
+  const paceFmt = (p?: string | null) => p ? (/\/(km|mi)\b/i.test(p) ? p : `${p}/km`) : null;
+
+  // ── NEW: when day has structured sessions[], render them directly ──
+  const sessions = Array.isArray((day as any).sessions) ? (day as any).sessions as any[] : null;
+  if (sessions && sessions.length > 0) {
+    return (
+      <div className="mt-2 space-y-2">
+        {sessions.map((sess, si) => {
+          const sZone = zoneForType(sess.type);
+          const sHr = hrRangeForZone(sZone, hrBounds);
+          const sZoneLabel = ZONE_LABEL[sZone][isZh ? "zh" : "en"];
+          const bg =
+            sess.type === "Warmup" ? "bg-amber-500/10 border-amber-500/20" :
+            sess.type === "Cooldown" ? "bg-sky-500/10 border-sky-500/20" :
+            sess.type === "Interval" || sess.type === "Intervals" ? "bg-primary/5 border-primary/20" :
+            "bg-muted/40";
+          const label = sess.title || sess.type;
+          const steps: any[] = Array.isArray(sess.steps) ? sess.steps : [];
+          return (
+            <div key={si} className={`rounded-md p-2 space-y-1 border ${bg}`}>
+              <div className="flex items-center justify-between">
+                <div className="text-[11px] font-semibold text-foreground">
+                  {sess.time_of_day ? `[${sess.time_of_day}] ` : ""}{label}
+                </div>
+                {sess.distance_km != null && (
+                  <div className="text-[10px] text-muted-foreground tabular-nums">{sess.distance_km} km</div>
+                )}
+              </div>
+              {steps.length > 0 ? (
+                <div className="space-y-0.5">
+                  {steps.map((st, sti) => {
+                    if (st.kind === "interval" && st.reps && st.distance_m) {
+                      const rest = st.rest ? ` · ${isZh ? "休息" : "rest"} ${st.rest}` : "";
+                      const pace = paceFmt(st.pace);
+                      return (
+                        <div key={sti} className="flex items-baseline justify-between gap-2 text-xs">
+                          <span className="text-foreground font-medium tabular-nums">{st.reps} × {st.distance_m}m{rest}</span>
+                          {pace && <span className="text-muted-foreground tabular-nums">@ {pace}</span>}
+                        </div>
+                      );
+                    }
+                    const pace = paceFmt(st.pace);
+                    const dist = st.distance_km != null ? `${st.distance_km} km` : (st.distance_m != null ? `${st.distance_m} m` : null);
+                    return (
+                      <div key={sti} className="flex items-baseline justify-between gap-2 text-xs">
+                        <span className="text-foreground tabular-nums">{dist || (isZh ? "—" : "—")}</span>
+                        {pace && <span className="text-muted-foreground tabular-nums">@ {pace}</span>}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="flex items-baseline justify-between gap-2 text-xs">
+                  {paceFmt(sess.pace) && <span className="text-muted-foreground tabular-nums">@ {paceFmt(sess.pace)}</span>}
+                </div>
+              )}
+              <div className="flex items-baseline justify-between gap-2 text-[10px] text-muted-foreground">
+                <span>{isZh ? "心率" : "HR"}</span>
+                <span className="tabular-nums">{sHr ? `${sZoneLabel} · ${sHr}` : sZoneLabel}</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
+  // ── Legacy single-day fallback (unchanged) ──
   const zone = zoneForType(day.type);
   const hr = hrRangeForZone(zone, hrBounds);
   const zoneLabel = ZONE_LABEL[zone][isZh ? "zh" : "en"];
-  const paceFmt = (p?: string | null) => p ? (/\/(km|mi)\b/i.test(p) ? p : `${p}/km`) : null;
 
   const isInterval = day.type === "Interval";
   const reps = isInterval ? parseIntervalReps(day.description) : null;
@@ -399,7 +466,7 @@ const WorkoutDetails = ({ day, lang, hrBounds }: { day: DayPlan; lang: Lang; hrB
 // Draggable + droppable day row for the AI calendar (long-press to swap)
 const DraggableDay = ({
   id, idx, day, lang, isToday, dayNum, hrBounds,
-  onEditClick, onAddClick,
+  onEditClick, onAddClick, onAddAnotherClick,
   isPushed, isPushing, onPushDay, watchProvider,
 }: {
   id: string;
@@ -411,6 +478,7 @@ const DraggableDay = ({
   hrBounds: HrBounds | null;
   onEditClick: () => void;
   onAddClick: () => void;
+  onAddAnotherClick?: () => void;
   isPushed?: boolean;
   isPushing?: boolean;
   onPushDay?: (idx: number) => void;
@@ -418,6 +486,7 @@ const DraggableDay = ({
 }) => {
   const { attributes, listeners, setNodeRef: setDragRef, isDragging, transform } = useDraggable({ id });
   const { setNodeRef: setDropRef, isOver } = useDroppable({ id });
+  const sessionsCount = Array.isArray((day as any).sessions) ? (day as any).sessions.length : 0;
   const [expanded, setExpanded] = useState(false);
 
   const setRefs = (node: HTMLDivElement | null) => {
@@ -465,7 +534,12 @@ const DraggableDay = ({
                 <GripVertical size={16} />
               </button>
               <div className="flex-1 min-w-0 flex items-center justify-between gap-2 select-none">
-                <span className="font-medium text-sm text-foreground truncate">{localizeTitle(day.type, lang)}</span>
+                <span className="font-medium text-sm text-foreground truncate">
+                  {localizeTitle(day.type, lang)}
+                  {sessionsCount > 1 && (
+                    <span className="ml-1 text-[10px] font-bold text-muted-foreground">×{sessionsCount}</span>
+                  )}
+                </span>
               </div>
               <button
                 type="button"
@@ -498,6 +572,17 @@ const DraggableDay = ({
               >
                 <Pencil size={14} />
               </button>
+              {onAddAnotherClick && (
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); onAddAnotherClick(); }}
+                  className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground"
+                  aria-label={lang === "zh" ? "再新增訓練" : "Add another session"}
+                  title={lang === "zh" ? "再新增同日訓練" : "Add another session same day"}
+                >
+                  <Plus size={14} />
+                </button>
+              )}
             </div>
             {expanded && <WorkoutDetails day={day} lang={lang} hrBounds={hrBounds} />}
           </div>
@@ -509,7 +594,7 @@ const DraggableDay = ({
 
 // Calendar day list with long-press drag-to-swap (within a week)
 const CalendarDayList = ({
-  days, weekIdx, lang, hrBounds, onSwap, onAddClick, onEditClick,
+  days, weekIdx, lang, hrBounds, onSwap, onAddClick, onEditClick, onAddAnotherClick,
   pushedSet, pushingIdx, onPushDay, watchProvider,
 }: {
   days: DayPlan[];
@@ -519,6 +604,7 @@ const CalendarDayList = ({
   onSwap: (fromIdx: number, toIdx: number) => void;
   onAddClick: (idx: number) => void;
   onEditClick: (idx: number, day: DayPlan) => void;
+  onAddAnotherClick?: (idx: number, day: DayPlan) => void;
   pushedSet?: Set<number>;
   pushingIdx?: number | null;
   onPushDay?: (idx: number) => void;
@@ -559,6 +645,7 @@ const CalendarDayList = ({
               hrBounds={hrBounds}
               onEditClick={() => onEditClick(i, day)}
               onAddClick={() => onAddClick(i)}
+              onAddAnotherClick={onAddAnotherClick ? () => onAddAnotherClick(i, day) : undefined}
               isPushed={pushedSet?.has(i)}
               isPushing={pushingIdx === i}
               onPushDay={onPushDay}
@@ -570,6 +657,7 @@ const CalendarDayList = ({
     </DndContext>
   );
 };
+
 
 // ─── Program Header (collapsible summary above the week card) ───
 function parsePaceMin(p: string | null | undefined): number | null {
@@ -1431,6 +1519,8 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
   const [addElevation, setAddElevation] = useState("");
   const [addEph, setAddEph] = useState("");
   const [editingDayIdx, setEditingDayIdx] = useState<number | null>(null);
+  const [editAppendNew, setEditAppendNew] = useState(false);
+  const [customEditAppendNew, setCustomEditAppendNew] = useState(false);
   const [editDistance, setEditDistance] = useState("");
   const [editPace, setEditPace] = useState("");
   const [editDescription, setEditDescription] = useState("");
@@ -2525,7 +2615,8 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                       hrBounds={hrBounds}
                       onSwap={(from, to) => swapDays(currentWeekIdx, from, to)}
                       onAddClick={(i) => { setAddingDayIdx(i); setAddRunType(null); setAddDistance(""); setAddElevation(""); setAddEph(""); }}
-                      onEditClick={(i, day) => { setEditingDayIdx(i); setEditDistance(day.distance_km?.toString() || ""); setEditPace(day.pace || ""); setEditDescription(day.description || ""); }}
+                      onEditClick={(i, day) => { setEditAppendNew(false); setEditingDayIdx(i); setEditDistance(day.distance_km?.toString() || ""); setEditPace(day.pace || ""); setEditDescription(day.description || ""); }}
+                      onAddAnotherClick={(i) => { setEditAppendNew(true); setEditingDayIdx(i); }}
                     />
                     {planDirty && (
                       <Button onClick={savePlanEdits} disabled={savingPlan} className="w-full mt-4" size="lg">
@@ -3336,7 +3427,8 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                             hrBounds={hrBounds}
                             onSwap={(from, to) => swapDays(currentWeekIdx, from, to)}
                             onAddClick={(i) => { setAddingDayIdx(i); setAddRunType(null); setAddDistance(""); setAddElevation(""); setAddEph(""); }}
-                            onEditClick={(i, day) => { setEditingDayIdx(i); setEditDistance(day.distance_km?.toString() || ""); setEditPace(day.pace || ""); setEditDescription(day.description || ""); }}
+                            onEditClick={(i, day) => { setEditAppendNew(false); setEditingDayIdx(i); setEditDistance(day.distance_km?.toString() || ""); setEditPace(day.pace || ""); setEditDescription(day.description || ""); }}
+                            onAddAnotherClick={(i) => { setEditAppendNew(true); setEditingDayIdx(i); }}
                             pushedSet={pushedSet}
                             pushingIdx={pushingIdx}
                             onPushDay={isPremium && watchProvider ? pushDayToWatch : undefined}
@@ -3606,7 +3698,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
       {editingDayIdx !== null && plan[currentWeekIdx]?.days[editingDayIdx] && (
         <EditWorkoutDialog
           open={editingDayIdx !== null}
-          onOpenChange={(o) => { if (!o) setEditingDayIdx(null); }}
+          onOpenChange={(o) => { if (!o) { setEditingDayIdx(null); setEditAppendNew(false); } }}
           lang={lang}
           workout={{
             type: plan[currentWeekIdx].days[editingDayIdx].type,
@@ -3620,6 +3712,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
             sessions: (plan[currentWeekIdx].days[editingDayIdx] as any).sessions,
           }}
           multiSession
+          appendNewSession={editAppendNew}
           recentActivities={recentRunActivities}
           profile={suggestProfile}
           targetTime={aiTargetTime}
@@ -3791,7 +3884,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
       {customEditingDayIdx !== null && customPlan[customWeekIdx]?.days[customEditingDayIdx] && (
         <EditWorkoutDialog
           open={customEditingDayIdx !== null}
-          onOpenChange={(o) => { if (!o) setCustomEditingDayIdx(null); }}
+          onOpenChange={(o) => { if (!o) { setCustomEditingDayIdx(null); setCustomEditAppendNew(false); } }}
           lang={lang}
           workout={{
             type: customPlan[customWeekIdx].days[customEditingDayIdx].type,
@@ -3805,6 +3898,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
             sessions: (customPlan[customWeekIdx].days[customEditingDayIdx] as any).sessions,
           }}
           multiSession
+          appendNewSession={customEditAppendNew}
           recentActivities={recentRunActivities}
           profile={suggestProfile}
           targetTime={null}

@@ -15,10 +15,15 @@ export interface HrTarget {
 export interface WorkoutStep {
   kind: WorkoutStepKind;
   distance_km?: number | null;
+  /** For interval reps: distance per rep in meters (e.g. 800). */
+  distance_m?: number | null;
+  /** Number of repetitions for interval steps. */
+  reps?: number | null;
+  /** Recovery between reps, free text e.g. "90s" or "2:00". */
+  rest?: string | null;
   duration_s?: number | null;
   pace?: string | null;
   hr_target?: HrTarget | null;
-  reps?: number | null;
   note?: string | null;
 }
 

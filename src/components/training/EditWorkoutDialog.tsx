@@ -534,50 +534,102 @@ const EditWorkoutDialog = ({
                       className="text-xs flex items-center gap-1 text-muted-foreground hover:text-foreground"
                     >
                       {stepsExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-                      {isZh ? "步驟 (熱身/主項/緩和)" : "Steps (warmup / main / cooldown)"}
+                      {isZh ? "順序 (熱身 / 主項 / 緩和 / 間歇)" : "Sequence (warmup / main / cooldown / intervals)"}
                       {(s.steps?.length ?? 0) > 0 ? ` · ${s.steps!.length}` : ""}
                     </button>
                     {stepsExpanded && (
                       <div className="mt-2 space-y-2">
                         {(s.steps ?? []).map((st, stIdx) => (
-                          <div key={stIdx} className="grid grid-cols-12 gap-1 items-center">
-                            <select
-                              className="col-span-4 text-xs rounded border border-input bg-background px-1.5 py-1"
-                              value={st.kind}
-                              onChange={(e) => updateStep(sIdx, stIdx, { kind: e.target.value as WorkoutStepKind })}
-                            >
-                              {STEP_KINDS.map((k) => (
-                                <option key={k.id} value={k.id}>{isZh ? k.zh : k.en}</option>
-                              ))}
-                            </select>
-                            <Input
-                              className="col-span-3 h-8 text-xs"
-                              type="number" placeholder="km"
-                              value={st.distance_km != null ? String(st.distance_km) : ""}
-                              onChange={(e) => updateStep(sIdx, stIdx, { distance_km: e.target.value ? Number(e.target.value) : null })}
-                            />
-                            <Input
-                              className="col-span-4 h-8 text-xs"
-                              type="text" placeholder="pace"
-                              value={st.pace ?? ""}
-                              onChange={(e) => updateStep(sIdx, stIdx, { pace: e.target.value })}
-                            />
-                            <button
-                              type="button"
-                              onClick={() => removeStep(sIdx, stIdx)}
-                              className="col-span-1 text-muted-foreground hover:text-destructive flex justify-center"
-                            >
-                              <X size={12} />
-                            </button>
+                          <div key={stIdx} className="rounded border border-border/60 p-2 space-y-1.5">
+                            <div className="flex items-center gap-1.5">
+                              <select
+                                className="flex-1 text-xs rounded border border-input bg-background px-1.5 py-1"
+                                value={st.kind}
+                                onChange={(e) => {
+                                  const nk = e.target.value as WorkoutStepKind;
+                                  if (nk === "interval" && st.kind !== "interval") {
+                                    updateStep(sIdx, stIdx, { kind: nk, reps: st.reps ?? 5, distance_m: st.distance_m ?? 800, rest: st.rest ?? "90s", distance_km: null });
+                                  } else if (nk !== "interval" && st.kind === "interval") {
+                                    updateStep(sIdx, stIdx, { kind: nk, reps: null, distance_m: null, rest: null, distance_km: st.distance_km ?? 1 });
+                                  } else {
+                                    updateStep(sIdx, stIdx, { kind: nk });
+                                  }
+                                }}
+                              >
+                                {STEP_KINDS.map((k) => (
+                                  <option key={k.id} value={k.id}>{isZh ? k.zh : k.en}</option>
+                                ))}
+                              </select>
+                              <button
+                                type="button"
+                                onClick={() => removeStep(sIdx, stIdx)}
+                                className="text-muted-foreground hover:text-destructive p-1"
+                              >
+                                <X size={12} />
+                              </button>
+                            </div>
+                            {st.kind === "interval" ? (
+                              <div className="grid grid-cols-12 gap-1 items-center">
+                                <Input
+                                  className="col-span-3 h-8 text-xs"
+                                  type="number" min="1" placeholder={isZh ? "組數" : "reps"}
+                                  value={st.reps != null ? String(st.reps) : ""}
+                                  onChange={(e) => updateStep(sIdx, stIdx, { reps: e.target.value ? Number(e.target.value) : null })}
+                                />
+                                <span className="col-span-1 text-center text-xs text-muted-foreground">×</span>
+                                <Input
+                                  className="col-span-3 h-8 text-xs"
+                                  type="number" min="50" step="50" placeholder="m"
+                                  value={st.distance_m != null ? String(st.distance_m) : ""}
+                                  onChange={(e) => updateStep(sIdx, stIdx, { distance_m: e.target.value ? Number(e.target.value) : null })}
+                                />
+                                <Input
+                                  className="col-span-5 h-8 text-xs"
+                                  type="text" placeholder={isZh ? "配速 4:10/km" : "pace 4:10/km"}
+                                  value={st.pace ?? ""}
+                                  onChange={(e) => updateStep(sIdx, stIdx, { pace: e.target.value })}
+                                />
+                                <Input
+                                  className="col-span-12 h-8 text-xs"
+                                  type="text" placeholder={isZh ? "組間休息 (例: 90s / 2:00)" : "Rest between reps (e.g. 90s / 2:00)"}
+                                  value={st.rest ?? ""}
+                                  onChange={(e) => updateStep(sIdx, stIdx, { rest: e.target.value })}
+                                />
+                              </div>
+                            ) : (
+                              <div className="grid grid-cols-12 gap-1 items-center">
+                                <Input
+                                  className="col-span-5 h-8 text-xs"
+                                  type="number" step="0.1" placeholder="km"
+                                  value={st.distance_km != null ? String(st.distance_km) : ""}
+                                  onChange={(e) => updateStep(sIdx, stIdx, { distance_km: e.target.value ? Number(e.target.value) : null })}
+                                />
+                                <Input
+                                  className="col-span-7 h-8 text-xs"
+                                  type="text" placeholder={isZh ? "配速" : "pace"}
+                                  value={st.pace ?? ""}
+                                  onChange={(e) => updateStep(sIdx, stIdx, { pace: e.target.value })}
+                                />
+                              </div>
+                            )}
                           </div>
                         ))}
-                        <button
-                          type="button"
-                          onClick={() => addStep(sIdx)}
-                          className="text-xs text-primary hover:underline flex items-center gap-1"
-                        >
-                          <Plus size={12} /> {isZh ? "新增步驟" : "Add step"}
-                        </button>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => addStep(sIdx, "main")}
+                            className="text-xs text-primary hover:underline flex items-center gap-1"
+                          >
+                            <Plus size={12} /> {isZh ? "新增步驟" : "Add step"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => addStep(sIdx, "interval")}
+                            className="text-xs text-primary hover:underline flex items-center gap-1"
+                          >
+                            <Plus size={12} /> {isZh ? "新增間歇" : "Add interval"}
+                          </button>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -586,14 +638,7 @@ const EditWorkoutDialog = ({
             );
           })}
 
-          {showMulti && (
-            <Button
-              type="button" variant="outline" size="sm" className="w-full"
-              onClick={addSession}
-            >
-              <Plus size={14} className="mr-1" /> {isZh ? "新增同日訓練" : "Add another session this day"}
-            </Button>
-          )}
+
 
           {feedback && verdict && (
             <div

@@ -45,10 +45,44 @@ const WIDGETS: WidgetOption[] = [
   { id: "year_heatmap", en: "Year Heatmap", zh: "年度熱力圖", desc_en: "Open app for full view", desc_zh: "開啟 App 查看完整視圖" },
 ];
 
+type SizeId = "small" | "medium" | "large";
+
+interface SizeOption {
+  id: SizeId;
+  en: string;
+  zh: string;
+  capacity_en: string;
+  capacity_zh: string;
+}
+
+const SIZES: SizeOption[] = [
+  {
+    id: "small",
+    en: "Small",
+    zh: "小",
+    capacity_en: "1 main stat + 2 supporting stats",
+    capacity_zh: "1 個主要數據 + 2 個輔助數據",
+  },
+  {
+    id: "medium",
+    en: "Medium",
+    zh: "中",
+    capacity_en: "1 main stat + 3 supporting stats (no chart)",
+    capacity_zh: "1 個主要數據 + 3 個輔助數據（無圖表）",
+  },
+  {
+    id: "large",
+    en: "Large",
+    zh: "大",
+    capacity_en: "1 main stat + up to 6 supporting stats + chart",
+    capacity_zh: "1 個主要數據 + 最多 6 個輔助數據 + 圖表",
+  },
+];
+
 const LS_KEY = "home_widget_type";
+const LS_SIZE_KEY = "home_widget_size";
 
 export function getProjectFunctionsBase(): string {
-  // VITE_SUPABASE_PROJECT_ID is auto-populated
   const projectId = (import.meta as any).env?.VITE_SUPABASE_PROJECT_ID || "kbghvclwhxnjeskdodeh";
   return `https://${projectId}.supabase.co/functions/v1/home-widget`;
 }
@@ -57,11 +91,12 @@ const HomeWidgetDialog = ({ lang, open, onOpenChange }: Props) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [selected, setSelected] = useState<string>(() => localStorage.getItem(LS_KEY) || "latest_activity");
+  const [size, setSize] = useState<SizeId>(() => (localStorage.getItem(LS_SIZE_KEY) as SizeId) || "large");
 
   useEffect(() => {
     if (open) {
-      const cur = localStorage.getItem(LS_KEY) || "latest_activity";
-      setSelected(cur);
+      setSelected(localStorage.getItem(LS_KEY) || "latest_activity");
+      setSize((localStorage.getItem(LS_SIZE_KEY) as SizeId) || "large");
     }
   }, [open]);
 
@@ -70,7 +105,7 @@ const HomeWidgetDialog = ({ lang, open, onOpenChange }: Props) => {
     [open],
   );
 
-  const apply = (widgetId: string) => {
+  const apply = (widgetId: string, sizeId: SizeId) => {
     if (!user) {
       toast({
         title: lang === "zh" ? "請先登入" : "Sign in required",
@@ -85,7 +120,7 @@ const HomeWidgetDialog = ({ lang, open, onOpenChange }: Props) => {
     const base = getProjectFunctionsBase();
     const theme = isDark ? "dark" : "light";
     const refresh = 30;
-    const widgetUrl = `${base}?user=${encodeURIComponent(user.id)}&type=${encodeURIComponent(widgetId)}&theme=${theme}&refresh=${refresh}`;
+    const widgetUrl = `${base}?user=${encodeURIComponent(user.id)}&type=${encodeURIComponent(widgetId)}&size=${sizeId}&theme=${theme}&refresh=${refresh}`;
     if (isDespia && isIOS) {
       try {
         despia(`widget://${widgetUrl}`);
@@ -94,14 +129,20 @@ const HomeWidgetDialog = ({ lang, open, onOpenChange }: Props) => {
       }
     }
     localStorage.setItem(LS_KEY, widgetId);
+    localStorage.setItem(LS_SIZE_KEY, sizeId);
     setSelected(widgetId);
+    setSize(sizeId);
     toast({
       title: lang === "zh" ? "已套用小工具" : "Widget applied",
       description: isDespia && isIOS
-        ? (lang === "zh" ? "請在主螢幕加入 Runward 小工具以查看。" : "Add the Runward widget on your home screen to view it.")
+        ? (lang === "zh"
+            ? `已套用 ${SIZES.find(s => s.id === sizeId)?.zh} 尺寸。請在主螢幕加入對應大小的 Runward 小工具。`
+            : `Applied at ${SIZES.find(s => s.id === sizeId)?.en} size. Add the matching Runward widget size on your home screen.`)
         : (lang === "zh" ? "小工具僅在 iOS App 上顯示。" : "Widgets only display in the iOS app."),
     });
   };
+
+  const currentCapacity = SIZES.find((s) => s.id === size);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -113,18 +154,56 @@ const HomeWidgetDialog = ({ lang, open, onOpenChange }: Props) => {
           </DialogTitle>
           <DialogDescription>
             {lang === "zh"
-              ? "選擇一個小工具，加入到 iOS 主螢幕後便會自動更新。"
-              : "Pick a widget to show on your iOS home screen. Updates automatically."}
+              ? "選擇尺寸與內容，加入到 iOS 主螢幕後便會自動更新。"
+              : "Pick a size and a widget. Updates automatically on your iOS home screen."}
           </DialogDescription>
         </DialogHeader>
 
+        {/* Size selector */}
         <div className="space-y-2">
+          <div className="text-xs font-semibold text-foreground uppercase tracking-wide">
+            {lang === "zh" ? "尺寸" : "Size"}
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            {SIZES.map((s) => {
+              const active = size === s.id;
+              return (
+                <button
+                  key={s.id}
+                  onClick={() => {
+                    setSize(s.id);
+                    localStorage.setItem(LS_SIZE_KEY, s.id);
+                  }}
+                  className={`p-2 rounded-lg border text-center transition-colors ${
+                    active ? "border-primary bg-primary/5" : "border-border hover:bg-muted"
+                  }`}
+                >
+                  <div className="font-semibold text-sm text-foreground">
+                    {lang === "zh" ? s.zh : s.en}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+          {currentCapacity && (
+            <div className="text-[11px] text-muted-foreground leading-snug px-1">
+              {lang === "zh" ? "可顯示：" : "Fits: "}
+              {lang === "zh" ? currentCapacity.capacity_zh : currentCapacity.capacity_en}
+            </div>
+          )}
+        </div>
+
+        {/* Widget content selector */}
+        <div className="space-y-2 pt-2">
+          <div className="text-xs font-semibold text-foreground uppercase tracking-wide">
+            {lang === "zh" ? "內容" : "Content"}
+          </div>
           {WIDGETS.map((w) => {
             const isSelected = selected === w.id;
             return (
               <button
                 key={w.id}
-                onClick={() => apply(w.id)}
+                onClick={() => apply(w.id, size)}
                 className={`w-full flex items-center justify-between text-left p-3 rounded-lg border transition-colors ${
                   isSelected ? "border-primary bg-primary/5" : "border-border hover:bg-muted"
                 }`}
@@ -145,8 +224,8 @@ const HomeWidgetDialog = ({ lang, open, onOpenChange }: Props) => {
 
         <div className="text-[11px] text-muted-foreground leading-relaxed pt-2 border-t border-border">
           {lang === "zh"
-            ? "提示：在 iOS 主螢幕長按空白處 → 加入小工具 → 搜尋 Runward。"
-            : "Tip: long-press your iOS home screen → Add Widget → search Runward."}
+            ? "提示：在 iOS 主螢幕長按空白處 → 加入小工具 → 搜尋 Runward → 選擇對應尺寸。"
+            : "Tip: long-press your iOS home screen → Add Widget → search Runward → pick the matching size."}
         </div>
 
         <div className="flex justify-end pt-2">

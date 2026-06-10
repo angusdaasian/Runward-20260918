@@ -1519,6 +1519,8 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
   const [addElevation, setAddElevation] = useState("");
   const [addEph, setAddEph] = useState("");
   const [editingDayIdx, setEditingDayIdx] = useState<number | null>(null);
+  const [editAppendNew, setEditAppendNew] = useState(false);
+  const [customEditAppendNew, setCustomEditAppendNew] = useState(false);
   const [editDistance, setEditDistance] = useState("");
   const [editPace, setEditPace] = useState("");
   const [editDescription, setEditDescription] = useState("");

@@ -80,10 +80,10 @@ async function fetchLatestActivity(supabase: any, userId: string) {
   const cutoff = new Date(Date.now() - 60 * 24 * 3600 * 1000).toISOString();
   const queries = [
     supabase.from("strava_activities").select("name,distance,moving_time,average_speed,average_heartrate,start_date").eq("user_id", userId).gte("start_date", cutoff).order("start_date", { ascending: false }).limit(1),
-    supabase.from("suunto_activities").select("activity_name,distance,duration,avg_speed,avg_hr,start_time").eq("user_id", userId).gte("start_time", cutoff).order("start_time", { ascending: false }).limit(1),
+    supabase.from("suunto_activities").select("name,distance,moving_time,average_speed,average_heartrate,start_date").eq("user_id", userId).gte("start_date", cutoff).order("start_date", { ascending: false }).limit(1),
     supabase.from("garmin_activities").select("activity_name,distance_meters,duration_seconds,average_speed,average_hr,start_time").eq("user_id", userId).gte("start_time", cutoff).order("start_time", { ascending: false }).limit(1),
-    supabase.from("terra_activities").select("activity_name,distance_meters,duration_seconds,average_speed_mps,average_hr_bpm,start_time").eq("user_id", userId).gte("start_time", cutoff).order("start_time", { ascending: false }).limit(1),
-    supabase.from("apple_health_activities").select("name,distance,duration,average_speed,average_hr,start_date").eq("user_id", userId).gte("start_date", cutoff).order("start_date", { ascending: false }).limit(1),
+    supabase.from("terra_activities").select("activity_name,distance_meters,duration_seconds,average_speed,average_hr,start_time").eq("user_id", userId).gte("start_time", cutoff).order("start_time", { ascending: false }).limit(1),
+    supabase.from("apple_health_activities").select("name,distance,moving_time,average_speed,average_heartrate,start_date").eq("user_id", userId).gte("start_date", cutoff).order("start_date", { ascending: false }).limit(1),
   ];
   const results = await Promise.allSettled(queries);
   const normalized: { date: Date; name: string; distM: number; durS: number; speed: number; hr: number | null }[] = [];

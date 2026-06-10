@@ -131,6 +131,7 @@ export function splitIntervalDay(day: DayLike, opts: { lang?: "en" | "zh" } = {}
       color: "#FFB74D",
       elevation_m: null,
       eph: null,
+      steps: [{ kind: "warmup", distance_km: wcKm, pace: wcPace }],
     },
     {
       id: genId(),
@@ -143,6 +144,15 @@ export function splitIntervalDay(day: DayLike, opts: { lang?: "en" | "zh" } = {}
       color: day.color ?? "#F44336",
       elevation_m: null,
       eph: null,
+      steps: parsed
+        ? [{
+            kind: "interval",
+            reps: parsed.reps,
+            distance_m: parsed.distM,
+            pace: day.pace ?? null,
+            rest: parsed.rest,
+          }]
+        : [{ kind: "interval", distance_km: intervalKm, pace: day.pace ?? null }],
     },
     {
       id: genId(),
@@ -155,6 +165,7 @@ export function splitIntervalDay(day: DayLike, opts: { lang?: "en" | "zh" } = {}
       color: "#90CAF9",
       elevation_m: null,
       eph: null,
+      steps: [{ kind: "cooldown", distance_km: wcKm, pace: wcPace }],
     },
   ];
 

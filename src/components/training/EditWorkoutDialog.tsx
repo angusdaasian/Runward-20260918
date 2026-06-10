@@ -419,6 +419,8 @@ const EditWorkoutDialog = ({
             const trail = isTrailType(s.type);
             const stepsExpanded = expandedSteps[s.id] ?? ((s.steps?.length ?? 0) > 0);
             const sourceLabel = suggestSource[s.id];
+            const structuredInterval = normalizeType(s.type) === "Interval" && (s.steps?.length ?? 0) > 0;
+            const computedDistance = sessionDistanceKm(s);
             return (
               <div key={s.id} className="border border-border rounded-lg p-3 space-y-3 relative">
                 {showMulti && sessions.length > 1 && (
@@ -497,9 +499,15 @@ const EditWorkoutDialog = ({
                   </label>
                   <Input
                     type="number" min="0" step="0.5"
-                    value={s.distance_km != null ? String(s.distance_km) : ""}
+                    value={structuredInterval && computedDistance > 0 ? String(computedDistance) : (s.distance_km != null ? String(s.distance_km) : "")}
+                    disabled={structuredInterval}
                     onChange={(e) => updateSession(sIdx, { distance_km: e.target.value ? Number(e.target.value) : null })}
                   />
+                  {structuredInterval && (
+                    <p className="text-[11px] text-muted-foreground mt-1">
+                      {isZh ? "距離由下方順序自動加總" : "Distance is calculated from the sequence below"}
+                    </p>
+                  )}
                 </div>
 
                 {trail ? (

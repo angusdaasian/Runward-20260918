@@ -559,7 +559,7 @@ const DraggableDay = ({
   const { attributes, listeners, setNodeRef: setDragRef, isDragging, transform } = useDraggable({ id });
   const { setNodeRef: setDropRef, isOver } = useDroppable({ id });
   const sessions = workoutSessionsForDay(day);
-  const [expanded, setExpanded] = useState(false);
+  const [expandedSessionId, setExpandedSessionId] = useState<string | null>(null);
 
   const setRefs = (node: HTMLDivElement | null) => {
     setDragRef(node);
@@ -597,6 +597,7 @@ const DraggableDay = ({
           {sessions.map((session, sessionIdx) => {
             const sessionDay = dayForWorkoutSession(day, session);
             const sessionKm = sessionDistanceKm(session);
+            const expanded = expandedSessionId === (session.id || String(sessionIdx));
             return (
           <div key={session.id || sessionIdx} className="bg-card border border-border rounded-lg p-3 hover:border-primary transition-colors">
             <div className="flex items-center gap-2">
@@ -617,7 +618,7 @@ const DraggableDay = ({
               </div>
               <button
                 type="button"
-                onClick={(e) => { e.stopPropagation(); setExpanded((v) => !v); }}
+                onClick={(e) => { e.stopPropagation(); setExpandedSessionId(expanded ? null : (session.id || String(sessionIdx))); }}
                 className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground"
                 aria-expanded={expanded}
                 aria-label={lang === "zh" ? "展開" : "Expand"}

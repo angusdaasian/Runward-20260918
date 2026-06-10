@@ -124,6 +124,16 @@ function sessionDistanceKm(session?: SessionLike | null): number {
   return fromSteps > 0 ? fromSteps : (Number(session.distance_km) || 0);
 }
 
+function sessionPace(session?: SessionLike | null): string | null {
+  if (!session) return null;
+  const steps = session.steps ?? [];
+  return steps.find((st) => st.kind === "interval" && st.pace)?.pace
+    ?? steps.find((st) => st.kind === "main" && st.pace)?.pace
+    ?? session.pace
+    ?? steps.find((st) => st.pace)?.pace
+    ?? null;
+}
+
 /** Returns a new day with one Interval session containing warmup/interval/cooldown steps. */
 export function splitIntervalDay(day: DayLike, opts: { lang?: "en" | "zh" } = {}): DayLike {
   if (!isIntervalDay(day)) return day;
@@ -133,6 +143,22 @@ export function splitIntervalDay(day: DayLike, opts: { lang?: "en" | "zh" } = {}
   const warmSource = existingSessions.find((s) => normalizeType(s.type) === "Warmup");
   const coolSource = existingSessions.find((s) => normalizeType(s.type) === "Cooldown");
   const intervalSource = existingSessions.find((s) => normalizeType(s.type) === "Interval") ?? existingSessions[0];
+  if (existingSessions.length === 1 && intervalSource?.steps?.length) {
+    const steps = intervalSource.steps.map((st) => ({ ...st }));
+    const totalKm = Number(sessionDistanceKm({ ...intervalSource, steps }).toFixed(2));
+    const session: SessionLike = {
+      ...intervalSource,
+      id: intervalSource.id || genId(),
+      type: "Interval",
+      title: intervalSource.title ?? day.title ?? (lang === "zh" ? "間歇跑" : "Interval Run"),
+      distance_km: totalKm > 0 ? totalKm : (intervalSource.distance_km ?? day.distance_km ?? null),
+      pace: sessionPace({ ...intervalSource, steps }) ?? day.pace ?? null,
+      description: intervalSource.description ?? day.description ?? (lang === "zh" ? "熱身 + 間歇 + 緩和" : "Warm up + intervals + cool down"),
+      color: intervalSource.color ?? day.color ?? "#F44336",
+      steps,
+    };
+    return { ...day, type: "Interval", title: session.title, distance_km: session.distance_km, pace: session.pace, description: session.description, color: session.color, elevation_m: null, eph: null, sessions: [session] };
+  }
   const parsed = parseIntervals(intervalSource?.description ?? day.description);
   const existingIntervalStep = intervalSource?.steps?.find((st) => st.kind === "interval");
   const intervalStep: StepLike = existingIntervalStep

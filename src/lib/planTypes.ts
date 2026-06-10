@@ -86,6 +86,15 @@ export function sessionDistanceKm(session: WorkoutSession | null | undefined): n
   return Number(session.distance_km) || 0;
 }
 
+export function sessionPace(session: WorkoutSession | null | undefined): string | null {
+  if (!session) return null;
+  const steps = session.steps ?? [];
+  const intervalPace = steps.find((step) => step.kind === "interval" && step.pace)?.pace;
+  const mainPace = steps.find((step) => step.kind === "main" && step.pace)?.pace;
+  const firstStepPace = steps.find((step) => step.pace)?.pace;
+  return intervalPace ?? mainPace ?? session.pace ?? firstStepPace ?? null;
+}
+
 /** Return effective sessions for a day. When day.sessions is missing, synthesize a single
  *  session from the legacy fields so downstream code can treat both shapes uniformly. */
 export function effectiveSessions(day: PlanDay | null | undefined): WorkoutSession[] {
@@ -116,7 +125,7 @@ export function summarizeDay(sessions: WorkoutSession[]): Pick<PlanDayLegacy, "t
     return {
       type: s.type, title: s.title ?? s.type,
       distance_km: totalKm > 0 ? totalKm : (s.distance_km ?? null),
-      pace: s.pace ?? null,
+      pace: sessionPace(s),
       description: s.description ?? null,
       color: s.color ?? null,
       elevation_m: s.elevation_m ?? null,
@@ -133,7 +142,7 @@ export function summarizeDay(sessions: WorkoutSession[]): Pick<PlanDayLegacy, "t
     type: primary.type,
     title: primary.title ?? primary.type,
     distance_km: totalKm > 0 ? Number(totalKm.toFixed(2)) : null,
-    pace: primary.pace ?? null,
+    pace: sessionPace(primary),
     description: desc,
     color: primary.color ?? null,
     elevation_m: primary.elevation_m ?? null,

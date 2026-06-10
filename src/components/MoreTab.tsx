@@ -33,6 +33,7 @@ import { useDespiaPurchases } from "@/hooks/use-despia-purchases";
 import PlanComparisonDialog from "@/components/PlanComparisonDialog";
 import StartRunningGuide from "@/components/StartRunningGuide";
 import FuelingGuide from "@/components/FuelingGuide";
+import HomeWidgetDialog from "@/components/HomeWidgetDialog";
 
 interface Props {
   lang: Lang;
@@ -89,6 +90,7 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps }: Props
   const [profileSubpage, setProfileSubpage] = useState<"main" | "hr-zones" | "personal-bests" | "edit-profile" /* | "badges" */>("main");
   const [aiChatDisabled, setAiChatDisabled] = useState(() => localStorage.getItem("ai_chat_disabled") === "true");
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showWidgetDialog, setShowWidgetDialog] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [textScale, setTextScale] = useTextScale();
 
@@ -251,6 +253,22 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps }: Props
             </button>
           </div>
         </div>
+
+        {/* Home Screen Widget */}
+        <button
+          onClick={() => setShowWidgetDialog(true)}
+          className="w-full bg-card border border-border rounded-xl p-4 flex items-center justify-between"
+        >
+          <div className="flex items-center gap-3">
+            <Smartphone size={20} className="text-primary" />
+            <span className="font-medium text-foreground">
+              {lang === "zh" ? "主螢幕小工具" : "Home Screen Widget"}
+            </span>
+          </div>
+          <ChevronRight size={18} className="text-muted-foreground" />
+        </button>
+
+
 
         {!user && (
           <button
@@ -675,6 +693,7 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps }: Props
       </Dialog>
 
       <PlanComparisonDialog open={showPlanCompare} onOpenChange={setShowPlanCompare} lang={lang} />
+      <HomeWidgetDialog open={showWidgetDialog} onOpenChange={setShowWidgetDialog} lang={lang} />
 
       {/* Delete Account Confirmation */}
       <AlertDialog open={showDeleteDialog} onOpenChange={(o) => !deleting && setShowDeleteDialog(o)}>

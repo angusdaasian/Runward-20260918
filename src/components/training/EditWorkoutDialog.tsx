@@ -568,6 +568,24 @@ const EditWorkoutDialog = ({
                               </select>
                               <button
                                 type="button"
+                                onClick={() => moveStep(sIdx, stIdx, -1)}
+                                disabled={stIdx === 0}
+                                className="text-muted-foreground hover:text-foreground disabled:opacity-30 p-1"
+                                aria-label={isZh ? "上移步驟" : "Move step up"}
+                              >
+                                <ChevronUp size={12} />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => moveStep(sIdx, stIdx, 1)}
+                                disabled={stIdx === (s.steps?.length ?? 0) - 1}
+                                className="text-muted-foreground hover:text-foreground disabled:opacity-30 p-1"
+                                aria-label={isZh ? "下移步驟" : "Move step down"}
+                              >
+                                <ChevronDown size={12} />
+                              </button>
+                              <button
+                                type="button"
                                 onClick={() => removeStep(sIdx, stIdx)}
                                 className="text-muted-foreground hover:text-destructive p-1"
                               >
@@ -589,12 +607,17 @@ const EditWorkoutDialog = ({
                                   value={st.distance_m != null ? String(st.distance_m) : ""}
                                   onChange={(e) => updateStep(sIdx, stIdx, { distance_m: e.target.value ? Number(e.target.value) : null })}
                                 />
-                                <Input
-                                  className="col-span-5 h-8 text-xs"
-                                  type="text" placeholder={isZh ? "配速 4:10/km" : "pace 4:10/km"}
-                                  value={st.pace ?? ""}
-                                  onChange={(e) => updateStep(sIdx, stIdx, { pace: e.target.value })}
-                                />
+                                <select
+                                  className="col-span-5 h-8 text-xs rounded border border-input bg-background px-1.5"
+                                  value={paceSelectValue(st.pace)}
+                                  onChange={(e) => updateStep(sIdx, stIdx, { pace: e.target.value || null })}
+                                >
+                                  <option value="">{isZh ? "配速" : "pace"}</option>
+                                  {normalizePace(st.pace) && !PACE_OPTIONS.includes(normalizePace(st.pace)!) && (
+                                    <option value={normalizePace(st.pace)!}>{normalizePace(st.pace)}</option>
+                                  )}
+                                  {PACE_OPTIONS.map((pace) => <option key={pace} value={pace}>{pace}</option>)}
+                                </select>
                                 <Input
                                   className="col-span-12 h-8 text-xs"
                                   type="text" placeholder={isZh ? "組間休息 (例: 90s / 2:00)" : "Rest between reps (e.g. 90s / 2:00)"}
@@ -610,12 +633,17 @@ const EditWorkoutDialog = ({
                                   value={st.distance_km != null ? String(st.distance_km) : ""}
                                   onChange={(e) => updateStep(sIdx, stIdx, { distance_km: e.target.value ? Number(e.target.value) : null })}
                                 />
-                                <Input
-                                  className="col-span-7 h-8 text-xs"
-                                  type="text" placeholder={isZh ? "配速" : "pace"}
-                                  value={st.pace ?? ""}
-                                  onChange={(e) => updateStep(sIdx, stIdx, { pace: e.target.value })}
-                                />
+                                <select
+                                  className="col-span-7 h-8 text-xs rounded border border-input bg-background px-1.5"
+                                  value={paceSelectValue(st.pace)}
+                                  onChange={(e) => updateStep(sIdx, stIdx, { pace: e.target.value || null })}
+                                >
+                                  <option value="">{isZh ? "配速" : "pace"}</option>
+                                  {normalizePace(st.pace) && !PACE_OPTIONS.includes(normalizePace(st.pace)!) && (
+                                    <option value={normalizePace(st.pace)!}>{normalizePace(st.pace)}</option>
+                                  )}
+                                  {PACE_OPTIONS.map((pace) => <option key={pace} value={pace}>{pace}</option>)}
+                                </select>
                               </div>
                             )}
                           </div>

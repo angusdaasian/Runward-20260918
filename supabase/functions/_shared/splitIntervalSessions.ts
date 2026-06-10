@@ -1,4 +1,5 @@
-// Split an Interval workout day into three sessions: Warmup + Intervals + Cooldown.
+// Structure an Interval workout day as one workout session whose sequence contains
+// Warmup + Interval + Cooldown steps.
 // Backward-compatible: legacy day-level fields are preserved so older readers keep working,
 // while new UI / Terra push consumes day.sessions when present.
 
@@ -101,75 +102,77 @@ export function isIntervalDay(day: DayLike | null | undefined): boolean {
   return !!day && INTERVAL_TYPES.has(String(day.type || ""));
 }
 
-/** Returns a new day with sessions = [Warmup, Intervals, Cooldown]. Idempotent. */
+function normalizeType(t?: string | null): string {
+  const v = String(t || "").toLowerCase();
+  if (v.includes("warm")) return "Warmup";
+  if (v.includes("cool")) return "Cooldown";
+  if (v.includes("interval")) return "Interval";
+  return String(t || "");
+}
+
+function stepDistanceKm(step?: StepLike | null): number {
+  if (!step) return 0;
+  if (step.kind === "interval" && step.reps && step.distance_m) return Number(step.reps) * Number(step.distance_m) / 1000;
+  if (step.distance_km != null) return Number(step.distance_km) || 0;
+  if (step.distance_m != null) return (Number(step.distance_m) || 0) / 1000;
+  return 0;
+}
+
+function sessionDistanceKm(session?: SessionLike | null): number {
+  if (!session) return 0;
+  const fromSteps = (session.steps ?? []).reduce((sum, st) => sum + stepDistanceKm(st), 0);
+  return fromSteps > 0 ? fromSteps : (Number(session.distance_km) || 0);
+}
+
+/** Returns a new day with one Interval session containing warmup/interval/cooldown steps. */
 export function splitIntervalDay(day: DayLike, opts: { lang?: "en" | "zh" } = {}): DayLike {
   if (!isIntervalDay(day)) return day;
-  if (Array.isArray(day.sessions) && day.sessions.length > 0) return day; // already split or customized
-  const totalKm = Number(day.distance_km) || 0;
-  if (totalKm <= 0) return day;
 
   const lang = opts.lang ?? "en";
-  const parsed = parseIntervals(day.description);
-  const wcKm = totalKm >= 6 ? 1.5 : 1;
-  let intervalKm = parsed ? (parsed.reps * parsed.distM) / 1000 : Math.max(1, totalKm - 2 * wcKm);
-  intervalKm = Math.round(intervalKm * 10) / 10;
-  const wcPace = adjustPace(day.pace, 1.4) ?? day.pace ?? null;
+  const existingSessions = Array.isArray(day.sessions) ? day.sessions : [];
+  const warmSource = existingSessions.find((s) => normalizeType(s.type) === "Warmup");
+  const coolSource = existingSessions.find((s) => normalizeType(s.type) === "Cooldown");
+  const intervalSource = existingSessions.find((s) => normalizeType(s.type) === "Interval") ?? existingSessions[0];
+  const parsed = parseIntervals(intervalSource?.description ?? day.description);
+  const existingIntervalStep = intervalSource?.steps?.find((st) => st.kind === "interval");
+  const intervalStep: StepLike = existingIntervalStep
+    ? { ...existingIntervalStep, kind: "interval" }
+    : parsed
+      ? { kind: "interval", reps: parsed.reps, distance_m: parsed.distM, pace: intervalSource?.pace ?? day.pace ?? null, rest: parsed.rest }
+      : { kind: "interval", distance_km: Math.max(1, Number(intervalSource?.distance_km ?? day.distance_km) || 1), pace: intervalSource?.pace ?? day.pace ?? null };
+  const intervalKm = stepDistanceKm(intervalStep);
+  const declaredTotalKm = Number(day.distance_km) || 0;
+  const remainingKm = declaredTotalKm > intervalKm ? declaredTotalKm - intervalKm : 0;
+  const fallbackWcKm = remainingKm >= 3 ? 1.5 : remainingKm >= 2 ? 1 : (declaredTotalKm >= 6 || intervalKm >= 4 ? 1.5 : 1);
+  const warmKm = sessionDistanceKm(warmSource) || fallbackWcKm;
+  const coolKm = sessionDistanceKm(coolSource) || fallbackWcKm;
+  const wcPace = warmSource?.pace ?? coolSource?.pace ?? adjustPace(day.pace, 1.4) ?? day.pace ?? null;
 
   const labels = lang === "zh"
-    ? { warm: "熱身", cool: "緩和", warmDesc: `${wcKm}km 輕鬆熱身慢跑`, coolDesc: `${wcKm}km 輕鬆緩和慢跑`, intervals: "間歇跑" }
-    : { warm: "Warm Up", cool: "Cool Down", warmDesc: `Easy ${wcKm}km warm-up jog`, coolDesc: `Easy ${wcKm}km cool-down jog`, intervals: "Intervals" };
+    ? { warm: "熱身", cool: "緩和", intervals: "間歇跑", desc: "熱身 + 間歇 + 緩和" }
+    : { warm: "Warm Up", cool: "Cool Down", intervals: "Interval Run", desc: "Warm up + intervals + cool down" };
 
-  const sessions: SessionLike[] = [
-    {
-      id: genId(),
-      type: "Warmup",
-      title: labels.warm,
-      time_of_day: null,
-      distance_km: wcKm,
-      pace: wcPace,
-      description: labels.warmDesc,
-      color: "#FFB74D",
-      elevation_m: null,
-      eph: null,
-      steps: [{ kind: "warmup", distance_km: wcKm, pace: wcPace }],
-    },
-    {
-      id: genId(),
-      type: "Interval",
-      title: day.title ?? labels.intervals,
-      time_of_day: null,
-      distance_km: intervalKm,
-      pace: day.pace ?? null,
-      description: cleanIntervalDescription(day.description),
-      color: day.color ?? "#F44336",
-      elevation_m: null,
-      eph: null,
-      steps: parsed
-        ? [{
-            kind: "interval",
-            reps: parsed.reps,
-            distance_m: parsed.distM,
-            pace: day.pace ?? null,
-            rest: parsed.rest,
-          }]
-        : [{ kind: "interval", distance_km: intervalKm, pace: day.pace ?? null }],
-    },
-    {
-      id: genId(),
-      type: "Cooldown",
-      title: labels.cool,
-      time_of_day: null,
-      distance_km: wcKm,
-      pace: wcPace,
-      description: labels.coolDesc,
-      color: "#90CAF9",
-      elevation_m: null,
-      eph: null,
-      steps: [{ kind: "cooldown", distance_km: wcKm, pace: wcPace }],
-    },
+  const steps: StepLike[] = [
+    { kind: "warmup", distance_km: warmKm, pace: wcPace, note: labels.warm },
+    intervalStep,
+    { kind: "cooldown", distance_km: coolKm, pace: coolSource?.pace ?? wcPace, note: labels.cool },
   ];
+  const totalKm = Number((warmKm + intervalKm + coolKm).toFixed(2));
+  const session: SessionLike = {
+    id: intervalSource?.id || genId(),
+    type: "Interval",
+    title: day.title ?? intervalSource?.title ?? labels.intervals,
+    time_of_day: intervalSource?.time_of_day ?? null,
+    distance_km: totalKm,
+    pace: intervalSource?.pace ?? day.pace ?? null,
+    description: cleanIntervalDescription(intervalSource?.description ?? day.description) ?? labels.desc,
+    color: day.color ?? intervalSource?.color ?? "#F44336",
+    elevation_m: null,
+    eph: null,
+    steps,
+  };
 
-  return { ...day, sessions };
+  return { ...day, type: "Interval", title: session.title, distance_km: totalKm, pace: session.pace, description: session.description, color: session.color, elevation_m: null, eph: null, sessions: [session] };
 }
 
 /** Walk a full plan_data array of weeks and split every interval day in place. */
@@ -180,9 +183,8 @@ export function splitIntervalsInPlan(planData: any, opts: { lang?: "en" | "zh" }
     if (!week || !Array.isArray(week.days)) return week;
     const days = week.days.map((d: any) => {
       if (!isIntervalDay(d)) return d;
-      if (Array.isArray(d?.sessions) && d.sessions.length > 0) return d;
       const next = splitIntervalDay(d, opts);
-      if (next !== d) changed++;
+      if (JSON.stringify(next) !== JSON.stringify(d)) changed++;
       return next;
     });
     return { ...week, days };

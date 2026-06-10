@@ -25,6 +25,8 @@ import { shareTrainingWeek } from "@/lib/sharePlanWeek";
 import { estimateMaxHr, estimateRestingHr, zoneBoundaries, isValidCustomZones } from "@/lib/hrZones";
 import { predictRaceFromActivities, typeLabel, type RunType } from "@/lib/racePredictionHr";
 import { targetTimeFromPlan, type SuggestProfile, type SuggestActivity } from "@/lib/paceSuggest";
+import { sessionDistanceKm, type WorkoutSession } from "@/lib/planTypes";
+import { splitIntervalsInPlan } from "@/lib/splitIntervalSessions";
 import {
   DndContext, PointerSensor, TouchSensor, useSensor, useSensors,
   closestCenter, type DragEndEvent
@@ -79,7 +81,7 @@ const RUN_TYPES = [
 const TYPE_LABELS: Record<string, { en: string; zh: string }> = {
   "Easy Run": { en: "Easy Run", zh: "輕鬆跑" }, "Easy": { en: "Easy Run", zh: "輕鬆跑" },
   "Tempo Run": { en: "Tempo Run", zh: "節奏跑" }, "Tempo": { en: "Tempo Run", zh: "節奏跑" },
-  "Interval": { en: "Interval", zh: "間歇跑" },
+  "Interval": { en: "Interval Run", zh: "間歇跑" },
   "Long Run": { en: "Long Run", zh: "長課" }, "Long": { en: "Long Run", zh: "長課" },
   "Recovery": { en: "Recovery Run", zh: "恢復跑" }, "Recovery Run": { en: "Recovery Run", zh: "恢復跑" },
   "Rest": { en: "Rest", zh: "休息" }, "Cross Training": { en: "Cross Training", zh: "交叉訓練" },
@@ -351,12 +353,13 @@ const WorkoutDetails = ({ day, lang, hrBounds }: { day: DayPlan; lang: Lang; hrB
               {steps.length > 0 ? (
                 <div className="space-y-0.5">
                   {steps.map((st, sti) => {
+                    const stepLabel = st.kind === "warmup" ? (isZh ? "熱身" : "Warm-up") : st.kind === "cooldown" ? (isZh ? "緩和" : "Cool-down") : st.kind === "recovery" ? (isZh ? "恢復" : "Recovery") : st.kind === "interval" ? (isZh ? "間歇" : "Interval") : (isZh ? "主項" : "Main");
                     if (st.kind === "interval" && st.reps && st.distance_m) {
                       const rest = st.rest ? ` · ${isZh ? "休息" : "rest"} ${st.rest}` : "";
                       const pace = paceFmt(st.pace);
                       return (
                         <div key={sti} className="flex items-baseline justify-between gap-2 text-xs">
-                          <span className="text-foreground font-medium tabular-nums">{st.reps} × {st.distance_m}m{rest}</span>
+                          <span className="text-foreground font-medium tabular-nums">{stepLabel}: {st.reps} × {st.distance_m}m{rest}</span>
                           {pace && <span className="text-muted-foreground tabular-nums">@ {pace}</span>}
                         </div>
                       );
@@ -365,7 +368,7 @@ const WorkoutDetails = ({ day, lang, hrBounds }: { day: DayPlan; lang: Lang; hrB
                     const dist = st.distance_km != null ? `${st.distance_km} km` : (st.distance_m != null ? `${st.distance_m} m` : null);
                     return (
                       <div key={sti} className="flex items-baseline justify-between gap-2 text-xs">
-                        <span className="text-foreground tabular-nums">{dist || (isZh ? "—" : "—")}</span>
+                        <span className="text-foreground tabular-nums">{stepLabel}: {dist || (isZh ? "—" : "—")}</span>
                         {pace && <span className="text-muted-foreground tabular-nums">@ {pace}</span>}
                       </div>
                     );
@@ -486,7 +489,8 @@ const DraggableDay = ({
 }) => {
   const { attributes, listeners, setNodeRef: setDragRef, isDragging, transform } = useDraggable({ id });
   const { setNodeRef: setDropRef, isOver } = useDroppable({ id });
-  const sessionsCount = Array.isArray((day as any).sessions) ? (day as any).sessions.length : 0;
+  const sessions = Array.isArray((day as any).sessions) ? ((day as any).sessions as WorkoutSession[]) : [];
+  const sessionsCount = sessions.length;
   const [expanded, setExpanded] = useState(false);
 
   const setRefs = (node: HTMLDivElement | null) => {
@@ -536,9 +540,6 @@ const DraggableDay = ({
               <div className="flex-1 min-w-0 flex items-center justify-between gap-2 select-none">
                 <span className="font-medium text-sm text-foreground truncate">
                   {localizeTitle(day.type, lang)}
-                  {sessionsCount > 1 && (
-                    <span className="ml-1 text-[10px] font-bold text-muted-foreground">×{sessionsCount}</span>
-                  )}
                 </span>
               </div>
               <button
@@ -584,6 +585,19 @@ const DraggableDay = ({
                 </button>
               )}
             </div>
+            {!expanded && sessionsCount > 1 && (
+              <div className="mt-2 flex gap-1 overflow-x-auto">
+                {sessions.map((sess, si) => {
+                  const label = localizeTitle(sess.type || "Run", lang);
+                  const km = sessionDistanceKm(sess);
+                  return (
+                    <span key={sess.id || si} className="shrink-0 rounded-md border border-border bg-muted/40 px-2 py-1 text-[10px] text-foreground">
+                      {sess.time_of_day ? `${sess.time_of_day} · ` : ""}{label}{km ? ` · ${km} km` : ""}
+                    </span>
+                  );
+                })}
+              </div>
+            )}
             {expanded && <WorkoutDetails day={day} lang={lang} hrBounds={hrBounds} />}
           </div>
         </div>
@@ -1621,23 +1635,29 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
     let initializedWeekIdx = false;
     const applyPlan = (p: any) => {
       if (!p) return;
+      const normalized = splitIntervalsInPlan(p.plan_data || [], { lang });
+      const planData = normalized.plan || p.plan_data || [];
+      const nextPlanObj = normalized.changed > 0 ? { ...p, plan_data: planData } : p;
+      if (normalized.changed > 0 && online) {
+        supabase.from("training_plans" as any).update({ plan_data: planData } as any).eq("id", p.id).then(() => notifyPlanChanged());
+      }
       if (p.goal === "custom") {
-        setCustomExistingPlan(p);
-        setCustomPlan(p.plan_data || []);
+        setCustomExistingPlan(nextPlanObj);
+        setCustomPlan(planData);
         setCustomStep("calendar");
         if (!initializedWeekIdx) {
           const today = new Date().toISOString().split("T")[0];
-          const idx = (p.plan_data || []).findIndex((w: WeekPlan) => w.days.some((d: DayPlan) => d.date >= today));
+          const idx = planData.findIndex((w: WeekPlan) => w.days.some((d: DayPlan) => d.date >= today));
           setCustomWeekIdx(Math.max(0, idx));
           initializedWeekIdx = true;
         }
       } else {
-        setExistingPlan(p);
-        setPlan(p.plan_data || []);
+        setExistingPlan(nextPlanObj);
+        setPlan(planData);
         setProgramStep("calendar");
         if (!initializedWeekIdx) {
           const today = new Date().toISOString().split("T")[0];
-          const idx = (p.plan_data || []).findIndex((w: WeekPlan) => w.days.some((d: DayPlan) => d.date >= today));
+          const idx = planData.findIndex((w: WeekPlan) => w.days.some((d: DayPlan) => d.date >= today));
           setCurrentWeekIdx(Math.max(0, idx));
           initializedWeekIdx = true;
         }
@@ -3428,7 +3448,6 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                             onSwap={(from, to) => swapDays(currentWeekIdx, from, to)}
                             onAddClick={(i) => { setAddingDayIdx(i); setAddRunType(null); setAddDistance(""); setAddElevation(""); setAddEph(""); }}
                             onEditClick={(i, day) => { setEditAppendNew(false); setEditingDayIdx(i); setEditDistance(day.distance_km?.toString() || ""); setEditPace(day.pace || ""); setEditDescription(day.description || ""); }}
-                            onAddAnotherClick={(i) => { setEditAppendNew(true); setEditingDayIdx(i); }}
                             pushedSet={pushedSet}
                             pushingIdx={pushingIdx}
                             onPushDay={isPremium && watchProvider ? pushDayToWatch : undefined}

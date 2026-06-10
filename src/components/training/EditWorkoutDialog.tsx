@@ -7,7 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Lang } from "@/lib/i18n";
 import { toast } from "sonner";
 import type { WorkoutSession, WorkoutStep, WorkoutStepKind, HrTarget } from "@/lib/planTypes";
-import { genSessionId, summarizeDay } from "@/lib/planTypes";
+import { genSessionId, sessionDistanceKm, summarizeDay } from "@/lib/planTypes";
 import { suggestPaceAndHr, type SuggestActivity, type SuggestProfile } from "@/lib/paceSuggest";
 import { splitIntervalDay } from "@/lib/splitIntervalSessions";
 
@@ -139,7 +139,13 @@ function seedStepsForType(s: WorkoutSession): WorkoutSession {
     const step: WorkoutStep = p
       ? { kind: "interval", reps: p.reps, distance_m: p.distM, pace: s.pace ?? null, rest: p.rest }
       : { kind: "interval", reps: 5, distance_m: 800, pace: s.pace ?? null, rest: "90s" };
-    return { ...s, steps: [step] };
+    const workKm = step.reps && step.distance_m ? (step.reps * step.distance_m) / 1000 : (s.distance_km ?? 5);
+    const wcKm = s.distance_km && s.distance_km > workKm ? Number(((s.distance_km - workKm) / 2).toFixed(1)) : 1.5;
+    return { ...s, steps: [
+      { kind: "warmup", distance_km: wcKm, pace: s.pace ?? null },
+      step,
+      { kind: "cooldown", distance_km: wcKm, pace: s.pace ?? null },
+    ] };
   }
   if (t === "Warmup") return { ...s, steps: [{ kind: "warmup", distance_km: s.distance_km ?? 1.5, pace: s.pace ?? null }] };
   if (t === "Cooldown") return { ...s, steps: [{ kind: "cooldown", distance_km: s.distance_km ?? 1.5, pace: s.pace ?? null }] };
@@ -147,11 +153,17 @@ function seedStepsForType(s: WorkoutSession): WorkoutSession {
 }
 
 function sessionsFromWorkout(w: EditableWorkout): WorkoutSession[] {
-  // If a legacy single-workout Interval is opened, auto-split into 3 sessions so the
-  // sequence shows Warmup + Intervals + Cooldown structured steps.
+  // If an Interval is opened, keep it as one workout and put warmup/interval/cooldown
+  // inside that workout's sequence.
   let base: WorkoutSession[] = [];
   if (Array.isArray(w.sessions) && w.sessions.length > 0) {
     base = w.sessions.map((s) => ({ ...s, id: s.id || genSessionId(), type: normalizeType(s.type) }));
+    if (normalizeType(w.type || base[0]?.type) === "Interval") {
+      const merged = splitIntervalDay({ ...w, type: "Interval", sessions: base }, {});
+      if (Array.isArray(merged.sessions) && merged.sessions.length > 0) {
+        base = merged.sessions.map((s: any) => ({ ...s, id: s.id || genSessionId(), type: normalizeType(s.type) }));
+      }
+    }
   } else if (w.type || w.distance_km) {
     const t = normalizeType(w.type || "");
     if ((t === "Interval") && w.distance_km) {
@@ -205,6 +217,7 @@ const EditWorkoutDialog = ({
     return base;
   };
   const [sessions, setSessions] = useState<WorkoutSession[]>(initSessions);
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [expandedSteps, setExpandedSteps] = useState<Record<string, boolean>>({});
   const [validating, setValidating] = useState(false);
   const [verdict, setVerdict] = useState<Verdict | null>(null);
@@ -214,7 +227,9 @@ const EditWorkoutDialog = ({
 
   useEffect(() => {
     if (open) {
-      setSessions(initSessions());
+      const nextSessions = initSessions();
+      setSessions(nextSessions);
+      setActiveSessionId(nextSessions[0]?.id ?? null);
       // Auto-expand the steps panel — that's where the real structure lives now.
       setExpandedSteps({});
       setVerdict(null);
@@ -225,20 +240,29 @@ const EditWorkoutDialog = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, workout, appendNewSession]);
 
+  useEffect(() => {
+    if (sessions.length === 0) { setActiveSessionId(null); return; }
+    if (!activeSessionId || !sessions.some((s) => s.id === activeSessionId)) {
+      setActiveSessionId(sessions[0].id);
+    }
+  }, [sessions, activeSessionId]);
+
   const updateSession = (idx: number, patch: Partial<WorkoutSession>) => {
     setSessions((prev) => prev.map((s, i) => (i === idx ? { ...s, ...patch } : s)));
     setVerdict(null); setNeedsConfirm(false);
   };
 
   const addSession = () => {
+    const id = genSessionId();
     setSessions((prev) => [...prev, {
-      id: genSessionId(),
+      id,
       time_of_day: prev.length === 0 ? null : (prev.length === 1 ? "PM" : null),
       type: "Easy Run",
       distance_km: null, pace: null, description: null,
       color: typeColor("Easy Run"),
       steps: [],
     }]);
+    setActiveSessionId(id);
     setVerdict(null); setNeedsConfirm(false);
   };
 
@@ -291,13 +315,15 @@ const EditWorkoutDialog = ({
       ...s,
       type: normalizeType(s.type),
       color: typeColor(normalizeType(s.type)),
+      distance_km: sessionDistanceKm(s) || s.distance_km || null,
     }));
+    const keepStructuredSessions = cleanSessions.length > 1 || cleanSessions.some((s) => (s.steps?.length ?? 0) > 0);
     const summary = summarizeDay(cleanSessions);
     return {
       ...workout,
       ...summary,
-      sessions: cleanSessions.length > 1 ? cleanSessions : undefined,
-      // For single session, mirror to top-level fields so legacy readers work; drop sessions key.
+      sessions: keepStructuredSessions ? cleanSessions : undefined,
+      // Mirror to top-level fields so legacy readers work, but keep sessions when sequence exists.
     } as EditableWorkout;
   };
 
@@ -363,23 +389,38 @@ const EditWorkoutDialog = ({
         </DialogHeader>
 
         {showMulti && (
-          <div className="flex items-center justify-between -mt-1 mb-1">
-            <span className="text-xs text-muted-foreground">
-              {sessions.length > 1
-                ? (isZh ? `本日 ${sessions.length} 個訓練` : `${sessions.length} sessions today`)
-                : (isZh ? "可加入第二個訓練（例如下午跑）" : "You can add a second session (e.g. PM run)")}
-            </span>
-            <Button type="button" variant="outline" size="sm" onClick={addSession}>
-              <Plus size={14} className="mr-1" /> {isZh ? "新增訓練" : "Add session"}
+          <div className="-mt-1 mb-1 space-y-2">
+            <div className="flex gap-1 overflow-x-auto border-b border-border">
+              {sessions.map((s, idx) => {
+                const opt = TYPE_OPTIONS.find((o) => o.id === normalizeType(s.type));
+                const label = normalizeType(s.type) === "Interval" ? (isZh ? "間歇跑" : "Interval Run") : (isZh ? (opt?.zh ?? s.type) : (opt?.en ?? s.type));
+                const active = activeSessionId === s.id;
+                return (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => setActiveSessionId(s.id)}
+                    className={`shrink-0 px-3 py-2 text-xs font-semibold border-b-2 transition-colors ${active ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+                  >
+                    {s.time_of_day ? `${s.time_of_day} · ` : ""}{label || (isZh ? `訓練 ${idx + 1}` : `Workout ${idx + 1}`)}
+                  </button>
+                );
+              })}
+            </div>
+            <Button type="button" variant="outline" size="sm" className="w-full" onClick={addSession}>
+              <Plus size={14} className="mr-1" /> {isZh ? "新增另一個訓練" : "Add another workout"}
             </Button>
           </div>
         )}
 
         <div className="space-y-4">
           {sessions.map((s, sIdx) => {
+            if (showMulti && activeSessionId && s.id !== activeSessionId) return null;
             const trail = isTrailType(s.type);
             const stepsExpanded = expandedSteps[s.id] ?? ((s.steps?.length ?? 0) > 0);
             const sourceLabel = suggestSource[s.id];
+            const structuredInterval = normalizeType(s.type) === "Interval" && (s.steps?.length ?? 0) > 0;
+            const computedDistance = sessionDistanceKm(s);
             return (
               <div key={s.id} className="border border-border rounded-lg p-3 space-y-3 relative">
                 {showMulti && sessions.length > 1 && (
@@ -428,7 +469,11 @@ const EditWorkoutDialog = ({
                           description: opt ? (isZh ? opt.descZh : opt.descEn) : s.description,
                         };
                         if (newType === "Interval" && (!s.steps || s.steps.length === 0)) {
-                          patch.steps = [{ kind: "interval", reps: 5, distance_m: 800, pace: s.pace ?? null, rest: "90s" }];
+                          patch.steps = [
+                            { kind: "warmup", distance_km: 1.5, pace: s.pace ?? null },
+                            { kind: "interval", reps: 5, distance_m: 800, pace: s.pace ?? null, rest: "90s" },
+                            { kind: "cooldown", distance_km: 1.5, pace: s.pace ?? null },
+                          ];
                         } else if (newType === "Warmup" && (!s.steps || s.steps.length === 0)) {
                           patch.steps = [{ kind: "warmup", distance_km: s.distance_km ?? 1.5, pace: s.pace ?? null }];
                         } else if (newType === "Cooldown" && (!s.steps || s.steps.length === 0)) {
@@ -454,9 +499,15 @@ const EditWorkoutDialog = ({
                   </label>
                   <Input
                     type="number" min="0" step="0.5"
-                    value={s.distance_km != null ? String(s.distance_km) : ""}
+                    value={structuredInterval && computedDistance > 0 ? String(computedDistance) : (s.distance_km != null ? String(s.distance_km) : "")}
+                    disabled={structuredInterval}
                     onChange={(e) => updateSession(sIdx, { distance_km: e.target.value ? Number(e.target.value) : null })}
                   />
+                  {structuredInterval && (
+                    <p className="text-[11px] text-muted-foreground mt-1">
+                      {isZh ? "距離由下方順序自動加總" : "Distance is calculated from the sequence below"}
+                    </p>
+                  )}
                 </div>
 
                 {trail ? (

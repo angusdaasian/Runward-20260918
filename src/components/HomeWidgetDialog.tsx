@@ -45,10 +45,12 @@ const WIDGETS: WidgetOption[] = [
   { id: "year_heatmap", en: "Year Heatmap", zh: "年度熱力圖", desc_en: "Open app for full view", desc_zh: "開啟 App 查看完整視圖" },
 ];
 
-const LS_KEY = "home_widget_type";
+const SLOTS = [1, 2, 3] as const;
+type Slot = typeof SLOTS[number];
+
+const lsKey = (slot: Slot) => (slot === 1 ? "home_widget_type" : `home_widget_type_${slot}`);
 
 export function getProjectFunctionsBase(): string {
-  // VITE_SUPABASE_PROJECT_ID is auto-populated
   const projectId = (import.meta as any).env?.VITE_SUPABASE_PROJECT_ID || "kbghvclwhxnjeskdodeh";
   return `https://${projectId}.supabase.co/functions/v1/home-widget`;
 }
@@ -56,12 +58,20 @@ export function getProjectFunctionsBase(): string {
 const HomeWidgetDialog = ({ lang, open, onOpenChange }: Props) => {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [selected, setSelected] = useState<string>(() => localStorage.getItem(LS_KEY) || "latest_activity");
+  const [activeSlot, setActiveSlot] = useState<Slot>(1);
+  const [selections, setSelections] = useState<Record<Slot, string>>({
+    1: localStorage.getItem(lsKey(1)) || "latest_activity",
+    2: localStorage.getItem(lsKey(2)) || "health",
+    3: localStorage.getItem(lsKey(3)) || "program_week",
+  });
 
   useEffect(() => {
     if (open) {
-      const cur = localStorage.getItem(LS_KEY) || "latest_activity";
-      setSelected(cur);
+      setSelections({
+        1: localStorage.getItem(lsKey(1)) || "latest_activity",
+        2: localStorage.getItem(lsKey(2)) || "health",
+        3: localStorage.getItem(lsKey(3)) || "program_week",
+      });
     }
   }, [open]);
 
@@ -85,23 +95,29 @@ const HomeWidgetDialog = ({ lang, open, onOpenChange }: Props) => {
     const base = getProjectFunctionsBase();
     const theme = isDark ? "dark" : "light";
     const refresh = 30;
-    const widgetUrl = `${base}?user=${encodeURIComponent(user.id)}&type=${encodeURIComponent(widgetId)}&theme=${theme}&refresh=${refresh}`;
+    const widgetUrl = `${base}?user=${encodeURIComponent(user.id)}&type=${encodeURIComponent(widgetId)}&theme=${theme}&refresh=${refresh}&slot=${activeSlot}`;
     if (isDespia && isIOS) {
       try {
-        despia(`widget://${widgetUrl}`);
+        // Slot 1 uses the default `widget://` scheme; slots 2/3 use numbered schemes
+        const scheme = activeSlot === 1 ? "widget" : `widget${activeSlot}`;
+        despia(`${scheme}://${widgetUrl}`);
       } catch (e) {
         console.error("despia widget call failed", e);
       }
     }
-    localStorage.setItem(LS_KEY, widgetId);
-    setSelected(widgetId);
+    localStorage.setItem(lsKey(activeSlot), widgetId);
+    setSelections((prev) => ({ ...prev, [activeSlot]: widgetId }));
     toast({
-      title: lang === "zh" ? "已套用小工具" : "Widget applied",
+      title: lang === "zh" ? `已套用到小工具 ${activeSlot}` : `Applied to Widget ${activeSlot}`,
       description: isDespia && isIOS
-        ? (lang === "zh" ? "請在主螢幕加入 Runward 小工具以查看。" : "Add the Runward widget on your home screen to view it.")
+        ? (lang === "zh"
+            ? `在主螢幕加入 Runward 小工具（位置 ${activeSlot}）以查看。`
+            : `Add the Runward widget (slot ${activeSlot}) on your home screen to view it.`)
         : (lang === "zh" ? "小工具僅在 iOS App 上顯示。" : "Widgets only display in the iOS app."),
     });
   };
+
+  const selected = selections[activeSlot];
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -113,12 +129,36 @@ const HomeWidgetDialog = ({ lang, open, onOpenChange }: Props) => {
           </DialogTitle>
           <DialogDescription>
             {lang === "zh"
-              ? "選擇一個小工具，加入到 iOS 主螢幕後便會自動更新。"
-              : "Pick a widget to show on your iOS home screen. Updates automatically."}
+              ? "可同時設定最多 3 個不同的小工具，加入到 iOS 主螢幕後便會自動更新。"
+              : "Set up to 3 different widgets at once. They update automatically on your iOS home screen."}
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-2">
+        {/* Slot tabs */}
+        <div className="grid grid-cols-3 gap-2">
+          {SLOTS.map((s) => {
+            const active = activeSlot === s;
+            const cur = WIDGETS.find((w) => w.id === selections[s]);
+            return (
+              <button
+                key={s}
+                onClick={() => setActiveSlot(s)}
+                className={`p-2 rounded-lg border text-left transition-colors ${
+                  active ? "border-primary bg-primary/10" : "border-border hover:bg-muted"
+                }`}
+              >
+                <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                  {lang === "zh" ? `位置 ${s}` : `Slot ${s}`}
+                </div>
+                <div className="text-xs font-medium text-foreground truncate">
+                  {cur ? (lang === "zh" ? cur.zh : cur.en) : "—"}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="space-y-2 pt-1">
           {WIDGETS.map((w) => {
             const isSelected = selected === w.id;
             return (
@@ -145,8 +185,8 @@ const HomeWidgetDialog = ({ lang, open, onOpenChange }: Props) => {
 
         <div className="text-[11px] text-muted-foreground leading-relaxed pt-2 border-t border-border">
           {lang === "zh"
-            ? "提示：在 iOS 主螢幕長按空白處 → 加入小工具 → 搜尋 Runward。"
-            : "Tip: long-press your iOS home screen → Add Widget → search Runward."}
+            ? "提示：在 iOS 主螢幕長按空白處 → 加入小工具 → 搜尋 Runward，分別加入 Widget 1、2、3。"
+            : "Tip: long-press your iOS home screen → Add Widget → search Runward, then add Widget 1, 2, and 3."}
         </div>
 
         <div className="flex justify-end pt-2">

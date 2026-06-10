@@ -623,12 +623,9 @@ const DraggableDay = ({
               >
                 <GripVertical size={16} />
               </button>
-              <div className="flex-1 min-w-0 flex items-center justify-between gap-2 select-none">
+              <div className="flex-1 min-w-0 flex items-center select-none">
                 <span className="font-medium text-sm text-foreground truncate">
                   {session.time_of_day ? `${session.time_of_day} · ` : ""}{localizeTitle(session.type || "Run", lang)}
-                </span>
-                <span className="text-xs text-muted-foreground tabular-nums shrink-0">
-                  {[sessionKm > 0 ? `${sessionKm} km` : null, sessionPaceLabel].filter(Boolean).join(" · ")}
                 </span>
               </div>
               <button

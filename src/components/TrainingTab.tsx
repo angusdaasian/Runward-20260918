@@ -660,7 +660,7 @@ const DraggableDay = ({
                 <Pencil size={14} />
               </button>
             </div>
-            {expanded && <WorkoutDetails day={sessionDay} lang={lang} hrBounds={hrBounds} />}
+            {expanded && <WorkoutDetails day={{ ...sessionDay, sessions: undefined } as DayPlan} lang={lang} hrBounds={hrBounds} />}
           </div>
             );
           })}

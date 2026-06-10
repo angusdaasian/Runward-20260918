@@ -243,6 +243,7 @@ const EditWorkoutDialog = ({
       setVerdict(null);
       setFeedback("");
       setNeedsConfirm(false);
+      setPendingDescription(undefined);
       setSuggestSource({});
     }
     // Intentionally only re-init on open transitions. The parent rebuilds the
@@ -253,7 +254,7 @@ const EditWorkoutDialog = ({
 
   const updateSession = (idx: number, patch: Partial<WorkoutSession>) => {
     setSessions((prev) => prev.map((s, i) => (i === idx ? { ...s, ...patch } : s)));
-    setVerdict(null); setNeedsConfirm(false);
+    setVerdict(null); setNeedsConfirm(false); setPendingDescription(undefined);
   };
 
   const addStep = (sIdx: number, kind: WorkoutStepKind = "main") => {

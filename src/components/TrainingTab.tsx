@@ -451,8 +451,9 @@ const WorkoutDetails = ({ day, lang, hrBounds }: { day: DayPlan; lang: Lang; hrB
                     : isMain ? (isZh ? "主項" : "Main Set")
                     : st.kind === "recovery" ? (isZh ? "恢復" : "Recovery") : (isZh ? "主項" : "Main");
                   const stepPace = paceFmt(st.pace) ?? (isWarm || isCool ? easyPace : null);
-                  const stepHr = (isWarm || isCool) ? easyHr : sHr;
-                  const stepHrLabel = (isWarm || isCool) ? easyZoneLabel : sZoneLabel;
+                  const isRecov = st.kind === "recovery";
+                  const stepHr = (isWarm || isCool || isRecov) ? easyHr : sHr;
+                  const stepHrLabel = (isWarm || isCool || isRecov) ? easyZoneLabel : sZoneLabel;
                   return (
                     <div key={sti} className={`rounded-md p-2 space-y-1 border ${bg}`}>
                       <div className="text-[11px] font-semibold text-foreground">{title}</div>

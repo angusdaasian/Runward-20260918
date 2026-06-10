@@ -231,6 +231,7 @@ const EditWorkoutDialog = ({
   const [verdict, setVerdict] = useState<Verdict | null>(null);
   const [feedback, setFeedback] = useState<string>("");
   const [needsConfirm, setNeedsConfirm] = useState(false);
+  const [pendingDescription, setPendingDescription] = useState<string | undefined>(undefined);
   const [suggestSource, setSuggestSource] = useState<Record<string, string>>({});
 
   useEffect(() => {
@@ -242,6 +243,7 @@ const EditWorkoutDialog = ({
       setVerdict(null);
       setFeedback("");
       setNeedsConfirm(false);
+      setPendingDescription(undefined);
       setSuggestSource({});
     }
     // Intentionally only re-init on open transitions. The parent rebuilds the
@@ -252,7 +254,7 @@ const EditWorkoutDialog = ({
 
   const updateSession = (idx: number, patch: Partial<WorkoutSession>) => {
     setSessions((prev) => prev.map((s, i) => (i === idx ? { ...s, ...patch } : s)));
-    setVerdict(null); setNeedsConfirm(false);
+    setVerdict(null); setNeedsConfirm(false); setPendingDescription(undefined);
   };
 
   const addStep = (sIdx: number, kind: WorkoutStepKind = "main") => {
@@ -342,7 +344,7 @@ const EditWorkoutDialog = ({
       return;
     }
     if (isUnchanged()) { onOpenChange(false); return; }
-    if (verdict === "ok" || needsConfirm) { await persist(); return; }
+    if (needsConfirm) { await persist(pendingDescription); return; }
     setValidating(true);
     try {
       const next = buildEdited();
@@ -355,11 +357,10 @@ const EditWorkoutDialog = ({
       const newDesc = (data as any)?.updatedDescription as string | undefined;
       setVerdict(v ?? "caution");
       setFeedback(fb ?? "");
-      if (v === "ok") {
-        await persist(newDesc?.trim() || undefined);
-      } else {
-        setNeedsConfirm(true);
-      }
+      setPendingDescription(newDesc?.trim() || undefined);
+      // Always show coach feedback and require a second click to confirm,
+      // regardless of verdict — users want to read the comment before saving.
+      setNeedsConfirm(true);
     } catch (e) {
       console.error("[EditWorkoutDialog] validate error:", e);
       // If validator is unavailable, fall back to direct save
@@ -715,7 +716,9 @@ const EditWorkoutDialog = ({
                 ? (isZh ? "我了解風險，仍要儲存" : "I understand the risk — save anyway")
                 : needsConfirm && verdict === "caution"
                   ? (isZh ? "明白了，儲存變更" : "Got it — save change")
-                  : (isZh ? "儲存變更" : "Save Changes")}
+                  : needsConfirm && verdict === "ok"
+                    ? (isZh ? "確認儲存" : "Confirm & save")
+                    : (isZh ? "儲存變更" : "Save Changes")}
           </Button>
 
           {onDelete && (

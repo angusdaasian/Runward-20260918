@@ -254,6 +254,22 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps }: Props
           </div>
         </div>
 
+        {/* Home Screen Widget */}
+        <button
+          onClick={() => setShowWidgetDialog(true)}
+          className="w-full bg-card border border-border rounded-xl p-4 flex items-center justify-between"
+        >
+          <div className="flex items-center gap-3">
+            <Smartphone size={20} className="text-primary" />
+            <span className="font-medium text-foreground">
+              {lang === "zh" ? "主螢幕小工具" : "Home Screen Widget"}
+            </span>
+          </div>
+          <ChevronRight size={18} className="text-muted-foreground" />
+        </button>
+
+
+
         {!user && (
           <button
             onClick={onLoginRequest}

@@ -251,7 +251,6 @@ async function renderHealth(supabase: any, userId: string, type: string, t: Them
     }
   }
 }
-}
 
 async function renderDurationWeek(supabase: any, userId: string, t: Theme): Promise<string> {
   const now = new Date();

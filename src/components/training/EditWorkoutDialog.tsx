@@ -225,8 +225,11 @@ const EditWorkoutDialog = ({
       setNeedsConfirm(false);
       setSuggestSource({});
     }
+    // Intentionally only re-init on open transitions. The parent rebuilds the
+    // `workout` prop on every render, so depending on it here would wipe local
+    // UI state (expanded sequence, suggest source) on every parent re-render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, workout]);
+  }, [open]);
 
   const updateSession = (idx: number, patch: Partial<WorkoutSession>) => {
     setSessions((prev) => prev.map((s, i) => (i === idx ? { ...s, ...patch } : s)));

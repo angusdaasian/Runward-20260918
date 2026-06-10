@@ -25,6 +25,8 @@ import { shareTrainingWeek } from "@/lib/sharePlanWeek";
 import { estimateMaxHr, estimateRestingHr, zoneBoundaries, isValidCustomZones } from "@/lib/hrZones";
 import { predictRaceFromActivities, typeLabel, type RunType } from "@/lib/racePredictionHr";
 import { targetTimeFromPlan, type SuggestProfile, type SuggestActivity } from "@/lib/paceSuggest";
+import { sessionDistanceKm, type WorkoutSession } from "@/lib/planTypes";
+import { splitIntervalsInPlan, splitIntervalDay } from "@/lib/splitIntervalSessions";
 import {
   DndContext, PointerSensor, TouchSensor, useSensor, useSensors,
   closestCenter, type DragEndEvent
@@ -79,7 +81,7 @@ const RUN_TYPES = [
 const TYPE_LABELS: Record<string, { en: string; zh: string }> = {
   "Easy Run": { en: "Easy Run", zh: "輕鬆跑" }, "Easy": { en: "Easy Run", zh: "輕鬆跑" },
   "Tempo Run": { en: "Tempo Run", zh: "節奏跑" }, "Tempo": { en: "Tempo Run", zh: "節奏跑" },
-  "Interval": { en: "Interval", zh: "間歇跑" },
+  "Interval": { en: "Interval Run", zh: "間歇跑" },
   "Long Run": { en: "Long Run", zh: "長課" }, "Long": { en: "Long Run", zh: "長課" },
   "Recovery": { en: "Recovery Run", zh: "恢復跑" }, "Recovery Run": { en: "Recovery Run", zh: "恢復跑" },
   "Rest": { en: "Rest", zh: "休息" }, "Cross Training": { en: "Cross Training", zh: "交叉訓練" },

@@ -1524,6 +1524,10 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
       toast({ title: lang === "zh" ? "請先連接 Garmin 或 Coros" : "Connect Garmin or Coros first", variant: "destructive" });
       return;
     }
+    const confirmMsg = lang === "zh"
+      ? `確定要將此訓練推送到 ${watchProvider}？`
+      : `Push this workout to ${watchProvider}?`;
+    if (!window.confirm(confirmMsg)) return;
     setPushingIdx(dayIdx);
     try {
       const { data, error } = await supabase.functions.invoke("terra-push-workout", {
@@ -1572,6 +1576,10 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
       toast({ title: lang === "zh" ? "請先連接 Garmin 或 Coros" : "Connect Garmin or Coros first", variant: "destructive" });
       return;
     }
+    const confirmMsg = lang === "zh"
+      ? `確定要將本週全部訓練推送到 ${watchProvider}？`
+      : `Push the entire week's workouts to ${watchProvider}?`;
+    if (!window.confirm(confirmMsg)) return;
     setPushingWeek(true);
     try {
       const { data, error } = await supabase.functions.invoke("terra-push-week", {

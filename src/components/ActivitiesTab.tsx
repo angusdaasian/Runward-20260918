@@ -1368,6 +1368,7 @@ const ActivitiesTab = ({ lang }: Props) => {
                     pace: (planned as any).pace ?? null,
                     elevation_m: (planned as any).elevation_m ?? null,
                     eph: (planned as any).eph ?? null,
+                    sessions: (planned as any).sessions ?? undefined,
                   }
                 : null,
               races: races || [],

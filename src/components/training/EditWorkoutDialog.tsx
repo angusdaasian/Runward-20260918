@@ -389,20 +389,33 @@ const EditWorkoutDialog = ({
         </DialogHeader>
 
         {showMulti && (
-          <div className="flex items-center justify-between -mt-1 mb-1">
-            <span className="text-xs text-muted-foreground">
-              {sessions.length > 1
-                ? (isZh ? `本日 ${sessions.length} 個訓練` : `${sessions.length} sessions today`)
-                : (isZh ? "可加入第二個訓練（例如下午跑）" : "You can add a second session (e.g. PM run)")}
-            </span>
-            <Button type="button" variant="outline" size="sm" onClick={addSession}>
-              <Plus size={14} className="mr-1" /> {isZh ? "新增訓練" : "Add session"}
+          <div className="-mt-1 mb-1 space-y-2">
+            <div className="flex gap-1 overflow-x-auto border-b border-border">
+              {sessions.map((s, idx) => {
+                const opt = TYPE_OPTIONS.find((o) => o.id === normalizeType(s.type));
+                const label = normalizeType(s.type) === "Interval" ? (isZh ? "間歇跑" : "Interval Run") : (isZh ? (opt?.zh ?? s.type) : (opt?.en ?? s.type));
+                const active = activeSessionId === s.id;
+                return (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => setActiveSessionId(s.id)}
+                    className={`shrink-0 px-3 py-2 text-xs font-semibold border-b-2 transition-colors ${active ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+                  >
+                    {s.time_of_day ? `${s.time_of_day} · ` : ""}{label || (isZh ? `訓練 ${idx + 1}` : `Workout ${idx + 1}`)}
+                  </button>
+                );
+              })}
+            </div>
+            <Button type="button" variant="outline" size="sm" className="w-full" onClick={addSession}>
+              <Plus size={14} className="mr-1" /> {isZh ? "新增另一個訓練" : "Add another workout"}
             </Button>
           </div>
         )}
 
         <div className="space-y-4">
           {sessions.map((s, sIdx) => {
+            if (showMulti && activeSessionId && s.id !== activeSessionId) return null;
             const trail = isTrailType(s.type);
             const stepsExpanded = expandedSteps[s.id] ?? ((s.steps?.length ?? 0) > 0);
             const sourceLabel = suggestSource[s.id];

@@ -26,7 +26,7 @@ import { estimateMaxHr, estimateRestingHr, zoneBoundaries, isValidCustomZones } 
 import { predictRaceFromActivities, typeLabel, type RunType } from "@/lib/racePredictionHr";
 import { targetTimeFromPlan, type SuggestProfile, type SuggestActivity } from "@/lib/paceSuggest";
 import { sessionDistanceKm, type WorkoutSession } from "@/lib/planTypes";
-import { splitIntervalsInPlan, splitIntervalDay } from "@/lib/splitIntervalSessions";
+import { splitIntervalsInPlan } from "@/lib/splitIntervalSessions";
 import {
   DndContext, PointerSensor, TouchSensor, useSensor, useSensors,
   closestCenter, type DragEndEvent
@@ -1635,23 +1635,29 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
     let initializedWeekIdx = false;
     const applyPlan = (p: any) => {
       if (!p) return;
+      const normalized = splitIntervalsInPlan(p.plan_data || [], { lang });
+      const planData = normalized.plan || p.plan_data || [];
+      const nextPlanObj = normalized.changed > 0 ? { ...p, plan_data: planData } : p;
+      if (normalized.changed > 0 && online) {
+        supabase.from("training_plans" as any).update({ plan_data: planData } as any).eq("id", p.id).then(() => notifyPlanChanged());
+      }
       if (p.goal === "custom") {
-        setCustomExistingPlan(p);
-        setCustomPlan(p.plan_data || []);
+        setCustomExistingPlan(nextPlanObj);
+        setCustomPlan(planData);
         setCustomStep("calendar");
         if (!initializedWeekIdx) {
           const today = new Date().toISOString().split("T")[0];
-          const idx = (p.plan_data || []).findIndex((w: WeekPlan) => w.days.some((d: DayPlan) => d.date >= today));
+          const idx = planData.findIndex((w: WeekPlan) => w.days.some((d: DayPlan) => d.date >= today));
           setCustomWeekIdx(Math.max(0, idx));
           initializedWeekIdx = true;
         }
       } else {
-        setExistingPlan(p);
-        setPlan(p.plan_data || []);
+        setExistingPlan(nextPlanObj);
+        setPlan(planData);
         setProgramStep("calendar");
         if (!initializedWeekIdx) {
           const today = new Date().toISOString().split("T")[0];
-          const idx = (p.plan_data || []).findIndex((w: WeekPlan) => w.days.some((d: DayPlan) => d.date >= today));
+          const idx = planData.findIndex((w: WeekPlan) => w.days.some((d: DayPlan) => d.date >= today));
           setCurrentWeekIdx(Math.max(0, idx));
           initializedWeekIdx = true;
         }

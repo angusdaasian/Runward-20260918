@@ -716,7 +716,9 @@ const EditWorkoutDialog = ({
                 ? (isZh ? "我了解風險，仍要儲存" : "I understand the risk — save anyway")
                 : needsConfirm && verdict === "caution"
                   ? (isZh ? "明白了，儲存變更" : "Got it — save change")
-                  : (isZh ? "儲存變更" : "Save Changes")}
+                  : needsConfirm && verdict === "ok"
+                    ? (isZh ? "確認儲存" : "Confirm & save")
+                    : (isZh ? "儲存變更" : "Save Changes")}
           </Button>
 
           {onDelete && (

@@ -2,6 +2,18 @@
 // Backward-compatible: legacy day-level fields are preserved so older readers keep working,
 // while new UI / Terra push consumes day.sessions when present.
 
+export type StepKind = "warmup" | "main" | "cooldown" | "recovery" | "interval";
+
+export interface StepLike {
+  kind: StepKind;
+  distance_km?: number | null;
+  distance_m?: number | null;
+  reps?: number | null;
+  rest?: string | null;
+  pace?: string | null;
+  note?: string | null;
+}
+
 export interface SessionLike {
   id: string;
   type: string;
@@ -13,6 +25,7 @@ export interface SessionLike {
   color?: string | null;
   elevation_m?: number | null;
   eph?: number | null;
+  steps?: StepLike[];
 }
 
 export interface DayLike {

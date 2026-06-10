@@ -21,6 +21,7 @@ interface PlannedWorkout {
   pace?: string | null;
   elevation_m?: number | null;
   eph?: number | null;
+  sessions?: any[];
 }
 
 interface UserRaceLite {

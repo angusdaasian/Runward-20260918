@@ -217,7 +217,7 @@ const EditWorkoutDialog = ({
     return base;
   };
   const [sessions, setSessions] = useState<WorkoutSession[]>(initSessions);
-  const [activeSessionId, setActiveSessionId] = useState<string | null>(() => initSessions()[0]?.id ?? null);
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [expandedSteps, setExpandedSteps] = useState<Record<string, boolean>>({});
   const [validating, setValidating] = useState(false);
   const [verdict, setVerdict] = useState<Verdict | null>(null);

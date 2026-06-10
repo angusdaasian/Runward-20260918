@@ -467,7 +467,11 @@ const EditWorkoutDialog = ({
                           description: opt ? (isZh ? opt.descZh : opt.descEn) : s.description,
                         };
                         if (newType === "Interval" && (!s.steps || s.steps.length === 0)) {
-                          patch.steps = [{ kind: "interval", reps: 5, distance_m: 800, pace: s.pace ?? null, rest: "90s" }];
+                          patch.steps = [
+                            { kind: "warmup", distance_km: 1.5, pace: s.pace ?? null },
+                            { kind: "interval", reps: 5, distance_m: 800, pace: s.pace ?? null, rest: "90s" },
+                            { kind: "cooldown", distance_km: 1.5, pace: s.pace ?? null },
+                          ];
                         } else if (newType === "Warmup" && (!s.steps || s.steps.length === 0)) {
                           patch.steps = [{ kind: "warmup", distance_km: s.distance_km ?? 1.5, pace: s.pace ?? null }];
                         } else if (newType === "Cooldown" && (!s.steps || s.steps.length === 0)) {

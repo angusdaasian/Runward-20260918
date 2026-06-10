@@ -24,6 +24,7 @@ import {
 import { shareTrainingWeek } from "@/lib/sharePlanWeek";
 import { estimateMaxHr, estimateRestingHr, zoneBoundaries, isValidCustomZones } from "@/lib/hrZones";
 import { predictRaceFromActivities, typeLabel, type RunType } from "@/lib/racePredictionHr";
+import { targetTimeFromPlan, type SuggestProfile, type SuggestActivity } from "@/lib/paceSuggest";
 import {
   DndContext, PointerSensor, TouchSensor, useSensor, useSensors,
   closestCenter, type DragEndEvent

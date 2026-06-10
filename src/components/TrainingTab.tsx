@@ -3427,7 +3427,8 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                             hrBounds={hrBounds}
                             onSwap={(from, to) => swapDays(currentWeekIdx, from, to)}
                             onAddClick={(i) => { setAddingDayIdx(i); setAddRunType(null); setAddDistance(""); setAddElevation(""); setAddEph(""); }}
-                            onEditClick={(i, day) => { setEditingDayIdx(i); setEditDistance(day.distance_km?.toString() || ""); setEditPace(day.pace || ""); setEditDescription(day.description || ""); }}
+                            onEditClick={(i, day) => { setCustomEditAppendNew(false); setCustomEditingDayIdx(i); }}
+                            onAddAnotherClick={(i) => { setCustomEditAppendNew(true); setCustomEditingDayIdx(i); }}
                             pushedSet={pushedSet}
                             pushingIdx={pushingIdx}
                             onPushDay={isPremium && watchProvider ? pushDayToWatch : undefined}

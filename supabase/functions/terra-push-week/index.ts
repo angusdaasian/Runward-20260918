@@ -87,12 +87,15 @@ Deno.serve(async (req) => {
       .eq("user_id", user.id).eq("plan_id", planId).eq("week", week);
     for (const row of existing ?? []) {
       if (row.terra_log_id) {
-        try {
-          await fetch(
-            `https://api.tryterra.co/v2/plannedWorkout?user_id=${conn.terra_user_id}&workout_id=${row.terra_log_id}`,
-            { method: "DELETE", headers: { "dev-id": devId, "x-api-key": apiKey } },
-          );
-        } catch (e) { console.warn("[terra-push-week] delete prior failed:", e); }
+        const ids = String(row.terra_log_id).split(",").map((s) => s.trim()).filter(Boolean);
+        for (const wid of ids) {
+          try {
+            await fetch(
+              `https://api.tryterra.co/v2/plannedWorkout?user_id=${conn.terra_user_id}&workout_id=${wid}`,
+              { method: "DELETE", headers: { "dev-id": devId, "x-api-key": apiKey } },
+            );
+          } catch (e) { console.warn("[terra-push-week] delete prior failed:", e); }
+        }
       }
     }
     if (existing && existing.length > 0) {

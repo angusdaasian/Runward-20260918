@@ -539,7 +539,7 @@ const WorkoutDetails = ({ day, lang, hrBounds }: { day: DayPlan; lang: Lang; hrB
 // Draggable + droppable day row for the AI calendar (long-press to swap)
 const DraggableDay = ({
   id, idx, day, lang, isToday, dayNum, hrBounds,
-  onEditClick, onAddClick, onAddAnotherClick,
+  onEditClick, onAddClick,
   isPushed, isPushing, onPushDay, watchProvider,
 }: {
   id: string;
@@ -549,9 +549,8 @@ const DraggableDay = ({
   isToday: boolean;
   dayNum: number | string;
   hrBounds: HrBounds | null;
-  onEditClick: () => void;
+  onEditClick: (sessionIdx?: number) => void;
   onAddClick: () => void;
-  onAddAnotherClick?: () => void;
   isPushed?: boolean;
   isPushing?: boolean;
   onPushDay?: (idx: number) => void;
@@ -559,8 +558,7 @@ const DraggableDay = ({
 }) => {
   const { attributes, listeners, setNodeRef: setDragRef, isDragging, transform } = useDraggable({ id });
   const { setNodeRef: setDropRef, isOver } = useDroppable({ id });
-  const sessions = Array.isArray((day as any).sessions) ? ((day as any).sessions as WorkoutSession[]) : [];
-  const sessionsCount = sessions.length;
+  const sessions = workoutSessionsForDay(day);
   const [expanded, setExpanded] = useState(false);
 
   const setRefs = (node: HTMLDivElement | null) => {
@@ -579,7 +577,7 @@ const DraggableDay = ({
         <span className="text-[10px] font-medium text-muted-foreground uppercase">{labelForDay(day, idx)}</span>
         <span className={`text-sm font-bold ${isToday ? "text-primary" : "text-foreground"}`}>{dayNum}</span>
       </div>
-      {day.type === "Rest" ? (
+      {isRestWorkoutDay(day) ? (
         <div className="flex-1 border-l-2 border-border pl-3 py-3 min-h-[48px] flex items-center gap-2">
           <button
             type="button"
@@ -595,8 +593,12 @@ const DraggableDay = ({
           </button>
         </div>
       ) : (
-        <div className="flex-1 border-l-2 pl-3 py-2" style={{ borderColor: day.color || "hsl(var(--border))" }}>
-          <div className="bg-card border border-border rounded-lg p-3 hover:border-primary transition-colors">
+        <div className="flex-1 border-l-2 pl-3 py-2 space-y-2" style={{ borderColor: day.color || "hsl(var(--border))" }}>
+          {sessions.map((session, sessionIdx) => {
+            const sessionDay = dayForWorkoutSession(day, session);
+            const sessionKm = sessionDistanceKm(session);
+            return (
+          <div key={session.id || sessionIdx} className="bg-card border border-border rounded-lg p-3 hover:border-primary transition-colors">
             <div className="flex items-center gap-2">
               <button
                 type="button"
@@ -609,8 +611,9 @@ const DraggableDay = ({
               </button>
               <div className="flex-1 min-w-0 flex items-center justify-between gap-2 select-none">
                 <span className="font-medium text-sm text-foreground truncate">
-                  {localizeTitle(day.type, lang)}
+                  {session.time_of_day ? `${session.time_of_day} · ` : ""}{localizeTitle(session.type || "Run", lang)}
                 </span>
+                {sessionKm > 0 && <span className="text-xs text-muted-foreground tabular-nums shrink-0">{sessionKm} km</span>}
               </div>
               <button
                 type="button"
@@ -637,39 +640,20 @@ const DraggableDay = ({
               )}
               <button
                 type="button"
-                onClick={(e) => { e.stopPropagation(); onEditClick(); }}
+                onClick={(e) => { e.stopPropagation(); onEditClick(sessionIdx); }}
                 className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground"
                 aria-label={lang === "zh" ? "編輯訓練" : "Edit workout"}
               >
                 <Pencil size={14} />
               </button>
-              {onAddAnotherClick && (
-                <button
-                  type="button"
-                  onClick={(e) => { e.stopPropagation(); onAddAnotherClick(); }}
-                  className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground"
-                  aria-label={lang === "zh" ? "再新增訓練" : "Add another session"}
-                  title={lang === "zh" ? "再新增同日訓練" : "Add another session same day"}
-                >
-                  <Plus size={14} />
-                </button>
-              )}
             </div>
-            {!expanded && sessionsCount > 1 && (
-              <div className="mt-2 flex gap-1 overflow-x-auto">
-                {sessions.map((sess, si) => {
-                  const label = localizeTitle(sess.type || "Run", lang);
-                  const km = sessionDistanceKm(sess);
-                  return (
-                    <span key={sess.id || si} className="shrink-0 rounded-md border border-border bg-muted/40 px-2 py-1 text-[10px] text-foreground">
-                      {sess.time_of_day ? `${sess.time_of_day} · ` : ""}{label}{km ? ` · ${km} km` : ""}
-                    </span>
-                  );
-                })}
-              </div>
-            )}
-            {expanded && <WorkoutDetails day={day} lang={lang} hrBounds={hrBounds} />}
+            {expanded && <WorkoutDetails day={sessionDay} lang={lang} hrBounds={hrBounds} />}
           </div>
+            );
+          })}
+          <button onClick={onAddClick} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors px-1 py-1">
+            <Plus size={12} />{lang === "zh" ? "新增訓練" : "Add workout"}
+          </button>
         </div>
       )}
     </div>

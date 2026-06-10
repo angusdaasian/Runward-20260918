@@ -85,10 +85,10 @@ const HomeWidgetDialog = ({ lang, open, onOpenChange }: Props) => {
     const base = getProjectFunctionsBase();
     const theme = isDark ? "dark" : "light";
     const refresh = 30;
-    const widgetUrl = `${base}?user=${encodeURIComponent(user.id)}&type=${encodeURIComponent(widgetId)}&theme=${theme}`;
+    const widgetUrl = `${base}?user=${encodeURIComponent(user.id)}&type=${encodeURIComponent(widgetId)}&theme=${theme}&refresh=${refresh}`;
     if (isDespia && isIOS) {
       try {
-        despia(`widget://${widgetUrl}?refresh=${refresh}`);
+        despia(`widget://${widgetUrl}`);
       } catch (e) {
         console.error("despia widget call failed", e);
       }

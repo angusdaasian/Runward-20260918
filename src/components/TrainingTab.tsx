@@ -25,7 +25,7 @@ import { shareTrainingWeek } from "@/lib/sharePlanWeek";
 import { estimateMaxHr, estimateRestingHr, zoneBoundaries, isValidCustomZones } from "@/lib/hrZones";
 import { predictRaceFromActivities, typeLabel, type RunType } from "@/lib/racePredictionHr";
 import { targetTimeFromPlan, type SuggestProfile, type SuggestActivity } from "@/lib/paceSuggest";
-import { genSessionId, sessionDistanceKm, summarizeDay, type WorkoutSession } from "@/lib/planTypes";
+import { genSessionId, sessionDistanceKm, sessionPace, summarizeDay, type WorkoutSession } from "@/lib/planTypes";
 import { splitIntervalsInPlan } from "@/lib/splitIntervalSessions";
 import {
   DndContext, PointerSensor, TouchSensor, useSensor, useSensors,
@@ -349,7 +349,7 @@ const dayForWorkoutSession = (day: DayPlan, session: WorkoutSession): DayPlan =>
   type: session.type,
   title: session.title ?? session.type,
   distance_km: sessionDistanceKm(session) || session.distance_km || null,
-  pace: session.pace ?? null,
+  pace: sessionPace(session),
   description: session.description ?? null,
   color: session.color ?? day.color,
   elevation_m: session.elevation_m ?? null,

@@ -316,7 +316,7 @@ const EditWorkoutDialog = ({
       ...s,
       type: normalizeType(s.type),
       color: typeColor(normalizeType(s.type)),
-      pace: sessionPace(s) ?? normalizePace(s.pace) ?? null,
+      pace: normalizePace(sessionPace(s) ?? s.pace) ?? null,
       steps: (s.steps ?? []).map((step) => ({ ...step, pace: normalizePace(step.pace) })),
       distance_km: sessionDistanceKm(s) || s.distance_km || null,
     }));

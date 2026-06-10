@@ -167,7 +167,7 @@ async function fetchTodayHealth(supabase: any, userId: string) {
   const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
   const { data: terra } = await supabase
     .from("terra_daily_health")
-    .select("date, steps, calories_total, resting_hr, sleep_total_seconds, sleep_score, hrv_rmssd_ms")
+    .select("date, steps, resting_hr, sleep_seconds, sleep_score, hrv")
     .eq("user_id", userId)
     .gte("date", yesterday)
     .order("date", { ascending: false })
@@ -185,6 +185,25 @@ async function fetchTodayHealth(supabase: any, userId: string) {
   return { today_t, yesterday_t, latest_g };
 }
 
+async function fetchCaloriesToday(supabase: any, userId: string): Promise<number> {
+  // Sum calories from today's activities (no dedicated daily-calories column).
+  const start = new Date(); start.setHours(0, 0, 0, 0);
+  const iso = start.toISOString();
+  const q = await Promise.allSettled([
+    supabase.from("strava_activities").select("calories").eq("user_id", userId).gte("start_date", iso),
+    supabase.from("terra_activities").select("calories").eq("user_id", userId).gte("start_time", iso),
+    supabase.from("apple_health_activities").select("calories").eq("user_id", userId).gte("start_date", iso),
+    supabase.from("garmin_activities").select("calories").eq("user_id", userId).gte("start_time", iso),
+  ]);
+  let cal = 0;
+  q.forEach((r) => {
+    if (r.status === "fulfilled" && r.value?.data) {
+      for (const row of r.value.data as any[]) cal += Number(row.calories || 0);
+    }
+  });
+  return cal;
+}
+
 async function renderHealth(supabase: any, userId: string, type: string, t: Theme): Promise<string> {
   const h = await fetchTodayHealth(supabase, userId);
   const today = h.today_t;
@@ -195,15 +214,15 @@ async function renderHealth(supabase: any, userId: string, type: string, t: Them
       return svgWrap(header("Steps Today", t) + bigStat(v ? Number(v).toLocaleString() : "—", "steps", t), t);
     }
     case "calories_today": {
-      const v = today?.calories_total;
-      return svgWrap(header("Calories Today", t) + bigStat(v ? Number(v).toLocaleString() : "—", "kcal", t), t);
+      const v = await fetchCaloriesToday(supabase, userId);
+      return svgWrap(header("Calories Today", t) + bigStat(v ? Math.round(v).toLocaleString() : "—", "kcal", t), t);
     }
     case "rhr": {
       const v = today?.resting_hr ?? h.latest_g?.resting_hr;
       return svgWrap(header("Resting HR", t) + bigStat(v ? `${v}` : "—", "bpm", t), t);
     }
     case "sleep_last_night": {
-      const sec = sleepRow?.sleep_total_seconds ?? (h.latest_g?.sleep_seconds);
+      const sec = sleepRow?.sleep_seconds ?? (h.latest_g?.sleep_seconds);
       const v = sec ? `${Math.floor(sec / 3600)}h ${Math.round((sec % 3600) / 60)}m` : "—";
       return svgWrap(header("Sleep Last Night", t) + bigStat(v, "duration", t), t);
     }
@@ -212,24 +231,26 @@ async function renderHealth(supabase: any, userId: string, type: string, t: Them
       return svgWrap(header("Sleep Score", t) + bigStat(v ? `${v}` : "—", "/ 100", t), t);
     }
     case "hrv": {
-      const v = today?.hrv_rmssd_ms;
+      const v = today?.hrv;
       return svgWrap(header("HRV", t) + bigStat(v ? `${Math.round(Number(v))}` : "—", "ms (RMSSD)", t), t);
     }
     case "health":
     default: {
       const steps = today?.steps ? Number(today.steps).toLocaleString() : "—";
-      const cal = today?.calories_total ? Number(today.calories_total).toLocaleString() : "—";
+      const cal = await fetchCaloriesToday(supabase, userId);
+      const calStr = cal ? Math.round(cal).toLocaleString() : "—";
       const rhr = today?.resting_hr ?? h.latest_g?.resting_hr ?? "—";
-      const sec = sleepRow?.sleep_total_seconds ?? h.latest_g?.sleep_seconds;
+      const sec = sleepRow?.sleep_seconds ?? h.latest_g?.sleep_seconds;
       const sleep = sec ? `${Math.floor(sec / 3600)}h${Math.round((sec % 3600) / 60)}m` : "—";
       const inner = header("Daily Health", t) +
         statBlock(20, 80, steps, "Steps", t) +
-        statBlock(110, 80, cal, "Calories", t) +
+        statBlock(110, 80, calStr, "Calories", t) +
         statBlock(200, 80, `${rhr}`, "RHR", t) +
-        statBlock(280, 80, sleep, "Sleep", t);
+        statBlock(270, 80, sleep, "Sleep", t);
       return svgWrap(inner, t);
     }
   }
+}
 }
 
 async function renderDurationWeek(supabase: any, userId: string, t: Theme): Promise<string> {

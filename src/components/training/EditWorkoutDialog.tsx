@@ -295,7 +295,11 @@ const EditWorkoutDialog = ({
       type: s.type, profile, recentActivities, targetTime,
     });
     const patch: Partial<WorkoutSession> = {};
-    if (sug.pace) patch.pace = sug.pace;
+    if (sug.pace) {
+      const pace = normalizePace(sug.pace);
+      patch.pace = pace;
+      patch.steps = (s.steps ?? []).map((step) => step.pace ? step : { ...step, pace });
+    }
     if (sug.bpm_low && sug.bpm_high) patch.hr_target = { zone: sug.zone ?? undefined, bpm_low: sug.bpm_low, bpm_high: sug.bpm_high };
     updateSession(sIdx, patch);
     const label =
@@ -494,11 +498,17 @@ const EditWorkoutDialog = ({
                         </button>
                       )}
                     </div>
-                    <Input
-                      type="text" placeholder="5:30/km"
-                      value={s.pace ?? ""}
-                      onChange={(e) => updateSession(sIdx, { pace: e.target.value })}
-                    />
+                    <select
+                      className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                      value={paceSelectValue(s.pace)}
+                      onChange={(e) => updateSessionPace(sIdx, e.target.value || null)}
+                    >
+                      <option value="">{isZh ? "選擇配速" : "Select pace"}</option>
+                      {normalizePace(s.pace) && !PACE_OPTIONS.includes(normalizePace(s.pace)!) && (
+                        <option value={normalizePace(s.pace)!}>{normalizePace(s.pace)}</option>
+                      )}
+                      {PACE_OPTIONS.map((pace) => <option key={pace} value={pace}>{pace}</option>)}
+                    </select>
                     {showMulti && s.hr_target?.bpm_low && s.hr_target?.bpm_high ? (
                       <p className="text-[11px] text-muted-foreground mt-1">
                         {isZh ? `心率 ${s.hr_target.bpm_low}-${s.hr_target.bpm_high} bpm` : `HR ${s.hr_target.bpm_low}-${s.hr_target.bpm_high} bpm`}

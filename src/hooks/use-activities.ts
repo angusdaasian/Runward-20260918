@@ -54,6 +54,7 @@ export interface PlannedWorkout {
   pace?: string | null;
   elevation_m?: number | null;
   eph?: number | null;
+  sessions?: import("@/lib/planTypes").WorkoutSession[];
 }
 
 export interface UserRace {

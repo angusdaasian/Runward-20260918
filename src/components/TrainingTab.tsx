@@ -1461,8 +1461,9 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
 
   // User HR profile → zone bounds for showing HR ranges in the plan
   const [hrBounds, setHrBounds] = useState<HrBounds | null>(null);
+  const [suggestProfile, setSuggestProfile] = useState<SuggestProfile | null>(null);
   useEffect(() => {
-    if (!user) { setHrBounds(null); return; }
+    if (!user) { setHrBounds(null); setSuggestProfile(null); return; }
     let cancelled = false;
     (async () => {
       try {
@@ -1476,13 +1477,35 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
         const rest = estimateRestingHr(p.resting_heartrate);
         const custom = isValidCustomZones(p.custom_hr_zones) ? (p.custom_hr_zones as number[]) : null;
         const b = zoneBoundaries(max, rest, custom);
-        if (!cancelled) setHrBounds({ ...b, max });
+        if (!cancelled) {
+          setHrBounds({ ...b, max });
+          setSuggestProfile({ age: p.age ?? null, max_hr: p.max_heartrate ?? null, resting_hr: p.resting_heartrate ?? null, custom_zones: custom });
+        }
       } catch {
-        if (!cancelled) setHrBounds(null);
+        if (!cancelled) { setHrBounds(null); setSuggestProfile(null); }
       }
     })();
     return () => { cancelled = true; };
   }, [user]);
+
+  // Recent runs (last 30 days) for pace suggestion.
+  const recentRunActivities = useMemo<SuggestActivity[]>(() => {
+    if (!allActivities) return [];
+    const cutoff = Date.now() - 30 * 24 * 3600 * 1000;
+    return (allActivities as any[])
+      .filter((a) => a && (!a.sport_type || /run/i.test(a.sport_type)))
+      .filter((a) => a.start_date ? Date.parse(a.start_date) >= cutoff : true)
+      .map((a) => ({
+        distance: Number(a.distance) || 0,
+        moving_time: a.moving_time ?? null,
+        elapsed_time: a.elapsed_time ?? null,
+        sport_type: a.sport_type ?? null,
+        start_date: a.start_date ?? null,
+        average_heartrate: a.average_heartrate ?? null,
+      }));
+  }, [allActivities]);
+
+  const aiTargetTime = useMemo(() => targetTimeFromPlan(existingPlan?.distance ?? null, existingPlan?.target_time ?? null), [existingPlan?.distance, existingPlan?.target_time]);
 
   // Deterministic HR + VDOT race prediction over last 30 days.
   const racePrediction = useMemo(() => {

@@ -34,10 +34,8 @@ interface Props {
   onSave: (next: EditableWorkout) => void | Promise<void>;
   onDelete?: () => void | Promise<void>;
   title?: string;
-  /** Enable multi-session + warmup/cooldown + auto-suggest (AI plan + Custom only). */
+  /** Enable structured warmup/cooldown sequence + auto-suggest (AI plan + Custom only). */
   multiSession?: boolean;
-  /** When true, open with one extra empty session appended (for "Add another" from calendar). */
-  appendNewSession?: boolean;
   /** Recent runs for auto-suggest (last 30 days). */
   recentActivities?: SuggestActivity[] | null;
   /** Profile for HR zones. */
@@ -200,24 +198,15 @@ function sessionsFromWorkout(w: EditableWorkout): WorkoutSession[] {
 
 const EditWorkoutDialog = ({
   open, onOpenChange, lang, workout, planContext, onSave, onDelete, title,
-  multiSession = false, appendNewSession = false,
+  multiSession = false,
   recentActivities = null, profile = null, targetTime = null,
 }: Props) => {
   const isZh = lang === "zh";
   const initSessions = (): WorkoutSession[] => {
     const base = sessionsFromWorkout(workout);
-    if (appendNewSession) {
-      base.push({
-        id: genSessionId(),
-        time_of_day: base.length === 1 ? "PM" : null,
-        type: "Easy Run", distance_km: null, pace: null, description: null,
-        color: typeColor("Easy Run"), steps: [],
-      });
-    }
-    return base;
+    return base.length > 0 ? [base[0]] : [];
   };
   const [sessions, setSessions] = useState<WorkoutSession[]>(initSessions);
-  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [expandedSteps, setExpandedSteps] = useState<Record<string, boolean>>({});
   const [validating, setValidating] = useState(false);
   const [verdict, setVerdict] = useState<Verdict | null>(null);
@@ -229,7 +218,6 @@ const EditWorkoutDialog = ({
     if (open) {
       const nextSessions = initSessions();
       setSessions(nextSessions);
-      setActiveSessionId(nextSessions[0]?.id ?? null);
       // Auto-expand the steps panel — that's where the real structure lives now.
       setExpandedSteps({});
       setVerdict(null);
@@ -238,36 +226,10 @@ const EditWorkoutDialog = ({
       setSuggestSource({});
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, workout, appendNewSession]);
-
-  useEffect(() => {
-    if (sessions.length === 0) { setActiveSessionId(null); return; }
-    if (!activeSessionId || !sessions.some((s) => s.id === activeSessionId)) {
-      setActiveSessionId(sessions[0].id);
-    }
-  }, [sessions, activeSessionId]);
+  }, [open, workout]);
 
   const updateSession = (idx: number, patch: Partial<WorkoutSession>) => {
     setSessions((prev) => prev.map((s, i) => (i === idx ? { ...s, ...patch } : s)));
-    setVerdict(null); setNeedsConfirm(false);
-  };
-
-  const addSession = () => {
-    const id = genSessionId();
-    setSessions((prev) => [...prev, {
-      id,
-      time_of_day: prev.length === 0 ? null : (prev.length === 1 ? "PM" : null),
-      type: "Easy Run",
-      distance_km: null, pace: null, description: null,
-      color: typeColor("Easy Run"),
-      steps: [],
-    }]);
-    setActiveSessionId(id);
-    setVerdict(null); setNeedsConfirm(false);
-  };
-
-  const removeSession = (idx: number) => {
-    setSessions((prev) => prev.filter((_, i) => i !== idx));
     setVerdict(null); setNeedsConfirm(false);
   };
 

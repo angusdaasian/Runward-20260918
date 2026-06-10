@@ -231,6 +231,7 @@ const EditWorkoutDialog = ({
   const [verdict, setVerdict] = useState<Verdict | null>(null);
   const [feedback, setFeedback] = useState<string>("");
   const [needsConfirm, setNeedsConfirm] = useState(false);
+  const [pendingDescription, setPendingDescription] = useState<string | undefined>(undefined);
   const [suggestSource, setSuggestSource] = useState<Record<string, string>>({});
 
   useEffect(() => {

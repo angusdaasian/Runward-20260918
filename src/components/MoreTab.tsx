@@ -693,6 +693,7 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps }: Props
       </Dialog>
 
       <PlanComparisonDialog open={showPlanCompare} onOpenChange={setShowPlanCompare} lang={lang} />
+      <HomeWidgetDialog open={showWidgetDialog} onOpenChange={setShowWidgetDialog} lang={lang} />
 
       {/* Delete Account Confirmation */}
       <AlertDialog open={showDeleteDialog} onOpenChange={(o) => !deleting && setShowDeleteDialog(o)}>

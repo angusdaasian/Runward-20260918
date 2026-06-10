@@ -140,6 +140,13 @@ export function splitIntervalDay(day: DayLike, opts: { lang?: "en" | "zh" } = {}
 
   const lang = opts.lang ?? "en";
   const existingSessions = Array.isArray(day.sessions) ? day.sessions : [];
+  // Preserve multi-workout days: if the user added another workout alongside the
+  // interval, splitting would collapse them all into a single session. Leave as-is.
+  const nonWcSessions = existingSessions.filter((s) => {
+    const t = normalizeType(s.type);
+    return t !== "Warmup" && t !== "Cooldown";
+  });
+  if (nonWcSessions.length > 1) return day;
   const warmSource = existingSessions.find((s) => normalizeType(s.type) === "Warmup");
   const coolSource = existingSessions.find((s) => normalizeType(s.type) === "Cooldown");
   const intervalSource = existingSessions.find((s) => normalizeType(s.type) === "Interval") ?? existingSessions[0];

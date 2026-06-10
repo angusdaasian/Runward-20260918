@@ -2681,6 +2681,18 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                       </span>
                     </div>
                     <div className="flex items-center gap-1">
+                      {watchProvider && isPremium && (
+                        <button
+                          type="button"
+                          onClick={pushWeekToWatch}
+                          disabled={pushingWeek}
+                          className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full bg-primary/10 text-primary hover:bg-primary/20 disabled:opacity-50 mr-1"
+                          title={lang === "zh" ? `推送本週到 ${watchProvider}` : `Push week to ${watchProvider}`}
+                        >
+                          {pushingWeek ? <Loader2 size={12} className="animate-spin" /> : <Watch size={12} />}
+                          {lang === "zh" ? `推送到 ${watchProvider}` : `Push to ${watchProvider}`}
+                        </button>
+                      )}
                       <button
                         onClick={() => shareTrainingWeek({ weekIndex: currentWeekIdx, days: currentWeek.days as any, lang })}
                         className="p-1 rounded hover:bg-accent text-muted-foreground"

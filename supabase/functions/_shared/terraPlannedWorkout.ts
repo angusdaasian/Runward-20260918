@@ -11,6 +11,18 @@
 // Note: distance duration uses `distance_meters`, NOT `distance`.
 // Pace target uses target_type 11 with speed_meters_per_second fields, NOT target_type 6.
 
+export interface PlanSession {
+  id?: string;
+  time_of_day?: string | null;
+  type?: string | null;
+  title?: string | null;
+  distance_km?: number | null;
+  pace?: string | null;
+  description?: string | null;
+  elevation_m?: number | null;
+  eph?: number | null;
+}
+
 export interface PlanDay {
   type?: string | null;
   title?: string | null;
@@ -18,6 +30,26 @@ export interface PlanDay {
   pace?: string | null;       // "5:30" mm:ss per km
   description?: string | null;
   date?: string | null;       // ISO YYYY-MM-DD
+  elevation_m?: number | null;
+  eph?: number | null;
+  sessions?: PlanSession[];
+}
+
+/** Expand a PlanDay into one or more session-day objects for Terra push. */
+export function expandSessions(day: PlanDay): PlanDay[] {
+  if (Array.isArray(day.sessions) && day.sessions.length > 0) {
+    return day.sessions.map((s) => ({
+      type: s.type ?? day.type,
+      title: s.title ?? s.type ?? day.title,
+      distance_km: s.distance_km ?? null,
+      pace: s.pace ?? null,
+      description: s.description ?? null,
+      date: day.date ?? null,
+      elevation_m: s.elevation_m ?? null,
+      eph: s.eph ?? null,
+    }));
+  }
+  return [day];
 }
 
 function paceSecPerKm(pace?: string | null): number | null {

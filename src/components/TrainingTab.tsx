@@ -609,6 +609,7 @@ const DraggableDay = ({
           {sessions.map((session, sessionIdx) => {
             const sessionDay = dayForWorkoutSession(day, session);
             const sessionKm = sessionDistanceKm(session);
+            const sessionPaceLabel = sessionPace(session);
             const expanded = expandedSessionId === (session.id || String(sessionIdx));
             return (
           <div key={session.id || sessionIdx} className="bg-card border border-border rounded-lg p-3 hover:border-primary transition-colors">
@@ -626,7 +627,9 @@ const DraggableDay = ({
                 <span className="font-medium text-sm text-foreground truncate">
                   {session.time_of_day ? `${session.time_of_day} · ` : ""}{localizeTitle(session.type || "Run", lang)}
                 </span>
-                {sessionKm > 0 && <span className="text-xs text-muted-foreground tabular-nums shrink-0">{sessionKm} km</span>}
+                <span className="text-xs text-muted-foreground tabular-nums shrink-0">
+                  {[sessionKm > 0 ? `${sessionKm} km` : null, sessionPaceLabel].filter(Boolean).join(" · ")}
+                </span>
               </div>
               <button
                 type="button"

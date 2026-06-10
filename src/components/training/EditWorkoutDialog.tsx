@@ -446,12 +446,15 @@ const EditWorkoutDialog = ({
                   <label className="text-sm font-medium text-foreground mb-1 block">
                     {isZh ? "距離 (公里)" : "Distance (km)"}
                   </label>
-                  <Input
-                    type="number" min="0" step="0.5"
-                    value={structuredInterval && computedDistance > 0 ? String(computedDistance) : (s.distance_km != null ? String(s.distance_km) : "")}
-                    disabled={structuredInterval}
-                    onChange={(e) => updateSession(sIdx, { distance_km: e.target.value ? Number(e.target.value) : null })}
-                  />
+                  {structuredInterval ? (
+                    <Input type="number" value={computedDistance > 0 ? String(computedDistance) : ""} disabled readOnly />
+                  ) : (
+                    <Input
+                      type="number" min="0" step="0.1"
+                      defaultValue={s.distance_km != null ? String(s.distance_km) : ""}
+                      onChange={(e) => updateSession(sIdx, { distance_km: e.target.value ? Number(e.target.value) : null })}
+                    />
+                  )}
                   {structuredInterval && (
                     <p className="text-[11px] text-muted-foreground mt-1">
                       {isZh ? "距離由下方順序自動加總" : "Distance is calculated from the sequence below"}
@@ -597,14 +600,14 @@ const EditWorkoutDialog = ({
                                 <Input
                                   className="col-span-3 h-8 text-xs"
                                   type="number" min="1" placeholder={isZh ? "組數" : "reps"}
-                                  value={st.reps != null ? String(st.reps) : ""}
+                                  defaultValue={st.reps != null ? String(st.reps) : ""}
                                   onChange={(e) => updateStep(sIdx, stIdx, { reps: e.target.value ? Number(e.target.value) : null })}
                                 />
                                 <span className="col-span-1 text-center text-xs text-muted-foreground">×</span>
                                 <Input
                                   className="col-span-3 h-8 text-xs"
                                   type="number" min="50" step="50" placeholder="m"
-                                  value={st.distance_m != null ? String(st.distance_m) : ""}
+                                  defaultValue={st.distance_m != null ? String(st.distance_m) : ""}
                                   onChange={(e) => updateStep(sIdx, stIdx, { distance_m: e.target.value ? Number(e.target.value) : null })}
                                 />
                                 <select
@@ -630,7 +633,7 @@ const EditWorkoutDialog = ({
                                 <Input
                                   className="col-span-5 h-8 text-xs"
                                   type="number" step="0.1" placeholder="km"
-                                  value={st.distance_km != null ? String(st.distance_km) : ""}
+                                  defaultValue={st.distance_km != null ? String(st.distance_km) : ""}
                                   onChange={(e) => updateStep(sIdx, stIdx, { distance_km: e.target.value ? Number(e.target.value) : null })}
                                 />
                                 <select

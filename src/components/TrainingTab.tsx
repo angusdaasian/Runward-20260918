@@ -466,7 +466,7 @@ const WorkoutDetails = ({ day, lang, hrBounds }: { day: DayPlan; lang: Lang; hrB
 // Draggable + droppable day row for the AI calendar (long-press to swap)
 const DraggableDay = ({
   id, idx, day, lang, isToday, dayNum, hrBounds,
-  onEditClick, onAddClick,
+  onEditClick, onAddClick, onAddAnotherClick,
   isPushed, isPushing, onPushDay, watchProvider,
 }: {
   id: string;
@@ -478,6 +478,7 @@ const DraggableDay = ({
   hrBounds: HrBounds | null;
   onEditClick: () => void;
   onAddClick: () => void;
+  onAddAnotherClick?: () => void;
   isPushed?: boolean;
   isPushing?: boolean;
   onPushDay?: (idx: number) => void;
@@ -485,6 +486,7 @@ const DraggableDay = ({
 }) => {
   const { attributes, listeners, setNodeRef: setDragRef, isDragging, transform } = useDraggable({ id });
   const { setNodeRef: setDropRef, isOver } = useDroppable({ id });
+  const sessionsCount = Array.isArray((day as any).sessions) ? (day as any).sessions.length : 0;
   const [expanded, setExpanded] = useState(false);
 
   const setRefs = (node: HTMLDivElement | null) => {
@@ -532,7 +534,12 @@ const DraggableDay = ({
                 <GripVertical size={16} />
               </button>
               <div className="flex-1 min-w-0 flex items-center justify-between gap-2 select-none">
-                <span className="font-medium text-sm text-foreground truncate">{localizeTitle(day.type, lang)}</span>
+                <span className="font-medium text-sm text-foreground truncate">
+                  {localizeTitle(day.type, lang)}
+                  {sessionsCount > 1 && (
+                    <span className="ml-1 text-[10px] font-bold text-muted-foreground">×{sessionsCount}</span>
+                  )}
+                </span>
               </div>
               <button
                 type="button"
@@ -565,6 +572,17 @@ const DraggableDay = ({
               >
                 <Pencil size={14} />
               </button>
+              {onAddAnotherClick && (
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); onAddAnotherClick(); }}
+                  className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground"
+                  aria-label={lang === "zh" ? "再新增訓練" : "Add another session"}
+                  title={lang === "zh" ? "再新增同日訓練" : "Add another session same day"}
+                >
+                  <Plus size={14} />
+                </button>
+              )}
             </div>
             {expanded && <WorkoutDetails day={day} lang={lang} hrBounds={hrBounds} />}
           </div>
@@ -576,7 +594,7 @@ const DraggableDay = ({
 
 // Calendar day list with long-press drag-to-swap (within a week)
 const CalendarDayList = ({
-  days, weekIdx, lang, hrBounds, onSwap, onAddClick, onEditClick,
+  days, weekIdx, lang, hrBounds, onSwap, onAddClick, onEditClick, onAddAnotherClick,
   pushedSet, pushingIdx, onPushDay, watchProvider,
 }: {
   days: DayPlan[];
@@ -586,6 +604,7 @@ const CalendarDayList = ({
   onSwap: (fromIdx: number, toIdx: number) => void;
   onAddClick: (idx: number) => void;
   onEditClick: (idx: number, day: DayPlan) => void;
+  onAddAnotherClick?: (idx: number, day: DayPlan) => void;
   pushedSet?: Set<number>;
   pushingIdx?: number | null;
   onPushDay?: (idx: number) => void;
@@ -626,6 +645,7 @@ const CalendarDayList = ({
               hrBounds={hrBounds}
               onEditClick={() => onEditClick(i, day)}
               onAddClick={() => onAddClick(i)}
+              onAddAnotherClick={onAddAnotherClick ? () => onAddAnotherClick(i, day) : undefined}
               isPushed={pushedSet?.has(i)}
               isPushing={pushingIdx === i}
               onPushDay={onPushDay}
@@ -637,6 +657,7 @@ const CalendarDayList = ({
     </DndContext>
   );
 };
+
 
 // ─── Program Header (collapsible summary above the week card) ───
 function parsePaceMin(p: string | null | undefined): number | null {

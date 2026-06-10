@@ -571,7 +571,7 @@ const DraggableDay = ({
   const { attributes, listeners, setNodeRef: setDragRef, isDragging, transform } = useDraggable({ id });
   const { setNodeRef: setDropRef, isOver } = useDroppable({ id });
   const sessions = workoutSessionsForDay(day);
-  const [expandedSessionId, setExpandedSessionId] = useState<string | null>(null);
+  const [expandedIdx, setExpandedIdx] = useState<number | null>(null);
 
   const setRefs = (node: HTMLDivElement | null) => {
     setDragRef(node);

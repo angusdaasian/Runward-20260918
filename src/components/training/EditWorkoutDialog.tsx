@@ -350,34 +350,8 @@ const EditWorkoutDialog = ({
           <DialogTitle>{title ?? (isZh ? "編輯訓練" : "Edit Workout")}</DialogTitle>
         </DialogHeader>
 
-        {showMulti && (
-          <div className="-mt-1 mb-1 space-y-2">
-            <div className="flex gap-1 overflow-x-auto border-b border-border">
-              {sessions.map((s, idx) => {
-                const opt = TYPE_OPTIONS.find((o) => o.id === normalizeType(s.type));
-                const label = normalizeType(s.type) === "Interval" ? (isZh ? "間歇跑" : "Interval Run") : (isZh ? (opt?.zh ?? s.type) : (opt?.en ?? s.type));
-                const active = activeSessionId === s.id;
-                return (
-                  <button
-                    key={s.id}
-                    type="button"
-                    onClick={() => setActiveSessionId(s.id)}
-                    className={`shrink-0 px-3 py-2 text-xs font-semibold border-b-2 transition-colors ${active ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
-                  >
-                    {s.time_of_day ? `${s.time_of_day} · ` : ""}{label || (isZh ? `訓練 ${idx + 1}` : `Workout ${idx + 1}`)}
-                  </button>
-                );
-              })}
-            </div>
-            <Button type="button" variant="outline" size="sm" className="w-full" onClick={addSession}>
-              <Plus size={14} className="mr-1" /> {isZh ? "新增另一個訓練" : "Add another workout"}
-            </Button>
-          </div>
-        )}
-
         <div className="space-y-4">
           {sessions.map((s, sIdx) => {
-            if (showMulti && activeSessionId && s.id !== activeSessionId) return null;
             const trail = isTrailType(s.type);
             const stepsExpanded = expandedSteps[s.id] ?? ((s.steps?.length ?? 0) > 0);
             const sourceLabel = suggestSource[s.id];
@@ -385,34 +359,6 @@ const EditWorkoutDialog = ({
             const computedDistance = sessionDistanceKm(s);
             return (
               <div key={s.id} className="border border-border rounded-lg p-3 space-y-3 relative">
-                {showMulti && sessions.length > 1 && (
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: typeColor(s.type) }} />
-                      <span className="text-xs font-medium text-muted-foreground">
-                        {isZh ? `訓練 ${sIdx + 1}` : `Session ${sIdx + 1}`}
-                      </span>
-                      <select
-                        className="text-xs rounded border border-input bg-background px-1.5 py-0.5"
-                        value={s.time_of_day ?? ""}
-                        onChange={(e) => updateSession(sIdx, { time_of_day: e.target.value || null })}
-                      >
-                        <option value="">{isZh ? "全日" : "Any time"}</option>
-                        <option value="AM">AM</option>
-                        <option value="PM">PM</option>
-                      </select>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => removeSession(sIdx)}
-                      className="text-muted-foreground hover:text-destructive p-1"
-                      aria-label="Remove session"
-                    >
-                      <X size={14} />
-                    </button>
-                  </div>
-                )}
-
                 <div>
                   <label className="text-sm font-medium text-foreground mb-1 block">
                     {isZh ? "活動類型" : "Activity Type"}

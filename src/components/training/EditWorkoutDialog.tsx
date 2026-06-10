@@ -7,7 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Lang } from "@/lib/i18n";
 import { toast } from "sonner";
 import type { WorkoutSession, WorkoutStep, WorkoutStepKind, HrTarget } from "@/lib/planTypes";
-import { genSessionId, summarizeDay } from "@/lib/planTypes";
+import { genSessionId, sessionDistanceKm, summarizeDay } from "@/lib/planTypes";
 import { suggestPaceAndHr, type SuggestActivity, type SuggestProfile } from "@/lib/paceSuggest";
 import { splitIntervalDay } from "@/lib/splitIntervalSessions";
 
@@ -139,7 +139,13 @@ function seedStepsForType(s: WorkoutSession): WorkoutSession {
     const step: WorkoutStep = p
       ? { kind: "interval", reps: p.reps, distance_m: p.distM, pace: s.pace ?? null, rest: p.rest }
       : { kind: "interval", reps: 5, distance_m: 800, pace: s.pace ?? null, rest: "90s" };
-    return { ...s, steps: [step] };
+    const workKm = step.reps && step.distance_m ? (step.reps * step.distance_m) / 1000 : (s.distance_km ?? 5);
+    const wcKm = s.distance_km && s.distance_km > workKm ? Number(((s.distance_km - workKm) / 2).toFixed(1)) : 1.5;
+    return { ...s, steps: [
+      { kind: "warmup", distance_km: wcKm, pace: s.pace ?? null },
+      step,
+      { kind: "cooldown", distance_km: wcKm, pace: s.pace ?? null },
+    ] };
   }
   if (t === "Warmup") return { ...s, steps: [{ kind: "warmup", distance_km: s.distance_km ?? 1.5, pace: s.pace ?? null }] };
   if (t === "Cooldown") return { ...s, steps: [{ kind: "cooldown", distance_km: s.distance_km ?? 1.5, pace: s.pace ?? null }] };
@@ -147,11 +153,17 @@ function seedStepsForType(s: WorkoutSession): WorkoutSession {
 }
 
 function sessionsFromWorkout(w: EditableWorkout): WorkoutSession[] {
-  // If a legacy single-workout Interval is opened, auto-split into 3 sessions so the
-  // sequence shows Warmup + Intervals + Cooldown structured steps.
+  // If an Interval is opened, keep it as one workout and put warmup/interval/cooldown
+  // inside that workout's sequence.
   let base: WorkoutSession[] = [];
   if (Array.isArray(w.sessions) && w.sessions.length > 0) {
     base = w.sessions.map((s) => ({ ...s, id: s.id || genSessionId(), type: normalizeType(s.type) }));
+    if (normalizeType(w.type || base[0]?.type) === "Interval") {
+      const merged = splitIntervalDay({ ...w, type: "Interval", sessions: base }, {});
+      if (Array.isArray(merged.sessions) && merged.sessions.length > 0) {
+        base = merged.sessions.map((s: any) => ({ ...s, id: s.id || genSessionId(), type: normalizeType(s.type) }));
+      }
+    }
   } else if (w.type || w.distance_km) {
     const t = normalizeType(w.type || "");
     if ((t === "Interval") && w.distance_km) {

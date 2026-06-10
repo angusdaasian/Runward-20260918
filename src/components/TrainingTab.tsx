@@ -320,10 +320,77 @@ const labelForDay = (day: any, i: number): string => {
 // Render the structured details (paces, distance, HR, warmup/cooldown) for a workout
 const WorkoutDetails = ({ day, lang, hrBounds }: { day: DayPlan; lang: Lang; hrBounds: HrBounds | null }) => {
   const isZh = lang === "zh";
+  const paceFmt = (p?: string | null) => p ? (/\/(km|mi)\b/i.test(p) ? p : `${p}/km`) : null;
+
+  // ── NEW: when day has structured sessions[], render them directly ──
+  const sessions = Array.isArray((day as any).sessions) ? (day as any).sessions as any[] : null;
+  if (sessions && sessions.length > 0) {
+    return (
+      <div className="mt-2 space-y-2">
+        {sessions.map((sess, si) => {
+          const sZone = zoneForType(sess.type);
+          const sHr = hrRangeForZone(sZone, hrBounds);
+          const sZoneLabel = ZONE_LABEL[sZone][isZh ? "zh" : "en"];
+          const bg =
+            sess.type === "Warmup" ? "bg-amber-500/10 border-amber-500/20" :
+            sess.type === "Cooldown" ? "bg-sky-500/10 border-sky-500/20" :
+            sess.type === "Interval" || sess.type === "Intervals" ? "bg-primary/5 border-primary/20" :
+            "bg-muted/40";
+          const label = sess.title || sess.type;
+          const steps: any[] = Array.isArray(sess.steps) ? sess.steps : [];
+          return (
+            <div key={si} className={`rounded-md p-2 space-y-1 border ${bg}`}>
+              <div className="flex items-center justify-between">
+                <div className="text-[11px] font-semibold text-foreground">
+                  {sess.time_of_day ? `[${sess.time_of_day}] ` : ""}{label}
+                </div>
+                {sess.distance_km != null && (
+                  <div className="text-[10px] text-muted-foreground tabular-nums">{sess.distance_km} km</div>
+                )}
+              </div>
+              {steps.length > 0 ? (
+                <div className="space-y-0.5">
+                  {steps.map((st, sti) => {
+                    if (st.kind === "interval" && st.reps && st.distance_m) {
+                      const rest = st.rest ? ` · ${isZh ? "休息" : "rest"} ${st.rest}` : "";
+                      const pace = paceFmt(st.pace);
+                      return (
+                        <div key={sti} className="flex items-baseline justify-between gap-2 text-xs">
+                          <span className="text-foreground font-medium tabular-nums">{st.reps} × {st.distance_m}m{rest}</span>
+                          {pace && <span className="text-muted-foreground tabular-nums">@ {pace}</span>}
+                        </div>
+                      );
+                    }
+                    const pace = paceFmt(st.pace);
+                    const dist = st.distance_km != null ? `${st.distance_km} km` : (st.distance_m != null ? `${st.distance_m} m` : null);
+                    return (
+                      <div key={sti} className="flex items-baseline justify-between gap-2 text-xs">
+                        <span className="text-foreground tabular-nums">{dist || (isZh ? "—" : "—")}</span>
+                        {pace && <span className="text-muted-foreground tabular-nums">@ {pace}</span>}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="flex items-baseline justify-between gap-2 text-xs">
+                  {paceFmt(sess.pace) && <span className="text-muted-foreground tabular-nums">@ {paceFmt(sess.pace)}</span>}
+                </div>
+              )}
+              <div className="flex items-baseline justify-between gap-2 text-[10px] text-muted-foreground">
+                <span>{isZh ? "心率" : "HR"}</span>
+                <span className="tabular-nums">{sHr ? `${sZoneLabel} · ${sHr}` : sZoneLabel}</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
+  // ── Legacy single-day fallback (unchanged) ──
   const zone = zoneForType(day.type);
   const hr = hrRangeForZone(zone, hrBounds);
   const zoneLabel = ZONE_LABEL[zone][isZh ? "zh" : "en"];
-  const paceFmt = (p?: string | null) => p ? (/\/(km|mi)\b/i.test(p) ? p : `${p}/km`) : null;
 
   const isInterval = day.type === "Interval";
   const reps = isInterval ? parseIntervalReps(day.description) : null;

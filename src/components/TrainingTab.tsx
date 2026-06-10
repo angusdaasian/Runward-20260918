@@ -660,7 +660,11 @@ const DraggableDay = ({
                 <Pencil size={14} />
               </button>
             </div>
-            {expanded && <WorkoutDetails day={{ ...sessionDay, sessions: undefined } as DayPlan} lang={lang} hrBounds={hrBounds} />}
+            {expanded && (
+              Array.isArray(session.steps) && session.steps.some((st: any) => st && (st.kind === "warmup" || st.kind === "cooldown"))
+                ? <WorkoutDetails day={{ ...sessionDay, sessions: [session] } as DayPlan} lang={lang} hrBounds={hrBounds} />
+                : <WorkoutDetails day={{ ...sessionDay, sessions: undefined } as DayPlan} lang={lang} hrBounds={hrBounds} />
+            )}
           </div>
             );
           })}

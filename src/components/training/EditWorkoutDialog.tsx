@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import type { WorkoutSession, WorkoutStep, WorkoutStepKind, HrTarget } from "@/lib/planTypes";
 import { genSessionId, summarizeDay } from "@/lib/planTypes";
 import { suggestPaceAndHr, type SuggestActivity, type SuggestProfile } from "@/lib/paceSuggest";
+import { splitIntervalDay } from "@/lib/splitIntervalSessions";
 
 export interface EditableWorkout {
   type?: string | null;

@@ -362,6 +362,19 @@ const EditWorkoutDialog = ({
           <DialogTitle>{title ?? (isZh ? "編輯訓練" : "Edit Workout")}</DialogTitle>
         </DialogHeader>
 
+        {showMulti && (
+          <div className="flex items-center justify-between -mt-1 mb-1">
+            <span className="text-xs text-muted-foreground">
+              {sessions.length > 1
+                ? (isZh ? `本日 ${sessions.length} 個訓練` : `${sessions.length} sessions today`)
+                : (isZh ? "可加入第二個訓練（例如下午跑）" : "You can add a second session (e.g. PM run)")}
+            </span>
+            <Button type="button" variant="outline" size="sm" onClick={addSession}>
+              <Plus size={14} className="mr-1" /> {isZh ? "新增訓練" : "Add session"}
+            </Button>
+          </div>
+        )}
+
         <div className="space-y-4">
           {sessions.map((s, sIdx) => {
             const trail = isTrailType(s.type);

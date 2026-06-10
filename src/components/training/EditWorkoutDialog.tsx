@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, AlertTriangle, CheckCircle2, Info, Plus, X, Sparkles, ChevronDown, ChevronRight } from "lucide-react";
+import { Loader2, AlertTriangle, CheckCircle2, Info, Plus, X, Sparkles, ChevronDown, ChevronRight, ChevronUp } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -7,7 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Lang } from "@/lib/i18n";
 import { toast } from "sonner";
 import type { WorkoutSession, WorkoutStep, WorkoutStepKind, HrTarget } from "@/lib/planTypes";
-import { genSessionId, sessionDistanceKm, summarizeDay } from "@/lib/planTypes";
+import { genSessionId, sessionDistanceKm, sessionPace, summarizeDay } from "@/lib/planTypes";
 import { suggestPaceAndHr, type SuggestActivity, type SuggestProfile } from "@/lib/paceSuggest";
 import { splitIntervalDay } from "@/lib/splitIntervalSessions";
 
@@ -113,6 +113,25 @@ const normalizeType = (t?: string | null): string => {
 
 function typeColor(type: string): string {
   return TYPE_OPTIONS.find((o) => o.id === type)?.color ?? "#94a3b8";
+}
+
+const PACE_OPTIONS = Array.from({ length: 151 }, (_, i) => {
+  const seconds = 180 + i * 5;
+  const mm = Math.floor(seconds / 60);
+  const ss = String(seconds % 60).padStart(2, "0");
+  return `${mm}:${ss}/km`;
+});
+
+function normalizePace(pace?: string | null): string | null {
+  if (!pace) return null;
+  const m = String(pace).trim().match(/^(\d+)\s*[:']\s*(\d{1,2})/);
+  if (!m) return pace;
+  return `${Number(m[1])}:${String(Number(m[2])).padStart(2, "0")}/km`;
+}
+
+function paceSelectValue(pace?: string | null): string {
+  const normalized = normalizePace(pace);
+  return normalized && PACE_OPTIONS.includes(normalized) ? normalized : "";
 }
 
 function parseIntervalDesc(desc?: string | null): { reps: number; distM: number; rest: string | null } | null {
@@ -251,6 +270,19 @@ const EditWorkoutDialog = ({
     updateSession(sIdx, { steps });
   };
 
+  const moveStep = (sIdx: number, stIdx: number, direction: -1 | 1) => {
+    const s = sessions[sIdx];
+    const steps = [...(s.steps ?? [])];
+    const nextIdx = stIdx + direction;
+    if (nextIdx < 0 || nextIdx >= steps.length) return;
+    [steps[stIdx], steps[nextIdx]] = [steps[nextIdx], steps[stIdx]];
+    updateSession(sIdx, { steps });
+  };
+
+  const updateSessionPace = (sIdx: number, pace: string | null) => {
+    updateSession(sIdx, { pace: normalizePace(pace) });
+  };
+
   const removeStep = (sIdx: number, stIdx: number) => {
     const s = sessions[sIdx];
     const steps = (s.steps ?? []).filter((_, i) => i !== stIdx);
@@ -263,7 +295,11 @@ const EditWorkoutDialog = ({
       type: s.type, profile, recentActivities, targetTime,
     });
     const patch: Partial<WorkoutSession> = {};
-    if (sug.pace) patch.pace = sug.pace;
+    if (sug.pace) {
+      const pace = normalizePace(sug.pace);
+      patch.pace = pace;
+      patch.steps = (s.steps ?? []).map((step) => step.pace ? step : { ...step, pace });
+    }
     if (sug.bpm_low && sug.bpm_high) patch.hr_target = { zone: sug.zone ?? undefined, bpm_low: sug.bpm_low, bpm_high: sug.bpm_high };
     updateSession(sIdx, patch);
     const label =
@@ -280,6 +316,8 @@ const EditWorkoutDialog = ({
       ...s,
       type: normalizeType(s.type),
       color: typeColor(normalizeType(s.type)),
+      pace: normalizePace(sessionPace(s) ?? s.pace) ?? null,
+      steps: (s.steps ?? []).map((step) => ({ ...step, pace: normalizePace(step.pace) })),
       distance_km: sessionDistanceKm(s) || s.distance_km || null,
     }));
     const keepStructuredSessions = cleanSessions.length > 1 || cleanSessions.some((s) => (s.steps?.length ?? 0) > 0);
@@ -408,12 +446,15 @@ const EditWorkoutDialog = ({
                   <label className="text-sm font-medium text-foreground mb-1 block">
                     {isZh ? "距離 (公里)" : "Distance (km)"}
                   </label>
-                  <Input
-                    type="number" min="0" step="0.5"
-                    value={structuredInterval && computedDistance > 0 ? String(computedDistance) : (s.distance_km != null ? String(s.distance_km) : "")}
-                    disabled={structuredInterval}
-                    onChange={(e) => updateSession(sIdx, { distance_km: e.target.value ? Number(e.target.value) : null })}
-                  />
+                  {structuredInterval ? (
+                    <Input type="number" value={computedDistance > 0 ? String(computedDistance) : ""} disabled readOnly />
+                  ) : (
+                    <Input
+                      type="number" min="0" step="0.1"
+                      defaultValue={s.distance_km != null ? String(s.distance_km) : ""}
+                      onChange={(e) => updateSession(sIdx, { distance_km: e.target.value ? Number(e.target.value) : null })}
+                    />
+                  )}
                   {structuredInterval && (
                     <p className="text-[11px] text-muted-foreground mt-1">
                       {isZh ? "距離由下方順序自動加總" : "Distance is calculated from the sequence below"}
@@ -460,11 +501,17 @@ const EditWorkoutDialog = ({
                         </button>
                       )}
                     </div>
-                    <Input
-                      type="text" placeholder="5:30/km"
-                      value={s.pace ?? ""}
-                      onChange={(e) => updateSession(sIdx, { pace: e.target.value })}
-                    />
+                    <select
+                      className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                      value={paceSelectValue(s.pace)}
+                      onChange={(e) => updateSessionPace(sIdx, e.target.value || null)}
+                    >
+                      <option value="">{isZh ? "選擇配速" : "Select pace"}</option>
+                      {normalizePace(s.pace) && !PACE_OPTIONS.includes(normalizePace(s.pace)!) && (
+                        <option value={normalizePace(s.pace)!}>{normalizePace(s.pace)}</option>
+                      )}
+                      {PACE_OPTIONS.map((pace) => <option key={pace} value={pace}>{pace}</option>)}
+                    </select>
                     {showMulti && s.hr_target?.bpm_low && s.hr_target?.bpm_high ? (
                       <p className="text-[11px] text-muted-foreground mt-1">
                         {isZh ? `心率 ${s.hr_target.bpm_low}-${s.hr_target.bpm_high} bpm` : `HR ${s.hr_target.bpm_low}-${s.hr_target.bpm_high} bpm`}
@@ -524,6 +571,24 @@ const EditWorkoutDialog = ({
                               </select>
                               <button
                                 type="button"
+                                onClick={() => moveStep(sIdx, stIdx, -1)}
+                                disabled={stIdx === 0}
+                                className="text-muted-foreground hover:text-foreground disabled:opacity-30 p-1"
+                                aria-label={isZh ? "上移步驟" : "Move step up"}
+                              >
+                                <ChevronUp size={12} />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => moveStep(sIdx, stIdx, 1)}
+                                disabled={stIdx === (s.steps?.length ?? 0) - 1}
+                                className="text-muted-foreground hover:text-foreground disabled:opacity-30 p-1"
+                                aria-label={isZh ? "下移步驟" : "Move step down"}
+                              >
+                                <ChevronDown size={12} />
+                              </button>
+                              <button
+                                type="button"
                                 onClick={() => removeStep(sIdx, stIdx)}
                                 className="text-muted-foreground hover:text-destructive p-1"
                               >
@@ -535,22 +600,27 @@ const EditWorkoutDialog = ({
                                 <Input
                                   className="col-span-3 h-8 text-xs"
                                   type="number" min="1" placeholder={isZh ? "組數" : "reps"}
-                                  value={st.reps != null ? String(st.reps) : ""}
+                                  defaultValue={st.reps != null ? String(st.reps) : ""}
                                   onChange={(e) => updateStep(sIdx, stIdx, { reps: e.target.value ? Number(e.target.value) : null })}
                                 />
                                 <span className="col-span-1 text-center text-xs text-muted-foreground">×</span>
                                 <Input
                                   className="col-span-3 h-8 text-xs"
                                   type="number" min="50" step="50" placeholder="m"
-                                  value={st.distance_m != null ? String(st.distance_m) : ""}
+                                  defaultValue={st.distance_m != null ? String(st.distance_m) : ""}
                                   onChange={(e) => updateStep(sIdx, stIdx, { distance_m: e.target.value ? Number(e.target.value) : null })}
                                 />
-                                <Input
-                                  className="col-span-5 h-8 text-xs"
-                                  type="text" placeholder={isZh ? "配速 4:10/km" : "pace 4:10/km"}
-                                  value={st.pace ?? ""}
-                                  onChange={(e) => updateStep(sIdx, stIdx, { pace: e.target.value })}
-                                />
+                                <select
+                                  className="col-span-5 h-8 text-xs rounded border border-input bg-background px-1.5"
+                                  value={paceSelectValue(st.pace)}
+                                  onChange={(e) => updateStep(sIdx, stIdx, { pace: e.target.value || null })}
+                                >
+                                  <option value="">{isZh ? "配速" : "pace"}</option>
+                                  {normalizePace(st.pace) && !PACE_OPTIONS.includes(normalizePace(st.pace)!) && (
+                                    <option value={normalizePace(st.pace)!}>{normalizePace(st.pace)}</option>
+                                  )}
+                                  {PACE_OPTIONS.map((pace) => <option key={pace} value={pace}>{pace}</option>)}
+                                </select>
                                 <Input
                                   className="col-span-12 h-8 text-xs"
                                   type="text" placeholder={isZh ? "組間休息 (例: 90s / 2:00)" : "Rest between reps (e.g. 90s / 2:00)"}
@@ -563,15 +633,20 @@ const EditWorkoutDialog = ({
                                 <Input
                                   className="col-span-5 h-8 text-xs"
                                   type="number" step="0.1" placeholder="km"
-                                  value={st.distance_km != null ? String(st.distance_km) : ""}
+                                  defaultValue={st.distance_km != null ? String(st.distance_km) : ""}
                                   onChange={(e) => updateStep(sIdx, stIdx, { distance_km: e.target.value ? Number(e.target.value) : null })}
                                 />
-                                <Input
-                                  className="col-span-7 h-8 text-xs"
-                                  type="text" placeholder={isZh ? "配速" : "pace"}
-                                  value={st.pace ?? ""}
-                                  onChange={(e) => updateStep(sIdx, stIdx, { pace: e.target.value })}
-                                />
+                                <select
+                                  className="col-span-7 h-8 text-xs rounded border border-input bg-background px-1.5"
+                                  value={paceSelectValue(st.pace)}
+                                  onChange={(e) => updateStep(sIdx, stIdx, { pace: e.target.value || null })}
+                                >
+                                  <option value="">{isZh ? "配速" : "pace"}</option>
+                                  {normalizePace(st.pace) && !PACE_OPTIONS.includes(normalizePace(st.pace)!) && (
+                                    <option value={normalizePace(st.pace)!}>{normalizePace(st.pace)}</option>
+                                  )}
+                                  {PACE_OPTIONS.map((pace) => <option key={pace} value={pace}>{pace}</option>)}
+                                </select>
                               </div>
                             )}
                           </div>

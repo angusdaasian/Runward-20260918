@@ -25,7 +25,7 @@ import { shareTrainingWeek } from "@/lib/sharePlanWeek";
 import { estimateMaxHr, estimateRestingHr, zoneBoundaries, isValidCustomZones } from "@/lib/hrZones";
 import { predictRaceFromActivities, typeLabel, type RunType } from "@/lib/racePredictionHr";
 import { targetTimeFromPlan, type SuggestProfile, type SuggestActivity } from "@/lib/paceSuggest";
-import { genSessionId, sessionDistanceKm, summarizeDay, type WorkoutSession } from "@/lib/planTypes";
+import { genSessionId, sessionDistanceKm, sessionPace, summarizeDay, type WorkoutSession } from "@/lib/planTypes";
 import { splitIntervalsInPlan } from "@/lib/splitIntervalSessions";
 import {
   DndContext, PointerSensor, TouchSensor, useSensor, useSensors,
@@ -349,7 +349,7 @@ const dayForWorkoutSession = (day: DayPlan, session: WorkoutSession): DayPlan =>
   type: session.type,
   title: session.title ?? session.type,
   distance_km: sessionDistanceKm(session) || session.distance_km || null,
-  pace: session.pace ?? null,
+  pace: sessionPace(session),
   description: session.description ?? null,
   color: session.color ?? day.color,
   elevation_m: session.elevation_m ?? null,
@@ -609,6 +609,7 @@ const DraggableDay = ({
           {sessions.map((session, sessionIdx) => {
             const sessionDay = dayForWorkoutSession(day, session);
             const sessionKm = sessionDistanceKm(session);
+            const sessionPaceLabel = sessionPace(session);
             const expanded = expandedSessionId === (session.id || String(sessionIdx));
             return (
           <div key={session.id || sessionIdx} className="bg-card border border-border rounded-lg p-3 hover:border-primary transition-colors">
@@ -626,7 +627,9 @@ const DraggableDay = ({
                 <span className="font-medium text-sm text-foreground truncate">
                   {session.time_of_day ? `${session.time_of_day} · ` : ""}{localizeTitle(session.type || "Run", lang)}
                 </span>
-                {sessionKm > 0 && <span className="text-xs text-muted-foreground tabular-nums shrink-0">{sessionKm} km</span>}
+                <span className="text-xs text-muted-foreground tabular-nums shrink-0">
+                  {[sessionKm > 0 ? `${sessionKm} km` : null, sessionPaceLabel].filter(Boolean).join(" · ")}
+                </span>
               </div>
               <button
                 type="button"
@@ -2702,6 +2705,10 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                       onSwap={(from, to) => swapDays(currentWeekIdx, from, to)}
                       onAddClick={(i) => { setAddingDayIdx(i); setAddRunType(null); setAddDistance(""); setAddElevation(""); setAddEph(""); }}
                       onEditClick={(i, day, sessionIdx = 0) => { setEditingSessionIdx(sessionIdx); setEditingDayIdx(i); setEditDistance(day.distance_km?.toString() || ""); setEditPace(day.pace || ""); setEditDescription(day.description || ""); }}
+                      pushedSet={pushedSet}
+                      pushingIdx={pushingIdx}
+                      onPushDay={isPremium && watchProvider ? pushDayToWatch : undefined}
+                      watchProvider={watchProvider}
                     />
                     {planDirty && (
                       <Button onClick={savePlanEdits} disabled={savingPlan} className="w-full mt-4" size="lg">

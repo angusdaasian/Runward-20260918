@@ -422,11 +422,20 @@ const EditWorkoutDialog = ({
                       onChange={(e) => {
                         const newType = e.target.value;
                         const opt = TYPE_OPTIONS.find((o) => o.id === newType);
-                        updateSession(sIdx, {
+                        const patch: Partial<WorkoutSession> = {
                           type: newType,
                           color: opt?.color,
                           description: opt ? (isZh ? opt.descZh : opt.descEn) : s.description,
-                        });
+                        };
+                        if (newType === "Interval" && (!s.steps || s.steps.length === 0)) {
+                          patch.steps = [{ kind: "interval", reps: 5, distance_m: 800, pace: s.pace ?? null, rest: "90s" }];
+                        } else if (newType === "Warmup" && (!s.steps || s.steps.length === 0)) {
+                          patch.steps = [{ kind: "warmup", distance_km: s.distance_km ?? 1.5, pace: s.pace ?? null }];
+                        } else if (newType === "Cooldown" && (!s.steps || s.steps.length === 0)) {
+                          patch.steps = [{ kind: "cooldown", distance_km: s.distance_km ?? 1.5, pace: s.pace ?? null }];
+                        }
+                        updateSession(sIdx, patch);
+                        if (newType === "Interval") setExpandedSteps((p) => ({ ...p, [s.id]: true }));
                       }}
                     >
                       {!TYPE_OPTIONS.some((o) => o.id === s.type) && s.type && (

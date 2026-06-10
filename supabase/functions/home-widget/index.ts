@@ -13,8 +13,9 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "GET, OPTIONS",
 };
 
+// Large square widget canvas (~iOS Large widget aspect)
 const W = 360;
-const H = 169;
+const H = 380;
 
 const THEMES = {
   dark: { bg1: "#1c1c1e", bg2: "#0f0f10", fg: "#ffffff", sub: "#9aa0a6", accent: "#f59e0b" },

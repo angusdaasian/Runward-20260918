@@ -640,6 +640,7 @@ const ActivitiesTab = ({ lang }: Props) => {
       pace?: string | null;
       elevation_m?: number | null;
       eph?: number | null;
+      sessions?: any[];
     } | null;
     races?: { id: string; race_name: string; race_name_zh?: string | null; category: string }[];
   } | null>(null);

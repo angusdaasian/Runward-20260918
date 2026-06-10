@@ -247,9 +247,12 @@ const EditWorkoutDialog = ({
     setVerdict(null); setNeedsConfirm(false);
   };
 
-  const addStep = (sIdx: number) => {
+  const addStep = (sIdx: number, kind: WorkoutStepKind = "main") => {
     const s = sessions[sIdx];
-    const steps = [...(s.steps ?? []), { kind: "main" as WorkoutStepKind }];
+    const base: WorkoutStep = kind === "interval"
+      ? { kind, reps: 5, distance_m: 800, pace: s.pace ?? null, rest: "90s" }
+      : { kind, distance_km: null, pace: s.pace ?? null };
+    const steps = [...(s.steps ?? []), base];
     updateSession(sIdx, { steps });
   };
 

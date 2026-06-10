@@ -3842,59 +3842,35 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
       </Dialog>
 
       {/* Custom Add Workout Dialog */}
-      <Dialog open={customAddingDayIdx !== null} onOpenChange={(open) => { if (!open) setCustomAddingDayIdx(null); }}>
-        <DialogContent className="sm:max-w-sm">
-          <DialogHeader><DialogTitle>{lang === "zh" ? "新增訓練" : "Add Workout"}</DialogTitle></DialogHeader>
-          {!customAddRunType ? (
-            <div className="space-y-2">
-              <p className="text-sm text-muted-foreground">{lang === "zh" ? "選擇跑步類型" : "Select run type"}</p>
-              {RUN_TYPES.map((rt) => (
-                <button key={rt.id} onClick={() => setCustomAddRunType(rt.id)} className="w-full bg-card border border-border rounded-lg p-3 flex items-center gap-3 text-left hover:border-primary transition-colors">
-                  <span>{rt.emoji}</span><span className="font-medium text-sm text-foreground">{lang === "zh" ? rt.zh : rt.en}</span><ChevronRight size={14} className="text-muted-foreground ml-auto" />
-                </button>
-              ))}
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <button onClick={() => setCustomAddRunType(null)} className="flex items-center gap-1 text-sm text-muted-foreground"><ChevronLeft size={14} />{lang === "zh" ? "返回" : "Back"}</button>
-              <div className="flex items-center gap-2">
-                <span>{RUN_TYPES.find(r => r.id === customAddRunType)?.emoji}</span>
-                <span className="font-medium text-foreground">{lang === "zh" ? RUN_TYPES.find(r => r.id === customAddRunType)?.zh : RUN_TYPES.find(r => r.id === customAddRunType)?.en}</span>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-foreground mb-1 block">{lang === "zh" ? "距離 (公里)" : "Distance (km)"}</label>
-                <Input type="number" min="0.5" step="0.5" placeholder="e.g. 8" value={customAddDistance} onChange={(e) => setCustomAddDistance(e.target.value)} className="w-full" />
-              </div>
-              {(customAddRunType === "Trail Run" || customAddRunType === "Trail Race") && (
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-sm font-medium text-foreground mb-1 block">{lang === "zh" ? "爬升 (米)" : "Elevation (m)"}</label>
-                    <Input type="number" min="0" step="10" placeholder="e.g. 500" value={customAddElevation} onChange={(e) => setCustomAddElevation(e.target.value)} className="w-full" />
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-foreground mb-1 block">EpH</label>
-                    <Input type="number" min="0" step="0.1" placeholder="e.g. 8" value={customAddEph} onChange={(e) => setCustomAddEph(e.target.value)} className="w-full" />
-                  </div>
-                </div>
-              )}
-              <Button className="w-full" disabled={!customAddDistance || Number(customAddDistance) <= 0 || ((customAddRunType === "Trail Run" || customAddRunType === "Trail Race") && (!customAddElevation || !customAddEph))} onClick={() => {
-                if (customAddingDayIdx === null || !customAddRunType || !customAddDistance) return;
-                const rt = RUN_TYPES.find(r => r.id === customAddRunType)!;
-                const updatedPlan = [...customPlan]; const week = { ...updatedPlan[customWeekIdx] }; const days = [...week.days];
-                const isTrail = customAddRunType === "Trail Run" || customAddRunType === "Trail Race";
-                const trailDesc = lang === "zh" ? `${customAddDistance}km · 爬升 ${Math.round(Number(customAddElevation) || 0)}m · 目標 EpH ${customAddEph}。以 EpH 控制越野強度。` : `${customAddDistance}km · ${Math.round(Number(customAddElevation) || 0)}m ascent · target EpH ${customAddEph}. Use EpH to control trail effort.`;
-                const newSession: WorkoutSession = { id: genSessionId(), type: customAddRunType, title: lang === "zh" ? rt.zh : rt.en, description: isTrail ? trailDesc : "", distance_km: Number(customAddDistance), pace: null, color: rt.color, elevation_m: isTrail ? Number(customAddElevation) || null : null, eph: isTrail ? Number(customAddEph) || null : null, steps: [] };
-                const existingSessions = workoutSessionsForDay(days[customAddingDayIdx]);
-                days[customAddingDayIdx] = rebuildDayFromSessions(days[customAddingDayIdx], [...existingSessions, newSession], lang);
-                week.days = days; updatedPlan[customWeekIdx] = week; setCustomPlan(updatedPlan);
-                if (user && customExistingPlan) supabase.from("training_plans" as any).update({ plan_data: updatedPlan } as any).eq("id", customExistingPlan.id).then(() => { notifyPlanChanged(); });
-                setCustomAddingDayIdx(null);
-                toast({ title: lang === "zh" ? "已新增訓練" : "Workout Added", description: `${lang === "zh" ? rt.zh : rt.en} - ${customAddDistance} km` });
-              }}>{lang === "zh" ? "新增訓練" : "Add Workout"}</Button>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+      {customAddingDayIdx !== null && customPlan[customWeekIdx]?.days[customAddingDayIdx] && (
+        <EditWorkoutDialog
+          open={customAddingDayIdx !== null}
+          onOpenChange={(o) => { if (!o) setCustomAddingDayIdx(null); }}
+          lang={lang}
+          title={lang === "zh" ? "新增訓練" : "New Workout"}
+          workout={{ type: "Easy Run", title: lang === "zh" ? "輕鬆跑" : "Easy Run", distance_km: null, pace: null, description: "", color: "#22c55e", sessions: [] }}
+          multiSession
+          recentActivities={recentRunActivities}
+          profile={suggestProfile}
+          targetTime={null}
+          planContext={customExistingPlan ? `Custom plan, week ${customWeekIdx + 1}` : null}
+          onSave={async (next) => {
+            if (customAddingDayIdx === null) return;
+            const newSession = firstSessionFromEditedWorkout(next as DayPlan);
+            if (!newSession) return;
+            newSession.id = genSessionId();
+            const updatedPlan = [...customPlan]; const week = { ...updatedPlan[customWeekIdx] }; const days = [...week.days];
+            const existingSessions = workoutSessionsForDay(days[customAddingDayIdx]);
+            days[customAddingDayIdx] = rebuildDayFromSessions(days[customAddingDayIdx], [...existingSessions, newSession], lang);
+            week.days = days; updatedPlan[customWeekIdx] = week; setCustomPlan(updatedPlan);
+            if (user && customExistingPlan) await supabase.from("training_plans" as any).update({ plan_data: updatedPlan } as any).eq("id", customExistingPlan.id);
+            notifyPlanChanged();
+            toast({ title: lang === "zh" ? "已新增訓練" : "Workout Added" });
+            setCustomAddingDayIdx(null);
+          }}
+        />
+      )}
+
 
       {/* Custom Edit Workout Dialog (validated) */}
       {customEditingDayIdx !== null && customPlan[customWeekIdx]?.days[customEditingDayIdx] && (

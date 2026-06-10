@@ -3,7 +3,7 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { getTerraCreds, pickEnvFromRequest } from "../_shared/terraEnv.ts";
-import { buildPlannedWorkout, type PlanDay } from "../_shared/terraPlannedWorkout.ts";
+import { buildPlannedWorkout, expandSessions, type PlanDay } from "../_shared/terraPlannedWorkout.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",

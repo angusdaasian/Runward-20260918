@@ -62,6 +62,8 @@ function paceSecPerKm(pace?: string | null): number | null {
 
 function normalizeType(type?: string | null): string {
   const t = (type ?? "").toString().trim().toLowerCase();
+  if (t.includes("warm")) return "Warmup";
+  if (t.includes("cool")) return "Cooldown";
   if (t.includes("interval")) return "Intervals";
   if (t.includes("tempo")) return "Tempo";
   if (t.includes("recovery")) return "Recovery Run";
@@ -73,13 +75,10 @@ function normalizeType(type?: string | null): string {
 }
 
 function watchText(value: string | null | undefined, fallback: string, maxLen = 60): string {
-  // Garmin/Coros both accept UTF-8 (incl. CJK) in workout names/descriptions.
-  // Strip only control characters; keep ASCII printable + extended Unicode.
   const text = (value || "").replace(/[\x00-\x1F\x7F]/g, "").trim();
   return (text || fallback).slice(0, maxLen);
 }
 
-// Localized step labels.
 const L = {
   en: { warmup: "Warm Up", cooldown: "Cool Down", work: "Work", recovery: "Recovery", tempo: "Tempo", easy: "Easy Run", long: "Long Run", recoveryRun: "Recovery Run", trail: "Trail Run", run: "Run", intervals: "Intervals" },
   zh: { warmup: "熱身", cooldown: "緩和", work: "主項", recovery: "恢復", tempo: "節奏跑", easy: "輕鬆跑", long: "長距離跑", recoveryRun: "恢復跑", trail: "越野跑", run: "跑步", intervals: "間歇跑" },
@@ -88,6 +87,8 @@ const L = {
 function typeLabel(type: string, lang: "en" | "zh"): string {
   const d = L[lang];
   switch (type) {
+    case "Warmup": return d.warmup;
+    case "Cooldown": return d.cooldown;
     case "Intervals": return d.intervals;
     case "Tempo": return d.tempo;
     case "Easy Run": return d.easy;

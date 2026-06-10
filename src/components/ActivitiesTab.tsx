@@ -1576,6 +1576,32 @@ const ActivitiesTab = ({ lang }: Props) => {
                                 lang,
                               )}
                             </p>
+                            {Array.isArray(s.steps) && s.steps.length > 0 && (
+                              <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
+                                {s.steps.map((st: any, sidx: number) => {
+                                  const kind = String(st.kind || "").toLowerCase();
+                                  const label = lang === "zh"
+                                    ? (kind === "warmup" ? "熱身" : kind === "cooldown" ? "緩和" : kind === "interval" ? "間歇" : kind === "recovery" ? "恢復" : "主項")
+                                    : (kind === "warmup" ? "Warm Up" : kind === "cooldown" ? "Cool Down" : kind === "interval" ? "Intervals" : kind === "recovery" ? "Recovery" : "Main");
+                                  const parts: string[] = [];
+                                  if (kind === "interval" && st.reps && st.distance_m) {
+                                    parts.push(`${st.reps} × ${st.distance_m} m`);
+                                  } else if (st.distance_km != null) {
+                                    parts.push(`${st.distance_km} km`);
+                                  } else if (st.distance_m != null) {
+                                    parts.push(`${st.distance_m} m`);
+                                  }
+                                  if (st.pace) parts.push(`@ ${st.pace}`);
+                                  if (st.rest) parts.push(lang === "zh" ? `休息 ${st.rest}` : `rest ${st.rest}`);
+                                  return (
+                                    <li key={sidx} className="flex gap-2">
+                                      <span className="font-medium text-foreground/80 min-w-[64px]">{label}</span>
+                                      <span>{parts.join(" · ")}</span>
+                                    </li>
+                                  );
+                                })}
+                              </ul>
+                            )}
                           </div>
                         );
                       })}

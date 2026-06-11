@@ -112,7 +112,25 @@ serve(async (req) => {
       }, { onConflict: "user_id" });
     if (dbError) throw new Error(`DB error: ${dbError.message}`);
 
-    return new Response(JSON.stringify({ success: true, polar_user_id: polarUserId }), {
+    // Kick off an initial backfill of the last 7 days.
+    // Fire-and-forget so the callback stays snappy; surface any error in logs.
+    let initialSync: { count?: number; error?: string } = {};
+    try {
+      const syncRes = await fetch(`${SUPABASE_URL}/functions/v1/polar-sync`, {
+        method: "POST",
+        headers: {
+          "Authorization": authHeader,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ since_days: 7 }),
+      });
+      initialSync = await syncRes.json().catch(() => ({}));
+    } catch (e) {
+      console.warn("[polar-callback] initial sync failed", e);
+      initialSync = { error: e instanceof Error ? e.message : String(e) };
+    }
+
+    return new Response(JSON.stringify({ success: true, polar_user_id: polarUserId, initial_sync: initialSync }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error: unknown) {

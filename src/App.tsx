@@ -55,11 +55,13 @@ const RouteFallback = () => (
 
 const RootRoute = () => {
   const { session, loading } = useAuth();
+  // Only the native app shell can access the in-app Index experience.
   if (native) return <Index />;
-  if (hadInAppParams || hadOAuthReturn) return <Index />;
-  if (loading) return <Index />;
-  if (isDesktop) return <Landing />;
-  if (session?.user) return <Index />;
+  // OAuth/in-app redirects still need to hit Index so callbacks complete.
+  if (hadOAuthReturn) return <Index />;
+  if (native && hadInAppParams) return <Index />;
+  // All browser users (desktop + mobile Safari/Chrome) get the marketing site.
+  if (loading) return <Landing />;
   return <Landing />;
 };
 

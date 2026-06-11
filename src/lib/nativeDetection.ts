@@ -4,9 +4,8 @@
  *
  * Despia-only signals (strict — mobile Safari must NOT match):
  * 1. ?native=true query parameter (configure Despia start URL with this)
- * 2. window.despia / window.median JS bridge globals
- * 3. User-Agent contains "despia" or "median"
- * 4. navigator.standalone === true (iOS standalone WebView / PWA)
+ * 2. User-Agent contains "despia" or "median"
+ * 3. navigator.standalone === true (iOS standalone WebView / PWA)
  *
  * Anything else (mobile Safari, mobile Chrome, desktop) → web → landing page.
  */
@@ -37,28 +36,21 @@ export function isNativeApp(): boolean {
     return true;
   }
 
-  // 2. Despia / Median JS bridge globals
-  if (
-    typeof (window as any).median !== "undefined" ||
-    typeof (window as any).despia !== "undefined"
-  ) {
-    localStorage.setItem(STORAGE_KEY, "true");
-    return true;
-  }
-
-  // 3. UA token from the Despia wrapper
+  // 2. UA token from the Despia wrapper.
+  // Do NOT trust window.despia/window.median here: the public website loads
+  // despia-native from index.html, so those globals can exist in desktop Safari/Chrome.
   if (/despia|median/i.test(ua)) {
     localStorage.setItem(STORAGE_KEY, "true");
     return true;
   }
 
-  // 4. iOS standalone WebView (Despia's iOS shell sets this)
+  // 3. iOS standalone WebView (Despia's iOS shell sets this)
   if ((navigator as any).standalone === true) {
     localStorage.setItem(STORAGE_KEY, "true");
     return true;
   }
 
-  // 5. Cached result — only honor cached "true" if any active signal also
+  // 4. Cached result — only honor cached "true" if any active signal also
   // matched above. Since none did, clear stale cache so a mobile Safari
   // visitor who was previously misdetected isn't stuck on Index forever.
   if (localStorage.getItem(STORAGE_KEY) === "true") {

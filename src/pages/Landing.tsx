@@ -172,22 +172,35 @@ const Landing = () => {
 
       {/* ─── Brand logos strip ─── */}
       <section className="border-y border-border bg-card/50">
-        <div className="max-w-5xl mx-auto px-6 py-8">
-          <p className="text-center text-[11px] font-semibold tracking-[0.18em] text-muted-foreground/80 uppercase mb-5">
+        <div className="max-w-5xl mx-auto px-6 py-10">
+          <p className="text-center text-[11px] font-semibold tracking-[0.18em] text-muted-foreground/80 uppercase mb-6">
             {zh ? "支援的平台" : "Works with"}
           </p>
-          <div className="flex flex-wrap items-center justify-center gap-x-10 gap-y-4 md:gap-x-14 opacity-80">
-            {["Strava", "Garmin", "Suunto", "COROS", "Polar"].map((b) => (
-              <span
-                key={b}
-                className="font-display font-bold text-lg md:text-2xl tracking-tight text-foreground/70 hover:text-foreground transition-colors"
+          <div className="flex flex-wrap items-center justify-center gap-4 md:gap-6">
+            {[
+              { src: stravaLogo.url, alt: "Strava", h: "h-7 md:h-8" },
+              { src: garminLogo.url, alt: "Garmin", h: "h-9 md:h-11" },
+              { src: suuntoLogo.url, alt: "Suunto", h: "h-9 md:h-11" },
+              { src: corosLogo.url, alt: "COROS", h: "h-11 md:h-14" },
+              { src: polarLogo.url, alt: "Polar", h: "h-8 md:h-9" },
+              { src: appleHealthLogo.url, alt: "Apple Health", h: "h-9 md:h-11" },
+            ].map((b) => (
+              <div
+                key={b.alt}
+                className="flex items-center justify-center bg-white rounded-xl px-5 py-3 ring-1 ring-border/50 shadow-sm"
               >
-                {b}
-              </span>
+                <img
+                  src={b.src}
+                  alt={b.alt}
+                  className={`${b.h} w-auto object-contain`}
+                  loading="lazy"
+                />
+              </div>
             ))}
           </div>
         </div>
       </section>
+
 
       {/* ─── App Store Screenshots ─── */}
       <AppStoreScreenshots lang={lang} />

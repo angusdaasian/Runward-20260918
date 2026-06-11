@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { maybeSendTelegramActivityPrompt } from "../_shared/telegramActivityPrompt.ts";
+import { maybeSendWhatsappActivityPrompt } from "../_shared/whatsappActivityPrompt.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -332,14 +333,16 @@ serve(async (req) => {
           xp,
           trainingScore
         );
-        await maybeSendTelegramActivityPrompt({
+        const _ahPrompt = {
           userId: user.id,
-          source: "apple_health",
+          source: "apple_health" as const,
           activityKey: `${act.start_date || ""}:${Math.round(act.distance || 0)}`,
           distanceMeters: act.distance || 0,
           durationSeconds: act.moving_time || 0,
           sportType: act.sport_type,
-        });
+        };
+        await maybeSendTelegramActivityPrompt(_ahPrompt);
+        await maybeSendWhatsappActivityPrompt(_ahPrompt);
       }
     }
 

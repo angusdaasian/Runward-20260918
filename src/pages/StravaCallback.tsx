@@ -54,7 +54,13 @@ export default function StravaCallback() {
         return;
       }
       toast.success("Strava connected");
-      navigate("/?page=connect-apps", { replace: true });
+      const origin = localStorage.getItem("fitness_pending_origin");
+      localStorage.removeItem("fitness_pending_origin");
+      if (origin === "dashboard") {
+        navigate("/dashboard?view=connect", { replace: true });
+      } else {
+        navigate("/?page=connect-apps", { replace: true });
+      }
     })();
 
   }, [searchParams, navigate]);

@@ -47,6 +47,7 @@ import NotificationManager from "@/components/admin/NotificationManager";
 import TerraSyncTester from "@/components/admin/TerraSyncTester";
 import StravaAppsManager from "@/components/admin/StravaAppsManager";
 import SuuntoSyncTester from "@/components/admin/SuuntoSyncTester";
+import PolarSyncTester from "@/components/admin/PolarSyncTester";
 
 interface UserRow {
   user_id: string;
@@ -73,7 +74,8 @@ type TabKey =
   | "feedback"
   | "terra"
   | "strava"
-  | "suunto";
+  | "suunto"
+  | "polar";
 
 const TABS: { key: TabKey; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { key: "users", label: "Users", icon: Users },
@@ -87,6 +89,7 @@ const TABS: { key: TabKey; label: string; icon: React.ComponentType<{ className?
   { key: "terra", label: "Terra Sync", icon: RefreshCw },
   { key: "strava", label: "Strava Apps", icon: RefreshCw },
   { key: "suunto", label: "Suunto Sync", icon: RefreshCw },
+  { key: "polar", label: "Polar Sync", icon: RefreshCw },
 ];
 
 const initialAdminTab = (): TabKey => {
@@ -427,6 +430,8 @@ const AdminPanel = () => {
         return <StravaAppsManager />;
       case "suunto":
         return <SuuntoSyncTester />;
+      case "polar":
+        return <PolarSyncTester />;
     }
   };
 

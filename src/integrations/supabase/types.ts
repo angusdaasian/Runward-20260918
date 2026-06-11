@@ -635,6 +635,99 @@ export type Database = {
         }
         Relationships: []
       }
+      polar_activities: {
+        Row: {
+          average_heart_rate: number | null
+          calories: number | null
+          club_id: number | null
+          club_name: string | null
+          created_at: string
+          detailed_sport_type: string | null
+          distance: number | null
+          duration: number | null
+          has_route: boolean | null
+          id: string
+          maximum_heart_rate: number | null
+          polar_exercise_id: string
+          raw: Json | null
+          sport_type: string | null
+          start_date: string
+          training_load: number | null
+          upload_time: string | null
+          user_id: string
+        }
+        Insert: {
+          average_heart_rate?: number | null
+          calories?: number | null
+          club_id?: number | null
+          club_name?: string | null
+          created_at?: string
+          detailed_sport_type?: string | null
+          distance?: number | null
+          duration?: number | null
+          has_route?: boolean | null
+          id?: string
+          maximum_heart_rate?: number | null
+          polar_exercise_id: string
+          raw?: Json | null
+          sport_type?: string | null
+          start_date: string
+          training_load?: number | null
+          upload_time?: string | null
+          user_id: string
+        }
+        Update: {
+          average_heart_rate?: number | null
+          calories?: number | null
+          club_id?: number | null
+          club_name?: string | null
+          created_at?: string
+          detailed_sport_type?: string | null
+          distance?: number | null
+          duration?: number | null
+          has_route?: boolean | null
+          id?: string
+          maximum_heart_rate?: number | null
+          polar_exercise_id?: string
+          raw?: Json | null
+          sport_type?: string | null
+          start_date?: string
+          training_load?: number | null
+          upload_time?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      polar_connections: {
+        Row: {
+          access_token: string
+          created_at: string
+          expires_at: number
+          member_id: string
+          polar_user_id: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          access_token: string
+          created_at?: string
+          expires_at: number
+          member_id: string
+          polar_user_id: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          access_token?: string
+          created_at?: string
+          expires_at?: number
+          member_id?: string
+          polar_user_id?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       posture_analyses: {
         Row: {
           created_at: string

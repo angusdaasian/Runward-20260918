@@ -209,6 +209,48 @@ const PolarSyncTester = () => {
           )}
         </CardContent>
       </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Polar Webhook</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Polar pushes new exercises to a single partner webhook. The receiver URL is:
+          </p>
+          <pre className="text-xs bg-muted p-2 rounded-md overflow-x-auto break-all">{webhookUrl}</pre>
+
+          <div className="rounded-md border border-border p-3 text-sm">
+            {webhook ? (
+              <div className="space-y-1">
+                <div><span className="text-muted-foreground">ID:</span> <code>{webhook.id}</code></div>
+                <div><span className="text-muted-foreground">URL:</span> <code className="break-all">{webhook.url}</code></div>
+                <div><span className="text-muted-foreground">Events:</span> {webhook.events?.join(", ")}</div>
+                <div className="text-muted-foreground text-xs">
+                  Registered {new Date(webhook.created_at).toLocaleString()}
+                </div>
+              </div>
+            ) : (
+              <span className="text-muted-foreground">No webhook registered with Polar.</span>
+            )}
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {!webhook ? (
+              <Button onClick={handleCreateWebhook} disabled={busy !== null}>
+                {busy === "webhook-create" ? "Creating…" : "Create webhook"}
+              </Button>
+            ) : (
+              <Button variant="destructive" onClick={handleDeleteWebhook} disabled={busy !== null}>
+                {busy === "webhook-delete" ? "Deleting…" : "Delete webhook"}
+              </Button>
+            )}
+            <Button variant="outline" onClick={handleListWebhook} disabled={busy !== null}>
+              {busy === "webhook-list" ? "Listing…" : "List from Polar"}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };

@@ -286,7 +286,7 @@ const Index = () => {
             <AnalyticsTab lang={lang} />
           </Suspense>
         </div>
-        {activeTab === "more" && !showConnectApps && !showTelegram && !showWhatsapp && (
+        {activeTab === "more" && !showConnectApps && !showMessaging && (
           <Suspense fallback={<SettingsSkeleton />}>
             <MoreTab
               lang={lang}
@@ -297,8 +297,7 @@ const Index = () => {
                 setShowOnboarding(true);
               }}
               onNavigateConnectApps={() => setShowConnectApps(true)}
-              onNavigateTelegram={() => setShowTelegram(true)}
-              onNavigateWhatsapp={() => setShowWhatsapp(true)}
+              onNavigateMessaging={() => setShowMessaging(true)}
             />
           </Suspense>
         )}
@@ -307,14 +306,9 @@ const Index = () => {
             <ConnectApps lang={lang} onBack={() => setShowConnectApps(false)} />
           </Suspense>
         )}
-        {activeTab === "more" && showTelegram && (
+        {activeTab === "more" && showMessaging && (
           <Suspense fallback={<TabPageSkeleton />}>
-            <TelegramSettingsPage lang={lang} onBack={() => setShowTelegram(false)} />
-          </Suspense>
-        )}
-        {activeTab === "more" && showWhatsapp && (
-          <Suspense fallback={<TabPageSkeleton />}>
-            <WhatsAppSettingsPage lang={lang} onBack={() => setShowWhatsapp(false)} />
+            <MessagingSettingsPage lang={lang} onBack={() => setShowMessaging(false)} />
           </Suspense>
         )}
         {activeTab === "races" && (

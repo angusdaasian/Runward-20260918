@@ -1,13 +1,16 @@
 // Sends a Telegram post-run prompt asking for RPE + how the run felt.
 // Idempotent per (user_id, source, activity_key) via unique constraint.
+// Looks up the actual activity DB row so the reply handler can call analyze-activity.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const BOT_TOKEN = Deno.env.get("TELEGRAM_BOT_TOKEN") ?? "";
 
+export type ActivitySource = "strava" | "suunto" | "terra" | "apple_health";
+
 export type ActivitySummary = {
   userId: string;
-  source: "strava" | "suunto" | "terra" | "apple_health";
-  activityKey: string; // unique per activity within source
+  source: ActivitySource;
+  activityKey: string;
   distanceMeters?: number | null;
   durationSeconds?: number | null;
   sportType?: string | null;
@@ -58,6 +61,63 @@ async function tgSend(chatId: number, text: string): Promise<number | null> {
   }
 }
 
+// Look up the activity DB row id matching this (source, activity_key).
+async function lookupActivityDbId(
+  supabase: any,
+  userId: string,
+  summary: ActivitySummary,
+): Promise<string | null> {
+  try {
+    if (summary.source === "strava") {
+      const { data } = await supabase
+        .from("strava_activities")
+        .select("id")
+        .eq("user_id", userId)
+        .eq("strava_id", Number(summary.activityKey))
+        .maybeSingle();
+      return data?.id ?? null;
+    }
+    if (summary.source === "suunto") {
+      const { data } = await supabase
+        .from("suunto_activities")
+        .select("id")
+        .eq("user_id", userId)
+        .eq("suunto_workout_key", String(summary.activityKey))
+        .maybeSingle();
+      return data?.id ?? null;
+    }
+    if (summary.source === "terra") {
+      const [provider, ...rest] = String(summary.activityKey).split(":");
+      const aid = rest.join(":");
+      const { data } = await supabase
+        .from("terra_activities")
+        .select("id")
+        .eq("user_id", userId)
+        .eq("provider", provider)
+        .eq("terra_activity_id", aid)
+        .maybeSingle();
+      return data?.id ?? null;
+    }
+    if (summary.source === "apple_health") {
+      // key was `${start_date}:${distance}`. Look up by start_date prefix + close distance.
+      const [startDate, distStr] = String(summary.activityKey).split(":");
+      const distance = Number(distStr) || 0;
+      const { data } = await supabase
+        .from("apple_health_activities")
+        .select("id, distance")
+        .eq("user_id", userId)
+        .eq("start_date", startDate)
+        .limit(5);
+      if (!data?.length) return null;
+      const best = data.find((r: any) => Math.abs(Number(r.distance) - distance) < 2) ?? data[0];
+      return best?.id ?? null;
+    }
+  } catch (e) {
+    console.warn("[tg-activity-prompt] lookupActivityDbId failed", e);
+  }
+  return null;
+}
+
 export async function maybeSendTelegramActivityPrompt(summary: ActivitySummary): Promise<void> {
   try {
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -76,7 +136,6 @@ export async function maybeSendTelegramActivityPrompt(summary: ActivitySummary):
 
     if (!profile?.telegram_chat_id || !profile?.telegram_activity_feedback) return;
 
-    // Prefer auth user_metadata if profile.lang missing
     let lang = detectLang((profile as any).lang);
     if (!(profile as any).lang) {
       try {
@@ -86,7 +145,9 @@ export async function maybeSendTelegramActivityPrompt(summary: ActivitySummary):
       } catch (_) { /* default */ }
     }
 
-    // Try to claim this activity (idempotency via unique (user_id, source, activity_key))
+    const activityDbId = await lookupActivityDbId(supabase, summary.userId, summary);
+
+    // Idempotent insert
     const { data: inserted, error: insertErr } = await supabase
       .from("telegram_pending_prompts")
       .insert({
@@ -94,6 +155,7 @@ export async function maybeSendTelegramActivityPrompt(summary: ActivitySummary):
         chat_id: profile.telegram_chat_id,
         activity_source: summary.source,
         activity_key: summary.activityKey,
+        activity_db_id: activityDbId,
         activity_summary: {
           distance_m: summary.distanceMeters ?? null,
           duration_s: summary.durationSeconds ?? null,
@@ -103,15 +165,12 @@ export async function maybeSendTelegramActivityPrompt(summary: ActivitySummary):
       .select("id")
       .maybeSingle();
 
-    if (insertErr || !inserted) {
-      // Already prompted for this activity
-      return;
-    }
+    if (insertErr || !inserted) return; // already prompted
 
     const summaryBlock = fmtSummary(summary, lang);
     const text = lang === "zh"
-      ? `🏃 *剛剛完成跑步！*\n\n${summaryBlock}\n\n你覺得這次跑步如何？回覆訊息告訴我：\n• *RPE*（1–10 自覺強度）\n• 感覺如何（可選，例如「腿很重」、「狀態很好」）\n\n例如：\`7 腿有點累但完成了\``
-      : `🏃 *Nice run!*\n\n${summaryBlock}\n\nHow did it feel? Reply with:\n• *RPE* (1–10 perceived effort)\n• How you felt (optional, e.g. "legs heavy", "felt strong")\n\nExample: \`7 legs heavy but pushed through\``;
+      ? `🏃 *剛剛完成跑步！*\n\n${summaryBlock}\n\n回覆訊息告訴我這次跑步的 *RPE*（1–10）以及感覺如何（可選），我會為你生成完整的 AI 跑步分析。\n\n例如：\`7 腿有點累但完成了\``
+      : `🏃 *Nice run!*\n\n${summaryBlock}\n\nReply with your *RPE* (1–10) and how it felt (optional) and I'll generate your full AI run analysis.\n\nExample: \`7 legs heavy but pushed through\``;
 
     const messageId = await tgSend(profile.telegram_chat_id as number, text);
     if (messageId) {

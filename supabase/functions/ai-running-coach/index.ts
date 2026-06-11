@@ -220,18 +220,32 @@ serve(async (req) => {
     const VERTEX_API_KEY = Deno.env.get("GOOGLE_VERTEX_API_KEY");
     if (!VERTEX_API_KEY) return json({ error: "AI not configured" }, 500);
 
-    const authHeader = req.headers.get("Authorization") || "";
-    const token = authHeader.replace("Bearer ", "");
-    if (!token) return json({ error: "Unauthorized" }, 401);
-
-    const userClient = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_ANON_KEY")!, {
-      global: { headers: { Authorization: authHeader } },
-    });
-    const {
-      data: { user },
-      error: authErr,
-    } = await userClient.auth.getUser(token);
-    if (authErr || !user) return json({ error: "Unauthorized" }, 401);
+    // Internal service mode (used by telegram-webhook): bypass JWT auth when a
+    // valid x-internal-secret + internalUserId are provided.
+    const internalSecret = req.headers.get("x-internal-secret") || "";
+    let user: { id: string } | null = null;
+    let internalBody: any = null;
+    if (internalSecret && internalSecret === SERVICE_ROLE) {
+      try { internalBody = await req.clone().json(); } catch { internalBody = null; }
+      const uid = internalBody?.internalUserId;
+      if (typeof uid === "string" && UUID_RE.test(uid)) {
+        user = { id: uid };
+      }
+    }
+    if (!user) {
+      const authHeader = req.headers.get("Authorization") || "";
+      const token = authHeader.replace("Bearer ", "");
+      if (!token) return json({ error: "Unauthorized" }, 401);
+      const userClient = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_ANON_KEY")!, {
+        global: { headers: { Authorization: authHeader } },
+      });
+      const {
+        data: { user: authUser },
+        error: authErr,
+      } = await userClient.auth.getUser(token);
+      if (authErr || !authUser) return json({ error: "Unauthorized" }, 401);
+      user = { id: authUser.id };
+    }
 
     const admin = createClient(SUPABASE_URL, SERVICE_ROLE);
 

@@ -389,7 +389,58 @@ Deno.serve(async (req) => {
       }
     }
 
-    await sendMessage(chatId, "🤖 I handle /start, /stop, /feedback and /help. Open RunWard to manage settings.");
+    // Free-form text with no pending prompt → AI Running Coach chat
+    if (!text.startsWith("/")) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("user_id, lang, telegram_coach_session_id")
+        .eq("telegram_chat_id", chatId)
+        .maybeSingle();
+      if (!profile) {
+        await sendMessage(chatId, "ℹ️ This chat is not linked. Open RunWard → More → Connect Telegram.");
+        return new Response("ok");
+      }
+      const lang = await getUserLang(supabase, profile.user_id, (profile as any).lang);
+
+      try {
+        const resp = await fetch(`${SUPABASE_URL}/functions/v1/ai-running-coach`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${SERVICE_KEY}`,
+            "x-internal-secret": SERVICE_KEY,
+          },
+          body: JSON.stringify({
+            internalUserId: profile.user_id,
+            message: text,
+            lang,
+            session_id: (profile as any).telegram_coach_session_id || undefined,
+          }),
+        });
+        const data = await resp.json().catch(() => ({} as any));
+        if (!resp.ok) {
+          if (data?.code === "premium_required") {
+            await sendMessage(chatId, lang === "zh" ? "⚠️ AI 教練是進階功能。請在 App 中升級。" : "⚠️ AI Coach is a Premium feature. Upgrade in the app to chat here.");
+          } else if (data?.code === "rate_limited") {
+            await sendMessage(chatId, lang === "zh" ? "⏳ 今日 AI 教練訊息已達上限，明天再試。" : "⏳ Daily AI Coach message limit reached. Try again tomorrow.");
+          } else {
+            await sendMessage(chatId, lang === "zh" ? "⚠️ AI 教練暫時無法回覆。" : "⚠️ AI Coach is temporarily unavailable.");
+          }
+          return new Response("ok");
+        }
+        const reply: string = data?.response || (lang === "zh" ? "（無回覆）" : "(no reply)");
+        if (data?.session_id && data.session_id !== (profile as any).telegram_coach_session_id) {
+          await supabase.from("profiles").update({ telegram_coach_session_id: data.session_id }).eq("user_id", profile.user_id);
+        }
+        await sendMessage(chatId, reply);
+      } catch (e) {
+        console.error("[tg-webhook] ai-running-coach error", e);
+        await sendMessage(chatId, lang === "zh" ? "⚠️ AI 教練錯誤。" : "⚠️ AI Coach error.");
+      }
+      return new Response("ok");
+    }
+
+    await sendMessage(chatId, "🤖 Send me a message to chat with your AI Coach, or use /start /stop /feedback /help.");
     return new Response("ok");
   } catch (e) {
     console.error("[tg-webhook] error", e);

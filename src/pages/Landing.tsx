@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Globe, Smartphone, ChevronRight, CheckCircle2, Check, X, Crown, Sparkles, Target, KeyRound } from "lucide-react";
+import { Globe, Smartphone, ChevronLeft, ChevronRight, CheckCircle2, Check, X, Crown, Sparkles, Target, KeyRound } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import appStoreBadge from "@/assets/app-store-badge.png";
@@ -176,25 +176,29 @@ const Landing = () => {
           <p className="text-center text-[11px] font-semibold tracking-[0.18em] text-muted-foreground/80 uppercase mb-6">
             {zh ? "支援的平台" : "Works with"}
           </p>
-          <div className="flex flex-wrap items-center justify-center gap-x-10 gap-y-6 md:gap-x-14">
-            {[
-              { src: stravaLogo.url, alt: "Strava", h: "h-6 md:h-7", invert: false, offset: "translate-y-1 md:translate-y-1.5" },
-              { src: garminLogo.url, alt: "Garmin", h: "h-7 md:h-9", invert: true },
-              { src: suuntoLogo.url, alt: "Suunto", h: "h-8 md:h-10", invert: true },
-              { src: corosLogo.url, alt: "COROS", h: "h-7 md:h-9", invert: true, offset: "translate-y-1 md:translate-y-1.5" },
-              { src: polarLogo.url, alt: "Polar", h: "h-6 md:h-7", invert: true },
-              { src: appleHealthLogo.url, alt: "Works with Apple Health", h: "h-9 md:h-11", invert: true },
-            ].map((b) => (
-              <img
-                key={b.alt}
-                src={b.src}
-                alt={b.alt}
-                loading="lazy"
-                className={`${b.h} w-auto object-contain opacity-90 hover:opacity-100 transition-opacity ${
-                  b.invert ? "dark:invert" : ""
-                } ${b.offset ?? ""}`}
-              />
-            ))}
+          <div className="flex items-center justify-center gap-3 md:gap-5">
+            <ChevronLeft className="shrink-0 h-5 w-5 md:h-6 md:w-6 text-muted-foreground/50" aria-hidden />
+            <div className="flex-1 flex flex-nowrap items-center justify-between gap-3 sm:gap-5 md:gap-8 overflow-x-auto no-scrollbar">
+              {[
+                { src: stravaLogo.url, alt: "Strava", h: "h-4 sm:h-5 md:h-7", invert: false, offset: "translate-y-0.5 md:translate-y-1.5" },
+                { src: garminLogo.url, alt: "Garmin", h: "h-5 sm:h-6 md:h-9", invert: true },
+                { src: suuntoLogo.url, alt: "Suunto", h: "h-6 sm:h-7 md:h-10", invert: true },
+                { src: corosLogo.url, alt: "COROS", h: "h-5 sm:h-6 md:h-9", invert: true, offset: "translate-y-0.5 md:translate-y-1.5" },
+                { src: polarLogo.url, alt: "Polar", h: "h-4 sm:h-5 md:h-7", invert: true },
+                { src: appleHealthLogo.url, alt: "Works with Apple Health", h: "h-6 sm:h-8 md:h-11", invert: true },
+              ].map((b) => (
+                <img
+                  key={b.alt}
+                  src={b.src}
+                  alt={b.alt}
+                  loading="lazy"
+                  className={`shrink-0 ${b.h} w-auto object-contain opacity-90 hover:opacity-100 transition-opacity ${
+                    b.invert ? "dark:invert" : ""
+                  } ${b.offset ?? ""}`}
+                />
+              ))}
+            </div>
+            <ChevronRight className="shrink-0 h-5 w-5 md:h-6 md:w-6 text-muted-foreground/50" aria-hidden />
           </div>
 
         </div>

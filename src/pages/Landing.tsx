@@ -223,45 +223,22 @@ const Landing = () => {
         </div>
       </section>
 
-      {/* ─── Social proof strip ─── */}
+      {/* ─── Brand logos strip ─── */}
       <section className="border-y border-border bg-card/50">
-        <div className="max-w-5xl mx-auto px-6 py-6 flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-6 text-center">
-          <div className="flex -space-x-2">
-            {[appIcon, appIcon, appIcon].map((src, i) => (
-              <img
-                key={i}
-                src={src}
-                alt=""
-                className="h-8 w-8 rounded-full ring-2 ring-card object-cover"
-                style={{ opacity: 0.85 - i * 0.15 }}
-              />
+        <div className="max-w-5xl mx-auto px-6 py-8">
+          <p className="text-center text-[11px] font-semibold tracking-[0.18em] text-muted-foreground/80 uppercase mb-5">
+            {zh ? "支援的平台" : "Works with"}
+          </p>
+          <div className="flex flex-wrap items-center justify-center gap-x-10 gap-y-4 md:gap-x-14 opacity-80">
+            {["Strava", "Garmin", "Suunto", "COROS", "Polar"].map((b) => (
+              <span
+                key={b}
+                className="font-display font-bold text-lg md:text-2xl tracking-tight text-foreground/70 hover:text-foreground transition-colors"
+              >
+                {b}
+              </span>
             ))}
           </div>
-          <p className="text-sm text-muted-foreground">
-            {zh ? (
-              <>被 <span className="font-semibold text-foreground">數百位跑者</span> 使用 — 包括馬拉松 sub-3 跑者與越野跑愛好者</>
-            ) : (
-              <>Trusted by <span className="font-semibold text-foreground">hundreds of runners</span> — from sub-3 marathoners to trail and ultra athletes</>
-            )}
-          </p>
-        </div>
-      </section>
-
-
-      {/* ─── Feature Showcases ─── */}
-      <section className="px-6 py-20 md:py-28">
-        <div className="max-w-5xl mx-auto space-y-24 md:space-y-32">
-          {features.map((f, i) => (
-            <FeatureShowcase
-              key={i}
-              badge={f.badge}
-              title={f.title}
-              description={f.desc}
-              screenshot={f.screenshot}
-              screenshotAlt={f.alt}
-              reverse={i % 2 === 1}
-            />
-          ))}
         </div>
       </section>
 

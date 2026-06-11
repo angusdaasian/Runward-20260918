@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getActiveApps, getAppForConnection } from "../_shared/strava-apps.ts";
+import { maybeSendTelegramActivityPrompt } from "../_shared/telegramActivityPrompt.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -260,6 +261,14 @@ async function syncActivityById(
   if (!existing) {
     await awardActivityXP(supabase, userId, distance, movingTime, Math.round(trainingScore));
     await sendActivityNotification(supabase, userId, `strava:${act.id}`);
+    await maybeSendTelegramActivityPrompt({
+      userId,
+      source: "strava",
+      activityKey: String(act.id),
+      distanceMeters: distance,
+      durationSeconds: movingTime,
+      sportType: act.sport_type || act.type || "Run",
+    });
   }
 }
 

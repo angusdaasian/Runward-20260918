@@ -11,7 +11,6 @@ import heroZh from "@/assets/appstore/hero-zh.png.asset.json";
 import FeatureShowcase from "@/components/landing/FeatureShowcase";
 import AppStoreScreenshots from "@/components/landing/AppStoreScreenshots";
 import DashboardPreview from "@/components/landing/DashboardPreview";
-import HeroPhoneStack from "@/components/landing/HeroPhoneStack";
 
 import rewardsScreenshot from "@/assets/screenshots/rewards.png";
 import trainingScreenshot from "@/assets/screenshots/training.png";
@@ -145,83 +144,106 @@ const Landing = () => {
         </div>
       </nav>
 
-      {/* ─── Hero (Grocerex-style, light mint) ─── */}
-      <section className="relative overflow-hidden" style={{ background: "linear-gradient(180deg, #e8f8ee 0%, #f4fbf6 60%, #ffffff 100%)" }}>
-        <div className="relative z-10 max-w-6xl mx-auto px-6 pt-12 md:pt-20 pb-16 md:pb-24 grid md:grid-cols-[1.1fr_1fr] gap-10 md:gap-12 items-center">
+      {/* ─── Hero ─── */}
+      <section className="relative px-6 pt-16 pb-20 md:pt-24 md:pb-28 overflow-hidden">
+        <div className="absolute top-[-160px] right-[-120px] w-[600px] h-[600px] rounded-full bg-primary/5 blur-3xl pointer-events-none" />
+
+        <div className="relative z-10 max-w-6xl mx-auto grid md:grid-cols-[1.15fr_1fr] gap-12 md:gap-16 items-center">
           {/* Left — copy */}
           <div className={`transition-all duration-700 ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"}`}>
-            <div className="inline-block text-[11px] tracking-[0.18em] font-semibold uppercase text-emerald-700/80 mb-5">
-              {zh ? "2025 年全方位跑步應用" : "Top Running App in 2025"}
-            </div>
-
-            <h1 className="font-display text-[2.5rem] sm:text-5xl md:text-[3.5rem] lg:text-[4rem] font-bold tracking-tight leading-[1.05] text-zinc-900">
+            <h1 className="font-display text-[2.5rem] sm:text-5xl md:text-6xl lg:text-[4.25rem] font-bold tracking-tight leading-[1.02]">
               {zh ? (
                 <>
-                  <span className="text-emerald-500">智能訓練</span>
+                  你的 AI 跑步教練,
                   <br />
-                  陪你跑向<span className="text-emerald-500">每一個目標</span>
+                  <span className="italic text-primary">隨時陪你訓練。</span>
                 </>
               ) : (
                 <>
-                  <span className="text-emerald-500">Smart training</span>
+                  Your AI running coach.
                   <br />
-                  delivered <span className="text-emerald-500">to every run</span>
+                  <span className="italic text-primary">In your pocket.</span>
                 </>
               )}
             </h1>
 
-            <p className="text-base md:text-lg text-zinc-600 leading-relaxed max-w-xl mt-6">
+            <p className="text-base md:text-lg text-muted-foreground leading-relaxed max-w-xl mt-6 md:mt-8">
               {zh
-                ? "你的一站式跑步夥伴 — Strava、Garmin、Apple Health 同步，AI 訓練計劃、跑姿分析與排名獎勵全部整合。"
-                : "Your one-stop running companion — sync Strava, Garmin and Apple Health, follow AI-built plans, analyse your form, and climb ranked seasons."}
+                ? "Strava、Garmin、Apple Health 一鍵同步。AI 自動生成訓練計劃、跑姿分析、賽季排名與獎勵 — 全部整合在一個應用裡。"
+                : "Strava, Garmin, Apple Health — synced in one tap. AI training plans, posture analysis, ranked seasons and rewards, all in one beautifully crafted app."}
             </p>
 
-            <div className="mt-8 flex items-center gap-4 flex-wrap">
+            {/* Integrations strip */}
+            <div className="mt-8 md:mt-10">
+              <div className="text-[11px] font-semibold tracking-[0.12em] text-muted-foreground/80 uppercase mb-3">
+                {zh ? "整合你的裝置" : "Pick your stack"}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {["Strava", "Garmin", "Apple Health", "COROS", "Polar", "Suunto", "Fitbit"].map((p) => (
+                  <span
+                    key={p}
+                    className="inline-flex items-center px-3 py-1.5 rounded-full bg-card border border-border text-xs font-medium text-foreground"
+                  >
+                    {p}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            {/* CTA */}
+            <div className="mt-8 md:mt-10 flex flex-wrap items-center gap-4">
               <a
                 href={APP_STORE_URL}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 px-7 py-3.5 rounded-full bg-emerald-500 text-white text-base font-semibold hover:bg-emerald-600 transition-colors shadow-lg shadow-emerald-500/25"
+                className="inline-flex items-center gap-2 px-6 py-3.5 rounded-full bg-primary text-primary-foreground text-base font-semibold hover:bg-primary/90 transition-colors shadow-lg shadow-primary/25"
               >
-                {zh ? "立即下載" : "Download Now"}
+                {zh ? "免費開始使用" : "Get started, it's free"}
+                <ChevronRight size={18} />
               </a>
-              <a
-                href="#features"
-                className="inline-flex items-center gap-2 px-7 py-3.5 rounded-full bg-white border border-zinc-200 text-zinc-900 text-base font-semibold hover:border-emerald-400 hover:text-emerald-600 transition-colors"
-              >
-                {zh ? "探索功能" : "Explore Features"}
+              <a href={APP_STORE_URL} target="_blank" rel="noopener noreferrer" className="inline-block">
+                <img src={appStoreBadge} alt="Download on the App Store" className="h-12" />
               </a>
             </div>
 
-            <div className="mt-10 flex items-center gap-4">
-              <div className="flex -space-x-2">
-                {[appIcon, appIcon, appIcon].map((src, i) => (
-                  <img
-                    key={i}
-                    src={src}
-                    alt=""
-                    className="h-9 w-9 rounded-full ring-2 ring-white object-cover"
-                    style={{ opacity: 0.9 - i * 0.15 }}
-                  />
-                ))}
-              </div>
-              <div>
-                <div className="font-display font-bold text-zinc-900 text-base">
-                  {zh ? "20k+ 活躍跑者" : "20k+ Happy Runners"}
-                </div>
-                <div className="text-xs text-zinc-500 max-w-[260px] leading-snug mt-0.5">
-                  {zh
-                    ? "從馬拉松 sub-3 跑者到越野跑愛好者，都選擇 Runward。"
-                    : "Trusted by sub-3 marathoners and trail athletes alike."}
-                </div>
-              </div>
-            </div>
+            <p className="text-xs text-muted-foreground mt-5">
+              {zh ? "iPhone · 免費下載 · 7 天 Premium 試用" : "iPhone · Free to download · 7-day Premium trial"}
+            </p>
           </div>
 
-          {/* Right — hand holding phone with screenshot */}
-          <div className={`relative transition-all duration-700 delay-200 ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}>
-            <HeroPhoneStack lang={lang} />
+          {/* Right — single hero phone */}
+          <div className={`relative flex justify-center md:justify-end transition-all duration-700 delay-200 ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}>
+            <div className="absolute inset-0 -z-10 bg-gradient-to-tr from-primary/10 via-primary/5 to-transparent rounded-[3rem] blur-2xl" />
+            <IPhoneFrame
+              src={zh ? heroZh.url : heroEn.url}
+              alt="Runward app"
+              className="w-[260px] sm:w-[300px] md:w-[340px]"
+            />
           </div>
+        </div>
+      </section>
+
+      {/* ─── Social proof strip ─── */}
+      <section className="border-y border-border bg-card/50">
+        <div className="max-w-5xl mx-auto px-6 py-6 flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-6 text-center">
+          <div className="flex -space-x-2">
+            {[appIcon, appIcon, appIcon].map((src, i) => (
+              <img
+                key={i}
+                src={src}
+                alt=""
+                className="h-8 w-8 rounded-full ring-2 ring-card object-cover"
+                style={{ opacity: 0.85 - i * 0.15 }}
+              />
+            ))}
+          </div>
+          <p className="text-sm text-muted-foreground">
+            {zh ? (
+              <>被 <span className="font-semibold text-foreground">數百位跑者</span> 使用 — 包括馬拉松 sub-3 跑者與越野跑愛好者</>
+            ) : (
+              <>Trusted by <span className="font-semibold text-foreground">hundreds of runners</span> — from sub-3 marathoners to trail and ultra athletes</>
+            )}
+          </p>
         </div>
       </section>
 

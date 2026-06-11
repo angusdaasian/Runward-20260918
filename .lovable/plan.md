@@ -1,82 +1,98 @@
 ## Goal
 
-Replace the current hero section of `src/pages/Landing.tsx` with a "dappr-style" layout: dark canvas, big display headline on the left, two CTAs, and on the right an isometric stack of phone screenshots with selected widgets floating off the phone, glowing/highlighted in the brand mint-green to draw the eye.
+For AI plan days and Custom workouts only:
+1. Let users add **multiple workouts per day** (e.g. AM easy + PM intervals).
+2. Each workout can include **Warmup / Main / Cooldown** as ordered sub-steps, plus new top-level types **Warmup** and **Cooldown** for stand-alone short sessions.
+3. **Auto-suggest pace and HR target** based on, in order of preference:
+   - Past 30 days of running (computed VDOT from best recent efforts),
+   - Falling back to AI plan target race time when recent data is insufficient,
+   - HR (BPM) target always derived from profile age + max/resting HR zones.
 
-Rest of the landing page (features, pricing, footer, etc.) stays unchanged.
+Free preset plans are unchanged.
 
-## Layout (desktop)
+## Data model (no schema migration)
 
-```text
-┌───────────────────────────────────────────────────────────────┐
-│ runward                                              Sign in  │
-│                                                               │
-│  Everything you need                ┌──────────┐              │
-│  to train, race, and                │ floating │  ← glowing   │
-│  improve.                           │  widget  │     mint     │
-│                                     └────┬─────┘              │
-│  Tagline copy two lines max.             │                    │
-│                                   ┌──────┴──────┐             │
-│  [ Download on App Store ]        │   PHONE     │             │
-│   View features                   │  screenshot │             │
-│                                   │  (English)  │             │
-│                                   └──────┬──────┘             │
-│                                          │  ┌──────────┐      │
-│                                          └──│ floating │ glow │
-│                                             │  widget  │      │
-│                                             └──────────┘      │
-│                                                               │
-│ ─────────────────────────────────────────────────────────── │
-│ Product Stats  │  20k+ runners │ 6 sports │ ...               │
-└───────────────────────────────────────────────────────────────┘
+`training_plans.plan_data` is `jsonb`. Today each week-day holds a single workout with `{ type, distance_km, pace, description, ... }`. We extend the shape backward-compatibly:
+
+```ts
+type PlanDay = {
+  date?: string;
+  // Legacy summary fields (kept populated = sum of sessions, primary type of the day)
+  type?: string; distance_km?: number; pace?: string; description?: string;
+  // NEW
+  sessions?: WorkoutSession[];                    // when present, this is the source of truth
+};
+
+type WorkoutSession = {
+  id: string;                                     // local uuid
+  time_of_day?: "AM" | "PM" | string;             // free label
+  type: string;                                   // Easy Run, Intervals, Warmup, Cooldown, ...
+  distance_km?: number; pace?: string; description?: string;
+  hr_target?: { zone?: 1|2|3|4|5; bpm_low?: number; bpm_high?: number };
+  steps?: WorkoutStep[];                          // optional warmup/main/cooldown breakdown
+};
+
+type WorkoutStep = {
+  kind: "warmup" | "main" | "cooldown" | "recovery" | "interval";
+  distance_km?: number; duration_s?: number;
+  pace?: string; hr_target?: { bpm_low?: number; bpm_high?: number };
+  reps?: number; note?: string;
+};
 ```
 
-- Background: deep charcoal (`#1a1a1a`-ish via existing dark tokens) with a subtle warm radial highlight top-right, exactly like the reference.
-- Headline: large display font, left-aligned, ~5 lines tall on desktop.
-- Two CTAs: filled mint pill ("Get the app" / linked to App Store) + underlined text ("See features" anchor).
-- Phone stack: uses existing screenshot assets — English uses `IMG_5586.PNG`-style activities screenshot, Chinese uses `IMG_5596.PNG`. A second smaller phone (analytics, `IMG_5591`/`IMG_5599`) sits behind/offset isometrically to create the layered feel.
+Consumers that only read `day.type / distance_km / pace` keep working. New UI and the Terra push path read `sessions/steps` when present.
 
-## Floating highlighted widgets
+## Auto-suggest engine
 
-The "floating away from the phone" elements that are highlighted in mint:
-1. **Top-floating widget** — the **HRV** card cropped from the analytics screenshot, tilted ~ -8°, mint glow ring (`shadow-[0_0_60px_hsl(var(--primary)/0.55)]`), positioned above the phone.
-2. **Bottom-right floating widget** — the **Today Stats / Steps** card cropped from the activities screenshot, tilted +6°, same mint glow.
-3. Optional small mini-card: VO₂max value chip, also glowing, anchored bottom-left of the stack.
+New file `src/lib/paceSuggest.ts`:
+- `estimateVdotFromRecent(activities, profile)` — scans last 30 days of runs, picks the best Daniels Running Score across distances, returns a VDOT.
+- `vdotFromTargetTime(distance_m, seconds)` — uses existing `calculateRunningScore` in `src/lib/vdot.ts`.
+- `suggestPaceAndHr({ type, vdot, profile })` — maps Easy / Tempo / Threshold / Interval / Long / Recovery / Warmup / Cooldown / Race Pace to a pace range (via `getMainPaces`) and an HR zone (via `zoneBoundaries`).
+- Resolution order in caller: recent activities → target time → null.
 
-The widgets are reproduced as real React/Tailwind cards (not image crops) so they stay crisp, read in both languages, and can carry the glow. Each card has:
-- mint border `border-primary/60`
-- mint outer glow via box-shadow
-- semi-transparent dark fill so they read as "lifted out of the screen"
-- inner content mirrors the app: title + big number + unit.
+## UI changes
 
-Cards swap language with the existing `lang` state — EN versions show "Steps / Daily Steps / HRV" etc., ZH versions show "步數 / 每日步數 / HRV".
+### `src/components/training/EditWorkoutDialog.tsx`
+- Accept `sessions` array; render a list of session cards with add/remove.
+- Add **Warmup** and **Cooldown** to `TYPE_OPTIONS`.
+- For each session: collapsible **Steps** section (warmup/main/cooldown) with the same fields.
+- New **Suggest** button next to pace and BPM inputs → calls auto-suggest; fills value and shows source ("from last 30 days" / "from target time" / "from HR zones").
+- When saving, also recompute the day-level summary (sum distance, primary type) so legacy reads stay correct.
 
-## Phones
+### `src/components/TrainingTab.tsx` and `ProgramsTab.tsx`
+- Calendar day cell renders a small stack when `sessions.length > 1` (dot per session, summed distance).
+- Day detail view lists each session with its steps.
+- "Add workout" button on a day that already has one → appends to `sessions`.
+- Restrict the new affordances to AI plans and custom-added entries (Free plan rendering path untouched).
 
-- Use existing `IPhoneFrame` component to wrap two screenshot images.
-- Primary phone (right): activities tab screenshot — `IMG_5586.PNG` (EN) / `IMG_5596.PNG` (ZH).
-- Secondary phone (slightly behind, rotated): analytics tab — `IMG_5591.PNG` (EN) / `IMG_5599.PNG` (ZH).
-- Upload all four screenshots to lovable-assets and import via `*.asset.json`.
-- Apply `rotate-[-12deg] skew-y-[-6deg]` style isometric transform on the group, with subtle hover lift.
+## Backend changes
 
-## Product Stats strip (bottom of hero)
+### `supabase/functions/terra-push-workout/index.ts` and `terra-push-week/index.ts`
+- If `day.sessions` exists, push one Terra planned workout per session (Terra has no "two workouts in one day" object; multiple pushes on the same date is fine).
+- Map step `kind` to Terra `intensity` (warmup=1, cooldown=2, recovery=3, interval=4, main=5) and re-use `buildPlannedWorkout` step builders.
 
-Below the hero, replicate the reference's stat bar:
-- 4 stats: e.g. "Runners onboarded", "Workouts logged", "Races indexed", "Countries". Numbers can be placeholders matching what the marketing page already states elsewhere (reuse existing copy where possible — won't fabricate new numbers if existing landing already has them).
-- Mint accent bar to the left of the title block, mirroring the reference's mint label tab.
+### `supabase/functions/_shared/terraPlannedWorkout.ts`
+- Add `buildPlannedWorkoutFromSession(session)` that respects pre-built `steps`. Existing `buildPlannedWorkout(day)` keeps working for single-session days.
 
-## Mobile
-
-Stack vertically: headline → CTAs → phone composition centered, with floating widgets repositioned around the single primary phone (still glowing). Stats become a 2×2 grid.
-
-## Files touched
-
-- `src/pages/Landing.tsx` — replace hero JSX only (top section through stats strip). Nav, features, pricing, footer untouched.
-- `src/components/landing/HeroPhoneStack.tsx` *(new)* — isometric phones + floating highlighted widget cards, language-aware.
-- `src/components/landing/HeroStats.tsx` *(new)* — stat strip.
-- `src/assets/appstore/` — add 4 new `.asset.json` pointers for the uploaded screenshots (EN activities, EN analytics, ZH activities, ZH analytics) via `lovable-assets create` from `/mnt/user-uploads/`.
+### `supabase/functions/generate-suggested-workout/index.ts` and AI plan generator (if any)
+- When the model returns a day, allow it to emit `sessions[]`. Validate and coerce.
 
 ## Out of scope
 
-- No changes to features carousel, pricing table, FAQ, footer.
-- No new copy in languages beyond what already exists; only the hero headline/CTAs get new strings (EN + ZH).
-- No backend or data changes.
+- Free preset plans (`free_training_plans`) — left as single-session days.
+- Watch push for warmup/cooldown step targets beyond what Terra already accepts.
+- Migrating historical `plan_data`: not needed because the new shape is additive.
+
+## Technical notes
+
+- VDOT estimator caps at distance ≥ 1500 m efforts, ignores cross-training; uses `average_heartrate` for an HR-floor sanity check (rejects efforts below Z3 avg as "easy" candidates).
+- Pace ranges shown to the user follow the existing `getMainPaces` ±band; HR ranges follow `zoneBoundaries`.
+- All new code is TypeScript with shared types in `src/lib/planTypes.ts` (re-exported on the edge side via a small copy in `_shared/planTypes.ts`).
+
+## Rollout order
+
+1. `planTypes.ts` + `paceSuggest.ts` (pure functions, unit-testable).
+2. `EditWorkoutDialog` multi-session + Suggest button.
+3. Calendar/day rendering in TrainingTab and ProgramsTab.
+4. Terra push: per-session pushing + step mapping.
+5. AI plan generator: allow sessions[] output.

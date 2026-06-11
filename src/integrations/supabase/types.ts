@@ -851,6 +851,10 @@ export type Database = {
           runs_per_week: number | null
           sex: string | null
           simple_mode: boolean
+          telegram_chat_id: number | null
+          telegram_daily_workout: boolean
+          telegram_link_code: string | null
+          telegram_link_code_expires_at: string | null
           training_score: number | null
           trial_used: boolean
           updated_at: string
@@ -882,6 +886,10 @@ export type Database = {
           runs_per_week?: number | null
           sex?: string | null
           simple_mode?: boolean
+          telegram_chat_id?: number | null
+          telegram_daily_workout?: boolean
+          telegram_link_code?: string | null
+          telegram_link_code_expires_at?: string | null
           training_score?: number | null
           trial_used?: boolean
           updated_at?: string
@@ -913,6 +921,10 @@ export type Database = {
           runs_per_week?: number | null
           sex?: string | null
           simple_mode?: boolean
+          telegram_chat_id?: number | null
+          telegram_daily_workout?: boolean
+          telegram_link_code?: string | null
+          telegram_link_code_expires_at?: string | null
           training_score?: number | null
           trial_used?: boolean
           updated_at?: string

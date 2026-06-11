@@ -34,6 +34,7 @@ import PlanComparisonDialog from "@/components/PlanComparisonDialog";
 import StartRunningGuide from "@/components/StartRunningGuide";
 import FuelingGuide from "@/components/FuelingGuide";
 import HomeWidgetDialog from "@/components/HomeWidgetDialog";
+import TelegramConnectCard from "@/components/TelegramConnectCard";
 
 interface Props {
   lang: Lang;
@@ -561,6 +562,9 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps }: Props
             </button>
           </div>
         )}
+
+        {/* Telegram daily workout suggestion */}
+        <TelegramConnectCard lang={lang} />
 
         {/* Disable AI Chat toggle */}
         <div className="bg-card border border-border rounded-xl p-4">

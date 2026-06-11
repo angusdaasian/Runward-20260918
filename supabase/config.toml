@@ -94,3 +94,9 @@ verify_jwt = false
 
 [functions.get-whatsapp-number]
 verify_jwt = false
+
+[functions.whatsapp-webhook]
+verify_jwt = false
+
+[functions.send-daily-whatsapp-workout]
+verify_jwt = false

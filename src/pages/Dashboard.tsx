@@ -300,6 +300,7 @@ const Dashboard = () => {
                 {view === "races" && <DashboardRaces lang={lang} />}
                 {view === "community" && <DashboardCommunity lang={lang} />}
                 {view === "analytics" && <DashboardAnalytics lang={lang} />}
+                {view === "calculators" && <DashboardCalculators lang={lang} />}
                 {view === "connect" && (
                   <DashboardConnect lang={lang} onBack={() => setView("overview")} />
                 )}

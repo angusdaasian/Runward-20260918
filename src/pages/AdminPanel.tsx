@@ -430,6 +430,8 @@ const AdminPanel = () => {
         return <StravaAppsManager />;
       case "suunto":
         return <SuuntoSyncTester />;
+      case "polar":
+        return <PolarSyncTester />;
     }
   };
 

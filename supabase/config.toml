@@ -64,4 +64,17 @@ verify_jwt = false
 [functions.suunto-247-webhook]
 verify_jwt = false
 
+[functions.polar-auth]
+verify_jwt = false
+
+[functions.polar-callback]
+verify_jwt = false
+
+[functions.polar-disconnect]
+verify_jwt = false
+
+[functions.polar-sync]
+verify_jwt = false
+
+
 

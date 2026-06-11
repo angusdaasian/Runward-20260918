@@ -440,7 +440,7 @@ const Landing = () => {
           viewport={{ once: true }}
           transition={{ duration: 0.5 }}
         >
-          <img src={appIcon} alt="Runward" className="h-20 w-20 rounded-2xl shadow-lg mx-auto" />
+          <img src={appIcon} alt="Runward" className="h-20 w-auto mx-auto" />
           <h2 className="font-display text-2xl md:text-3xl font-bold">
             {zh ? "準備好跑得更聰明了嗎？" : "Ready to Run Smarter?"}
           </h2>

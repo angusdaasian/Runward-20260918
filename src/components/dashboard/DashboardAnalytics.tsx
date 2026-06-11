@@ -26,7 +26,7 @@ import TrainingLoadChart from "@/components/activities/TrainingLoadChart";
 import TrendsCard from "@/components/activities/TrendsCard";
 import ActivityYearHeatmap from "@/components/activities/ActivityYearHeatmap";
 
-const PostureTab = lazy(() => import("@/components/PostureTab"));
+const DesktopPostureAnalysis = lazy(() => import("./DesktopPostureAnalysis"));
 
 interface Props {
   lang: Lang;

@@ -289,14 +289,12 @@ const Landing = () => {
                 </h3>
                 <p className="text-sm text-muted-foreground">{zh ? "彈性月度訂閱" : "Flexible monthly billing"}</p>
               </div>
-              <div className="mb-1">
-                <span className="font-display text-4xl font-bold">HK$28</span>
+              <div className="mb-6">
+                <span className="font-display text-4xl font-bold">HK$48</span>
                 <span className="text-muted-foreground">/{zh ? "月" : "mo"}</span>
+                <div className="text-sm text-muted-foreground mt-1">TWD 190/{zh ? "月" : "mo"}</div>
               </div>
-              <div className="text-sm text-muted-foreground mb-1">TWD 120/{zh ? "月" : "mo"}</div>
-              <div className="text-xs text-muted-foreground line-through mb-6">
-                {zh ? "6 月 1 日後 HK$48 / TWD 190" : "After June 1 HK$48 / TWD 190"}
-              </div>
+
               <ul className="space-y-2.5 text-sm mb-6 flex-1">
                 {[
                   zh ? "包含所有免費功能" : "Everything in Free",

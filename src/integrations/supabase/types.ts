@@ -853,6 +853,7 @@ export type Database = {
           simple_mode: boolean
           telegram_activity_feedback: boolean
           telegram_chat_id: number | null
+          telegram_coach_session_id: string | null
           telegram_daily_workout: boolean
           telegram_link_code: string | null
           telegram_link_code_expires_at: string | null
@@ -889,6 +890,7 @@ export type Database = {
           simple_mode?: boolean
           telegram_activity_feedback?: boolean
           telegram_chat_id?: number | null
+          telegram_coach_session_id?: string | null
           telegram_daily_workout?: boolean
           telegram_link_code?: string | null
           telegram_link_code_expires_at?: string | null
@@ -925,6 +927,7 @@ export type Database = {
           simple_mode?: boolean
           telegram_activity_feedback?: boolean
           telegram_chat_id?: number | null
+          telegram_coach_session_id?: string | null
           telegram_daily_workout?: boolean
           telegram_link_code?: string | null
           telegram_link_code_expires_at?: string | null

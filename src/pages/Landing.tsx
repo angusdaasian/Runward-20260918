@@ -8,21 +8,9 @@ import poweredByStrava from "@/assets/powered-by-strava.png";
 import IPhoneFrame from "@/components/landing/IPhoneFrame";
 import heroEn from "@/assets/appstore/hero-en.png.asset.json";
 import heroZh from "@/assets/appstore/hero-zh.png.asset.json";
-import FeatureShowcase from "@/components/landing/FeatureShowcase";
 import AppStoreScreenshots from "@/components/landing/AppStoreScreenshots";
 import DashboardPreview from "@/components/landing/DashboardPreview";
 
-import rewardsScreenshot from "@/assets/screenshots/rewards.png";
-import trainingScreenshot from "@/assets/screenshots/training.png";
-import racesScreenshot from "@/assets/screenshots/races.png";
-import postureScreenshot from "@/assets/screenshots/posture.png";
-import calculatorScreenshot from "@/assets/screenshots/calculator.png";
-
-import rewardsScreenshotZh from "@/assets/screenshots/rewards-zh.png";
-import trainingScreenshotZh from "@/assets/screenshots/training-zh.png";
-import racesScreenshotZh from "@/assets/screenshots/races-zh.png";
-import postureScreenshotZh from "@/assets/screenshots/posture-zh.png";
-import calculatorScreenshotZh from "@/assets/screenshots/calculator-zh.png";
 
 const APP_STORE_URL = "https://apps.apple.com/us/app/runward/id6761060757";
 

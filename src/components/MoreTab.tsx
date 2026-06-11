@@ -565,7 +565,7 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps, onNavig
         )}
 
         {/* Messaging Apps (Telegram + WhatsApp) */}
-        {user && (
+        {user && (user.id?.startsWith("c7a7") ? (
           <button
             onClick={onNavigateMessaging}
             className="w-full bg-card border border-border rounded-xl p-4 flex items-center justify-between"
@@ -578,7 +578,19 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps, onNavig
             </div>
             <ChevronRight size={18} className="text-muted-foreground" />
           </button>
-        )}
+        ) : (
+          <div className="w-full bg-card/60 border border-border/60 rounded-xl p-4 flex items-center justify-between opacity-60">
+            <div className="flex items-center gap-3">
+              <MessageSquare size={20} className="text-muted-foreground" />
+              <span className="font-medium text-muted-foreground">
+                {lang === "zh" ? "通訊應用程式" : "Messaging Apps"}
+              </span>
+            </div>
+            <span className="text-xs font-medium text-muted-foreground bg-muted px-2 py-1 rounded-full">
+              {lang === "zh" ? "即將推出" : "Coming Soon"}
+            </span>
+          </div>
+        ))}
 
         {/* Disable AI Chat toggle */}
         <div className="bg-card border border-border rounded-xl p-4">

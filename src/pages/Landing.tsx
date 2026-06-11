@@ -331,19 +331,16 @@ const Landing = () => {
                 </h3>
                 <p className="text-sm text-muted-foreground">{zh ? "節省更多，承諾全年" : "Save more, commit to the year"}</p>
               </div>
-              <div className="mb-1">
-                <span className="font-display text-4xl font-bold">HK$328</span>
+              <div className="mb-6">
+                <span className="font-display text-4xl font-bold">HK$488</span>
                 <span className="text-muted-foreground">/{zh ? "年" : "yr"}</span>
-              </div>
-              <div className="text-sm text-muted-foreground mb-1">TWD 1290/{zh ? "年" : "yr"}</div>
-              <div className="text-xs text-muted-foreground line-through mb-6">
-                {zh ? "6 月 1 日後 HK$488 / TWD 1990" : "After June 1 HK$488 / TWD 1990"}
+                <div className="text-sm text-muted-foreground mt-1">TWD 1990/{zh ? "年" : "yr"}</div>
               </div>
               <ul className="space-y-2.5 text-sm mb-6 flex-1">
                 {[
                   zh ? "包含所有月費功能" : "Everything in Monthly",
-                  zh ? "相當於每月 HK$27" : "Just HK$27 / month",
-                  zh ? "節省 HK$8/月" : "Save HK$8 / month",
+                  zh ? "相當於每月約 HK$41" : "About HK$41 / month",
+                  zh ? "年費省更多" : "Save more annually",
                   zh ? "AI 活動分享海報" : "AI activity share posters",
                   zh ? "每週計劃回顧（即將推出）" : "Weekly plan reviews (soon)",
                   zh ? "優先獲取新功能" : "Priority access to new features",
@@ -361,16 +358,12 @@ const Landing = () => {
                 className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-full bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors"
               >
                 <Crown size={14} />
-                {zh ? "鎖定優惠價" : "Lock in Offer Price"}
+                {zh ? "立即訂閱" : "Subscribe Yearly"}
               </a>
             </div>
           </div>
 
-          <p className="text-center text-xs text-muted-foreground mt-8 max-w-2xl mx-auto">
-            {zh
-              ? "★ 在 6 月 1 日前訂閱的用戶將永久享有此優惠價格，只要訂閱保持有效。"
-              : "★ Subscribe before June 1 and keep this special price forever, as long as your subscription stays active."}
-          </p>
+
 
           {/* Comparison table */}
           <div className="mt-16 max-w-3xl mx-auto">

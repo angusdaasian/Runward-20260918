@@ -227,6 +227,14 @@ const Landing = () => {
         </div>
       </section>
 
+      {/* ─── App Store Screenshots ─── */}
+      <AppStoreScreenshots lang={lang} />
+
+      {/* ─── Web Dashboard Preview ─── */}
+      <DashboardPreview lang={lang} />
+
+
+
       {/* ─── Pricing ─── */}
       <section id="pricing" className="px-6 py-20 md:py-28 bg-card/30 border-y border-border">
         <div className="max-w-6xl mx-auto">

@@ -114,11 +114,9 @@ export default function DashboardAnalytics({ lang }: Props) {
       )}
 
       {sub === "posture" && (
-        <Card className="p-6">
-          <Suspense fallback={<PostureSkeleton />}>
-            <PostureTab lang={lang} />
-          </Suspense>
-        </Card>
+        <Suspense fallback={<PostureSkeleton />}>
+          <DesktopPostureAnalysis lang={lang} />
+        </Suspense>
       )}
     </div>
   );

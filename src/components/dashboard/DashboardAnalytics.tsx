@@ -26,7 +26,7 @@ import TrainingLoadChart from "@/components/activities/TrainingLoadChart";
 import TrendsCard from "@/components/activities/TrendsCard";
 import ActivityYearHeatmap from "@/components/activities/ActivityYearHeatmap";
 
-const PostureTab = lazy(() => import("@/components/PostureTab"));
+const DesktopPostureAnalysis = lazy(() => import("./DesktopPostureAnalysis"));
 
 interface Props {
   lang: Lang;
@@ -114,11 +114,9 @@ export default function DashboardAnalytics({ lang }: Props) {
       )}
 
       {sub === "posture" && (
-        <Card className="p-6">
-          <Suspense fallback={<PostureSkeleton />}>
-            <PostureTab lang={lang} />
-          </Suspense>
-        </Card>
+        <Suspense fallback={<PostureSkeleton />}>
+          <DesktopPostureAnalysis lang={lang} />
+        </Suspense>
       )}
     </div>
   );

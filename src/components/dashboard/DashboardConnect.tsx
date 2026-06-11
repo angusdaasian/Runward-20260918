@@ -149,6 +149,9 @@ export default function DashboardConnect({ lang }: Props) {
     }
     setBusy("STRAVA");
     const redirect_uri = `${window.location.origin}/auth/callback`;
+    // Remember we initiated this from the desktop dashboard so the callback
+    // returns the user to /dashboard?view=connect instead of the mobile surface.
+    localStorage.setItem("fitness_pending_origin", "dashboard");
     const { data, error } = await supabase.functions.invoke("strava-auth", {
       body: { redirect_uri },
     });

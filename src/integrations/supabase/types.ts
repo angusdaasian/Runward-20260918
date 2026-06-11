@@ -851,6 +851,7 @@ export type Database = {
           runs_per_week: number | null
           sex: string | null
           simple_mode: boolean
+          telegram_activity_feedback: boolean
           telegram_chat_id: number | null
           telegram_daily_workout: boolean
           telegram_link_code: string | null
@@ -886,6 +887,7 @@ export type Database = {
           runs_per_week?: number | null
           sex?: string | null
           simple_mode?: boolean
+          telegram_activity_feedback?: boolean
           telegram_chat_id?: number | null
           telegram_daily_workout?: boolean
           telegram_link_code?: string | null
@@ -921,6 +923,7 @@ export type Database = {
           runs_per_week?: number | null
           sex?: string | null
           simple_mode?: boolean
+          telegram_activity_feedback?: boolean
           telegram_chat_id?: number | null
           telegram_daily_workout?: boolean
           telegram_link_code?: string | null
@@ -1445,6 +1448,51 @@ export type Database = {
           refresh_token?: string
           suunto_username?: string
           updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      telegram_pending_prompts: {
+        Row: {
+          activity_key: string
+          activity_source: string
+          activity_summary: Json
+          chat_id: number
+          created_at: string
+          expires_at: string
+          id: string
+          prompt_message_id: number | null
+          responded_at: string | null
+          response_text: string | null
+          rpe: number | null
+          user_id: string
+        }
+        Insert: {
+          activity_key: string
+          activity_source: string
+          activity_summary?: Json
+          chat_id: number
+          created_at?: string
+          expires_at?: string
+          id?: string
+          prompt_message_id?: number | null
+          responded_at?: string | null
+          response_text?: string | null
+          rpe?: number | null
+          user_id: string
+        }
+        Update: {
+          activity_key?: string
+          activity_source?: string
+          activity_summary?: Json
+          chat_id?: number
+          created_at?: string
+          expires_at?: string
+          id?: string
+          prompt_message_id?: number | null
+          responded_at?: string | null
+          response_text?: string | null
+          rpe?: number | null
           user_id?: string
         }
         Relationships: []

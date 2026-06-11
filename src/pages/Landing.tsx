@@ -10,6 +10,12 @@ import heroEn from "@/assets/appstore/hero-en.png.asset.json";
 import heroZh from "@/assets/appstore/hero-zh.png.asset.json";
 import AppStoreScreenshots from "@/components/landing/AppStoreScreenshots";
 import DashboardPreview from "@/components/landing/DashboardPreview";
+import stravaLogo from "@/assets/brands/strava.png.asset.json";
+import suuntoLogo from "@/assets/brands/suunto.png.asset.json";
+import garminLogo from "@/assets/brands/garmin.png.asset.json";
+import corosLogo from "@/assets/brands/coros.png.asset.json";
+import polarLogo from "@/assets/brands/polar.png.asset.json";
+import appleHealthLogo from "@/assets/brands/apple-health.png.asset.json";
 
 
 const APP_STORE_URL = "https://apps.apple.com/us/app/runward/id6761060757";

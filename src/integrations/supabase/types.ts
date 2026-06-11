@@ -728,6 +728,30 @@ export type Database = {
         }
         Relationships: []
       }
+      polar_webhooks: {
+        Row: {
+          created_at: string
+          events: string[]
+          id: string
+          signature_secret: string
+          url: string
+        }
+        Insert: {
+          created_at?: string
+          events?: string[]
+          id: string
+          signature_secret: string
+          url: string
+        }
+        Update: {
+          created_at?: string
+          events?: string[]
+          id?: string
+          signature_secret?: string
+          url?: string
+        }
+        Relationships: []
+      }
       posture_analyses: {
         Row: {
           created_at: string

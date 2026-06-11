@@ -9,14 +9,18 @@ import despia from "despia-native";
 import { isDespiaUA } from "@/lib/despiaOAuth";
 
 type ConnRow = { polar_user_id: number; member_id: string; expires_at: number; updated_at: string };
+type WebhookRow = { id: string; url: string; events: string[]; created_at: string };
 
 const POLAR_PENDING_REDIRECT_KEY = "polar_pending_redirect_uri";
 
 const PolarSyncTester = () => {
   const { user } = useAuth();
   const [conn, setConn] = useState<ConnRow | null>(null);
+  const [webhook, setWebhook] = useState<WebhookRow | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [lastResult, setLastResult] = useState<string>("");
+
+  const webhookUrl = `https://kbghvclwhxnjeskdodeh.supabase.co/functions/v1/polar-webhook`;
 
   const loadConn = async () => {
     if (!user) return;
@@ -28,7 +32,61 @@ const PolarSyncTester = () => {
     setConn((data as unknown as ConnRow | null) ?? null);
   };
 
-  useEffect(() => { loadConn(); }, [user]);
+  const loadWebhook = async () => {
+    const { data } = await supabase
+      .from("polar_webhooks" as any)
+      .select("id, url, events, created_at")
+      .limit(1)
+      .maybeSingle();
+    setWebhook((data as unknown as WebhookRow | null) ?? null);
+  };
+
+  useEffect(() => { loadConn(); loadWebhook(); }, [user]);
+
+  const handleCreateWebhook = async () => {
+    setBusy("webhook-create");
+    try {
+      const { data, error } = await supabase.functions.invoke("polar-webhook-manage", {
+        body: { action: "create", url: webhookUrl, events: ["EXERCISE"] },
+      });
+      if (error) throw error;
+      if (!(data as any)?.ok) throw new Error(JSON.stringify((data as any)?.polar ?? data));
+      toast.success("Webhook created");
+      setLastResult(JSON.stringify(data, null, 2));
+      await loadWebhook();
+    } catch (e: any) {
+      toast.error(e?.message || "Failed to create webhook");
+    } finally { setBusy(null); }
+  };
+
+  const handleDeleteWebhook = async () => {
+    if (!webhook) return;
+    setBusy("webhook-delete");
+    try {
+      const { data, error } = await supabase.functions.invoke("polar-webhook-manage", {
+        body: { action: "delete", id: webhook.id },
+      });
+      if (error) throw error;
+      toast.success("Webhook deleted");
+      setLastResult(JSON.stringify(data, null, 2));
+      await loadWebhook();
+    } catch (e: any) {
+      toast.error(e?.message || "Failed to delete webhook");
+    } finally { setBusy(null); }
+  };
+
+  const handleListWebhook = async () => {
+    setBusy("webhook-list");
+    try {
+      const { data, error } = await supabase.functions.invoke("polar-webhook-manage", {
+        body: { action: "list" },
+      });
+      if (error) throw error;
+      setLastResult(JSON.stringify(data, null, 2));
+    } catch (e: any) {
+      toast.error(e?.message || "Failed to list webhooks");
+    } finally { setBusy(null); }
+  };
 
   const handleConnect = async () => {
     setBusy("connect");
@@ -149,6 +207,48 @@ const PolarSyncTester = () => {
               )}
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Polar Webhook</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Polar pushes new exercises to a single partner webhook. The receiver URL is:
+          </p>
+          <pre className="text-xs bg-muted p-2 rounded-md overflow-x-auto break-all">{webhookUrl}</pre>
+
+          <div className="rounded-md border border-border p-3 text-sm">
+            {webhook ? (
+              <div className="space-y-1">
+                <div><span className="text-muted-foreground">ID:</span> <code>{webhook.id}</code></div>
+                <div><span className="text-muted-foreground">URL:</span> <code className="break-all">{webhook.url}</code></div>
+                <div><span className="text-muted-foreground">Events:</span> {webhook.events?.join(", ")}</div>
+                <div className="text-muted-foreground text-xs">
+                  Registered {new Date(webhook.created_at).toLocaleString()}
+                </div>
+              </div>
+            ) : (
+              <span className="text-muted-foreground">No webhook registered with Polar.</span>
+            )}
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {!webhook ? (
+              <Button onClick={handleCreateWebhook} disabled={busy !== null}>
+                {busy === "webhook-create" ? "Creating…" : "Create webhook"}
+              </Button>
+            ) : (
+              <Button variant="destructive" onClick={handleDeleteWebhook} disabled={busy !== null}>
+                {busy === "webhook-delete" ? "Deleting…" : "Delete webhook"}
+              </Button>
+            )}
+            <Button variant="outline" onClick={handleListWebhook} disabled={busy !== null}>
+              {busy === "webhook-list" ? "Listing…" : "List from Polar"}
+            </Button>
+          </div>
         </CardContent>
       </Card>
     </div>

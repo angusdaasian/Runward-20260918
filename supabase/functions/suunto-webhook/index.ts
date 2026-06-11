@@ -3,6 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { SUUNTO_API_BASE, refreshSuuntoToken, workoutRow, SuuntoWorkout } from "../_shared/suunto.ts";
 import { fetchSuuntoFit, parseFit } from "../_shared/suunto-fit.ts";
 import { maybeSendTelegramActivityPrompt } from "../_shared/telegramActivityPrompt.ts";
+import { maybeSendWhatsappActivityPrompt } from "../_shared/whatsappActivityPrompt.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -172,14 +173,16 @@ serve(async (req) => {
       }
 
       await sendActivityUploadedNotification(supabase, conn.user_id, `suunto:${w.workoutKey}`);
-      await maybeSendTelegramActivityPrompt({
+      const _suuntoPrompt = {
         userId: conn.user_id,
-        source: "suunto",
+        source: "suunto" as const,
         activityKey: String(w.workoutKey),
         distanceMeters: w.totalDistance ?? null,
         durationSeconds: w.totalTime ?? null,
         sportType: "run",
-      });
+      };
+      await maybeSendTelegramActivityPrompt(_suuntoPrompt);
+      await maybeSendWhatsappActivityPrompt(_suuntoPrompt);
     }
   } catch (err) {
     console.error('[suunto-webhook] error:', err);

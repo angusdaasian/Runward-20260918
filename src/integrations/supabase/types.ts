@@ -861,6 +861,13 @@ export type Database = {
           trial_used: boolean
           updated_at: string
           user_id: string
+          whatsapp_activity_feedback: boolean
+          whatsapp_coach_session_id: string | null
+          whatsapp_daily_workout: boolean
+          whatsapp_link_code: string | null
+          whatsapp_link_code_expires_at: string | null
+          whatsapp_phone_e164: string | null
+          whatsapp_wa_id: string | null
         }
         Insert: {
           activity_notifications?: boolean
@@ -898,6 +905,13 @@ export type Database = {
           trial_used?: boolean
           updated_at?: string
           user_id: string
+          whatsapp_activity_feedback?: boolean
+          whatsapp_coach_session_id?: string | null
+          whatsapp_daily_workout?: boolean
+          whatsapp_link_code?: string | null
+          whatsapp_link_code_expires_at?: string | null
+          whatsapp_phone_e164?: string | null
+          whatsapp_wa_id?: string | null
         }
         Update: {
           activity_notifications?: boolean
@@ -935,6 +949,13 @@ export type Database = {
           trial_used?: boolean
           updated_at?: string
           user_id?: string
+          whatsapp_activity_feedback?: boolean
+          whatsapp_coach_session_id?: string | null
+          whatsapp_daily_workout?: boolean
+          whatsapp_link_code?: string | null
+          whatsapp_link_code_expires_at?: string | null
+          whatsapp_phone_e164?: string | null
+          whatsapp_wa_id?: string | null
         }
         Relationships: []
       }
@@ -2429,6 +2450,54 @@ export type Database = {
           week_end?: string
           week_index?: number
           week_start?: string
+        }
+        Relationships: []
+      }
+      whatsapp_pending_prompts: {
+        Row: {
+          activity_db_id: string | null
+          activity_key: string
+          activity_source: string
+          activity_summary: Json | null
+          created_at: string
+          expires_at: string
+          id: string
+          prompt_message_id: string | null
+          responded_at: string | null
+          response_text: string | null
+          rpe: number | null
+          user_id: string
+          wa_id: string
+        }
+        Insert: {
+          activity_db_id?: string | null
+          activity_key: string
+          activity_source: string
+          activity_summary?: Json | null
+          created_at?: string
+          expires_at?: string
+          id?: string
+          prompt_message_id?: string | null
+          responded_at?: string | null
+          response_text?: string | null
+          rpe?: number | null
+          user_id: string
+          wa_id: string
+        }
+        Update: {
+          activity_db_id?: string | null
+          activity_key?: string
+          activity_source?: string
+          activity_summary?: Json | null
+          created_at?: string
+          expires_at?: string
+          id?: string
+          prompt_message_id?: string | null
+          responded_at?: string | null
+          response_text?: string | null
+          rpe?: number | null
+          user_id?: string
+          wa_id?: string
         }
         Relationships: []
       }

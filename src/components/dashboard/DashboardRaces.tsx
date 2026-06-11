@@ -42,7 +42,7 @@ export default function DashboardRaces({ lang }: Props) {
       <div className="grid grid-cols-1 xl:grid-cols-4 gap-4">
         <Card className="xl:col-span-3 p-0 overflow-hidden">
           <Suspense fallback={<TabPageSkeleton />}>
-            <RaceTab lang={lang} />
+            <DesktopRaceTab lang={lang} />
           </Suspense>
         </Card>
 

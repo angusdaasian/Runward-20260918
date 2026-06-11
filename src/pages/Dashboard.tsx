@@ -147,6 +147,14 @@ const Dashboard = () => {
   const currentLabel =
     [...VIEWS, ...TOOLS].find((v) => v.id === view)?.[zh ? "labelZh" : "labelEn"] ?? "";
 
+  if (authLoading || (user && adminLoading) || (user && !canAccessDashboard)) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-background">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+      </div>
+    );
+  }
+
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full bg-background">

@@ -22,8 +22,7 @@ const TrainingTab = lazy(() => import("@/components/TrainingTab"));
 const MoreTab = lazy(() => import("@/components/MoreTab"));
 const AnalyticsTab = lazy(() => import("@/components/AnalyticsTab"));
 const ConnectApps = lazy(() => import("@/components/ConnectApps"));
-const TelegramSettingsPage = lazy(() => import("@/components/TelegramSettingsPage"));
-const WhatsAppSettingsPage = lazy(() => import("@/components/WhatsAppSettingsPage"));
+const MessagingSettingsPage = lazy(() => import("@/components/MessagingSettingsPage"));
 const RewardsTab = lazy(() => import("@/components/RewardsTab"));
 const RaceTab = lazy(() => import("@/components/RaceTab"));
 const FloatingChatButton = lazy(() => import("@/components/coach/FloatingChatButton"));
@@ -46,8 +45,10 @@ const Index = () => {
     return (tabParam === "training" || tabParam === "analytics" || tabParam === "activities" || tabParam === "more" || tabParam === "community" || tabParam === "races") ? tabParam : "activities";
   });
   const [showConnectApps, setShowConnectApps] = useState(() => searchParams.get("page") === "connect-apps");
-  const [showTelegram, setShowTelegram] = useState(() => searchParams.get("page") === "telegram");
-  const [showWhatsapp, setShowWhatsapp] = useState(() => searchParams.get("page") === "whatsapp");
+  const [showMessaging, setShowMessaging] = useState(() => {
+    const p = searchParams.get("page");
+    return p === "messaging" || p === "telegram" || p === "whatsapp";
+  });
   const [promoTrigger, setPromoTrigger] = useState(0);
   const [runningScore, setRunningScore] = useState<number | null>(null);
   const [lang, setLangState] = useState<Lang>(() => (localStorage.getItem("app_lang") as Lang) || "en");
@@ -107,8 +108,10 @@ const Index = () => {
       setActiveTab("analytics");
     }
     setShowConnectApps(searchParams.get("page") === "connect-apps");
-    setShowTelegram(searchParams.get("page") === "telegram");
-    setShowWhatsapp(searchParams.get("page") === "whatsapp");
+    {
+      const p = searchParams.get("page");
+      setShowMessaging(p === "messaging" || p === "telegram" || p === "whatsapp");
+    }
   }, [searchParams]);
 
   // Preload header profile as soon as user is known
@@ -283,7 +286,7 @@ const Index = () => {
             <AnalyticsTab lang={lang} />
           </Suspense>
         </div>
-        {activeTab === "more" && !showConnectApps && !showTelegram && !showWhatsapp && (
+        {activeTab === "more" && !showConnectApps && !showMessaging && (
           <Suspense fallback={<SettingsSkeleton />}>
             <MoreTab
               lang={lang}
@@ -294,8 +297,7 @@ const Index = () => {
                 setShowOnboarding(true);
               }}
               onNavigateConnectApps={() => setShowConnectApps(true)}
-              onNavigateTelegram={() => setShowTelegram(true)}
-              onNavigateWhatsapp={() => setShowWhatsapp(true)}
+              onNavigateMessaging={() => setShowMessaging(true)}
             />
           </Suspense>
         )}
@@ -304,14 +306,9 @@ const Index = () => {
             <ConnectApps lang={lang} onBack={() => setShowConnectApps(false)} />
           </Suspense>
         )}
-        {activeTab === "more" && showTelegram && (
+        {activeTab === "more" && showMessaging && (
           <Suspense fallback={<TabPageSkeleton />}>
-            <TelegramSettingsPage lang={lang} onBack={() => setShowTelegram(false)} />
-          </Suspense>
-        )}
-        {activeTab === "more" && showWhatsapp && (
-          <Suspense fallback={<TabPageSkeleton />}>
-            <WhatsAppSettingsPage lang={lang} onBack={() => setShowWhatsapp(false)} />
+            <MessagingSettingsPage lang={lang} onBack={() => setShowMessaging(false)} />
           </Suspense>
         )}
         {activeTab === "races" && (
@@ -352,8 +349,7 @@ const Index = () => {
                 if (id !== activeTab && !confirmLeave(lang === "zh" ? "您的訓練計劃有未儲存的變更。確定要離開嗎？" : "You have unsaved changes to your training plan. Leave without saving?")) return;
                 setActiveTab(id);
                 setShowConnectApps(false);
-                setShowTelegram(false);
-                setShowWhatsapp(false);
+                setShowMessaging(false);
               }}
               className={`relative z-10 flex flex-1 flex-col items-center gap-0.5 px-3 py-1.5 transition-colors ${
                 activeTab === id ? "text-tab-active" : "text-tab-inactive"

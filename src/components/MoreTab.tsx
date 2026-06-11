@@ -34,15 +34,14 @@ import PlanComparisonDialog from "@/components/PlanComparisonDialog";
 import StartRunningGuide from "@/components/StartRunningGuide";
 import FuelingGuide from "@/components/FuelingGuide";
 import HomeWidgetDialog from "@/components/HomeWidgetDialog";
-import { Send, MessageCircle } from "lucide-react";
+import { MessageSquare } from "lucide-react";
 
 interface Props {
   lang: Lang;
   setLang: (l: Lang) => void;
   onLoginRequest?: () => void;
   onNavigateConnectApps?: () => void;
-  onNavigateTelegram?: () => void;
-  onNavigateWhatsapp?: () => void;
+  onNavigateMessaging?: () => void;
 }
 
 const definitions = [
@@ -66,7 +65,7 @@ function formatCountdown(expiresAt: Date): string {
   return `${hours}h ${mins}m`;
 }
 
-const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps, onNavigateTelegram, onNavigateWhatsapp }: Props) => {
+const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps, onNavigateMessaging }: Props) => {
   // Mandatory skeleton on every mount
   const [skeletonDone, setSkeletonDone] = useState(false);
   useEffect(() => {
@@ -565,32 +564,16 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps, onNavig
           </div>
         )}
 
-        {/* Telegram settings */}
+        {/* Messaging Apps (Telegram + WhatsApp) */}
         {user && (
           <button
-            onClick={onNavigateTelegram}
+            onClick={onNavigateMessaging}
             className="w-full bg-card border border-border rounded-xl p-4 flex items-center justify-between"
           >
             <div className="flex items-center gap-3">
-              <Send size={20} className="text-primary" />
+              <MessageSquare size={20} className="text-primary" />
               <span className="font-medium text-foreground">
-                {lang === "zh" ? "Telegram 通知" : "Telegram"}
-              </span>
-            </div>
-            <ChevronRight size={18} className="text-muted-foreground" />
-          </button>
-        )}
-
-        {/* WhatsApp settings */}
-        {user && (
-          <button
-            onClick={onNavigateWhatsapp}
-            className="w-full bg-card border border-border rounded-xl p-4 flex items-center justify-between"
-          >
-            <div className="flex items-center gap-3">
-              <MessageCircle size={20} className="text-primary" />
-              <span className="font-medium text-foreground">
-                {lang === "zh" ? "WhatsApp 通知" : "WhatsApp"}
+                {lang === "zh" ? "通訊應用程式" : "Messaging Apps"}
               </span>
             </div>
             <ChevronRight size={18} className="text-muted-foreground" />

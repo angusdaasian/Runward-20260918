@@ -45,8 +45,10 @@ const Index = () => {
     return (tabParam === "training" || tabParam === "analytics" || tabParam === "activities" || tabParam === "more" || tabParam === "community" || tabParam === "races") ? tabParam : "activities";
   });
   const [showConnectApps, setShowConnectApps] = useState(() => searchParams.get("page") === "connect-apps");
-  const [showTelegram, setShowTelegram] = useState(() => searchParams.get("page") === "telegram");
-  const [showWhatsapp, setShowWhatsapp] = useState(() => searchParams.get("page") === "whatsapp");
+  const [showMessaging, setShowMessaging] = useState(() => {
+    const p = searchParams.get("page");
+    return p === "messaging" || p === "telegram" || p === "whatsapp";
+  });
   const [promoTrigger, setPromoTrigger] = useState(0);
   const [runningScore, setRunningScore] = useState<number | null>(null);
   const [lang, setLangState] = useState<Lang>(() => (localStorage.getItem("app_lang") as Lang) || "en");
@@ -106,8 +108,10 @@ const Index = () => {
       setActiveTab("analytics");
     }
     setShowConnectApps(searchParams.get("page") === "connect-apps");
-    setShowTelegram(searchParams.get("page") === "telegram");
-    setShowWhatsapp(searchParams.get("page") === "whatsapp");
+    {
+      const p = searchParams.get("page");
+      setShowMessaging(p === "messaging" || p === "telegram" || p === "whatsapp");
+    }
   }, [searchParams]);
 
   // Preload header profile as soon as user is known

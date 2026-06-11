@@ -23,6 +23,7 @@ const MoreTab = lazy(() => import("@/components/MoreTab"));
 const AnalyticsTab = lazy(() => import("@/components/AnalyticsTab"));
 const ConnectApps = lazy(() => import("@/components/ConnectApps"));
 const TelegramSettingsPage = lazy(() => import("@/components/TelegramSettingsPage"));
+const WhatsAppSettingsPage = lazy(() => import("@/components/WhatsAppSettingsPage"));
 const RewardsTab = lazy(() => import("@/components/RewardsTab"));
 const RaceTab = lazy(() => import("@/components/RaceTab"));
 const FloatingChatButton = lazy(() => import("@/components/coach/FloatingChatButton"));
@@ -46,6 +47,7 @@ const Index = () => {
   });
   const [showConnectApps, setShowConnectApps] = useState(() => searchParams.get("page") === "connect-apps");
   const [showTelegram, setShowTelegram] = useState(() => searchParams.get("page") === "telegram");
+  const [showWhatsapp, setShowWhatsapp] = useState(() => searchParams.get("page") === "whatsapp");
   const [promoTrigger, setPromoTrigger] = useState(0);
   const [runningScore, setRunningScore] = useState<number | null>(null);
   const [lang, setLangState] = useState<Lang>(() => (localStorage.getItem("app_lang") as Lang) || "en");
@@ -106,6 +108,7 @@ const Index = () => {
     }
     setShowConnectApps(searchParams.get("page") === "connect-apps");
     setShowTelegram(searchParams.get("page") === "telegram");
+    setShowWhatsapp(searchParams.get("page") === "whatsapp");
   }, [searchParams]);
 
   // Preload header profile as soon as user is known
@@ -280,7 +283,7 @@ const Index = () => {
             <AnalyticsTab lang={lang} />
           </Suspense>
         </div>
-        {activeTab === "more" && !showConnectApps && !showTelegram && (
+        {activeTab === "more" && !showConnectApps && !showTelegram && !showWhatsapp && (
           <Suspense fallback={<SettingsSkeleton />}>
             <MoreTab
               lang={lang}
@@ -292,6 +295,7 @@ const Index = () => {
               }}
               onNavigateConnectApps={() => setShowConnectApps(true)}
               onNavigateTelegram={() => setShowTelegram(true)}
+              onNavigateWhatsapp={() => setShowWhatsapp(true)}
             />
           </Suspense>
         )}
@@ -303,6 +307,11 @@ const Index = () => {
         {activeTab === "more" && showTelegram && (
           <Suspense fallback={<TabPageSkeleton />}>
             <TelegramSettingsPage lang={lang} onBack={() => setShowTelegram(false)} />
+          </Suspense>
+        )}
+        {activeTab === "more" && showWhatsapp && (
+          <Suspense fallback={<TabPageSkeleton />}>
+            <WhatsAppSettingsPage lang={lang} onBack={() => setShowWhatsapp(false)} />
           </Suspense>
         )}
         {activeTab === "races" && (
@@ -344,6 +353,7 @@ const Index = () => {
                 setActiveTab(id);
                 setShowConnectApps(false);
                 setShowTelegram(false);
+                setShowWhatsapp(false);
               }}
               className={`relative z-10 flex flex-1 flex-col items-center gap-0.5 px-3 py-1.5 transition-colors ${
                 activeTab === id ? "text-tab-active" : "text-tab-inactive"

@@ -45,7 +45,7 @@ export function isNativeApp(): boolean {
   }
 
   // 3. iOS standalone WebView (Despia's iOS shell sets this)
-  if ((navigator as any).standalone === true) {
+  if ((navigator as Navigator & { standalone?: boolean }).standalone === true) {
     localStorage.setItem(STORAGE_KEY, "true");
     return true;
   }

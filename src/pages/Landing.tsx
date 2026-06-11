@@ -42,7 +42,7 @@ const Landing = () => {
       <nav className="sticky top-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border/50">
         <div className="max-w-6xl mx-auto flex items-center justify-between px-6 py-3">
           <div className="flex items-center gap-2.5">
-            <img src={appIcon} alt="Runward" className="h-8 w-8 rounded-lg" />
+            <img src={appIcon} alt="Runward" className="h-8 w-auto" />
             <span className="font-display font-bold text-lg">{zh ? "向前跑" : "Runward"}</span>
           </div>
           <div className="flex items-center gap-3">
@@ -440,7 +440,7 @@ const Landing = () => {
           viewport={{ once: true }}
           transition={{ duration: 0.5 }}
         >
-          <img src={appIcon} alt="Runward" className="h-20 w-20 rounded-2xl shadow-lg mx-auto" />
+          <img src={appIcon} alt="Runward" className="h-20 w-auto mx-auto" />
           <h2 className="font-display text-2xl md:text-3xl font-bold">
             {zh ? "準備好跑得更聰明了嗎？" : "Ready to Run Smarter?"}
           </h2>

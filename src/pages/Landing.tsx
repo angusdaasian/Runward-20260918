@@ -19,7 +19,7 @@ type Lang = "en" | "zh";
 
 const Landing = () => {
   const location = useLocation();
-  const [lang, setLang] = useState<Lang>(() => (localStorage.getItem("app_lang") as Lang) || "en");
+  const [lang, setLang] = useState<Lang>(() => (localStorage.getItem("app_lang") as Lang) || "zh");
   const currentRoute = `${location.pathname}${location.search}`;
   const toggleLang = () => {
     const next = lang === "en" ? "zh" : "en";
@@ -111,8 +111,8 @@ const Landing = () => {
 
             <p className="text-base md:text-lg text-muted-foreground leading-relaxed max-w-xl mt-6 md:mt-8">
               {zh
-                ? "Strava、Garmin、Apple Health 一鍵同步。AI 自動生成訓練計劃、跑姿分析、賽季排名與獎勵 — 全部整合在一個應用裡。"
-                : "Strava, Garmin, Apple Health — synced in one tap. AI training plans, posture analysis, ranked seasons and rewards, all in one beautifully crafted app."}
+                ? "Strava、Garmin、Suunto、COROS、Apple Health、Polar 一鍵同步。AI 自動生成訓練計劃、跑姿分析、賽季排名與獎勵 — 全部整合在一個應用裡。"
+                : "Strava, Garmin, Suunto, COROS, Apple Health, Polar — synced in one tap. AI training plans, posture analysis, ranked seasons and rewards, all in one beautifully crafted app."}
             </p>
 
             {/* Integrations strip */}

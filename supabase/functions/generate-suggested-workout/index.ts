@@ -124,10 +124,6 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const auth = req.headers.get("Authorization");
-    if (!auth) return json({ error: "Unauthorized" }, 401);
-    const token = auth.replace(/^Bearer\s+/i, "").trim();
-
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
     const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const VERTEX_API_KEY = Deno.env.get("GOOGLE_VERTEX_API_KEY")!;
@@ -136,11 +132,24 @@ serve(async (req) => {
     }
 
     const svc = createClient(SUPABASE_URL, SERVICE_KEY);
-    const { data: userResp, error: uErr } = await svc.auth.getUser(token);
-    if (uErr || !userResp?.user) return json({ error: "Unauthorized" }, 401);
-    const user = userResp.user;
-
     const body = await req.json().catch(() => ({}));
+
+    // Internal service-role call (used by cron jobs like send-daily-telegram-workout)
+    const internalSecret = req.headers.get("x-internal-secret");
+    const internalUserId: string | undefined = typeof body?.internalUserId === "string" ? body.internalUserId : undefined;
+    let user: { id: string };
+
+    if (internalSecret && internalSecret === SERVICE_KEY && internalUserId) {
+      user = { id: internalUserId };
+    } else {
+      const auth = req.headers.get("Authorization");
+      if (!auth) return json({ error: "Unauthorized" }, 401);
+      const token = auth.replace(/^Bearer\s+/i, "").trim();
+      const { data: userResp, error: uErr } = await svc.auth.getUser(token);
+      if (uErr || !userResp?.user) return json({ error: "Unauthorized" }, 401);
+      user = userResp.user;
+    }
+
     const lang: "en" | "zh" = body?.lang === "zh" ? "zh" : "en";
     const idealTime: { distance?: string; seconds?: number } | null = body?.idealTime ?? null;
     const todayDate: string | null = typeof body?.todayDate === "string" ? body.todayDate : null;

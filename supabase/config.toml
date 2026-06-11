@@ -91,3 +91,6 @@ verify_jwt = false
 
 [functions.send-daily-telegram-workout]
 verify_jwt = false
+
+[functions.get-whatsapp-number]
+verify_jwt = false

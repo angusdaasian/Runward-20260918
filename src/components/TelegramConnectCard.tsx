@@ -1,8 +1,10 @@
 import { Send } from "lucide-react";
 import { useEffect, useState } from "react";
+import despia from "despia-native";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
+import { isDespiaUA } from "@/lib/despiaOAuth";
 import { Lang } from "@/lib/i18n";
 
 const BOT_USERNAME = "runward_coach_bot";
@@ -43,9 +45,10 @@ export default function TelegramConnectCard({ lang }: { lang: Lang }) {
 
   async function generateAndOpen() {
     if (!user) return;
-    // Open a blank tab SYNCHRONOUSLY so the popup blocker treats it as a
-    // direct user gesture. We'll set the real URL after the DB update.
-    const popup = window.open("about:blank", "_blank");
+    const native = isDespiaUA();
+    // On web, open a blank tab SYNCHRONOUSLY so the popup blocker treats it
+    // as a direct user gesture. We set the real URL after the DB update.
+    const popup = native ? null : window.open("about:blank", "_blank");
     setBusy(true);
     try {
       const code = makeCode();
@@ -59,10 +62,13 @@ export default function TelegramConnectCard({ lang }: { lang: Lang }) {
         .eq("user_id", user.id);
       if (error) throw error;
       const url = `https://t.me/${BOT_USERNAME}?start=${code}`;
-      if (popup && !popup.closed) {
+      if (native) {
+        // Despia native bridge: open in an external browser session instead
+        // of trying to spawn a popup inside the webview.
+        despia(`oauth://?url=${encodeURIComponent(url)}`);
+      } else if (popup && !popup.closed) {
         popup.location.href = url;
       } else {
-        // Popup blocked — fall back to same-tab navigation.
         window.location.href = url;
       }
       toast({

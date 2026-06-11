@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { getTerraCreds, type TerraEnv } from "./terraEnv.ts";
+import { maybeSendTelegramActivityPrompt } from "./telegramActivityPrompt.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -831,6 +832,15 @@ async function processWebhook(
           if (isNew && (distanceMeters ?? 0) > 0) {
             newActivityCount++;
             newActivityKeys.push(`terra:${provider}:${aid}`);
+            // Fire and forget telegram prompt for this new activity
+            await maybeSendTelegramActivityPrompt({
+              userId: appUserId,
+              source: "terra",
+              activityKey: `${provider}:${aid}`,
+              distanceMeters: distanceMeters ?? null,
+              durationSeconds: durationSeconds ?? null,
+              sportType: meta?.type ?? meta?.activity_type ?? "run",
+            });
           }
         }
         // Recalculate XP & leaderboard rank from terra_activities

@@ -20,18 +20,20 @@ export default function TelegramConnectCard({ lang }: { lang: Lang }) {
   const [busy, setBusy] = useState(false);
   const [linkedChatId, setLinkedChatId] = useState<number | null>(null);
   const [enabled, setEnabled] = useState(false);
+  const [feedbackEnabled, setFeedbackEnabled] = useState(false);
 
   useEffect(() => {
     if (!user) return;
     (async () => {
       const { data } = await supabase
         .from("profiles")
-        .select("telegram_chat_id, telegram_daily_workout")
+        .select("telegram_chat_id, telegram_daily_workout, telegram_activity_feedback")
         .eq("user_id", user.id)
         .maybeSingle();
       if (data) {
         setLinkedChatId((data as any).telegram_chat_id ?? null);
         setEnabled(!!(data as any).telegram_daily_workout);
+        setFeedbackEnabled(!!(data as any).telegram_activity_feedback);
       }
       setLoading(false);
     })();
@@ -75,6 +77,7 @@ export default function TelegramConnectCard({ lang }: { lang: Lang }) {
         .update({
           telegram_chat_id: null,
           telegram_daily_workout: false,
+          telegram_activity_feedback: false,
           telegram_link_code: null,
           telegram_link_code_expires_at: null,
         } as any)
@@ -82,6 +85,7 @@ export default function TelegramConnectCard({ lang }: { lang: Lang }) {
       if (error) throw error;
       setLinkedChatId(null);
       setEnabled(false);
+      setFeedbackEnabled(false);
       toast({ title: isZh ? "已中斷連結" : "Disconnected" });
     } catch (e: any) {
       toast({ title: "Error", description: e.message ?? String(e), variant: "destructive" });
@@ -90,7 +94,7 @@ export default function TelegramConnectCard({ lang }: { lang: Lang }) {
     }
   }
 
-  async function toggle() {
+  async function toggleDaily() {
     if (!user) return;
     const next = !enabled;
     setEnabled(next);
@@ -104,34 +108,67 @@ export default function TelegramConnectCard({ lang }: { lang: Lang }) {
     }
   }
 
+  async function toggleFeedback() {
+    if (!user) return;
+    const next = !feedbackEnabled;
+    setFeedbackEnabled(next);
+    const { error } = await supabase
+      .from("profiles")
+      .update({ telegram_activity_feedback: next } as any)
+      .eq("user_id", user.id);
+    if (error) {
+      setFeedbackEnabled(!next);
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    }
+  }
+
   if (!user || loading) return null;
 
+  const Switch = ({ on, onClick }: { on: boolean; onClick: () => void }) => (
+    <button
+      onClick={onClick}
+      disabled={busy}
+      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${on ? "bg-primary" : "bg-input"}`}
+    >
+      <span className={`inline-block h-5 w-5 rounded-full bg-background shadow-lg transition-transform ${on ? "translate-x-5" : "translate-x-0.5"}`} />
+    </button>
+  );
+
   return (
-    <div className="bg-card border border-border rounded-xl p-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Send size={20} className="text-primary" />
-          <span className="font-medium text-foreground">
-            {isZh ? "Telegram 每日訓練建議" : "Daily Telegram Workout"}
-          </span>
-        </div>
-        {linkedChatId && (
-          <button
-            onClick={toggle}
-            disabled={busy}
-            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${enabled ? "bg-primary" : "bg-input"}`}
-          >
-            <span className={`inline-block h-5 w-5 rounded-full bg-background shadow-lg transition-transform ${enabled ? "translate-x-5" : "translate-x-0.5"}`} />
-          </button>
-        )}
+    <div className="bg-card border border-border rounded-xl p-4 space-y-4">
+      <div className="flex items-center gap-3">
+        <Send size={20} className="text-primary" />
+        <span className="font-medium text-foreground">
+          {isZh ? "Telegram 通知" : "Telegram"}
+        </span>
       </div>
-      <p className="text-xs text-muted-foreground mt-1 ml-8">
-        {linkedChatId
-          ? (isZh ? "每日早上 7 點（HKT）在 Telegram 收到 AI 跑步建議。" : "Get your AI workout suggestion in Telegram daily at 7am HKT.")
-          : (isZh ? "把 RunWard 連到 Telegram，每天早上收到 AI 跑步建議。" : "Connect to Telegram and get an AI workout suggestion each morning.")}
-      </p>
-      <div className="mt-3 ml-8 flex gap-2">
-        {linkedChatId ? (
+
+      {linkedChatId ? (
+        <>
+          <div className="flex items-center justify-between">
+            <div className="pr-3">
+              <div className="text-sm text-foreground">
+                {isZh ? "每日跑步建議" : "Daily workout suggestion"}
+              </div>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {isZh ? "每天早上 7 點（HKT）收到 AI 跑步建議。" : "Get an AI workout suggestion every morning at 7am HKT."}
+              </p>
+            </div>
+            <Switch on={enabled} onClick={toggleDaily} />
+          </div>
+
+          <div className="flex items-center justify-between">
+            <div className="pr-3">
+              <div className="text-sm text-foreground">
+                {isZh ? "跑步後回饋" : "Post-run feedback"}
+              </div>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {isZh ? "完成跑步後在 Telegram 詢問你的 RPE 和感受，並提供 AI 教練回饋。" : "After each run, I'll ask for your RPE and how you felt, then reply with AI coach feedback."}
+              </p>
+            </div>
+            <Switch on={feedbackEnabled} onClick={toggleFeedback} />
+          </div>
+
           <button
             onClick={disconnect}
             disabled={busy}
@@ -139,16 +176,23 @@ export default function TelegramConnectCard({ lang }: { lang: Lang }) {
           >
             {isZh ? "中斷 Telegram 連結" : "Disconnect Telegram"}
           </button>
-        ) : (
+        </>
+      ) : (
+        <>
+          <p className="text-xs text-muted-foreground">
+            {isZh
+              ? "把 RunWard 連到 Telegram，每天早上收到 AI 跑步建議，並在跑步後分享感受獲得回饋。"
+              : "Connect to Telegram for daily AI workout suggestions and post-run feedback chats."}
+          </p>
           <button
             onClick={generateAndOpen}
             disabled={busy}
-            className="text-xs font-medium text-primary hover:underline"
+            className="text-sm font-medium text-primary hover:underline"
           >
             {isZh ? "💬 連結 Telegram" : "💬 Connect Telegram"}
           </button>
-        )}
-      </div>
+        </>
+      )}
     </div>
   );
 }

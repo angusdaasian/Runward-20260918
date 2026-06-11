@@ -243,45 +243,8 @@ const Landing = () => {
           </div>
 
 
-          <div className="max-w-3xl mx-auto mb-10 rounded-2xl border border-warning/30 bg-warning/10 p-5 md:p-6">
-            <div className="flex items-start gap-3">
-              <Target className="text-warning shrink-0 mt-0.5" size={22} />
-              <div className="space-y-1.5 text-sm">
-                <p className="font-bold text-foreground text-base mb-1">
-                  {zh ? "早鳥方案詳情" : "Early Bird Plan Details"}
-                </p>
-                <p>
-                  <span className="font-semibold">{zh ? "優惠期至:" : "Available until:"}</span>{" "}
-                  <span className="text-muted-foreground">{zh ? "2026 年 6 月 1 日" : "June 1, 2026"}</span>
-                </p>
-                <p>
-                  <span className="font-semibold">{zh ? "早鳥價:" : "Early bird price:"}</span>{" "}
-                  <span className="text-muted-foreground">
-                    {zh
-                      ? "每月 HK$28 / 每年 HK$328（6 月 1 日後 HK$48 / HK$488；TWD 120 / TWD 1290，6 月 1 日後 TWD 190 / TWD 1990）"
-                      : "Monthly HK$28 / Yearly HK$328 (after June 1: HK$48 / HK$488; TWD 120 / TWD 1290, after June 1: TWD 190 / TWD 1990)"}
-                  </span>
-                </p>
-                <p>
-                  <span className="font-semibold">{zh ? "免費試用:" : "Free trial:"}</span>{" "}
-                  <span className="text-muted-foreground">
-                    {zh
-                      ? "月費方案 7 天免費試用 — 試用結束後扣款,可隨時取消"
-                      : "7-day free trial on monthly plan — billed after trial, cancel anytime"}
-                  </span>
-                </p>
-                <p>
-                  <span className="font-semibold">{zh ? "早鳥福利:" : "Early bird perk:"}</span>{" "}
-                  <span className="text-muted-foreground">
-                    {zh ? "早鳥訂閱用戶可永久鎖定優惠價," : "Early bird subscribers keep the same low price forever, "}
-                    <span className="font-semibold text-foreground">
-                      {zh ? "不受未來價格調整影響" : "regardless of future price increases"}
-                    </span>
-                  </span>
-                </p>
-              </div>
-            </div>
-          </div>
+
+
 
           <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
             {/* Free */}

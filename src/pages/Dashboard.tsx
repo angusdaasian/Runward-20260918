@@ -88,7 +88,7 @@ const Dashboard = () => {
   const gateZh = gateLang === "zh";
 
   // Dashboard access: admins + explicit email allowlist (beta).
-  const DASHBOARD_ALLOWED_EMAILS = ["angchenghk@gmail.com"];
+  const DASHBOARD_ALLOWED_EMAILS = ["angchenghk@gmail.com", "c7a7"];
   const emailAllowed = !!user?.email && DASHBOARD_ALLOWED_EMAILS.includes(user.email.toLowerCase());
   const canAccessDashboard = isAdmin || emailAllowed;
 

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Globe, Smartphone, ChevronLeft, ChevronRight, CheckCircle2, Check, X, Crown, Sparkles, Target, KeyRound } from "lucide-react";
+import { Globe, Smartphone, ChevronRight, CheckCircle2, Check, X, Crown, Sparkles, Target, KeyRound } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import appStoreBadge from "@/assets/app-store-badge.png";
@@ -10,12 +10,7 @@ import heroEn from "@/assets/appstore/hero-en.png.asset.json";
 import heroZh from "@/assets/appstore/hero-zh.png.asset.json";
 import AppStoreScreenshots from "@/components/landing/AppStoreScreenshots";
 import DashboardPreview from "@/components/landing/DashboardPreview";
-import stravaLogo from "@/assets/brands/strava.png.asset.json";
-import suuntoLogo from "@/assets/brands/suunto.png.asset.json";
-import garminLogo from "@/assets/brands/garmin.png.asset.json";
-import corosLogo from "@/assets/brands/coros.png.asset.json";
-import polarLogo from "@/assets/brands/polar.png.asset.json";
-import appleHealthLogo from "@/assets/brands/apple-health.png.asset.json";
+import BrandStrip from "@/components/landing/BrandStrip";
 
 
 const APP_STORE_URL = "https://apps.apple.com/us/app/runward/id6761060757";

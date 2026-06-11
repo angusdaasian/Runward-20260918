@@ -25,7 +25,7 @@ const PolarSyncTester = () => {
       .select("polar_user_id, member_id, expires_at, updated_at")
       .eq("user_id", user.id)
       .maybeSingle();
-    setConn((data as ConnRow | null) ?? null);
+    setConn((data as unknown as ConnRow | null) ?? null);
   };
 
   useEffect(() => { loadConn(); }, [user]);

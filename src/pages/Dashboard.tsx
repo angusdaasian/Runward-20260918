@@ -45,9 +45,21 @@ const DashboardTraining = lazy(() => import("@/components/dashboard/DashboardTra
 const DashboardRaces = lazy(() => import("@/components/dashboard/DashboardRaces"));
 const DashboardCommunity = lazy(() => import("@/components/dashboard/DashboardCommunity"));
 const DashboardAnalytics = lazy(() => import("@/components/dashboard/DashboardAnalytics"));
+const DashboardCalculators = lazy(() => import("@/components/dashboard/DashboardCalculators"));
 const DashboardConnect = lazy(() => import("@/components/dashboard/DashboardConnect"));
 const DashboardSettings = lazy(() => import("@/components/dashboard/DashboardSettings"));
 const DashboardAuth = lazy(() => import("@/components/dashboard/DashboardAuth"));
+
+type View =
+  | "overview"
+  | "activities"
+  | "training"
+  | "races"
+  | "community"
+  | "analytics"
+  | "calculators"
+  | "connect"
+  | "settings";
 
 type View =
   | "overview"

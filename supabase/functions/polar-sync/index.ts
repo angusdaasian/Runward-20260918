@@ -30,6 +30,19 @@ serve(async (req) => {
       });
     }
 
+    // Optional: filter to only exercises started within the last N days.
+    // Used for the initial backfill after auth (sinceDays=7).
+    let sinceDays: number | null = null;
+    if (req.method === "POST") {
+      try {
+        const body = await req.json();
+        if (body?.since_days && Number.isFinite(Number(body.since_days))) {
+          sinceDays = Number(body.since_days);
+        }
+      } catch { /* no body */ }
+    }
+    const sinceMs = sinceDays ? Date.now() - sinceDays * 86400 * 1000 : null;
+
     const supabase = createClient(SUPABASE_URL, SERVICE);
     const { data: conn, error: connErr } = await supabase
       .from("polar_connections")
@@ -99,6 +112,10 @@ serve(async (req) => {
           continue;
         }
         const ex = await exRes.json() as PolarExercise;
+        if (sinceMs && ex["start-time"]) {
+          const t = new Date(ex["start-time"]).getTime();
+          if (Number.isFinite(t) && t < sinceMs) continue;
+        }
         const { error: upErr } = await supabase
           .from("polar_activities")
           .upsert(exerciseRow(user.id, ex), { onConflict: "polar_exercise_id" });

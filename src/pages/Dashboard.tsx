@@ -13,6 +13,7 @@ import {
   LogOut,
   Home,
   LayoutDashboard,
+  Calculator,
 } from "lucide-react";
 import {
   Sidebar,

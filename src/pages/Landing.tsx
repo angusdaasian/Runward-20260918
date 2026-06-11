@@ -52,6 +52,12 @@ const Landing = () => {
             >
               {zh ? "價格" : "Pricing"}
             </a>
+            <Link
+              to="/compare"
+              className="hidden sm:inline-block text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              {zh ? "比較" : "Compare"}
+            </Link>
             <button
               onClick={toggleLang}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-card border border-border text-sm text-muted-foreground hover:text-foreground transition-colors"
@@ -374,6 +380,14 @@ const Landing = () => {
                   </div>
                 </div>
               ))}
+            </div>
+            <div className="mt-8 text-center">
+              <Link
+                to="/compare"
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-card border border-border text-sm font-semibold hover:bg-muted transition-colors"
+              >
+                {zh ? "對比 Garmin Connect 與 Strava →" : "Compare with Garmin Connect & Strava →"}
+              </Link>
             </div>
           </div>
         </div>

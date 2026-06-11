@@ -92,13 +92,6 @@ const Dashboard = () => {
   const emailAllowed = !!user?.email && DASHBOARD_ALLOWED_EMAILS.includes(user.email.toLowerCase());
   const canAccessDashboard = isAdmin || emailAllowed;
 
-  if (authLoading || (user && adminLoading)) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-background">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
-      </div>
-    );
-  }
   // Redirect signed-in users who aren't allowlisted back to home,
   // so the sign-in flow completes without being trapped on a gate screen.
   useEffect(() => {
@@ -106,16 +99,6 @@ const Dashboard = () => {
       navigate("/", { replace: true });
     }
   }, [authLoading, adminLoading, user, canAccessDashboard, navigate]);
-
-  if (user && !canAccessDashboard) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-background">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
-      </div>
-    );
-  }
-
-
 
   const setView = (v: View) => {
     setViewState(v);
@@ -163,6 +146,14 @@ const Dashboard = () => {
 
   const currentLabel =
     [...VIEWS, ...TOOLS].find((v) => v.id === view)?.[zh ? "labelZh" : "labelEn"] ?? "";
+
+  if (authLoading || (user && adminLoading) || (user && !canAccessDashboard)) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-background">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+      </div>
+    );
+  }
 
   return (
     <SidebarProvider>

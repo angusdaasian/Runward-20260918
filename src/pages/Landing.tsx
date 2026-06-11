@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Globe, Smartphone, ChevronRight, CheckCircle2, Check, X, Crown, Sparkles, Target, KeyRound } from "lucide-react";
+import { Globe, Smartphone, ChevronLeft, ChevronRight, CheckCircle2, Check, X, Crown, Sparkles, Target, KeyRound } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import appStoreBadge from "@/assets/app-store-badge.png";

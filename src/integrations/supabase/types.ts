@@ -1454,6 +1454,7 @@ export type Database = {
       }
       telegram_pending_prompts: {
         Row: {
+          activity_db_id: string | null
           activity_key: string
           activity_source: string
           activity_summary: Json
@@ -1468,6 +1469,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          activity_db_id?: string | null
           activity_key: string
           activity_source: string
           activity_summary?: Json
@@ -1482,6 +1484,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          activity_db_id?: string | null
           activity_key?: string
           activity_source?: string
           activity_summary?: Json

@@ -143,72 +143,108 @@ const Landing = () => {
       </nav>
 
       {/* ─── Hero ─── */}
-      <section className="relative px-6 pt-20 pb-28 md:pt-28 md:pb-36 overflow-hidden">
-        {/* BG blurs */}
-        <div className="absolute top-[-200px] left-1/2 -translate-x-1/2 w-[900px] h-[900px] rounded-full bg-primary/6 blur-3xl pointer-events-none" />
-        <div className="absolute top-20 -right-32 w-80 h-80 rounded-full bg-primary/8 blur-3xl pointer-events-none" />
+      <section className="relative px-6 pt-16 pb-20 md:pt-24 md:pb-28 overflow-hidden">
+        <div className="absolute top-[-160px] right-[-120px] w-[600px] h-[600px] rounded-full bg-primary/5 blur-3xl pointer-events-none" />
 
-        <div className="relative z-10 max-w-6xl mx-auto grid md:grid-cols-2 gap-12 items-center">
+        <div className="relative z-10 max-w-6xl mx-auto grid md:grid-cols-[1.15fr_1fr] gap-12 md:gap-16 items-center">
           {/* Left — copy */}
           <div className={`transition-all duration-700 ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"}`}>
-            <div className="flex items-center gap-3 mb-6">
-              <img src={appIcon} alt="" className="h-14 w-14 rounded-2xl shadow-lg ring-1 ring-border" />
-              <div>
-                <h1 className="font-display text-4xl sm:text-5xl md:text-[3.25rem] font-bold tracking-tight leading-[1.1]">
-                  {zh ? "你的 AI 跑步教練" : "Run Smarter."}
-                </h1>
+            <h1 className="font-display text-[2.5rem] sm:text-5xl md:text-6xl lg:text-[4.25rem] font-bold tracking-tight leading-[1.02]">
+              {zh ? (
+                <>
+                  你的 AI 跑步教練,
+                  <br />
+                  <span className="italic text-primary">隨時陪你訓練。</span>
+                </>
+              ) : (
+                <>
+                  Your AI running coach.
+                  <br />
+                  <span className="italic text-primary">In your pocket.</span>
+                </>
+              )}
+            </h1>
+
+            <p className="text-base md:text-lg text-muted-foreground leading-relaxed max-w-xl mt-6 md:mt-8">
+              {zh
+                ? "Strava、Garmin、Apple Health 一鍵同步。AI 自動生成訓練計劃、跑姿分析、賽季排名與獎勵 — 全部整合在一個應用裡。"
+                : "Strava, Garmin, Apple Health — synced in one tap. AI training plans, posture analysis, ranked seasons and rewards, all in one beautifully crafted app."}
+            </p>
+
+            {/* Integrations strip */}
+            <div className="mt-8 md:mt-10">
+              <div className="text-[11px] font-semibold tracking-[0.12em] text-muted-foreground/80 uppercase mb-3">
+                {zh ? "整合你的裝置" : "Pick your stack"}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {["Strava", "Garmin", "Apple Health", "COROS", "Polar", "Suunto", "Fitbit", "Whoop"].map((p) => (
+                  <span
+                    key={p}
+                    className="inline-flex items-center px-3 py-1.5 rounded-full bg-card border border-border text-xs font-medium text-foreground"
+                  >
+                    {p}
+                  </span>
+                ))}
               </div>
             </div>
-            {!zh && (
-              <h1 className="font-display text-4xl sm:text-5xl md:text-[3.25rem] font-bold tracking-tight leading-[1.1] -mt-2 mb-6">
-                <span className="text-primary">Train Better.</span>
-              </h1>
-            )}
-            <p className="text-lg md:text-xl text-muted-foreground leading-relaxed max-w-lg mb-8">
-              {zh
-                ? "AI 訓練計劃、跑姿分析、排名賽季獎勵 — 跑得更聰明，盡在一個應用。"
-                : "AI training plans, posture analysis, ranked seasons & rewards — everything a runner needs in one beautifully crafted app."}
-            </p>
-            <div className="flex flex-col sm:flex-row items-start gap-4">
-              <a href={APP_STORE_URL} target="_blank" rel="noopener noreferrer">
-                <img src={appStoreBadge} alt="Download on the App Store" className="h-14" />
+
+            {/* CTA */}
+            <div className="mt-8 md:mt-10 flex flex-wrap items-center gap-4">
+              <a
+                href={APP_STORE_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-6 py-3.5 rounded-full bg-primary text-primary-foreground text-base font-semibold hover:bg-primary/90 transition-colors shadow-lg shadow-primary/25"
+              >
+                {zh ? "免費開始使用" : "Get started, it's free"}
+                <ChevronRight size={18} />
               </a>
-              <span className="text-sm text-muted-foreground mt-2 sm:mt-4">
-                {zh ? "免費下載 · 支援 iPhone" : "Free · iPhone"}
-              </span>
+              <a href={APP_STORE_URL} target="_blank" rel="noopener noreferrer" className="inline-block">
+                <img src={appStoreBadge} alt="Download on the App Store" className="h-12" />
+              </a>
             </div>
+
+            <p className="text-xs text-muted-foreground mt-5">
+              {zh ? "iPhone · 免費下載 · 7 天 Premium 試用" : "iPhone · Free to download · 7-day Premium trial"}
+            </p>
           </div>
 
-          {/* Right — hero phones */}
-          <div className={`relative flex justify-center items-end gap-4 transition-all duration-700 delay-200 ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}>
-            <div className="relative -rotate-6 translate-y-4">
-              <IPhoneFrame src={zh ? trainingScreenshotZh : trainingScreenshot} alt="Training" className="w-[180px] md:w-[210px]" />
-            </div>
-            <div className="relative z-10">
-              <IPhoneFrame src={zh ? rewardsScreenshotZh : rewardsScreenshot} alt="Rewards" className="w-[200px] md:w-[240px]" />
-            </div>
-            <div className="relative rotate-6 translate-y-4">
-              <IPhoneFrame src={zh ? racesScreenshotZh : racesScreenshot} alt="Races" className="w-[180px] md:w-[210px]" />
-            </div>
+          {/* Right — single hero phone */}
+          <div className={`relative flex justify-center md:justify-end transition-all duration-700 delay-200 ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}>
+            <div className="absolute inset-0 -z-10 bg-gradient-to-tr from-primary/10 via-primary/5 to-transparent rounded-[3rem] blur-2xl" />
+            <IPhoneFrame
+              src={zh ? rewardsScreenshotZh : rewardsScreenshot}
+              alt="Runward app"
+              className="w-[260px] sm:w-[300px] md:w-[340px]"
+            />
           </div>
         </div>
       </section>
 
       {/* ─── Social proof strip ─── */}
       <section className="border-y border-border bg-card/50">
-        <div className="max-w-5xl mx-auto grid grid-cols-3 divide-x divide-border">
-          {[
-            { value: zh ? "AI 教練" : "AI Coach", label: zh ? "個人化訓練" : "Personalized Plans" },
-            { value: zh ? "跑者排名" : "Ranked", label: zh ? "賽季制度" : "Seasonal Leagues" },
-            { value: zh ? "免費" : "Free", label: zh ? "核心功能" : "Core Features" },
-          ].map((stat, i) => (
-            <div key={i} className="flex flex-col items-center py-5 px-4 text-center">
-              <span className="font-display font-bold text-foreground text-lg">{stat.value}</span>
-              <span className="text-xs text-muted-foreground mt-0.5">{stat.label}</span>
-            </div>
-          ))}
+        <div className="max-w-5xl mx-auto px-6 py-6 flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-6 text-center">
+          <div className="flex -space-x-2">
+            {[appIcon, appIcon, appIcon].map((src, i) => (
+              <img
+                key={i}
+                src={src}
+                alt=""
+                className="h-8 w-8 rounded-full ring-2 ring-card object-cover"
+                style={{ opacity: 0.85 - i * 0.15 }}
+              />
+            ))}
+          </div>
+          <p className="text-sm text-muted-foreground">
+            {zh ? (
+              <>被 <span className="font-semibold text-foreground">數百位跑者</span> 使用 — 包括馬拉松 sub-3 跑者與越野跑愛好者</>
+            ) : (
+              <>Trusted by <span className="font-semibold text-foreground">hundreds of runners</span> — from sub-3 marathoners to trail and ultra athletes</>
+            )}
+          </p>
         </div>
       </section>
+
 
       {/* ─── Feature Showcases ─── */}
       <section className="px-6 py-20 md:py-28">

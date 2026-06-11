@@ -9,14 +9,18 @@ import despia from "despia-native";
 import { isDespiaUA } from "@/lib/despiaOAuth";
 
 type ConnRow = { polar_user_id: number; member_id: string; expires_at: number; updated_at: string };
+type WebhookRow = { id: string; url: string; events: string[]; created_at: string };
 
 const POLAR_PENDING_REDIRECT_KEY = "polar_pending_redirect_uri";
 
 const PolarSyncTester = () => {
   const { user } = useAuth();
   const [conn, setConn] = useState<ConnRow | null>(null);
+  const [webhook, setWebhook] = useState<WebhookRow | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [lastResult, setLastResult] = useState<string>("");
+
+  const webhookUrl = `https://kbghvclwhxnjeskdodeh.supabase.co/functions/v1/polar-webhook`;
 
   const loadConn = async () => {
     if (!user) return;

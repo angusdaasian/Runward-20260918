@@ -39,10 +39,10 @@ const partial = (note_en: string, note_zh: string): Cell => ({ kind: "partial", 
 const text = (text_en: string, text_zh: string): Cell => ({ kind: "text", text_en, text_zh });
 
 export const RUNWARD_PRICE = {
-  monthly_en: "≈ US$6.15 / mo",
-  monthly_zh: "約 US$6.15 / 月",
-  yearly_en: "≈ US$62 / yr",
-  yearly_zh: "約 US$62 / 年",
+  monthly_en: "US$5.99 / mo",
+  monthly_zh: "US$5.99 / 月",
+  yearly_en: "US$62 / yr",
+  yearly_zh: "US$62 / 年",
 };
 
 export const garminComparison: CompetitorComparison = {
@@ -133,7 +133,7 @@ export const garminComparison: CompetitorComparison = {
     {
       label_en: "Price",
       label_zh: "價格",
-      runward: text("≈ US$6.15 / mo · ≈ US$62 / yr", "約 US$6.15 / 月 · 約 US$62 / 年"),
+      runward: text("US$5.99 / mo · US$62 / yr", "US$5.99 / 月 · US$62 / 年"),
       competitor_free: text("Free", "免費"),
       competitor_premium: text("≈ US$6.99 / mo", "約 US$6.99 / 月"),
     },
@@ -235,7 +235,7 @@ export const stravaComparison: CompetitorComparison = {
     {
       label_en: "Price",
       label_zh: "價格",
-      runward: text("≈ US$6.15 / mo · ≈ US$62 / yr", "約 US$6.15 / 月 · 約 US$62 / 年"),
+      runward: text("US$5.99 / mo · US$62 / yr", "US$5.99 / 月 · US$62 / 年"),
       competitor_free: text("Free", "免費"),
       competitor_premium: text("≈ US$11.99 / mo", "約 US$11.99 / 月"),
     },

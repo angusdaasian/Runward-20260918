@@ -257,7 +257,17 @@ serve(async (req) => {
       cadenceSamples, avgCadence,
       summaryPolyline, startLat, startLon,
       simpleMode,
+      internalUserId,
     } = body;
+
+    if (isInternal) {
+      if (!internalUserId || typeof internalUserId !== "string") {
+        return jsonResponse({ error: "internalUserId required for internal calls" }, 400);
+      }
+      user = { id: internalUserId };
+    }
+    if (!user) return jsonResponse({ error: "Unauthorized" }, 401);
+
     const isZh = lang === "zh";
 
     // --- Translation mode ---

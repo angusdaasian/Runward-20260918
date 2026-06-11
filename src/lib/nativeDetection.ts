@@ -2,74 +2,69 @@
  * Detect whether the app is running inside the Despia native wrapper
  * or in a regular web browser.
  *
- * Priority:
- * 1. ?native=true query parameter
- * 2. navigator.standalone (iOS PWA / native shell)
- * 3. Despia / median JS bridge globals
- * 4. Default → web (landing page)
+ * Despia-only signals (strict — mobile Safari must NOT match):
+ * 1. ?native=true query parameter (configure Despia start URL with this)
+ * 2. window.despia / window.median JS bridge globals
+ * 3. User-Agent contains "despia" or "median"
+ * 4. navigator.standalone === true (iOS standalone WebView / PWA)
  *
- * Result is cached in localStorage so subsequent navigations skip detection.
+ * Anything else (mobile Safari, mobile Chrome, desktop) → web → landing page.
  */
 
 const STORAGE_KEY = "runward_native_app";
 
 export function isNativeApp(): boolean {
-  const params = new URLSearchParams(window.location.search);
-  const ua = navigator.userAgent || '';
-  const host = window.location.hostname;
+  if (typeof window === "undefined") return false;
 
-  // 0. OAuth / callback routes — always show full app
+  const params = new URLSearchParams(window.location.search);
+  const ua = navigator.userAgent || "";
   const path = window.location.pathname;
-  if (/\/(callback|auth|strava|garmin)/i.test(path)) {
-    localStorage.setItem(STORAGE_KEY, "true");
+
+  // OAuth / callback routes — always show full app so callbacks complete
+  if (/\/(callback|auth|strava|garmin|terra|suunto|polar)/i.test(path)) {
     return true;
   }
 
-  // 0b. ?dev=true bypass — always show full app
+  // ?dev=true bypass for testing in a browser
   if (params.get("dev") === "true") {
     localStorage.setItem(STORAGE_KEY, "true");
     return true;
   }
 
-  // 1. ?native=true explicit flag
+  // 1. Explicit ?native=true flag (set this in the Despia start URL)
   if (params.get("native") === "true") {
     localStorage.setItem(STORAGE_KEY, "true");
     return true;
   }
 
-  // 2. navigator.standalone (iOS PWA / native shell / Despia)
+  // 2. Despia / Median JS bridge globals
+  if (
+    typeof (window as any).median !== "undefined" ||
+    typeof (window as any).despia !== "undefined"
+  ) {
+    localStorage.setItem(STORAGE_KEY, "true");
+    return true;
+  }
+
+  // 3. UA token from the Despia wrapper
+  if (/despia|median/i.test(ua)) {
+    localStorage.setItem(STORAGE_KEY, "true");
+    return true;
+  }
+
+  // 4. iOS standalone WebView (Despia's iOS shell sets this)
   if ((navigator as any).standalone === true) {
     localStorage.setItem(STORAGE_KEY, "true");
     return true;
   }
 
-  // 3. Despia / Median JS bridge globals
-  if (typeof (window as any).median !== "undefined" || typeof (window as any).despia !== "undefined") {
-    localStorage.setItem(STORAGE_KEY, "true");
-    return true;
+  // 5. Cached result — only honor cached "true" if any active signal also
+  // matched above. Since none did, clear stale cache so a mobile Safari
+  // visitor who was previously misdetected isn't stuck on Index forever.
+  if (localStorage.getItem(STORAGE_KEY) === "true") {
+    localStorage.removeItem(STORAGE_KEY);
   }
 
-  // 4. WebView detection via User-Agent (covers Despia, native wrappers)
-  const isWebView = /wv|WebView|(iPhone|iPod|iPad)(?!.*Safari)|Android.*Version\/[\d.]+/i.test(ua);
-  if (isWebView) {
-    localStorage.setItem(STORAGE_KEY, "true");
-    return true;
-  }
-
-  // 5. Mobile on production domain → likely Despia app
-  const isProdDomain = host === 'runward.app' || host === 'www.runward.app' || /\.netlify\.app$/i.test(host);
-  const isMobile = /Mobile|Android|iPhone|iPad|iPod/i.test(ua);
-  if (isMobile && isProdDomain) {
-    localStorage.setItem(STORAGE_KEY, "true");
-    return true;
-  }
-
-  // 6. Check cache (after all active detection, so new signals always win)
-  const cached = localStorage.getItem(STORAGE_KEY);
-  if (cached === "true") return true;
-  if (cached === "false") return false;
-
-  // 7. Default — desktop/mobile web browser → show landing page
   localStorage.setItem(STORAGE_KEY, "false");
   return false;
 }

@@ -133,7 +133,7 @@ export const garminComparison: CompetitorComparison = {
     {
       label_en: "Price",
       label_zh: "價格",
-      runward: text("≈ US$6.15 / mo · ≈ US$62 / yr", "約 US$6.15 / 月 · 約 US$62 / 年"),
+      runward: text("US$5.99 / mo · US$62 / yr", "US$5.99 / 月 · US$62 / 年"),
       competitor_free: text("Free", "免費"),
       competitor_premium: text("≈ US$6.99 / mo", "約 US$6.99 / 月"),
     },
@@ -235,7 +235,7 @@ export const stravaComparison: CompetitorComparison = {
     {
       label_en: "Price",
       label_zh: "價格",
-      runward: text("≈ US$6.15 / mo · ≈ US$62 / yr", "約 US$6.15 / 月 · 約 US$62 / 年"),
+      runward: text("US$5.99 / mo · US$62 / yr", "US$5.99 / 月 · US$62 / 年"),
       competitor_free: text("Free", "免費"),
       competitor_premium: text("≈ US$11.99 / mo", "約 US$11.99 / 月"),
     },

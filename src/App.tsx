@@ -41,6 +41,12 @@ const hadOAuthHash =
 const hadOAuthReturn = hadOAuthHash || initialParams.has("code") || initialParams.has("error");
 const hadInAppParams = initialParams.has("tab") || initialParams.has("page");
 
+const isDesktop =
+  typeof navigator !== "undefined" &&
+  !/Mobile|Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+    navigator.userAgent
+  );
+
 const RouteFallback = () => (
   <div className="flex flex-col items-center justify-center min-h-screen bg-background gap-3">
     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
@@ -52,6 +58,7 @@ const RootRoute = () => {
   if (native) return <Index />;
   if (hadInAppParams || hadOAuthReturn) return <Index />;
   if (loading) return <Index />;
+  if (isDesktop) return <Landing />;
   if (session?.user) return <Index />;
   return <Landing />;
 };

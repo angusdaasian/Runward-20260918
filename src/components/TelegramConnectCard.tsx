@@ -43,6 +43,9 @@ export default function TelegramConnectCard({ lang }: { lang: Lang }) {
 
   async function generateAndOpen() {
     if (!user) return;
+    // Open a blank tab SYNCHRONOUSLY so the popup blocker treats it as a
+    // direct user gesture. We'll set the real URL after the DB update.
+    const popup = window.open("about:blank", "_blank");
     setBusy(true);
     try {
       const code = makeCode();
@@ -56,12 +59,18 @@ export default function TelegramConnectCard({ lang }: { lang: Lang }) {
         .eq("user_id", user.id);
       if (error) throw error;
       const url = `https://t.me/${BOT_USERNAME}?start=${code}`;
-      window.open(url, "_blank");
+      if (popup && !popup.closed) {
+        popup.location.href = url;
+      } else {
+        // Popup blocked — fall back to same-tab navigation.
+        window.location.href = url;
+      }
       toast({
         title: isZh ? "請在 Telegram 完成連結" : "Finish linking in Telegram",
         description: isZh ? "在 Telegram 點擊「Start」即可。連結碼 15 分鐘內有效。" : "Tap 'Start' inside Telegram. The code is valid for 15 minutes.",
       });
     } catch (e: any) {
+      if (popup && !popup.closed) popup.close();
       toast({ title: "Error", description: e.message ?? String(e), variant: "destructive" });
     } finally {
       setBusy(false);

@@ -112,6 +112,10 @@ serve(async (req) => {
           continue;
         }
         const ex = await exRes.json() as PolarExercise;
+        if (sinceMs && ex["start-time"]) {
+          const t = new Date(ex["start-time"]).getTime();
+          if (Number.isFinite(t) && t < sinceMs) continue;
+        }
         const { error: upErr } = await supabase
           .from("polar_activities")
           .upsert(exerciseRow(user.id, ex), { onConflict: "polar_exercise_id" });

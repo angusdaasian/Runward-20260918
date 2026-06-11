@@ -141,11 +141,14 @@ export default function TelegramConnectCard({ lang }: { lang: Lang }) {
 
   const Switch = ({ on, onClick }: { on: boolean; onClick: () => void }) => (
     <button
+      type="button"
+      role="switch"
+      aria-checked={on}
       onClick={onClick}
       disabled={busy}
-      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${on ? "bg-primary" : "bg-input"}`}
+      className={`relative shrink-0 inline-flex h-6 w-11 items-center rounded-full transition-colors ${on ? "bg-primary" : "bg-input"}`}
     >
-      <span className={`inline-block h-5 w-5 rounded-full bg-background shadow-lg transition-transform ${on ? "translate-x-5" : "translate-x-0.5"}`} />
+      <span className={`inline-block h-5 w-5 rounded-full bg-background shadow-lg transition-transform ${on ? "translate-x-[22px]" : "translate-x-0.5"}`} />
     </button>
   );
 

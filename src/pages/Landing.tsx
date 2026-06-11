@@ -11,6 +11,8 @@ import heroZh from "@/assets/appstore/hero-zh.png.asset.json";
 import FeatureShowcase from "@/components/landing/FeatureShowcase";
 import AppStoreScreenshots from "@/components/landing/AppStoreScreenshots";
 import DashboardPreview from "@/components/landing/DashboardPreview";
+import HeroPhoneStack from "@/components/landing/HeroPhoneStack";
+import HeroStats from "@/components/landing/HeroStats";
 
 import rewardsScreenshot from "@/assets/screenshots/rewards.png";
 import trainingScreenshot from "@/assets/screenshots/training.png";

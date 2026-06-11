@@ -65,6 +65,8 @@ export default function SuuntoReturn() {
         localStorage.removeItem("suunto_pending_origin");
         if (origin === "admin") {
           navigate("/admin?tab=suunto", { replace: true });
+        } else if (origin === "dashboard") {
+          navigate("/dashboard?view=connect", { replace: true });
         } else {
           navigate("/?page=connect-apps", { replace: true });
         }

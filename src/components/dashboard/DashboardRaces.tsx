@@ -6,7 +6,7 @@ import DesktopPageHeader from "./DesktopPageHeader";
 import { TabPageSkeleton } from "@/components/ui/PageSkeleton";
 import { useActivities } from "@/hooks/use-activities";
 
-const RaceTab = lazy(() => import("@/components/RaceTab"));
+const DesktopRaceTab = lazy(() => import("./DesktopRaceTab"));
 
 interface Props {
   lang: Lang;
@@ -42,7 +42,7 @@ export default function DashboardRaces({ lang }: Props) {
       <div className="grid grid-cols-1 xl:grid-cols-4 gap-4">
         <Card className="xl:col-span-3 p-0 overflow-hidden">
           <Suspense fallback={<TabPageSkeleton />}>
-            <RaceTab lang={lang} />
+            <DesktopRaceTab lang={lang} />
           </Suspense>
         </Card>
 

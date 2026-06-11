@@ -62,6 +62,21 @@ export default function DashboardPreview({ lang }: Props) {
           transition={{ duration: 0.6, ease: "easeOut" }}
           className="relative mx-auto rounded-2xl overflow-hidden border border-border shadow-2xl shadow-foreground/15 bg-card"
         >
+          {/* Coming soon overlay */}
+          <div className="absolute inset-0 z-20 flex items-center justify-center bg-background/70 backdrop-blur-sm">
+            <div className="text-center px-6">
+              <span className="inline-block px-3 py-1 rounded-full bg-primary text-primary-foreground text-[11px] font-semibold tracking-[0.18em] uppercase mb-4">
+                {zh ? "即將推出" : "Coming Soon"}
+              </span>
+              <h3 className="font-display text-2xl md:text-4xl font-bold tracking-tight">
+                {zh ? "網頁儀表板開發中" : "Web Dashboard in the works"}
+              </h3>
+              <p className="text-sm md:text-base text-muted-foreground mt-2 max-w-md mx-auto">
+                {zh ? "我們正在打造完整的瀏覽器體驗,敬請期待。" : "We're building the full browser experience. Stay tuned."}
+              </p>
+            </div>
+          </div>
+
           {/* Browser chrome */}
           <div className="flex items-center gap-2 px-4 py-3 bg-muted/60 border-b border-border">
             <div className="flex gap-1.5">

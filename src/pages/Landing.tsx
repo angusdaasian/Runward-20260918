@@ -146,61 +146,83 @@ const Landing = () => {
         </div>
       </nav>
 
-      {/* ─── Hero (dark, dappr-style) ─── */}
-      <section className="relative bg-[#1a1a1a] text-white overflow-hidden">
-        {/* Warm highlight top-right */}
-        <div className="pointer-events-none absolute top-[-200px] right-[-150px] w-[700px] h-[700px] rounded-full blur-3xl"
-          style={{ background: "radial-gradient(circle, rgba(255,200,140,0.18), transparent 60%)" }} />
-        {/* Mint glow center-right */}
-        <div className="pointer-events-none absolute top-1/3 right-[10%] w-[500px] h-[500px] rounded-full blur-3xl"
-          style={{ background: "radial-gradient(circle, hsl(var(--primary) / 0.15), transparent 65%)" }} />
-
-        <div className="relative z-10 max-w-6xl mx-auto px-6 pt-16 md:pt-24 pb-10 md:pb-16 grid md:grid-cols-[1.05fr_1fr] gap-12 md:gap-10 items-center">
+      {/* ─── Hero (Grocerex-style, light mint) ─── */}
+      <section className="relative overflow-hidden" style={{ background: "linear-gradient(180deg, #e8f8ee 0%, #f4fbf6 60%, #ffffff 100%)" }}>
+        <div className="relative z-10 max-w-6xl mx-auto px-6 pt-12 md:pt-20 pb-16 md:pb-24 grid md:grid-cols-[1.1fr_1fr] gap-10 md:gap-12 items-center">
           {/* Left — copy */}
           <div className={`transition-all duration-700 ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"}`}>
-            <h1 className="font-display text-[2.75rem] sm:text-5xl md:text-6xl lg:text-[4.5rem] font-bold tracking-tight leading-[1.02] text-white">
-              {zh
-                ? "你需要的一切，讓訓練更有方向。"
-                : "Everything you need to train, race, and improve."}
+            <div className="inline-block text-[11px] tracking-[0.18em] font-semibold uppercase text-emerald-700/80 mb-5">
+              {zh ? "2025 年全方位跑步應用" : "Top Running App in 2025"}
+            </div>
+
+            <h1 className="font-display text-[2.5rem] sm:text-5xl md:text-[3.5rem] lg:text-[4rem] font-bold tracking-tight leading-[1.05] text-zinc-900">
+              {zh ? (
+                <>
+                  <span className="text-emerald-500">智能訓練</span>
+                  <br />
+                  陪你跑向<span className="text-emerald-500">每一個目標</span>
+                </>
+              ) : (
+                <>
+                  <span className="text-emerald-500">Smart training</span>
+                  <br />
+                  delivered <span className="text-emerald-500">to every run</span>
+                </>
+              )}
             </h1>
 
-            <p className="text-base md:text-lg text-white/70 leading-relaxed max-w-xl mt-6 md:mt-8">
+            <p className="text-base md:text-lg text-zinc-600 leading-relaxed max-w-xl mt-6">
               {zh
-                ? "成為首批使用 AI 跑步教練的跑者 — Strava、Garmin、Apple Health 一鍵同步，訓練、比賽、分析全部整合。"
-                : "Be among the first runners to experience the easiest way to train smarter — wearables, AI plans, races and analytics in one app."}
+                ? "你的一站式跑步夥伴 — Strava、Garmin、Apple Health 同步，AI 訓練計劃、跑姿分析與排名獎勵全部整合。"
+                : "Your one-stop running companion — sync Strava, Garmin and Apple Health, follow AI-built plans, analyse your form, and climb ranked seasons."}
             </p>
 
-            <div className="mt-8 md:mt-10 flex items-center gap-6 flex-wrap">
+            <div className="mt-8 flex items-center gap-4 flex-wrap">
               <a
                 href={APP_STORE_URL}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 px-7 py-3.5 rounded-full bg-primary text-primary-foreground text-base font-bold hover:bg-primary/90 transition-colors shadow-[0_0_40px_hsl(var(--primary)/0.45)]"
+                className="inline-flex items-center gap-2 px-7 py-3.5 rounded-full bg-emerald-500 text-white text-base font-semibold hover:bg-emerald-600 transition-colors shadow-lg shadow-emerald-500/25"
               >
-                {zh ? "免費下載" : "Get the app"}
+                {zh ? "立即下載" : "Download Now"}
               </a>
               <a
                 href="#features"
-                className="inline-flex items-center text-base font-semibold text-white border-b-2 border-white/40 hover:border-white pb-0.5 transition-colors"
+                className="inline-flex items-center gap-2 px-7 py-3.5 rounded-full bg-white border border-zinc-200 text-zinc-900 text-base font-semibold hover:border-emerald-400 hover:text-emerald-600 transition-colors"
               >
-                {zh ? "查看功能" : "View features"}
+                {zh ? "探索功能" : "Explore Features"}
               </a>
             </div>
 
-            <p className="text-xs text-white/50 mt-5">
-              {zh ? "iPhone · 免費下載 · 7 天 Premium 試用" : "iPhone · Free to download · 7-day Premium trial"}
-            </p>
+            <div className="mt-10 flex items-center gap-4">
+              <div className="flex -space-x-2">
+                {[appIcon, appIcon, appIcon].map((src, i) => (
+                  <img
+                    key={i}
+                    src={src}
+                    alt=""
+                    className="h-9 w-9 rounded-full ring-2 ring-white object-cover"
+                    style={{ opacity: 0.9 - i * 0.15 }}
+                  />
+                ))}
+              </div>
+              <div>
+                <div className="font-display font-bold text-zinc-900 text-base">
+                  {zh ? "20k+ 活躍跑者" : "20k+ Happy Runners"}
+                </div>
+                <div className="text-xs text-zinc-500 max-w-[260px] leading-snug mt-0.5">
+                  {zh
+                    ? "從馬拉松 sub-3 跑者到越野跑愛好者，都選擇 Runward。"
+                    : "Trusted by sub-3 marathoners and trail athletes alike."}
+                </div>
+              </div>
+            </div>
           </div>
 
-          {/* Right — phone stack with glowing widgets */}
+          {/* Right — hand holding phone with screenshot */}
           <div className={`relative transition-all duration-700 delay-200 ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}>
             <HeroPhoneStack lang={lang} />
           </div>
-        </div>
-
-        {/* Product stats strip */}
-        <div className="relative z-10 max-w-6xl mx-auto px-6 pb-14 md:pb-20">
-          <HeroStats lang={lang} />
         </div>
       </section>
 

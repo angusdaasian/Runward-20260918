@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Globe, Smartphone, ChevronLeft, ChevronRight, CheckCircle2, Check, X, Crown, Sparkles, Target, KeyRound } from "lucide-react";
+import { Globe, Smartphone, ChevronRight, CheckCircle2, Check, X, Crown, Sparkles, Target, KeyRound } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import appStoreBadge from "@/assets/app-store-badge.png";
@@ -10,12 +10,7 @@ import heroEn from "@/assets/appstore/hero-en.png.asset.json";
 import heroZh from "@/assets/appstore/hero-zh.png.asset.json";
 import AppStoreScreenshots from "@/components/landing/AppStoreScreenshots";
 import DashboardPreview from "@/components/landing/DashboardPreview";
-import stravaLogo from "@/assets/brands/strava.png.asset.json";
-import suuntoLogo from "@/assets/brands/suunto.png.asset.json";
-import garminLogo from "@/assets/brands/garmin.png.asset.json";
-import corosLogo from "@/assets/brands/coros.png.asset.json";
-import polarLogo from "@/assets/brands/polar.png.asset.json";
-import appleHealthLogo from "@/assets/brands/apple-health.png.asset.json";
+import BrandStrip from "@/components/landing/BrandStrip";
 
 
 const APP_STORE_URL = "https://apps.apple.com/us/app/runward/id6761060757";
@@ -171,38 +166,8 @@ const Landing = () => {
       </section>
 
       {/* ─── Brand logos strip ─── */}
-      <section className="border-y border-border bg-card/50">
-        <div className="max-w-5xl mx-auto px-6 py-10">
-          <p className="text-center text-[11px] font-semibold tracking-[0.18em] text-muted-foreground/80 uppercase mb-6">
-            {zh ? "支援的平台" : "Works with"}
-          </p>
-          <div className="flex items-center justify-center gap-3 md:gap-5">
-            <ChevronLeft className="shrink-0 h-5 w-5 md:h-6 md:w-6 text-muted-foreground/50" aria-hidden />
-            <div className="flex-1 flex flex-nowrap items-center justify-between gap-3 sm:gap-5 md:gap-8 overflow-x-auto no-scrollbar">
-              {[
-                { src: stravaLogo.url, alt: "Strava", h: "h-4 sm:h-5 md:h-7", invert: false, offset: "translate-y-0.5 md:translate-y-1.5" },
-                { src: garminLogo.url, alt: "Garmin", h: "h-5 sm:h-6 md:h-9", invert: true },
-                { src: suuntoLogo.url, alt: "Suunto", h: "h-6 sm:h-7 md:h-10", invert: true },
-                { src: corosLogo.url, alt: "COROS", h: "h-5 sm:h-6 md:h-9", invert: true, offset: "translate-y-0.5 md:translate-y-1.5" },
-                { src: polarLogo.url, alt: "Polar", h: "h-4 sm:h-5 md:h-7", invert: true },
-                { src: appleHealthLogo.url, alt: "Works with Apple Health", h: "h-6 sm:h-8 md:h-11", invert: true },
-              ].map((b) => (
-                <img
-                  key={b.alt}
-                  src={b.src}
-                  alt={b.alt}
-                  loading="lazy"
-                  className={`shrink-0 ${b.h} w-auto object-contain opacity-90 hover:opacity-100 transition-opacity ${
-                    b.invert ? "dark:invert" : ""
-                  } ${b.offset ?? ""}`}
-                />
-              ))}
-            </div>
-            <ChevronRight className="shrink-0 h-5 w-5 md:h-6 md:w-6 text-muted-foreground/50" aria-hidden />
-          </div>
+      <BrandStrip lang={lang} />
 
-        </div>
-      </section>
 
 
       {/* ─── App Store Screenshots ─── */}

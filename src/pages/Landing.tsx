@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Globe, Smartphone, ChevronRight, CheckCircle2, Check, X, Crown, Sparkles, Target, KeyRound } from "lucide-react";
+import { Globe, Smartphone, ChevronRight, CheckCircle2, Check, X, Sparkles, Target, KeyRound } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import appStoreBadge from "@/assets/app-store-badge.png";
@@ -7,6 +7,8 @@ import appIcon from "@/assets/app-icon.png";
 import poweredByStrava from "@/assets/powered-by-strava.png";
 import IPhoneFrame from "@/components/landing/IPhoneFrame";
 import FeatureShowcase from "@/components/landing/FeatureShowcase";
+import AppStoreScreenshots from "@/components/landing/AppStoreScreenshots";
+import DashboardPreview from "@/components/landing/DashboardPreview";
 
 import rewardsScreenshot from "@/assets/screenshots/rewards.png";
 import trainingScreenshot from "@/assets/screenshots/training.png";

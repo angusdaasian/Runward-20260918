@@ -87,10 +87,12 @@ const Dashboard = () => {
   const gateLang: Lang = (localStorage.getItem("app_lang") as Lang) || "en";
   const gateZh = gateLang === "zh";
 
-  // Dashboard access: admins + explicit email allowlist (beta).
-  const DASHBOARD_ALLOWED_EMAILS = ["angchenghk@gmail.com", "c7a7"];
+  // Dashboard access: admins + explicit email/user-id allowlist (beta).
+  const DASHBOARD_ALLOWED_EMAILS = ["angchenghk@gmail.com"];
+  const DASHBOARD_ALLOWED_USER_IDS = ["c7a7d1ca-c7bf-4288-bb9d-794006a04087"];
   const emailAllowed = !!user?.email && DASHBOARD_ALLOWED_EMAILS.includes(user.email.toLowerCase());
-  const canAccessDashboard = isAdmin || emailAllowed;
+  const idAllowed = !!user?.id && DASHBOARD_ALLOWED_USER_IDS.includes(user.id);
+  const canAccessDashboard = isAdmin || emailAllowed || idAllowed;
 
   // Redirect signed-in users who aren't allowlisted back to home,
   // so the sign-in flow completes without being trapped on a gate screen.

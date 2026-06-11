@@ -6,6 +6,8 @@ import appStoreBadge from "@/assets/app-store-badge.png";
 import appIcon from "@/assets/app-icon.png";
 import poweredByStrava from "@/assets/powered-by-strava.png";
 import IPhoneFrame from "@/components/landing/IPhoneFrame";
+import heroEn from "@/assets/appstore/hero-en.png.asset.json";
+import heroZh from "@/assets/appstore/hero-zh.png.asset.json";
 import FeatureShowcase from "@/components/landing/FeatureShowcase";
 import AppStoreScreenshots from "@/components/landing/AppStoreScreenshots";
 import DashboardPreview from "@/components/landing/DashboardPreview";
@@ -177,7 +179,7 @@ const Landing = () => {
                 {zh ? "整合你的裝置" : "Pick your stack"}
               </div>
               <div className="flex flex-wrap gap-2">
-                {["Strava", "Garmin", "Apple Health", "COROS", "Polar", "Suunto", "Fitbit", "Whoop"].map((p) => (
+                {["Strava", "Garmin", "Apple Health", "COROS", "Polar", "Suunto", "Fitbit"].map((p) => (
                   <span
                     key={p}
                     className="inline-flex items-center px-3 py-1.5 rounded-full bg-card border border-border text-xs font-medium text-foreground"
@@ -213,7 +215,7 @@ const Landing = () => {
           <div className={`relative flex justify-center md:justify-end transition-all duration-700 delay-200 ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}>
             <div className="absolute inset-0 -z-10 bg-gradient-to-tr from-primary/10 via-primary/5 to-transparent rounded-[3rem] blur-2xl" />
             <IPhoneFrame
-              src={zh ? rewardsScreenshotZh : rewardsScreenshot}
+              src={zh ? heroZh.url : heroEn.url}
               alt="Runward app"
               className="w-[260px] sm:w-[300px] md:w-[340px]"
             />

@@ -61,16 +61,6 @@ type View =
   | "connect"
   | "settings";
 
-type View =
-  | "overview"
-  | "activities"
-  | "training"
-  | "races"
-  | "community"
-  | "analytics"
-  | "connect"
-  | "settings";
-
 const VIEWS: { id: View; icon: typeof Activity; labelEn: string; labelZh: string }[] = [
   { id: "overview", icon: LayoutDashboard, labelEn: "Overview", labelZh: "總覽" },
   { id: "activities", icon: Activity, labelEn: "Activities", labelZh: "活動" },
@@ -78,6 +68,7 @@ const VIEWS: { id: View; icon: typeof Activity; labelEn: string; labelZh: string
   { id: "races", icon: Trophy, labelEn: "Races", labelZh: "比賽" },
   { id: "community", icon: Award, labelEn: "Community", labelZh: "社群" },
   { id: "analytics", icon: BarChart3, labelEn: "Analytics", labelZh: "分析" },
+  { id: "calculators", icon: Calculator, labelEn: "Calculators", labelZh: "計算器" },
 ];
 
 const TOOLS: { id: View; icon: typeof Activity; labelEn: string; labelZh: string }[] = [

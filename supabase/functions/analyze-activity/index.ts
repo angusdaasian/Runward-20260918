@@ -223,10 +223,6 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) return jsonResponse({ error: "Unauthorized" }, 401);
-
-    const accessToken = authHeader.replace(/^Bearer\s+/i, "").trim();
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     const VERTEX_API_KEY = Deno.env.get("GOOGLE_VERTEX_API_KEY");
@@ -235,8 +231,23 @@ serve(async (req) => {
     if (!VERTEX_API_KEY) throw new Error("GOOGLE_VERTEX_API_KEY is not configured");
 
     const serviceClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-    const { data: { user }, error: userError } = await serviceClient.auth.getUser(accessToken);
-    if (userError || !user) return jsonResponse({ error: "Unauthorized" }, 401);
+
+    // Allow internal (service-role) callers: bypass JWT auth when x-internal-secret matches.
+    const internalSecret = req.headers.get("x-internal-secret") || "";
+    const isInternal = internalSecret && internalSecret === SUPABASE_SERVICE_ROLE_KEY;
+
+    let user: { id: string } | null = null;
+    if (isInternal) {
+      // We'll read internalUserId from the body below.
+    } else {
+      const authHeader = req.headers.get("Authorization");
+      if (!authHeader) return jsonResponse({ error: "Unauthorized" }, 401);
+      const accessToken = authHeader.replace(/^Bearer\s+/i, "").trim();
+      const { data: { user: authUser }, error: userError } = await serviceClient.auth.getUser(accessToken);
+      if (userError || !authUser) return jsonResponse({ error: "Unauthorized" }, 401);
+      user = { id: authUser.id };
+    }
+
 
     const body = await req.json();
     const {

@@ -563,6 +563,9 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps }: Props
           </div>
         )}
 
+        {/* Telegram daily workout suggestion */}
+        <TelegramConnectCard lang={lang} />
+
         {/* Disable AI Chat toggle */}
         <div className="bg-card border border-border rounded-xl p-4">
           <div className="flex items-center justify-between">

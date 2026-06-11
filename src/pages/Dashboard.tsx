@@ -13,6 +13,7 @@ import {
   LogOut,
   Home,
   LayoutDashboard,
+  Calculator,
 } from "lucide-react";
 import {
   Sidebar,
@@ -44,6 +45,7 @@ const DashboardTraining = lazy(() => import("@/components/dashboard/DashboardTra
 const DashboardRaces = lazy(() => import("@/components/dashboard/DashboardRaces"));
 const DashboardCommunity = lazy(() => import("@/components/dashboard/DashboardCommunity"));
 const DashboardAnalytics = lazy(() => import("@/components/dashboard/DashboardAnalytics"));
+const DashboardCalculators = lazy(() => import("@/components/dashboard/DashboardCalculators"));
 const DashboardConnect = lazy(() => import("@/components/dashboard/DashboardConnect"));
 const DashboardSettings = lazy(() => import("@/components/dashboard/DashboardSettings"));
 const DashboardAuth = lazy(() => import("@/components/dashboard/DashboardAuth"));
@@ -55,6 +57,7 @@ type View =
   | "races"
   | "community"
   | "analytics"
+  | "calculators"
   | "connect"
   | "settings";
 
@@ -65,6 +68,7 @@ const VIEWS: { id: View; icon: typeof Activity; labelEn: string; labelZh: string
   { id: "races", icon: Trophy, labelEn: "Races", labelZh: "比賽" },
   { id: "community", icon: Award, labelEn: "Community", labelZh: "社群" },
   { id: "analytics", icon: BarChart3, labelEn: "Analytics", labelZh: "分析" },
+  { id: "calculators", icon: Calculator, labelEn: "Calculators", labelZh: "計算器" },
 ];
 
 const TOOLS: { id: View; icon: typeof Activity; labelEn: string; labelZh: string }[] = [
@@ -296,6 +300,7 @@ const Dashboard = () => {
                 {view === "races" && <DashboardRaces lang={lang} />}
                 {view === "community" && <DashboardCommunity lang={lang} />}
                 {view === "analytics" && <DashboardAnalytics lang={lang} />}
+                {view === "calculators" && <DashboardCalculators lang={lang} />}
                 {view === "connect" && (
                   <DashboardConnect lang={lang} onBack={() => setView("overview")} />
                 )}

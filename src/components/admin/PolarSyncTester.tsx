@@ -32,7 +32,61 @@ const PolarSyncTester = () => {
     setConn((data as unknown as ConnRow | null) ?? null);
   };
 
-  useEffect(() => { loadConn(); }, [user]);
+  const loadWebhook = async () => {
+    const { data } = await supabase
+      .from("polar_webhooks" as any)
+      .select("id, url, events, created_at")
+      .limit(1)
+      .maybeSingle();
+    setWebhook((data as unknown as WebhookRow | null) ?? null);
+  };
+
+  useEffect(() => { loadConn(); loadWebhook(); }, [user]);
+
+  const handleCreateWebhook = async () => {
+    setBusy("webhook-create");
+    try {
+      const { data, error } = await supabase.functions.invoke("polar-webhook-manage", {
+        body: { action: "create", url: webhookUrl, events: ["EXERCISE"] },
+      });
+      if (error) throw error;
+      if (!(data as any)?.ok) throw new Error(JSON.stringify((data as any)?.polar ?? data));
+      toast.success("Webhook created");
+      setLastResult(JSON.stringify(data, null, 2));
+      await loadWebhook();
+    } catch (e: any) {
+      toast.error(e?.message || "Failed to create webhook");
+    } finally { setBusy(null); }
+  };
+
+  const handleDeleteWebhook = async () => {
+    if (!webhook) return;
+    setBusy("webhook-delete");
+    try {
+      const { data, error } = await supabase.functions.invoke("polar-webhook-manage", {
+        body: { action: "delete", id: webhook.id },
+      });
+      if (error) throw error;
+      toast.success("Webhook deleted");
+      setLastResult(JSON.stringify(data, null, 2));
+      await loadWebhook();
+    } catch (e: any) {
+      toast.error(e?.message || "Failed to delete webhook");
+    } finally { setBusy(null); }
+  };
+
+  const handleListWebhook = async () => {
+    setBusy("webhook-list");
+    try {
+      const { data, error } = await supabase.functions.invoke("polar-webhook-manage", {
+        body: { action: "list" },
+      });
+      if (error) throw error;
+      setLastResult(JSON.stringify(data, null, 2));
+    } catch (e: any) {
+      toast.error(e?.message || "Failed to list webhooks");
+    } finally { setBusy(null); }
+  };
 
   const handleConnect = async () => {
     setBusy("connect");

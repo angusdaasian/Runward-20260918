@@ -1,8 +1,10 @@
 import { Send } from "lucide-react";
 import { useEffect, useState } from "react";
+import despia from "despia-native";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
+import { isDespiaUA } from "@/lib/despiaOAuth";
 import { Lang } from "@/lib/i18n";
 
 const BOT_USERNAME = "runward_coach_bot";

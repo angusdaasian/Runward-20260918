@@ -6,7 +6,7 @@ import DesktopPageHeader from "./DesktopPageHeader";
 import { TabPageSkeleton } from "@/components/ui/PageSkeleton";
 import { useActivities } from "@/hooks/use-activities";
 
-const RaceTab = lazy(() => import("@/components/RaceTab"));
+const DesktopRaceTab = lazy(() => import("./DesktopRaceTab"));
 
 interface Props {
   lang: Lang;

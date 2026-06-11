@@ -87,7 +87,11 @@ const Dashboard = () => {
   const gateLang: Lang = (localStorage.getItem("app_lang") as Lang) || "en";
   const gateZh = gateLang === "zh";
 
-  // Temporary gate: dashboard restricted to admins while in beta.
+  // Dashboard access: admins + explicit email allowlist (beta).
+  const DASHBOARD_ALLOWED_EMAILS = ["angchenghk@gmail.com"];
+  const emailAllowed = !!user?.email && DASHBOARD_ALLOWED_EMAILS.includes(user.email.toLowerCase());
+  const canAccessDashboard = isAdmin || emailAllowed;
+
   if (authLoading || (user && adminLoading)) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-background">
@@ -95,7 +99,7 @@ const Dashboard = () => {
       </div>
     );
   }
-  if (!isAdmin) {
+  if (user && !canAccessDashboard) {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center px-6 text-center">
         <div className="h-14 w-14 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mb-6">
@@ -113,6 +117,7 @@ const Dashboard = () => {
       </div>
     );
   }
+
 
 
   const setView = (v: View) => {

@@ -39,14 +39,6 @@ const hadOAuthHash =
   initialHash.includes("refresh_token=") ||
   initialHash.includes("type=recovery");
 const hadOAuthReturn = hadOAuthHash || initialParams.has("code") || initialParams.has("error");
-const hadInAppParams = initialParams.has("tab") || initialParams.has("page");
-
-const isDesktop =
-  typeof navigator !== "undefined" &&
-  !/Mobile|Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
-    navigator.userAgent
-  );
-
 const RouteFallback = () => (
   <div className="flex flex-col items-center justify-center min-h-screen bg-background gap-3">
     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
@@ -59,7 +51,6 @@ const RootRoute = () => {
   if (native) return <Index />;
   // OAuth/in-app redirects still need to hit Index so callbacks complete.
   if (hadOAuthReturn) return <Index />;
-  if (native && hadInAppParams) return <Index />;
   // All browser users (desktop + mobile Safari/Chrome) get the marketing site.
   if (loading) return <Landing />;
   return <Landing />;

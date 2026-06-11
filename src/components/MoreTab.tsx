@@ -34,13 +34,14 @@ import PlanComparisonDialog from "@/components/PlanComparisonDialog";
 import StartRunningGuide from "@/components/StartRunningGuide";
 import FuelingGuide from "@/components/FuelingGuide";
 import HomeWidgetDialog from "@/components/HomeWidgetDialog";
-import TelegramConnectCard from "@/components/TelegramConnectCard";
+import { Send } from "lucide-react";
 
 interface Props {
   lang: Lang;
   setLang: (l: Lang) => void;
   onLoginRequest?: () => void;
   onNavigateConnectApps?: () => void;
+  onNavigateTelegram?: () => void;
 }
 
 const definitions = [
@@ -64,7 +65,7 @@ function formatCountdown(expiresAt: Date): string {
   return `${hours}h ${mins}m`;
 }
 
-const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps }: Props) => {
+const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps, onNavigateTelegram }: Props) => {
   // Mandatory skeleton on every mount
   const [skeletonDone, setSkeletonDone] = useState(false);
   useEffect(() => {
@@ -563,8 +564,21 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps }: Props
           </div>
         )}
 
-        {/* Telegram daily workout suggestion */}
-        <TelegramConnectCard lang={lang} />
+        {/* Telegram settings */}
+        {user && (
+          <button
+            onClick={onNavigateTelegram}
+            className="w-full bg-card border border-border rounded-xl p-4 flex items-center justify-between"
+          >
+            <div className="flex items-center gap-3">
+              <Send size={20} className="text-primary" />
+              <span className="font-medium text-foreground">
+                {lang === "zh" ? "Telegram 通知" : "Telegram"}
+              </span>
+            </div>
+            <ChevronRight size={18} className="text-muted-foreground" />
+          </button>
+        )}
 
         {/* Disable AI Chat toggle */}
         <div className="bg-card border border-border rounded-xl p-4">

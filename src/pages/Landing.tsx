@@ -176,28 +176,27 @@ const Landing = () => {
           <p className="text-center text-[11px] font-semibold tracking-[0.18em] text-muted-foreground/80 uppercase mb-6">
             {zh ? "支援的平台" : "Works with"}
           </p>
-          <div className="flex flex-wrap items-center justify-center gap-4 md:gap-6">
+          <div className="flex flex-wrap items-center justify-center gap-x-10 gap-y-6 md:gap-x-14">
             {[
-              { src: stravaLogo.url, alt: "Strava", h: "h-7 md:h-8" },
-              { src: garminLogo.url, alt: "Garmin", h: "h-9 md:h-11" },
-              { src: suuntoLogo.url, alt: "Suunto", h: "h-9 md:h-11" },
-              { src: corosLogo.url, alt: "COROS", h: "h-11 md:h-14" },
-              { src: polarLogo.url, alt: "Polar", h: "h-8 md:h-9" },
-              { src: appleHealthLogo.url, alt: "Apple Health", h: "h-9 md:h-11" },
+              { src: stravaLogo.url, alt: "Strava", h: "h-6 md:h-7", invert: false },
+              { src: garminLogo.url, alt: "Garmin", h: "h-7 md:h-9", invert: true },
+              { src: suuntoLogo.url, alt: "Suunto", h: "h-8 md:h-10", invert: true },
+              { src: corosLogo.url, alt: "COROS", h: "h-7 md:h-9", invert: true },
+              { src: polarLogo.url, alt: "Polar", h: "h-6 md:h-7", invert: true },
+              { src: appleHealthLogo.url, alt: "Works with Apple Health", h: "h-9 md:h-11", invert: true },
             ].map((b) => (
-              <div
+              <img
                 key={b.alt}
-                className="flex items-center justify-center bg-white rounded-xl px-5 py-3 ring-1 ring-border/50 shadow-sm"
-              >
-                <img
-                  src={b.src}
-                  alt={b.alt}
-                  className={`${b.h} w-auto object-contain`}
-                  loading="lazy"
-                />
-              </div>
+                src={b.src}
+                alt={b.alt}
+                loading="lazy"
+                className={`${b.h} w-auto object-contain opacity-90 hover:opacity-100 transition-opacity ${
+                  b.invert ? "dark:invert" : ""
+                }`}
+              />
             ))}
           </div>
+
         </div>
       </section>
 

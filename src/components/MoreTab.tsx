@@ -34,6 +34,7 @@ import PlanComparisonDialog from "@/components/PlanComparisonDialog";
 import StartRunningGuide from "@/components/StartRunningGuide";
 import FuelingGuide from "@/components/FuelingGuide";
 import HomeWidgetDialog from "@/components/HomeWidgetDialog";
+import TelegramConnectCard from "@/components/TelegramConnectCard";
 
 interface Props {
   lang: Lang;

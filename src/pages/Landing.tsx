@@ -231,13 +231,17 @@ const Landing = () => {
       <section id="pricing" className="px-6 py-20 md:py-28 bg-card/30 border-y border-border">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-12">
-            <span className="inline-block px-3 py-1 rounded-full bg-warning/15 text-warning text-xs font-semibold tracking-wide uppercase mb-4">
-              {zh ? "限時優惠 · 6 月 1 日截止" : "Limited Offer · Ends June 1"}
+            <span className="inline-block px-3 py-1 rounded-full bg-primary/15 text-primary text-xs font-semibold tracking-wide uppercase mb-4">
+              {zh ? "訂閱方案" : "Pricing"}
             </span>
             <h2 className="font-display text-3xl md:text-4xl font-bold mb-4">
               {zh ? "簡單透明的訂閱方案" : "Simple, Transparent Pricing"}
             </h2>
+            <p className="text-muted-foreground max-w-xl mx-auto">
+              {zh ? "免費開始,隨時升級為 Premium。" : "Start for free. Upgrade to Premium when you're ready."}
+            </p>
           </div>
+
 
           <div className="max-w-3xl mx-auto mb-10 rounded-2xl border border-warning/30 bg-warning/10 p-5 md:p-6">
             <div className="flex items-start gap-3">

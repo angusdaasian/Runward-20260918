@@ -7,16 +7,20 @@ import { useToast } from "@/hooks/use-toast";
 import { isDespiaUA } from "@/lib/despiaOAuth";
 import { Lang } from "@/lib/i18n";
 
-// E.164 digits only (no +), used by wa.me deep links.
-// WHATSAPP_BUSINESS_NUMBER is a backend secret; for the public wa.me link we
-// just need the digits. Override via VITE_WHATSAPP_BUSINESS_NUMBER if needed.
-const BUSINESS_NUMBER =
-  (import.meta.env.VITE_WHATSAPP_BUSINESS_NUMBER as string | undefined)?.replace(/[^\d]/g, "") || "";
-
 function makeCode(): string {
   const bytes = new Uint8Array(8);
   crypto.getRandomValues(bytes);
   return Array.from(bytes).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+async function fetchBusinessNumber(): Promise<string> {
+  try {
+    const { data, error } = await supabase.functions.invoke("get-whatsapp-number");
+    if (error) return "";
+    return (data?.number as string | undefined)?.replace(/[^\d]/g, "") || "";
+  } catch {
+    return "";
+  }
 }
 
 export default function WhatsAppConnectCard({ lang }: { lang: Lang }) {
@@ -49,10 +53,11 @@ export default function WhatsAppConnectCard({ lang }: { lang: Lang }) {
 
   async function generateAndOpen() {
     if (!user) return;
-    if (!BUSINESS_NUMBER) {
+    const businessNumber = await fetchBusinessNumber();
+    if (!businessNumber) {
       toast({
         title: "Not configured",
-        description: "VITE_WHATSAPP_BUSINESS_NUMBER is not set.",
+        description: "WHATSAPP_BUSINESS_NUMBER backend secret is not set.",
         variant: "destructive",
       });
       return;
@@ -72,7 +77,7 @@ export default function WhatsAppConnectCard({ lang }: { lang: Lang }) {
         .eq("user_id", user.id);
       if (error) throw error;
       const message = encodeURIComponent(`LINK ${code}`);
-      const url = `https://wa.me/${BUSINESS_NUMBER}?text=${message}`;
+      const url = `https://wa.me/${businessNumber}?text=${message}`;
       if (native) {
         despia(`oauth://?url=${encodeURIComponent(url)}`);
       } else if (popup && !popup.closed) {

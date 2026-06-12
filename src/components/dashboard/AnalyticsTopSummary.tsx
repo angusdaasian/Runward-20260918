@@ -641,16 +641,22 @@ function Card({
 
 function CardHead({
   label,
+  infoText,
   children,
 }: {
   label: string;
+  infoText?: string;
   children?: React.ReactNode;
 }) {
   return (
     <div className="flex items-center justify-between gap-2">
       <div className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground flex items-center gap-1">
         {label}
-        <Info size={10} className="opacity-50" />
+        {infoText ? (
+          <InfoTip text={infoText} iconSize={11} />
+        ) : (
+          <Info size={10} className="opacity-50" />
+        )}
       </div>
       {children}
     </div>

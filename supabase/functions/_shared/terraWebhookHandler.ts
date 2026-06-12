@@ -844,6 +844,7 @@ async function processWebhook(
             // Fire and forget Telegram + WhatsApp prompts for running activities only
             const rawType = meta?.type ?? meta?.activity_type;
             if (isRunning(rawType, meta?.name)) {
+              console.log(`[terra-webhook] sending activity prompts ${aid} user=${appUserId} type=${String(rawType)} name=${String(meta?.name ?? "")}`);
               const _terraPrompt = {
                 userId: appUserId,
                 source: "terra" as const,
@@ -854,6 +855,8 @@ async function processWebhook(
               };
               await maybeSendTelegramActivityPrompt(_terraPrompt);
               await maybeSendWhatsappActivityPrompt(_terraPrompt);
+            } else {
+              console.log(`[terra-webhook] skipped activity prompts ${aid} user=${appUserId} type=${String(rawType)} name=${String(meta?.name ?? "")}`);
             }
           }
         }

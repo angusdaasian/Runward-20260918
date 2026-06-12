@@ -134,7 +134,10 @@ export async function maybeSendTelegramActivityPrompt(summary: ActivitySummary):
       .eq("user_id", summary.userId)
       .maybeSingle();
 
-    if (!profile?.telegram_chat_id || !profile?.telegram_activity_feedback) return;
+    if (!profile?.telegram_chat_id || !profile?.telegram_activity_feedback) {
+      console.log(`[tg-activity-prompt] skipped user=${summary.userId} has_chat=${!!profile?.telegram_chat_id} enabled=${!!profile?.telegram_activity_feedback}`);
+      return;
+    }
 
     let lang = detectLang((profile as any).lang);
     if (!(profile as any).lang) {
@@ -165,7 +168,10 @@ export async function maybeSendTelegramActivityPrompt(summary: ActivitySummary):
       .select("id")
       .maybeSingle();
 
-    if (insertErr || !inserted) return; // already prompted
+    if (insertErr || !inserted) {
+      console.warn(`[tg-activity-prompt] insert skipped user=${summary.userId} key=${summary.activityKey}`, insertErr?.message ?? "no row returned");
+      return; // already prompted or insert failed
+    }
 
     const summaryBlock = fmtSummary(summary, lang);
     const text = lang === "zh"
@@ -173,6 +179,7 @@ export async function maybeSendTelegramActivityPrompt(summary: ActivitySummary):
       : `🏃 *Nice run!*\n\n${summaryBlock}\n\nReply with your *RPE* (1–10) and how it felt (optional) and I'll generate your full AI run analysis.\n\nExample: \`7 legs heavy but pushed through\``;
 
     const messageId = await tgSend(profile.telegram_chat_id as number, text);
+    console.log(`[tg-activity-prompt] sent user=${summary.userId} key=${summary.activityKey} message_id=${messageId ?? "null"}`);
     if (messageId) {
       await supabase
         .from("telegram_pending_prompts")

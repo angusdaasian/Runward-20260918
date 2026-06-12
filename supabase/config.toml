@@ -106,3 +106,6 @@ verify_jwt = false
 
 [functions.send-daily-whatsapp-workout]
 verify_jwt = false
+
+[functions.admin-trigger-activity-prompt]
+verify_jwt = false

@@ -2,7 +2,10 @@ import { useMemo } from "react";
 import { Lang } from "@/lib/i18n";
 import { useActivities } from "@/hooks/use-activities";
 import { useTerraDailyHealth } from "@/hooks/use-terra-daily-health";
-import { Activity, Flame, Footprints, HeartPulse, Moon, Timer, Sparkles, Heart, LineChart, TrendingUp, CalendarDays, Trophy } from "lucide-react";
+import {
+  Activity, Flame, Footprints, HeartPulse, Moon, Timer, Sparkles, Heart,
+  LineChart, TrendingUp, CalendarDays, Trophy, ShieldAlert, Scale,
+} from "lucide-react";
 import WidgetTile from "../WidgetTile";
 import { WidgetId } from "@/lib/analyticsWidgets";
 import {
@@ -12,6 +15,7 @@ import {
 } from "@/lib/hrvReadiness";
 import { useTerraConnections } from "@/hooks/use-terra-daily-health";
 import { usePremium } from "@/contexts/PremiumContext";
+import { loadForActivity, isCardio, isRunning, buildWeeklyLoadSeries } from "@/lib/trainingLoad";
 
 interface Props {
   id: WidgetId;

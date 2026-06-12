@@ -21,7 +21,7 @@ import { useSimpleMode } from "@/hooks/use-simple-mode";
 
 type Props = {
   lang: Lang;
-  onNavigate: (view: "activities" | "training" | "races" | "community" | "analytics") => void;
+  onNavigate: (view: "training" | "races" | "community" | "analytics") => void;
 };
 
 function fmtDistance(meters: number) {

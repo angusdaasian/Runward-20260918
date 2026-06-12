@@ -22,7 +22,13 @@ import {
   selectProviderRows,
 } from "@/lib/hrvReadiness";
 import InfoTip from "@/components/analytics/InfoTip";
-import { tInfo } from "@/lib/analyticsExplain";
+import { computeTrainingReadiness, tInfo } from "@/lib/analyticsExplain";
+import { useActivities } from "@/hooks/use-activities";
+import {
+  buildWeeklyLoadSeries,
+  loadForActivity,
+  isCardio,
+} from "@/lib/trainingLoad";
 
 interface Props {
   lang: Lang;

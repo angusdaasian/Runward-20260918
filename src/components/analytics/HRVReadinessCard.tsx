@@ -22,7 +22,13 @@ import {
   selectProviderRows,
 } from "@/lib/hrvReadiness";
 import InfoTip from "@/components/analytics/InfoTip";
-import { tInfo } from "@/lib/analyticsExplain";
+import { computeTrainingReadiness, tInfo } from "@/lib/analyticsExplain";
+import { useActivities } from "@/hooks/use-activities";
+import {
+  buildWeeklyLoadSeries,
+  loadForActivity,
+  isCardio,
+} from "@/lib/trainingLoad";
 
 interface Props {
   lang: Lang;
@@ -65,9 +71,85 @@ const HRVReadinessCard = ({ lang }: Props) => {
   const series = useMemo(() => getHrvSeries(rows, 7), [rows]);
   const readiness = useMemo(() => computeReadiness(rows), [rows]);
 
+  // --- Training-load context layered on top of physio readiness ---
+  const { activities, profile } = useActivities();
+  const ageForLoad = (profile as any)?.age ?? null;
+
+  const loadActs = useMemo(
+    () =>
+      activities.map((a) => ({
+        start_date: a.start_date,
+        moving_time: a.moving_time,
+        average_heartrate: a.average_heartrate,
+        max_heartrate: a.max_heartrate,
+        sport_type: a.sport_type,
+        source: a.source,
+        garmin_training_load: (a as any).garmin_training_load ?? null,
+        distance: (a as any).distance ?? 0,
+      })),
+    [activities],
+  );
+
+  const weekly = useMemo(
+    () => buildWeeklyLoadSeries(loadActs as any, ageForLoad, 26),
+    [loadActs, ageForLoad],
+  );
+  const tsb = weekly[weekly.length - 1]?.form ?? 0;
+
+  const loadStats = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const dayLoads: number[] = new Array(28).fill(0);
+    for (const a of loadActs) {
+      if (!isCardio(a.sport_type)) continue;
+      const d = new Date(a.start_date);
+      d.setHours(0, 0, 0, 0);
+      const offset = Math.round((today.getTime() - d.getTime()) / 86400000);
+      if (offset < 0 || offset >= 28) continue;
+      const idx = 27 - offset;
+      dayLoads[idx] += loadForActivity(a as any, ageForLoad) || 0;
+    }
+    const last7 = dayLoads.slice(-7);
+    const acute = last7.reduce((s, v) => s + v, 0);
+    const chronic28 = dayLoads.reduce((s, v) => s + v, 0);
+    const acwr = chronic28 > 0 ? acute / (chronic28 / 4) : 0;
+    const m = acute / 7;
+    const sdv =
+      Math.sqrt(last7.reduce((s, v) => s + (v - m) ** 2, 0) / 7) || 0.0001;
+    return {
+      acwr: Number.isFinite(acwr) ? acwr : 0,
+      monotony: Number.isFinite(m / sdv) ? m / sdv : 0,
+    };
+  }, [loadActs, ageForLoad]);
+
+  const sleepDebtPerNight = useMemo(() => {
+    const last14 = rows
+      .slice(-14)
+      .filter((r) => r.sleep_seconds && r.sleep_seconds > 0);
+    if (!last14.length) return null;
+    const target = 8 * 3600;
+    const debt = last14.reduce(
+      (s, r) => s + Math.max(0, target - (r.sleep_seconds || 0)),
+      0,
+    );
+    return debt / 3600 / last14.length;
+  }, [rows]);
+
+  const training = useMemo(
+    () =>
+      computeTrainingReadiness(readiness, {
+        tsb,
+        acwr: loadStats.acwr,
+        monotony: loadStats.monotony,
+        sleepDebtPerNightHours: sleepDebtPerNight,
+        sleepScore: null,
+      }),
+    [readiness, tsb, loadStats, sleepDebtPerNight],
+  );
+
   if (!active || series.length < 3) return null;
 
-  const band = getBandMeta(readiness.band, lang);
+  const band = getBandMeta(training.band, lang);
   const baseline = readiness.baselineHrv ?? 0;
   const sd = readiness.baselineSdHrv ?? 0;
 
@@ -86,7 +168,7 @@ const HRVReadinessCard = ({ lang }: Props) => {
         </div>
         <div className="text-right">
           <div className={`text-3xl font-bold ${band.color} leading-none`}>
-            {readiness.score}
+            {training.score}
           </div>
           <div className={`text-[11px] font-medium ${band.color}`}>
             {band.label}
@@ -209,7 +291,7 @@ const HRVReadinessCard = ({ lang }: Props) => {
           <div className="absolute inset-y-0 left-[70%] w-[30%] bg-emerald-500/70" />
           <div
             className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-3 h-3 rounded-full bg-foreground border-2 border-background shadow"
-            style={{ left: `${Math.min(100, Math.max(0, readiness.score))}%` }}
+            style={{ left: `${Math.min(100, Math.max(0, training.score))}%` }}
           />
         </div>
         <div className="flex justify-between text-[9px] text-muted-foreground mt-1">

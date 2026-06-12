@@ -75,6 +75,8 @@ const PerformanceTab = ({ lang }: Props) => {
 
       <HRVReadinessCard lang={lang} />
 
+      <InjuryLoadCards lang={lang} />
+
       <ActivityYearHeatmap lang={lang} activities={loadActivities} />
 
       <TrainingLoadChart

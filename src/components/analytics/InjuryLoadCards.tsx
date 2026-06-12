@@ -249,7 +249,7 @@ export default function InjuryLoadCards({ lang }: Props) {
 
       {/* Load Balance */}
       <div className="rounded-xl border border-border bg-card p-4">
-        <Head label={zhT("Load Balance", "負荷平衡", lang)}>
+        <Head label={zhT("Load Balance", "負荷平衡", lang)} infoText={tInfo("load", lang)}>
           <span className="text-[11px] text-muted-foreground flex items-center gap-1.5">
             <span className={`h-2 w-2 rounded-full ${acwrDot}`} />
             <span className="uppercase tracking-wider">{acwrLabel}</span>

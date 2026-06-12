@@ -55,9 +55,9 @@ const BulkFitExportButton = ({ lang, activities, isPremium }: Props) => {
     let idx = 0;
     let done = 0;
     const worker = async () => {
-      while (idx < activities.length) {
+      while (idx < exportable.length) {
         const i = idx++;
-        const a = activities[i];
+        const a = exportable[i];
         try {
           let streams: any[] | null = null;
           const isStrava = a.provenance === "strava" && (a as any).strava_id && (a as any).strava_id > 0;
@@ -101,11 +101,11 @@ const BulkFitExportButton = ({ lang, activities, isPremium }: Props) => {
           failed++;
         }
         done++;
-        setProgress({ done, total: activities.length });
+        setProgress({ done, total: exportable.length });
         toast.loading(
           lang === "zh"
-            ? `匯出中 ${done}/${activities.length}...`
-            : `Exporting ${done}/${activities.length}...`,
+            ? `匯出中 ${done}/${exportable.length}...`
+            : `Exporting ${done}/${exportable.length}...`,
           { id: tid },
         );
       }

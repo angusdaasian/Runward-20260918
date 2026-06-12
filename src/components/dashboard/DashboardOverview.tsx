@@ -142,7 +142,7 @@ export default function DashboardOverview({ lang, onNavigate }: Props) {
             <Dumbbell className="h-4 w-4 mr-1.5" />
             {zh ? "查看訓練" : "Training"}
           </Button>
-          <Button size="sm" onClick={() => onNavigate("activities")}>
+          <Button size="sm" onClick={() => setShowAllActivities(true)}>
             <ActivityIcon className="h-4 w-4 mr-1.5" />
             {zh ? "所有活動" : "All activities"}
           </Button>

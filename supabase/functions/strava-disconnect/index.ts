@@ -7,39 +7,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-async function refreshIfNeeded(connection: any, supabase: any, clientId: string, clientSecret: string) {
-  const now = Math.floor(Date.now() / 1000);
-  if (connection.expires_at && connection.expires_at > now + 60) {
-    return connection.access_token;
-  }
-  if (!connection.refresh_token) return connection.access_token;
-  const res = await fetch("https://www.strava.com/oauth/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      client_id: clientId,
-      client_secret: clientSecret,
-      refresh_token: connection.refresh_token,
-      grant_type: "refresh_token",
-    }),
-  });
-  const data = await res.json();
-  if (!res.ok) {
-    console.warn("strava-disconnect refresh failed", data);
-    return connection.access_token;
-  }
-  await supabase
-    .from("strava_connections")
-    .update({
-      access_token: data.access_token,
-      refresh_token: data.refresh_token,
-      expires_at: data.expires_at,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("user_id", connection.user_id);
-  return data.access_token;
-}
-
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -69,8 +36,7 @@ serve(async (req) => {
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    // Load the connection so we can call Strava's deauthorize endpoint per
-    // https://developers.strava.com/docs/authentication/#deauthorization
+    // Load the connection so we can revoke Strava access before local cleanup.
     const { data: connection } = await supabase
       .from('strava_connections')
       .select('*')
@@ -84,39 +50,34 @@ serve(async (req) => {
       try {
         const app = await getAppForConnection(supabase, connection);
         if (!app.client_secret) throw new Error('Missing client_secret for Strava app');
-        const accessToken = await refreshIfNeeded(
-          connection,
-          supabase,
-          app.client_id,
-          app.client_secret,
-        );
-
-        // Per https://developers.strava.com/docs/authentication/#deauthorization
-        // Strava now recommends POST /oauth/revoke with Basic Auth. Revoking
-        // either token revokes its associated access/refresh token pair, but we
-        // try refresh first and access second to cover older/stale token states.
+        // Do not refresh first: refreshing can rotate tokens, then revoking the
+        // old stored refresh token can fail before the new pair is revoked.
+        // Per Strava's 2026 spec, POST /oauth/revoke uses Basic Auth and only a
+        // token form field. Revoking either token revokes the associated pair.
         const basicAuth = btoa(`${app.client_id}:${app.client_secret}`);
-        const tokensToRevoke = [
-          { token: connection.refresh_token, token_type_hint: 'refresh_token' },
-          { token: accessToken, token_type_hint: 'access_token' },
-        ].filter((entry) => Boolean(entry.token));
+        const tokensToRevoke = [connection.refresh_token, connection.access_token]
+          .filter((token, index, arr) => Boolean(token) && arr.indexOf(token) === index);
 
         const revokeResults = [];
-        for (const entry of tokensToRevoke) {
+        for (const token of tokensToRevoke) {
           const res = await fetch('https://www.strava.com/oauth/revoke', {
             method: 'POST',
             headers: {
               Authorization: `Basic ${basicAuth}`,
               'Content-Type': 'application/x-www-form-urlencoded',
             },
-            body: new URLSearchParams(entry),
+            body: new URLSearchParams({ token }),
           });
           const text = await res.text();
-          revokeResults.push({ hint: entry.token_type_hint, status: res.status, body: text?.slice(0, 200) });
-          if (!res.ok && res.status !== 503) {
-            throw new Error(`Strava revoke ${entry.token_type_hint} ${res.status}: ${text}`);
+          revokeResults.push({ status: res.status, body: text?.slice(0, 200) });
+          if (res.status === 401) {
+            throw new Error(`Strava revoke unauthorized: ${text}`);
+          }
+          if (!res.ok && res.status !== 400 && res.status !== 503) {
+            throw new Error(`Strava revoke ${res.status}: ${text}`);
           }
           if (res.ok) deauthorized = true;
+          if (deauthorized) break;
         }
         console.log('strava-disconnect revoke response', revokeResults);
         if (!deauthorized && revokeResults.some((r) => r.status === 503)) {

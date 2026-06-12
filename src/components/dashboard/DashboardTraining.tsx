@@ -16,7 +16,7 @@ import { usePremium } from "@/contexts/PremiumContext";
 import { supabase } from "@/integrations/supabase/client";
 import { subscribePlanChanged } from "@/lib/planEvents";
 
-const TrainingTab = lazy(() => import("@/components/TrainingTab"));
+const DesktopPlanEditor = lazy(() => import("./DesktopPlanEditor"));
 
 interface Props {
   lang: Lang;
@@ -331,32 +331,39 @@ export default function DashboardTraining({ lang, score, setScore, onLoginReques
         </>
       )}
 
-      {/* Plan generation / editing — reuses the mobile TrainingTab inside a wide desktop sheet */}
+      {/* Desktop-only plan editor (no calculator, no mobile reuse) */}
       <Sheet open={planOpen} onOpenChange={setPlanOpen}>
         <SheetContent
           side="right"
-          className="w-full sm:max-w-none md:!max-w-[1100px] lg:!max-w-[1200px] p-0 flex flex-col"
+          className="w-full sm:max-w-none md:!max-w-[1200px] lg:!max-w-[1320px] p-0 flex flex-col"
         >
           <SheetHeader className="px-6 py-4 border-b bg-background z-10 shrink-0">
             <SheetTitle>
               {L(
-                activePlanKind === "free" ? "Free plan — view & edit"
-                  : activePlanKind === "custom" ? "Custom plan — view & edit"
-                  : activePlanKind === "ai" ? "AI plan — edit goals, rest days & workouts"
-                  : "Plan workspace",
-                activePlanKind === "free" ? "免費計劃 — 查看與編輯"
-                  : activePlanKind === "custom" ? "自訂計劃 — 查看與編輯"
-                  : activePlanKind === "ai" ? "AI 計劃 — 編輯目標、休息日與訓練"
-                  : "計劃工作區",
+                selectedKind === "free" ? "Free plan"
+                  : selectedKind === "ai" ? "AI plan"
+                  : "Custom plan",
+                selectedKind === "free" ? "免費計劃"
+                  : selectedKind === "ai" ? "AI 計劃"
+                  : "自訂計劃",
               )}
+              {activePlanKind === selectedKind ? L(" — view & edit", " — 查看與編輯") : L(" — create", " — 建立")}
             </SheetTitle>
           </SheetHeader>
-          <div className="flex-1 overflow-y-auto">
-            <div className="mx-auto max-w-3xl px-4 md:px-6 py-4">
-              <Suspense fallback={<TabPageSkeleton />}>
-                <TrainingTab score={score} setScore={setScore} lang={lang} onLoginRequest={onLoginRequest} />
-              </Suspense>
-            </div>
+          <div className="flex-1 overflow-hidden">
+            <Suspense fallback={<TabPageSkeleton />}>
+              <DesktopPlanEditor
+                lang={lang}
+                selectedKind={selectedKind}
+                activePlanKind={activePlanKind}
+                plan={plan}
+                isPremium={isPremium}
+                onPlanSaved={(next) => {
+                  setPlan(next);
+                  if (!next) setPlanOpen(false);
+                }}
+              />
+            </Suspense>
           </div>
         </SheetContent>
       </Sheet>

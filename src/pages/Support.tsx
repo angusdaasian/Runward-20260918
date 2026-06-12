@@ -80,20 +80,20 @@ const Support = () => {
     new Date(iso).toLocaleDateString(lang === "zh" ? "zh-HK" : "en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
 
   return (
-    <div className="min-h-screen bg-background px-5 pt-6 max-w-lg mx-auto pb-10">
-      <button onClick={handleReturn} className="flex items-center gap-1.5 text-sm text-muted-foreground mb-6">
+    <div className="min-h-screen bg-background px-5 pt-6 max-w-lg md:max-w-3xl lg:max-w-4xl mx-auto pb-10 md:px-10 md:pt-12 md:pb-20">
+      <button onClick={handleReturn} className="flex items-center gap-1.5 text-sm text-muted-foreground mb-6 md:mb-10 hover:text-foreground transition-colors">
         <ArrowLeft size={16} />
         {lang === "zh" ? "返回" : "Back"}
       </button>
 
-      <div className="flex items-center gap-3 mb-6">
-        <LifeBuoy size={24} className="text-primary" />
-        <h1 className="font-display text-2xl font-bold text-foreground">
+      <div className="flex items-center gap-3 mb-6 md:mb-10">
+        <LifeBuoy size={24} className="text-primary md:w-8 md:h-8" />
+        <h1 className="font-display text-2xl md:text-4xl font-bold text-foreground">
           {lang === "zh" ? "支援與幫助" : "Support"}
         </h1>
       </div>
 
-      <div className="space-y-6">
+      <div className="space-y-6 md:space-y-8">
         {/* My Tickets */}
         {user && (
           <div className="bg-card border border-border rounded-xl p-5 space-y-3">

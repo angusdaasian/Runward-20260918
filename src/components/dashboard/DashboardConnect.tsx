@@ -583,6 +583,14 @@ export default function DashboardConnect({ lang }: Props) {
                             {new Date(sync).toLocaleString(zh ? "zh-TW" : "en-US")}
                           </p>
                         )}
+                        {p.kind === "strava" && !connected && stravaFull && (
+                          <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
+                            {L(
+                              "Strava connection is hitting its limit. Please try other fitness apps while we request Strava to increase the limit.",
+                              "Strava 連線已達上限，請先使用其他健身應用。我們正在向 Strava 申請提高上限。",
+                            )}
+                          </p>
+                        )}
                       </div>
                     </div>
                     <div className="mt-auto pt-1 border-t border-border/40 -mx-5 px-5 pt-3">

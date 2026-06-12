@@ -34,7 +34,7 @@ const Privacy = () => {
 
       <div className="space-y-5 text-sm text-muted-foreground leading-relaxed">
         <p className="text-xs text-muted-foreground">
-          {lang === "zh" ? "最後更新日期：2026 年 4 月" : "Last updated: April 2026"}
+          {lang === "zh" ? "最後更新日期：2026 年 6 月" : "Last updated: June 2026"}
         </p>
 
         <section>
@@ -134,19 +134,28 @@ const Privacy = () => {
           </h2>
           <p className="mb-2">
             {lang === "zh"
-              ? "我們嚴格遵守 Strava、Garmin、COROS 與 Apple Health 的服務條款。以下原則同樣適用於所有第三方健身資料："
-              : "We strictly adhere to the terms of service of Strava, Garmin, COROS, and Apple Health. The following principles apply to all third-party fitness data:"}
+              ? "我們嚴格遵守 Strava、Garmin、COROS、Polar、Suunto 與 Apple Health 的服務條款。對於 Strava 的資料,我們完整遵循最新版的 Strava API 協議 (Strava API Agreement),全文請見:"
+              : "We strictly adhere to the terms of service of Strava, Garmin, COROS, Polar, Suunto, and Apple Health. For Strava data we fully comply with the latest Strava API Agreement, available at:"}{" "}
+            <a
+              href="https://www.strava.com/legal/api"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary font-medium break-all"
+            >
+              https://www.strava.com/legal/api
+            </a>
+            .
           </p>
           <ul className="list-disc pl-5 space-y-1">
             <li>
               {lang === "zh"
-                ? "禁止 AI 訓練:我們絕對不會使用透過 Strava、Garmin、COROS 或 Apple Health 取得的資料來訓練、改進或測試任何 AI 或機器學習模型。"
-                : "No AI Training: We strictly do NOT use data accessed via Strava, Garmin, COROS, or Apple Health to train, improve, or test any AI or machine learning models."}
+                ? "禁止 AI 訓練:我們絕對不會使用透過 Strava、Garmin、COROS、Polar、Suunto 或 Apple Health 取得的資料來訓練、改進或測試任何 AI 或機器學習模型。"
+                : "No AI Training: We strictly do NOT use data accessed via Strava, Garmin, COROS, Polar, Suunto, or Apple Health to train, improve, or test any AI or machine learning models."}
             </li>
             <li>
               {lang === "zh"
-                ? "僅限運動員查看:您的健身資料僅顯示於您的個人儀表板中,絕不會與其他用戶或第三方分享。"
-                : "Athlete-Only Display: Your fitness data is displayed only within your personal dashboard and is never shared with other users or third parties."}
+                ? "僅限運動員查看:您的健身資料僅顯示於您的個人儀表板中,絕不會與其他用戶或第三方分享,也不會用於將您與其他運動員排名或比較。"
+                : "Athlete-Only Display: Your fitness data is displayed only within your personal dashboard and is never shared with other users or third parties, and is never used to rank or compare you against other athletes."}
             </li>
             <li>
               {lang === "zh"
@@ -155,8 +164,28 @@ const Privacy = () => {
             </li>
             <li>
               {lang === "zh"
-                ? "排行榜:僅顯示彙總後的數值 (顯示名稱、頭像、月度與終身經驗值、段位),不會顯示個別活動細節、GPS 軌跡或心率。"
-                : "Leaderboards: only show aggregated values (display name, avatar, monthly and lifetime XP, rank tier) — never individual activity details, GPS tracks, or heart rate."}
+                ? "排行榜:僅依據彙總後的應用內經驗值 (XP) 排名,絕不顯示個別 Strava 活動細節、GPS 軌跡或心率,也不會比較跨用戶的 Strava 衍生指標。"
+                : "Leaderboards: ranked only by aggregated in-app XP — never individual Strava activity details, GPS tracks, or heart rate, and never by cross-user Strava-derived metrics."}
+            </li>
+            <li>
+              {lang === "zh"
+                ? "Strava 歸屬標示:所有顯示 Strava 來源活動的畫面與分享圖片皆會標示「Powered by Strava」並使用官方 Strava 商標。"
+                : "Strava attribution: every view and shared image that surfaces Strava-sourced activities displays the “Powered by Strava” mark and uses official Strava brand assets."}
+            </li>
+            <li>
+              {lang === "zh"
+                ? "禁止批量匯出 Strava 資料:Strava 來源的活動無法透過批量 .fit 匯出功能下載;批量匯出僅限於 Terra (Garmin/COROS/Polar/Zepp/Fitbit) 與 Suunto 來源的活動。"
+                : "No bulk export of Strava data: Strava-sourced activities are excluded from the bulk .fit export. Bulk export is limited to activities sourced via Terra (Garmin/COROS/Polar/Zepp/Fitbit) and Suunto."}
+            </li>
+            <li>
+              {lang === "zh"
+                ? "OAuth 範圍:我們僅向 Strava 要求 read 與 activity:read_all 範圍,用於讀取您的個人檔案與活動資料,絕不發布或修改 Strava 上的任何內容。"
+                : "OAuth scopes: we request only the read and activity:read_all scopes from Strava, used to fetch your profile and activity data. We never write to, post to, or modify anything on Strava on your behalf."}
+            </li>
+            <li>
+              {lang === "zh"
+                ? "撤銷與刪除:中斷 Strava 連線時,我們會呼叫 Strava 的 /oauth/deauthorize 端點撤銷權杖,並刪除我們儲存的 Strava 權杖與已快取的 Strava 活動資料,通常在 24 小時內完成。您也可以隨時在 Strava 帳戶設定的「My Apps」中撤銷授權。"
+                : "Revocation & deletion: when you disconnect Strava we call Strava's /oauth/deauthorize endpoint to revoke your tokens and delete the Strava tokens and cached Strava activity data we hold, typically within 24 hours. You may also revoke access at any time from Strava's “My Apps” settings."}
             </li>
           </ul>
         </section>

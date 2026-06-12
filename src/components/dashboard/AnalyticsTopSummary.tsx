@@ -160,8 +160,32 @@ export default function AnalyticsTopSummary({ lang }: Props) {
     if (!last14.length) return null;
     const target = 8 * 3600;
     const debt = last14.reduce((s, r) => s + Math.max(0, target - (r.sleep_seconds || 0)), 0);
-    return { hours: debt / 3600, nights: last14.length };
+    return {
+      hours: debt / 3600,
+      nights: last14.length,
+      perNightHours: debt / 3600 / last14.length,
+    };
   }, [garminRows]);
+
+  // HRV z-score (recent 7d vs 60d baseline, log-space)
+  const hrvZ = useMemo<number | null>(() => {
+    const hrv = garminRows.filter((r) => r.hrv != null).map((r) => Number(r.hrv));
+    if (hrv.length < 8) return null;
+    const last60 = hrv.slice(-60);
+    const last7 = hrv.slice(-7);
+    if (last60.length < 5 || last7.length < 3) return null;
+    const mean = (x: number[]) => x.reduce((a, b) => a + b, 0) / x.length;
+    const sd = (x: number[]) => {
+      if (x.length < 2) return 0;
+      const m = mean(x);
+      return Math.sqrt(mean(x.map((v) => (v - m) ** 2)));
+    };
+    const lnBase = mean(last60.map((v) => Math.log(v)));
+    const lnBaseSd = Math.max(sd(last60.map((v) => Math.log(v))), 0.05);
+    const lnRecent = mean(last7.map((v) => Math.log(v)));
+    return (lnRecent - lnBase) / lnBaseSd;
+  }, [garminRows]);
+
 
   /* ACWR + monotony + strain */
   const ageForLoad = (profile as any)?.age ?? null;

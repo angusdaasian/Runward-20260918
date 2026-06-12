@@ -331,16 +331,32 @@ export default function DashboardTraining({ lang, score, setScore, onLoginReques
         </>
       )}
 
-      {/* Plan generation / editing — reuses the mobile TrainingTab in a Sheet */}
+      {/* Plan generation / editing — reuses the mobile TrainingTab inside a wide desktop sheet */}
       <Sheet open={planOpen} onOpenChange={setPlanOpen}>
-        <SheetContent side="right" className="w-full sm:max-w-2xl p-0 overflow-y-auto">
-          <SheetHeader className="px-5 py-4 border-b sticky top-0 bg-background z-10">
-            <SheetTitle>{L("Plan workspace", "計劃工作區")}</SheetTitle>
+        <SheetContent
+          side="right"
+          className="w-full sm:max-w-none md:!max-w-[1100px] lg:!max-w-[1200px] p-0 flex flex-col"
+        >
+          <SheetHeader className="px-6 py-4 border-b bg-background z-10 shrink-0">
+            <SheetTitle>
+              {L(
+                activePlanKind === "free" ? "Free plan — view & edit"
+                  : activePlanKind === "custom" ? "Custom plan — view & edit"
+                  : activePlanKind === "ai" ? "AI plan — edit goals, rest days & workouts"
+                  : "Plan workspace",
+                activePlanKind === "free" ? "免費計劃 — 查看與編輯"
+                  : activePlanKind === "custom" ? "自訂計劃 — 查看與編輯"
+                  : activePlanKind === "ai" ? "AI 計劃 — 編輯目標、休息日與訓練"
+                  : "計劃工作區",
+              )}
+            </SheetTitle>
           </SheetHeader>
-          <div className="p-2">
-            <Suspense fallback={<TabPageSkeleton />}>
-              <TrainingTab score={null} setScore={() => {}} lang={lang} onLoginRequest={onLoginRequest} />
-            </Suspense>
+          <div className="flex-1 overflow-y-auto">
+            <div className="mx-auto max-w-3xl px-4 md:px-6 py-4">
+              <Suspense fallback={<TabPageSkeleton />}>
+                <TrainingTab score={score} setScore={setScore} lang={lang} onLoginRequest={onLoginRequest} />
+              </Suspense>
+            </div>
           </div>
         </SheetContent>
       </Sheet>

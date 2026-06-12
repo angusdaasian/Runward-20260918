@@ -91,7 +91,7 @@ export default function BrandStrip({ lang }: Props) {
             aria-label={isZh ? "上一個" : "Previous"}
             onClick={() => scrollBy(-1)}
             disabled={!canPrev}
-            className="flex absolute left-0 top-1/2 -translate-y-1/2 h-10 w-10 items-center justify-center rounded-full bg-background border border-border shadow-lg shadow-foreground/10 hover:bg-muted transition disabled:opacity-0 disabled:pointer-events-none"
+            className="flex absolute -left-3 top-1/2 -translate-y-1/2 h-10 w-10 items-center justify-center rounded-full bg-background border border-border shadow-lg shadow-foreground/10 hover:bg-muted transition disabled:opacity-0 disabled:pointer-events-none"
           >
             <ChevronLeft className="h-5 w-5" />
           </button>
@@ -100,7 +100,7 @@ export default function BrandStrip({ lang }: Props) {
             aria-label={isZh ? "下一個" : "Next"}
             onClick={() => scrollBy(1)}
             disabled={!canNext}
-            className="flex absolute right-0 top-1/2 -translate-y-1/2 h-10 w-10 items-center justify-center rounded-full bg-background border border-border shadow-lg shadow-foreground/10 hover:bg-muted transition disabled:opacity-0 disabled:pointer-events-none"
+            className="flex absolute -right-3 top-1/2 -translate-y-1/2 h-10 w-10 items-center justify-center rounded-full bg-background border border-border shadow-lg shadow-foreground/10 hover:bg-muted transition disabled:opacity-0 disabled:pointer-events-none"
           >
             <ChevronRight className="h-5 w-5" />
           </button>

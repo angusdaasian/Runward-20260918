@@ -841,17 +841,20 @@ async function processWebhook(
           if (isNew && (distanceMeters ?? 0) > 0) {
             newActivityCount++;
             newActivityKeys.push(`terra:${provider}:${aid}`);
-            // Fire and forget Telegram + WhatsApp prompts for this new activity
-            const _terraPrompt = {
-              userId: appUserId,
-              source: "terra" as const,
-              activityKey: `${provider}:${aid}`,
-              distanceMeters: distanceMeters ?? null,
-              durationSeconds: durationSeconds ?? null,
-              sportType: meta?.type ?? meta?.activity_type ?? "run",
-            };
-            await maybeSendTelegramActivityPrompt(_terraPrompt);
-            await maybeSendWhatsappActivityPrompt(_terraPrompt);
+            // Fire and forget Telegram + WhatsApp prompts for running activities only
+            const rawType = meta?.type ?? meta?.activity_type;
+            if (isRunning(rawType, meta?.name)) {
+              const _terraPrompt = {
+                userId: appUserId,
+                source: "terra" as const,
+                activityKey: `${provider}:${aid}`,
+                distanceMeters: distanceMeters ?? null,
+                durationSeconds: durationSeconds ?? null,
+                sportType: "run",
+              };
+              await maybeSendTelegramActivityPrompt(_terraPrompt);
+              await maybeSendWhatsappActivityPrompt(_terraPrompt);
+            }
           }
         }
         // Recalculate XP & leaderboard rank from terra_activities

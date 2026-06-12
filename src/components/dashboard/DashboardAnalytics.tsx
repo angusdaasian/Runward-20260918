@@ -25,6 +25,7 @@ import RacePredictorCard from "@/components/analytics/RacePredictorCard";
 import TrainingLoadChart from "@/components/activities/TrainingLoadChart";
 import TrendsCard from "@/components/activities/TrendsCard";
 import ActivityYearHeatmap from "@/components/activities/ActivityYearHeatmap";
+import AnalyticsTopSummary from "./AnalyticsTopSummary";
 
 const DesktopPostureAnalysis = lazy(() => import("./DesktopPostureAnalysis"));
 
@@ -161,6 +162,9 @@ function PerformanceDesktop({
 
   return (
     <div className="space-y-6">
+      {/* New top summary: CTL/ATL/TSB strip, Readiness/Injury/Load, week-vs-week */}
+      <AnalyticsTopSummary lang={lang} />
+
       {/* Row 1 — Health + Readiness side by side */}
       <Section
         icon={<Heart className="h-4 w-4 text-rose-500" />}
@@ -171,6 +175,7 @@ function PerformanceDesktop({
           <DashCard><HRVReadinessCard lang={lang} /></DashCard>
         </div>
       </Section>
+
 
       {hasActivities && (
         <>

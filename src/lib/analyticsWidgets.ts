@@ -13,7 +13,9 @@ export type WidgetId =
   | "sleep_last_night"
   | "sleep_score"
   | "rhr"
-  | "duration_week";
+  | "duration_week"
+  | "injury_risk"
+  | "load_balance";
 
 export interface AnalyticsWidgetPrefs {
   order: WidgetId[];
@@ -34,6 +36,8 @@ export const ALL_WIDGETS: WidgetId[] = [
   "sleep_last_night",
   "sleep_score",
   "rhr",
+  "injury_risk",
+  "load_balance",
 ];
 
 export const PREMIUM_WIDGETS: WidgetId[] = [
@@ -44,7 +48,7 @@ export const PREMIUM_WIDGETS: WidgetId[] = [
 
 export const DEFAULT_PREFS: AnalyticsWidgetPrefs = {
   order: ALL_WIDGETS,
-  hidden: ["year_heatmap"],
+  hidden: ["year_heatmap", "injury_risk", "load_balance"],
 };
 
 export function normalizePrefs(raw: any): AnalyticsWidgetPrefs {

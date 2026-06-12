@@ -1,11 +1,16 @@
 import { useMemo } from "react";
-import { Info } from "lucide-react";
 import { Lang } from "@/lib/i18n";
 import { useActivities } from "@/hooks/use-activities";
 import { useTerraDailyHealth } from "@/hooks/use-terra-daily-health";
 import { loadForActivity, isCardio, isRunning } from "@/lib/trainingLoad";
 import { buildWeeklyLoadSeries } from "@/lib/trainingLoad";
 import { computeReadiness, selectProviderRows } from "@/lib/hrvReadiness";
+import {
+  computeInjuryRisk,
+  injuryBand as injuryBandFn,
+  tInfo,
+} from "@/lib/analyticsExplain";
+import InfoTip from "@/components/analytics/InfoTip";
 
 interface Props {
   lang: Lang;

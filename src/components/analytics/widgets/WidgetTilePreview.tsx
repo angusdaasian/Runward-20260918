@@ -397,6 +397,42 @@ const Tile = ({ id, lang, onOpen }: Props) => {
           <Big value={zh(lang) ? "查看" : "View"} sub={zh(lang) ? "365 天熱力圖" : "365-day map"} />
         </WidgetTile>
       );
+    case "injury_risk":
+      return (
+        <WidgetTile
+          title={zh(lang) ? "受傷風險" : "Injury Risk"}
+          subtitle={injuryBand.label}
+          icon={<ShieldAlert size={16} className="text-rose-500" />}
+          onClick={onOpen}
+          readonly
+          lang={lang}
+        >
+          <Big
+            value={String(injury.score)}
+            unit="/100"
+            sub={injury.drivers[0] ? (zh(lang) ? injury.drivers[0].zh : injury.drivers[0].en) : (zh(lang) ? "無顯著因素" : "No significant drivers")}
+            cls={injuryBand.color}
+          />
+        </WidgetTile>
+      );
+    case "load_balance":
+      return (
+        <WidgetTile
+          title={zh(lang) ? "負荷平衡" : "Load Balance"}
+          subtitle={acwrLabel}
+          icon={<Scale size={16} className="text-sky-500" />}
+          onClick={onOpen}
+          readonly
+          lang={lang}
+        >
+          <Big
+            value={loadStats.acwr === 0 ? "—" : loadStats.acwr.toFixed(2)}
+            unit={loadStats.acwr === 0 ? undefined : "ACWR"}
+            sub={zh(lang) ? `單一性 ${loadStats.monotony.toFixed(2)}` : `Monotony ${loadStats.monotony.toFixed(2)}`}
+            cls={acwrDot.replace("bg-", "text-")}
+          />
+        </WidgetTile>
+      );
   }
 };
 

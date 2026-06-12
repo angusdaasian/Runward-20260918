@@ -250,56 +250,46 @@ export default function AnalyticsTopSummary({ lang }: Props) {
       .sort((a, b) => b.pct - a.pct);
   }, [last7]);
 
+  /* CTL ramp rate per week */
+  const ctlRampPerWeek = useMemo(() => {
+    if (series.length < 2) return 0;
+    const last = series[series.length - 1]?.fitness ?? 0;
+    const prev = series[series.length - 2]?.fitness ?? last;
+    return last - prev;
+  }, [series]);
+
   /* Injury risk score (0-100) */
-  const injury = useMemo(() => {
-    let score = 0;
-    const drivers: { en: string; zh: string; weight: number }[] = [];
+  const injury = useMemo(
+    () =>
+      computeInjuryRisk({
+        acwr: loadStats.acwr,
+        monotony: loadStats.monotony,
+        acute: loadStats.acute,
+        tsb,
+        ctlRampPerWeek,
+        hrvZ,
+        sleepDebtPerNightHours: sleepDebt14?.perNightHours ?? null,
+        readinessScore: readiness?.score ?? null,
+      }),
+    [loadStats, tsb, ctlRampPerWeek, hrvZ, sleepDebt14, readiness],
+  );
 
-    if (loadStats.acwr > 1.5) {
-      const w = Math.min(35, (loadStats.acwr - 1.5) * 60);
-      score += w;
-      drivers.push({ en: "ACWR spike", zh: "急性負荷過高", weight: w });
-    } else if (loadStats.acwr > 0 && loadStats.acwr < 0.5 && loadStats.acute > 0) {
-      const w = 15;
-      score += w;
-      drivers.push({ en: "Detraining", zh: "訓練不足", weight: w });
-    }
-    if (loadStats.monotony > 2) {
-      const w = Math.min(20, (loadStats.monotony - 2) * 20);
-      score += w;
-      drivers.push({ en: "High monotony", zh: "訓練單一", weight: w });
-    }
-    if (sleepDebt14 && sleepDebt14.hours > 4) {
-      const w = Math.min(25, (sleepDebt14.hours - 4) * 3);
-      score += w;
-      drivers.push({ en: "Sleep debt severe", zh: "睡眠不足嚴重", weight: w });
-    }
-    if (tsb < -20) {
-      const w = Math.min(20, (-20 - tsb) * 1.2);
-      score += w;
-      drivers.push({ en: "Deep fatigue (TSB)", zh: "深度疲勞", weight: w });
-    }
-    if (readiness && readiness.score < 35) {
-      const w = 15;
-      score += w;
-      drivers.push({ en: "Low readiness", zh: "準備度低", weight: w });
-    }
-
-    score = Math.max(0, Math.min(100, Math.round(score)));
-    drivers.sort((a, b) => b.weight - a.weight);
-    return { score, drivers };
-  }, [loadStats, sleepDebt14, tsb, readiness]);
+  /* Training readiness layered with training context (spec) */
+  const trainingReadiness = useMemo(
+    () =>
+      computeTrainingReadiness(readiness, {
+        tsb,
+        acwr: loadStats.acwr,
+        monotony: loadStats.monotony,
+        sleepDebtPerNightHours: sleepDebt14?.perNightHours ?? null,
+        sleepScore: null,
+      }),
+    [readiness, tsb, loadStats, sleepDebt14],
+  );
 
   if (!user) return null;
 
-  const injuryBand =
-    injury.score < 25
-      ? { label: zhT("Low", "低", lang), color: "text-emerald-600" }
-      : injury.score < 50
-        ? { label: zhT("Moderate", "中等", lang), color: "text-amber-500" }
-        : injury.score < 75
-          ? { label: zhT("Elevated", "偏高", lang), color: "text-orange-500" }
-          : { label: zhT("High", "高", lang), color: "text-rose-600" };
+  const injuryBand = injuryBandFn(injury.score, lang);
 
   const acwrLabel =
     loadStats.acwr === 0

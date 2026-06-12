@@ -11,6 +11,13 @@ import {
   isRunning,
 } from "@/lib/trainingLoad";
 import { computeReadiness, selectProviderRows } from "@/lib/hrvReadiness";
+import {
+  computeInjuryRisk,
+  injuryBand as injuryBandFn,
+  computeTrainingReadiness,
+  tInfo,
+} from "@/lib/analyticsExplain";
+import InfoTip from "@/components/analytics/InfoTip";
 
 interface Props {
   lang: Lang;
@@ -153,8 +160,32 @@ export default function AnalyticsTopSummary({ lang }: Props) {
     if (!last14.length) return null;
     const target = 8 * 3600;
     const debt = last14.reduce((s, r) => s + Math.max(0, target - (r.sleep_seconds || 0)), 0);
-    return { hours: debt / 3600, nights: last14.length };
+    return {
+      hours: debt / 3600,
+      nights: last14.length,
+      perNightHours: debt / 3600 / last14.length,
+    };
   }, [garminRows]);
+
+  // HRV z-score (recent 7d vs 60d baseline, log-space)
+  const hrvZ = useMemo<number | null>(() => {
+    const hrv = garminRows.filter((r) => r.hrv != null).map((r) => Number(r.hrv));
+    if (hrv.length < 8) return null;
+    const last60 = hrv.slice(-60);
+    const last7 = hrv.slice(-7);
+    if (last60.length < 5 || last7.length < 3) return null;
+    const mean = (x: number[]) => x.reduce((a, b) => a + b, 0) / x.length;
+    const sd = (x: number[]) => {
+      if (x.length < 2) return 0;
+      const m = mean(x);
+      return Math.sqrt(mean(x.map((v) => (v - m) ** 2)));
+    };
+    const lnBase = mean(last60.map((v) => Math.log(v)));
+    const lnBaseSd = Math.max(sd(last60.map((v) => Math.log(v))), 0.05);
+    const lnRecent = mean(last7.map((v) => Math.log(v)));
+    return (lnRecent - lnBase) / lnBaseSd;
+  }, [garminRows]);
+
 
   /* ACWR + monotony + strain */
   const ageForLoad = (profile as any)?.age ?? null;
@@ -219,56 +250,46 @@ export default function AnalyticsTopSummary({ lang }: Props) {
       .sort((a, b) => b.pct - a.pct);
   }, [last7]);
 
+  /* CTL ramp rate per week */
+  const ctlRampPerWeek = useMemo(() => {
+    if (series.length < 2) return 0;
+    const last = series[series.length - 1]?.fitness ?? 0;
+    const prev = series[series.length - 2]?.fitness ?? last;
+    return last - prev;
+  }, [series]);
+
   /* Injury risk score (0-100) */
-  const injury = useMemo(() => {
-    let score = 0;
-    const drivers: { en: string; zh: string; weight: number }[] = [];
+  const injury = useMemo(
+    () =>
+      computeInjuryRisk({
+        acwr: loadStats.acwr,
+        monotony: loadStats.monotony,
+        acute: loadStats.acute,
+        tsb,
+        ctlRampPerWeek,
+        hrvZ,
+        sleepDebtPerNightHours: sleepDebt14?.perNightHours ?? null,
+        readinessScore: readiness?.score ?? null,
+      }),
+    [loadStats, tsb, ctlRampPerWeek, hrvZ, sleepDebt14, readiness],
+  );
 
-    if (loadStats.acwr > 1.5) {
-      const w = Math.min(35, (loadStats.acwr - 1.5) * 60);
-      score += w;
-      drivers.push({ en: "ACWR spike", zh: "急性負荷過高", weight: w });
-    } else if (loadStats.acwr > 0 && loadStats.acwr < 0.5 && loadStats.acute > 0) {
-      const w = 15;
-      score += w;
-      drivers.push({ en: "Detraining", zh: "訓練不足", weight: w });
-    }
-    if (loadStats.monotony > 2) {
-      const w = Math.min(20, (loadStats.monotony - 2) * 20);
-      score += w;
-      drivers.push({ en: "High monotony", zh: "訓練單一", weight: w });
-    }
-    if (sleepDebt14 && sleepDebt14.hours > 4) {
-      const w = Math.min(25, (sleepDebt14.hours - 4) * 3);
-      score += w;
-      drivers.push({ en: "Sleep debt severe", zh: "睡眠不足嚴重", weight: w });
-    }
-    if (tsb < -20) {
-      const w = Math.min(20, (-20 - tsb) * 1.2);
-      score += w;
-      drivers.push({ en: "Deep fatigue (TSB)", zh: "深度疲勞", weight: w });
-    }
-    if (readiness && readiness.score < 35) {
-      const w = 15;
-      score += w;
-      drivers.push({ en: "Low readiness", zh: "準備度低", weight: w });
-    }
-
-    score = Math.max(0, Math.min(100, Math.round(score)));
-    drivers.sort((a, b) => b.weight - a.weight);
-    return { score, drivers };
-  }, [loadStats, sleepDebt14, tsb, readiness]);
+  /* Training readiness layered with training context (spec) */
+  const trainingReadiness = useMemo(
+    () =>
+      computeTrainingReadiness(readiness, {
+        tsb,
+        acwr: loadStats.acwr,
+        monotony: loadStats.monotony,
+        sleepDebtPerNightHours: sleepDebt14?.perNightHours ?? null,
+        sleepScore: null,
+      }),
+    [readiness, tsb, loadStats, sleepDebt14],
+  );
 
   if (!user) return null;
 
-  const injuryBand =
-    injury.score < 25
-      ? { label: zhT("Low", "低", lang), color: "text-emerald-600" }
-      : injury.score < 50
-        ? { label: zhT("Moderate", "中等", lang), color: "text-amber-500" }
-        : injury.score < 75
-          ? { label: zhT("Elevated", "偏高", lang), color: "text-orange-500" }
-          : { label: zhT("High", "高", lang), color: "text-rose-600" };
+  const injuryBand = injuryBandFn(injury.score, lang);
 
   const acwrLabel =
     loadStats.acwr === 0
@@ -333,53 +354,52 @@ export default function AnalyticsTopSummary({ lang }: Props) {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         {/* Training readiness */}
         <Card>
-          <CardHead label={zhT("Training Readiness", "訓練準備度", lang)}>
-            {readiness && (
-              <span
-                className={`text-[10px] font-semibold tracking-wider px-2 py-0.5 rounded ${
-                  readiness.band === "primed" || readiness.band === "balanced"
-                    ? "bg-emerald-100 text-emerald-700"
-                    : readiness.band === "moderate"
-                      ? "bg-amber-100 text-amber-700"
-                      : "bg-rose-100 text-rose-700"
-                }`}
-              >
-                {readiness.band === "primed"
-                  ? zhT("PRIMED", "極佳", lang)
-                  : readiness.band === "balanced"
-                    ? zhT("READY", "良好", lang)
-                    : readiness.band === "moderate"
-                      ? zhT("MODERATE", "中等", lang)
-                      : readiness.band === "strained"
-                        ? zhT("REST", "休息", lang)
-                        : zhT("REST", "休息", lang)}
-              </span>
-            )}
+          <CardHead
+            label={zhT("Training Readiness", "訓練準備度", lang)}
+            infoText={tInfo("readiness", lang)}
+          >
+            <span
+              className={`text-[10px] font-semibold tracking-wider px-2 py-0.5 rounded ${
+                trainingReadiness.band === "primed" || trainingReadiness.band === "balanced"
+                  ? "bg-emerald-100 text-emerald-700"
+                  : trainingReadiness.band === "moderate"
+                    ? "bg-amber-100 text-amber-700"
+                    : "bg-rose-100 text-rose-700"
+              }`}
+            >
+              {trainingReadiness.band === "primed"
+                ? zhT("PRIMED", "極佳", lang)
+                : trainingReadiness.band === "balanced"
+                  ? zhT("READY", "良好", lang)
+                  : trainingReadiness.band === "moderate"
+                    ? zhT("MODERATE", "中等", lang)
+                    : zhT("REST", "休息", lang)}
+            </span>
           </CardHead>
           <div className="flex items-baseline gap-2 mt-2">
             <div
               className={`text-5xl font-display font-bold ${
-                readiness && readiness.score < 35
+                trainingReadiness.score < 35
                   ? "text-rose-500"
-                  : readiness && readiness.score < 65
+                  : trainingReadiness.score < 65
                     ? "text-amber-500"
                     : "text-emerald-600"
               }`}
             >
-              {readiness?.score ?? "—"}
+              {trainingReadiness.score}
             </div>
             <div className="text-sm text-muted-foreground">/100</div>
           </div>
           <div className="mt-3 h-1.5 rounded-full bg-muted overflow-hidden">
             <div
               className={`h-full ${
-                readiness && readiness.score < 35
+                trainingReadiness.score < 35
                   ? "bg-rose-500"
-                  : readiness && readiness.score < 65
+                  : trainingReadiness.score < 65
                     ? "bg-amber-500"
                     : "bg-emerald-500"
               }`}
-              style={{ width: `${readiness?.score ?? 0}%` }}
+              style={{ width: `${trainingReadiness.score}%` }}
             />
           </div>
           <div className="grid grid-cols-3 gap-3 mt-4 text-xs">
@@ -408,7 +428,7 @@ export default function AnalyticsTopSummary({ lang }: Props) {
 
         {/* Injury risk */}
         <Card>
-          <CardHead label={zhT("Injury Risk", "受傷風險", lang)}>
+          <CardHead label={zhT("Injury Risk", "受傷風險", lang)} infoText={tInfo("injury", lang)}>
             <span className="text-[11px] text-muted-foreground">{injury.score}/100</span>
           </CardHead>
           <div className="flex items-baseline gap-2 mt-2">
@@ -454,7 +474,7 @@ export default function AnalyticsTopSummary({ lang }: Props) {
 
         {/* Load balance */}
         <Card>
-          <CardHead label={zhT("Load Balance", "負荷平衡", lang)}>
+          <CardHead label={zhT("Load Balance", "負荷平衡", lang)} infoText={tInfo("load", lang)}>
             <span className="text-[11px] text-muted-foreground flex items-center gap-1.5">
               <span className={`h-2 w-2 rounded-full ${acwrDot}`} />
               <span className="uppercase tracking-wider">{acwrLabel}</span>
@@ -621,16 +641,22 @@ function Card({
 
 function CardHead({
   label,
+  infoText,
   children,
 }: {
   label: string;
+  infoText?: string;
   children?: React.ReactNode;
 }) {
   return (
     <div className="flex items-center justify-between gap-2">
       <div className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground flex items-center gap-1">
         {label}
-        <Info size={10} className="opacity-50" />
+        {infoText ? (
+          <InfoTip text={infoText} iconSize={11} />
+        ) : (
+          <Info size={10} className="opacity-50" />
+        )}
       </div>
       {children}
     </div>

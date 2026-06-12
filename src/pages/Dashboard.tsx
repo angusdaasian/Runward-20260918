@@ -287,7 +287,7 @@ const Dashboard = () => {
                 {view === "overview" && (
                   <DashboardOverview lang={lang} onNavigate={(v) => setView(v)} />
                 )}
-                {view === "activities" && <DashboardActivities lang={lang} />}
+                
                 {view === "training" && (
                   <DashboardTraining
                     lang={lang}

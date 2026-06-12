@@ -11,6 +11,13 @@ import {
   isRunning,
 } from "@/lib/trainingLoad";
 import { computeReadiness, selectProviderRows } from "@/lib/hrvReadiness";
+import {
+  computeInjuryRisk,
+  injuryBand as injuryBandFn,
+  computeTrainingReadiness,
+  tInfo,
+} from "@/lib/analyticsExplain";
+import InfoTip from "@/components/analytics/InfoTip";
 
 interface Props {
   lang: Lang;

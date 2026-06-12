@@ -204,14 +204,14 @@ export default function InjuryLoadCards({ lang }: Props) {
     <div className="mb-4">
       {/* Injury Risk */}
       <div className="rounded-xl border border-border bg-card p-4 mb-3">
-        <Head label={zhT("Injury Risk", "受傷風險", lang)}>
+        <Head label={zhT("Injury Risk", "受傷風險", lang)} infoText={tInfo("injury", lang)}>
           <span className="text-[11px] text-muted-foreground">{injury.score}/100</span>
         </Head>
         <div className="flex items-baseline gap-2 mt-2">
-          <div className={`text-4xl font-display font-bold ${injuryBand.color}`}>
+          <div className={`text-4xl font-display font-bold ${band.color}`}>
             {injury.score}
           </div>
-          <div className={`text-sm font-medium ${injuryBand.color}`}>{injuryBand.label}</div>
+          <div className={`text-sm font-medium ${band.color}`}>{band.label}</div>
         </div>
         <div className="mt-3 h-1.5 rounded-full overflow-hidden relative bg-gradient-to-r from-emerald-500 via-amber-400 to-rose-500">
           <div

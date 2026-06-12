@@ -21,6 +21,8 @@ import {
   getHrvSeries,
   selectProviderRows,
 } from "@/lib/hrvReadiness";
+import InfoTip from "@/components/analytics/InfoTip";
+import { tInfo } from "@/lib/analyticsExplain";
 
 interface Props {
   lang: Lang;

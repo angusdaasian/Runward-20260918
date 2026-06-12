@@ -144,7 +144,10 @@ export async function maybeSendWhatsappActivityPrompt(summary: ActivitySummary):
       .eq("user_id", summary.userId)
       .maybeSingle();
 
-    if (!profile?.whatsapp_wa_id || !profile?.whatsapp_activity_feedback) return;
+    if (!profile?.whatsapp_wa_id || !profile?.whatsapp_activity_feedback) {
+      console.log(`[wa-activity-prompt] skipped user=${summary.userId} has_wa=${!!profile?.whatsapp_wa_id} enabled=${!!profile?.whatsapp_activity_feedback}`);
+      return;
+    }
 
     let lang = detectLang((profile as any).lang);
     if (!(profile as any).lang) {
@@ -174,7 +177,10 @@ export async function maybeSendWhatsappActivityPrompt(summary: ActivitySummary):
       .select("id")
       .maybeSingle();
 
-    if (insertErr || !inserted) return; // already prompted
+    if (insertErr || !inserted) {
+      console.warn(`[wa-activity-prompt] insert skipped user=${summary.userId} key=${summary.activityKey}`, insertErr?.message ?? "no row returned");
+      return; // already prompted or insert failed
+    }
 
     const summaryBlock = fmtSummary(summary, lang);
     const text = lang === "zh"
@@ -182,6 +188,7 @@ export async function maybeSendWhatsappActivityPrompt(summary: ActivitySummary):
       : `🏃 *Nice run!*\n\n${summaryBlock}\n\nReply with your *RPE* (1–10) and how it felt (optional) and I'll generate your full AI run analysis.\n\nExample: 7 legs heavy but pushed through`;
 
     const messageId = await waSendText(profile.whatsapp_wa_id as string, text);
+    console.log(`[wa-activity-prompt] sent user=${summary.userId} key=${summary.activityKey} message_id=${messageId ?? "null"}`);
     if (messageId) {
       await supabase
         .from("whatsapp_pending_prompts")

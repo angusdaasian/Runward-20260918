@@ -474,7 +474,7 @@ export default function AnalyticsTopSummary({ lang }: Props) {
 
         {/* Load balance */}
         <Card>
-          <CardHead label={zhT("Load Balance", "負荷平衡", lang)}>
+          <CardHead label={zhT("Load Balance", "負荷平衡", lang)} infoText={tInfo("load", lang)}>
             <span className="text-[11px] text-muted-foreground flex items-center gap-1.5">
               <span className={`h-2 w-2 rounded-full ${acwrDot}`} />
               <span className="uppercase tracking-wider">{acwrLabel}</span>

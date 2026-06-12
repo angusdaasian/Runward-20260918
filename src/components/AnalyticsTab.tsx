@@ -50,6 +50,8 @@ const widgetLabel = (id: WidgetId, lang: Lang): string => {
     case "sleep_score": return zh ? "睡眠分數" : "Sleep score";
     case "rhr": return zh ? "靜息心率" : "Resting HR";
     case "duration_week": return zh ? "運動時數 (本週)" : "Duration (week)";
+    case "injury_risk": return zh ? "受傷風險" : "Injury Risk";
+    case "load_balance": return zh ? "負荷平衡" : "Load Balance";
   }
 };
 
@@ -99,7 +101,7 @@ const AnalyticsTab = ({ lang }: Props) => {
 
   const labels = useMemo(() => {
     const out: Record<WidgetId, string> = {} as any;
-    (["hrv","health","hr_zones","race_predictor","training_load","trends","year_heatmap","steps_today","calories_today","sleep_last_night","sleep_score","rhr","duration_week"] as WidgetId[]).forEach((id) => {
+    (["hrv","health","hr_zones","race_predictor","training_load","trends","year_heatmap","steps_today","calories_today","sleep_last_night","sleep_score","rhr","duration_week","injury_risk","load_balance"] as WidgetId[]).forEach((id) => {
       out[id] = widgetLabel(id, lang);
     });
     return out;
@@ -151,11 +153,13 @@ const AnalyticsTab = ({ lang }: Props) => {
         return <ActivityYearHeatmap lang={lang} activities={loadActivities} />;
       case "calories_today":
       case "duration_week":
+      case "injury_risk":
+      case "load_balance":
         return (
           <div className="text-sm text-muted-foreground">
             {lang === "zh"
-              ? "請至『活動』分頁查看更多細節。"
-              : "Open the Activities tab for full details."}
+              ? "請至『表現』分頁的傳統檢視查看完整詳情。"
+              : "Open the Performance tab classic view for full details."}
           </div>
         );
     }

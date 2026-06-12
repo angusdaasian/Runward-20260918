@@ -14,6 +14,7 @@ import { notifyPlanChanged } from "@/lib/planEvents";
 import type { EditableWorkout } from "@/components/training/EditWorkoutDialog";
 
 const EditWorkoutDialog = lazy(() => import("@/components/training/EditWorkoutDialog"));
+import DesktopAiPlanControls from "./DesktopAiPlanControls";
 
 export type PlanKind = "free" | "ai" | "custom";
 
@@ -355,35 +356,50 @@ export default function DesktopPlanEditor({
 
       <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
         {/* Plan meta */}
-        <Card className="p-5">
-          <h3 className="font-display font-semibold text-sm uppercase tracking-wider mb-4">
-            {L("Plan goals", "計劃目標")}
-          </h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <Field label={L("Distance", "距離")}>
-              <Input value={draft?.distance ?? ""} disabled={!planMetaEditable}
-                onChange={(e) => setDraft({ ...draft, distance: e.target.value })} />
-            </Field>
-            <Field label={L("Target time", "目標時間")}>
-              <Input value={draft?.target_time ?? ""} placeholder="hh:mm:ss" disabled={!planMetaEditable}
-                onChange={(e) => setDraft({ ...draft, target_time: e.target.value })} />
-            </Field>
-            <Field label={L("Weeks", "週數")}>
-              <Input type="number" min={1} max={52} value={draft?.weeks ?? ""} disabled={!planMetaEditable}
-                onChange={(e) => setDraft({ ...draft, weeks: Number(e.target.value) || null })} />
-            </Field>
-            <Field label={L("Days / week", "每週天數")}>
-              <Input type="number" min={1} max={7} value={draft?.days_per_week ?? ""} disabled={!planMetaEditable}
-                onChange={(e) => setDraft({ ...draft, days_per_week: Number(e.target.value) || null })} />
-            </Field>
-            {("race_date" in (draft || {})) && (
-              <Field label={L("Race date", "比賽日期")}>
-                <Input type="date" value={draft?.race_date ?? ""} disabled={!planMetaEditable}
-                  onChange={(e) => setDraft({ ...draft, race_date: e.target.value || null })} />
+        {selectedKind === "ai" ? (
+          <DesktopAiPlanControls
+            lang={lang}
+            plan={draft}
+            weekIdx={(() => {
+              const todayIso = isoDay(new Date());
+              const idx = weeks.findIndex((w: any) => (w.days || []).some((d: any) => d.date >= todayIso));
+              return Math.max(0, idx);
+            })()}
+            isPremium={isPremium}
+            onPlanUpdated={(next) => { setDraft(next ? JSON.parse(JSON.stringify(next)) : null); onPlanSaved(next); }}
+          />
+        ) : (
+          <Card className="p-5">
+            <h3 className="font-display font-semibold text-sm uppercase tracking-wider mb-4">
+              {L("Plan goals", "計劃目標")}
+            </h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <Field label={L("Distance", "距離")}>
+                <Input value={draft?.distance ?? ""} disabled={!planMetaEditable}
+                  onChange={(e) => setDraft({ ...draft, distance: e.target.value })} />
               </Field>
-            )}
-          </div>
-        </Card>
+              <Field label={L("Target time", "目標時間")}>
+                <Input value={draft?.target_time ?? ""} placeholder="hh:mm:ss" disabled={!planMetaEditable}
+                  onChange={(e) => setDraft({ ...draft, target_time: e.target.value })} />
+              </Field>
+              <Field label={L("Weeks", "週數")}>
+                <Input type="number" min={1} max={52} value={draft?.weeks ?? ""} disabled={!planMetaEditable}
+                  onChange={(e) => setDraft({ ...draft, weeks: Number(e.target.value) || null })} />
+              </Field>
+              <Field label={L("Days / week", "每週天數")}>
+                <Input type="number" min={1} max={7} value={draft?.days_per_week ?? ""} disabled={!planMetaEditable}
+                  onChange={(e) => setDraft({ ...draft, days_per_week: Number(e.target.value) || null })} />
+              </Field>
+              {("race_date" in (draft || {})) && (
+                <Field label={L("Race date", "比賽日期")}>
+                  <Input type="date" value={draft?.race_date ?? ""} disabled={!planMetaEditable}
+                    onChange={(e) => setDraft({ ...draft, race_date: e.target.value || null })} />
+                </Field>
+              )}
+            </div>
+          </Card>
+        )}
+
 
         {/* Weeks */}
         <Tabs defaultValue="0" className="w-full">

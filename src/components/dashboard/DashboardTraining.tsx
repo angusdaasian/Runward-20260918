@@ -41,7 +41,7 @@ function planKindOf(p: any): PlanKind | null {
   return "ai";
 }
 
-export default function DashboardTraining({ lang, onLoginRequest }: Props) {
+export default function DashboardTraining({ lang, score, setScore, onLoginRequest }: Props) {
   const zh = lang === "zh";
   const L = (en: string, z: string) => (zh ? z : en);
   const { activities } = useActivities();

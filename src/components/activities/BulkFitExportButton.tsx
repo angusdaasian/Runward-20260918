@@ -16,24 +16,37 @@ const BulkFitExportButton = ({ lang, activities, isPremium }: Props) => {
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
 
+  // Strava's API terms prohibit bulk export of Strava-sourced activities,
+  // and we keep Garmin Connect / Apple Health out of bulk export too.
+  // Only Terra-routed providers (Garmin/COROS/Polar/Zepp/Fitbit via Terra)
+  // and native Suunto are eligible.
+  const exportable = (activities || []).filter((a: any) => {
+    const prov = (a.provenance || "").toLowerCase();
+    return prov === "terra" || prov === "suunto";
+  });
+
   const onClick = async () => {
     if (!isPremium) {
       toast.error(lang === "zh" ? "升級 Premium 以解鎖批量匯出" : "Upgrade to Premium for bulk export");
       return;
     }
-    if (!activities || activities.length === 0) {
-      toast.info(lang === "zh" ? "沒有可匯出的活動" : "No activities to export");
+    if (!exportable || exportable.length === 0) {
+      toast.info(
+        lang === "zh"
+          ? "沒有可批量匯出的活動（僅支援 Terra、Suunto、Polar）"
+          : "No exportable activities (Terra, Suunto, Polar only)",
+      );
       return;
     }
     setRunning(true);
-    setProgress({ done: 0, total: activities.length });
+    setProgress({ done: 0, total: exportable.length });
     const zip = new JSZip();
     let failed = 0;
     const tid = "bulk-fit";
     toast.loading(
       lang === "zh"
-        ? `準備匯出 ${activities.length} 個活動...`
-        : `Preparing ${activities.length} activities...`,
+        ? `準備匯出 ${exportable.length} 個活動...`
+        : `Preparing ${exportable.length} activities...`,
       { id: tid },
     );
 
@@ -42,9 +55,9 @@ const BulkFitExportButton = ({ lang, activities, isPremium }: Props) => {
     let idx = 0;
     let done = 0;
     const worker = async () => {
-      while (idx < activities.length) {
+      while (idx < exportable.length) {
         const i = idx++;
-        const a = activities[i];
+        const a = exportable[i];
         try {
           let streams: any[] | null = null;
           const isStrava = a.provenance === "strava" && (a as any).strava_id && (a as any).strava_id > 0;
@@ -88,11 +101,11 @@ const BulkFitExportButton = ({ lang, activities, isPremium }: Props) => {
           failed++;
         }
         done++;
-        setProgress({ done, total: activities.length });
+        setProgress({ done, total: exportable.length });
         toast.loading(
           lang === "zh"
-            ? `匯出中 ${done}/${activities.length}...`
-            : `Exporting ${done}/${activities.length}...`,
+            ? `匯出中 ${done}/${exportable.length}...`
+            : `Exporting ${done}/${exportable.length}...`,
           { id: tid },
         );
       }

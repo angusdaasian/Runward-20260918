@@ -1,7 +1,7 @@
 import { useRef, useState, useEffect, useCallback } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
-import stravaLogo from "@/assets/brands/strava.png.asset.json";
+import poweredByStrava from "@/assets/brands/powered-by-strava.svg.asset.json";
 import suuntoLogo from "@/assets/brands/suunto.png.asset.json";
 import garminLogo from "@/assets/brands/garmin.png.asset.json";
 import corosLogo from "@/assets/brands/coros.png.asset.json";
@@ -13,7 +13,7 @@ interface Props {
 }
 
 const brands = [
-  { src: stravaLogo.url, alt: "Strava", h: "h-6 md:h-8", invert: false, offset: "translate-y-1 md:translate-y-1.5" },
+  { src: poweredByStrava.url, alt: "Powered by Strava", h: "h-7 md:h-9", invert: false },
   { src: garminLogo.url, alt: "Garmin", h: "h-8 md:h-10", invert: true },
   { src: suuntoLogo.url, alt: "Suunto", h: "h-9 md:h-11", invert: true },
   { src: corosLogo.url, alt: "COROS", h: "h-8 md:h-10", invert: true, offset: "translate-y-1 md:translate-y-1.5" },

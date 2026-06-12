@@ -19,6 +19,7 @@ import garminIcon from "@/assets/brands/garmin.png";
 import suuntoIcon from "@/assets/brands/suunto.png";
 import zeppIcon from "@/assets/brands/zepp.png";
 import fitbitIcon from "@/assets/brands/fitbit.png";
+import stravaConnectBtn from "@/assets/brands/btn_strava_connect.svg.asset.json";
 
 interface Props {
   lang: Lang;
@@ -685,9 +686,10 @@ const ConnectApps = ({ lang, onBack }: Props) => {
                   <button
                     onClick={handleConnectStrava}
                     disabled={stravaDisabledByOther || stravaFull}
-                    className={`text-xs font-medium px-3 py-1 rounded-full ${(stravaDisabledByOther || stravaFull) ? "bg-muted text-muted-foreground cursor-not-allowed" : "text-primary-foreground bg-primary"} disabled:opacity-50`}
+                    aria-label="Connect with Strava"
+                    className="disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {lang === "zh" ? "連結" : "Connect"}
+                    <img src={stravaConnectBtn.url} alt="Connect with Strava" className="h-8 w-auto" />
                   </button>
                 )}
               </div>

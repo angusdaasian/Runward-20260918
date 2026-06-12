@@ -4,7 +4,7 @@ import { Link, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import appStoreBadge from "@/assets/app-store-badge.png";
 import appIcon from "@/assets/app-icon.png";
-import poweredByStrava from "@/assets/powered-by-strava.png";
+import poweredByStrava from "@/assets/brands/powered-by-strava.svg.asset.json";
 import IPhoneFrame from "@/components/landing/IPhoneFrame";
 import heroEn from "@/assets/appstore/hero-en.png.asset.json";
 import heroZh from "@/assets/appstore/hero-zh.png.asset.json";
@@ -476,7 +476,7 @@ const Landing = () => {
             <img src={appIcon} alt="" className="h-5 w-5 rounded" />
             <span>© {new Date().getFullYear()} {zh ? "向前跑" : "Runward"}. {zh ? "保留所有權利。" : "All rights reserved."}</span>
             <span className="text-border">|</span>
-            <img src={poweredByStrava} alt="Powered by Strava" className="h-5 rounded-sm px-1" style={{ backgroundColor: "#F7F7F7" }} />
+            <img src={poweredByStrava.url} alt="Powered by Strava" className="h-5" />
           </div>
           <div className="flex gap-6">
             <Link to="/privacy" state={{ from: currentRoute }} className="hover:text-foreground transition-colors">

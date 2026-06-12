@@ -178,7 +178,7 @@ export default function DashboardOverview({ lang, onNavigate }: Props) {
               <ActivityIcon className="h-4 w-4 text-primary" />
               {zh ? "最近活動" : "Recent activities"}
             </h3>
-            <Button variant="ghost" size="sm" onClick={() => onNavigate("activities")}>
+            <Button variant="ghost" size="sm" onClick={() => setShowAllActivities(true)}>
               {zh ? "查看全部" : "View all"}
               <ChevronRight className="h-4 w-4 ml-1" />
             </Button>

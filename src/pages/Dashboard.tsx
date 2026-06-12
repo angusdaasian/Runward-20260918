@@ -52,7 +52,7 @@ const DashboardAuth = lazy(() => import("@/components/dashboard/DashboardAuth"))
 
 type View =
   | "overview"
-  | "activities"
+  
   | "training"
   | "races"
   | "community"

@@ -354,53 +354,52 @@ export default function AnalyticsTopSummary({ lang }: Props) {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         {/* Training readiness */}
         <Card>
-          <CardHead label={zhT("Training Readiness", "訓練準備度", lang)}>
-            {readiness && (
-              <span
-                className={`text-[10px] font-semibold tracking-wider px-2 py-0.5 rounded ${
-                  readiness.band === "primed" || readiness.band === "balanced"
-                    ? "bg-emerald-100 text-emerald-700"
-                    : readiness.band === "moderate"
-                      ? "bg-amber-100 text-amber-700"
-                      : "bg-rose-100 text-rose-700"
-                }`}
-              >
-                {readiness.band === "primed"
-                  ? zhT("PRIMED", "極佳", lang)
-                  : readiness.band === "balanced"
-                    ? zhT("READY", "良好", lang)
-                    : readiness.band === "moderate"
-                      ? zhT("MODERATE", "中等", lang)
-                      : readiness.band === "strained"
-                        ? zhT("REST", "休息", lang)
-                        : zhT("REST", "休息", lang)}
-              </span>
-            )}
+          <CardHead
+            label={zhT("Training Readiness", "訓練準備度", lang)}
+            infoText={tInfo("readiness", lang)}
+          >
+            <span
+              className={`text-[10px] font-semibold tracking-wider px-2 py-0.5 rounded ${
+                trainingReadiness.band === "primed" || trainingReadiness.band === "balanced"
+                  ? "bg-emerald-100 text-emerald-700"
+                  : trainingReadiness.band === "moderate"
+                    ? "bg-amber-100 text-amber-700"
+                    : "bg-rose-100 text-rose-700"
+              }`}
+            >
+              {trainingReadiness.band === "primed"
+                ? zhT("PRIMED", "極佳", lang)
+                : trainingReadiness.band === "balanced"
+                  ? zhT("READY", "良好", lang)
+                  : trainingReadiness.band === "moderate"
+                    ? zhT("MODERATE", "中等", lang)
+                    : zhT("REST", "休息", lang)}
+            </span>
           </CardHead>
           <div className="flex items-baseline gap-2 mt-2">
             <div
               className={`text-5xl font-display font-bold ${
-                readiness && readiness.score < 35
+                trainingReadiness.score < 35
                   ? "text-rose-500"
-                  : readiness && readiness.score < 65
+                  : trainingReadiness.score < 65
                     ? "text-amber-500"
                     : "text-emerald-600"
               }`}
             >
-              {readiness?.score ?? "—"}
+              {trainingReadiness.score}
             </div>
             <div className="text-sm text-muted-foreground">/100</div>
           </div>
           <div className="mt-3 h-1.5 rounded-full bg-muted overflow-hidden">
             <div
               className={`h-full ${
-                readiness && readiness.score < 35
+                trainingReadiness.score < 35
                   ? "bg-rose-500"
-                  : readiness && readiness.score < 65
+                  : trainingReadiness.score < 65
                     ? "bg-amber-500"
                     : "bg-emerald-500"
               }`}
-              style={{ width: `${readiness?.score ?? 0}%` }}
+              style={{ width: `${trainingReadiness.score}%` }}
             />
           </div>
           <div className="grid grid-cols-3 gap-3 mt-4 text-xs">

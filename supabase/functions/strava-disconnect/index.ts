@@ -50,44 +50,77 @@ serve(async (req) => {
       try {
         const app = await getAppForConnection(supabase, connection);
         if (!app.client_secret) throw new Error('Missing client_secret for Strava app');
-        // Do not refresh first: refreshing can rotate tokens, then revoking the
-        // old stored refresh token can fail before the new pair is revoked.
-        // Per Strava's 2026 spec, POST /oauth/revoke uses Basic Auth and only a
-        // token form field. Revoking either token revokes the associated pair.
         const basicAuth = btoa(`${app.client_id}:${app.client_secret}`);
-        const tokensToRevoke = [connection.refresh_token, connection.access_token]
-          .filter((token, index, arr) => Boolean(token) && arr.indexOf(token) === index);
+        const tokensToTry = [connection.refresh_token, connection.access_token]
+          .filter((token, index, arr) => Boolean(token) && arr.indexOf(token) === index) as string[];
 
-        const revokeResults = [];
-        for (const token of tokensToRevoke) {
-          const res = await fetch('https://www.strava.com/oauth/revoke', {
-            method: 'POST',
-            headers: {
-              Authorization: `Basic ${basicAuth}`,
-              'Content-Type': 'application/x-www-form-urlencoded',
-            },
-            body: new URLSearchParams({ token }),
-          });
-          const text = await res.text();
-          revokeResults.push({ status: res.status, body: text?.slice(0, 200) });
-          if (res.status === 401) {
-            throw new Error(`Strava revoke unauthorized: ${text}`);
+        const attempts: Array<{ endpoint: string; token: string; attempt: number; status: number; body: string }> = [];
+
+        const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+        // 1) Try the new /oauth/revoke endpoint with retries on 503.
+        outer: for (const token of tokensToTry) {
+          for (let attempt = 1; attempt <= 3; attempt++) {
+            const res = await fetch('https://www.strava.com/oauth/revoke', {
+              method: 'POST',
+              headers: {
+                Authorization: `Basic ${basicAuth}`,
+                'Content-Type': 'application/x-www-form-urlencoded',
+              },
+              body: new URLSearchParams({ token }),
+            });
+            const text = await res.text();
+            attempts.push({ endpoint: 'revoke', token: token.slice(0, 6), attempt, status: res.status, body: text.slice(0, 120) });
+            if (res.ok) { deauthorized = true; break outer; }
+            if (res.status === 401) throw new Error(`Strava revoke unauthorized: ${text.slice(0, 200)}`);
+            if (res.status === 400) break; // bad token — try the next one
+            if (res.status !== 503) throw new Error(`Strava revoke ${res.status}: ${text.slice(0, 200)}`);
+            if (attempt < 3) await sleep(500 * attempt); // backoff on 503
           }
-          if (!res.ok && res.status !== 400 && res.status !== 503) {
-            throw new Error(`Strava revoke ${res.status}: ${text}`);
-          }
-          if (res.ok) deauthorized = true;
-          if (deauthorized) break;
         }
-        console.log('strava-disconnect revoke response', revokeResults);
-        if (!deauthorized && revokeResults.some((r) => r.status === 503)) {
-          deauthError = 'Strava revoke temporarily unavailable; safe to retry';
+
+        // 2) Fallback to legacy /oauth/deauthorize?access_token=... if revoke is unavailable.
+        // Still supported through June 2027 and uses the access_token as a query/body param.
+        if (!deauthorized) {
+          for (const token of tokensToTry) {
+            for (let attempt = 1; attempt <= 2; attempt++) {
+              const res = await fetch('https://www.strava.com/oauth/deauthorize', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams({ access_token: token }),
+              });
+              const text = await res.text();
+              attempts.push({ endpoint: 'deauthorize', token: token.slice(0, 6), attempt, status: res.status, body: text.slice(0, 120) });
+              if (res.ok) { deauthorized = true; break; }
+              if (res.status === 401) break; // wrong/expired token — try next
+              if (res.status !== 503) break;
+              if (attempt < 2) await sleep(500);
+            }
+            if (deauthorized) break;
+          }
+        }
+
+        console.log('strava-disconnect attempts', JSON.stringify(attempts));
+        if (!deauthorized) {
+          deauthError = attempts.some((a) => a.status === 503)
+            ? 'Strava temporarily unavailable on both /oauth/revoke and /oauth/deauthorize; safe to retry'
+            : `Strava deauth failed: ${JSON.stringify(attempts.slice(-2))}`;
           console.error('strava-disconnect revoke failed', deauthError);
         }
       } catch (e) {
         deauthError = e instanceof Error ? e.message : String(e);
         console.error('strava-disconnect deauthorize error', deauthError);
       }
+    }
+
+    // If Strava is still authorized (revoke failed), KEEP the local connection
+    // so the user can retry. Otherwise the app would look disconnected here but
+    // remain in their Strava settings forever.
+    if (!deauthorized && connection) {
+      return new Response(
+        JSON.stringify({ success: false, deauthorized: false, deauthError, retryable: true }),
+        { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
     }
 
     // Always clear local data so the user is disconnected on our side even if

@@ -14,6 +14,7 @@ import { notifyPlanChanged } from "@/lib/planEvents";
 import type { EditableWorkout } from "@/components/training/EditWorkoutDialog";
 
 const EditWorkoutDialog = lazy(() => import("@/components/training/EditWorkoutDialog"));
+import DesktopAiPlanControls from "./DesktopAiPlanControls";
 
 export type PlanKind = "free" | "ai" | "custom";
 

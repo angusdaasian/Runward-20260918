@@ -291,7 +291,7 @@ const HRVReadinessCard = ({ lang }: Props) => {
           <div className="absolute inset-y-0 left-[70%] w-[30%] bg-emerald-500/70" />
           <div
             className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-3 h-3 rounded-full bg-foreground border-2 border-background shadow"
-            style={{ left: `${Math.min(100, Math.max(0, readiness.score))}%` }}
+            style={{ left: `${Math.min(100, Math.max(0, training.score))}%` }}
           />
         </div>
         <div className="flex justify-between text-[9px] text-muted-foreground mt-1">

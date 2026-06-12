@@ -334,6 +334,17 @@ export default function DashboardOverview({ lang, onNavigate }: Props) {
         profileRestingHr={(profile as any)?.resting_heartrate ?? null}
         profileCustomZones={(profile as any)?.custom_hr_zones ?? null}
       />
+
+      <AllActivitiesSheet
+        open={showAllActivities}
+        onClose={() => setShowAllActivities(false)}
+        lang={lang}
+        activities={activities || []}
+        onSelect={(a) => {
+          setShowAllActivities(false);
+          setSelectedActivity(a);
+        }}
+      />
     </div>
   );
 }

@@ -9,6 +9,7 @@ import RacePredictorCard from "@/components/analytics/RacePredictorCard";
 import HrZonesWeekCard from "@/components/analytics/HrZonesWeekCard";
 import HealthStatsCard from "@/components/analytics/HealthStatsCard";
 import HRVReadinessCard from "@/components/analytics/HRVReadinessCard";
+import InjuryLoadCards from "@/components/analytics/InjuryLoadCards";
 import { ActivityListSkeleton } from "@/components/ui/PageSkeleton";
 
 interface Props {
@@ -73,6 +74,8 @@ const PerformanceTab = ({ lang }: Props) => {
       <HealthStatsCard lang={lang} />
 
       <HRVReadinessCard lang={lang} />
+
+      <InjuryLoadCards lang={lang} />
 
       <ActivityYearHeatmap lang={lang} activities={loadActivities} />
 

@@ -62,8 +62,7 @@ type View =
   | "settings";
 
 const VIEWS: { id: View; icon: typeof Activity; labelEn: string; labelZh: string }[] = [
-  { id: "overview", icon: LayoutDashboard, labelEn: "Overview", labelZh: "總覽" },
-  { id: "activities", icon: Activity, labelEn: "Activities", labelZh: "活動" },
+  { id: "overview", icon: Activity, labelEn: "Activity", labelZh: "活動" },
   { id: "training", icon: Dumbbell, labelEn: "Training", labelZh: "訓練" },
   { id: "races", icon: Trophy, labelEn: "Races", labelZh: "比賽" },
   { id: "community", icon: Award, labelEn: "Community", labelZh: "社群" },

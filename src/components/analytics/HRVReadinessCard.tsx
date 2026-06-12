@@ -75,8 +75,9 @@ const HRVReadinessCard = ({ lang }: Props) => {
     <Card className="p-4 mb-4 bg-gradient-to-br from-primary/5 via-card to-card border-primary/20">
       <div className="flex items-center justify-between mb-3">
         <div>
-          <h3 className="font-display text-base font-semibold text-foreground">
+          <h3 className="font-display text-base font-semibold text-foreground flex items-center gap-1.5">
             {lang === "zh" ? "心率變異與訓練準備度" : "HRV & Training Readiness"}
+            <InfoTip text={tInfo("readiness", lang)} iconSize={12} />
           </h3>
           <p className="text-[11px] text-muted-foreground">
             {PROVIDER_LABEL[active]} ·{" "}

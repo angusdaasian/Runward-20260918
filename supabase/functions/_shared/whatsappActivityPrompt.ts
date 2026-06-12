@@ -38,7 +38,10 @@ function fmtSummary(s: ActivitySummary, lang: "zh" | "en"): string {
 }
 
 export async function waSendText(waId: string, text: string): Promise<string | null> {
-  if (!ACCESS_TOKEN || !PHONE_NUMBER_ID) return null;
+  if (!ACCESS_TOKEN || !PHONE_NUMBER_ID) {
+    console.warn("[wa] send skipped: WHATSAPP_ACCESS_TOKEN or WHATSAPP_PHONE_NUMBER_ID is missing");
+    return null;
+  }
   try {
     // WhatsApp text limit is 4096 chars
     const chunks: string[] = [];
@@ -71,7 +74,11 @@ export async function waSendText(waId: string, text: string): Promise<string | n
         },
       );
       if (!res.ok) {
-        console.warn("[wa] send non-ok", res.status, (await res.text()).slice(0, 300));
+        const errText = (await res.text()).slice(0, 500);
+        console.warn("[wa] send non-ok", res.status, errText);
+        if (res.status === 401 || res.status === 403 || /131005|access token|permissions/i.test(errText)) {
+          console.error("[wa] WhatsApp token/permission failure. Refresh WHATSAPP_ACCESS_TOKEN and verify it can send from WHATSAPP_PHONE_NUMBER_ID.");
+        }
         return null;
       }
       const data = await res.json().catch(() => null) as any;
@@ -188,13 +195,19 @@ export async function maybeSendWhatsappActivityPrompt(summary: ActivitySummary):
       : `🏃 *Nice run!*\n\n${summaryBlock}\n\nReply with your *RPE* (1–10) and how it felt (optional) and I'll generate your full AI run analysis.\n\nExample: 7 legs heavy but pushed through`;
 
     const messageId = await waSendText(profile.whatsapp_wa_id as string, text);
-    console.log(`[wa-activity-prompt] sent user=${summary.userId} key=${summary.activityKey} message_id=${messageId ?? "null"}`);
-    if (messageId) {
+    if (!messageId) {
+      console.warn(`[wa-activity-prompt] send failed user=${summary.userId} key=${summary.activityKey}; removing undelivered pending prompt`);
       await supabase
         .from("whatsapp_pending_prompts")
-        .update({ prompt_message_id: messageId })
+        .delete()
         .eq("id", (inserted as any).id);
+      return;
     }
+    console.log(`[wa-activity-prompt] sent user=${summary.userId} key=${summary.activityKey} message_id=${messageId}`);
+    await supabase
+      .from("whatsapp_pending_prompts")
+      .update({ prompt_message_id: messageId })
+      .eq("id", (inserted as any).id);
   } catch (e) {
     console.error("[wa-activity-prompt] failed", e);
   }

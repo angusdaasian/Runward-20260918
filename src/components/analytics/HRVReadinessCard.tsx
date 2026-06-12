@@ -168,7 +168,7 @@ const HRVReadinessCard = ({ lang }: Props) => {
         </div>
         <div className="text-right">
           <div className={`text-3xl font-bold ${band.color} leading-none`}>
-            {readiness.score}
+            {training.score}
           </div>
           <div className={`text-[11px] font-medium ${band.color}`}>
             {band.label}

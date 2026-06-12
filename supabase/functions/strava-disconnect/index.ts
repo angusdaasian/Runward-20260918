@@ -91,7 +91,9 @@ serve(async (req) => {
           app.client_secret,
         );
 
-        // POST https://www.strava.com/oauth/deauthorize with the access token.
+        // Per https://developers.strava.com/docs/authentication/#deauthorization
+        // POST https://www.strava.com/oauth/deauthorize with Bearer auth.
+        // Successful response returns 200 with { access_token: "..." }.
         const res = await fetch('https://www.strava.com/oauth/deauthorize', {
           method: 'POST',
           headers: {
@@ -101,9 +103,10 @@ serve(async (req) => {
           body: new URLSearchParams({ access_token: accessToken }),
         });
         const text = await res.text();
+        console.log('strava-disconnect deauthorize response', { status: res.status, body: text?.slice(0, 200) });
         if (!res.ok) {
-          // 401 means the token is already invalid → treat as already deauthorized.
-          if (res.status === 401) {
+          // 401/410 → token already invalid / app already deauthorized on Strava's side.
+          if (res.status === 401 || res.status === 410) {
             deauthorized = true;
           } else {
             deauthError = `Strava deauthorize ${res.status}: ${text}`;

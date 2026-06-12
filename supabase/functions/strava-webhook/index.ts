@@ -313,6 +313,34 @@ serve(async (req) => {
       const event = await req.json();
       console.log('Strava webhook event:', JSON.stringify(event));
 
+      // Per Strava docs, an athlete deauthorization event arrives as:
+      //   { object_type: 'athlete', aspect_type: 'update', updates: { authorized: 'false' }, owner_id }
+      // When that arrives we must purge the local connection so we stop
+      // refreshing tokens and re-pulling activities (which can effectively
+      // "restore" the link from the user's perspective).
+      if (event.object_type === 'athlete') {
+        const authorizedFlag = event?.updates?.authorized;
+        const isDeauth = event.aspect_type === 'update' &&
+          (authorizedFlag === 'false' || authorizedFlag === false);
+        if (isDeauth && event.owner_id) {
+          console.log('Strava athlete deauthorization webhook for owner_id', event.owner_id);
+          const { data: conns } = await supabase
+            .from('strava_connections')
+            .select('user_id')
+            .eq('strava_athlete_id', event.owner_id);
+          for (const c of conns ?? []) {
+            await supabase.from('strava_activities').delete().eq('user_id', c.user_id);
+          }
+          await supabase
+            .from('strava_connections')
+            .delete()
+            .eq('strava_athlete_id', event.owner_id);
+        }
+        return new Response(JSON.stringify({ ok: true }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
       if (event.object_type !== 'activity') {
         return new Response(JSON.stringify({ ok: true }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },

@@ -56,33 +56,44 @@ export async function waSendText(waId: string, text: string): Promise<string | n
 
     let lastId: string | null = null;
     for (const part of chunks) {
-      const res = await fetch(
-        `https://graph.facebook.com/${GRAPH_VERSION}/${PHONE_NUMBER_ID}/messages`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${ACCESS_TOKEN}`,
+      let attempt = 0;
+      let sent = false;
+      while (attempt < 4 && !sent) {
+        attempt++;
+        const res = await fetch(
+          `https://graph.facebook.com/${GRAPH_VERSION}/${PHONE_NUMBER_ID}/messages`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${ACCESS_TOKEN}`,
+            },
+            body: JSON.stringify({
+              messaging_product: "whatsapp",
+              recipient_type: "individual",
+              to: waId,
+              type: "text",
+              text: { preview_url: false, body: part },
+            }),
           },
-          body: JSON.stringify({
-            messaging_product: "whatsapp",
-            recipient_type: "individual",
-            to: waId,
-            type: "text",
-            text: { preview_url: false, body: part },
-          }),
-        },
-      );
-      if (!res.ok) {
+        );
+        if (res.ok) {
+          const data = await res.json().catch(() => null) as any;
+          lastId = data?.messages?.[0]?.id ?? lastId;
+          sent = true;
+          break;
+        }
         const errText = (await res.text()).slice(0, 500);
-        console.warn("[wa] send non-ok", res.status, errText);
+        const transient = res.status >= 500 || /is_transient|"code":2[,}]/i.test(errText);
+        console.warn(`[wa] send non-ok status=${res.status} attempt=${attempt} transient=${transient}`, errText);
         if (res.status === 401 || res.status === 403 || /131005|access token|permissions/i.test(errText)) {
           console.error("[wa] WhatsApp token/permission failure. Refresh WHATSAPP_ACCESS_TOKEN and verify it can send from WHATSAPP_PHONE_NUMBER_ID.");
+          return null;
         }
-        return null;
+        if (!transient || attempt >= 4) return null;
+        await new Promise((r) => setTimeout(r, 400 * Math.pow(2, attempt - 1)));
       }
-      const data = await res.json().catch(() => null) as any;
-      lastId = data?.messages?.[0]?.id ?? lastId;
+      if (!sent) return null;
     }
     return lastId;
   } catch (e) {

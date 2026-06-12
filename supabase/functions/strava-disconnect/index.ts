@@ -92,28 +92,36 @@ serve(async (req) => {
         );
 
         // Per https://developers.strava.com/docs/authentication/#deauthorization
-        // POST https://www.strava.com/oauth/deauthorize with Bearer auth.
-        // Successful response returns 200 with { access_token: "..." }.
-        const res = await fetch('https://www.strava.com/oauth/deauthorize', {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            'Content-Type': 'application/x-www-form-urlencoded',
-          },
-          body: new URLSearchParams({ access_token: accessToken }),
-        });
-        const text = await res.text();
-        console.log('strava-disconnect deauthorize response', { status: res.status, body: text?.slice(0, 200) });
-        if (!res.ok) {
-          // 401/410 → token already invalid / app already deauthorized on Strava's side.
-          if (res.status === 401 || res.status === 410) {
-            deauthorized = true;
-          } else {
-            deauthError = `Strava deauthorize ${res.status}: ${text}`;
-            console.error('strava-disconnect deauthorize failed', deauthError);
+        // Strava now recommends POST /oauth/revoke with Basic Auth. Revoking
+        // either token revokes its associated access/refresh token pair, but we
+        // try refresh first and access second to cover older/stale token states.
+        const basicAuth = btoa(`${app.client_id}:${app.client_secret}`);
+        const tokensToRevoke = [
+          { token: connection.refresh_token, token_type_hint: 'refresh_token' },
+          { token: accessToken, token_type_hint: 'access_token' },
+        ].filter((entry) => Boolean(entry.token));
+
+        const revokeResults = [];
+        for (const entry of tokensToRevoke) {
+          const res = await fetch('https://www.strava.com/oauth/revoke', {
+            method: 'POST',
+            headers: {
+              Authorization: `Basic ${basicAuth}`,
+              'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: new URLSearchParams(entry),
+          });
+          const text = await res.text();
+          revokeResults.push({ hint: entry.token_type_hint, status: res.status, body: text?.slice(0, 200) });
+          if (!res.ok && res.status !== 503) {
+            throw new Error(`Strava revoke ${entry.token_type_hint} ${res.status}: ${text}`);
           }
-        } else {
-          deauthorized = true;
+          if (res.ok) deauthorized = true;
+        }
+        console.log('strava-disconnect revoke response', revokeResults);
+        if (!deauthorized && revokeResults.some((r) => r.status === 503)) {
+          deauthError = 'Strava revoke temporarily unavailable; safe to retry';
+          console.error('strava-disconnect revoke failed', deauthError);
         }
       } catch (e) {
         deauthError = e instanceof Error ? e.message : String(e);

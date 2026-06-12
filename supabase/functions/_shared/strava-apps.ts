@@ -23,6 +23,8 @@ export class StravaAppsError extends Error {
   }
 }
 
+const STRAVA_APP_RESERVED_SLOTS = 1;
+
 // Fallback to env secrets only for the legacy primary app (Client ID 215250)
 // while the admin UI gets the new secret pasted in.
 function envFallbackSecret(clientId: string): string | null {
@@ -99,7 +101,8 @@ export async function pickAvailableApp(supabase: any): Promise<StravaApp> {
       .from("strava_connections")
       .select("id", { count: "exact", head: true })
       .eq("strava_app_id", row.id);
-    if ((count ?? 0) < row.max_athletes) {
+    const effectiveLimit = Math.max((row.max_athletes ?? 0) - STRAVA_APP_RESERVED_SLOTS, 0);
+    if ((count ?? 0) < effectiveLimit) {
       const app = await hydrate(supabase, row);
       if (!app.client_secret) {
         throw new StravaAppsError(
@@ -112,7 +115,7 @@ export async function pickAvailableApp(supabase: any): Promise<StravaApp> {
   }
   throw new StravaAppsError(
     "ALL_APPS_FULL",
-    "All Strava apps have reached their athlete cap"
+    "Strava connection is hitting its limit. Please try other fitness apps while we request Strava to increase the limit."
   );
 }
 

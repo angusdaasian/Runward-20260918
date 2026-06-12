@@ -60,6 +60,7 @@ export default function DashboardConnect({ lang }: Props) {
     Record<string, { id: string; last_synced_at: string | null }>
   >({});
   const [busy, setBusy] = useState<string | null>(null);
+  const [stravaFull, setStravaFull] = useState(false);
 
   const hasFitnessApp = stravaConnected || garminConnected;
   const hasTerraConn = Object.keys(terraConns).length > 0;
@@ -102,6 +103,12 @@ export default function DashboardConnect({ lang }: Props) {
     checkConnections();
     loadTerraConns();
   }, [checkConnections, loadTerraConns]);
+
+  useEffect(() => {
+    supabase.functions.invoke("strava-capacity")
+      .then(({ data }) => setStravaFull(!!(data as any)?.full))
+      .catch(() => setStravaFull(false));
+  }, []);
 
   // Refresh after returning from OAuth tab
   useEffect(() => {
@@ -155,6 +162,15 @@ export default function DashboardConnect({ lang }: Props) {
     const { data, error } = await supabase.functions.invoke("strava-auth", {
       body: { redirect_uri },
     });
+    const errCode = (data as any)?.code ?? (error as any)?.context?.code;
+    if (errCode === "ALL_APPS_FULL") {
+      toast.error(L(
+        "Strava connection is hitting its limit. Please try other fitness apps while we request Strava to increase the limit.",
+        "Strava 連線已達上限，請先使用其他健身應用。我們正在向 Strava 申請提高上限。",
+      ));
+      setBusy(null);
+      return;
+    }
     if (error || !data?.url) {
       toast.error(L("Failed to start Strava connection", "無法啟動 Strava 連結"));
       setBusy(null);
@@ -399,6 +415,7 @@ export default function DashboardConnect({ lang }: Props) {
       !connected &&
       ((p.category !== "health" && hasFitnessApp) ||
         (p.kind === "terra" && hasTerraConn));
+    const stravaBlockedByLimit = p.kind === "strava" && !connected && stravaFull;
 
     if (p.kind === "apple-health") {
       // iOS-only — never connectable from a desktop browser.
@@ -453,7 +470,7 @@ export default function DashboardConnect({ lang }: Props) {
     return (
       <Button
         size="sm"
-        disabled={isBusy || disabledByOther}
+        disabled={isBusy || disabledByOther || stravaBlockedByLimit}
         onClick={() => {
           if (p.kind === "strava") handleStravaConnect();
           else if (p.kind === "garmin-credentials") handleGarminCredentialsConnect();
@@ -467,6 +484,8 @@ export default function DashboardConnect({ lang }: Props) {
         )}
         {disabledByOther
           ? L("Unavailable", "目前無法使用")
+          : stravaBlockedByLimit
+            ? L("Limit reached", "已達上限")
           : L("Connect in browser", "在瀏覽器中連結")}
       </Button>
     );
@@ -562,6 +581,14 @@ export default function DashboardConnect({ lang }: Props) {
                           <p className="text-[10px] text-muted-foreground mt-1.5">
                             {L("Last synced", "上次同步")}:{" "}
                             {new Date(sync).toLocaleString(zh ? "zh-TW" : "en-US")}
+                          </p>
+                        )}
+                        {p.kind === "strava" && !connected && stravaFull && (
+                          <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
+                            {L(
+                              "Strava connection is hitting its limit. Please try other fitness apps while we request Strava to increase the limit.",
+                              "Strava 連線已達上限，請先使用其他健身應用。我們正在向 Strava 申請提高上限。",
+                            )}
                           </p>
                         )}
                       </div>

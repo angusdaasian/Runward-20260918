@@ -124,8 +124,8 @@ const ConnectApps = ({ lang, onBack }: Props) => {
     const errCode = (data as any)?.code ?? (error as any)?.context?.code;
     if (errCode === "ALL_APPS_FULL") {
       toast.error(lang === "zh"
-        ? "Strava 名額已滿,請稍後再試"
-        : "All Strava slots are currently full — please try again later");
+        ? "Strava 連線已達上限，請先使用其他健身應用。我們正在向 Strava 申請提高上限。"
+        : "Strava connection is hitting its limit. Please try other fitness apps while we request Strava to increase the limit.");
       return;
     }
     if (errCode === "APP_SECRET_MISSING" || errCode === "NO_APPS_CONFIGURED") {
@@ -696,8 +696,8 @@ const ConnectApps = ({ lang, onBack }: Props) => {
               {!stravaConnected && stravaFull && (
                 <p className="text-xs text-muted-foreground mt-2">
                   {lang === "zh"
-                    ? "Strava 名額已滿,我們正向 Strava 申請更多名額,請稍後再試。"
-                    : "Max athletes connected. We've requested more capacity from Strava — please check back soon."}
+                    ? "Strava 連線已達上限，請先使用其他健身應用。我們正在向 Strava 申請提高上限。"
+                    : "Strava connection is hitting its limit. Please try other fitness apps while we request Strava to increase the limit."}
                 </p>
               )}
             </div>

@@ -161,49 +161,22 @@ export default function InjuryLoadCards({ lang }: Props) {
       .sort((a, b) => b.pct - a.pct);
   }, [last7]);
 
-  const injury = useMemo(() => {
-    let score = 0;
-    const drivers: { en: string; zh: string; weight: number }[] = [];
-    if (loadStats.acwr > 1.5) {
-      const w = Math.min(35, (loadStats.acwr - 1.5) * 60);
-      score += w;
-      drivers.push({ en: "ACWR spike", zh: "急性負荷過高", weight: w });
-    } else if (loadStats.acwr > 0 && loadStats.acwr < 0.5 && loadStats.acute > 0) {
-      score += 15;
-      drivers.push({ en: "Detraining", zh: "訓練不足", weight: 15 });
-    }
-    if (loadStats.monotony > 2) {
-      const w = Math.min(20, (loadStats.monotony - 2) * 20);
-      score += w;
-      drivers.push({ en: "High monotony", zh: "訓練單一", weight: w });
-    }
-    if (sleepDebt14 && sleepDebt14.hours > 4) {
-      const w = Math.min(25, (sleepDebt14.hours - 4) * 3);
-      score += w;
-      drivers.push({ en: "Sleep debt severe", zh: "睡眠不足嚴重", weight: w });
-    }
-    if (tsb < -20) {
-      const w = Math.min(20, (-20 - tsb) * 1.2);
-      score += w;
-      drivers.push({ en: "Deep fatigue (TSB)", zh: "深度疲勞", weight: w });
-    }
-    if (readiness && readiness.score < 35) {
-      score += 15;
-      drivers.push({ en: "Low readiness", zh: "準備度低", weight: 15 });
-    }
-    score = Math.max(0, Math.min(100, Math.round(score)));
-    drivers.sort((a, b) => b.weight - a.weight);
-    return { score, drivers };
-  }, [loadStats, sleepDebt14, tsb, readiness]);
+  const injury = useMemo(
+    () =>
+      computeInjuryRisk({
+        acwr: loadStats.acwr,
+        monotony: loadStats.monotony,
+        acute: loadStats.acute,
+        tsb,
+        ctlRampPerWeek,
+        hrvZ,
+        sleepDebtPerNightHours: sleepDebt14?.perNightHours ?? null,
+        readinessScore: readiness?.score ?? null,
+      }),
+    [loadStats, tsb, ctlRampPerWeek, hrvZ, sleepDebt14, readiness],
+  );
 
-  const injuryBand =
-    injury.score < 25
-      ? { label: zhT("Low", "低", lang), color: "text-emerald-600" }
-      : injury.score < 50
-        ? { label: zhT("Moderate", "中等", lang), color: "text-amber-500" }
-        : injury.score < 75
-          ? { label: zhT("Elevated", "偏高", lang), color: "text-orange-500" }
-          : { label: zhT("High", "高", lang), color: "text-rose-600" };
+  const band = injuryBandFn(injury.score, lang);
 
   const acwrLabel =
     loadStats.acwr === 0

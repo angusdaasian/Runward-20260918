@@ -428,7 +428,7 @@ export default function AnalyticsTopSummary({ lang }: Props) {
 
         {/* Injury risk */}
         <Card>
-          <CardHead label={zhT("Injury Risk", "受傷風險", lang)}>
+          <CardHead label={zhT("Injury Risk", "受傷風險", lang)} infoText={tInfo("injury", lang)}>
             <span className="text-[11px] text-muted-foreground">{injury.score}/100</span>
           </CardHead>
           <div className="flex items-baseline gap-2 mt-2">

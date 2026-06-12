@@ -19,20 +19,20 @@ const Privacy = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background px-5 pt-6 max-w-lg mx-auto pb-10">
-      <button onClick={handleReturn} className="flex items-center gap-1.5 text-sm text-muted-foreground mb-6">
+    <div className="min-h-screen bg-background px-5 pt-6 max-w-lg md:max-w-3xl lg:max-w-4xl mx-auto pb-10 md:px-10 md:pt-12 md:pb-20">
+      <button onClick={handleReturn} className="flex items-center gap-1.5 text-sm text-muted-foreground mb-6 md:mb-10 hover:text-foreground transition-colors">
         <ArrowLeft size={16} />
         {lang === "zh" ? "返回" : "Back"}
       </button>
 
-      <div className="flex items-center gap-3 mb-6">
-        <ShieldCheck size={24} className="text-primary" />
-        <h1 className="font-display text-2xl font-bold text-foreground">
+      <div className="flex items-center gap-3 mb-6 md:mb-10">
+        <ShieldCheck size={24} className="text-primary md:w-8 md:h-8" />
+        <h1 className="font-display text-2xl md:text-4xl font-bold text-foreground">
           {lang === "zh" ? "隱私權政策" : "Privacy Policy"}
         </h1>
       </div>
 
-      <div className="space-y-5 text-sm text-muted-foreground leading-relaxed">
+      <div className="space-y-5 md:space-y-8 text-sm md:text-base text-muted-foreground leading-relaxed md:leading-loose">
         <p className="text-xs text-muted-foreground">
           {lang === "zh" ? "最後更新日期：2026 年 6 月" : "Last updated: June 2026"}
         </p>

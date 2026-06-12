@@ -40,7 +40,7 @@ import appIcon from "@/assets/app-icon.png";
 
 const FloatingChatButton = lazy(() => import("@/components/coach/FloatingChatButton"));
 const DashboardOverview = lazy(() => import("@/components/dashboard/DashboardOverview"));
-const DashboardActivities = lazy(() => import("@/components/dashboard/DashboardActivities"));
+
 const DashboardTraining = lazy(() => import("@/components/dashboard/DashboardTraining"));
 const DashboardRaces = lazy(() => import("@/components/dashboard/DashboardRaces"));
 const DashboardCommunity = lazy(() => import("@/components/dashboard/DashboardCommunity"));

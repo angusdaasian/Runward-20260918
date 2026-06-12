@@ -39,9 +39,17 @@ const RUNNING_TYPES = new Set([
   "Run", "TrailRun", "VirtualRun", "Treadmill", "Workout",
   "running", "trail_running", "treadmill_running", "RUNNING", "TRAIL_RUNNING",
 ]);
-function isRunning(t: unknown): boolean {
-  if (typeof t !== "string") return false;
-  return RUNNING_TYPES.has(t) || t.toLowerCase().includes("run");
+// Terra normalized numeric activity codes that represent running.
+// Observed: Garmin "Running" / "Track Running" → 8.
+const RUNNING_TYPE_CODES = new Set<number>([8]);
+function isRunning(t: unknown, name?: unknown): boolean {
+  if (typeof t === "number") {
+    if (RUNNING_TYPE_CODES.has(t)) return true;
+  } else if (typeof t === "string") {
+    if (RUNNING_TYPES.has(t) || t.toLowerCase().includes("run")) return true;
+  }
+  if (typeof name === "string" && /run|jog|trail|treadmill/i.test(name)) return true;
+  return false;
 }
 
 async function recalcUserXp(userId: string) {

@@ -192,9 +192,9 @@ export default function InjuryLoadCards({ lang }: Props) {
             : "bg-rose-500";
 
   return (
-    <div className="px-4 mb-4 grid grid-cols-1 gap-3">
+    <div className="mb-4">
       {/* Injury Risk */}
-      <div className="rounded-xl border border-border bg-card p-4">
+      <div className="rounded-xl border border-border bg-card p-4 mb-3">
         <Head label={zhT("Injury Risk", "受傷風險", lang)}>
           <span className="text-[11px] text-muted-foreground">{injury.score}/100</span>
         </Head>

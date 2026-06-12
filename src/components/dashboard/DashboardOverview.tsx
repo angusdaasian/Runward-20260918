@@ -17,11 +17,12 @@ import { useActivities, type StravaActivity } from "@/hooks/use-activities";
 import type { Lang } from "@/lib/i18n";
 import DashboardMonthlyChallenge from "./DashboardMonthlyChallenge";
 import DashboardActivityDetail from "./DashboardActivityDetail";
+import AllActivitiesSheet from "./AllActivitiesSheet";
 import { useSimpleMode } from "@/hooks/use-simple-mode";
 
 type Props = {
   lang: Lang;
-  onNavigate: (view: "activities" | "training" | "races" | "community" | "analytics") => void;
+  onNavigate: (view: "training" | "races" | "community" | "analytics") => void;
 };
 
 function fmtDistance(meters: number) {
@@ -45,6 +46,7 @@ export default function DashboardOverview({ lang, onNavigate }: Props) {
   const zh = lang === "zh";
   const { activities, plannedWorkouts, userRaces, profile } = useActivities();
   const [selectedActivity, setSelectedActivity] = useState<StravaActivity | null>(null);
+  const [showAllActivities, setShowAllActivities] = useState(false);
   const [simpleMode] = useSimpleMode();
 
   const stats = useMemo(() => {
@@ -140,7 +142,7 @@ export default function DashboardOverview({ lang, onNavigate }: Props) {
             <Dumbbell className="h-4 w-4 mr-1.5" />
             {zh ? "查看訓練" : "Training"}
           </Button>
-          <Button size="sm" onClick={() => onNavigate("activities")}>
+          <Button size="sm" onClick={() => setShowAllActivities(true)}>
             <ActivityIcon className="h-4 w-4 mr-1.5" />
             {zh ? "所有活動" : "All activities"}
           </Button>
@@ -176,7 +178,7 @@ export default function DashboardOverview({ lang, onNavigate }: Props) {
               <ActivityIcon className="h-4 w-4 text-primary" />
               {zh ? "最近活動" : "Recent activities"}
             </h3>
-            <Button variant="ghost" size="sm" onClick={() => onNavigate("activities")}>
+            <Button variant="ghost" size="sm" onClick={() => setShowAllActivities(true)}>
               {zh ? "查看全部" : "View all"}
               <ChevronRight className="h-4 w-4 ml-1" />
             </Button>
@@ -331,6 +333,17 @@ export default function DashboardOverview({ lang, onNavigate }: Props) {
         profileMaxHr={(profile as any)?.max_heartrate ?? null}
         profileRestingHr={(profile as any)?.resting_heartrate ?? null}
         profileCustomZones={(profile as any)?.custom_hr_zones ?? null}
+      />
+
+      <AllActivitiesSheet
+        open={showAllActivities}
+        onClose={() => setShowAllActivities(false)}
+        lang={lang}
+        activities={activities || []}
+        onSelect={(a) => {
+          setShowAllActivities(false);
+          setSelectedActivity(a);
+        }}
       />
     </div>
   );

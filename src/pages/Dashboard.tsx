@@ -40,7 +40,7 @@ import appIcon from "@/assets/app-icon.png";
 
 const FloatingChatButton = lazy(() => import("@/components/coach/FloatingChatButton"));
 const DashboardOverview = lazy(() => import("@/components/dashboard/DashboardOverview"));
-const DashboardActivities = lazy(() => import("@/components/dashboard/DashboardActivities"));
+
 const DashboardTraining = lazy(() => import("@/components/dashboard/DashboardTraining"));
 const DashboardRaces = lazy(() => import("@/components/dashboard/DashboardRaces"));
 const DashboardCommunity = lazy(() => import("@/components/dashboard/DashboardCommunity"));
@@ -52,7 +52,7 @@ const DashboardAuth = lazy(() => import("@/components/dashboard/DashboardAuth"))
 
 type View =
   | "overview"
-  | "activities"
+  
   | "training"
   | "races"
   | "community"
@@ -62,8 +62,7 @@ type View =
   | "settings";
 
 const VIEWS: { id: View; icon: typeof Activity; labelEn: string; labelZh: string }[] = [
-  { id: "overview", icon: LayoutDashboard, labelEn: "Overview", labelZh: "總覽" },
-  { id: "activities", icon: Activity, labelEn: "Activities", labelZh: "活動" },
+  { id: "overview", icon: Activity, labelEn: "Activity", labelZh: "活動" },
   { id: "training", icon: Dumbbell, labelEn: "Training", labelZh: "訓練" },
   { id: "races", icon: Trophy, labelEn: "Races", labelZh: "比賽" },
   { id: "community", icon: Award, labelEn: "Community", labelZh: "社群" },
@@ -288,7 +287,7 @@ const Dashboard = () => {
                 {view === "overview" && (
                   <DashboardOverview lang={lang} onNavigate={(v) => setView(v)} />
                 )}
-                {view === "activities" && <DashboardActivities lang={lang} />}
+                
                 {view === "training" && (
                   <DashboardTraining
                     lang={lang}

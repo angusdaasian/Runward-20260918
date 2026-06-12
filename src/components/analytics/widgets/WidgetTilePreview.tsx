@@ -43,14 +43,151 @@ function fmtSleep(s: number | null) {
 }
 
 const Tile = ({ id, lang, onOpen }: Props) => {
-  const { activities } = useActivities();
+  const { activities, profile } = useActivities();
   const { data: history } = useTerraDailyHealth();
   const { data: conns } = useTerraConnections();
   const { isPremium } = usePremium();
 
   const hrZonesLocked = !isPremium && id === "hr_zones";
 
+  // --- shared injury/load computations ---
+  const ageForLoad = (profile as any)?.age ?? null;
+  const loadActs = useMemo(
+    () =>
+      activities.map((a) => ({
+        start_date: a.start_date,
+        moving_time: a.moving_time,
+        average_heartrate: a.average_heartrate,
+        max_heartrate: a.max_heartrate,
+        sport_type: a.sport_type,
+        source: a.source,
+        garmin_training_load: (a as any).garmin_training_load ?? null,
+        distance: (a as any).distance ?? 0,
+      })),
+    [activities],
+  );
+  const series = useMemo(
+    () => buildWeeklyLoadSeries(loadActs as any, ageForLoad, 26),
+    [loadActs, ageForLoad],
+  );
+  const tsb = series[series.length - 1]?.form ?? 0;
 
+  const garminRows = useMemo(
+    () => (history ? selectProviderRows(history as any, "GARMIN") : []),
+    [history],
+  );
+  const readiness = useMemo(
+    () => (garminRows.length ? computeReadiness(garminRows) : null),
+    [garminRows],
+  );
+  const sleepDebt14 = useMemo(() => {
+    if (!garminRows.length) return null;
+    const last14 = garminRows.slice(-14).filter((r) => r.sleep_seconds && r.sleep_seconds > 0);
+    if (!last14.length) return null;
+    const target = 8 * 3600;
+    const debt = last14.reduce((s, r) => s + Math.max(0, target - (r.sleep_seconds || 0)), 0);
+    return { hours: debt / 3600, nights: last14.length };
+  }, [garminRows]);
+
+  function startOfDay(d: Date) {
+    const x = new Date(d);
+    x.setHours(0, 0, 0, 0);
+    return x;
+  }
+
+  const loadStats = useMemo(() => {
+    const today = startOfDay(new Date());
+    const dayLoads: number[] = new Array(28).fill(0);
+    for (const a of loadActs) {
+      if (!isCardio(a.sport_type)) continue;
+      const d = startOfDay(new Date(a.start_date));
+      const offset = Math.round((today.getTime() - d.getTime()) / 86400000);
+      if (offset < 0 || offset >= 28) continue;
+      const idx = 27 - offset;
+      const l = loadForActivity(a as any, ageForLoad) || 0;
+      dayLoads[idx] += l;
+    }
+    const last7Loads = dayLoads.slice(-7);
+    const acute = last7Loads.reduce((s, v) => s + v, 0);
+    const chronic28 = dayLoads.reduce((s, v) => s + v, 0);
+    const acwr = chronic28 > 0 ? acute / (chronic28 / 4) : 0;
+    const m = acute / 7;
+    const sd = Math.sqrt(last7Loads.reduce((s, v) => s + (v - m) ** 2, 0) / 7) || 0.0001;
+    const monotony = m / sd;
+    const strain = acute * monotony;
+    return {
+      acwr: Number.isFinite(acwr) ? acwr : 0,
+      monotony: Number.isFinite(monotony) ? monotony : 0,
+      strain: Number.isFinite(strain) ? strain : 0,
+      acute,
+    };
+  }, [loadActs, ageForLoad]);
+
+  const injury = useMemo(() => {
+    let score = 0;
+    const drivers: { en: string; zh: string; weight: number }[] = [];
+    if (loadStats.acwr > 1.5) {
+      const w = Math.min(35, (loadStats.acwr - 1.5) * 60);
+      score += w;
+      drivers.push({ en: "ACWR spike", zh: "急性負荷過高", weight: w });
+    } else if (loadStats.acwr > 0 && loadStats.acwr < 0.5 && loadStats.acute > 0) {
+      score += 15;
+      drivers.push({ en: "Detraining", zh: "訓練不足", weight: 15 });
+    }
+    if (loadStats.monotony > 2) {
+      const w = Math.min(20, (loadStats.monotony - 2) * 20);
+      score += w;
+      drivers.push({ en: "High monotony", zh: "訓練單一", weight: w });
+    }
+    if (sleepDebt14 && sleepDebt14.hours > 4) {
+      const w = Math.min(25, (sleepDebt14.hours - 4) * 3);
+      score += w;
+      drivers.push({ en: "Sleep debt severe", zh: "睡眠不足嚴重", weight: w });
+    }
+    if (tsb < -20) {
+      const w = Math.min(20, (-20 - tsb) * 1.2);
+      score += w;
+      drivers.push({ en: "Deep fatigue (TSB)", zh: "深度疲勞", weight: w });
+    }
+    if (readiness && readiness.score < 35) {
+      score += 15;
+      drivers.push({ en: "Low readiness", zh: "準備度低", weight: 15 });
+    }
+    score = Math.max(0, Math.min(100, Math.round(score)));
+    drivers.sort((a, b) => b.weight - a.weight);
+    return { score, drivers };
+  }, [loadStats, sleepDebt14, tsb, readiness]);
+
+  const injuryBand =
+    injury.score < 25
+      ? { label: zh(lang) ? "低" : "Low", color: "text-emerald-600" }
+      : injury.score < 50
+        ? { label: zh(lang) ? "中等" : "Moderate", color: "text-amber-500" }
+        : injury.score < 75
+          ? { label: zh(lang) ? "偏高" : "Elevated", color: "text-orange-500" }
+          : { label: zh(lang) ? "高" : "High", color: "text-rose-600" };
+
+  const acwrLabel =
+    loadStats.acwr === 0
+      ? zh(lang) ? "無資料" : "No data"
+      : loadStats.acwr < 0.8
+        ? zh(lang) ? "訓練不足" : "Undertrained"
+        : loadStats.acwr <= 1.3
+          ? zh(lang) ? "最佳" : "Optimal"
+          : loadStats.acwr <= 1.5
+            ? zh(lang) ? "注意" : "Caution"
+            : zh(lang) ? "高風險" : "High risk";
+
+  const acwrDot =
+    loadStats.acwr === 0
+      ? "bg-muted-foreground"
+      : loadStats.acwr < 0.8
+        ? "bg-sky-500"
+        : loadStats.acwr <= 1.3
+          ? "bg-emerald-500"
+          : loadStats.acwr <= 1.5
+            ? "bg-amber-500"
+            : "bg-rose-500";
 
   // Pick newest non-null helper
   const latestOf = <K extends keyof NonNullable<typeof history>[number]>(key: K) =>

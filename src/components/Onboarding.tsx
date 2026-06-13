@@ -276,11 +276,9 @@ const Onboarding = ({
   const { launchPaywall, redeemOfferCode } = useDespiaPurchases();
   const [step, setStep] = useState<OnboardingStep>(() => {
     if (sessionStorage.getItem(ONBOARDING_SIGNUP_IN_PROGRESS_KEY) === "true") return 11;
-    // Only honor the persisted plan-prompt flag if we actually have an authed
-    // user. Otherwise (e.g. user bailed mid Apple/Google OAuth and reopened
-    // the app) we'd show the plan prompt to a null-user, who then taps
-    // through and lands inside the app with no auth and no guest mode.
-    if (localStorage.getItem("onboarding_show_plan_prompt") === "true" && user?.id) return 10;
+    // Legacy plan-prompt flag is intentionally ignored — onboarding now
+    // finishes straight into the app and the AI-plan paywall is triggered
+    // on-demand from ProgramsTab.
     return 0;
   });
   const [isSignInMode, setIsSignInMode] = useState(false);
@@ -410,13 +408,16 @@ const Onboarding = ({
     }
   }, [user?.id]);
 
-  // When account creation finishes and user is available, advance to step 10
+  // When account creation finishes and user is available, finalize and exit.
+  // Previously this routed to step 10 (plan-prompt paywall). The paywall is
+  // now triggered on-demand when the user opens the AI plan, so onboarding
+  // drops them straight into the activities tab.
   useEffect(() => {
     if (!user || step !== 11 || !isAccountCreationInFlight) return;
 
     let cancelled = false;
 
-    const advanceToPlanPrompt = async () => {
+    const finishAccountCreation = async () => {
       try {
         await new Promise((r) => setTimeout(r, 500));
         if (cancelled) return;
@@ -426,11 +427,14 @@ const Onboarding = ({
           age: age ? parseInt(age) : null,
           sex: sex || null,
           runs_per_week: runsPerWeek,
-          onboarding_completed: false,
+          onboarding_completed: true,
         }).eq("user_id", user.id);
 
         if (!cancelled) {
-          setStep(10);
+          setSignupInProgress(false);
+          localStorage.removeItem("onboarding_show_plan_prompt");
+          localStorage.removeItem("pending_onboarding_data");
+          onComplete();
         }
       } finally {
         if (!cancelled) {
@@ -440,12 +444,12 @@ const Onboarding = ({
       }
     };
 
-    void advanceToPlanPrompt();
+    void finishAccountCreation();
 
     return () => {
       cancelled = true;
     };
-  }, [user, step, isAccountCreationInFlight, displayName, age, sex, runsPerWeek]);
+  }, [user, step, isAccountCreationInFlight, displayName, age, sex, runsPerWeek, onComplete]);
 
   useEffect(() => {
     if (user && !isSignInMode) {
@@ -461,20 +465,15 @@ const Onboarding = ({
 
       // Returning from an OAuth (Apple/Google) signup: pending_onboarding_data
       // was stashed before the redirect. Now that we have a real authed user,
-      // hydrate the profile and show the plan prompt (step 10).
-      // IMPORTANT: this must run even when `onboardingUserId` is already set
-      // (which happens immediately on mount because we seed it from `user.id`).
-      // Previously the early-return on `onboardingUserId` skipped this whole
-      // block, leaving the OAuth-returning user stranded on step 0 and forcing
-      // them through the questionnaire again.
+      // hydrate the profile and drop them into the activities tab — no
+      // plan-prompt paywall during onboarding anymore.
       const pendingData = localStorage.getItem("pending_onboarding_data");
       if (pendingData) {
         try {
           const parsed = JSON.parse(pendingData);
           localStorage.removeItem("pending_onboarding_data");
-          localStorage.setItem("onboarding_show_plan_prompt", "true");
+          localStorage.removeItem("onboarding_show_plan_prompt");
           setOnboardingUserId(user.id);
-          setStep(10);
           (async () => {
             await new Promise((r) => setTimeout(r, 500));
             await supabase.from("profiles").update({
@@ -482,8 +481,9 @@ const Onboarding = ({
               age: parsed.age ? parseInt(parsed.age) : null,
               sex: parsed.sex || null,
               runs_per_week: parsed.runsPerWeek,
-              onboarding_completed: false,
+              onboarding_completed: true,
             }).eq("user_id", user.id);
+            onComplete();
           })();
           return;
         } catch {
@@ -491,12 +491,10 @@ const Onboarding = ({
         }
       }
 
-      // Plan-prompt flag is already set (e.g. user reloaded mid-step-10) AND
-      // we have a real user → safe to resume on step 10.
+      // Stale plan-prompt flag from a previous app version — clear it and
+      // continue (the profile-completion check below decides where to go).
       if (localStorage.getItem("onboarding_show_plan_prompt") === "true") {
-        setOnboardingUserId(user.id);
-        setStep(10);
-        return;
+        localStorage.removeItem("onboarding_show_plan_prompt");
       }
 
       // From here on, only the "first time we see this user mid-flow" branch
@@ -516,17 +514,20 @@ const Onboarding = ({
               return;
             }
             // Fresh OAuth signup (Apple/Google direct from welcome screen):
-            // profile exists but has no onboarding fields filled → skip the
-            // questionnaire and route straight to the plan prompt (step 10).
+            // profile exists but has no onboarding fields filled → mark as
+            // complete and drop them into the activities tab.
             const isFreshOAuthUser =
               !data?.display_name &&
               data?.age == null &&
               !data?.sex &&
               data?.runs_per_week == null;
             if (isFreshOAuthUser) {
-              localStorage.setItem("onboarding_show_plan_prompt", "true");
               setOnboardingUserId(user.id);
-              setStep(10);
+              supabase
+                .from("profiles")
+                .update({ onboarding_completed: true })
+                .eq("user_id", user.id)
+                .then(() => onComplete());
               return;
             }
             setStep(1);
@@ -629,7 +630,6 @@ const Onboarding = ({
     // and proceed straight to finalizing the account on step 11.
     if (authData.user) {
       setOnboardingUserId(authData.user.id);
-      localStorage.setItem("onboarding_show_plan_prompt", "true");
       saveOnboardingDataToStorage();
     }
   };

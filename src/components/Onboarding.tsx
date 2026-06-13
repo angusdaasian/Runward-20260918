@@ -630,7 +630,6 @@ const Onboarding = ({
     // and proceed straight to finalizing the account on step 11.
     if (authData.user) {
       setOnboardingUserId(authData.user.id);
-      localStorage.setItem("onboarding_show_plan_prompt", "true");
       saveOnboardingDataToStorage();
     }
   };

@@ -219,6 +219,62 @@ const ConnectApps = ({ lang, onBack }: Props) => {
     }
   };
 
+  const [intervalsBusy, setIntervalsBusy] = useState<string | null>(null);
+
+  const handleConnectIntervals = async () => {
+    if (!user) return;
+    setIntervalsBusy("connect");
+    try {
+      const native = isDespiaUA();
+      const redirect_uri = `${window.location.origin}/intervals-callback`;
+      localStorage.setItem("fitness_pending_origin", "connect-apps");
+      const { data, error } = await supabase.functions.invoke("intervals-auth", {
+        body: { redirect_uri },
+      });
+      if (error || !(data as any)?.url) {
+        throw new Error((data as any)?.error || error?.message || "Auth init failed");
+      }
+      if (native) {
+        despia(`oauth://?url=${encodeURIComponent((data as any).url as string)}`);
+        setIntervalsBusy(null);
+      } else {
+        window.location.href = (data as any).url as string;
+      }
+    } catch (e: unknown) {
+      toast.error((lang === "zh" ? "intervals.icu 啟動失敗: " : "Failed to start intervals.icu: ") + errorMessage(e));
+      setIntervalsBusy(null);
+    }
+  };
+
+  const handleDisconnectIntervals = async () => {
+    setIntervalsBusy("disconnect");
+    try {
+      const { error } = await supabase.functions.invoke("intervals-disconnect");
+      if (error) throw error;
+      setIntervalsConnected(false);
+      toast.success(lang === "zh" ? "已中斷 intervals.icu 連結" : "intervals.icu disconnected");
+    } catch (e: unknown) {
+      toast.error((lang === "zh" ? "中斷失敗: " : "Disconnect failed: ") + errorMessage(e));
+    } finally {
+      setIntervalsBusy(null);
+    }
+  };
+
+  const handleSyncIntervals = async () => {
+    setIntervalsBusy("sync");
+    try {
+      const { data, error } = await supabase.functions.invoke("intervals-sync", { body: { limit: 50 } });
+      if (error) throw error;
+      toast.success(lang === "zh" ? `已同步 ${data?.count ?? 0} 個活動` : `Synced ${data?.count ?? 0} activities`);
+    } catch (e: unknown) {
+      toast.error((lang === "zh" ? "同步失敗: " : "Sync failed: ") + errorMessage(e));
+    } finally {
+      setIntervalsBusy(null);
+    }
+  };
+
+
+
 
   const handleConnectGarmin = () => {
     if (hasFitnessApp) {

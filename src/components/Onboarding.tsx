@@ -276,11 +276,9 @@ const Onboarding = ({
   const { launchPaywall, redeemOfferCode } = useDespiaPurchases();
   const [step, setStep] = useState<OnboardingStep>(() => {
     if (sessionStorage.getItem(ONBOARDING_SIGNUP_IN_PROGRESS_KEY) === "true") return 11;
-    // Only honor the persisted plan-prompt flag if we actually have an authed
-    // user. Otherwise (e.g. user bailed mid Apple/Google OAuth and reopened
-    // the app) we'd show the plan prompt to a null-user, who then taps
-    // through and lands inside the app with no auth and no guest mode.
-    if (localStorage.getItem("onboarding_show_plan_prompt") === "true" && user?.id) return 10;
+    // Legacy plan-prompt flag is intentionally ignored — onboarding now
+    // finishes straight into the app and the AI-plan paywall is triggered
+    // on-demand from ProgramsTab.
     return 0;
   });
   const [isSignInMode, setIsSignInMode] = useState(false);

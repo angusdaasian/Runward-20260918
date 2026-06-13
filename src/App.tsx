@@ -25,6 +25,7 @@ const PolarReturn = lazy(() => import("./pages/PolarReturn.tsx"));
 const Dashboard = lazy(() => import("./pages/Dashboard.tsx"));
 const AuthCallback = lazy(() => import("./pages/AuthCallback.tsx"));
 const StravaCallback = lazy(() => import("./pages/StravaCallback.tsx"));
+const IntervalsCallback = lazy(() => import("./pages/IntervalsCallback.tsx"));
 const Compare = lazy(() => import("./pages/Compare.tsx"));
 
 const queryClient = new QueryClient();
@@ -82,6 +83,7 @@ const App = () => (
                 <Route path="/compare" element={<Compare />} />
                 <Route path="/auth" element={<AuthCallback />} />
                 <Route path="/auth/callback" element={<StravaCallback />} />
+                <Route path="/intervals-callback" element={<IntervalsCallback />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </Suspense>

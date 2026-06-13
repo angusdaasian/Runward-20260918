@@ -109,6 +109,3 @@ verify_jwt = false
 
 [functions.admin-trigger-activity-prompt]
 verify_jwt = false
-
-[functions.rc-alias-admin]
-verify_jwt = false

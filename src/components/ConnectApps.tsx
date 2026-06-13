@@ -763,7 +763,55 @@ const ConnectApps = ({ lang, onBack }: Props) => {
           );
         })()}
 
+        {/* intervals.icu */}
+        <div className="bg-card border border-border rounded-xl p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                <span className="text-lg font-bold text-blue-500">i</span>
+              </div>
+              <div>
+                <span className="font-medium text-foreground block">intervals.icu</span>
+                <span className="text-xs text-muted-foreground">
+                  {lang === "zh"
+                    ? "同步 intervals.icu 上的活動、健康及訓練負荷數據"
+                    : "Sync activities, wellness & training load from intervals.icu"}
+                </span>
+              </div>
+            </div>
+            {intervalsConnected ? (
+              <div className="flex items-center gap-2">
+                {intervalsBusy && <RefreshCw size={14} className="animate-spin text-muted-foreground" />}
+                <Check size={16} className="text-green-500" />
+                <button
+                  onClick={handleSyncIntervals}
+                  disabled={!!intervalsBusy}
+                  className="text-xs text-muted-foreground hover:underline disabled:opacity-50"
+                >
+                  {lang === "zh" ? "同步" : "Sync"}
+                </button>
+                <button
+                  onClick={handleDisconnectIntervals}
+                  disabled={!!intervalsBusy}
+                  className="text-xs text-destructive hover:underline disabled:opacity-50"
+                >
+                  {lang === "zh" ? "中斷" : "Disconnect"}
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={handleConnectIntervals}
+                disabled={!!intervalsBusy}
+                className="text-xs font-medium px-3 py-1 rounded-full text-primary-foreground bg-primary disabled:opacity-50"
+              >
+                {intervalsBusy === "connect" ? "..." : (lang === "zh" ? "連結" : "Connect")}
+              </button>
+            )}
+          </div>
+        </div>
+
       </div>
+
 
       <GarminCredentialDialog
         open={garminDialogOpen}

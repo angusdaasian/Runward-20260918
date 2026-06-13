@@ -1,44 +1,34 @@
+## Situation
 
-## Goal
-Add a comparison subpage to the marketing site showing **Runward vs Garmin Connect** and **Runward vs Strava**, covering pricing and feature coverage. Bilingual (zh/en) matching the existing Landing page.
+- RevenueCat customer `bb9d6ce3-989e-46a6-b6c1-1fea08c1b87f` renewed `com.despia.runward.monthly` (FATHER DAY 2026 offer) at 2026-06-13 03:00 UTC.
+- Webhook hit the `no_matching_user` branch — no DB write — because that UUID is not in `auth.users`, `profiles`, or `premium_subscriptions`.
+- RC history shows the customer was first seen 2026-05-02 02:16 UTC as an anonymous user (`$RCAnonymousID:49083048dd094bfca4c72b559e...`), then aliased to `bb9d6ce3-…` at 02:20 UTC when the trial started. No further aliases.
+- None of the 6 Supabase users created between 02:10 and 02:30 UTC on 2026-05-02 match that UUID.
 
-## Route & navigation
-- New route `/compare` in `src/App.tsx` (lazy-loaded).
-- Add a "Compare" / "比較" link in the Landing nav (next to Pricing) and a CTA button at the bottom of the Pricing section.
-- Page reuses the same nav + footer styling as `Landing.tsx`, reads `localStorage.app_lang` for language.
+The aliased UUID was almost certainly generated client-side at trial time, before/without a Supabase auth session, and the user never completed signup under that id (or the row was hard-deleted).
 
-## Page structure (`src/pages/Compare.tsx`)
-1. **Hero** — "How Runward compares" with subhead, language toggle, back-to-home link.
-2. **Tabs / anchor switcher** — `vs Garmin Connect` | `vs Strava` (two side-by-side sections; on mobile they stack).
-3. **Price comparison block** per competitor — 3 cards: Runward / Competitor Free / Competitor Premium with monthly price, billing cadence, and a one-line summary.
-4. **Feature comparison table** per competitor — categories on the left, three columns (Runward, Competitor Free, Competitor Premium) with ✓ / ✗ / short note. Built from a typed data file so it's easy to maintain.
-5. **Bottom CTA** — "Try Runward free" → App Store + Dashboard buttons (same components used on Landing).
+## Plan
 
-## Feature rows to compare
-Activity sync (Garmin/Suunto/Coros/Polar/Strava/Apple Health) · GPS recording · Training load/HRV · Race predictor · **AI running coach (24/7)** · **AI activity analysis** · **AI personalized plans** · **Posture analysis (video)** · Social feed/leaderboards · Live segments · Heatmaps · Route planner · Web dashboard · Price.
+We can't recover the linkage from our side alone. To grant premium correctly we need a second identifier from RC. Two paths:
 
-The data emphasizes Runward's AI + posture + multi-watch sync at a lower price than Strava Premium and the AI features Garmin Connect lacks.
+### Path A — Get the customer's email from RC (preferred)
 
-### Pricing facts to display (verifiable, dated "as of 2026-06")
-- Runward Premium: HK$48/mo, HK$488/yr.
-- Garmin Connect: Free (with Garmin device); Garmin Connect+ ≈ US$6.99/mo or US$69.99/yr.
-- Strava: Free; Strava Premium ≈ US$11.99/mo or US$79.99/yr (varies by region).
-A small footnote notes prices may vary by region and links to each provider's pricing page.
+1. In the RC customer page, scroll to **Attributes** and copy `$email` (or `$displayName`/`$appleSubscriberId`).
+2. Look that email up in `auth.users` → get the real `user_id`.
+3. Either:
+   - Call RC `POST /v1/subscribers/{real_user_id}/alias` with `bb9d6ce3-…` as the alias body, then re-trigger the renewal webhook (RC dashboard → "Resend webhook"), or
+   - Run a one-off SQL insert into `premium_subscriptions` for the real `user_id` with `plan='com.despia.runward.monthly'`, `expires_at` = RC's `expires_date` (~2026-07-13 03:00 UTC), `rc_entitlement='premium'`, then set `profiles.is_premium=true`. Simpler, no webhook replay needed.
 
-## Files
-- **Create** `src/pages/Compare.tsx` — page component (~300 lines, same patterns as `Landing.tsx`).
-- **Create** `src/data/comparison.ts` — typed arrays of `{ label_en, label_zh, runward, competitor_free, competitor_premium }` for Garmin and Strava.
-- **Edit** `src/App.tsx` — add `<Route path="/compare" element={<Compare />} />` lazy import.
-- **Edit** `src/pages/Landing.tsx` — add nav link + Pricing-section CTA pointing to `/compare`.
+### Path B — If RC has no email attribute
 
-## SEO
-- `<title>` "Runward vs Garmin Connect vs Strava — Compare Features & Pricing"
-- Meta description ≈150 chars
-- Single H1, semantic sections, canonical `/compare`.
+The user paid Apple but never linked an account in Runward. There is no Supabase user to grant premium to. Options:
+1. Wait for them to email support → then apply Path A.
+2. Do nothing — Apple still bills them; if they log in later, the app's `Purchases.logIn(user_id)` call will alias the new `user_id` onto this RC customer, and the next renewal webhook (or `check-revenuecat-status` call) will grant premium automatically.
 
-## Out of scope (ask if you want)
-- Per-competitor dedicated URLs (`/compare/garmin`, `/compare/strava`).
-- Coros / Suunto / Polar comparisons.
-- Auto-fetching competitor pricing — kept as a static data file you can edit.
+### Optional hardening (separate follow-up, not for this ticket)
 
-Confirm and I'll build it.
+The `revenuecat-webhook` could log every `no_matching_user` event to a `rc_orphan_events` table (RC `app_user_id`, event type, product, original transaction id, timestamp). That would let us audit how often this happens and proactively reach out when emails appear.
+
+## What I need from you to proceed
+
+Open the RC customer page for `bb9d6ce3-989e-46a6-b6c1-1fea08c1b87f`, scroll to the **Attributes** section (below "App User IDs"), and paste the `$email` value here. Then I'll run Path A.

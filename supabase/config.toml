@@ -109,3 +109,20 @@ verify_jwt = false
 
 [functions.admin-trigger-activity-prompt]
 verify_jwt = false
+
+[functions.intervals-auth]
+verify_jwt = false
+
+[functions.intervals-callback]
+verify_jwt = false
+
+[functions.intervals-disconnect]
+verify_jwt = false
+
+[functions.intervals-sync]
+verify_jwt = false
+
+[functions.intervals-webhook]
+verify_jwt = false
+
+

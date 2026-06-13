@@ -50,6 +50,7 @@ const ConnectApps = ({ lang, onBack }: Props) => {
   const [appleHealthConnected, setAppleHealthConnected] = useState(false);
   const [garminConnected, setGarminConnected] = useState(false);
   const [suuntoConnected, setSuuntoConnected] = useState(false);
+  const [intervalsConnected, setIntervalsConnected] = useState(false);
   const [stravaFull, setStravaFull] = useState(false);
   const [loading, setLoading] = useState(true);
   const appleHealth = useAppleHealth(lang);
@@ -62,16 +63,18 @@ const ConnectApps = ({ lang, onBack }: Props) => {
 
   const checkConnections = useCallback(async () => {
     if (!user) { setLoading(false); return; }
-    const [stravaRes, ahRes, garminRes, suuntoRes] = await Promise.all([
+    const [stravaRes, ahRes, garminRes, suuntoRes, intervalsRes] = await Promise.all([
       supabase.from("strava_connections").select("id").eq("user_id", user.id).maybeSingle(),
       supabase.from("apple_health_connections").select("id").eq("user_id", user.id).maybeSingle(),
       supabase.from("garmin_connections").select("id").eq("user_id", user.id).maybeSingle(),
       supabase.from("suunto_connections").select("id").eq("user_id", user.id).maybeSingle(),
+      supabase.from("intervals_connections").select("id").eq("user_id", user.id).maybeSingle(),
     ]);
     setStravaConnected(!!stravaRes.data);
     setAppleHealthConnected(!!ahRes.data);
     setGarminConnected(!!garminRes.data);
     setSuuntoConnected(!!suuntoRes.data);
+    setIntervalsConnected(!!intervalsRes.data);
     setLoading(false);
   }, [user]);
 
@@ -215,6 +218,62 @@ const ConnectApps = ({ lang, onBack }: Props) => {
       setSuuntoBusy(null);
     }
   };
+
+  const [intervalsBusy, setIntervalsBusy] = useState<string | null>(null);
+
+  const handleConnectIntervals = async () => {
+    if (!user) return;
+    setIntervalsBusy("connect");
+    try {
+      const native = isDespiaUA();
+      const redirect_uri = `${window.location.origin}/intervals-callback`;
+      localStorage.setItem("fitness_pending_origin", "connect-apps");
+      const { data, error } = await supabase.functions.invoke("intervals-auth", {
+        body: { redirect_uri },
+      });
+      if (error || !(data as any)?.url) {
+        throw new Error((data as any)?.error || error?.message || "Auth init failed");
+      }
+      if (native) {
+        despia(`oauth://?url=${encodeURIComponent((data as any).url as string)}`);
+        setIntervalsBusy(null);
+      } else {
+        window.location.href = (data as any).url as string;
+      }
+    } catch (e: unknown) {
+      toast.error((lang === "zh" ? "intervals.icu 啟動失敗: " : "Failed to start intervals.icu: ") + errorMessage(e));
+      setIntervalsBusy(null);
+    }
+  };
+
+  const handleDisconnectIntervals = async () => {
+    setIntervalsBusy("disconnect");
+    try {
+      const { error } = await supabase.functions.invoke("intervals-disconnect");
+      if (error) throw error;
+      setIntervalsConnected(false);
+      toast.success(lang === "zh" ? "已中斷 intervals.icu 連結" : "intervals.icu disconnected");
+    } catch (e: unknown) {
+      toast.error((lang === "zh" ? "中斷失敗: " : "Disconnect failed: ") + errorMessage(e));
+    } finally {
+      setIntervalsBusy(null);
+    }
+  };
+
+  const handleSyncIntervals = async () => {
+    setIntervalsBusy("sync");
+    try {
+      const { data, error } = await supabase.functions.invoke("intervals-sync", { body: { limit: 50 } });
+      if (error) throw error;
+      toast.success(lang === "zh" ? `已同步 ${data?.count ?? 0} 個活動` : `Synced ${data?.count ?? 0} activities`);
+    } catch (e: unknown) {
+      toast.error((lang === "zh" ? "同步失敗: " : "Sync failed: ") + errorMessage(e));
+    } finally {
+      setIntervalsBusy(null);
+    }
+  };
+
+
 
 
   const handleConnectGarmin = () => {
@@ -704,7 +763,55 @@ const ConnectApps = ({ lang, onBack }: Props) => {
           );
         })()}
 
+        {/* intervals.icu */}
+        <div className="bg-card border border-border rounded-xl p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                <span className="text-lg font-bold text-blue-500">i</span>
+              </div>
+              <div>
+                <span className="font-medium text-foreground block">intervals.icu</span>
+                <span className="text-xs text-muted-foreground">
+                  {lang === "zh"
+                    ? "同步 intervals.icu 上的活動、健康及訓練負荷數據"
+                    : "Sync activities, wellness & training load from intervals.icu"}
+                </span>
+              </div>
+            </div>
+            {intervalsConnected ? (
+              <div className="flex items-center gap-2">
+                {intervalsBusy && <RefreshCw size={14} className="animate-spin text-muted-foreground" />}
+                <Check size={16} className="text-green-500" />
+                <button
+                  onClick={handleSyncIntervals}
+                  disabled={!!intervalsBusy}
+                  className="text-xs text-muted-foreground hover:underline disabled:opacity-50"
+                >
+                  {lang === "zh" ? "同步" : "Sync"}
+                </button>
+                <button
+                  onClick={handleDisconnectIntervals}
+                  disabled={!!intervalsBusy}
+                  className="text-xs text-destructive hover:underline disabled:opacity-50"
+                >
+                  {lang === "zh" ? "中斷" : "Disconnect"}
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={handleConnectIntervals}
+                disabled={!!intervalsBusy}
+                className="text-xs font-medium px-3 py-1 rounded-full text-primary-foreground bg-primary disabled:opacity-50"
+              >
+                {intervalsBusy === "connect" ? "..." : (lang === "zh" ? "連結" : "Connect")}
+              </button>
+            )}
+          </div>
+        </div>
+
       </div>
+
 
       <GarminCredentialDialog
         open={garminDialogOpen}

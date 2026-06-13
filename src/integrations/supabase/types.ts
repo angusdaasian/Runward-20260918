@@ -557,6 +557,105 @@ export type Database = {
         }
         Relationships: []
       }
+      intervals_activities: {
+        Row: {
+          average_heartrate: number | null
+          average_speed: number | null
+          created_at: string
+          distance: number | null
+          elapsed_time: number | null
+          environment: string | null
+          id: string
+          intervals_id: string
+          max_heartrate: number | null
+          max_speed: number | null
+          moving_time: number | null
+          name: string | null
+          sport_type: string | null
+          start_date: string | null
+          summary_polyline: string | null
+          total_elevation_gain: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          average_heartrate?: number | null
+          average_speed?: number | null
+          created_at?: string
+          distance?: number | null
+          elapsed_time?: number | null
+          environment?: string | null
+          id?: string
+          intervals_id: string
+          max_heartrate?: number | null
+          max_speed?: number | null
+          moving_time?: number | null
+          name?: string | null
+          sport_type?: string | null
+          start_date?: string | null
+          summary_polyline?: string | null
+          total_elevation_gain?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          average_heartrate?: number | null
+          average_speed?: number | null
+          created_at?: string
+          distance?: number | null
+          elapsed_time?: number | null
+          environment?: string | null
+          id?: string
+          intervals_id?: string
+          max_heartrate?: number | null
+          max_speed?: number | null
+          moving_time?: number | null
+          name?: string | null
+          sport_type?: string | null
+          start_date?: string | null
+          summary_polyline?: string | null
+          total_elevation_gain?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      intervals_connections: {
+        Row: {
+          access_token: string
+          athlete_id: string
+          created_at: string
+          expires_at: number
+          id: string
+          refresh_token: string
+          scope: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          access_token: string
+          athlete_id: string
+          created_at?: string
+          expires_at: number
+          id?: string
+          refresh_token: string
+          scope?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          access_token?: string
+          athlete_id?: string
+          created_at?: string
+          expires_at?: number
+          id?: string
+          refresh_token?: string
+          scope?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       pending_races: {
         Row: {
           ai_verification_result: string | null

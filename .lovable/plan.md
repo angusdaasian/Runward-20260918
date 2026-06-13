@@ -1,34 +1,46 @@
-## Situation
+## Short answer
 
-- RevenueCat customer `bb9d6ce3-989e-46a6-b6c1-1fea08c1b87f` renewed `com.despia.runward.monthly` (FATHER DAY 2026 offer) at 2026-06-13 03:00 UTC.
-- Webhook hit the `no_matching_user` branch — no DB write — because that UUID is not in `auth.users`, `profiles`, or `premium_subscriptions`.
-- RC history shows the customer was first seen 2026-05-02 02:16 UTC as an anonymous user (`$RCAnonymousID:49083048dd094bfca4c72b559e...`), then aliased to `bb9d6ce3-…` at 02:20 UTC when the trial started. No further aliases.
-- None of the 6 Supabase users created between 02:10 and 02:30 UTC on 2026-05-02 match that UUID.
+**No — `check-revenuecat-status` will not revoke the manual grant**, even though RC doesn't know about martin1993's Supabase UID yet.
 
-The aliased UUID was almost certainly generated client-side at trial time, before/without a Supabase auth session, and the user never completed signup under that id (or the row was hard-deleted).
+That function calls `GET /v1/subscribers/{supabase_user_id}`. Since RC has no subscriber under `45e41f43-…`, it returns 404 → the function exits with `{isPremium:false, synced:false, reason:"not_in_rc"}` and **does not touch** `premium_subscriptions` or `profiles.is_premium`. Even on a non-404 "all expired" response, lines 185–214 explicitly preserve any still-valid local row.
 
-## Plan
+**But** — adding the email as an attribute in RC does **not** alias the IDs. RC won't link `bb9d6ce3-…` ↔ `45e41f43-…` from email alone. Consequences if we stop here:
 
-We can't recover the linkage from our side alone. To grant premium correctly we need a second identifier from RC. Two paths:
+- Manual grant works today ✅
+- Next renewal webhook (~30 days) still fires with `app_user_id=bb9d6ce3-…` → hits `no_matching_user` again → no auto-renewal in DB
+- `check-revenuecat-status` will never sync (RC 404 for his UID)
 
-### Path A — Get the customer's email from RC (preferred)
+## Plan: grant now + alias so it stays automatic
 
-1. In the RC customer page, scroll to **Attributes** and copy `$email` (or `$displayName`/`$appleSubscriberId`).
-2. Look that email up in `auth.users` → get the real `user_id`.
-3. Either:
-   - Call RC `POST /v1/subscribers/{real_user_id}/alias` with `bb9d6ce3-…` as the alias body, then re-trigger the renewal webhook (RC dashboard → "Resend webhook"), or
-   - Run a one-off SQL insert into `premium_subscriptions` for the real `user_id` with `plan='com.despia.runward.monthly'`, `expires_at` = RC's `expires_date` (~2026-07-13 03:00 UTC), `rc_entitlement='premium'`, then set `profiles.is_premium=true`. Simpler, no webhook replay needed.
+### 1. Insert the premium row (one-off)
+```sql
+INSERT INTO premium_subscriptions
+  (user_id, plan, activated_at, expires_at, is_trial, rc_entitlement)
+VALUES
+  ('45e41f43-8d04-410a-99bb-d76b76dad63c',
+   'com.despia.runward.monthly',
+   '2026-06-13 03:00:00+00',
+   '2026-06-27 03:00:00+00',   -- 14-day trial end
+   true, 'premium')
+ON CONFLICT (user_id) DO UPDATE SET ...;
 
-### Path B — If RC has no email attribute
+UPDATE profiles SET is_premium=true
+WHERE user_id='45e41f43-8d04-410a-99bb-d76b76dad63c';
+```
 
-The user paid Apple but never linked an account in Runward. There is no Supabase user to grant premium to. Options:
-1. Wait for them to email support → then apply Path A.
-2. Do nothing — Apple still bills them; if they log in later, the app's `Purchases.logIn(user_id)` call will alias the new `user_id` onto this RC customer, and the next renewal webhook (or `check-revenuecat-status` call) will grant premium automatically.
+### 2. Add a temporary admin edge function `rc-alias-admin`
+- Auth: `WEBHOOK_AUTH_KEY` header
+- Calls `POST https://api.revenuecat.com/v1/subscribers/bb9d6ce3-989e-46a6-b6c1-1fea08c1b87f/alias` with body `{ "new_app_user_id": "45e41f43-8d04-410a-99bb-d76b76dad63c" }`
+- Uses existing `REVENUECAT_SECRET_KEY` secret
 
-### Optional hardening (separate follow-up, not for this ticket)
+### 3. Call it once with curl
+Once aliased, RC will:
+- Send a `SUBSCRIBER_ALIAS` webhook (logged only)
+- Send all future `RENEWAL` / `EXPIRATION` webhooks with `app_user_id` = martin1993's UID → webhook will resolve and write to DB automatically
+- `check-revenuecat-status` from his device will start returning the live RC subscriber → sync works
 
-The `revenuecat-webhook` could log every `no_matching_user` event to a `rc_orphan_events` table (RC `app_user_id`, event type, product, original transaction id, timestamp). That would let us audit how often this happens and proactively reach out when emails appear.
+### 4. Optional cleanup
+Delete `rc-alias-admin` after we confirm the alias took, or keep it as an admin tool for future orphan customers.
 
-## What I need from you to proceed
-
-Open the RC customer page for `bb9d6ce3-989e-46a6-b6c1-1fea08c1b87f`, scroll to the **Attributes** section (below "App User IDs"), and paste the `$email` value here. Then I'll run Path A.
+### Why this works
+RC aliases are bidirectional — any one of them can be queried and gets the same subscriber object. So once `45e41f43-…` is aliased to `bb9d6ce3-…`, the existing webhook and status-check code resolve correctly without any code changes to those two functions.

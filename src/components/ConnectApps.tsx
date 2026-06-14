@@ -13,6 +13,7 @@ import { isDespiaUA } from "@/lib/despiaOAuth";
 import { useLocation } from "react-router-dom";
 
 import GarminCredentialDialog from "@/components/GarminCredentialDialog";
+import IntervalsIntroSheet from "@/components/IntervalsIntroSheet";
 import corosIcon from "@/assets/brands/coros.png";
 import polarIcon from "@/assets/brands/polar.png";
 import garminIcon from "@/assets/brands/garmin.png";
@@ -220,6 +221,7 @@ const ConnectApps = ({ lang, onBack }: Props) => {
   };
 
   const [intervalsBusy, setIntervalsBusy] = useState<string | null>(null);
+  const [intervalsIntroOpen, setIntervalsIntroOpen] = useState(false);
 
   const handleConnectIntervals = async () => {
     if (!user) return;
@@ -800,7 +802,7 @@ const ConnectApps = ({ lang, onBack }: Props) => {
               </div>
             ) : (
               <button
-                onClick={handleConnectIntervals}
+                onClick={() => setIntervalsIntroOpen(true)}
                 disabled={!!intervalsBusy}
                 className="text-xs font-medium px-3 py-1 rounded-full text-primary-foreground bg-primary disabled:opacity-50"
               >
@@ -808,7 +810,25 @@ const ConnectApps = ({ lang, onBack }: Props) => {
               </button>
             )}
           </div>
+          {!intervalsConnected && (
+            <button
+              onClick={() => setIntervalsIntroOpen(true)}
+              className="mt-2 text-xs text-primary hover:underline"
+            >
+              {lang === "zh" ? "什麼是 intervals.icu？" : "What is intervals.icu?"}
+            </button>
+          )}
         </div>
+        <IntervalsIntroSheet
+          open={intervalsIntroOpen}
+          onOpenChange={setIntervalsIntroOpen}
+          lang={lang}
+          busy={intervalsBusy === "connect"}
+          onContinue={async () => {
+            setIntervalsIntroOpen(false);
+            await handleConnectIntervals();
+          }}
+        />
 
       </div>
 

@@ -21,6 +21,7 @@ import suuntoIcon from "@/assets/brands/suunto.png";
 import zeppIcon from "@/assets/brands/zepp.png";
 import fitbitIcon from "@/assets/brands/fitbit.png";
 import stravaConnectBtn from "@/assets/brands/btn_strava_connect.svg.asset.json";
+import intervalsLogo from "@/assets/brands/intervals-icu.png.asset.json";
 
 interface Props {
   lang: Lang;

@@ -761,6 +761,13 @@ const ConnectApps = ({ lang, onBack }: Props) => {
                     : "Strava connection is hitting its limit. Please try other fitness apps while we request Strava to increase the limit."}
                 </p>
               )}
+              {!stravaConnected && (
+                <p className="text-xs text-muted-foreground mt-2">
+                  {lang === "zh"
+                    ? "若 Strava 連線額滿，可考慮 intervals.icu。"
+                    : "If Strava connection is full, consider intervals.icu."}
+                </p>
+              )}
             </div>
           );
         })()}
@@ -769,8 +776,8 @@ const ConnectApps = ({ lang, onBack }: Props) => {
         <div className="bg-card border border-border rounded-xl p-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
-                <span className="text-lg font-bold text-blue-500">i</span>
+              <div className="w-10 h-10 rounded-lg overflow-hidden flex items-center justify-center bg-background">
+                <img src={intervalsLogo.url} alt="intervals.icu" className="w-10 h-10 object-contain" />
               </div>
               <div>
                 <span className="font-medium text-foreground block">intervals.icu</span>

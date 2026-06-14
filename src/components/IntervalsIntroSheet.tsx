@@ -32,8 +32,7 @@ export default function IntervalsIntroSheet({ open, onOpenChange, onContinue, bu
             <SheetDescription className="text-base text-muted-foreground leading-relaxed">
               {zh ? (
                 <>
-                  我們會帶你前往 <strong className="text-foreground">intervals.icu</strong> — 一個免費鏡像你手錶數據的服務。支援
-                  {" "}<strong className="text-foreground">Garmin、COROS、Polar、Wahoo</strong> 等。
+                  我們會帶你前往 <strong className="text-foreground">intervals.icu</strong> — 一個免費連結你手錶數據的服務。
                 </>
               ) : (
                 <>

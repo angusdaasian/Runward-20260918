@@ -34,11 +34,18 @@ export function isCardio(sportType?: string): boolean {
 const runningTypes = new Set([
   "Run", "TrailRun", "VirtualRun", "Treadmill", "TrackRun",
   "running", "trail_running", "treadmill_running", "track_running", "virtual_running",
+  "Trail Run", "Trail Running", "trail run", "trail running",
 ]);
 
 export function isRunning(sportType?: string): boolean {
   if (!sportType) return false;
-  return runningTypes.has(sportType);
+  if (runningTypes.has(sportType)) return true;
+  // Defensive fallback: match any variant containing "run" or "trail"
+  // (covers Garmin/Coros/Suunto/Apple/Terra labels we may not have enumerated).
+  const s = sportType.toLowerCase();
+  if (s.includes("trail")) return true;
+  if (s.includes("run") && !s.includes("running_belt") && !s.includes("runway")) return true;
+  return false;
 }
 
 /**

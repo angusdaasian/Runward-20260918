@@ -6,6 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { isDespiaUA } from "@/lib/despiaOAuth";
 import { Lang } from "@/lib/i18n";
+import MessagingIntroSheet from "@/components/MessagingIntroSheet";
 
 const BOT_USERNAME = "runward_coach_bot";
 
@@ -23,6 +24,7 @@ export default function TelegramConnectCard({ lang }: { lang: Lang }) {
   const [linkedChatId, setLinkedChatId] = useState<number | null>(null);
   const [enabled, setEnabled] = useState(false);
   const [feedbackEnabled, setFeedbackEnabled] = useState(false);
+  const [introOpen, setIntroOpen] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -203,7 +205,7 @@ export default function TelegramConnectCard({ lang }: { lang: Lang }) {
               : "Connect to Telegram for daily AI workout suggestions and post-run feedback chats."}
           </p>
           <button
-            onClick={generateAndOpen}
+            onClick={() => setIntroOpen(true)}
             disabled={busy}
             className="text-sm font-medium text-primary hover:underline"
           >
@@ -211,6 +213,17 @@ export default function TelegramConnectCard({ lang }: { lang: Lang }) {
           </button>
         </>
       )}
+      <MessagingIntroSheet
+        open={introOpen}
+        onOpenChange={setIntroOpen}
+        busy={busy}
+        lang={lang}
+        variant="telegram"
+        onContinue={() => {
+          setIntroOpen(false);
+          generateAndOpen();
+        }}
+      />
     </div>
   );
 }

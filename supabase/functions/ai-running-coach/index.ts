@@ -581,7 +581,7 @@ serve(async (req) => {
 - Training intensity preference: ${prefs.training_intensity || "moderate"}`
       : "(no preferences set yet — gently ask onboarding questions across replies)";
 
-    const todayIso = new Date().toISOString().slice(0, 10);
+    const todayIso = today; // HKT today (YYYY-MM-DD)
     const racesData = (racesR.data || []) as any[];
     const upcomingRaces = racesData.filter((r) => r.race_date >= todayIso).slice(0, 8);
     const pastRaces = racesData.filter((r) => r.race_date < todayIso).slice(-8);

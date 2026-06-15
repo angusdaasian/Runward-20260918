@@ -1,5 +1,5 @@
 import { ArrowLeft, Crown, Sparkles, MessageCircle, Bot } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Lang } from "@/lib/i18n";
 import TelegramConnectCard from "@/components/TelegramConnectCard";
 import WhatsAppConnectCard from "@/components/WhatsAppConnectCard";
@@ -17,6 +17,31 @@ const MessagingSettingsPage = ({ lang, onBack }: Props) => {
   const isZh = lang === "zh";
   const { isPremium } = usePremium();
   const [showPlan, setShowPlan] = useState(false);
+
+  useEffect(() => {
+    const checkAndReload = () => {
+      const ts = sessionStorage.getItem("rw_messaging_connect");
+      if (ts) {
+        const elapsed = Date.now() - parseInt(ts, 10);
+        if (elapsed < 5 * 60 * 1000) {
+          sessionStorage.removeItem("rw_messaging_connect");
+          window.location.reload();
+        } else {
+          sessionStorage.removeItem("rw_messaging_connect");
+        }
+      }
+    };
+    window.addEventListener("focus", checkAndReload);
+    window.addEventListener("pageshow", checkAndReload);
+    document.addEventListener("visibilitychange", () => {
+      if (!document.hidden) checkAndReload();
+    });
+    checkAndReload();
+    return () => {
+      window.removeEventListener("focus", checkAndReload);
+      window.removeEventListener("pageshow", checkAndReload);
+    };
+  }, []);
 
   return (
     <div className="min-h-full">

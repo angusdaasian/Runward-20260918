@@ -200,7 +200,8 @@ function buildActivitySummary(rows: any[], units: string): string {
   return rows
     .slice(0, 10)
     .map((a) => {
-      const date = new Date(a.start_time || a.start_date).toISOString().slice(0, 10);
+      const hk = toHkDate(a.start_time || a.start_date);
+      const date = hk ? `${hk} (${hkWeekday(hk)}, ${hkRelativeLabel(hk)})` : "(unknown date)";
       const distRaw = a.distance_meters ?? (a.distance ? a.distance : 0);
       const dist = (distRaw * conv).toFixed(2);
       const dur = a.duration_seconds ?? a.moving_time ?? 0;

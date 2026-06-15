@@ -89,7 +89,8 @@ export default function Developers() {
       <header className="border-b border-border px-4 py-3 flex items-center gap-3">
         <Button variant="ghost" size="icon" onClick={() => navigate("/")}><ArrowLeft className="h-4 w-4" /></Button>
         <h1 className="text-lg font-semibold">Developer Portal</h1>
-        <div className="ml-auto">
+        <div className="ml-auto flex gap-2">
+          <Button variant="outline" onClick={() => navigate("/developers/docs")}>API docs</Button>
           <Button onClick={() => setCreateOpen(true)}><Plus className="h-4 w-4 mr-1" />New app</Button>
         </div>
       </header>

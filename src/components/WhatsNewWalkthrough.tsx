@@ -308,6 +308,15 @@ const WhatsNewWalkthrough = ({ lang, enabled, manualOpen, onManualOpenChange }: 
 
   const steps = [
     {
+      title: tx(lang, "Connect WhatsApp & Telegram", "連接 WhatsApp 與 Telegram"),
+      desc: tx(
+        lang,
+        "Bring RunWard into your favourite chat app. Get a daily AI workout suggestion each morning, share how a run felt to get instant coach feedback, or chat with your AI coach anytime — all inside WhatsApp or Telegram. Open it from More → Messaging Apps.",
+        "把 RunWard 帶進你常用的聊天工具。每天早上收到 AI 訓練建議、跑完即時分享感受獲得教練回饋，或隨時與 AI 教練對話 — 全部在 WhatsApp 或 Telegram 內完成。從「更多 → 通訊應用程式」開啟。"
+      ),
+      illustration: <MessagingIllustration lang={lang} />,
+    },
+    {
       title: tx(lang, "Meet Simple Mode", "認識簡易模式"),
       desc: tx(
         lang,
@@ -316,6 +325,7 @@ const WhatsNewWalkthrough = ({ lang, enabled, manualOpen, onManualOpenChange }: 
       ),
       illustration: <SimpleModeIllustration lang={lang} />,
     },
+
     {
       title: tx(lang, "New Widget Analytics", "全新小工具數據分析"),
       desc: tx(

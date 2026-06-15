@@ -172,6 +172,9 @@ const TERRA_ACTIVITY_TYPE_MAP: Record<string, string> = {
   "63": "Run",
   "64": "Run",
   "8.0": "Run",
+  "149": "TrailRun",  // trail running
+  "169": "TrailRun",
+  "210": "TrailRun",
   // Cycling
   "1": "Ride",       // outdoor cycling
   "18": "Ride",      // indoor cycling

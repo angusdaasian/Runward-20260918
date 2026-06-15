@@ -3,11 +3,12 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import {
   Sparkles, Menu, ArrowRight, ChevronRight, Settings2, Hand,
-  Activity, BarChart3, Heart, Moon, Type, Link2,
+  Activity, BarChart3, Heart, Moon, Type, Link2, MessageSquare, Send,
 } from "lucide-react";
 import { Lang } from "@/lib/i18n";
 
-const STORAGE_KEY = "walkthrough_v2026_06_simple_widgets_seen";
+const STORAGE_KEY = "walkthrough_v2026_06_messaging_apps_seen";
+
 
 interface Props {
   lang: Lang;

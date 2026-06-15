@@ -92,7 +92,7 @@ const MessagingSettingsPage = ({ lang, onBack }: Props) => {
               </div>
             </div>
 
-            <div className="relative overflow-hidden rounded-2xl border border-border bg-card">
+            <div className="overflow-hidden rounded-2xl border border-border bg-card">
               <img
                 src={teaserImg}
                 alt={isZh ? "WhatsApp 與 Telegram AI 教練預覽" : "Preview of AI coach on WhatsApp and Telegram"}
@@ -101,10 +101,10 @@ const MessagingSettingsPage = ({ lang, onBack }: Props) => {
                 height={960}
                 className="w-full h-auto block"
               />
-              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-background via-background/80 to-transparent p-4 pt-12">
+              <div className="p-4 bg-background">
                 <p className="text-xs text-center text-muted-foreground font-medium">
                   {isZh
-                    ? "✨ 預覽：解鎖後即可在 WhatsApp 與 Telegram 收到 AI 教練訊息"
+                    ? "✨ 預覽:解鎖後即可在 WhatsApp 與 Telegram 收到 AI 教練訊息"
                     : "✨ Preview: unlock to receive AI coach messages on WhatsApp & Telegram"}
                 </p>
               </div>

@@ -106,11 +106,36 @@ export const PremiumProvider = ({ children }: { children: ReactNode }) => {
       }
       return true;
     } else {
+      const wasPremium = isPremium;
       setIsPremium(false);
       setIsTrial(false);
       setExpiresAt(null);
       setPlan(null);
       setRcEntitlement(null);
+      if (wasPremium && user) {
+        // Premium lapsed: unsubscribe from Telegram & WhatsApp messaging
+        try {
+          await supabase
+            .from("profiles")
+            .update({
+              is_premium: false,
+              telegram_chat_id: null,
+              telegram_daily_workout: false,
+              telegram_activity_feedback: false,
+              telegram_link_code: null,
+              telegram_link_code_expires_at: null,
+              whatsapp_wa_id: null,
+              whatsapp_phone_e164: null,
+              whatsapp_daily_workout: false,
+              whatsapp_activity_feedback: false,
+              whatsapp_link_code: null,
+              whatsapp_link_code_expires_at: null,
+            } as any)
+            .eq("user_id", user.id);
+        } catch (err) {
+          console.warn("Failed to clear messaging subscriptions on premium loss:", err);
+        }
+      }
       return false;
     }
   }, [user, isPremium, notifyPurchaseListeners]);

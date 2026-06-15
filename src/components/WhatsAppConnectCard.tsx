@@ -6,6 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { isDespiaUA } from "@/lib/despiaOAuth";
 import { Lang } from "@/lib/i18n";
+import MessagingIntroSheet from "@/components/MessagingIntroSheet";
 
 function makeCode(): string {
   const bytes = new Uint8Array(8);

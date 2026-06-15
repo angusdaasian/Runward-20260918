@@ -23,16 +23,30 @@ export default function MessagingIntroSheet({ open, onOpenChange, onContinue, bu
   const brand = isWa ? "WhatsApp" : "Telegram";
   const image = isWa ? whatsappTutorial : telegramTutorial;
 
-  const step2Text = isWa
+  const domain = isWa ? "wa.me" : "t.me";
+  const step1Text = L(
+    `A system prompt "RunWard wants to use ${domain} to Sign In" appears. Tap Continue.`,
+    `系統會彈出「RunWard 想要使用 ${domain} 登入」，點擊 Continue。`,
+  );
+  const step1Bold = "Continue";
+
+  const step2Text = L(
+    `Then "Open in ${brand}?" appears. Tap Open.`,
+    `接著彈出「在 ${brand} 中打開？」，點擊 Open。`,
+  );
+  const step2Bold = "Open";
+
+  const step3Text = isWa
     ? L(
-        'A message "LNK xxxxxx" is pre-filled. Just tap Send.',
-        '訊息「LNK xxxxxx」已自動填好，只要按「傳送」即可。',
+        'A message "LINK xxxxxx" is pre-filled. Tap the green Send button to finish.',
+        '訊息「LINK xxxxxx」已自動填好，按綠色「傳送」按鈕完成連結。',
       )
     : L(
-        'Tap Start (or send /start) to the bot.',
-        '點擊「Start」（或傳送 /start）給機器人。',
+        '/start is sent automatically — you\'re linked instantly.',
+        '系統會自動傳送 /start，立即完成連結。',
       );
-  const step2Bold = isWa ? "Send" : "Start";
+  const step3Bold = isWa ? "Send" : undefined;
+
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -66,16 +80,11 @@ export default function MessagingIntroSheet({ open, onOpenChange, onContinue, bu
           </div>
 
           <div className="space-y-4 mb-5">
-            <Step n={1} text={L(
-              `${brand} will open with a chat to our bot.`,
-              `${brand} 會打開與機器人的對話。`,
-            )} />
+            <Step n={1} text={step1Text} bold={step1Bold} />
             <Step n={2} text={step2Text} bold={step2Bold} />
-            <Step n={3} text={L(
-              "Come back here — you're connected.",
-              "回到這裡 — 連結完成。",
-            )} />
+            <Step n={3} text={step3Text} bold={step3Bold} />
           </div>
+
 
           <p className="text-xs text-muted-foreground mb-4">
             {L(

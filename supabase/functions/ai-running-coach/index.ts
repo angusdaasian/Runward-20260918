@@ -36,6 +36,35 @@ function normalizeThinking(v: unknown): ThinkingLevel {
   return v === "low" || v === "medium" || v === "high" ? v : "minimal";
 }
 
+// ── Timezone helpers (Asia/Hong_Kong, UTC+8, no DST) ──
+const HKT_OFFSET_MS = 8 * 60 * 60 * 1000;
+function toHkDate(input: string | Date | null | undefined): string {
+  if (!input) return "";
+  const d = typeof input === "string" ? new Date(input) : input;
+  if (!(d instanceof Date) || isNaN(d.getTime())) return "";
+  return new Date(d.getTime() + HKT_OFFSET_MS).toISOString().slice(0, 10);
+}
+function hkToday(): string {
+  return toHkDate(new Date());
+}
+function hkWeekday(yyyyMmDd: string): string {
+  const [y, m, d] = yyyyMmDd.split("-").map(Number);
+  if (!y || !m || !d) return "";
+  const date = new Date(Date.UTC(y, m - 1, d));
+  return ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][date.getUTCDay()];
+}
+function hkRelativeLabel(yyyyMmDd: string, todayStr = hkToday()): string {
+  if (!yyyyMmDd) return "";
+  const a = new Date(`${yyyyMmDd}T00:00:00Z`).getTime();
+  const b = new Date(`${todayStr}T00:00:00Z`).getTime();
+  const diff = Math.round((a - b) / 86400000);
+  if (diff === 0) return "today";
+  if (diff === -1) return "yesterday";
+  if (diff === 1) return "tomorrow";
+  if (diff < 0) return `${-diff}d ago`;
+  return `in ${diff}d`;
+}
+
 // ── Vertex AI helper ──
 async function callVertexAI(opts: {
   apiKey: string;
@@ -171,7 +200,8 @@ function buildActivitySummary(rows: any[], units: string): string {
   return rows
     .slice(0, 10)
     .map((a) => {
-      const date = new Date(a.start_time || a.start_date).toISOString().slice(0, 10);
+      const hk = toHkDate(a.start_time || a.start_date);
+      const date = hk ? `${hk} (${hkWeekday(hk)}, ${hkRelativeLabel(hk)})` : "(unknown date)";
       const distRaw = a.distance_meters ?? (a.distance ? a.distance : 0);
       const dist = (distRaw * conv).toFixed(2);
       const dur = a.duration_seconds ?? a.moving_time ?? 0;
@@ -189,7 +219,7 @@ async function getTodayUsage(
   userId: string,
   currentLevel: ThinkingLevel,
 ): Promise<{ used: number; limit: number; remaining: number; row: any }> {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = hkToday();
   const { data: row } = await admin
     .from("ai_coach_usage")
     .select("message_count, thinking_level")
@@ -402,6 +432,125 @@ serve(async (req) => {
       return json({ remaining, used, limit, thinking_level: level });
     }
 
+    // ── TRAIN PER-USER MODEL FROM 2026 DATA ──
+    // Pulls the user's full 2026 activity history and asks the model (medium
+    // thinking) to extract durable insights about their training pattern,
+    // performance trends, strengths/weaknesses, and recovery habits. Insights
+    // are upserted into ai_coach_insights so future chats are personalised.
+    if (action === "train_user_model" && req.method === "POST") {
+      const yearStartIso = "2026-01-01T00:00:00Z";
+      const [garminR, stravaR, appleR, terraR, racesR] = await Promise.all([
+        admin.from("garmin_activities")
+          .select("start_time, distance_meters, duration_seconds, average_hr, activity_type, laps")
+          .eq("user_id", user.id).gte("start_time", yearStartIso)
+          .order("start_time", { ascending: false }).limit(400),
+        admin.from("strava_activities")
+          .select("start_date, distance, moving_time, average_heartrate, sport_type")
+          .eq("user_id", user.id).gte("start_date", yearStartIso)
+          .order("start_date", { ascending: false }).limit(400),
+        admin.from("apple_health_activities")
+          .select("start_date, distance, moving_time, average_heartrate, sport_type")
+          .eq("user_id", user.id).gte("start_date", yearStartIso)
+          .order("start_date", { ascending: false }).limit(400),
+        admin.from("terra_activities")
+          .select("start_time, distance_meters, duration_seconds, average_hr, activity_type, provider, laps")
+          .eq("user_id", user.id).gte("start_time", yearStartIso)
+          .order("start_time", { ascending: false }).limit(400),
+        admin.from("user_races")
+          .select("race_name, race_date, category, finish_time_seconds, priority")
+          .eq("user_id", user.id).order("race_date", { ascending: true }),
+      ]);
+      const { data: prefsRow } = await admin
+        .from("ai_coach_preferences").select("preferred_units")
+        .eq("user_id", user.id).maybeSingle();
+      const units = prefsRow?.preferred_units || "kilometers";
+      const merged = [
+        ...(garminR.data || []).map((a: any) => ({ ...a, start_date: a.start_time, distance: a.distance_meters, moving_time: a.duration_seconds, average_heartrate: a.average_hr })),
+        ...(stravaR.data || []),
+        ...(appleR.data || []),
+        ...(terraR.data || []).map((a: any) => ({ ...a, start_date: a.start_time, distance: a.distance_meters, moving_time: a.duration_seconds, average_heartrate: a.average_hr, sport_type: a.activity_type })),
+      ].sort((a: any, b: any) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime());
+
+      if (merged.length === 0) {
+        return json({ ok: true, trained: false, reason: "no_2026_activities" });
+      }
+
+      // De-dup by HKT date+km to keep prompt compact, cap at 120 lines.
+      const seen = new Set<string>();
+      const compact: any[] = [];
+      for (const a of merged) {
+        const hk = toHkDate(a.start_date);
+        const km = Math.round(((a.distance ?? 0) / 1000) * 10) / 10;
+        const key = `${hk}|${km}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        compact.push(a);
+        if (compact.length >= 120) break;
+      }
+      const lines = compact.map((a: any) => {
+        const hk = toHkDate(a.start_date);
+        const dist = ((a.distance ?? 0) / 1000).toFixed(2);
+        const min = Math.round((a.moving_time ?? 0) / 60);
+        return `${hk} (${hkWeekday(hk)}): ${dist}km, ${min}min, ${pace(a.distance ?? 0, a.moving_time ?? 0)}, HR ${a.average_heartrate ?? "—"}${summarizeLaps(a.laps) || ""}`;
+      }).join("\n");
+      const racesBlock = (racesR.data || []).map((r: any) => `${r.race_date} ${r.race_name} (${r.category}${r.priority ? `, ${r.priority}` : ""})${r.finish_time_seconds ? ` finish ${Math.round(r.finish_time_seconds/60)}min` : ""}`).join("\n") || "(none)";
+
+      const prompt = `You are profiling a runner from their full 2026 training history (HKT dates). Today is ${hkToday()}.
+
+ACTIVITIES (${compact.length} of ${merged.length}, most recent first; units=${units}):
+${lines}
+
+RACES:
+${racesBlock}
+
+Extract 8–15 DURABLE, SPECIFIC insights about this runner's training pattern, fitness, strengths, weaknesses, recovery, consistency, weekly volume range, typical easy/quality split, long-run habits, and noteworthy PRs or breakthroughs in 2026. Be quantitative when possible (e.g. "avg weekly volume 38–45km", "typical easy pace 5:40/km", "long run usually Sunday").
+
+Return ONLY a JSON array. Each item: {"type":"preference|goal|challenge|achievement","key":"snake_case_key","value":"short specific value (<240 chars)","confidence":0..1}. No prose.`;
+
+      const out = await callVertexAI({
+        apiKey: VERTEX_API_KEY,
+        messages: [{ role: "user", content: prompt }],
+        temperature: 0.3,
+        maxOutputTokens: 4000,
+        thinkingBudget: THINKING_BUDGETS.medium,
+      });
+      const m = out.match(/\[[\s\S]*\]/);
+      let inserted = 0;
+      if (m) {
+        try {
+          const arr = JSON.parse(m[0]);
+          if (Array.isArray(arr)) {
+            const rows = arr
+              .filter((x: any) => x?.key && x?.value)
+              .slice(0, 20)
+              .map((x: any) => ({
+                user_id: user.id,
+                insight_type: String(x.type || "preference").slice(0, 32),
+                insight_key: String(x.key).slice(0, 64),
+                insight_value: String(x.value).slice(0, 240),
+                confidence: Math.max(0, Math.min(1, Number(x.confidence) || 0.6)),
+              }));
+            if (rows.length) {
+              // Also stamp a marker so we don't re-train on every chat.
+              rows.push({
+                user_id: user.id,
+                insight_type: "preference",
+                insight_key: "_trained_2026_at",
+                insight_value: new Date().toISOString(),
+                confidence: 1,
+              });
+              await admin.from("ai_coach_insights")
+                .upsert(rows, { onConflict: "user_id,insight_key" });
+              inserted = rows.length - 1;
+            }
+          }
+        } catch (e) {
+          console.warn("train_user_model parse failed", e);
+        }
+      }
+      return json({ ok: true, trained: inserted > 0, inserted, activities_used: compact.length });
+    }
+
     // ── CHAT ──
     if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
 
@@ -416,7 +565,10 @@ serve(async (req) => {
     }
 
     const thinkingLevel = await getThinkingLevel();
-    const today = new Date().toISOString().slice(0, 10);
+    const today = hkToday();
+    // Look back ~9 days from UTC now to safely cover the last 7 HKT days
+    // (TZ buffer) — we still display HKT-converted dates downstream.
+    const lookbackIso = new Date(Date.now() - 9 * 86400000).toISOString();
     const { used: usedToday, limit: dailyLimit } = await getTodayUsage(
       admin,
       user.id,
@@ -464,28 +616,28 @@ serve(async (req) => {
           .from("garmin_activities")
           .select("start_time, distance_meters, duration_seconds, average_hr, activity_type, laps")
           .eq("user_id", user.id)
-          .gte("start_time", new Date(Date.now() - 7 * 86400000).toISOString())
+          .gte("start_time", lookbackIso)
           .order("start_time", { ascending: false })
           .limit(10),
         admin
           .from("strava_activities")
           .select("start_date, distance, moving_time, average_heartrate, sport_type")
           .eq("user_id", user.id)
-          .gte("start_date", new Date(Date.now() - 7 * 86400000).toISOString())
+          .gte("start_date", lookbackIso)
           .order("start_date", { ascending: false })
           .limit(10),
         admin
           .from("apple_health_activities")
           .select("start_date, distance, moving_time, average_heartrate, sport_type")
           .eq("user_id", user.id)
-          .gte("start_date", new Date(Date.now() - 7 * 86400000).toISOString())
+          .gte("start_date", lookbackIso)
           .order("start_date", { ascending: false })
           .limit(10),
         admin
           .from("terra_activities")
           .select("start_time, distance_meters, duration_seconds, average_hr, activity_type, provider, laps")
           .eq("user_id", user.id)
-          .gte("start_time", new Date(Date.now() - 7 * 86400000).toISOString())
+          .gte("start_time", lookbackIso)
           .order("start_time", { ascending: false })
           .limit(10),
         admin
@@ -548,7 +700,7 @@ serve(async (req) => {
 - Training intensity preference: ${prefs.training_intensity || "moderate"}`
       : "(no preferences set yet — gently ask onboarding questions across replies)";
 
-    const todayIso = new Date().toISOString().slice(0, 10);
+    const todayIso = today; // HKT today (YYYY-MM-DD)
     const racesData = (racesR.data || []) as any[];
     const upcomingRaces = racesData.filter((r) => r.race_date >= todayIso).slice(0, 8);
     const pastRaces = racesData.filter((r) => r.race_date < todayIso).slice(-8);
@@ -638,9 +790,32 @@ PLANNED WORKOUTS (today + next 14 days):
 ${upcomingDays.length ? upcomingDays.join("\n") : "(no scheduled workouts in this window)"}`;
     }
 
+    // Build an explicit date-anchor table the model can use for "yesterday",
+    // "Saturday", "2 days ago", etc. Avoid the model guessing from training data.
+    const dateAnchorLines: string[] = [];
+    for (let i = 0; i <= 7; i++) {
+      const ts = new Date(`${today}T00:00:00Z`).getTime() - i * 86400000;
+      const d = new Date(ts).toISOString().slice(0, 10);
+      dateAnchorLines.push(`- ${d} = ${hkWeekday(d)}, ${hkRelativeLabel(d, today)}`);
+    }
+    const dateContextBlock = `CURRENT DATE & TIMEZONE (authoritative — ignore any other date you may have learned):
+- Today: ${today} (${hkWeekday(today)})
+- Timezone: Asia/Hong_Kong (HKT, UTC+8). All activity dates below are already converted to HKT.
+- Year is 2026.
+Date anchors (use these to resolve any relative date the user mentions):
+${dateAnchorLines.join("\n")}
+
+DATE RULES (strict):
+- "Yesterday" ALWAYS means ${dateAnchorLines[1].split(" = ")[0].replace("- ", "")}. "Today" ALWAYS means ${today}.
+- When the user mentions a weekday (e.g. "Saturday"), map it to the most recent past occurrence using the anchor table above — never guess.
+- When citing a run, state the actual HKT date and weekday from the activity line. Do NOT shift the date by ±1 day.
+- If no activity matches the requested date, say so explicitly instead of substituting a nearby run.`;
+
     const systemPrompt = `You are an expert AI Running Coach for an athlete named ${profile?.display_name || "the runner"}.
 
 REPLY LANGUAGE: ${userLang}. Always answer in this language regardless of the language of the user's question.
+
+${dateContextBlock}
 
 USER PROFILE:${prefsBlock}
 
@@ -717,6 +892,28 @@ If the user has no preferences set yet, ask ONE friendly onboarding question per
         },
         { onConflict: "user_id,date" },
       );
+
+    // Auto-train per-user 2026 model once (fire-and-forget). Skipped if the
+    // marker insight is already present.
+    const alreadyTrained = insights.some((i: any) => i.insight_key === "_trained_2026_at");
+    if (!alreadyTrained) {
+      (async () => {
+        try {
+          const trainUrl = `${SUPABASE_URL}/functions/v1/ai-running-coach?action=train_user_model`;
+          await fetch(trainUrl, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-internal-secret": SERVICE_ROLE,
+              "Authorization": `Bearer ${SERVICE_ROLE}`,
+            },
+            body: JSON.stringify({ internalUserId: user.id }),
+          });
+        } catch (e) {
+          console.warn("auto train_user_model failed", e);
+        }
+      })();
+    }
 
     // Fire-and-forget insight extraction
     (async () => {

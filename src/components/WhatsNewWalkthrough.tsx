@@ -222,7 +222,57 @@ const StravaIllustration = ({ lang }: { lang: Lang }) => (
   </div>
 );
 
+const MessagingIllustration = ({ lang }: { lang: Lang }) => (
+  <div className="relative w-full rounded-xl bg-muted/40 border border-border p-3 overflow-hidden">
+    <div className="grid grid-cols-2 gap-2">
+      <div className="rounded-lg bg-card border-2 border-primary p-2.5 shadow">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-full bg-[#25D366] flex items-center justify-center text-white">
+            <MessageSquare size={14} />
+          </div>
+          <div className="text-[11px] font-semibold text-foreground">WhatsApp</div>
+        </div>
+        <div className="mt-2 rounded-md bg-muted/60 p-1.5 text-[9px] text-foreground/80 leading-snug">
+          {tx(lang, "Daily AI workout & chat", "每日 AI 訓練與聊天")}
+        </div>
+      </div>
+      <div className="rounded-lg bg-card border-2 border-primary p-2.5 shadow">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-full bg-[#229ED9] flex items-center justify-center text-white">
+            <Send size={14} />
+          </div>
+          <div className="text-[11px] font-semibold text-foreground">Telegram</div>
+        </div>
+        <div className="mt-2 rounded-md bg-muted/60 p-1.5 text-[9px] text-foreground/80 leading-snug">
+          {tx(lang, "Chat with your AI coach", "與 AI 教練對話")}
+        </div>
+      </div>
+    </div>
+    <div className="mt-2.5 space-y-1.5">
+      <div className="flex items-center gap-1.5">
+        <ChevronRight size={12} className="text-primary shrink-0" />
+        <span className="text-[10px] text-foreground/80">
+          {tx(lang, "Get a morning workout suggestion", "每天早上收到訓練建議")}
+        </span>
+      </div>
+      <div className="flex items-center gap-1.5">
+        <ChevronRight size={12} className="text-primary shrink-0" />
+        <span className="text-[10px] text-foreground/80">
+          {tx(lang, "Share post-run feelings, get coach feedback", "跑步後分享感受，獲得教練回饋")}
+        </span>
+      </div>
+      <div className="flex items-center gap-1.5">
+        <Settings2 size={12} className="text-primary shrink-0" />
+        <span className="text-[10px] text-foreground/80">
+          {tx(lang, "Open from More → Messaging Apps", "從「更多 → 通訊應用程式」開啟")}
+        </span>
+      </div>
+    </div>
+  </div>
+);
+
 /* -------------------- Component -------------------- */
+
 
 const WhatsNewWalkthrough = ({ lang, enabled, manualOpen, onManualOpenChange }: Props) => {
   const [open, setOpen] = useState(false);

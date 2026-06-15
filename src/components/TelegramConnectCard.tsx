@@ -50,6 +50,7 @@ export default function TelegramConnectCard({ lang }: { lang: Lang }) {
     const native = isDespiaUA();
     // On web, open a blank tab SYNCHRONOUSLY so the popup blocker treats it
     // as a direct user gesture. We set the real URL after the DB update.
+    sessionStorage.setItem("rw_messaging_connect", Date.now().toString());
     const popup = native ? null : window.open("about:blank", "_blank");
     setBusy(true);
     try {
@@ -70,6 +71,12 @@ export default function TelegramConnectCard({ lang }: { lang: Lang }) {
         despia(`oauth://?url=${encodeURIComponent(url)}`);
       } else if (popup && !popup.closed) {
         popup.location.href = url;
+        const timer = setInterval(() => {
+          if (popup.closed) {
+            clearInterval(timer);
+            window.location.reload();
+          }
+        }, 500);
       } else {
         window.location.href = url;
       }

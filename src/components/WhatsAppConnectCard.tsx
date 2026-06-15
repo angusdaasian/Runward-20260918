@@ -65,6 +65,7 @@ export default function WhatsAppConnectCard({ lang }: { lang: Lang }) {
       return;
     }
     const native = isDespiaUA();
+    sessionStorage.setItem("rw_messaging_connect", Date.now().toString());
     const popup = native ? null : window.open("about:blank", "_blank");
     setBusy(true);
     try {
@@ -84,6 +85,12 @@ export default function WhatsAppConnectCard({ lang }: { lang: Lang }) {
         despia(`oauth://?url=${encodeURIComponent(url)}`);
       } else if (popup && !popup.closed) {
         popup.location.href = url;
+        const timer = setInterval(() => {
+          if (popup.closed) {
+            clearInterval(timer);
+            window.location.reload();
+          }
+        }, 500);
       } else {
         window.location.href = url;
       }

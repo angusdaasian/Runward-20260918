@@ -29,6 +29,8 @@ const IntervalsCallback = lazy(() => import("./pages/IntervalsCallback.tsx"));
 const Compare = lazy(() => import("./pages/Compare.tsx"));
 const Developers = lazy(() => import("./pages/Developers.tsx"));
 const OAuthAuthorize = lazy(() => import("./pages/OAuthAuthorize.tsx"));
+const ApiDocs = lazy(() => import("./pages/ApiDocs.tsx"));
+const ConnectedApps = lazy(() => import("./pages/ConnectedApps.tsx"));
 
 const queryClient = new QueryClient();
 const native = isNativeApp();
@@ -87,6 +89,8 @@ const App = () => (
                 <Route path="/auth/callback" element={<StravaCallback />} />
                 <Route path="/intervals-callback" element={<IntervalsCallback />} />
                 <Route path="/developers" element={<Developers />} />
+                <Route path="/developers/docs" element={<ApiDocs />} />
+                <Route path="/settings/connected-apps" element={<ConnectedApps />} />
                 <Route path="/oauth/authorize" element={<OAuthAuthorize />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>

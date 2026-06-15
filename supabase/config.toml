@@ -125,4 +125,24 @@ verify_jwt = false
 [functions.intervals-webhook]
 verify_jwt = false
 
+[functions.developer-apps]
+verify_jwt = false
+
+[functions.admin-developer-apps]
+verify_jwt = false
+
+[functions.oauth-authorize]
+verify_jwt = false
+
+[functions.oauth-token]
+verify_jwt = false
+
+[functions.api-v1]
+verify_jwt = false
+
+[functions.webhook-dispatcher]
+verify_jwt = false
+
+
+
 

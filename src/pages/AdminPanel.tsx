@@ -23,6 +23,7 @@ import {
   ClipboardList,
   MessageSquare,
   RefreshCw,
+  Code2,
 } from "lucide-react";
 import {
   Sidebar,
@@ -48,6 +49,7 @@ import TerraSyncTester from "@/components/admin/TerraSyncTester";
 import StravaAppsManager from "@/components/admin/StravaAppsManager";
 import SuuntoSyncTester from "@/components/admin/SuuntoSyncTester";
 import PolarSyncTester from "@/components/admin/PolarSyncTester";
+import DeveloperAppsManager from "@/components/admin/DeveloperAppsManager";
 
 interface UserRow {
   user_id: string;
@@ -75,7 +77,8 @@ type TabKey =
   | "terra"
   | "strava"
   | "suunto"
-  | "polar";
+  | "polar"
+  | "devapps";
 
 const TABS: { key: TabKey; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { key: "users", label: "Users", icon: Users },
@@ -90,6 +93,7 @@ const TABS: { key: TabKey; label: string; icon: React.ComponentType<{ className?
   { key: "strava", label: "Strava Apps", icon: RefreshCw },
   { key: "suunto", label: "Suunto Sync", icon: RefreshCw },
   { key: "polar", label: "Polar Sync", icon: RefreshCw },
+  { key: "devapps", label: "Developer Apps", icon: Code2 },
 ];
 
 const initialAdminTab = (): TabKey => {
@@ -432,6 +436,8 @@ const AdminPanel = () => {
         return <SuuntoSyncTester />;
       case "polar":
         return <PolarSyncTester />;
+      case "devapps":
+        return <DeveloperAppsManager />;
     }
   };
 

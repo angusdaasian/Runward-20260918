@@ -254,6 +254,35 @@ export type Database = {
         }
         Relationships: []
       }
+      api_rate_limit_buckets: {
+        Row: {
+          app_id: string
+          request_count: number
+          window_kind: string
+          window_start: string
+        }
+        Insert: {
+          app_id: string
+          request_count?: number
+          window_kind: string
+          window_start: string
+        }
+        Update: {
+          app_id?: string
+          request_count?: number
+          window_kind?: string
+          window_start?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "api_rate_limit_buckets_app_id_fkey"
+            columns: ["app_id"]
+            isOneToOne: false
+            referencedRelation: "oauth_apps"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       apple_health_activities: {
         Row: {
           average_heartrate: number | null
@@ -655,6 +684,187 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      oauth_apps: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          client_id: string
+          client_secret_hash: string | null
+          client_secret_prefix: string | null
+          contact_email: string
+          created_at: string
+          description: string | null
+          id: string
+          logo_url: string | null
+          max_athletes: number
+          name: string
+          owner_user_id: string
+          rate_limit_15min: number
+          rate_limit_daily: number
+          redirect_uris: string[]
+          rejection_reason: string | null
+          status: Database["public"]["Enums"]["oauth_app_status"]
+          updated_at: string
+          webhook_signing_secret: string | null
+          webhook_url: string | null
+          webhook_verify_token: string | null
+          website_url: string | null
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          client_id: string
+          client_secret_hash?: string | null
+          client_secret_prefix?: string | null
+          contact_email: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          logo_url?: string | null
+          max_athletes?: number
+          name: string
+          owner_user_id: string
+          rate_limit_15min?: number
+          rate_limit_daily?: number
+          redirect_uris?: string[]
+          rejection_reason?: string | null
+          status?: Database["public"]["Enums"]["oauth_app_status"]
+          updated_at?: string
+          webhook_signing_secret?: string | null
+          webhook_url?: string | null
+          webhook_verify_token?: string | null
+          website_url?: string | null
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          client_id?: string
+          client_secret_hash?: string | null
+          client_secret_prefix?: string | null
+          contact_email?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          logo_url?: string | null
+          max_athletes?: number
+          name?: string
+          owner_user_id?: string
+          rate_limit_15min?: number
+          rate_limit_daily?: number
+          redirect_uris?: string[]
+          rejection_reason?: string | null
+          status?: Database["public"]["Enums"]["oauth_app_status"]
+          updated_at?: string
+          webhook_signing_secret?: string | null
+          webhook_url?: string | null
+          webhook_verify_token?: string | null
+          website_url?: string | null
+        }
+        Relationships: []
+      }
+      oauth_auth_codes: {
+        Row: {
+          app_id: string
+          code_hash: string
+          created_at: string
+          expires_at: string
+          id: string
+          pkce_challenge: string | null
+          pkce_method: string | null
+          redirect_uri: string
+          scopes: string[]
+          used_at: string | null
+          user_id: string
+        }
+        Insert: {
+          app_id: string
+          code_hash: string
+          created_at?: string
+          expires_at: string
+          id?: string
+          pkce_challenge?: string | null
+          pkce_method?: string | null
+          redirect_uri: string
+          scopes?: string[]
+          used_at?: string | null
+          user_id: string
+        }
+        Update: {
+          app_id?: string
+          code_hash?: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          pkce_challenge?: string | null
+          pkce_method?: string | null
+          redirect_uri?: string
+          scopes?: string[]
+          used_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "oauth_auth_codes_app_id_fkey"
+            columns: ["app_id"]
+            isOneToOne: false
+            referencedRelation: "oauth_apps"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      oauth_authorizations: {
+        Row: {
+          access_token_hash: string
+          app_id: string
+          created_at: string
+          expires_at: string
+          id: string
+          last_used_at: string | null
+          refresh_expires_at: string
+          refresh_token_hash: string
+          revoked_at: string | null
+          scopes: string[]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          access_token_hash: string
+          app_id: string
+          created_at?: string
+          expires_at: string
+          id?: string
+          last_used_at?: string | null
+          refresh_expires_at: string
+          refresh_token_hash: string
+          revoked_at?: string | null
+          scopes?: string[]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          access_token_hash?: string
+          app_id?: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          last_used_at?: string | null
+          refresh_expires_at?: string
+          refresh_token_hash?: string
+          revoked_at?: string | null
+          scopes?: string[]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "oauth_authorizations_app_id_fkey"
+            columns: ["app_id"]
+            isOneToOne: false
+            referencedRelation: "oauth_apps"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       pending_races: {
         Row: {
@@ -2492,6 +2702,68 @@ export type Database = {
         }
         Relationships: []
       }
+      webhook_deliveries: {
+        Row: {
+          app_id: string
+          attempts: number
+          created_at: string
+          delivered_at: string | null
+          event_type: string
+          id: string
+          last_error: string | null
+          last_response_code: number | null
+          next_attempt_at: string
+          object_id: string | null
+          object_type: string | null
+          payload: Json
+          status: Database["public"]["Enums"]["webhook_delivery_status"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          app_id: string
+          attempts?: number
+          created_at?: string
+          delivered_at?: string | null
+          event_type: string
+          id?: string
+          last_error?: string | null
+          last_response_code?: number | null
+          next_attempt_at?: string
+          object_id?: string | null
+          object_type?: string | null
+          payload: Json
+          status?: Database["public"]["Enums"]["webhook_delivery_status"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          app_id?: string
+          attempts?: number
+          created_at?: string
+          delivered_at?: string | null
+          event_type?: string
+          id?: string
+          last_error?: string | null
+          last_response_code?: number | null
+          next_attempt_at?: string
+          object_id?: string | null
+          object_type?: string | null
+          payload?: Json
+          status?: Database["public"]["Enums"]["webhook_delivery_status"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "webhook_deliveries_app_id_fkey"
+            columns: ["app_id"]
+            isOneToOne: false
+            referencedRelation: "oauth_apps"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       weekly_plan_reviews: {
         Row: {
           completion_pct: number
@@ -2647,6 +2919,15 @@ export type Database = {
           signature_header: string
         }[]
       }
+      consume_rate_limit: {
+        Args: { p_app_id: string }
+        Returns: {
+          allowed: boolean
+          remaining_15min: number
+          remaining_day: number
+          retry_after_seconds: number
+        }[]
+      }
       get_leaderboard: {
         Args: { p_is_premium: boolean; p_limit: number }
         Returns: {
@@ -2699,6 +2980,8 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "user"
+      oauth_app_status: "pending" | "active" | "suspended" | "rejected"
+      webhook_delivery_status: "pending" | "delivered" | "failed" | "dead"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -2827,6 +3110,8 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "user"],
+      oauth_app_status: ["pending", "active", "suspended", "rejected"],
+      webhook_delivery_status: ["pending", "delivered", "failed", "dead"],
     },
   },
 } as const

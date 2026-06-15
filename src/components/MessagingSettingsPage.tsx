@@ -55,7 +55,7 @@ const MessagingSettingsPage = ({ lang, onBack }: Props) => {
             <ArrowLeft size={20} />
           </button>
           <h1 className="text-base font-semibold text-foreground">
-            {isZh ? "通訊應用程式" : "Messaging Apps"}
+            {isZh ? "通訊應用程式 (試行)" : "Messaging Apps (BETA)"}
           </h1>
         </div>
       </div>

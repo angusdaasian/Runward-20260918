@@ -643,6 +643,20 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps, onNavig
           <ChevronRight size={18} className="text-muted-foreground" />
         </button>
 
+        {/* Connected apps (third-party API access) */}
+        {user && (
+          <button
+            onClick={() => navigate("/settings/connected-apps", { state: { from: currentRoute } })}
+            className="w-full bg-card border border-border rounded-xl p-4 flex items-center justify-between"
+          >
+            <div className="flex items-center gap-3">
+              <KeyRound size={20} className="text-primary" />
+              <span className="font-medium text-foreground">{lang === "zh" ? "已連結的應用程式" : "Connected apps"}</span>
+            </div>
+            <ChevronRight size={18} className="text-muted-foreground" />
+          </button>
+        )}
+
         {/* Privacy Policy */}
         <button
           onClick={() => navigate("/privacy", { state: { from: currentRoute } })}

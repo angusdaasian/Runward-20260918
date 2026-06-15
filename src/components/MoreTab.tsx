@@ -573,7 +573,7 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps, onNavig
             <div className="flex items-center gap-3">
               <MessageSquare size={20} className="text-primary" />
               <span className="font-medium text-foreground">
-                {lang === "zh" ? "通訊應用程式" : "Messaging Apps"}
+                {lang === "zh" ? "通訊應用程式 (試行)" : "Messaging Apps (BETA)"}
               </span>
             </div>
             <ChevronRight size={18} className="text-muted-foreground" />

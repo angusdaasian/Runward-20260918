@@ -32,6 +32,7 @@ export default function WhatsAppConnectCard({ lang }: { lang: Lang }) {
   const [linkedWaId, setLinkedWaId] = useState<string | null>(null);
   const [enabled, setEnabled] = useState(false);
   const [feedbackEnabled, setFeedbackEnabled] = useState(false);
+  const [introOpen, setIntroOpen] = useState(false);
 
   useEffect(() => {
     if (!user) return;

@@ -671,9 +671,32 @@ PLANNED WORKOUTS (today + next 14 days):
 ${upcomingDays.length ? upcomingDays.join("\n") : "(no scheduled workouts in this window)"}`;
     }
 
+    // Build an explicit date-anchor table the model can use for "yesterday",
+    // "Saturday", "2 days ago", etc. Avoid the model guessing from training data.
+    const dateAnchorLines: string[] = [];
+    for (let i = 0; i <= 7; i++) {
+      const ts = new Date(`${today}T00:00:00Z`).getTime() - i * 86400000;
+      const d = new Date(ts).toISOString().slice(0, 10);
+      dateAnchorLines.push(`- ${d} = ${hkWeekday(d)}, ${hkRelativeLabel(d, today)}`);
+    }
+    const dateContextBlock = `CURRENT DATE & TIMEZONE (authoritative — ignore any other date you may have learned):
+- Today: ${today} (${hkWeekday(today)})
+- Timezone: Asia/Hong_Kong (HKT, UTC+8). All activity dates below are already converted to HKT.
+- Year is 2026.
+Date anchors (use these to resolve any relative date the user mentions):
+${dateAnchorLines.join("\n")}
+
+DATE RULES (strict):
+- "Yesterday" ALWAYS means ${dateAnchorLines[1].split(" = ")[0].replace("- ", "")}. "Today" ALWAYS means ${today}.
+- When the user mentions a weekday (e.g. "Saturday"), map it to the most recent past occurrence using the anchor table above — never guess.
+- When citing a run, state the actual HKT date and weekday from the activity line. Do NOT shift the date by ±1 day.
+- If no activity matches the requested date, say so explicitly instead of substituting a nearby run.`;
+
     const systemPrompt = `You are an expert AI Running Coach for an athlete named ${profile?.display_name || "the runner"}.
 
 REPLY LANGUAGE: ${userLang}. Always answer in this language regardless of the language of the user's question.
+
+${dateContextBlock}
 
 USER PROFILE:${prefsBlock}
 

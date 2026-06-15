@@ -205,7 +205,7 @@ export default function TelegramConnectCard({ lang }: { lang: Lang }) {
               : "Connect to Telegram for daily AI workout suggestions and post-run feedback chats."}
           </p>
           <button
-            onClick={generateAndOpen}
+            onClick={() => setIntroOpen(true)}
             disabled={busy}
             className="text-sm font-medium text-primary hover:underline"
           >
@@ -213,6 +213,17 @@ export default function TelegramConnectCard({ lang }: { lang: Lang }) {
           </button>
         </>
       )}
+      <MessagingIntroSheet
+        open={introOpen}
+        onOpenChange={setIntroOpen}
+        busy={busy}
+        lang={lang}
+        variant="telegram"
+        onContinue={() => {
+          setIntroOpen(false);
+          generateAndOpen();
+        }}
+      />
     </div>
   );
 }

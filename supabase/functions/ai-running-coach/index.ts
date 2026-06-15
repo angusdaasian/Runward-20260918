@@ -219,7 +219,7 @@ async function getTodayUsage(
   userId: string,
   currentLevel: ThinkingLevel,
 ): Promise<{ used: number; limit: number; remaining: number; row: any }> {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = hkToday();
   const { data: row } = await admin
     .from("ai_coach_usage")
     .select("message_count, thinking_level")

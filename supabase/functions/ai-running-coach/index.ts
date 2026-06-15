@@ -893,6 +893,28 @@ If the user has no preferences set yet, ask ONE friendly onboarding question per
         { onConflict: "user_id,date" },
       );
 
+    // Auto-train per-user 2026 model once (fire-and-forget). Skipped if the
+    // marker insight is already present.
+    const alreadyTrained = insights.some((i: any) => i.insight_key === "_trained_2026_at");
+    if (!alreadyTrained) {
+      (async () => {
+        try {
+          const trainUrl = `${SUPABASE_URL}/functions/v1/ai-running-coach?action=train_user_model`;
+          await fetch(trainUrl, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-internal-secret": SERVICE_ROLE,
+              "Authorization": `Bearer ${SERVICE_ROLE}`,
+            },
+            body: JSON.stringify({ internalUserId: user.id }),
+          });
+        } catch (e) {
+          console.warn("auto train_user_model failed", e);
+        }
+      })();
+    }
+
     // Fire-and-forget insight extraction
     (async () => {
       try {

@@ -446,7 +446,10 @@ serve(async (req) => {
     }
 
     const thinkingLevel = await getThinkingLevel();
-    const today = new Date().toISOString().slice(0, 10);
+    const today = hkToday();
+    // Look back ~9 days from UTC now to safely cover the last 7 HKT days
+    // (TZ buffer) — we still display HKT-converted dates downstream.
+    const lookbackIso = new Date(Date.now() - 9 * 86400000).toISOString();
     const { used: usedToday, limit: dailyLimit } = await getTodayUsage(
       admin,
       user.id,

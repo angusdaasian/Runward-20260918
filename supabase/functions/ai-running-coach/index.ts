@@ -36,6 +36,35 @@ function normalizeThinking(v: unknown): ThinkingLevel {
   return v === "low" || v === "medium" || v === "high" ? v : "minimal";
 }
 
+// ── Timezone helpers (Asia/Hong_Kong, UTC+8, no DST) ──
+const HKT_OFFSET_MS = 8 * 60 * 60 * 1000;
+function toHkDate(input: string | Date | null | undefined): string {
+  if (!input) return "";
+  const d = typeof input === "string" ? new Date(input) : input;
+  if (!(d instanceof Date) || isNaN(d.getTime())) return "";
+  return new Date(d.getTime() + HKT_OFFSET_MS).toISOString().slice(0, 10);
+}
+function hkToday(): string {
+  return toHkDate(new Date());
+}
+function hkWeekday(yyyyMmDd: string): string {
+  const [y, m, d] = yyyyMmDd.split("-").map(Number);
+  if (!y || !m || !d) return "";
+  const date = new Date(Date.UTC(y, m - 1, d));
+  return ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][date.getUTCDay()];
+}
+function hkRelativeLabel(yyyyMmDd: string, todayStr = hkToday()): string {
+  if (!yyyyMmDd) return "";
+  const a = new Date(`${yyyyMmDd}T00:00:00Z`).getTime();
+  const b = new Date(`${todayStr}T00:00:00Z`).getTime();
+  const diff = Math.round((a - b) / 86400000);
+  if (diff === 0) return "today";
+  if (diff === -1) return "yesterday";
+  if (diff === 1) return "tomorrow";
+  if (diff < 0) return `${-diff}d ago`;
+  return `in ${diff}d`;
+}
+
 // ── Vertex AI helper ──
 async function callVertexAI(opts: {
   apiKey: string;

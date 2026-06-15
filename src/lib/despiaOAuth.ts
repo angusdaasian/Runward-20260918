@@ -25,12 +25,11 @@ const SUPABASE_URL = "https://kbghvclwhxnjeskdodeh.supabase.co";
 
 export function isDespiaUA(): boolean {
   if (typeof navigator === "undefined") return false;
-  const ua = navigator.userAgent || "";
-  return (
-    ua.toLowerCase().includes("despia") ||
-    (navigator as any).standalone === true ||
-    typeof (window as any).despia !== "undefined"
-  );
+  const ua = (navigator.userAgent || "").toLowerCase();
+  // Only true UA markers — do NOT check `window.despia`, since the
+  // despia-native npm package defines that global on plain web too.
+  // `navigator.standalone` is also unreliable (true for any iOS PWA).
+  return ua.includes("despia") || ua.includes("median");
 }
 
 type SupportedProvider = "google" | "apple";

@@ -75,44 +75,41 @@ serve(async (req) => {
     const targets = Array.from(userIds);
     const trainUrl = `${SUPABASE_URL}/functions/v1/ai-running-coach?action=train_user_model`;
 
-    let triggered = 0;
-    let failed = 0;
-    // Fire sequentially with a small concurrency to avoid rate limits.
-    const CONCURRENCY = 4;
-    for (let i = 0; i < targets.length; i += CONCURRENCY) {
-      const batch = targets.slice(i, i + CONCURRENCY);
-      const results = await Promise.allSettled(
-        batch.map((uid) =>
-          fetch(trainUrl, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "x-internal-secret": SERVICE_ROLE,
-              Authorization: `Bearer ${SERVICE_ROLE}`,
-            },
-            body: JSON.stringify({ internalUserId: uid }),
-          }).then(async (r) => {
-            if (!r.ok) throw new Error(`HTTP ${r.status}: ${(await r.text()).slice(0, 200)}`);
-            return r.json();
-          }),
-        ),
-      );
-      for (const r of results) {
-        if (r.status === "fulfilled") triggered++;
-        else {
-          failed++;
-          console.warn("train failed", r.reason);
-        }
+    // Fire-and-forget: kick off training in background so the HTTP request
+    // returns immediately. Each train call hits Vertex AI (~5-30s) and we
+    // can't hold the response open for hundreds of users.
+    (async () => {
+      const CONCURRENCY = 3;
+      for (let i = 0; i < targets.length; i += CONCURRENCY) {
+        const batch = targets.slice(i, i + CONCURRENCY);
+        await Promise.allSettled(
+          batch.map((uid) =>
+            fetch(trainUrl, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "x-internal-secret": SERVICE_ROLE,
+                Authorization: `Bearer ${SERVICE_ROLE}`,
+              },
+              body: JSON.stringify({ internalUserId: uid }),
+            })
+              .then(async (r) => {
+                if (!r.ok) console.warn(`train ${uid} HTTP ${r.status}`);
+              })
+              .catch((e) => console.warn(`train ${uid} failed`, e)),
+          ),
+        );
       }
-    }
+      console.log(`train-coach-all-users finished ${targets.length} users`);
+    })();
 
     return json({
       ok: true,
       candidates: targets.length,
-      triggered,
-      failed,
+      queued: targets.length,
       force,
     });
+
   } catch (e) {
     console.error("train-coach-all-users error", e);
     return json({ error: e instanceof Error ? e.message : "Unknown error" }, 500);

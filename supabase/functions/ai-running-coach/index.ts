@@ -16,25 +16,18 @@ const MODEL = "gemini-3.1-pro-preview";
 
 type ThinkingLevel = "minimal" | "low" | "medium" | "high";
 
-const THINKING_LIMITS: Record<ThinkingLevel, number> = {
-  minimal: 100,
-  low: 80,
-  medium: 60,
-  high: 40,
-};
+// Daily message limits by subscription tier.
+const FREE_DAILY_LIMIT = 20;
+const PREMIUM_DAILY_LIMIT = 100;
 
-// Token budget passed to Gemini's thinkingConfig.thinkingBudget.
-// 0 disables thinking; higher = more deliberation.
-const THINKING_BUDGETS: Record<ThinkingLevel, number> = {
-  minimal: 0,
-  low: 512,
-  medium: 2048,
-  high: 8192,
-};
+// Fixed thinking level for all users — always "high" for best quality.
+const FIXED_THINKING_LEVEL: ThinkingLevel = "high";
+const FIXED_THINKING_BUDGET = 8192;
 
-function normalizeThinking(v: unknown): ThinkingLevel {
-  return v === "low" || v === "medium" || v === "high" ? v : "minimal";
+function normalizeThinking(_v: unknown): ThinkingLevel {
+  return FIXED_THINKING_LEVEL;
 }
+
 
 // ── Timezone helpers (Asia/Hong_Kong, UTC+8, no DST) ──
 const HKT_OFFSET_MS = 8 * 60 * 60 * 1000;
@@ -322,34 +315,25 @@ function buildActivitySummary(rows: any[], units: string): string {
     .join("\n");
 }
 
-// Read today's usage row and return the effective used count converted to the
-// CURRENT thinking level using the ratio rule.
+// Read today's usage row and return the effective used count + tier-based limit.
 async function getTodayUsage(
   admin: any,
   userId: string,
-  currentLevel: ThinkingLevel,
+  isPremium: boolean,
 ): Promise<{ used: number; limit: number; remaining: number; row: any }> {
   const today = hkToday();
   const { data: row } = await admin
     .from("ai_coach_usage")
-    .select("message_count, thinking_level")
+    .select("message_count")
     .eq("user_id", userId)
     .eq("date", today)
     .maybeSingle();
 
-  const limit = THINKING_LIMITS[currentLevel];
-  if (!row) {
-    return { used: 0, limit, remaining: limit, row: null };
-  }
-  const storedLevel = normalizeThinking(row.thinking_level);
-  const storedLimit = THINKING_LIMITS[storedLevel];
-  let used = row.message_count ?? 0;
-  if (storedLevel !== currentLevel) {
-    // Convert by ratio: ceil(used / oldLimit * newLimit)
-    used = Math.min(limit, Math.ceil((used / storedLimit) * limit));
-  }
+  const limit = isPremium ? PREMIUM_DAILY_LIMIT : FREE_DAILY_LIMIT;
+  const used = row?.message_count ?? 0;
   return { used, limit, remaining: Math.max(0, limit - used), row };
 }
+
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -392,15 +376,16 @@ serve(async (req) => {
     const url = new URL(req.url);
     const action = url.searchParams.get("action");
 
-    // Helper to get the user's current thinking level.
-    const getThinkingLevel = async (): Promise<ThinkingLevel> => {
+    // Helper: check if user is premium.
+    const getIsPremium = async (): Promise<boolean> => {
       const { data } = await admin
-        .from("ai_coach_preferences")
-        .select("thinking_level")
+        .from("profiles")
+        .select("is_premium")
         .eq("user_id", user.id)
         .maybeSingle();
-      return normalizeThinking(data?.thinking_level);
+      return !!data?.is_premium;
     };
+
 
     // ── PREFERENCES (read/write) ──
     if (action === "preferences") {
@@ -422,13 +407,10 @@ serve(async (req) => {
           "training_days",
           "injuries_concerns",
           "training_intensity",
-          "thinking_level",
         ];
         const cleaned: any = { user_id: user.id };
         for (const k of allowed) if (k in patch) cleaned[k] = patch[k];
-        if ("thinking_level" in cleaned) {
-          cleaned.thinking_level = normalizeThinking(cleaned.thinking_level);
-        }
+
         const { data, error } = await admin
           .from("ai_coach_preferences")
           .upsert(cleaned, { onConflict: "user_id" })
@@ -537,10 +519,11 @@ serve(async (req) => {
 
     // ── USAGE (read) ──
     if (action === "usage" && req.method === "GET") {
-      const level = await getThinkingLevel();
-      const { used, limit, remaining } = await getTodayUsage(admin, user.id, level);
-      return json({ remaining, used, limit, thinking_level: level });
+      const isPremium = await getIsPremium();
+      const { used, limit, remaining } = await getTodayUsage(admin, user.id, isPremium);
+      return json({ remaining, used, limit, thinking_level: FIXED_THINKING_LEVEL });
     }
+
 
     // ── TRAIN PER-USER MODEL FROM 2026 DATA ──
     // Pulls the user's full 2026 activity history and asks the model (medium
@@ -622,7 +605,7 @@ Return ONLY a JSON array. Each item: {"type":"preference|goal|challenge|achievem
         messages: [{ role: "user", content: prompt }],
         temperature: 0.3,
         maxOutputTokens: 4000,
-        thinkingBudget: THINKING_BUDGETS.medium,
+        thinkingBudget: 2048,
       });
       const m = out.match(/\[[\s\S]*\]/);
       let inserted = 0;
@@ -664,17 +647,15 @@ Return ONLY a JSON array. Each item: {"type":"preference|goal|challenge|achievem
     // ── CHAT ──
     if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
 
-    // Premium check
+    // Lookup profile (for premium tier + display name)
     const { data: profile } = await admin
       .from("profiles")
       .select("is_premium, display_name")
       .eq("user_id", user.id)
       .maybeSingle();
-    if (!profile?.is_premium) {
-      return json({ error: "Premium required", code: "premium_required" }, 403);
-    }
+    const isPremium = !!profile?.is_premium;
 
-    const thinkingLevel = await getThinkingLevel();
+    const thinkingLevel: ThinkingLevel = FIXED_THINKING_LEVEL;
     const today = hkToday();
     // Look back ~9 days from UTC now to safely cover the last 7 HKT days
     // (TZ buffer) — we still display HKT-converted dates downstream.
@@ -682,7 +663,7 @@ Return ONLY a JSON array. Each item: {"type":"preference|goal|challenge|achievem
     const { used: usedToday, limit: dailyLimit } = await getTodayUsage(
       admin,
       user.id,
-      thinkingLevel,
+      isPremium,
     );
     if (usedToday >= dailyLimit) {
       return json(
@@ -696,6 +677,7 @@ Return ONLY a JSON array. Each item: {"type":"preference|goal|challenge|achievem
         429,
       );
     }
+
 
     const {
       message,
@@ -1018,8 +1000,8 @@ If the user has no preferences set yet, ask ONE friendly onboarding question per
       temperature: 0.7,
       // Gemini counts thinking tokens against maxOutputTokens, so scale the
       // budget with the thinking level — otherwise high thinking returns blank.
-      maxOutputTokens: 1500 + THINKING_BUDGETS[thinkingLevel],
-      thinkingBudget: THINKING_BUDGETS[thinkingLevel],
+      maxOutputTokens: 1500 + FIXED_THINKING_BUDGET,
+      thinkingBudget: FIXED_THINKING_BUDGET,
     });
 
     // Persist messages + usage (write under current thinking level so future

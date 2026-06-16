@@ -89,7 +89,7 @@ export function useAICoach(open: boolean) {
   );
 
   const loadAll = useCallback(async () => {
-    if (!user || !isPremium) return;
+    if (!user) return;
     setLoadingHistory(true);
     try {
       const storedSidRaw = localStorage.getItem(SESSION_KEY);
@@ -139,15 +139,15 @@ export function useAICoach(open: boolean) {
     } finally {
       setLoadingHistory(false);
     }
-  }, [user, isPremium, callFn]);
+  }, [user, callFn]);
 
   useEffect(() => {
-    if (open && user && isPremium && !initRef.current) {
+    if (open && user && !initRef.current) {
       initRef.current = true;
       loadAll();
     }
     if (!open) initRef.current = false;
-  }, [open, user, isPremium, loadAll]);
+  }, [open, user, loadAll]);
 
   const send = useCallback(
     async (text: string) => {

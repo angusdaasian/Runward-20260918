@@ -135,12 +135,8 @@ const FloatingChatButton = ({ lang }: Props) => {
 
   const handleClick = useCallback(() => {
     if (!user) return;
-    if (!isPremium) {
-      setShowUpgrade(true);
-      return;
-    }
     setOpen((v) => !v);
-  }, [user, isPremium]);
+  }, [user]);
 
   if (!user) return null;
 
@@ -177,11 +173,6 @@ const FloatingChatButton = ({ lang }: Props) => {
           <X size={size === BTN_SIZE_DESKTOP ? 28 : 24} strokeWidth={2.5} />
         ) : (
           <MessageCircle size={size === BTN_SIZE_DESKTOP ? 28 : 24} strokeWidth={2} />
-        )}
-        {!isPremium && !open && (
-          <span className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-background border-2 border-primary flex items-center justify-center">
-            <Lock size={12} className="text-primary" />
-          </span>
         )}
       </button>
 

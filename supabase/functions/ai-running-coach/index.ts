@@ -888,7 +888,7 @@ Return ONLY a JSON array. Each item: {"type":"preference|goal|challenge|achievem
         : null;
       const planStart = parsedStart || fallbackStart;
 
-      const todayStr = today;
+      const todayStr = promptToday;
       let weekNumber: number | null = null;
       if (planStart) {
         const diffDays = daysBetweenYmd(planStart, todayStr);

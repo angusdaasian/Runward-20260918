@@ -697,13 +697,37 @@ Return ONLY a JSON array. Each item: {"type":"preference|goal|challenge|achievem
       );
     }
 
-    const { message, session_id, new_session, lang } = await req.json();
+    const {
+      message,
+      session_id,
+      new_session,
+      lang,
+      client_date,
+      client_now,
+      client_weekday,
+      client_tz,
+      client_tz_offset_minutes,
+    } = await req.json();
     if (!message || typeof message !== "string" || message.length > 4000) {
       return json({ error: "Invalid message" }, 400);
     }
     const requestedSessionId =
       typeof session_id === "string" && UUID_RE.test(session_id) ? session_id : null;
     const sessionId = new_session || !requestedSessionId ? crypto.randomUUID() : requestedSessionId;
+
+    // Prefer the user's device date for prompt date-anchors (so the AI matches
+    // the phone clock). Fall back to server HKT if not provided / invalid.
+    const promptToday = normalizeIsoDate(client_date) || today;
+    const clientTzLabel = typeof client_tz === "string" && client_tz
+      ? client_tz
+      : "Asia/Hong_Kong";
+    const clientNowLabel = typeof client_now === "string" && client_now ? client_now : "";
+    const clientWeekdayLabel =
+      typeof client_weekday === "string" && client_weekday ? client_weekday : hkWeekday(promptToday);
+    const clientTzOffsetLabel =
+      typeof client_tz_offset_minutes === "number"
+        ? `UTC${client_tz_offset_minutes >= 0 ? "+" : "-"}${Math.floor(Math.abs(client_tz_offset_minutes) / 60)}:${String(Math.abs(client_tz_offset_minutes) % 60).padStart(2, "0")}`
+        : "UTC+8";
 
     // Load context in parallel
     const [prefsR, historyR, insightsR, garminR, stravaR, appleR, terraR, racesR, planR] =

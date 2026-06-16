@@ -519,10 +519,11 @@ serve(async (req) => {
 
     // ── USAGE (read) ──
     if (action === "usage" && req.method === "GET") {
-      const level = await getThinkingLevel();
-      const { used, limit, remaining } = await getTodayUsage(admin, user.id, level);
-      return json({ remaining, used, limit, thinking_level: level });
+      const isPremium = await getIsPremium();
+      const { used, limit, remaining } = await getTodayUsage(admin, user.id, isPremium);
+      return json({ remaining, used, limit, thinking_level: FIXED_THINKING_LEVEL });
     }
+
 
     // ── TRAIN PER-USER MODEL FROM 2026 DATA ──
     // Pulls the user's full 2026 activity history and asks the model (medium

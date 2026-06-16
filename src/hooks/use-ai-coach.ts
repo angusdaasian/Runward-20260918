@@ -89,7 +89,7 @@ export function useAICoach(open: boolean) {
   );
 
   const loadAll = useCallback(async () => {
-    if (!user || !isPremium) return;
+    if (!user) return;
     setLoadingHistory(true);
     try {
       const storedSidRaw = localStorage.getItem(SESSION_KEY);

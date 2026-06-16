@@ -38,6 +38,28 @@ function normalizeThinking(v: unknown): ThinkingLevel {
 
 // ── Timezone helpers (Asia/Hong_Kong, UTC+8, no DST) ──
 const HKT_OFFSET_MS = 8 * 60 * 60 * 1000;
+const DAY_MS = 86400000;
+const LOCKED_CALENDAR_YEAR = 2026;
+const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+function normalizeYmd(year: number, month: number, day: number): string | null {
+  if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) return null;
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) {
+    return null;
+  }
+  return date.toISOString().slice(0, 10);
+}
+
+function normalizeIsoDate(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const m = String(value).match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (!m) return null;
+  return normalizeYmd(Number(m[1]), Number(m[2]), Number(m[3]));
+}
+
 function toHkDate(input: string | Date | null | undefined): string {
   if (!input) return "";
   const d = typeof input === "string" ? new Date(input) : input;
@@ -51,7 +73,7 @@ function hkWeekday(yyyyMmDd: string): string {
   const [y, m, d] = yyyyMmDd.split("-").map(Number);
   if (!y || !m || !d) return "";
   const date = new Date(Date.UTC(y, m - 1, d));
-  return ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][date.getUTCDay()];
+  return WEEKDAYS[date.getUTCDay()];
 }
 function hkRelativeLabel(yyyyMmDd: string, todayStr = hkToday()): string {
   if (!yyyyMmDd) return "";
@@ -63,6 +85,94 @@ function hkRelativeLabel(yyyyMmDd: string, todayStr = hkToday()): string {
   if (diff === 1) return "tomorrow";
   if (diff < 0) return `${-diff}d ago`;
   return `in ${diff}d`;
+}
+
+function shiftYmd(yyyyMmDd: string, days: number): string {
+  const [y, m, d] = yyyyMmDd.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d) + days * DAY_MS).toISOString().slice(0, 10);
+}
+
+function daysBetweenYmd(from: string, to: string): number {
+  return Math.round(
+    (new Date(`${to}T00:00:00Z`).getTime() - new Date(`${from}T00:00:00Z`).getTime()) / DAY_MS,
+  );
+}
+
+function buildCalendar2026Block(): string {
+  const lines: string[] = [];
+  for (let month = 1; month <= 12; month++) {
+    const daysInMonth = new Date(Date.UTC(LOCKED_CALENDAR_YEAR, month, 0)).getUTCDate();
+    const days: string[] = [];
+    for (let day = 1; day <= daysInMonth; day++) {
+      const ymd = normalizeYmd(LOCKED_CALENDAR_YEAR, month, day)!;
+      days.push(`${String(day).padStart(2, "0")} ${hkWeekday(ymd)}`);
+    }
+    lines.push(`${MONTH_NAMES[month - 1]} 2026: ${days.join(", ")}`);
+  }
+  return lines.join("\n");
+}
+
+function resolveDateFactsFromMessage(message: string, todayStr: string): string {
+  const facts = new Map<string, string>();
+  const addFact = (label: string, date: string | null) => {
+    if (!date) return;
+    facts.set(label, `${date} = ${hkWeekday(date)} (${hkRelativeLabel(date, todayStr)})`);
+  };
+
+  const lower = message.toLowerCase();
+  if (/\b(today|tdy)\b|今天|今日/.test(lower)) addFact("today", todayStr);
+  if (/\b(tomorrow|tmr|tmrw)\b|明天|聽日/.test(lower)) addFact("tomorrow", shiftYmd(todayStr, 1));
+  if (/\b(day after tomorrow)\b|後天/.test(lower)) addFact("day after tomorrow", shiftYmd(todayStr, 2));
+  if (/\b(yesterday|ytd)\b|昨天|昨日/.test(lower)) addFact("yesterday", shiftYmd(todayStr, -1));
+
+  for (const match of message.matchAll(/\b(2026)-(\d{1,2})-(\d{1,2})\b/g)) {
+    addFact(match[0], normalizeYmd(Number(match[1]), Number(match[2]), Number(match[3])));
+  }
+
+  // Hong Kong user input defaults to D/M/2026. Example: 21/6 = 2026-06-21 (Sun), not 2025-06-21.
+  for (const match of message.matchAll(/(^|[^\d])(\d{1,2})[\/.](\d{1,2})(?:[\/.](\d{2,4}))?(?=$|[^\d])/g)) {
+    const day = Number(match[2]);
+    const month = Number(match[3]);
+    let year = match[4] ? Number(match[4]) : LOCKED_CALENDAR_YEAR;
+    if (year < 100) year += 2000;
+    addFact(`${match[2]}/${match[3]}${match[4] ? `/${match[4]}` : ""}`, normalizeYmd(year, month, day));
+  }
+
+  const weekdayPatterns: Array<{ idx: number; names: string[] }> = [
+    { idx: 0, names: ["sunday", "sun", "星期日", "星期天", "週日", "周日", "禮拜日"] },
+    { idx: 1, names: ["monday", "mon", "星期一", "週一", "周一", "禮拜一"] },
+    { idx: 2, names: ["tuesday", "tue", "tues", "星期二", "週二", "周二", "禮拜二"] },
+    { idx: 3, names: ["wednesday", "wed", "星期三", "週三", "周三", "禮拜三"] },
+    { idx: 4, names: ["thursday", "thu", "thur", "thurs", "星期四", "週四", "周四", "禮拜四"] },
+    { idx: 5, names: ["friday", "fri", "星期五", "週五", "周五", "禮拜五"] },
+    { idx: 6, names: ["saturday", "satruday", "sat", "星期六", "週六", "周六", "禮拜六"] },
+  ];
+  for (const w of weekdayPatterns) {
+    if (!w.names.some((name) => lower.includes(name))) continue;
+    let recent = todayStr;
+    for (let i = 0; i <= 6; i++) {
+      const candidate = shiftYmd(todayStr, -i);
+      if (new Date(`${candidate}T00:00:00Z`).getUTCDay() === w.idx) {
+        recent = candidate;
+        break;
+      }
+    }
+    let next = todayStr;
+    for (let i = 1; i <= 7; i++) {
+      const candidate = shiftYmd(todayStr, i);
+      if (new Date(`${candidate}T00:00:00Z`).getUTCDay() === w.idx) {
+        next = candidate;
+        break;
+      }
+    }
+    addFact(`most recent ${WEEKDAYS[w.idx]}`, recent);
+    addFact(`next ${WEEKDAYS[w.idx]}`, next);
+  }
+
+  if (!facts.size) return "USER MESSAGE DATE RESOLUTION: No explicit relative or D/M date references detected.";
+  return `USER MESSAGE DATE RESOLUTION (authoritative; use these exact dates/weekdays if referenced):\n${Array.from(facts.entries())
+    .map(([label, fact]) => `- ${label}: ${fact}`)
+    .join("\n")}`;
 }
 
 // ── Vertex AI helper ──

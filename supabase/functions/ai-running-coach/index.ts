@@ -856,34 +856,32 @@ Return ONLY a JSON array. Each item: {"type":"preference|goal|challenge|achievem
     let planBlock = "ACTIVE TRAINING PLAN: (none — the runner is not following a structured plan)";
     if (plan) {
       const planData = asArr<any>(plan.plan_data);
-      const raceDate = plan.race_date ? new Date(plan.race_date) : null;
+      const raceDate = normalizeIsoDate(plan.race_date);
       const planStartSeed = asArr<any>(planData[0]?.days)[0]?.date;
-      const parsedStart = planStartSeed ? new Date(planStartSeed) : null;
+      const parsedStart = normalizeIsoDate(planStartSeed);
       const fallbackStart = raceDate && Number.isFinite(Number(plan.weeks))
-        ? new Date(raceDate.getTime() - Number(plan.weeks) * 7 * 86400000)
+        ? shiftYmd(raceDate, -Number(plan.weeks) * 7)
         : null;
-      const planStart = parsedStart && !isNaN(parsedStart.getTime())
-        ? parsedStart
-        : fallbackStart && !isNaN(fallbackStart.getTime()) ? fallbackStart : null;
+      const planStart = parsedStart || fallbackStart;
 
-      const today = new Date();
-      const todayStr = today.toISOString().slice(0, 10);
+      const todayStr = today;
       let weekNumber: number | null = null;
-      if (planStart && today >= planStart) {
-        const diffMs = today.getTime() - planStart.getTime();
-        weekNumber = Math.max(1, Math.floor(diffMs / (7 * 86400000)) + 1);
+      if (planStart) {
+        const diffDays = daysBetweenYmd(planStart, todayStr);
+        if (diffDays >= 0) weekNumber = Math.max(1, Math.floor(diffDays / 7) + 1);
       }
 
       // Collect upcoming planned days (today + next 13 days)
       const upcomingDays: string[] = [];
-      const horizonEnd = new Date(today.getTime() + 14 * 86400000).toISOString().slice(0, 10);
+      const horizonEnd = shiftYmd(todayStr, 14);
       for (const week of planData) {
         for (const d of asArr<any>(week?.days)) {
-          if (!d?.date) continue;
-          if (d.date >= todayStr && d.date <= horizonEnd) {
+          const dayDate = normalizeIsoDate(d?.date);
+          if (!dayDate) continue;
+          if (dayDate >= todayStr && dayDate <= horizonEnd) {
             const dist = d.distance_km ?? d.distance;
             const workout = d.workout || d.description || d.type || "Rest";
-            upcomingDays.push(`- ${d.date} (W${week.week}): ${workout}${dist ? ` — ${dist} km` : ""}`);
+            upcomingDays.push(`- ${dayDate} (${hkWeekday(dayDate)}, W${week.week}): ${workout}${dist ? ` — ${dist} km` : ""}`);
           }
         }
       }
@@ -893,7 +891,7 @@ Return ONLY a JSON array. Each item: {"type":"preference|goal|challenge|achievem
 - Target finishing time: ${plan.target_time || "n/a"}
 - Race date: ${plan.race_date || "n/a"}
 - Plan length: ${plan.weeks || "?"} weeks
-- Plan start: ${planStart ? planStart.toISOString().slice(0, 10) : "unknown"}
+- Plan start: ${planStart || "unknown"}
 - Current week: ${weekNumber ? `Week ${weekNumber}` : "Plan has not started yet"}
 
 PLANNED WORKOUTS (today + next 14 days):
@@ -903,22 +901,35 @@ ${upcomingDays.length ? upcomingDays.join("\n") : "(no scheduled workouts in thi
     // Build an explicit date-anchor table the model can use for "yesterday",
     // "Saturday", "2 days ago", etc. Avoid the model guessing from training data.
     const dateAnchorLines: string[] = [];
-    for (let i = 0; i <= 7; i++) {
-      const ts = new Date(`${today}T00:00:00Z`).getTime() - i * 86400000;
-      const d = new Date(ts).toISOString().slice(0, 10);
+    for (let i = -14; i <= 21; i++) {
+      const d = shiftYmd(today, i);
       dateAnchorLines.push(`- ${d} = ${hkWeekday(d)}, ${hkRelativeLabel(d, today)}`);
     }
+    const yesterday = shiftYmd(today, -1);
+    const tomorrow = shiftYmd(today, 1);
+    const messageDateFacts = resolveDateFactsFromMessage(message, today);
     const dateContextBlock = `CURRENT DATE & TIMEZONE (authoritative — ignore any other date you may have learned):
 - Today: ${today} (${hkWeekday(today)})
+- Yesterday: ${yesterday} (${hkWeekday(yesterday)})
+- Tomorrow: ${tomorrow} (${hkWeekday(tomorrow)})
 - Timezone: Asia/Hong_Kong (HKT, UTC+8). All activity dates below are already converted to HKT.
 - Year is 2026.
-Date anchors (use these to resolve any relative date the user mentions):
+- Locked 2026 calendar source: timeanddate.com Hong Kong calendar. The table below is authoritative.
+
+${messageDateFacts}
+
+Nearby date anchors (use these to resolve relative dates; never infer weekdays from memory):
 ${dateAnchorLines.join("\n")}
 
+LOCKED 2026 CALENDAR (Hong Kong; immutable):
+${buildCalendar2026Block()}
+
 DATE RULES (strict):
-- "Yesterday" ALWAYS means ${dateAnchorLines[1].split(" = ")[0].replace("- ", "")}. "Today" ALWAYS means ${today}.
+- "Yesterday" ALWAYS means ${yesterday}. "Today" ALWAYS means ${today}. "Tomorrow" ALWAYS means ${tomorrow}.
+- Interpret slash dates as D/M/2026 unless a year is explicitly given: 21/6 means 2026-06-21 (${hkWeekday("2026-06-21")}); 14/6 means 2026-06-14 (${hkWeekday("2026-06-14")}).
 - When the user mentions a weekday (e.g. "Saturday"), map it to the most recent past occurrence using the anchor table above — never guess.
 - When citing a run, state the actual HKT date and weekday from the activity line. Do NOT shift the date by ±1 day.
+- If prior conversation history contains a different weekday/date mapping, treat it as wrong and correct it using this 2026 calendar.
 - If no activity matches the requested date, say so explicitly instead of substituting a nearby run.`;
 
     const systemPrompt = `You are an expert AI Running Coach for an athlete named ${profile?.display_name || "the runner"}.

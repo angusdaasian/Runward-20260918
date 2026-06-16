@@ -347,6 +347,8 @@ serve(async (req) => {
       }
     }
 
+    await maybeTrainCoachOnce(supabase, user.id);
+
     return new Response(
       JSON.stringify({
         success: true,

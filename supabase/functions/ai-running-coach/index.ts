@@ -16,25 +16,18 @@ const MODEL = "gemini-3.1-pro-preview";
 
 type ThinkingLevel = "minimal" | "low" | "medium" | "high";
 
-const THINKING_LIMITS: Record<ThinkingLevel, number> = {
-  minimal: 100,
-  low: 80,
-  medium: 60,
-  high: 40,
-};
+// Daily message limits by subscription tier.
+const FREE_DAILY_LIMIT = 20;
+const PREMIUM_DAILY_LIMIT = 100;
 
-// Token budget passed to Gemini's thinkingConfig.thinkingBudget.
-// 0 disables thinking; higher = more deliberation.
-const THINKING_BUDGETS: Record<ThinkingLevel, number> = {
-  minimal: 0,
-  low: 512,
-  medium: 2048,
-  high: 8192,
-};
+// Fixed thinking level for all users — always "high" for best quality.
+const FIXED_THINKING_LEVEL: ThinkingLevel = "high";
+const FIXED_THINKING_BUDGET = 8192;
 
-function normalizeThinking(v: unknown): ThinkingLevel {
-  return v === "low" || v === "medium" || v === "high" ? v : "minimal";
+function normalizeThinking(_v: unknown): ThinkingLevel {
+  return FIXED_THINKING_LEVEL;
 }
+
 
 // ── Timezone helpers (Asia/Hong_Kong, UTC+8, no DST) ──
 const HKT_OFFSET_MS = 8 * 60 * 60 * 1000;

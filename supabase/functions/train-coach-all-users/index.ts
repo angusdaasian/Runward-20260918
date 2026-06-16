@@ -73,16 +73,18 @@ serve(async (req) => {
     }
 
     const allTargets = Array.from(userIds);
-    const chunkSize = Math.max(1, Math.min(40, parseInt(url.searchParams.get("chunk") || "20", 10)));
+    const chunkSize = Math.max(1, Math.min(40, parseInt(url.searchParams.get("chunk") || "30", 10)));
     const targets = allTargets.slice(0, chunkSize);
-    const remaining = allTargets.length - targets.length;
     const trainUrl = `${SUPABASE_URL}/functions/v1/ai-running-coach?action=train_user_model`;
 
-    const MAX_RETRIES = 4;
-    const BASE_DELAY_MS = 6000;
-    const PACE_MS = 1500;
+    const MAX_RETRIES = 3;
+    const BASE_DELAY_MS = 4000;
+    const PACE_MS = 800;
+    const TIME_BUDGET_MS = 90_000; // stop accepting new work after 90s and chain
+    const start = Date.now();
     let ok = 0;
     let failed = 0;
+    let processed = 0;
 
     const trainOne = async (uid: string): Promise<void> => {
       for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
@@ -111,14 +113,17 @@ serve(async (req) => {
       failed++;
     };
 
-    // Process this chunk inline so we know it completes before responding.
     for (const uid of targets) {
+      if (Date.now() - start > TIME_BUDGET_MS) break;
       await trainOne(uid);
+      processed++;
       await new Promise((res) => setTimeout(res, PACE_MS));
     }
-    console.log(`train-coach-all-users chunk done processed=${targets.length} ok=${ok} failed=${failed} remaining=${remaining}`);
 
-    // Self-chain: kick off next chunk in background (don't await).
+    const remaining = allTargets.length - processed;
+    console.log(`train-coach-all-users chunk done processed=${processed}/${targets.length} ok=${ok} failed=${failed} remaining≈${remaining} elapsed=${Date.now() - start}ms`);
+
+    // Self-chain: kick off next invocation in background.
     if (remaining > 0) {
       const selfUrl = `${SUPABASE_URL}/functions/v1/train-coach-all-users?chunk=${chunkSize}${force ? "&force=1" : ""}`;
       const next = fetch(selfUrl, {
@@ -134,7 +139,7 @@ serve(async (req) => {
 
     return json({
       ok: true,
-      processed: targets.length,
+      processed,
       trained: ok,
       failed,
       remaining,

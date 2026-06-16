@@ -63,49 +63,7 @@ const CoachSettings = ({ open, onOpenChange, prefs, insights, onSave, onResetMem
         </SheetHeader>
 
         <div className="space-y-5 py-4">
-          {/* Thinking level */}
-          <div className="space-y-2 rounded-lg border border-border bg-muted/30 p-3">
-            <div className="flex items-center gap-2">
-              <Brain size={14} className="text-primary" />
-              <Label className="m-0">{t("Thinking level", "思考強度")}</Label>
-            </div>
-            <p className="text-[11px] text-muted-foreground leading-relaxed">
-              {t(
-                "Higher thinking gives smarter answers but uses more of your daily quota.",
-                "思考越深答案越聰明,但每日可用訊息數會減少。",
-              )}
-            </p>
-            <Select
-              value={(local.thinking_level as string) || "minimal"}
-              onValueChange={(v) =>
-                setLocal({ ...local, thinking_level: v as any })
-              }
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className="z-[10002]">
-                <SelectItem value="minimal">
-                  {t("Minimal — 100 messages/day", "最低 — 每日 100 則")}
-                </SelectItem>
-                <SelectItem value="low">
-                  {t("Low — 80 messages/day", "低 — 每日 80 則")}
-                </SelectItem>
-                <SelectItem value="medium">
-                  {t("Medium — 60 messages/day", "中 — 每日 60 則")}
-                </SelectItem>
-                <SelectItem value="high">
-                  {t("High — 40 messages/day", "高 — 每日 40 則")}
-                </SelectItem>
-              </SelectContent>
-            </Select>
-            <p className="text-[10px] text-muted-foreground">
-              {t(
-                "Switching levels mid-day converts your used count proportionally.",
-                "中途切換等級時,已使用次數會按比例換算。",
-              )}
-            </p>
-          </div>
+
 
           {/* Units */}
           <div className="flex items-center justify-between">

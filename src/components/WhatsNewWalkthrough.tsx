@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import {
   Sparkles, Menu, ArrowRight, ChevronRight, Settings2, Hand,
   Activity, BarChart3, Heart, Moon, Type, Link2, MessageSquare, Send,
+  Brain, LineChart, Database,
 } from "lucide-react";
 import { Lang } from "@/lib/i18n";
 

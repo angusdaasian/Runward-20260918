@@ -72,75 +72,73 @@ serve(async (req) => {
       }
     }
 
-    const targets = Array.from(userIds);
+    const allTargets = Array.from(userIds);
+    const chunkSize = Math.max(1, Math.min(40, parseInt(url.searchParams.get("chunk") || "20", 10)));
+    const targets = allTargets.slice(0, chunkSize);
+    const remaining = allTargets.length - targets.length;
     const trainUrl = `${SUPABASE_URL}/functions/v1/ai-running-coach?action=train_user_model`;
 
-    // Fire-and-forget: kick off training in background so the HTTP request
-    // returns immediately. Each train call hits Vertex AI (~5-30s) and we
-    // can't hold the response open for hundreds of users.
-    const bg = (async () => {
-      const CONCURRENCY = 1;
-      const MAX_RETRIES = 5;
-      const BASE_DELAY_MS = 8000; // backoff base for 429s
-      const PACE_MS = 2500; // gap between successful calls
+    const MAX_RETRIES = 4;
+    const BASE_DELAY_MS = 6000;
+    const PACE_MS = 1500;
+    let ok = 0;
+    let failed = 0;
 
-      let ok = 0;
-      let failed = 0;
-
-      const trainOne = async (uid: string): Promise<void> => {
-        for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-          try {
-            const r = await fetch(trainUrl, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                "x-internal-secret": SERVICE_ROLE,
-                Authorization: `Bearer ${SERVICE_ROLE}`,
-              },
-              body: JSON.stringify({ internalUserId: uid }),
-            });
-            const body = await r.text().catch(() => "");
-            if (r.ok) {
-              ok++;
-              return;
-            }
-            const isRate = r.status === 429 || /RESOURCE_EXHAUSTED|429/i.test(body);
-            console.warn(`train ${uid} HTTP ${r.status} attempt=${attempt + 1}`);
-            if (!isRate && r.status < 500) {
-              failed++;
-              return;
-            }
-            const delay = BASE_DELAY_MS * Math.pow(2, attempt) + Math.floor(Math.random() * 1500);
-            await new Promise((res) => setTimeout(res, delay));
-          } catch (e) {
-            console.warn(`train ${uid} threw attempt=${attempt + 1}`, e);
-            await new Promise((res) => setTimeout(res, BASE_DELAY_MS * (attempt + 1)));
-          }
-        }
-        failed++;
-        console.warn(`train ${uid} gave up after ${MAX_RETRIES} attempts`);
-      };
-
-      for (let i = 0; i < targets.length; i += CONCURRENCY) {
-        const batch = targets.slice(i, i + CONCURRENCY);
-        await Promise.allSettled(batch.map(trainOne));
-        await new Promise((res) => setTimeout(res, PACE_MS));
-        if ((i + CONCURRENCY) % 25 === 0) {
-          console.log(`train-coach-all-users progress ${i + CONCURRENCY}/${targets.length} ok=${ok} failed=${failed}`);
+    const trainOne = async (uid: string): Promise<void> => {
+      for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+        try {
+          const r = await fetch(trainUrl, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-internal-secret": SERVICE_ROLE,
+              Authorization: `Bearer ${SERVICE_ROLE}`,
+            },
+            body: JSON.stringify({ internalUserId: uid }),
+          });
+          const body = await r.text().catch(() => "");
+          if (r.ok) { ok++; return; }
+          const isRate = r.status === 429 || /RESOURCE_EXHAUSTED|429/i.test(body);
+          console.warn(`train ${uid} HTTP ${r.status} attempt=${attempt + 1}`);
+          if (!isRate && r.status < 500) { failed++; return; }
+          const delay = BASE_DELAY_MS * Math.pow(2, attempt) + Math.floor(Math.random() * 1500);
+          await new Promise((res) => setTimeout(res, delay));
+        } catch (e) {
+          console.warn(`train ${uid} threw attempt=${attempt + 1}`, e);
+          await new Promise((res) => setTimeout(res, BASE_DELAY_MS * (attempt + 1)));
         }
       }
-      console.log(`train-coach-all-users finished total=${targets.length} ok=${ok} failed=${failed}`);
-    })();
+      failed++;
+    };
 
-    // Keep the background task alive after the HTTP response returns.
-    const rt = (globalThis as any).EdgeRuntime;
-    if (rt?.waitUntil) rt.waitUntil(bg);
+    // Process this chunk inline so we know it completes before responding.
+    for (const uid of targets) {
+      await trainOne(uid);
+      await new Promise((res) => setTimeout(res, PACE_MS));
+    }
+    console.log(`train-coach-all-users chunk done processed=${targets.length} ok=${ok} failed=${failed} remaining=${remaining}`);
 
+    // Self-chain: kick off next chunk in background (don't await).
+    if (remaining > 0) {
+      const selfUrl = `${SUPABASE_URL}/functions/v1/train-coach-all-users?chunk=${chunkSize}${force ? "&force=1" : ""}`;
+      const next = fetch(selfUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${SERVICE_ROLE}`,
+        },
+      }).catch((e) => console.warn("self-chain failed", e));
+      const rt = (globalThis as any).EdgeRuntime;
+      if (rt?.waitUntil) rt.waitUntil(next);
+    }
 
     return json({
       ok: true,
-      candidates: targets.length,
-      queued: targets.length,
+      processed: targets.length,
+      trained: ok,
+      failed,
+      remaining,
+      total_candidates: allTargets.length,
       force,
     });
 

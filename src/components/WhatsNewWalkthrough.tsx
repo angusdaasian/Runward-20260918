@@ -272,7 +272,78 @@ const MessagingIllustration = ({ lang }: { lang: Lang }) => (
   </div>
 );
 
+const AiModelIllustration = ({ lang }: { lang: Lang }) => (
+  <div className="relative w-full rounded-xl bg-muted/40 border border-border p-3 overflow-hidden">
+    <div className="flex items-center gap-2 rounded-lg bg-card border-2 border-primary p-2.5 shadow">
+      <div className="w-10 h-10 rounded-full bg-primary/15 flex items-center justify-center text-primary">
+        <Brain size={18} />
+      </div>
+      <div className="flex-1">
+        <div className="text-[11px] font-semibold text-foreground">
+          {tx(lang, "Smarter AI Coach", "更聰明的 AI 教練")}
+        </div>
+        <div className="text-[9px] text-muted-foreground">
+          {tx(lang, "Trained on your full 2026 history", "已學習你 2026 年的全部紀錄")}
+        </div>
+      </div>
+    </div>
+    <div className="mt-2 grid grid-cols-3 gap-1.5">
+      {[
+        { icon: Database, label: tx(lang, "All runs", "所有跑步") },
+        { icon: LineChart, label: tx(lang, "Trends", "趨勢") },
+        { icon: Sparkles, label: tx(lang, "Insights", "洞察") },
+      ].map(({ icon: Icon, label }, i) => (
+        <div key={i} className="rounded-md bg-card border border-border p-1.5 flex flex-col items-center gap-1">
+          <Icon size={12} className="text-primary" />
+          <span className="text-[9px] font-semibold text-foreground/80">{label}</span>
+        </div>
+      ))}
+    </div>
+    <div className="mt-2 flex items-center gap-1.5">
+      <ChevronRight size={12} className="text-primary shrink-0" />
+      <span className="text-[10px] text-foreground/80">
+        {tx(lang, "More accurate analysis & suggestions", "更準確的分析與建議")}
+      </span>
+    </div>
+  </div>
+);
+
+const IntervalsIllustration = ({ lang }: { lang: Lang }) => (
+  <div className="relative w-full rounded-xl bg-muted/40 border border-border p-3 overflow-hidden">
+    <div className="flex items-center gap-2 rounded-lg bg-card border-2 border-primary p-2.5 shadow">
+      <div className="w-10 h-10 rounded-md bg-[#FF6B35] flex items-center justify-center text-white font-bold text-[11px]">
+        i.icu
+      </div>
+      <div className="flex-1">
+        <div className="text-[11px] font-semibold text-foreground">
+          {tx(lang, "Intervals.icu", "Intervals.icu")}
+        </div>
+        <div className="text-[9px] text-muted-foreground">
+          {tx(lang, "Sync workouts & fitness data", "同步訓練與體能數據")}
+        </div>
+      </div>
+      <Link2 size={14} className="text-primary" />
+    </div>
+    <div className="mt-2.5 space-y-1.5">
+      <div className="flex items-center gap-1.5">
+        <ChevronRight size={12} className="text-primary shrink-0" />
+        <span className="text-[10px] text-foreground/80">
+          {tx(lang, "Pull activities from intervals.icu", "從 intervals.icu 匯入活動")}
+        </span>
+      </div>
+      <div className="flex items-center gap-1.5">
+        <Settings2 size={12} className="text-primary shrink-0" />
+        <span className="text-[10px] text-foreground/80">
+          {tx(lang, "Connect from More → Connect Apps", "從「更多 → 連結應用程式」連接")}
+        </span>
+      </div>
+    </div>
+  </div>
+);
+
 /* -------------------- Component -------------------- */
+
+
 
 
 const WhatsNewWalkthrough = ({ lang, enabled, manualOpen, onManualOpenChange }: Props) => {

@@ -868,6 +868,7 @@ async function processWebhook(
           for (const key of newActivityKeys) {
             await pushActivityUploadedNotification(appUserId, key);
           }
+          await maybeTrainCoachOnce(supa, appUserId);
         }
       } else if (type === "daily" && appUserId) {
         const items = Array.isArray(payload?.data) ? payload.data : [payload?.data].filter(Boolean);

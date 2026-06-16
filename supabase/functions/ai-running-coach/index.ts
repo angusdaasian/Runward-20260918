@@ -697,13 +697,37 @@ Return ONLY a JSON array. Each item: {"type":"preference|goal|challenge|achievem
       );
     }
 
-    const { message, session_id, new_session, lang } = await req.json();
+    const {
+      message,
+      session_id,
+      new_session,
+      lang,
+      client_date,
+      client_now,
+      client_weekday,
+      client_tz,
+      client_tz_offset_minutes,
+    } = await req.json();
     if (!message || typeof message !== "string" || message.length > 4000) {
       return json({ error: "Invalid message" }, 400);
     }
     const requestedSessionId =
       typeof session_id === "string" && UUID_RE.test(session_id) ? session_id : null;
     const sessionId = new_session || !requestedSessionId ? crypto.randomUUID() : requestedSessionId;
+
+    // Prefer the user's device date for prompt date-anchors (so the AI matches
+    // the phone clock). Fall back to server HKT if not provided / invalid.
+    const promptToday = normalizeIsoDate(client_date) || today;
+    const clientTzLabel = typeof client_tz === "string" && client_tz
+      ? client_tz
+      : "Asia/Hong_Kong";
+    const clientNowLabel = typeof client_now === "string" && client_now ? client_now : "";
+    const clientWeekdayLabel =
+      typeof client_weekday === "string" && client_weekday ? client_weekday : hkWeekday(promptToday);
+    const clientTzOffsetLabel =
+      typeof client_tz_offset_minutes === "number"
+        ? `UTC${client_tz_offset_minutes >= 0 ? "+" : "-"}${Math.floor(Math.abs(client_tz_offset_minutes) / 60)}:${String(Math.abs(client_tz_offset_minutes) % 60).padStart(2, "0")}`
+        : "UTC+8";
 
     // Load context in parallel
     const [prefsR, historyR, insightsR, garminR, stravaR, appleR, terraR, racesR, planR] =
@@ -810,7 +834,7 @@ Return ONLY a JSON array. Each item: {"type":"preference|goal|challenge|achievem
 - Training intensity preference: ${prefs.training_intensity || "moderate"}`
       : "(no preferences set yet — gently ask onboarding questions across replies)";
 
-    const todayIso = today; // HKT today (YYYY-MM-DD)
+    const todayIso = promptToday; // user's device today (YYYY-MM-DD)
     const racesData = (racesR.data || []) as any[];
     const upcomingRaces = racesData.filter((r) => r.race_date >= todayIso).slice(0, 8);
     const pastRaces = racesData.filter((r) => r.race_date < todayIso).slice(-8);
@@ -864,7 +888,7 @@ Return ONLY a JSON array. Each item: {"type":"preference|goal|challenge|achievem
         : null;
       const planStart = parsedStart || fallbackStart;
 
-      const todayStr = today;
+      const todayStr = promptToday;
       let weekNumber: number | null = null;
       if (planStart) {
         const diffDays = daysBetweenYmd(planStart, todayStr);
@@ -902,17 +926,19 @@ ${upcomingDays.length ? upcomingDays.join("\n") : "(no scheduled workouts in thi
     // "Saturday", "2 days ago", etc. Avoid the model guessing from training data.
     const dateAnchorLines: string[] = [];
     for (let i = -14; i <= 21; i++) {
-      const d = shiftYmd(today, i);
-      dateAnchorLines.push(`- ${d} = ${hkWeekday(d)}, ${hkRelativeLabel(d, today)}`);
+      const d = shiftYmd(promptToday, i);
+      dateAnchorLines.push(`- ${d} = ${hkWeekday(d)}, ${hkRelativeLabel(d, promptToday)}`);
     }
-    const yesterday = shiftYmd(today, -1);
-    const tomorrow = shiftYmd(today, 1);
-    const messageDateFacts = resolveDateFactsFromMessage(message, today);
-    const dateContextBlock = `CURRENT DATE & TIMEZONE (authoritative — ignore any other date you may have learned):
-- Today: ${today} (${hkWeekday(today)})
+    const yesterday = shiftYmd(promptToday, -1);
+    const tomorrow = shiftYmd(promptToday, 1);
+    const messageDateFacts = resolveDateFactsFromMessage(message, promptToday);
+    const dateContextBlock = `CURRENT DATE & TIMEZONE (authoritative — from the user's device clock; ignore any other date you may have learned):
+- Today: ${promptToday} (${clientWeekdayLabel})
 - Yesterday: ${yesterday} (${hkWeekday(yesterday)})
 - Tomorrow: ${tomorrow} (${hkWeekday(tomorrow)})
-- Timezone: Asia/Hong_Kong (HKT, UTC+8). All activity dates below are already converted to HKT.
+- Device timezone: ${clientTzLabel} (${clientTzOffsetLabel})${clientNowLabel ? `\n- Device time (ISO): ${clientNowLabel}` : ""}
+- Server HKT today (for reference): ${today} (${hkWeekday(today)})
+- All activity dates below are already converted to HKT.
 - Year is 2026.
 - Locked 2026 calendar source: timeanddate.com Hong Kong calendar. The table below is authoritative.
 
@@ -925,7 +951,7 @@ LOCKED 2026 CALENDAR (Hong Kong; immutable):
 ${buildCalendar2026Block()}
 
 DATE RULES (strict):
-- "Yesterday" ALWAYS means ${yesterday}. "Today" ALWAYS means ${today}. "Tomorrow" ALWAYS means ${tomorrow}.
+- "Yesterday" ALWAYS means ${yesterday}. "Today" ALWAYS means ${promptToday}. "Tomorrow" ALWAYS means ${tomorrow}.
 - Interpret slash dates as D/M/2026 unless a year is explicitly given: 21/6 means 2026-06-21 (${hkWeekday("2026-06-21")}); 14/6 means 2026-06-14 (${hkWeekday("2026-06-14")}).
 - When the user mentions a weekday (e.g. "Saturday"), map it to the most recent past occurrence using the anchor table above — never guess.
 - When citing a run, state the actual HKT date and weekday from the activity line. Do NOT shift the date by ±1 day.

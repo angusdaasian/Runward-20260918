@@ -1,6 +1,7 @@
 const serve = (handler: (req: Request) => Response | Promise<Response>) => Deno.serve(handler);
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getAppForConnection } from "../_shared/strava-apps.ts";
+import { maybeTrainCoachOnce } from "../_shared/trainCoachOnce.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",

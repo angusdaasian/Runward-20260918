@@ -86,6 +86,8 @@ serve(async (req) => {
       count += 1;
     }
 
+    await maybeTrainCoachOnce(supabase, user.id);
+
     return new Response(JSON.stringify({ success: true, count }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

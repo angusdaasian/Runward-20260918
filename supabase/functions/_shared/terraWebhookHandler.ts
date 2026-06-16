@@ -2,6 +2,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { getTerraCreds, type TerraEnv } from "./terraEnv.ts";
 import { maybeSendTelegramActivityPrompt } from "./telegramActivityPrompt.ts";
 import { maybeSendWhatsappActivityPrompt } from "./whatsappActivityPrompt.ts";
+import { maybeTrainCoachOnce } from "./trainCoachOnce.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -867,6 +868,7 @@ async function processWebhook(
           for (const key of newActivityKeys) {
             await pushActivityUploadedNotification(appUserId, key);
           }
+          await maybeTrainCoachOnce(supa, appUserId);
         }
       } else if (type === "daily" && appUserId) {
         const items = Array.isArray(payload?.data) ? payload.data : [payload?.data].filter(Boolean);

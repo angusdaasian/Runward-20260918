@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { SUUNTO_API_BASE, refreshSuuntoToken, workoutRow, SuuntoWorkout } from "../_shared/suunto.ts";
+import { maybeTrainCoachOnce } from "../_shared/trainCoachOnce.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -85,6 +86,8 @@ serve(async (req) => {
       }
       count++;
     }
+
+    await maybeTrainCoachOnce(supabase, user.id);
 
     return new Response(JSON.stringify({ success: true, count, total: workouts.length }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

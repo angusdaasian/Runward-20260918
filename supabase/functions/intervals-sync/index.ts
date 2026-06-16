@@ -5,6 +5,7 @@ import {
   mapIntervalsActivity,
   refreshIntervalsTokenIfNeeded,
 } from "../_shared/intervals.ts";
+import { maybeTrainCoachOnce } from "../_shared/trainCoachOnce.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -84,6 +85,8 @@ serve(async (req) => {
         .upsert(row, { onConflict: "intervals_id" });
       count += 1;
     }
+
+    await maybeTrainCoachOnce(supabase, user.id);
 
     return new Response(JSON.stringify({ success: true, count }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

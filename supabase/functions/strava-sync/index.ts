@@ -1,6 +1,7 @@
 const serve = (handler: (req: Request) => Response | Promise<Response>) => Deno.serve(handler);
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getAppForConnection } from "../_shared/strava-apps.ts";
+import { maybeTrainCoachOnce } from "../_shared/trainCoachOnce.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -206,6 +207,8 @@ serve(async (req) => {
         .update({ training_score: Math.round(avgScore) })
         .eq("user_id", user.id);
     }
+
+    await maybeTrainCoachOnce(supabase, user.id);
 
     return new Response(JSON.stringify({ success: true, count: totalCount }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

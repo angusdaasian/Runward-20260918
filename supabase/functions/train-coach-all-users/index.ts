@@ -78,7 +78,7 @@ serve(async (req) => {
     // Fire-and-forget: kick off training in background so the HTTP request
     // returns immediately. Each train call hits Vertex AI (~5-30s) and we
     // can't hold the response open for hundreds of users.
-    (async () => {
+    const bg = (async () => {
       const CONCURRENCY = 1;
       const MAX_RETRIES = 5;
       const BASE_DELAY_MS = 8000; // backoff base for 429s
@@ -131,6 +131,11 @@ serve(async (req) => {
       }
       console.log(`train-coach-all-users finished total=${targets.length} ok=${ok} failed=${failed}`);
     })();
+
+    // Keep the background task alive after the HTTP response returns.
+    const rt = (globalThis as any).EdgeRuntime;
+    if (rt?.waitUntil) rt.waitUntil(bg);
+
 
     return json({
       ok: true,

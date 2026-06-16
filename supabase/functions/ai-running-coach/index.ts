@@ -376,15 +376,16 @@ serve(async (req) => {
     const url = new URL(req.url);
     const action = url.searchParams.get("action");
 
-    // Helper to get the user's current thinking level.
-    const getThinkingLevel = async (): Promise<ThinkingLevel> => {
+    // Helper: check if user is premium.
+    const getIsPremium = async (): Promise<boolean> => {
       const { data } = await admin
-        .from("ai_coach_preferences")
-        .select("thinking_level")
+        .from("profiles")
+        .select("is_premium")
         .eq("user_id", user.id)
         .maybeSingle();
-      return normalizeThinking(data?.thinking_level);
+      return !!data?.is_premium;
     };
+
 
     // ── PREFERENCES (read/write) ──
     if (action === "preferences") {

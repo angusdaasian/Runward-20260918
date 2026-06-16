@@ -605,7 +605,7 @@ Return ONLY a JSON array. Each item: {"type":"preference|goal|challenge|achievem
         messages: [{ role: "user", content: prompt }],
         temperature: 0.3,
         maxOutputTokens: 4000,
-        thinkingBudget: THINKING_BUDGETS.medium,
+        thinkingBudget: 2048,
       });
       const m = out.match(/\[[\s\S]*\]/);
       let inserted = 0;

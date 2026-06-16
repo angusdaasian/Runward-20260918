@@ -659,7 +659,8 @@ Return ONLY a JSON array. Each item: {"type":"preference|goal|challenge|achievem
     const today = hkToday();
     // Look back ~9 days from UTC now to safely cover the last 7 HKT days
     // (TZ buffer) — we still display HKT-converted dates downstream.
-    const lookbackIso = new Date(Date.now() - 9 * 86400000).toISOString();
+    // Full history: feed all of 2026 so the AI never "forgets" past activities.
+    const lookbackIso = "2026-01-01T00:00:00Z";
     const { used: usedToday, limit: dailyLimit } = await getTodayUsage(
       admin,
       user.id,

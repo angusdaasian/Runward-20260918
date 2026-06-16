@@ -135,8 +135,12 @@ const FloatingChatButton = ({ lang }: Props) => {
 
   const handleClick = useCallback(() => {
     if (!user) return;
+    if (!isPremium) {
+      setShowUpgrade(true);
+      return;
+    }
     setOpen((v) => !v);
-  }, [user]);
+  }, [user, isPremium]);
 
   if (!user) return null;
 

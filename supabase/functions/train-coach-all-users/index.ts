@@ -79,12 +79,18 @@ serve(async (req) => {
     // returns immediately. Each train call hits Vertex AI (~5-30s) and we
     // can't hold the response open for hundreds of users.
     (async () => {
-      const CONCURRENCY = 3;
-      for (let i = 0; i < targets.length; i += CONCURRENCY) {
-        const batch = targets.slice(i, i + CONCURRENCY);
-        await Promise.allSettled(
-          batch.map((uid) =>
-            fetch(trainUrl, {
+      const CONCURRENCY = 1;
+      const MAX_RETRIES = 5;
+      const BASE_DELAY_MS = 8000; // backoff base for 429s
+      const PACE_MS = 2500; // gap between successful calls
+
+      let ok = 0;
+      let failed = 0;
+
+      const trainOne = async (uid: string): Promise<void> => {
+        for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+          try {
+            const r = await fetch(trainUrl, {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
@@ -92,15 +98,38 @@ serve(async (req) => {
                 Authorization: `Bearer ${SERVICE_ROLE}`,
               },
               body: JSON.stringify({ internalUserId: uid }),
-            })
-              .then(async (r) => {
-                if (!r.ok) console.warn(`train ${uid} HTTP ${r.status}`);
-              })
-              .catch((e) => console.warn(`train ${uid} failed`, e)),
-          ),
-        );
+            });
+            const body = await r.text().catch(() => "");
+            if (r.ok) {
+              ok++;
+              return;
+            }
+            const isRate = r.status === 429 || /RESOURCE_EXHAUSTED|429/i.test(body);
+            console.warn(`train ${uid} HTTP ${r.status} attempt=${attempt + 1}`);
+            if (!isRate && r.status < 500) {
+              failed++;
+              return;
+            }
+            const delay = BASE_DELAY_MS * Math.pow(2, attempt) + Math.floor(Math.random() * 1500);
+            await new Promise((res) => setTimeout(res, delay));
+          } catch (e) {
+            console.warn(`train ${uid} threw attempt=${attempt + 1}`, e);
+            await new Promise((res) => setTimeout(res, BASE_DELAY_MS * (attempt + 1)));
+          }
+        }
+        failed++;
+        console.warn(`train ${uid} gave up after ${MAX_RETRIES} attempts`);
+      };
+
+      for (let i = 0; i < targets.length; i += CONCURRENCY) {
+        const batch = targets.slice(i, i + CONCURRENCY);
+        await Promise.allSettled(batch.map(trainOne));
+        await new Promise((res) => setTimeout(res, PACE_MS));
+        if ((i + CONCURRENCY) % 25 === 0) {
+          console.log(`train-coach-all-users progress ${i + CONCURRENCY}/${targets.length} ok=${ok} failed=${failed}`);
+        }
       }
-      console.log(`train-coach-all-users finished ${targets.length} users`);
+      console.log(`train-coach-all-users finished total=${targets.length} ok=${ok} failed=${failed}`);
     })();
 
     return json({

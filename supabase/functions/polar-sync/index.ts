@@ -138,6 +138,8 @@ serve(async (req) => {
       ).catch((e) => console.warn("[polar-sync] commit failed", e));
     }
 
+    await maybeTrainCoachOnce(supabase, user.id);
+
     return new Response(JSON.stringify({
       success: true,
       count,

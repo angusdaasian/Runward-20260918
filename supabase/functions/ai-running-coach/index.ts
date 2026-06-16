@@ -1000,8 +1000,8 @@ If the user has no preferences set yet, ask ONE friendly onboarding question per
       temperature: 0.7,
       // Gemini counts thinking tokens against maxOutputTokens, so scale the
       // budget with the thinking level — otherwise high thinking returns blank.
-      maxOutputTokens: 1500 + THINKING_BUDGETS[thinkingLevel],
-      thinkingBudget: THINKING_BUDGETS[thinkingLevel],
+      maxOutputTokens: 1500 + FIXED_THINKING_BUDGET,
+      thinkingBudget: FIXED_THINKING_BUDGET,
     });
 
     // Persist messages + usage (write under current thinking level so future

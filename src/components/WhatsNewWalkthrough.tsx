@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import { Lang } from "@/lib/i18n";
 
-const STORAGE_KEY = "walkthrough_v2026_06_messaging_apps_seen";
+const STORAGE_KEY = "walkthrough_v2026_06_ai_intervals_seen";
 
 
 interface Props {

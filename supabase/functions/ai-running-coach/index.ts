@@ -647,17 +647,15 @@ Return ONLY a JSON array. Each item: {"type":"preference|goal|challenge|achievem
     // ── CHAT ──
     if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
 
-    // Premium check
+    // Lookup profile (for premium tier + display name)
     const { data: profile } = await admin
       .from("profiles")
       .select("is_premium, display_name")
       .eq("user_id", user.id)
       .maybeSingle();
-    if (!profile?.is_premium) {
-      return json({ error: "Premium required", code: "premium_required" }, 403);
-    }
+    const isPremium = !!profile?.is_premium;
 
-    const thinkingLevel = await getThinkingLevel();
+    const thinkingLevel: ThinkingLevel = FIXED_THINKING_LEVEL;
     const today = hkToday();
     // Look back ~9 days from UTC now to safely cover the last 7 HKT days
     // (TZ buffer) — we still display HKT-converted dates downstream.
@@ -665,7 +663,7 @@ Return ONLY a JSON array. Each item: {"type":"preference|goal|challenge|achievem
     const { used: usedToday, limit: dailyLimit } = await getTodayUsage(
       admin,
       user.id,
-      thinkingLevel,
+      isPremium,
     );
     if (usedToday >= dailyLimit) {
       return json(
@@ -679,6 +677,7 @@ Return ONLY a JSON array. Each item: {"type":"preference|goal|challenge|achievem
         429,
       );
     }
+
 
     const {
       message,

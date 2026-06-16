@@ -315,34 +315,25 @@ function buildActivitySummary(rows: any[], units: string): string {
     .join("\n");
 }
 
-// Read today's usage row and return the effective used count converted to the
-// CURRENT thinking level using the ratio rule.
+// Read today's usage row and return the effective used count + tier-based limit.
 async function getTodayUsage(
   admin: any,
   userId: string,
-  currentLevel: ThinkingLevel,
+  isPremium: boolean,
 ): Promise<{ used: number; limit: number; remaining: number; row: any }> {
   const today = hkToday();
   const { data: row } = await admin
     .from("ai_coach_usage")
-    .select("message_count, thinking_level")
+    .select("message_count")
     .eq("user_id", userId)
     .eq("date", today)
     .maybeSingle();
 
-  const limit = THINKING_LIMITS[currentLevel];
-  if (!row) {
-    return { used: 0, limit, remaining: limit, row: null };
-  }
-  const storedLevel = normalizeThinking(row.thinking_level);
-  const storedLimit = THINKING_LIMITS[storedLevel];
-  let used = row.message_count ?? 0;
-  if (storedLevel !== currentLevel) {
-    // Convert by ratio: ceil(used / oldLimit * newLimit)
-    used = Math.min(limit, Math.ceil((used / storedLimit) * limit));
-  }
+  const limit = isPremium ? PREMIUM_DAILY_LIMIT : FREE_DAILY_LIMIT;
+  const used = row?.message_count ?? 0;
   return { used, limit, remaining: Math.max(0, limit - used), row };
 }
+
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });

@@ -163,12 +163,25 @@ export function useAICoach(open: boolean) {
       setMessages((m) => [...m, userMsg, placeholder]);
       setSending(true);
       try {
+        const now = new Date();
+        const tzOffsetMin = -now.getTimezoneOffset();
+        const pad = (n: number) => String(n).padStart(2, "0");
+        const clientDate = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+        const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+        const clientWeekday = weekdays[now.getDay()];
+        const clientTz =
+          Intl.DateTimeFormat().resolvedOptions().timeZone || "unknown";
         const data = await callFn("", {
           method: "POST",
           body: JSON.stringify({
             message: trimmed,
             session_id: sessionId,
             lang: getLang(),
+            client_now: now.toISOString(),
+            client_date: clientDate,
+            client_weekday: clientWeekday,
+            client_tz: clientTz,
+            client_tz_offset_minutes: tzOffsetMin,
           }),
         });
         if (data.session_id && data.session_id !== sessionId) {

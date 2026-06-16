@@ -721,42 +721,40 @@ Return ONLY a JSON array. Each item: {"type":"preference|goal|challenge|achievem
           .select("role, content")
           .eq("user_id", user.id)
           .eq("session_id", sessionId)
-          .order("created_at", { ascending: true })
-          .limit(10),
+          .order("created_at", { ascending: true }),
         admin
           .from("ai_coach_insights")
           .select("insight_key, insight_value, confidence")
           .eq("user_id", user.id)
-          .order("confidence", { ascending: false })
-          .limit(15),
+          .order("confidence", { ascending: false }),
         admin
           .from("garmin_activities")
           .select("start_time, distance_meters, duration_seconds, average_hr, activity_type, laps")
           .eq("user_id", user.id)
           .gte("start_time", lookbackIso)
           .order("start_time", { ascending: false })
-          .limit(10),
+          .limit(500),
         admin
           .from("strava_activities")
           .select("start_date, distance, moving_time, average_heartrate, sport_type")
           .eq("user_id", user.id)
           .gte("start_date", lookbackIso)
           .order("start_date", { ascending: false })
-          .limit(10),
+          .limit(500),
         admin
           .from("apple_health_activities")
           .select("start_date, distance, moving_time, average_heartrate, sport_type")
           .eq("user_id", user.id)
           .gte("start_date", lookbackIso)
           .order("start_date", { ascending: false })
-          .limit(10),
+          .limit(500),
         admin
           .from("terra_activities")
           .select("start_time, distance_meters, duration_seconds, average_hr, activity_type, provider, laps")
           .eq("user_id", user.id)
           .gte("start_time", lookbackIso)
           .order("start_time", { ascending: false })
-          .limit(10),
+          .limit(500),
         admin
           .from("user_races")
           .select("race_name, race_date, category, city, country, finish_time_seconds, notes, priority")

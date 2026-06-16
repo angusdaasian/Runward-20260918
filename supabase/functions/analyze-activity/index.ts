@@ -14,7 +14,7 @@ function jsonResponse(body: Record<string, unknown>, status = 200) {
 
 // ── Vertex AI helper (OpenAI-compatible response shape) ──
 const VERTEX_MODEL_MAP: Record<string, string> = {
-  "google/gemini-3-flash-preview": "gemini-3-flash-preview",
+  "google/gemini-3.1-pro-preview": "gemini-3.1-pro-preview",
   "google/gemini-3.1-flash-lite-preview": "gemini-3.1-flash-lite-preview",
   "google/gemini-2.5-flash": "gemini-2.5-flash",
   "google/gemini-2.5-flash-lite": "gemini-2.5-flash-lite",
@@ -137,7 +137,7 @@ async function extractCityFromRaceName(raceName: string, apiKey: string): Promis
   try {
     const resp = await callVertexAI({
       apiKey,
-      model: "google/gemini-3-flash-preview",
+      model: "google/gemini-3.1-pro-preview",
       messages: [
         {
           role: "system",
@@ -299,7 +299,7 @@ serve(async (req) => {
 
       const tlResp = await callVertexAI({
         apiKey: VERTEX_API_KEY,
-        model: "google/gemini-3-flash-preview",
+        model: "google/gemini-3.1-pro-preview",
         messages: [
           { role: "user", content: `Translate the following running coach output into ${targetLang}. Preserve the ===ANALYSIS=== and ===NEXT_WORKOUT=== separators exactly. Keep Markdown intact. Only translate, do not change content.\n\n${combinedSource}` },
         ],
@@ -357,7 +357,7 @@ serve(async (req) => {
           const combined = `===ANALYSIS===\n${cached[otherField]}\n\n===NEXT_WORKOUT===\n${cached[otherNField] || ""}`;
           const tlResp = await callVertexAI({
             apiKey: VERTEX_API_KEY,
-            model: "google/gemini-3-flash-preview",
+            model: "google/gemini-3.1-pro-preview",
             messages: [{ role: "user", content: `Translate the following running coach output into ${targetLang}. Preserve the ===ANALYSIS=== and ===NEXT_WORKOUT=== separators exactly. Keep Markdown intact. Only translate, do not change content.\n\n${combined}` }],
           });
           if (tlResp.ok) {
@@ -410,7 +410,7 @@ serve(async (req) => {
         const combined = `===ANALYSIS===\n${existingAnalysis[otherField]}\n\n===NEXT_WORKOUT===\n${existingAnalysis[otherNextField] || ""}`;
         const tlResp = await callVertexAI({
           apiKey: VERTEX_API_KEY,
-          model: "google/gemini-3-flash-preview",
+          model: "google/gemini-3.1-pro-preview",
           messages: [{ role: "user", content: `Translate the following into ${targetLang}. Preserve the ===ANALYSIS=== and ===NEXT_WORKOUT=== separators. Keep Markdown.\n\n${combined}` }],
         });
         if (tlResp.ok) {
@@ -1234,7 +1234,7 @@ If the runner raced hard today or said they struggled, suggest rest or a very ea
 
     const response = await callVertexAI({
       apiKey: VERTEX_API_KEY,
-      model: "google/gemini-3-flash-preview",
+      model: "google/gemini-3.1-pro-preview",
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userMessage },

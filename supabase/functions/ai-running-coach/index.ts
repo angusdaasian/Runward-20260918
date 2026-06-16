@@ -834,7 +834,7 @@ Return ONLY a JSON array. Each item: {"type":"preference|goal|challenge|achievem
 - Training intensity preference: ${prefs.training_intensity || "moderate"}`
       : "(no preferences set yet — gently ask onboarding questions across replies)";
 
-    const todayIso = today; // HKT today (YYYY-MM-DD)
+    const todayIso = promptToday; // user's device today (YYYY-MM-DD)
     const racesData = (racesR.data || []) as any[];
     const upcomingRaces = racesData.filter((r) => r.race_date >= todayIso).slice(0, 8);
     const pastRaces = racesData.filter((r) => r.race_date < todayIso).slice(-8);

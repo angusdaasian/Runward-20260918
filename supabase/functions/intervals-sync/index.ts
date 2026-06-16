@@ -5,6 +5,7 @@ import {
   mapIntervalsActivity,
   refreshIntervalsTokenIfNeeded,
 } from "../_shared/intervals.ts";
+import { maybeTrainCoachOnce } from "../_shared/trainCoachOnce.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",

@@ -178,6 +178,11 @@ const FloatingChatButton = ({ lang }: Props) => {
         ) : (
           <MessageCircle size={size === BTN_SIZE_DESKTOP ? 28 : 24} strokeWidth={2} />
         )}
+        {!isPremium && !open && (
+          <span className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-background border-2 border-primary flex items-center justify-center">
+            <Lock size={12} className="text-primary" />
+          </span>
+        )}
       </button>
 
       <ChatModal open={open} onClose={() => setOpen(false)} lang={lang} />

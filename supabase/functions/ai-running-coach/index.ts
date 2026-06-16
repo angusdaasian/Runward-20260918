@@ -407,13 +407,10 @@ serve(async (req) => {
           "training_days",
           "injuries_concerns",
           "training_intensity",
-          "thinking_level",
         ];
         const cleaned: any = { user_id: user.id };
         for (const k of allowed) if (k in patch) cleaned[k] = patch[k];
-        if ("thinking_level" in cleaned) {
-          cleaned.thinking_level = normalizeThinking(cleaned.thinking_level);
-        }
+
         const { data, error } = await admin
           .from("ai_coach_preferences")
           .upsert(cleaned, { onConflict: "user_id" })

@@ -1002,9 +1002,13 @@ SAFETY:
 
 If the user has no preferences set yet, ask ONE friendly onboarding question per reply (experience, goal, days/week) — not all at once.`;
 
+    // Prepend a strong date reminder to the user's message before sending to
+    // the model, so it overrides any stale dates in earlier conversation
+    // history. This wrapper is NOT persisted to the DB.
+    const dateReminder = `[SYSTEM DATE OVERRIDE — Today is ${promptToday} (${clientWeekdayLabel}). Yesterday was ${shiftYmd(promptToday, -1)} (${hkWeekday(shiftYmd(promptToday, -1))}). Tomorrow is ${shiftYmd(promptToday, 1)} (${hkWeekday(shiftYmd(promptToday, 1))}). Device timezone: ${clientTzLabel}. Ignore any other date mentioned earlier in this conversation — they are stale.]\n\n`;
     const messages: Array<{ role: "user" | "assistant"; content: string }> = [
       ...history.map((m: any) => ({ role: m.role as "user" | "assistant", content: m.content })),
-      { role: "user", content: message },
+      { role: "user", content: dateReminder + message },
     ];
 
     const aiText = await callVertexAI({

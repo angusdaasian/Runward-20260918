@@ -535,6 +535,8 @@ serve(async (req) => {
         }).eq("user_id", user.id);
       }
 
+      await maybeTrainCoachOnce(supabase, user.id);
+
       return new Response(JSON.stringify({
         success: true,
         synced: totalSynced,

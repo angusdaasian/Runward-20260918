@@ -2,6 +2,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { getTerraCreds, type TerraEnv } from "./terraEnv.ts";
 import { maybeSendTelegramActivityPrompt } from "./telegramActivityPrompt.ts";
 import { maybeSendWhatsappActivityPrompt } from "./whatsappActivityPrompt.ts";
+import { maybeTrainCoachOnce } from "./trainCoachOnce.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",

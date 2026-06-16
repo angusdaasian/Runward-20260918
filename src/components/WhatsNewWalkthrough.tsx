@@ -389,6 +389,24 @@ const WhatsNewWalkthrough = ({ lang, enabled, manualOpen, onManualOpenChange }: 
       illustration: <MessagingIllustration lang={lang} />,
     },
     {
+      title: tx(lang, "Improved AI model for better analysis", "升級 AI 模型，分析更精準"),
+      desc: tx(
+        lang,
+        "Our AI model now learns from your full 2026 training history every time you chat — every run, every PR, every trend. That means more accurate insights, smarter workout suggestions, and feedback that actually remembers what you did last week (and last month).",
+        "我們的 AI 模型現在每次對話都會學習你 2026 年的完整訓練紀錄 — 每一次跑步、每一個 PR、每一個趨勢。代表更準確的洞察、更聰明的訓練建議，以及真正記得你上週（甚至上個月）做過什麼的回饋。"
+      ),
+      illustration: <AiModelIllustration lang={lang} />,
+    },
+    {
+      title: tx(lang, "Added Intervals.icu connection", "新增 Intervals.icu 連接"),
+      desc: tx(
+        lang,
+        "You can now connect your Intervals.icu account to sync workouts and fitness data straight into RunWard. Open More → Connect Apps to link it up.",
+        "現在可以連接你的 Intervals.icu 帳戶，將訓練與體能數據直接同步到 RunWard。從「更多 → 連結應用程式」開啟連接。"
+      ),
+      illustration: <IntervalsIllustration lang={lang} />,
+    },
+    {
       title: tx(lang, "Meet Simple Mode", "認識簡易模式"),
       desc: tx(
         lang,

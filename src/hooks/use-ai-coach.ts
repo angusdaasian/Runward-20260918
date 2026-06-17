@@ -210,9 +210,16 @@ export function useAICoach(open: boolean) {
         setMessages((m) =>
           m.map((x) =>
             x.id === placeholder.id
-              ? { ...x, content: data.response || "", pending: false }
+              ? {
+                  ...x,
+                  content: data.response || "",
+                  pending: false,
+                  planSuggestion: data.plan_suggestion || null,
+                  planSuggestionStatus: data.plan_suggestion ? "pending" : undefined,
+                }
               : x,
           ),
+
         );
         // Refresh insights + sessions in background
         callFn("?action=insights", { method: "GET" })

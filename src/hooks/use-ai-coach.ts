@@ -4,12 +4,28 @@ import { useAuth } from "@/contexts/AuthContext";
 import { usePremium } from "@/contexts/PremiumContext";
 import { toast } from "sonner";
 
+export type PlanSuggestion = {
+  plan_id: string;
+  summary_en: string;
+  summary_zh: string;
+  changes: Array<{
+    date: string;
+    type?: string | null;
+    distance_km?: number | null;
+    pace?: string | null;
+    description?: string;
+  }>;
+};
+
 export type CoachMessage = {
   id: string;
   role: "user" | "assistant";
   content: string;
   pending?: boolean;
+  planSuggestion?: PlanSuggestion | null;
+  planSuggestionStatus?: "pending" | "applied" | "dismissed";
 };
+
 
 export type ThinkingLevel = "minimal" | "low" | "medium" | "high";
 

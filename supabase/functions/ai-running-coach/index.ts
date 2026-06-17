@@ -168,6 +168,44 @@ function resolveDateFactsFromMessage(message: string, todayStr: string): string 
     .join("\n")}`;
 }
 
+function inferSimplePlanChange(message: string, todayStr: string, rows: Array<{ date: string; type?: string; distance_km?: number | null; pace?: string | null; description?: string }>) {
+  const lower = message.toLowerCase();
+  const isRest = /\b(rest day|day off|take.*(?:rest|off)|skip|cancel|no run|not run|don't run|dont run)\b|休息|不跑|休跑|取消/.test(lower);
+  const type = isRest ? "rest"
+    : /\beasy\b|輕鬆|轻松/.test(lower) ? "easy"
+    : /\blong\b|長課|长课|長跑|长跑/.test(lower) ? "long"
+    : /\btempo\b|節奏|节奏/.test(lower) ? "tempo"
+    : /\binterval\b|間歇|间歇/.test(lower) ? "interval"
+    : null;
+  if (!type) return null;
+
+  const targetDates = new Set<string>();
+  if (/\b(today|tdy)\b|今天|今日/.test(lower)) targetDates.add(todayStr);
+  if (/\b(tomorrow|tmr|tmrw)\b|明天|聽日/.test(lower)) targetDates.add(shiftYmd(todayStr, 1));
+  for (const row of rows) {
+    const weekday = hkWeekday(row.date).toLowerCase();
+    if (weekday && lower.includes(weekday)) targetDates.add(row.date);
+  }
+
+  const kmMatch = lower.match(/(\d+(?:\.\d+)?)\s*(?:km|kilometer|kilometre|公里)/);
+  const distanceKm = isRest ? 0 : kmMatch ? Number(kmMatch[1]) : null;
+  const changes = rows
+    .filter((row) => targetDates.has(row.date))
+    .map((row) => ({
+      date: row.date,
+      type,
+      distance_km: distanceKm,
+      pace: null,
+      description: isRest ? "Rest day" : `${type} workout`,
+    }));
+  if (!changes.length) return null;
+  return {
+    summary_en: isRest ? "Change the selected training day to a rest day." : `Change the selected training day to ${type}.`,
+    summary_zh: isRest ? "將指定訓練日改為休息日。" : `將指定訓練日改為 ${type}。`,
+    changes,
+  };
+}
+
 // ── Vertex AI helper ──
 async function callVertexAI(opts: {
   apiKey: string;

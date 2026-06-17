@@ -1151,13 +1151,84 @@ COACH: ${aiText}`;
       }
     })();
 
+    // ── Plan-change suggestion detector ──
+    // If the user proposed a plan modification (e.g. "make today a rest day",
+    // "move long run to Sunday", "swap tomorrow's tempo for easy"), surface a
+    // structured suggestion so the client can prompt "Update plan?".
+    let planSuggestion: any = null;
+    const CHANGE_RE = /\b(rest|skip|cancel|move|swap|replace|reschedule|postpone|shorten|extend|change|switch|push|delay|easy day|day off|take.*(off|rest))\b|休息|改|換|移|取消|不跑|延後|延遲|推遲|挪|改成|改為|當休息|休跑/i;
+    if (plan && upcomingPlanRows.length && CHANGE_RE.test(message)) {
+      try {
+        const detectorSystem = `You detect whether a runner's message proposes a change to their existing training plan, and (if yes) which day(s) to modify. Output ONLY JSON. No prose.`;
+        const detectorUser = `TODAY: ${promptToday} (${clientWeekdayLabel})
+
+CURRENT PLANNED DAYS (the only days you may modify — date must match one of these exactly):
+${JSON.stringify(upcomingPlanRows)}
+
+USER MESSAGE:
+${message}
+
+COACH REPLY (for context — may have already agreed):
+${aiText}
+
+Decide: is the user proposing to change one or more of the planned days above (or asking to)?
+- If NO change is being proposed, return: {"detected": false}
+- If YES, return:
+{
+  "detected": true,
+  "summary_en": "one short sentence describing the change",
+  "summary_zh": "一句繁體中文描述更改",
+  "changes": [
+    { "date": "YYYY-MM-DD", "type": "rest|easy|long|tempo|interval|race|cross", "distance_km": number|null, "pace": string|null, "description": "short note" }
+  ]
+}
+Rules: date MUST be one of the planned dates above. Keep changes minimal — only include days that actually change. For a rest day, set type="rest", distance_km=0, pace=null. Output JSON only.`;
+        const detRaw = await callVertexAI({
+          apiKey: VERTEX_API_KEY,
+          systemPrompt: detectorSystem,
+          messages: [{ role: "user", content: detectorUser }],
+          temperature: 0.1,
+          maxOutputTokens: 600,
+          thinkingBudget: 0,
+        });
+        const m = detRaw.match(/\{[\s\S]*\}/);
+        if (m) {
+          const parsed = JSON.parse(m[0]);
+          if (parsed?.detected && Array.isArray(parsed.changes) && parsed.changes.length) {
+            const validDates = new Set(upcomingPlanRows.map((r) => r.date));
+            const changes = parsed.changes
+              .filter((c: any) => c?.date && validDates.has(normalizeIsoDate(c.date) || ""))
+              .map((c: any) => ({
+                date: normalizeIsoDate(c.date),
+                type: c.type ?? null,
+                distance_km: typeof c.distance_km === "number" ? c.distance_km : null,
+                pace: c.pace ?? null,
+                description: typeof c.description === "string" ? c.description.slice(0, 240) : "",
+              }));
+            if (changes.length) {
+              planSuggestion = {
+                plan_id: plan.id,
+                summary_en: String(parsed.summary_en || "").slice(0, 240),
+                summary_zh: String(parsed.summary_zh || "").slice(0, 240),
+                changes,
+              };
+            }
+          }
+        }
+      } catch (e) {
+        console.warn("plan suggestion detection failed", e);
+      }
+    }
+
     return json({
       response: aiText,
       session_id: sessionId,
       remaining_messages_today: Math.max(0, dailyLimit - (usedToday + 1)),
       limit: dailyLimit,
       thinking_level: thinkingLevel,
+      plan_suggestion: planSuggestion,
     });
+
   } catch (e) {
     console.error("ai-running-coach error", e);
     return json({ error: e instanceof Error ? e.message : "Unknown error" }, 500);

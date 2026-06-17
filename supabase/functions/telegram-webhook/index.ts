@@ -4,6 +4,15 @@
 // call analyze-activity (internal mode) to generate the SAME AI analysis used in-app,
 // store it in activity_analyses, and reply with the result in Telegram.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import {
+  classifyConfirmation,
+  formatSuggestionPrompt,
+  storePendingSuggestion,
+  clearPendingSuggestion,
+  getPendingSuggestion,
+  applyPendingSuggestion,
+  type PlanSuggestion,
+} from "../_shared/botPlanSuggestion.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -402,6 +411,33 @@ Deno.serve(async (req) => {
       }
       const lang = await getUserLang(supabase, profile.user_id, (profile as any).lang);
 
+      // If there's a pending plan-change suggestion waiting on yes/no, handle that first.
+      const pending = await getPendingSuggestion(supabase, profile.user_id, "telegram");
+      if (pending) {
+        const verdict = classifyConfirmation(text);
+        if (verdict === "yes") {
+          const res = await applyPendingSuggestion(profile.user_id, pending);
+          await clearPendingSuggestion(supabase, profile.user_id, "telegram");
+          if (res.ok) {
+            await sendMessage(chatId, lang === "zh"
+              ? `✅ 已更新 ${res.days_updated ?? pending.changes.length} 天的訓練計劃。`
+              : `✅ Updated ${res.days_updated ?? pending.changes.length} day(s) in your training plan.`);
+          } else {
+            await sendMessage(chatId, lang === "zh"
+              ? `⚠️ 更新計劃失敗：${res.error ?? ""}`
+              : `⚠️ Failed to update plan: ${res.error ?? ""}`);
+          }
+          return new Response("ok");
+        }
+        if (verdict === "no") {
+          await clearPendingSuggestion(supabase, profile.user_id, "telegram");
+          await sendMessage(chatId, lang === "zh" ? "👌 已保留原計劃。" : "👌 Plan kept as-is.");
+          return new Response("ok");
+        }
+        // Otherwise: drop the stale pending and continue as a normal chat message.
+        await clearPendingSuggestion(supabase, profile.user_id, "telegram");
+      }
+
       try {
         const resp = await fetch(`${SUPABASE_URL}/functions/v1/ai-running-coach`, {
           method: "POST",
@@ -428,9 +464,14 @@ Deno.serve(async (req) => {
           }
           return new Response("ok");
         }
-        const reply: string = data?.response || (lang === "zh" ? "（無回覆）" : "(no reply)");
+        let reply: string = data?.response || (lang === "zh" ? "（無回覆）" : "(no reply)");
         if (data?.session_id && data.session_id !== (profile as any).telegram_coach_session_id) {
           await supabase.from("profiles").update({ telegram_coach_session_id: data.session_id }).eq("user_id", profile.user_id);
+        }
+        const suggestion: PlanSuggestion | null = data?.plan_suggestion ?? null;
+        if (suggestion?.plan_id && Array.isArray(suggestion.changes) && suggestion.changes.length) {
+          await storePendingSuggestion(supabase, profile.user_id, "telegram", suggestion);
+          reply += formatSuggestionPrompt(suggestion, lang);
         }
         await sendMessage(chatId, reply);
       } catch (e) {

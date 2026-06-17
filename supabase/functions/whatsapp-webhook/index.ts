@@ -6,6 +6,15 @@
 // X-Hub-Signature-256 header (HMAC-SHA256 of the raw body using WHATSAPP_APP_SECRET).
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { waSendText } from "../_shared/whatsappActivityPrompt.ts";
+import {
+  classifyConfirmation,
+  formatSuggestionPrompt,
+  storePendingSuggestion,
+  clearPendingSuggestion,
+  getPendingSuggestion,
+  applyPendingSuggestion,
+  type PlanSuggestion,
+} from "../_shared/botPlanSuggestion.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -384,6 +393,33 @@ async function handleIncoming(supabase: any, waId: string, text: string) {
     return;
   }
   const lang = await getUserLang(supabase, profile.user_id, (profile as any).lang);
+
+  // If there's a pending plan-change suggestion waiting on yes/no, handle that first.
+  const pending = await getPendingSuggestion(supabase, profile.user_id, "whatsapp");
+  if (pending) {
+    const verdict = classifyConfirmation(text);
+    if (verdict === "yes") {
+      const res = await applyPendingSuggestion(profile.user_id, pending);
+      await clearPendingSuggestion(supabase, profile.user_id, "whatsapp");
+      if (res.ok) {
+        await waSendText(waId, lang === "zh"
+          ? `✅ 已更新 ${res.days_updated ?? pending.changes.length} 天的訓練計劃。`
+          : `✅ Updated ${res.days_updated ?? pending.changes.length} day(s) in your training plan.`);
+      } else {
+        await waSendText(waId, lang === "zh"
+          ? `⚠️ 更新計劃失敗：${res.error ?? ""}`
+          : `⚠️ Failed to update plan: ${res.error ?? ""}`);
+      }
+      return;
+    }
+    if (verdict === "no") {
+      await clearPendingSuggestion(supabase, profile.user_id, "whatsapp");
+      await waSendText(waId, lang === "zh" ? "👌 已保留原計劃。" : "👌 Plan kept as-is.");
+      return;
+    }
+    await clearPendingSuggestion(supabase, profile.user_id, "whatsapp");
+  }
+
   try {
     const resp = await fetch(`${SUPABASE_URL}/functions/v1/ai-running-coach`, {
       method: "POST",
@@ -410,9 +446,14 @@ async function handleIncoming(supabase: any, waId: string, text: string) {
       }
       return;
     }
-    const reply: string = data?.response || (lang === "zh" ? "（無回覆）" : "(no reply)");
+    let reply: string = data?.response || (lang === "zh" ? "（無回覆）" : "(no reply)");
     if (data?.session_id && data.session_id !== (profile as any).whatsapp_coach_session_id) {
       await supabase.from("profiles").update({ whatsapp_coach_session_id: data.session_id }).eq("user_id", profile.user_id);
+    }
+    const suggestion: PlanSuggestion | null = data?.plan_suggestion ?? null;
+    if (suggestion?.plan_id && Array.isArray(suggestion.changes) && suggestion.changes.length) {
+      await storePendingSuggestion(supabase, profile.user_id, "whatsapp", suggestion);
+      reply += formatSuggestionPrompt(suggestion, lang);
     }
     await waSendText(waId, reply);
   } catch (e) {

@@ -361,6 +361,36 @@ export type Database = {
         }
         Relationships: []
       }
+      bot_pending_plan_suggestions: {
+        Row: {
+          changes: Json
+          channel: string
+          created_at: string
+          plan_id: string
+          summary_en: string | null
+          summary_zh: string | null
+          user_id: string
+        }
+        Insert: {
+          changes: Json
+          channel: string
+          created_at?: string
+          plan_id: string
+          summary_en?: string | null
+          summary_zh?: string | null
+          user_id: string
+        }
+        Update: {
+          changes?: Json
+          channel?: string
+          created_at?: string
+          plan_id?: string
+          summary_en?: string | null
+          summary_zh?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       debug_logs: {
         Row: {
           created_at: string | null

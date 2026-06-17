@@ -4,6 +4,15 @@
 // call analyze-activity (internal mode) to generate the SAME AI analysis used in-app,
 // store it in activity_analyses, and reply with the result in Telegram.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import {
+  classifyConfirmation,
+  formatSuggestionPrompt,
+  storePendingSuggestion,
+  clearPendingSuggestion,
+  getPendingSuggestion,
+  applyPendingSuggestion,
+  type PlanSuggestion,
+} from "../_shared/botPlanSuggestion.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",

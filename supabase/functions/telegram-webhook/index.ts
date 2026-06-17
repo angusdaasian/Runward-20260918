@@ -70,6 +70,10 @@ function parseRpeAndFeel(text: string): { rpe: number | null; feel: string } {
   return { rpe, feel };
 }
 
+function looksLikePlanChangeRequest(text: string): boolean {
+  return /\b(plan|training|workout|today|tomorrow|rest|skip|cancel|move|swap|change|reschedule|postpone|delay|switch)\b|訓練|計劃|计划|今日|今天|明天|休息|不跑|休跑|改|換|换|移|取消/i.test(text);
+}
+
 // Map activity source → table, plus build the `activity` object analyze-activity expects.
 async function loadActivityForAnalyze(
   supabase: any,
@@ -313,7 +317,7 @@ Deno.serve(async (req) => {
         .limit(1)
         .maybeSingle();
 
-      if (pending) {
+      if (pending && !looksLikePlanChangeRequest(text)) {
         const { rpe, feel } = parseRpeAndFeel(text);
 
         const { data: profile } = await supabase

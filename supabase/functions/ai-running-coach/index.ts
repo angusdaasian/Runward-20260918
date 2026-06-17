@@ -525,6 +525,62 @@ serve(async (req) => {
     }
 
 
+    // ── APPLY PLAN SUGGESTION ──
+    // Merges date-keyed change rows into the user's latest training plan.
+    if (action === "apply_plan_suggestion" && req.method === "POST") {
+      const body = await req.json().catch(() => ({}));
+      const planId: string | undefined = body?.plan_id;
+      const changes: Array<any> = Array.isArray(body?.changes) ? body.changes : [];
+      if (!planId || changes.length === 0) {
+        return json({ error: "plan_id and changes required" }, 400);
+      }
+      const { data: plan, error: planErr } = await admin
+        .from("training_plans")
+        .select("*")
+        .eq("id", planId)
+        .eq("user_id", user.id)
+        .maybeSingle();
+      if (planErr || !plan) return json({ error: "Plan not found" }, 404);
+
+      const planData: any[] = Array.isArray(plan.plan_data) ? plan.plan_data : [];
+      const byDate = new Map<string, any>();
+      for (const c of changes) {
+        const d = normalizeIsoDate(c?.date);
+        if (d) byDate.set(d, c);
+      }
+      let touched = 0;
+      const newPlanData = planData.map((week: any) => {
+        if (!week || !Array.isArray(week.days)) return week;
+        const days = week.days.map((day: any) => {
+          const dDate = normalizeIsoDate(day?.date);
+          if (!dDate || !byDate.has(dDate)) return day;
+          const c = byDate.get(dDate);
+          touched++;
+          return {
+            ...day,
+            type: c.type ?? day.type,
+            distance_km: c.distance_km ?? day.distance_km,
+            pace: c.pace ?? day.pace ?? null,
+            description: c.description ?? day.description ?? "",
+            date: day.date,
+          };
+        });
+        return { ...week, days };
+      });
+
+      if (touched === 0) {
+        return json({ error: "No matching plan days for the suggested dates" }, 400);
+      }
+      const { error: upErr } = await admin
+        .from("training_plans")
+        .update({ plan_data: newPlanData })
+        .eq("id", planId)
+        .eq("user_id", user.id);
+      if (upErr) return json({ error: upErr.message }, 500);
+      return json({ ok: true, days_updated: touched });
+    }
+
+
     // ── TRAIN PER-USER MODEL FROM 2026 DATA ──
     // Pulls the user's full 2026 activity history and asks the model (medium
     // thinking) to extract durable insights about their training pattern,

@@ -1078,6 +1078,11 @@ PLAN ADHERENCE RULES:
 - If the runner asks for a workout on a date covered by the plan, restate the planned workout (with pace/HR guidance) instead of proposing something new.
 - Only suggest a fully different workout when (a) there is no active plan, (b) the date is outside the plan window, or (c) the runner explicitly asks to deviate / replace the planned session.
 
+PLAN EDITS (IMPORTANT):
+- You CAN update the runner's in-app training plan. When the runner asks to change, skip, swap, move, or rest any planned day (or confirms a change you proposed), DO NOT say you have no access or ask them to edit it manually.
+- Instead, briefly confirm the change in plain language (e.g. "Got it — making Thu and Fri rest days") and stop. The app will automatically show an "Update plan?" confirmation card/prompt so the runner can apply the change with one tap or reply YES on WhatsApp/Telegram.
+- Never tell the user the system can't modify the plan. Never instruct them to open the app to manually skip or delete days.
+
 COACHING STYLE:
 - Address the runner by name when natural.
 - Reference their actual recent runs, past race results, and upcoming races when relevant.
@@ -1201,8 +1206,14 @@ COACH: ${aiText}`;
     // "move long run to Sunday", "swap tomorrow's tempo for easy"), surface a
     // structured suggestion so the client can prompt "Update plan?".
     let planSuggestion: any = null;
-    const CHANGE_RE = /\b(rest|skip|cancel|move|swap|replace|reschedule|postpone|shorten|extend|change|switch|push|delay|easy day|day off|take.*(off|rest))\b|休息|改|換|移|取消|不跑|延後|延遲|推遲|挪|改成|改為|當休息|休跑/i;
-    if (plan && upcomingPlanRows.length && CHANGE_RE.test(message)) {
+    const CHANGE_RE = /\b(rest|skip|cancel|move|swap|replace|reschedule|postpone|shorten|extend|change|switch|push|delay|update|modify|adjust|edit|easy day|day off|take.*(off|rest))\b|休息|改|換|换|移|取消|不跑|延後|延遲|推遲|挪|改成|改為|當休息|休跑|更新|修改|調整|课表|課表|計劃|计划/i;
+    // Also consider the coach's own reply — if the coach agreed to a plan change
+    // (e.g. "skip Thu/Fri, mark as rest"), surface a structured suggestion even
+    // when the user's last message was just a short confirmation.
+    const shouldDetect =
+      plan && upcomingPlanRows.length &&
+      (CHANGE_RE.test(message) || CHANGE_RE.test(aiText || ""));
+    if (shouldDetect) {
       const simple = inferSimplePlanChange(message, promptToday, upcomingPlanRows);
       if (simple?.changes?.length) {
         planSuggestion = {
@@ -1214,15 +1225,22 @@ COACH: ${aiText}`;
       }
       try {
         const detectorSystem = `You detect whether a runner's message proposes a change to their existing training plan, and (if yes) which day(s) to modify. Output ONLY JSON. No prose.`;
+        const recentTurns = (history || [])
+          .slice(-6)
+          .map((m: any) => `${m.role === "assistant" ? "COACH" : "USER"}: ${m.content}`)
+          .join("\n");
         const detectorUser = `TODAY: ${promptToday} (${clientWeekdayLabel})
 
 CURRENT PLANNED DAYS (the only days you may modify — date must match one of these exactly):
 ${JSON.stringify(upcomingPlanRows)}
 
-USER MESSAGE:
+RECENT CONVERSATION (prior turns, for context):
+${recentTurns || "(none)"}
+
+LATEST USER MESSAGE:
 ${message}
 
-COACH REPLY (for context — may have already agreed):
+LATEST COACH REPLY (may have already agreed to a change):
 ${aiText}
 
 Decide: is the user proposing to change one or more of the planned days above (or asking to)?

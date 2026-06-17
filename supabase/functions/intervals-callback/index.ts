@@ -64,9 +64,37 @@ serve(async (req) => {
     }
 
     // intervals.icu returns: access_token, refresh_token, expires_in, athlete_id, scope
+    // Some responses nest it as athlete.id or return it as athlete_id at the top level.
     const expiresAt = Math.floor(Date.now() / 1000) + (tokenData.expires_in || 3600);
-    const athleteId = String(tokenData.athlete_id || "");
-    if (!athleteId) throw new Error("intervals.icu token response missing athlete_id");
+    const rawAthleteId =
+      tokenData.athlete_id ??
+      tokenData.athleteId ??
+      tokenData.athlete?.id ??
+      null;
+    let athleteId = rawAthleteId != null ? String(rawAthleteId) : "";
+
+    if (!athleteId) {
+      // Fall back to /api/v1/athlete using the access token.
+      console.log(
+        "intervals-callback: athlete_id missing from token response, keys=",
+        Object.keys(tokenData),
+      );
+      try {
+        const meRes = await fetch("https://intervals.icu/api/v1/athlete", {
+          headers: { Authorization: `Bearer ${tokenData.access_token}` },
+        });
+        const me = await meRes.json();
+        if (meRes.ok && me?.id) athleteId = String(me.id);
+        else console.log("intervals-callback: /athlete fallback failed", meRes.status, me);
+      } catch (e) {
+        console.log("intervals-callback: /athlete fallback threw", e);
+      }
+    }
+    if (!athleteId) {
+      throw new Error(
+        `intervals.icu token response missing athlete_id (keys: ${Object.keys(tokenData).join(",")})`,
+      );
+    }
 
     // Drop stale rows for this athlete owned by other users.
     await supabase

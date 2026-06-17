@@ -915,6 +915,8 @@ Return ONLY a JSON array. Each item: {"type":"preference|goal|challenge|achievem
     const plan = (planR.data || [])[0] as any;
     const asArr = <T,>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : []);
     let planBlock = "ACTIVE TRAINING PLAN: (none — the runner is not following a structured plan)";
+    let upcomingPlanRows: Array<{ date: string; type?: string; distance_km?: number | null; pace?: string | null; description?: string }> = [];
+
     if (plan) {
       const planData = asArr<any>(plan.plan_data);
       const raceDate = normalizeIsoDate(plan.race_date);

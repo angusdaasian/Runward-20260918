@@ -594,12 +594,19 @@ serve(async (req) => {
           if (!dDate || !byDate.has(dDate)) return day;
           const c = byDate.get(dDate);
           touched++;
+          const hasDistance = Object.prototype.hasOwnProperty.call(c, "distance_km");
+          const hasPace = Object.prototype.hasOwnProperty.call(c, "pace");
+          const nextType = c.type ?? day.type;
+          const nextDescription = c.description ?? day.description ?? c.type ?? "";
           return {
             ...day,
-            type: c.type ?? day.type,
-            distance_km: c.distance_km ?? day.distance_km,
-            pace: c.pace ?? day.pace ?? null,
-            description: c.description ?? day.description ?? "",
+            type: nextType,
+            title: nextType ?? day.title ?? null,
+            workout: nextDescription,
+            distance_km: hasDistance ? c.distance_km : day.distance_km,
+            pace: hasPace ? c.pace : day.pace ?? null,
+            description: nextDescription,
+            sessions: [],
             date: day.date,
           };
         });

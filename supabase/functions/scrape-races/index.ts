@@ -314,21 +314,37 @@ async function callVertexAIRaw(opts: { apiKey: string; model?: string; messages:
 }
 
 async function callAI(apiKey: string, systemPrompt: string, userPrompt: string): Promise<string> {
-  const res = await callVertexAIRaw({
-    apiKey,
-    model: "google/gemini-3.1-flash-lite-preview",
-    messages: [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: userPrompt },
-    ],
-  });
-  if (!res.ok) {
-    throw new Error(`AI call failed: ${res.status} ${res.text}`);
+  const maxAttempts = 5;
+  let lastErr = "";
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const res = await callVertexAIRaw({
+      apiKey,
+      model: "google/gemini-3.1-flash-lite-preview",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+    });
+    if (res.ok) {
+      let content = res.text || "";
+      const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
+      if (jsonMatch) content = jsonMatch[1].trim();
+      return content;
+    }
+    lastErr = `${res.status} ${res.text}`;
+    // Retry on 429 (rate limit) and 5xx (transient server errors)
+    const retryable = res.status === 429 || (res.status >= 500 && res.status < 600);
+    if (!retryable || attempt === maxAttempts) {
+      throw new Error(`AI call failed: ${lastErr}`);
+    }
+    // Exponential backoff with jitter: 5s, 15s, 30s, 60s
+    const baseDelay = Math.min(5000 * Math.pow(2, attempt - 1), 60000);
+    const jitter = Math.floor(Math.random() * 2000);
+    const delay = baseDelay + jitter;
+    console.warn(`AI call ${res.status}, retry ${attempt}/${maxAttempts - 1} in ${delay}ms`);
+    await new Promise((r) => setTimeout(r, delay));
   }
-  let content = res.text || "";
-  const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
-  if (jsonMatch) content = jsonMatch[1].trim();
-  return content;
+  throw new Error(`AI call failed after ${maxAttempts} attempts: ${lastErr}`);
 }
 
 async function scrapeFlyAreYou(

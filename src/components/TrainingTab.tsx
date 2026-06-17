@@ -493,7 +493,7 @@ const WorkoutDetails = ({ day, lang, hrBounds }: { day: DayPlan; lang: Lang; hrB
             <div key={si} className="space-y-1">
               {(sess.time_of_day || sessions.length > 1) && (
                 <div className="text-[11px] font-semibold text-foreground">
-                  {sess.time_of_day ? `[${sess.time_of_day}] ` : ""}{sess.title || localizeTitle(sess.type || "Run", lang)}
+                  {sess.time_of_day ? `[${sess.time_of_day}] ` : ""}{resolveDisplayTitle(sess.title, sess.type || "Run", lang)}
                 </div>
               )}
               {sess.distance_km != null && <StepRow label={isZh ? "距離" : "Distance"} value={`${sess.distance_km} km`} />}

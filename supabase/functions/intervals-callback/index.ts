@@ -63,31 +63,34 @@ serve(async (req) => {
       throw new Error(`intervals.icu token exchange failed: ${JSON.stringify(tokenData)}`);
     }
 
-    // intervals.icu returns: access_token, refresh_token, expires_in, athlete_id, scope
-    // Some responses nest it as athlete.id or return it as athlete_id at the top level.
+    // intervals.icu returns access_token, scope and the athlete nested as athlete.id.
+    // Keep top-level fallbacks for older/alternate payloads.
     const expiresAt = Math.floor(Date.now() / 1000) + (tokenData.expires_in || 3600);
-    const rawAthleteId =
-      tokenData.athlete_id ??
-      tokenData.athleteId ??
-      tokenData.athlete?.id ??
-      null;
+    const extractAthleteId = (payload: unknown): string => {
+      const data = payload as Record<string, unknown> | null;
+      const athlete = data?.athlete as Record<string, unknown> | null;
+      const raw = data?.athlete_id ?? data?.athleteId ?? athlete?.id ?? data?.id ?? null;
+      return raw != null ? String(raw) : "";
+    };
+    const rawAthleteId = extractAthleteId(tokenData);
     let athleteId = rawAthleteId != null ? String(rawAthleteId) : "";
 
     if (!athleteId) {
-      // Fall back to /api/v1/athlete using the access token.
+      // Fall back to the authenticated athlete endpoint. intervals.icu supports id "0"
+      // to mean the athlete belonging to the bearer token.
       console.log(
         "intervals-callback: athlete_id missing from token response, keys=",
         Object.keys(tokenData),
       );
       try {
-        const meRes = await fetch("https://intervals.icu/api/v1/athlete", {
+        const meRes = await fetch("https://intervals.icu/api/v1/athlete/0", {
           headers: { Authorization: `Bearer ${tokenData.access_token}` },
         });
         const me = await meRes.json();
-        if (meRes.ok && me?.id) athleteId = String(me.id);
-        else console.log("intervals-callback: /athlete fallback failed", meRes.status, me);
+        athleteId = meRes.ok ? extractAthleteId(me) : "";
+        if (!athleteId) console.log("intervals-callback: /athlete/0 fallback failed", meRes.status, me);
       } catch (e) {
-        console.log("intervals-callback: /athlete fallback threw", e);
+        console.log("intervals-callback: /athlete/0 fallback threw", e);
       }
     }
     if (!athleteId) {

@@ -9,6 +9,8 @@ import MessageBubble from "./MessageBubble";
 import TypingIndicator from "./TypingIndicator";
 import ContextBar from "./ContextBar";
 import CoachSettings from "./CoachSettings";
+import PlanSuggestionCard from "./PlanSuggestionCard";
+
 
 interface Props {
   open: boolean;

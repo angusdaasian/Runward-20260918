@@ -1220,15 +1220,22 @@ COACH: ${aiText}`;
       }
       try {
         const detectorSystem = `You detect whether a runner's message proposes a change to their existing training plan, and (if yes) which day(s) to modify. Output ONLY JSON. No prose.`;
+        const recentTurns = (history || [])
+          .slice(-6)
+          .map((m: any) => `${m.role === "assistant" ? "COACH" : "USER"}: ${m.content}`)
+          .join("\n");
         const detectorUser = `TODAY: ${promptToday} (${clientWeekdayLabel})
 
 CURRENT PLANNED DAYS (the only days you may modify — date must match one of these exactly):
 ${JSON.stringify(upcomingPlanRows)}
 
-USER MESSAGE:
+RECENT CONVERSATION (prior turns, for context):
+${recentTurns || "(none)"}
+
+LATEST USER MESSAGE:
 ${message}
 
-COACH REPLY (for context — may have already agreed):
+LATEST COACH REPLY (may have already agreed to a change):
 ${aiText}
 
 Decide: is the user proposing to change one or more of the planned days above (or asking to)?

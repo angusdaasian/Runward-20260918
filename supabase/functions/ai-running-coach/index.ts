@@ -1201,8 +1201,14 @@ COACH: ${aiText}`;
     // "move long run to Sunday", "swap tomorrow's tempo for easy"), surface a
     // structured suggestion so the client can prompt "Update plan?".
     let planSuggestion: any = null;
-    const CHANGE_RE = /\b(rest|skip|cancel|move|swap|replace|reschedule|postpone|shorten|extend|change|switch|push|delay|easy day|day off|take.*(off|rest))\b|休息|改|換|移|取消|不跑|延後|延遲|推遲|挪|改成|改為|當休息|休跑/i;
-    if (plan && upcomingPlanRows.length && CHANGE_RE.test(message)) {
+    const CHANGE_RE = /\b(rest|skip|cancel|move|swap|replace|reschedule|postpone|shorten|extend|change|switch|push|delay|update|modify|adjust|edit|easy day|day off|take.*(off|rest))\b|休息|改|換|换|移|取消|不跑|延後|延遲|推遲|挪|改成|改為|當休息|休跑|更新|修改|調整|课表|課表|計劃|计划/i;
+    // Also consider the coach's own reply — if the coach agreed to a plan change
+    // (e.g. "skip Thu/Fri, mark as rest"), surface a structured suggestion even
+    // when the user's last message was just a short confirmation.
+    const shouldDetect =
+      plan && upcomingPlanRows.length &&
+      (CHANGE_RE.test(message) || CHANGE_RE.test(aiText || ""));
+    if (shouldDetect) {
       const simple = inferSimplePlanChange(message, promptToday, upcomingPlanRows);
       if (simple?.changes?.length) {
         planSuggestion = {

@@ -65,7 +65,8 @@ serve(async (req) => {
 
     // intervals.icu returns access_token, scope and the athlete nested as athlete.id.
     // Keep top-level fallbacks for older/alternate payloads.
-    const expiresAt = Math.floor(Date.now() / 1000) + (tokenData.expires_in || 3600);
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    const expiresAt = tokenData.expires_in ? nowSeconds + tokenData.expires_in : nowSeconds + 10 * 365 * 24 * 60 * 60;
     const extractAthleteId = (payload: unknown): string => {
       const data = payload as Record<string, unknown> | null;
       const athlete = data?.athlete as Record<string, unknown> | null;
@@ -113,7 +114,7 @@ serve(async (req) => {
           user_id: user.id,
           athlete_id: athleteId,
           access_token: tokenData.access_token,
-          refresh_token: tokenData.refresh_token,
+          refresh_token: tokenData.refresh_token ?? tokenData.access_token,
           expires_at: expiresAt,
           scope: tokenData.scope ?? null,
           updated_at: new Date().toISOString(),

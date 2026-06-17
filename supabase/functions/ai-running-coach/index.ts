@@ -1203,6 +1203,15 @@ COACH: ${aiText}`;
     let planSuggestion: any = null;
     const CHANGE_RE = /\b(rest|skip|cancel|move|swap|replace|reschedule|postpone|shorten|extend|change|switch|push|delay|easy day|day off|take.*(off|rest))\b|休息|改|換|移|取消|不跑|延後|延遲|推遲|挪|改成|改為|當休息|休跑/i;
     if (plan && upcomingPlanRows.length && CHANGE_RE.test(message)) {
+      const simple = inferSimplePlanChange(message, promptToday, upcomingPlanRows);
+      if (simple?.changes?.length) {
+        planSuggestion = {
+          plan_id: plan.id,
+          summary_en: simple.summary_en,
+          summary_zh: simple.summary_zh,
+          changes: simple.changes,
+        };
+      }
       try {
         const detectorSystem = `You detect whether a runner's message proposes a change to their existing training plan, and (if yes) which day(s) to modify. Output ONLY JSON. No prose.`;
         const detectorUser = `TODAY: ${promptToday} (${clientWeekdayLabel})

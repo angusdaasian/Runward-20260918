@@ -8,7 +8,7 @@ const corsHeaders = {
 };
 
 const SOURCES = {
-  japan: "https://www.flyareyou.com/a/japan-marathons?s_locale=en-us",
+  japan: "https://www.flyareyou.com/a/japan-marathons",
   overseas: "https://www.flyareyou.com/a/overseas-marathons?s_locale=en-us",
   hk: "https://fitz.hk/hksports-timetable/",
   china:

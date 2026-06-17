@@ -19,6 +19,7 @@ export async function refreshIntervalsTokenIfNeeded(
 ) {
   const now = Math.floor(Date.now() / 1000);
   if (conn.expires_at > now + 60) return conn.access_token;
+  if (!conn.refresh_token || conn.refresh_token === conn.access_token) return conn.access_token;
 
   const clientId = Deno.env.get("INTERVALS_CLIENT_ID")!;
   const clientSecret = Deno.env.get("INTERVALS_CLIENT_SECRET")!;

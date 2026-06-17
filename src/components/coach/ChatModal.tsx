@@ -41,7 +41,10 @@ const ChatModal = ({ open, onClose, lang }: Props) => {
     deleteSession,
     savePreferences,
     resetMemory,
+    applyPlanSuggestion,
+    dismissPlanSuggestion,
   } = useAICoach(open);
+
 
   const t = (en: string, zh: string) => (lang === "zh" ? zh : en);
 

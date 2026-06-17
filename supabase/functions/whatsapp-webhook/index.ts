@@ -183,29 +183,61 @@ Deno.serve(async (req) => {
 
   const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
 
-  try {
-    const entries = Array.isArray(body?.entry) ? body.entry : [];
-    for (const entry of entries) {
-      const changes = Array.isArray(entry?.changes) ? entry.changes : [];
-      for (const change of changes) {
-        const value = change?.value ?? {};
-        const messages = Array.isArray(value?.messages) ? value.messages : [];
-        for (const message of messages) {
-          if (message.type !== "text") continue;
-          const waId: string = String(message.from ?? "");
-          const text: string = String(message.text?.body ?? "").trim();
-          if (!waId || !text) continue;
-          await handleIncoming(supabase, waId, text);
+  // Dedupe by message.id across Meta retries (instance-local, short TTL).
+  // Meta retries the webhook if we take too long to ack, which causes duplicate sends.
+  const work = (async () => {
+    try {
+      const entries = Array.isArray(body?.entry) ? body.entry : [];
+      for (const entry of entries) {
+        const changes = Array.isArray(entry?.changes) ? entry.changes : [];
+        for (const change of changes) {
+          const value = change?.value ?? {};
+          const messages = Array.isArray(value?.messages) ? value.messages : [];
+          for (const message of messages) {
+            if (message.type !== "text") continue;
+            const waId: string = String(message.from ?? "");
+            const text: string = String(message.text?.body ?? "").trim();
+            const msgId: string = String(message.id ?? "");
+            if (!waId || !text) continue;
+            if (msgId && seenMessageIds.has(msgId)) {
+              console.log(`[wa-webhook] dedupe skip message_id=${msgId}`);
+              continue;
+            }
+            if (msgId) {
+              seenMessageIds.add(msgId);
+              if (seenMessageIds.size > 500) {
+                // simple bounded LRU-ish prune
+                const first = seenMessageIds.values().next().value;
+                if (first) seenMessageIds.delete(first);
+              }
+            }
+            await handleIncoming(supabase, waId, text);
+          }
         }
       }
+    } catch (e) {
+      console.error("[wa-webhook] handler error", e);
     }
-  } catch (e) {
-    console.error("[wa-webhook] handler error", e);
+  })();
+
+  // Ack immediately so Meta doesn't retry while AI Coach is still generating.
+  try {
+    // @ts-ignore EdgeRuntime is provided by Supabase Edge runtime.
+    if (typeof EdgeRuntime !== "undefined" && EdgeRuntime?.waitUntil) {
+      // @ts-ignore
+      EdgeRuntime.waitUntil(work);
+    } else {
+      await work;
+    }
+  } catch (_) {
+    await work;
   }
 
-  // Always ack quickly
   return new Response("EVENT_RECEIVED", { status: 200 });
 });
+
+// Module-scope dedupe set for Meta webhook retries.
+const seenMessageIds = new Set<string>();
 
 async function handleIncoming(supabase: any, waId: string, text: string) {
   const lower = text.toLowerCase();

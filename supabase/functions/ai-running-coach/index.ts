@@ -525,6 +525,62 @@ serve(async (req) => {
     }
 
 
+    // ── APPLY PLAN SUGGESTION ──
+    // Merges date-keyed change rows into the user's latest training plan.
+    if (action === "apply_plan_suggestion" && req.method === "POST") {
+      const body = await req.json().catch(() => ({}));
+      const planId: string | undefined = body?.plan_id;
+      const changes: Array<any> = Array.isArray(body?.changes) ? body.changes : [];
+      if (!planId || changes.length === 0) {
+        return json({ error: "plan_id and changes required" }, 400);
+      }
+      const { data: plan, error: planErr } = await admin
+        .from("training_plans")
+        .select("*")
+        .eq("id", planId)
+        .eq("user_id", user.id)
+        .maybeSingle();
+      if (planErr || !plan) return json({ error: "Plan not found" }, 404);
+
+      const planData: any[] = Array.isArray(plan.plan_data) ? plan.plan_data : [];
+      const byDate = new Map<string, any>();
+      for (const c of changes) {
+        const d = normalizeIsoDate(c?.date);
+        if (d) byDate.set(d, c);
+      }
+      let touched = 0;
+      const newPlanData = planData.map((week: any) => {
+        if (!week || !Array.isArray(week.days)) return week;
+        const days = week.days.map((day: any) => {
+          const dDate = normalizeIsoDate(day?.date);
+          if (!dDate || !byDate.has(dDate)) return day;
+          const c = byDate.get(dDate);
+          touched++;
+          return {
+            ...day,
+            type: c.type ?? day.type,
+            distance_km: c.distance_km ?? day.distance_km,
+            pace: c.pace ?? day.pace ?? null,
+            description: c.description ?? day.description ?? "",
+            date: day.date,
+          };
+        });
+        return { ...week, days };
+      });
+
+      if (touched === 0) {
+        return json({ error: "No matching plan days for the suggested dates" }, 400);
+      }
+      const { error: upErr } = await admin
+        .from("training_plans")
+        .update({ plan_data: newPlanData })
+        .eq("id", planId)
+        .eq("user_id", user.id);
+      if (upErr) return json({ error: upErr.message }, 500);
+      return json({ ok: true, days_updated: touched });
+    }
+
+
     // ── TRAIN PER-USER MODEL FROM 2026 DATA ──
     // Pulls the user's full 2026 activity history and asks the model (medium
     // thinking) to extract durable insights about their training pattern,
@@ -859,6 +915,8 @@ Return ONLY a JSON array. Each item: {"type":"preference|goal|challenge|achievem
     const plan = (planR.data || [])[0] as any;
     const asArr = <T,>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : []);
     let planBlock = "ACTIVE TRAINING PLAN: (none — the runner is not following a structured plan)";
+    let upcomingPlanRows: Array<{ date: string; type?: string; distance_km?: number | null; pace?: string | null; description?: string }> = [];
+
     if (plan) {
       const planData = asArr<any>(plan.plan_data);
       const raceDate = normalizeIsoDate(plan.race_date);
@@ -887,9 +945,17 @@ Return ONLY a JSON array. Each item: {"type":"preference|goal|challenge|achievem
             const dist = d.distance_km ?? d.distance;
             const workout = d.workout || d.description || d.type || "Rest";
             upcomingDays.push(`- ${dayDate} (${hkWeekday(dayDate)}, W${week.week}): ${workout}${dist ? ` — ${dist} km` : ""}`);
+            upcomingPlanRows.push({
+              date: dayDate,
+              type: d.type ?? null,
+              distance_km: typeof dist === "number" ? dist : null,
+              pace: d.pace ?? null,
+              description: d.description ?? d.workout ?? "",
+            });
           }
         }
       }
+
 
       planBlock = `ACTIVE TRAINING PLAN:
 - Distance/goal: ${plan.distance} (${plan.goal === "custom" ? "Custom" : plan.goal})
@@ -1085,13 +1151,84 @@ COACH: ${aiText}`;
       }
     })();
 
+    // ── Plan-change suggestion detector ──
+    // If the user proposed a plan modification (e.g. "make today a rest day",
+    // "move long run to Sunday", "swap tomorrow's tempo for easy"), surface a
+    // structured suggestion so the client can prompt "Update plan?".
+    let planSuggestion: any = null;
+    const CHANGE_RE = /\b(rest|skip|cancel|move|swap|replace|reschedule|postpone|shorten|extend|change|switch|push|delay|easy day|day off|take.*(off|rest))\b|休息|改|換|移|取消|不跑|延後|延遲|推遲|挪|改成|改為|當休息|休跑/i;
+    if (plan && upcomingPlanRows.length && CHANGE_RE.test(message)) {
+      try {
+        const detectorSystem = `You detect whether a runner's message proposes a change to their existing training plan, and (if yes) which day(s) to modify. Output ONLY JSON. No prose.`;
+        const detectorUser = `TODAY: ${promptToday} (${clientWeekdayLabel})
+
+CURRENT PLANNED DAYS (the only days you may modify — date must match one of these exactly):
+${JSON.stringify(upcomingPlanRows)}
+
+USER MESSAGE:
+${message}
+
+COACH REPLY (for context — may have already agreed):
+${aiText}
+
+Decide: is the user proposing to change one or more of the planned days above (or asking to)?
+- If NO change is being proposed, return: {"detected": false}
+- If YES, return:
+{
+  "detected": true,
+  "summary_en": "one short sentence describing the change",
+  "summary_zh": "一句繁體中文描述更改",
+  "changes": [
+    { "date": "YYYY-MM-DD", "type": "rest|easy|long|tempo|interval|race|cross", "distance_km": number|null, "pace": string|null, "description": "short note" }
+  ]
+}
+Rules: date MUST be one of the planned dates above. Keep changes minimal — only include days that actually change. For a rest day, set type="rest", distance_km=0, pace=null. Output JSON only.`;
+        const detRaw = await callVertexAI({
+          apiKey: VERTEX_API_KEY,
+          systemPrompt: detectorSystem,
+          messages: [{ role: "user", content: detectorUser }],
+          temperature: 0.1,
+          maxOutputTokens: 600,
+          thinkingBudget: 0,
+        });
+        const m = detRaw.match(/\{[\s\S]*\}/);
+        if (m) {
+          const parsed = JSON.parse(m[0]);
+          if (parsed?.detected && Array.isArray(parsed.changes) && parsed.changes.length) {
+            const validDates = new Set(upcomingPlanRows.map((r) => r.date));
+            const changes = parsed.changes
+              .filter((c: any) => c?.date && validDates.has(normalizeIsoDate(c.date) || ""))
+              .map((c: any) => ({
+                date: normalizeIsoDate(c.date),
+                type: c.type ?? null,
+                distance_km: typeof c.distance_km === "number" ? c.distance_km : null,
+                pace: c.pace ?? null,
+                description: typeof c.description === "string" ? c.description.slice(0, 240) : "",
+              }));
+            if (changes.length) {
+              planSuggestion = {
+                plan_id: plan.id,
+                summary_en: String(parsed.summary_en || "").slice(0, 240),
+                summary_zh: String(parsed.summary_zh || "").slice(0, 240),
+                changes,
+              };
+            }
+          }
+        }
+      } catch (e) {
+        console.warn("plan suggestion detection failed", e);
+      }
+    }
+
     return json({
       response: aiText,
       session_id: sessionId,
       remaining_messages_today: Math.max(0, dailyLimit - (usedToday + 1)),
       limit: dailyLimit,
       thinking_level: thinkingLevel,
+      plan_suggestion: planSuggestion,
     });
+
   } catch (e) {
     console.error("ai-running-coach error", e);
     return json({ error: e instanceof Error ? e.message : "Unknown error" }, 500);

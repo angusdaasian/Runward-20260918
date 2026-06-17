@@ -9,6 +9,8 @@ import MessageBubble from "./MessageBubble";
 import TypingIndicator from "./TypingIndicator";
 import ContextBar from "./ContextBar";
 import CoachSettings from "./CoachSettings";
+import PlanSuggestionCard from "./PlanSuggestionCard";
+
 
 interface Props {
   open: boolean;
@@ -39,7 +41,10 @@ const ChatModal = ({ open, onClose, lang }: Props) => {
     deleteSession,
     savePreferences,
     resetMemory,
+    applyPlanSuggestion,
+    dismissPlanSuggestion,
   } = useAICoach(open);
+
 
   const t = (en: string, zh: string) => (lang === "zh" ? zh : en);
 
@@ -263,10 +268,26 @@ const ChatModal = ({ open, onClose, lang }: Props) => {
               m.pending ? (
                 <TypingIndicator key={m.id} />
               ) : (
-                <MessageBubble key={m.id} role={m.role} content={m.content} />
+                <div key={m.id}>
+                  <MessageBubble role={m.role} content={m.content} />
+                  {m.role === "assistant" && m.planSuggestion && (
+                    <div className="flex justify-start mt-1">
+                      <div className="max-w-[85%] w-full">
+                        <PlanSuggestionCard
+                          suggestion={m.planSuggestion}
+                          status={m.planSuggestionStatus}
+                          onApply={() => applyPlanSuggestion(m.id)}
+                          onDismiss={() => dismissPlanSuggestion(m.id)}
+                          lang={lang}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
               ),
             )
           )}
+
           <div ref={messagesEndRef} />
         </div>
 

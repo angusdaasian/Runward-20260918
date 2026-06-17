@@ -6,6 +6,15 @@
 // X-Hub-Signature-256 header (HMAC-SHA256 of the raw body using WHATSAPP_APP_SECRET).
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { waSendText } from "../_shared/whatsappActivityPrompt.ts";
+import {
+  classifyConfirmation,
+  formatSuggestionPrompt,
+  storePendingSuggestion,
+  clearPendingSuggestion,
+  getPendingSuggestion,
+  applyPendingSuggestion,
+  type PlanSuggestion,
+} from "../_shared/botPlanSuggestion.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",

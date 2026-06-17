@@ -348,6 +348,40 @@ export function useAICoach(open: boolean) {
     }
   }, [callFn, newConversation]);
 
+  const applyPlanSuggestion = useCallback(
+    async (messageId: string) => {
+      const msg = messages.find((m) => m.id === messageId);
+      const sug = msg?.planSuggestion;
+      if (!sug) return;
+      try {
+        await callFn("?action=apply_plan_suggestion", {
+          method: "POST",
+          body: JSON.stringify({ plan_id: sug.plan_id, changes: sug.changes }),
+        });
+        setMessages((arr) =>
+          arr.map((x) =>
+            x.id === messageId ? { ...x, planSuggestionStatus: "applied" } : x,
+          ),
+        );
+        toast.success(getLang() === "zh" ? "計劃已更新" : "Plan updated");
+        try {
+          window.dispatchEvent(new CustomEvent("training-plan-updated"));
+        } catch {}
+      } catch (e) {
+        toast.error(getLang() === "zh" ? "更新失敗" : "Failed to update plan");
+      }
+    },
+    [callFn, messages],
+  );
+
+  const dismissPlanSuggestion = useCallback((messageId: string) => {
+    setMessages((arr) =>
+      arr.map((x) =>
+        x.id === messageId ? { ...x, planSuggestionStatus: "dismissed" } : x,
+      ),
+    );
+  }, []);
+
   return {
     messages,
     sending,
@@ -362,6 +396,9 @@ export function useAICoach(open: boolean) {
     deleteSession,
     savePreferences,
     resetMemory,
+    applyPlanSuggestion,
+    dismissPlanSuggestion,
     sessionId,
   };
 }
+

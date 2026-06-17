@@ -153,7 +153,7 @@ export async function shareTrainingWeek(input: SharePlanWeekInput): Promise<void
       if (!day || day.type === "Rest" || !day.title) {
         ctx.fillStyle = "#475569";
         ctx.font = `700 28px ${FONT_DISPLAY}`;
-        ctx.fillText(isZh ? "休息日" : "Rest Day", tx, y + 40);
+        ctx.fillText(isZh ? "休息" : "Rest", tx, y + 40);
         ctx.fillStyle = "#94A3B8";
         ctx.font = `500 20px ${FONT_TEXT}`;
         ctx.fillText(isZh ? "好好恢復" : "Recover well", tx, y + 80);

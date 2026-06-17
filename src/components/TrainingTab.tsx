@@ -360,7 +360,7 @@ const dayForWorkoutSession = (day: DayPlan, session: WorkoutSession): DayPlan =>
 const restDayFrom = (day: DayPlan, lang: Lang): DayPlan => ({
   ...day,
   type: "Rest",
-  title: lang === "zh" ? "休息" : "Rest Day",
+  title: lang === "zh" ? "休息" : "Rest",
   description: lang === "zh" ? "全日休息恢復。" : "Full rest day for recovery.",
   distance_km: null,
   pace: null,
@@ -2394,7 +2394,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
       const days: DayPlan[] = [];
       for (let d = 0; d < 7; d++) {
         const dateStr = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, "0")}-${String(cursor.getDate()).padStart(2, "0")}`;
-        days.push({ day: DAY_LABELS[d], date: dateStr, type: "Rest", title: lang === "zh" ? "休息" : "Rest Day", description: "", distance_km: null, pace: null, color: "#607D8B" });
+        days.push({ day: DAY_LABELS[d], date: dateStr, type: "Rest", title: lang === "zh" ? "休息" : "Rest", description: "", distance_km: null, pace: null, color: "#607D8B" });
         cursor.setDate(cursor.getDate() + 1);
       }
       weeks.push({ week: weekNum, startDate: days[0].date, days });

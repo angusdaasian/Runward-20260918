@@ -65,7 +65,7 @@ function localizeDescription(day: DayPlan, lang: Lang): string {
   const distStr = day.distance_km ? `${day.distance_km}km` : "";
   const paceStr = day.pace || "";
 
-  if (day.type === "Rest") return lang === "zh" ? "休息日" : "Rest day";
+  if (day.type === "Rest") return lang === "zh" ? "休息" : "Rest";
 
   if (day.type === "Cross Training") {
     return lang === "zh"

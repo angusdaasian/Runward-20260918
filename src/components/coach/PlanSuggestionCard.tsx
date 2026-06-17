@@ -32,7 +32,7 @@ const PlanSuggestionCard = ({ suggestion, status, onApply, onDismiss, lang }: Pr
         {suggestion.changes.map((c) => {
           const isRest = (c.type || "").toLowerCase() === "rest" || c.distance_km === 0;
           const label = isRest
-            ? t("Rest day", "休息日")
+            ? t("Rest", "休息")
             : `${c.type || ""}${c.distance_km ? ` · ${c.distance_km} km` : ""}${c.pace ? ` @ ${c.pace}` : ""}`.trim();
           return (
             <li key={c.date} className="flex justify-between gap-2">

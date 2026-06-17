@@ -945,9 +945,17 @@ Return ONLY a JSON array. Each item: {"type":"preference|goal|challenge|achievem
             const dist = d.distance_km ?? d.distance;
             const workout = d.workout || d.description || d.type || "Rest";
             upcomingDays.push(`- ${dayDate} (${hkWeekday(dayDate)}, W${week.week}): ${workout}${dist ? ` — ${dist} km` : ""}`);
+            upcomingPlanRows.push({
+              date: dayDate,
+              type: d.type ?? null,
+              distance_km: typeof dist === "number" ? dist : null,
+              pace: d.pace ?? null,
+              description: d.description ?? d.workout ?? "",
+            });
           }
         }
       }
+
 
       planBlock = `ACTIVE TRAINING PLAN:
 - Distance/goal: ${plan.distance} (${plan.goal === "custom" ? "Custom" : plan.goal})

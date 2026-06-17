@@ -113,7 +113,22 @@ const MIN_WEEKS: Record<Distance, number> = { "5K": 4, "10K": 4, HM: 6, FM: 8, T
 const MIN_DAYS: Record<Distance, number> = { "5K": 2, "10K": 2, HM: 3, FM: 4, TR: 4, FT: 2 };
 
 function localizeTitle(type: string, lang: Lang): string {
-  return TYPE_LABELS[type]?.[lang] || type;
+  if (!type) return type;
+  if (TYPE_LABELS[type]) return TYPE_LABELS[type][lang];
+  // Case-insensitive lookup so titles like "rest" / "easy" / "long run" localize too
+  const norm = String(type).trim().toLowerCase();
+  const key = Object.keys(TYPE_LABELS).find((k) => k.toLowerCase() === norm);
+  return key ? TYPE_LABELS[key][lang] : type;
+}
+
+function resolveDisplayTitle(title: string | null | undefined, type: string | null | undefined, lang: Lang): string {
+  const t = (title || "").trim();
+  if (!t) return localizeTitle(type || "Run", lang);
+  // If the saved title is just a generic type keyword (e.g. "rest", "Easy"), localize it
+  const norm = t.toLowerCase();
+  const key = Object.keys(TYPE_LABELS).find((k) => k.toLowerCase() === norm);
+  if (key) return TYPE_LABELS[key][lang];
+  return t;
 }
 
 function localizeDescription(day: DayPlan, lang: Lang): string {

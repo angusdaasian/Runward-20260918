@@ -48,6 +48,10 @@ function parseRpeAndFeel(text: string): { rpe: number | null; feel: string } {
   return { rpe, feel };
 }
 
+function looksLikePlanChangeRequest(text: string): boolean {
+  return /\b(plan|training|workout|today|tomorrow|rest|skip|cancel|move|swap|change|reschedule|postpone|delay|switch)\b|訓練|計劃|计划|今日|今天|明天|休息|不跑|休跑|改|換|换|移|取消/i.test(text);
+}
+
 async function verifySignature(rawBody: string, signatureHeader: string | null): Promise<boolean> {
   if (!APP_SECRET) return true; // not configured → skip (handshake-only test setups)
   if (!signatureHeader || !signatureHeader.startsWith("sha256=")) return false;
@@ -296,7 +300,7 @@ async function handleIncoming(supabase: any, waId: string, text: string) {
   }
 
   // Free-form text → check for pending RPE prompt
-  const { data: pending } = await supabase
+  const { data: activityPrompt } = await supabase
     .from("whatsapp_pending_prompts")
     .select("id, user_id, activity_source, activity_db_id, activity_summary")
     .eq("wa_id", waId)
@@ -306,36 +310,36 @@ async function handleIncoming(supabase: any, waId: string, text: string) {
     .limit(1)
     .maybeSingle();
 
-  if (pending) {
+  if (activityPrompt && !looksLikePlanChangeRequest(text)) {
     const { rpe, feel } = parseRpeAndFeel(text);
     const { data: profile } = await supabase
-      .from("profiles").select("lang").eq("user_id", pending.user_id).maybeSingle();
-    const lang = await getUserLang(supabase, pending.user_id, (profile as any)?.lang);
+      .from("profiles").select("lang").eq("user_id", activityPrompt.user_id).maybeSingle();
+    const lang = await getUserLang(supabase, activityPrompt.user_id, (profile as any)?.lang);
 
     await supabase
       .from("whatsapp_pending_prompts")
       .update({ rpe, response_text: text, responded_at: new Date().toISOString() })
-      .eq("id", pending.id);
+      .eq("id", activityPrompt.id);
 
-    if (!pending.activity_db_id) {
+    if (!activityPrompt.activity_db_id) {
       await waSendText(waId, lang === "zh" ? "⚠️ 找不到對應的活動記錄，無法生成分析。" : "⚠️ Couldn't find the matching activity to analyze.");
       return;
     }
 
     await waSendText(waId, lang === "zh" ? "🧠 正在生成 AI 跑步分析…" : "🧠 Generating your AI run analysis…");
 
-    const loaded = await loadActivityForAnalyze(supabase, pending.activity_source, pending.activity_db_id);
+    const loaded = await loadActivityForAnalyze(supabase, activityPrompt.activity_source, activityPrompt.activity_db_id);
     if (!loaded) {
       await waSendText(waId, lang === "zh" ? "⚠️ 找不到活動資料。" : "⚠️ Activity data not found.");
       return;
     }
 
     const bodyPayload: any = {
-      activityDbId: pending.activity_db_id,
+      activityDbId: activityPrompt.activity_db_id,
       activity: loaded.activity,
       splits: [],
       lang,
-      internalUserId: pending.user_id,
+      internalUserId: activityPrompt.user_id,
       forceRefresh: true,
       ...(rpe !== null ? { rpe } : {}),
       ...(feel ? { userComment: feel } : {}),

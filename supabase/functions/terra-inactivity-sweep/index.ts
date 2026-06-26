@@ -63,7 +63,7 @@ function buildMsg(lang: "zh" | "en", daysInactive: number, provider: string, day
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
-  let body: { dryRun?: boolean; forceMode?: "warn" | "deauth"; forceHktDate?: string; source?: string } = {};
+  let body: { dryRun?: boolean; forceMode?: "warn" | "deauth"; forceHktDate?: string; source?: string; minDaysOverride?: number; daysUntilDeauthOverride?: number } = {};
   try { body = await req.json(); } catch { /* ignore */ }
   const dryRun = !!body.dryRun;
 
@@ -94,7 +94,8 @@ Deno.serve(async (req) => {
   }
 
   // Days until next deauth (always = days remaining until next month's 1st in HKT)
-  const daysUntilDeauth = mode === "warn" ? (lastDay - hkt.day + 1) : 0;
+  const daysUntilDeauth = body.daysUntilDeauthOverride ?? (mode === "warn" ? (lastDay - hkt.day + 1) : 0);
+  const warnMinDays = body.minDaysOverride ?? WARN_MIN_DAYS;
 
   // Load all active terra connections + their profiles
   const { data: conns, error: connErr } = await admin
@@ -128,7 +129,7 @@ Deno.serve(async (req) => {
 
     if (mode === "deauth" && days >= DEAUTH_THRESHOLD) {
       planned.push({ conn, profile: prof, days });
-    } else if (mode === "warn" && days >= WARN_MIN_DAYS) {
+    } else if (mode === "warn" && days >= warnMinDays) {
       planned.push({ conn, profile: prof, days });
     }
   }

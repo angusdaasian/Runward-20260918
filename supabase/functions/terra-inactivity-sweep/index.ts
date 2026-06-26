@@ -129,7 +129,7 @@ Deno.serve(async (req) => {
 
     if (mode === "deauth" && days >= DEAUTH_THRESHOLD) {
       planned.push({ conn, profile: prof, days });
-    } else if (mode === "warn" && days >= WARN_MIN_DAYS) {
+    } else if (mode === "warn" && days >= warnMinDays) {
       planned.push({ conn, profile: prof, days });
     }
   }

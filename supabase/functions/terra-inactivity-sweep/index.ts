@@ -94,7 +94,8 @@ Deno.serve(async (req) => {
   }
 
   // Days until next deauth (always = days remaining until next month's 1st in HKT)
-  const daysUntilDeauth = mode === "warn" ? (lastDay - hkt.day + 1) : 0;
+  const daysUntilDeauth = body.daysUntilDeauthOverride ?? (mode === "warn" ? (lastDay - hkt.day + 1) : 0);
+  const warnMinDays = body.minDaysOverride ?? WARN_MIN_DAYS;
 
   // Load all active terra connections + their profiles
   const { data: conns, error: connErr } = await admin

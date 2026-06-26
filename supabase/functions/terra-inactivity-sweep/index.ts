@@ -63,7 +63,7 @@ function buildMsg(lang: "zh" | "en", daysInactive: number, provider: string, day
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
-  let body: { dryRun?: boolean; forceMode?: "warn" | "deauth"; forceHktDate?: string; source?: string } = {};
+  let body: { dryRun?: boolean; forceMode?: "warn" | "deauth"; forceHktDate?: string; source?: string; minDaysOverride?: number; daysUntilDeauthOverride?: number } = {};
   try { body = await req.json(); } catch { /* ignore */ }
   const dryRun = !!body.dryRun;
 

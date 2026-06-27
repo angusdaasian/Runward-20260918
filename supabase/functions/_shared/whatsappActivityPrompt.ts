@@ -102,6 +102,64 @@ export async function waSendText(waId: string, text: string): Promise<string | n
   }
 }
 
+/**
+ * Send a WhatsApp Utility template message (bypasses 24h customer service window).
+ * Template body must contain a single {{1}} variable.
+ */
+export async function waSendTemplate(
+  waId: string,
+  templateName: string,
+  languageCode: string,
+  variable: string,
+): Promise<string | null> {
+  if (!ACCESS_TOKEN || !PHONE_NUMBER_ID) {
+    console.warn("[wa] template send skipped: missing token/phone id");
+    return null;
+  }
+  // Template parameters are capped (~1024 chars). Truncate safely.
+  let v = (variable ?? "").replace(/\s+/g, " ").trim();
+  if (v.length > 900) v = v.slice(0, 897) + "...";
+  if (!v) v = "—";
+  try {
+    const res = await fetch(
+      `https://graph.facebook.com/${GRAPH_VERSION}/${PHONE_NUMBER_ID}/messages`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${ACCESS_TOKEN}`,
+        },
+        body: JSON.stringify({
+          messaging_product: "whatsapp",
+          recipient_type: "individual",
+          to: waId,
+          type: "template",
+          template: {
+            name: templateName,
+            language: { code: languageCode },
+            components: [
+              {
+                type: "body",
+                parameters: [{ type: "text", text: v }],
+              },
+            ],
+          },
+        }),
+      },
+    );
+    if (res.ok) {
+      const data = await res.json().catch(() => null) as any;
+      return data?.messages?.[0]?.id ?? null;
+    }
+    const errText = (await res.text()).slice(0, 600);
+    console.warn(`[wa] template send failed status=${res.status} template=${templateName}`, errText);
+    return null;
+  } catch (e) {
+    console.error("[wa] template send error", e);
+    return null;
+  }
+}
+
 async function lookupActivityDbId(
   supabase: any,
   userId: string,

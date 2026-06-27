@@ -64,10 +64,16 @@ Deno.serve(async (req) => {
         const suggestion: string = data?.suggestion ?? "";
         if (!suggestion) { failed++; continue; }
 
-        const header = lang === "zh"
-          ? `🏃‍♂️ *今日跑步建議*\n\n`
-          : `🏃‍♂️ *Today's Run Suggestion*\n\n`;
-        const ok = await waSendText(u.whatsapp_wa_id as string, header + suggestion);
+        const templateName = lang === "zh" ? "daily_suggestion_cn" : "daily_suggestion_en";
+        const langCode = lang === "zh" ? "zh_HK" : "en";
+        let ok = !!(await waSendTemplate(u.whatsapp_wa_id as string, templateName, langCode, suggestion));
+        if (!ok) {
+          // Fallback to free-form (only delivers within 24h customer service window)
+          const header = lang === "zh"
+            ? `🏃‍♂️ *今日跑步建議*\n\n`
+            : `🏃‍♂️ *Today's Run Suggestion*\n\n`;
+          ok = !!(await waSendText(u.whatsapp_wa_id as string, header + suggestion));
+        }
         if (ok) sent++; else failed++;
       } catch (e) {
         console.error("[wa-daily] error for user", u.user_id, e);

@@ -258,12 +258,27 @@ export async function maybeSendWhatsappActivityPrompt(summary: ActivitySummary):
       return; // already prompted or insert failed
     }
 
-    const summaryBlock = fmtSummary(summary, lang);
-    const text = lang === "zh"
-      ? `🏃 *剛剛完成跑步！*\n\n${summaryBlock}\n\n回覆訊息告訴我這次跑步的 *RPE*（1–10）以及感覺如何（可選），我會為你生成完整的 AI 跑步分析。\n\n例如：7 腿有點累但完成了`
-      : `🏃 *Nice run!*\n\n${summaryBlock}\n\nReply with your *RPE* (1–10) and how it felt (optional) and I'll generate your full AI run analysis.\n\nExample: 7 legs heavy but pushed through`;
+    // Build one-line summary for template variable {{1}}
+    const km = summary.distanceMeters && summary.distanceMeters > 0 ? summary.distanceMeters / 1000 : 0;
+    const min = summary.durationSeconds && summary.durationSeconds > 0 ? summary.durationSeconds / 60 : 0;
+    const paceSec = km > 0 && min > 0 ? Math.round((min / km) * 60) : 0;
+    const paceStr = paceSec > 0 ? `${Math.floor(paceSec / 60)}:${String(paceSec % 60).padStart(2, "0")}/km` : "—";
+    const oneLine = lang === "zh"
+      ? `${km > 0 ? km.toFixed(2) : "—"} 公里，${min > 0 ? min.toFixed(0) : "—"} 分鐘，配速 ${paceStr}`
+      : `${km > 0 ? km.toFixed(2) : "—"} km in ${min > 0 ? min.toFixed(0) : "—"} min, pace ${paceStr}`;
 
-    const messageId = await waSendText(profile.whatsapp_wa_id as string, text);
+    // Send approved Utility template first (bypasses 24h window).
+    const templateName = lang === "zh" ? "activity_prompt_cn" : "activity_prompt_en";
+    const langCode = lang === "zh" ? "zh_HK" : "en";
+    let messageId = await waSendTemplate(profile.whatsapp_wa_id as string, templateName, langCode, oneLine);
+    if (!messageId) {
+      // Fallback to free-form (works only within 24h window)
+      const summaryBlock = fmtSummary(summary, lang);
+      const text = lang === "zh"
+        ? `🏃 *剛剛完成跑步！*\n\n${summaryBlock}\n\n回覆訊息告訴我這次跑步的 *RPE*（1–10）以及感覺如何（可選），我會為你生成完整的 AI 跑步分析。\n\n例如：7 腿有點累但完成了`
+        : `🏃 *Nice run!*\n\n${summaryBlock}\n\nReply with your *RPE* (1–10) and how it felt (optional) and I'll generate your full AI run analysis.\n\nExample: 7 legs heavy but pushed through`;
+      messageId = await waSendText(profile.whatsapp_wa_id as string, text);
+    }
     if (!messageId) {
       console.warn(`[wa-activity-prompt] send failed user=${summary.userId} key=${summary.activityKey}; removing undelivered pending prompt`);
       await supabase

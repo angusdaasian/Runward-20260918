@@ -53,9 +53,19 @@ Deno.serve(async (req) => {
   if (to) {
     const candidates = [
       { name: "daily_suggestion_en", lang: "en" },
+      { name: "daily_suggestion_en", lang: "en_US" },
       { name: "daily_suggestion_cn", lang: "zh_HK" },
+      { name: "daily_suggestion_cn", lang: "zh_CN" },
+      { name: "daily_suggestion_cn", lang: "zh_TW" },
       { name: "activity_prompt_en", lang: "en" },
+      { name: "activity_prompt_en", lang: "en_US" },
       { name: "activity_prompt_cn", lang: "zh_HK" },
+      { name: "activity_prompt_cn", lang: "zh_CN" },
+      { name: "activity_prompt_cn", lang: "zh_TW" },
+      { name: "daily_suggestion", lang: "en" },
+      { name: "daily_suggestion", lang: "en_US" },
+      { name: "activity_prompt", lang: "en" },
+      { name: "activity_prompt", lang: "en_US" },
     ];
     for (const c of candidates) {
       const r = await fetch(`https://graph.facebook.com/v21.0/${PNID}/messages`, {

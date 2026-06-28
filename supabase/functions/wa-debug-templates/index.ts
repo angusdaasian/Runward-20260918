@@ -92,6 +92,6 @@ Deno.serve(async (req) => {
     }
   }
 
-  return new Response(JSON.stringify({ pn, wabaId, templates, tests }, null, 2),
+  return new Response(JSON.stringify({ pn, wabaId, templates, phoneOwnership, tests }, null, 2),
     { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 });

@@ -9,12 +9,15 @@ Deno.serve(async (req) => {
   const to = url.searchParams.get("to");
 
   // 1) find WABA id - try several paths
-  const pnRes = await fetch(`https://graph.facebook.com/v21.0/${PNID}?fields=id,display_phone_number`, {
+  const pnRes = await fetch(`https://graph.facebook.com/v21.0/${PNID}?fields=id,display_phone_number,verified_name,name_status,account_mode`, {
     headers: { Authorization: `Bearer ${TOKEN}` },
   });
   const pn = await pnRes.json();
+  // Also try to walk up to WABA from the phone number node
+  const pnParent = await fetch(`https://graph.facebook.com/v21.0/${PNID}?fields=whatsapp_business_account_id`, { headers: { Authorization: `Bearer ${TOKEN}` } });
+  (pn as any)._parent = await pnParent.json();
   const wabaQuery = url.searchParams.get("waba");
-  let wabaId = wabaQuery;
+  let wabaId: string | null = wabaQuery ?? pn?.whatsapp_business_account?.id ?? null;
   if (!wabaId) {
     // Try debug_token to find owning WABA
     const dbg = await fetch(`https://graph.facebook.com/v21.0/debug_token?input_token=${TOKEN}&access_token=${TOKEN}`);
@@ -24,17 +27,17 @@ Deno.serve(async (req) => {
       ?? null;
     (pn as any)._debug_token = dbgJson;
   }
-  // Fallback: list businesses
-  if (!wabaId) {
-    const me = await fetch(`https://graph.facebook.com/v21.0/me/businesses?fields=id,name`, { headers: { Authorization: `Bearer ${TOKEN}` } });
-    const meJson = await me.json();
-    (pn as any)._me_biz = meJson;
-    const bizId = meJson?.data?.[0]?.id;
-    if (bizId) {
-      const wabas = await fetch(`https://graph.facebook.com/v21.0/${bizId}/owned_whatsapp_business_accounts?fields=id,name`, { headers: { Authorization: `Bearer ${TOKEN}` } });
-      const w = await wabas.json();
-      (pn as any)._wabas = w;
-      wabaId = w?.data?.[0]?.id ?? null;
+  // Fallback: use explicit business id from query param
+  const bizParam = url.searchParams.get("biz");
+  if (!wabaId && bizParam) {
+    const wabas = await fetch(`https://graph.facebook.com/v21.0/${bizParam}/owned_whatsapp_business_accounts?fields=id,name`, { headers: { Authorization: `Bearer ${TOKEN}` } });
+    const w = await wabas.json();
+    (pn as any)._owned_wabas = w;
+    wabaId = w?.data?.[0]?.id ?? null;
+    if (!wabaId) {
+      const cwabas = await fetch(`https://graph.facebook.com/v21.0/${bizParam}/client_whatsapp_business_accounts?fields=id,name`, { headers: { Authorization: `Bearer ${TOKEN}` } });
+      (pn as any)._client_wabas = await cwabas.json();
+      wabaId = (pn as any)._client_wabas?.data?.[0]?.id ?? null;
     }
   }
 

@@ -9,7 +9,7 @@ Deno.serve(async (req) => {
   const to = url.searchParams.get("to");
 
   // 1) find WABA id - try several paths
-  const pnRes = await fetch(`https://graph.facebook.com/v21.0/${PNID}?fields=id,display_phone_number`, {
+  const pnRes = await fetch(`https://graph.facebook.com/v21.0/${PNID}?fields=id,display_phone_number,whatsapp_business_account{id,name}`, {
     headers: { Authorization: `Bearer ${TOKEN}` },
   });
   const pn = await pnRes.json();

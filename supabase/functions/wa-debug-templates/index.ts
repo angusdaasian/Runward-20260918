@@ -51,6 +51,14 @@ Deno.serve(async (req) => {
     templates = await r.json();
   }
 
+  // 2b) list phone numbers in each known WABA to find which one owns ours
+  const wabasToProbe = ["1706990044049795","1032120229389422","1541524263983057","3029079680617432"];
+  const phoneOwnership: any[] = [];
+  for (const w of wabasToProbe) {
+    const r = await fetch(`https://graph.facebook.com/v21.0/${w}/phone_numbers?fields=id,display_phone_number,verified_name`, { headers: { Authorization: `Bearer ${TOKEN}` } });
+    phoneOwnership.push({ waba: w, body: await r.json() });
+  }
+
   // 3) optionally test send each
   const tests: any[] = [];
   if (to) {
@@ -84,6 +92,6 @@ Deno.serve(async (req) => {
     }
   }
 
-  return new Response(JSON.stringify({ pn, wabaId, templates, tests }, null, 2),
+  return new Response(JSON.stringify({ pn, wabaId, templates, phoneOwnership, tests }, null, 2),
     { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 });

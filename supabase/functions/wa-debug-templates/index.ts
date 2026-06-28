@@ -14,7 +14,7 @@ Deno.serve(async (req) => {
   });
   const pn = await pnRes.json();
   const wabaQuery = url.searchParams.get("waba");
-  let wabaId = wabaQuery;
+  let wabaId: string | null = wabaQuery ?? pn?.whatsapp_business_account?.id ?? null;
   if (!wabaId) {
     // Try debug_token to find owning WABA
     const dbg = await fetch(`https://graph.facebook.com/v21.0/debug_token?input_token=${TOKEN}&access_token=${TOKEN}`);

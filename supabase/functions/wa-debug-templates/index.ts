@@ -9,10 +9,13 @@ Deno.serve(async (req) => {
   const to = url.searchParams.get("to");
 
   // 1) find WABA id - try several paths
-  const pnRes = await fetch(`https://graph.facebook.com/v21.0/${PNID}?fields=id,display_phone_number,whatsapp_business_account{id,name}`, {
+  const pnRes = await fetch(`https://graph.facebook.com/v21.0/${PNID}?fields=id,display_phone_number,verified_name,name_status,account_mode`, {
     headers: { Authorization: `Bearer ${TOKEN}` },
   });
   const pn = await pnRes.json();
+  // Also try to walk up to WABA from the phone number node
+  const pnParent = await fetch(`https://graph.facebook.com/v21.0/${PNID}?fields=whatsapp_business_account_id`, { headers: { Authorization: `Bearer ${TOKEN}` } });
+  (pn as any)._parent = await pnParent.json();
   const wabaQuery = url.searchParams.get("waba");
   let wabaId: string | null = wabaQuery ?? pn?.whatsapp_business_account?.id ?? null;
   if (!wabaId) {

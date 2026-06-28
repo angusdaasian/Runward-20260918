@@ -8,12 +8,22 @@ Deno.serve(async (req) => {
   const url = new URL(req.url);
   const to = url.searchParams.get("to");
 
-  // 1) find WABA id from the phone number id
-  const pnRes = await fetch(`https://graph.facebook.com/v21.0/${PNID}?fields=id,display_phone_number,whatsapp_business_account`, {
+  // 1) find WABA id - try several paths
+  const pnRes = await fetch(`https://graph.facebook.com/v21.0/${PNID}?fields=id,display_phone_number`, {
     headers: { Authorization: `Bearer ${TOKEN}` },
   });
   const pn = await pnRes.json();
-  const wabaId = pn?.whatsapp_business_account?.id;
+  const wabaQuery = url.searchParams.get("waba");
+  let wabaId = wabaQuery;
+  if (!wabaId) {
+    // Try debug_token to find owning WABA
+    const dbg = await fetch(`https://graph.facebook.com/v21.0/debug_token?input_token=${TOKEN}&access_token=${TOKEN}`);
+    const dbgJson = await dbg.json();
+    wabaId = dbgJson?.data?.granular_scopes?.find?.((s: any) => s.scope === 'whatsapp_business_messaging')?.target_ids?.[0]
+      ?? dbgJson?.data?.granular_scopes?.find?.((s: any) => s.scope === 'whatsapp_business_management')?.target_ids?.[0]
+      ?? null;
+    (pn as any)._debug_token = dbgJson;
+  }
 
   // 2) list templates
   let templates: any = null;

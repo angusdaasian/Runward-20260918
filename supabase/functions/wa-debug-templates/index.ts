@@ -36,6 +36,8 @@ Deno.serve(async (req) => {
       (pn as any)._wabas = w;
       wabaId = w?.data?.[0]?.id ?? null;
     }
+  }
+
 
   // 2) list templates
   let templates: any = null;

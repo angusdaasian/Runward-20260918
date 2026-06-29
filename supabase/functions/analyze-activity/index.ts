@@ -32,13 +32,97 @@ function getVertexLocation(): string {
   return Deno.env.get("GOOGLE_VERTEX_LOCATION") || "global";
 }
 
+let cachedVertexAccessToken: { token: string; expiresAtMs: number } | null = null;
+
+function base64UrlEncodeBytes(bytes: Uint8Array): string {
+  let binary = "";
+  const chunkSize = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+  }
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+
+function base64UrlEncodeText(text: string): string {
+  return base64UrlEncodeBytes(new TextEncoder().encode(text));
+}
+
+function pemToDerBytes(pem: string): Uint8Array {
+  const base64 = pem
+    .replace(/-----BEGIN PRIVATE KEY-----/g, "")
+    .replace(/-----END PRIVATE KEY-----/g, "")
+    .replace(/\s+/g, "");
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+
+async function getVertexAccessToken(): Promise<string> {
+  if (cachedVertexAccessToken && cachedVertexAccessToken.expiresAtMs > Date.now() + 60_000) {
+    return cachedVertexAccessToken.token;
+  }
+
+  const serviceAccountJson = Deno.env.get("GOOGLE_VERTEX_SERVICE_ACCOUNT_JSON");
+  if (!serviceAccountJson) throw new Error("GOOGLE_VERTEX_SERVICE_ACCOUNT_JSON is not configured");
+
+  const serviceAccount = JSON.parse(serviceAccountJson);
+  const clientEmail = serviceAccount.client_email;
+  const privateKey = serviceAccount.private_key;
+  const tokenUri = serviceAccount.token_uri || "https://oauth2.googleapis.com/token";
+  if (!clientEmail || !privateKey) throw new Error("Invalid Vertex service account JSON");
+
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  const header = { alg: "RS256", typ: "JWT" };
+  const claimSet = {
+    iss: clientEmail,
+    scope: "https://www.googleapis.com/auth/cloud-platform",
+    aud: tokenUri,
+    exp: nowSeconds + 3600,
+    iat: nowSeconds,
+  };
+  const unsignedJwt = `${base64UrlEncodeText(JSON.stringify(header))}.${base64UrlEncodeText(JSON.stringify(claimSet))}`;
+  const key = await crypto.subtle.importKey(
+    "pkcs8",
+    pemToDerBytes(privateKey),
+    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const signature = await crypto.subtle.sign(
+    "RSASSA-PKCS1-v1_5",
+    key,
+    new TextEncoder().encode(unsignedJwt),
+  );
+  const assertion = `${unsignedJwt}.${base64UrlEncodeBytes(new Uint8Array(signature))}`;
+
+  const tokenResp = await fetch(tokenUri, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
+      assertion,
+    }),
+  });
+  const tokenBody = await tokenResp.json().catch(() => ({}));
+  if (!tokenResp.ok || !tokenBody.access_token) {
+    throw new Error(`Vertex service account auth failed (${tokenResp.status})`);
+  }
+
+  cachedVertexAccessToken = {
+    token: tokenBody.access_token,
+    expiresAtMs: Date.now() + Math.max(Number(tokenBody.expires_in || 3600) - 60, 60) * 1000,
+  };
+  return cachedVertexAccessToken.token;
+}
+
 async function callVertexAI(opts: {
-  apiKey: string;
+  apiKey?: string;
   model?: string;
   messages: Array<{ role: string; content: any }>;
 }): Promise<Response> {
   const model = VERTEX_MODEL_MAP[opts.model || ""] || (opts.model || "gemini-3-flash-preview").replace(/^google\//, "");
-  const url = `https://aiplatform.googleapis.com/v1/projects/${getVertexProjectId()}/locations/${getVertexLocation()}/publishers/google/models/${model}:generateContent?key=${opts.apiKey}`;
+  const baseUrl = `https://aiplatform.googleapis.com/v1/projects/${getVertexProjectId()}/locations/${getVertexLocation()}/publishers/google/models/${model}:generateContent`;
 
   const systemParts: any[] = [];
   const contents: any[] = [];
@@ -80,9 +164,19 @@ async function callVertexAI(opts: {
     };
   }
 
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  let url = baseUrl;
+  if (Deno.env.get("GOOGLE_VERTEX_SERVICE_ACCOUNT_JSON")) {
+    headers.Authorization = `Bearer ${await getVertexAccessToken()}`;
+  } else if (opts.apiKey) {
+    url = `${baseUrl}?key=${encodeURIComponent(opts.apiKey)}`;
+  } else {
+    throw new Error("Vertex authentication is not configured");
+  }
+
   const vRes = await fetch(url, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify(body),
   });
 

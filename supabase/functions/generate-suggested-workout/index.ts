@@ -32,6 +32,17 @@ const WORKOUT_TYPE_DESCRIPTIONS: Record<string, string> = {
   race_pace: "Race-pace specific workout aligned to the runner's goal pace.",
 };
 
+function getVertexProjectId(): string {
+  return Deno.env.get("GOOGLE_VERTEX_PROJECT_ID")
+    || Deno.env.get("GOOGLE_CLOUD_PROJECT")
+    || Deno.env.get("GCLOUD_PROJECT")
+    || "inbound-isotope-500908-n8";
+}
+
+function getVertexLocation(): string {
+  return Deno.env.get("GOOGLE_VERTEX_LOCATION") || "global";
+}
+
 interface RecentRun {
   date: string;
   distance_km: number;
@@ -66,7 +77,7 @@ async function callVertexAI(opts: { apiKey: string; model?: string; messages: Ar
     "google/gemini-3.1-flash-lite-preview": "gemini-3.1-flash-lite-preview",
   };
   const model = VERTEX_MODEL_MAP[opts.model || ""] || (opts.model || "gemini-3.1-flash-lite-preview").replace(/^google\//, "");
-  const url = `https://aiplatform.googleapis.com/v1/publishers/google/models/${model}:generateContent?key=${opts.apiKey}`;
+  const url = `https://aiplatform.googleapis.com/v1/projects/${getVertexProjectId()}/locations/${getVertexLocation()}/publishers/google/models/${model}:generateContent?key=${opts.apiKey}`;
   const systemParts: any[] = [];
   const contents: any[] = [];
   for (const m of opts.messages) {

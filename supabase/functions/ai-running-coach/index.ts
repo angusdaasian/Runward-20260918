@@ -12,6 +12,17 @@ const json = (body: Record<string, unknown>, status = 200) =>
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
+function getVertexProjectId(): string {
+  return Deno.env.get("GOOGLE_VERTEX_PROJECT_ID")
+    || Deno.env.get("GOOGLE_CLOUD_PROJECT")
+    || Deno.env.get("GCLOUD_PROJECT")
+    || "inbound-isotope-500908-n8";
+}
+
+function getVertexLocation(): string {
+  return Deno.env.get("GOOGLE_VERTEX_LOCATION") || "global";
+}
+
 const MODEL = "gemini-3.1-pro-preview";
 
 type ThinkingLevel = "minimal" | "low" | "medium" | "high";
@@ -215,7 +226,7 @@ async function callVertexAI(opts: {
   maxOutputTokens?: number;
   thinkingBudget?: number;
 }): Promise<string> {
-  const url = `https://aiplatform.googleapis.com/v1/publishers/google/models/${MODEL}:generateContent?key=${opts.apiKey}`;
+  const url = `https://aiplatform.googleapis.com/v1/projects/${getVertexProjectId()}/locations/${getVertexLocation()}/publishers/google/models/${MODEL}:generateContent?key=${opts.apiKey}`;
   const systemParts: any[] = [];
   const contents: any[] = [];
   if (opts.systemPrompt) systemParts.push({ text: opts.systemPrompt });

@@ -12,6 +12,17 @@ const json = (b: Record<string, unknown>, s = 200) =>
 
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 
+function getVertexProjectId(): string {
+  return Deno.env.get("GOOGLE_VERTEX_PROJECT_ID")
+    || Deno.env.get("GOOGLE_CLOUD_PROJECT")
+    || Deno.env.get("GCLOUD_PROJECT")
+    || "inbound-isotope-500908-n8";
+}
+
+function getVertexLocation(): string {
+  return Deno.env.get("GOOGLE_VERTEX_LOCATION") || "global";
+}
+
 async function callVertex(opts: {
   apiKey: string;
   model: string;
@@ -19,7 +30,7 @@ async function callVertex(opts: {
   userPrompt: string;
   jsonMode?: boolean;
 }): Promise<Response> {
-  const url = `https://aiplatform.googleapis.com/v1/publishers/google/models/${opts.model}:generateContent?key=${opts.apiKey}`;
+  const url = `https://aiplatform.googleapis.com/v1/projects/${getVertexProjectId()}/locations/${getVertexLocation()}/publishers/google/models/${opts.model}:generateContent?key=${opts.apiKey}`;
   const body: Record<string, unknown> = {
     systemInstruction: { parts: [{ text: opts.systemPrompt }] },
     contents: [{ role: "user", parts: [{ text: opts.userPrompt }] }],

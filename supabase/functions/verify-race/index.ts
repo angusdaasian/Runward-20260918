@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.100.0";
+import { buildVertexAuth } from "../_shared/vertex-auth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",

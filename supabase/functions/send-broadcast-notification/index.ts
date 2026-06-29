@@ -27,7 +27,12 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({} as any));
     const title = (body?.title ?? "").toString().trim();
     const message = (body?.message ?? "").toString().trim();
-    const audience: "all" | "free" = body?.audience === "free" ? "free" : "all";
+    const audience: "all" | "free" | "free_no_trial_this_month" =
+      body?.audience === "free" ? "free"
+      : body?.audience === "free_no_trial_this_month" ? "free_no_trial_this_month"
+      : "all";
+    const langFilter: "en" | "zh" | null =
+      body?.lang === "en" ? "en" : body?.lang === "zh" ? "zh" : null;
     const selfUnschedule: string | null =
       typeof body?.self_unschedule === "string" && body.self_unschedule.length > 0
         ? body.self_unschedule
@@ -54,14 +59,16 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { data: profiles, error: pErr } = await supabase.from("profiles").select("user_id");
+    let profileQuery = supabase.from("profiles").select("user_id, lang");
+    if (langFilter) profileQuery = profileQuery.eq("lang", langFilter);
+    const { data: profiles, error: pErr } = await profileQuery;
     if (pErr) throw pErr;
     let userIds: string[] = (profiles || []).map((p: any) => p.user_id).filter(Boolean);
 
-    if (audience === "free") {
+    if (audience === "free" || audience === "free_no_trial_this_month") {
       const { data: subs, error: sErr } = await supabase
         .from("premium_subscriptions")
-        .select("user_id, expires_at");
+        .select("user_id, expires_at, is_trial, activated_at");
       if (sErr) throw sErr;
       const nowMs = Date.now();
       const activePremium = new Set(
@@ -70,6 +77,21 @@ Deno.serve(async (req) => {
           .map((s: any) => s.user_id),
       );
       userIds = userIds.filter((id) => !activePremium.has(id));
+
+      if (audience === "free_no_trial_this_month") {
+        const now = new Date();
+        const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).getTime();
+        const trialThisMonth = new Set(
+          (subs || [])
+            .filter((s: any) => {
+              if (!s.is_trial) return false;
+              const t = s.activated_at ? new Date(s.activated_at).getTime() : 0;
+              return t >= monthStart;
+            })
+            .map((s: any) => s.user_id),
+        );
+        userIds = userIds.filter((id) => !trialThisMonth.has(id));
+      }
     }
 
     console.log(`[send-broadcast-notification] audience=${audience} recipients=${userIds.length}`);

@@ -5,8 +5,19 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+function getVertexProjectId(): string {
+  return Deno.env.get("GOOGLE_VERTEX_PROJECT_ID")
+    || Deno.env.get("GOOGLE_CLOUD_PROJECT")
+    || Deno.env.get("GCLOUD_PROJECT")
+    || "inbound-isotope-500908-n8";
+}
+
+function getVertexLocation(): string {
+  return Deno.env.get("GOOGLE_VERTEX_LOCATION") || "global";
+}
+
 async function callVertexAI(opts: { apiKey: string; model: string; messages: Array<{ role: string; content: string }> }) {
-  const url = `https://aiplatform.googleapis.com/v1/publishers/google/models/${opts.model}:generateContent?key=${opts.apiKey}`;
+  const url = `https://aiplatform.googleapis.com/v1/projects/${getVertexProjectId()}/locations/${getVertexLocation()}/publishers/google/models/${opts.model}:generateContent?key=${opts.apiKey}`;
   const systemParts: any[] = [];
   const contents: any[] = [];
   for (const m of opts.messages) {

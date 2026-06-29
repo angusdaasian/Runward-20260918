@@ -7,6 +7,17 @@ const corsHeaders = {
 };
 
 // ── Vertex AI helper ──
+function getVertexProjectId(): string {
+  return Deno.env.get("GOOGLE_VERTEX_PROJECT_ID")
+    || Deno.env.get("GOOGLE_CLOUD_PROJECT")
+    || Deno.env.get("GCLOUD_PROJECT")
+    || "inbound-isotope-500908-n8";
+}
+
+function getVertexLocation(): string {
+  return Deno.env.get("GOOGLE_VERTEX_LOCATION") || "global";
+}
+
 async function callVertexAI(opts: { apiKey: string; model?: string; messages: Array<{ role: string; content: any }> }): Promise<Response> {
   const VERTEX_MODEL_MAP: Record<string, string> = {
     "google/gemini-3.1-pro-preview": "gemini-3.1-pro-preview",
@@ -14,7 +25,7 @@ async function callVertexAI(opts: { apiKey: string; model?: string; messages: Ar
     "google/gemini-3.1-flash-lite-preview": "gemini-3.1-flash-lite-preview",
   };
   const model = VERTEX_MODEL_MAP[opts.model || ""] || (opts.model || "gemini-3.1-pro-preview").replace(/^google\//, "");
-  const url = `https://aiplatform.googleapis.com/v1/publishers/google/models/${model}:generateContent?key=${opts.apiKey}`;
+  const url = `https://aiplatform.googleapis.com/v1/projects/${getVertexProjectId()}/locations/${getVertexLocation()}/publishers/google/models/${model}:generateContent?key=${opts.apiKey}`;
   const systemParts: any[] = [];
   const contents: any[] = [];
   for (const m of opts.messages) {

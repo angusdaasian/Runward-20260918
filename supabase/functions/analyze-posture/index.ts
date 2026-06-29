@@ -6,6 +6,17 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+function getVertexProjectId(): string {
+  return Deno.env.get("GOOGLE_VERTEX_PROJECT_ID")
+    || Deno.env.get("GOOGLE_CLOUD_PROJECT")
+    || Deno.env.get("GCLOUD_PROJECT")
+    || "inbound-isotope-500908-n8";
+}
+
+function getVertexLocation(): string {
+  return Deno.env.get("GOOGLE_VERTEX_LOCATION") || "global";
+}
+
 async function callVertexAI(opts: {
   apiKey: string;
   model?: string;
@@ -18,7 +29,7 @@ async function callVertexAI(opts: {
     "google/gemini-3-flash-preview": "gemini-3-flash-preview",
   };
   const model = VERTEX_MODEL_MAP[opts.model || ""] || (opts.model || "gemini-3-flash-preview").replace(/^google\//, "");
-  const url = `https://aiplatform.googleapis.com/v1/publishers/google/models/${model}:generateContent?key=${opts.apiKey}`;
+  const url = `https://aiplatform.googleapis.com/v1/projects/${getVertexProjectId()}/locations/${getVertexLocation()}/publishers/google/models/${model}:generateContent?key=${opts.apiKey}`;
   const systemParts: any[] = [];
   const contents: any[] = [];
   for (const m of opts.messages) {

@@ -14,10 +14,21 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 const VERTEX_API_KEY = Deno.env.get("GOOGLE_VERTEX_API_KEY")!;
+function getVertexProjectId(): string {
+  return Deno.env.get("GOOGLE_VERTEX_PROJECT_ID")
+    || Deno.env.get("GOOGLE_CLOUD_PROJECT")
+    || Deno.env.get("GCLOUD_PROJECT")
+    || "inbound-isotope-500908-n8";
+}
+
+function getVertexLocation(): string {
+  return Deno.env.get("GOOGLE_VERTEX_LOCATION") || "global";
+}
+
 const MODEL = "gemini-3.1-flash-lite-preview";
 
 async function callGemini(systemPrompt: string, userPrompt: string): Promise<string> {
-  const url = `https://aiplatform.googleapis.com/v1/publishers/google/models/${MODEL}:generateContent?key=${VERTEX_API_KEY}`;
+  const url = `https://aiplatform.googleapis.com/v1/projects/${getVertexProjectId()}/locations/${getVertexLocation()}/publishers/google/models/${MODEL}:generateContent?key=${VERTEX_API_KEY}`;
   const body = {
     contents: [{ role: "user", parts: [{ text: userPrompt }] }],
     systemInstruction: { parts: [{ text: systemPrompt }] },

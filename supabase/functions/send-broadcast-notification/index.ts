@@ -94,7 +94,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    console.log(`[send-broadcast-notification] audience=${audience} recipients=${userIds.length}`);
+    console.log(`[send-broadcast-notification] audience=${audience} lang=${langFilter ?? "any"} recipients=${userIds.length}`);
 
     // Chunk to respect OneSignal include_external_user_ids limit (~2000)
     const CHUNK = 2000;

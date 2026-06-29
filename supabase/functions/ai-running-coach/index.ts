@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { buildVertexAuth } from "../_shared/vertex-auth.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
@@ -226,7 +227,8 @@ async function callVertexAI(opts: {
   maxOutputTokens?: number;
   thinkingBudget?: number;
 }): Promise<string> {
-  const url = `https://aiplatform.googleapis.com/v1/projects/${getVertexProjectId()}/locations/${getVertexLocation()}/publishers/google/models/${MODEL}:generateContent?key=${opts.apiKey}`;
+  const __baseUrl = `https://aiplatform.googleapis.com/v1/projects/${getVertexProjectId()}/locations/${getVertexLocation()}/publishers/google/models/${MODEL}:generateContent`;
+  const { url, headers: __vxHeaders } = await buildVertexAuth(__baseUrl, opts.apiKey);
   const systemParts: any[] = [];
   const contents: any[] = [];
   if (opts.systemPrompt) systemParts.push({ text: opts.systemPrompt });
@@ -252,7 +254,7 @@ async function callVertexAI(opts: {
 
   const r = await fetch(url, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: __vxHeaders,
     body: JSON.stringify(body),
   });
   if (!r.ok) {

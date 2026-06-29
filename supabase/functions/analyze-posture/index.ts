@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { buildVertexAuth } from "../_shared/vertex-auth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -29,7 +30,8 @@ async function callVertexAI(opts: {
     "google/gemini-3-flash-preview": "gemini-3-flash-preview",
   };
   const model = VERTEX_MODEL_MAP[opts.model || ""] || (opts.model || "gemini-3-flash-preview").replace(/^google\//, "");
-  const url = `https://aiplatform.googleapis.com/v1/projects/${getVertexProjectId()}/locations/${getVertexLocation()}/publishers/google/models/${model}:generateContent?key=${opts.apiKey}`;
+  const __baseUrl = `https://aiplatform.googleapis.com/v1/projects/${getVertexProjectId()}/locations/${getVertexLocation()}/publishers/google/models/${model}:generateContent`;
+  const { url, headers: __vxHeaders } = await buildVertexAuth(__baseUrl, opts.apiKey);
   const systemParts: any[] = [];
   const contents: any[] = [];
   for (const m of opts.messages) {
@@ -61,7 +63,7 @@ async function callVertexAI(opts: {
   if (systemParts.length) body.systemInstruction = { parts: systemParts };
   const vRes = await fetch(url, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: __vxHeaders,
     body: JSON.stringify(body),
   });
   if (!vRes.ok) {
@@ -73,7 +75,7 @@ async function callVertexAI(opts: {
   const text = vData?.candidates?.[0]?.content?.parts?.map((p: any) => p.text || "").join("") || "";
   return new Response(JSON.stringify({ choices: [{ message: { content: text } }] }), {
     status: 200,
-    headers: { "Content-Type": "application/json" },
+    headers: __vxHeaders,
   });
 }
 

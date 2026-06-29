@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { buildVertexAuth } from "../_shared/vertex-auth.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
@@ -28,7 +29,8 @@ function getVertexLocation(): string {
 const MODEL = "gemini-3.1-flash-lite-preview";
 
 async function callGemini(systemPrompt: string, userPrompt: string): Promise<string> {
-  const url = `https://aiplatform.googleapis.com/v1/projects/${getVertexProjectId()}/locations/${getVertexLocation()}/publishers/google/models/${MODEL}:generateContent?key=${VERTEX_API_KEY}`;
+  const __baseUrl = `https://aiplatform.googleapis.com/v1/projects/${getVertexProjectId()}/locations/${getVertexLocation()}/publishers/google/models/${MODEL}:generateContent`;
+  const { url, headers: __vxHeaders } = await buildVertexAuth(__baseUrl, VERTEX_API_KEY);
   const body = {
     contents: [{ role: "user", parts: [{ text: userPrompt }] }],
     systemInstruction: { parts: [{ text: systemPrompt }] },
@@ -40,7 +42,7 @@ async function callGemini(systemPrompt: string, userPrompt: string): Promise<str
   };
   const r = await fetch(url, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: __vxHeaders,
     body: JSON.stringify(body),
   });
   if (!r.ok) {

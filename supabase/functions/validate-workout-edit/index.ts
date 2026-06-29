@@ -31,7 +31,8 @@ async function callVertex(opts: {
   userPrompt: string;
   jsonMode?: boolean;
 }): Promise<Response> {
-  const url = `https://aiplatform.googleapis.com/v1/projects/${getVertexProjectId()}/locations/${getVertexLocation()}/publishers/google/models/${opts.model}:generateContent?key=${opts.apiKey}`;
+  const __baseUrl = `https://aiplatform.googleapis.com/v1/projects/${getVertexProjectId()}/locations/${getVertexLocation()}/publishers/google/models/${opts.model}:generateContent`;
+  const { url, headers: __vxHeaders } = await buildVertexAuth(__baseUrl, opts.apiKey);
   const body: Record<string, unknown> = {
     systemInstruction: { parts: [{ text: opts.systemPrompt }] },
     contents: [{ role: "user", parts: [{ text: opts.userPrompt }] }],
@@ -41,7 +42,7 @@ async function callVertex(opts: {
   };
   return await fetch(url, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: __vxHeaders,
     body: JSON.stringify(body),
   });
 }

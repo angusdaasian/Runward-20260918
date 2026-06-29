@@ -18,7 +18,8 @@ function getVertexLocation(): string {
 }
 
 async function callVertexAI(opts: { apiKey: string; model: string; messages: Array<{ role: string; content: string }> }) {
-  const url = `https://aiplatform.googleapis.com/v1/projects/${getVertexProjectId()}/locations/${getVertexLocation()}/publishers/google/models/${opts.model}:generateContent?key=${opts.apiKey}`;
+  const __baseUrl = `https://aiplatform.googleapis.com/v1/projects/${getVertexProjectId()}/locations/${getVertexLocation()}/publishers/google/models/${opts.model}:generateContent`;
+  const { url, headers: __vxHeaders } = await buildVertexAuth(__baseUrl, opts.apiKey);
   const systemParts: any[] = [];
   const contents: any[] = [];
   for (const m of opts.messages) {
@@ -35,7 +36,7 @@ async function callVertexAI(opts: { apiKey: string; model: string; messages: Arr
     },
   };
   if (systemParts.length) body.systemInstruction = { parts: systemParts };
-  const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const res = await fetch(url, { method: "POST", headers: __vxHeaders, body: JSON.stringify(body) });
   const text = await res.text();
   if (!res.ok) throw new Error(`Vertex error ${res.status}: ${text}`);
   const data = JSON.parse(text);

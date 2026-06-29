@@ -58,7 +58,8 @@ function parsePaceStr(p: string | null | undefined): number | null {
 function clamp(n: number, lo = 0, hi = 100) { return Math.max(lo, Math.min(hi, n)); }
 
 async function callGemini(systemPrompt: string, userPrompt: string): Promise<string> {
-  const url = `https://aiplatform.googleapis.com/v1/projects/${getVertexProjectId()}/locations/${getVertexLocation()}/publishers/google/models/${MODEL}:generateContent?key=${VERTEX_API_KEY}`;
+  const __baseUrl = `https://aiplatform.googleapis.com/v1/projects/${getVertexProjectId()}/locations/${getVertexLocation()}/publishers/google/models/${MODEL}:generateContent`;
+  const { url, headers: __vxHeaders } = await buildVertexAuth(__baseUrl, VERTEX_API_KEY);
   const body = {
     contents: [{ role: "user", parts: [{ text: userPrompt }] }],
     systemInstruction: { parts: [{ text: systemPrompt }] },
@@ -66,7 +67,7 @@ async function callGemini(systemPrompt: string, userPrompt: string): Promise<str
   };
   const r = await fetch(url, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: __vxHeaders,
     body: JSON.stringify(body),
   });
   if (!r.ok) {

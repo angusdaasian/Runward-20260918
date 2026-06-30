@@ -1,5 +1,36 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { INTERVALS_API_BASE, mapIntervalsActivity } from "../_shared/intervals.ts";
+import { maybeTrainCoachOnce } from "../_shared/trainCoachOnce.ts";
+
+async function backfillIntervalsSevenDays(
+  supabase: any,
+  userId: string,
+  athleteId: string,
+  accessToken: string,
+) {
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const url = `${INTERVALS_API_BASE}/athlete/${encodeURIComponent(athleteId)}/activities?oldest=${weekAgo}&newest=${today}&limit=200`;
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
+    if (!res.ok) {
+      console.error("[intervals-callback] backfill fetch failed", res.status, await res.text());
+      return;
+    }
+    const activities = await res.json();
+    if (!Array.isArray(activities)) return;
+    for (const a of activities) {
+      await supabase
+        .from("intervals_activities")
+        .upsert(mapIntervalsActivity(userId, a), { onConflict: "intervals_id" });
+    }
+    console.log(`[intervals-callback] backfilled ${activities.length} activities user=${userId}`);
+    await maybeTrainCoachOnce(supabase, userId);
+  } catch (e) {
+    console.error("[intervals-callback] backfill error", e);
+  }
+}
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -122,6 +153,10 @@ serve(async (req) => {
         { onConflict: "user_id" },
       );
     if (dbError) throw new Error(`DB error: ${dbError.message}`);
+
+    // Fire-and-forget 7-day backfill + coach training.
+    const backfillTask = backfillIntervalsSevenDays(supabase, user.id, athleteId, tokenData.access_token);
+    try { (globalThis as any).EdgeRuntime?.waitUntil?.(backfillTask); } catch (_) { /* ignore */ }
 
     return new Response(JSON.stringify({ success: true, athlete_id: athleteId }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

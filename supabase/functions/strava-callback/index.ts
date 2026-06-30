@@ -1,6 +1,53 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getStravaAppById, pickAvailableApp, StravaAppsError } from "../_shared/strava-apps.ts";
+import { maybeTrainCoachOnce } from "../_shared/trainCoachOnce.ts";
+
+async function backfillStravaSevenDays(
+  supabase: any,
+  userId: string,
+  accessToken: string,
+) {
+  try {
+    const after = Math.floor(Date.now() / 1000) - 7 * 24 * 60 * 60;
+    const res = await fetch(
+      `https://www.strava.com/api/v3/athlete/activities?after=${after}&per_page=50`,
+      { headers: { Authorization: `Bearer ${accessToken}` } },
+    );
+    if (!res.ok) {
+      console.error("[strava-callback] backfill fetch failed", res.status, await res.text());
+      return;
+    }
+    const activities = await res.json();
+    if (!Array.isArray(activities)) return;
+    for (const act of activities) {
+      await supabase.from("strava_activities").upsert(
+        {
+          user_id: userId,
+          strava_id: act.id,
+          name: act.name,
+          sport_type: act.sport_type || act.type || "Run",
+          distance: act.distance,
+          moving_time: act.moving_time,
+          elapsed_time: act.elapsed_time,
+          total_elevation_gain: act.total_elevation_gain,
+          start_date: act.start_date,
+          average_speed: act.average_speed,
+          max_speed: act.max_speed,
+          average_heartrate: act.average_heartrate || null,
+          max_heartrate: act.max_heartrate || null,
+          summary_polyline: act.map?.summary_polyline || null,
+          environment: "prod",
+        },
+        { onConflict: "strava_id" },
+      );
+    }
+    console.log(`[strava-callback] backfilled ${activities.length} activities user=${userId}`);
+    await maybeTrainCoachOnce(supabase, userId);
+  } catch (e) {
+    console.error("[strava-callback] backfill error", e);
+  }
+}
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -94,6 +141,10 @@ serve(async (req) => {
     if (dbError) {
       throw new Error(`DB error: ${dbError.message}`);
     }
+
+    // Fire-and-forget 7-day activity backfill + coach training.
+    const backfillTask = backfillStravaSevenDays(supabase, user.id, tokenData.access_token);
+    try { (globalThis as any).EdgeRuntime?.waitUntil?.(backfillTask); } catch (_) { /* ignore */ }
 
     return new Response(JSON.stringify({ success: true, athlete: tokenData.athlete }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

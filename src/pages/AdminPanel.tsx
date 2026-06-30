@@ -69,6 +69,7 @@ interface UserRow {
 
 type TabKey =
   | "users"
+  | "llama"
   | "notifications"
   | "announcements"
   | "promo"
@@ -84,6 +85,7 @@ type TabKey =
 
 const TABS: { key: TabKey; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { key: "users", label: "Users", icon: Users },
+  { key: "llama", label: "Llama Training", icon: Brain },
   { key: "notifications", label: "Notifications", icon: Bell },
   { key: "announcements", label: "Announcements", icon: Megaphone },
   { key: "promo", label: "Promo Banners", icon: ImageIcon },

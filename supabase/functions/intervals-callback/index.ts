@@ -154,6 +154,10 @@ serve(async (req) => {
       );
     if (dbError) throw new Error(`DB error: ${dbError.message}`);
 
+    // Fire-and-forget 7-day backfill + coach training.
+    const backfillTask = backfillIntervalsSevenDays(supabase, user.id, athleteId, tokenData.access_token);
+    try { (globalThis as any).EdgeRuntime?.waitUntil?.(backfillTask); } catch (_) { /* ignore */ }
+
     return new Response(JSON.stringify({ success: true, athlete_id: athleteId }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

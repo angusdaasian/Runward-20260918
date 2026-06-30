@@ -24,6 +24,7 @@ import {
   MessageSquare,
   RefreshCw,
   Code2,
+  Brain,
 } from "lucide-react";
 import {
   Sidebar,
@@ -50,6 +51,7 @@ import StravaAppsManager from "@/components/admin/StravaAppsManager";
 import SuuntoSyncTester from "@/components/admin/SuuntoSyncTester";
 import PolarSyncTester from "@/components/admin/PolarSyncTester";
 import DeveloperAppsManager from "@/components/admin/DeveloperAppsManager";
+import AdminLlamaTraining from "@/components/admin/AdminLlamaTraining";
 
 interface UserRow {
   user_id: string;
@@ -67,6 +69,7 @@ interface UserRow {
 
 type TabKey =
   | "users"
+  | "llama"
   | "notifications"
   | "announcements"
   | "promo"
@@ -82,6 +85,7 @@ type TabKey =
 
 const TABS: { key: TabKey; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { key: "users", label: "Users", icon: Users },
+  { key: "llama", label: "Llama Training", icon: Brain },
   { key: "notifications", label: "Notifications", icon: Bell },
   { key: "announcements", label: "Announcements", icon: Megaphone },
   { key: "promo", label: "Promo Banners", icon: ImageIcon },
@@ -414,6 +418,8 @@ const AdminPanel = () => {
     switch (activeTab) {
       case "users":
         return renderUsersTab();
+      case "llama":
+        return <AdminLlamaTraining />;
       case "notifications":
         return <NotificationManager />;
       case "announcements":

@@ -24,6 +24,7 @@ import {
   MessageSquare,
   RefreshCw,
   Code2,
+  Brain,
 } from "lucide-react";
 import {
   Sidebar,
@@ -50,6 +51,7 @@ import StravaAppsManager from "@/components/admin/StravaAppsManager";
 import SuuntoSyncTester from "@/components/admin/SuuntoSyncTester";
 import PolarSyncTester from "@/components/admin/PolarSyncTester";
 import DeveloperAppsManager from "@/components/admin/DeveloperAppsManager";
+import AdminLlamaTraining from "@/components/admin/AdminLlamaTraining";
 
 interface UserRow {
   user_id: string;

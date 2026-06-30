@@ -180,28 +180,42 @@ Deno.serve(async (req) => {
     const startDate = `${year}-01-01`;
     const endDate = `${year}-12-31T23:59:59Z`;
 
-    const sources: { table: string; dateCol: string; source: string }[] = [
-      { table: "strava_activities", dateCol: "start_date", source: "strava" },
-      { table: "garmin_activities", dateCol: "start_time", source: "garmin" },
-      { table: "intervals_activities", dateCol: "start_date", source: "intervals" },
-      { table: "polar_activities", dateCol: "start_date", source: "polar" },
-      { table: "suunto_activities", dateCol: "start_date", source: "suunto" },
-      { table: "terra_activities", dateCol: "start_time", source: "terra" },
-      { table: "apple_health_activities", dateCol: "start_date", source: "apple_health" },
+    const sources: { table: string; dateCol: string; source: string; cols: string }[] = [
+      { table: "strava_activities", dateCol: "start_date", source: "strava",
+        cols: "user_id, start_date, sport_type, distance, moving_time, average_speed, total_elevation_gain, average_heartrate, max_heartrate" },
+      { table: "garmin_activities", dateCol: "start_time", source: "garmin",
+        cols: "user_id, start_time, activity_type, distance_meters, duration_seconds, average_speed, elevation_gain, average_hr, max_hr" },
+      { table: "intervals_activities", dateCol: "start_date", source: "intervals",
+        cols: "user_id, start_date, sport_type, distance, moving_time, average_speed, total_elevation_gain, average_heartrate, max_heartrate" },
+      { table: "polar_activities", dateCol: "start_date", source: "polar",
+        cols: "user_id, start_date, sport_type, distance, duration, average_heart_rate, maximum_heart_rate" },
+      { table: "suunto_activities", dateCol: "start_date", source: "suunto",
+        cols: "user_id, start_date, sport_type, distance, moving_time, average_speed, total_elevation_gain, average_heartrate, max_heartrate" },
+      { table: "terra_activities", dateCol: "start_time", source: "terra",
+        cols: "user_id, start_time, activity_type, distance_meters, duration_seconds, average_speed, elevation_gain, average_hr, max_hr" },
+      { table: "apple_health_activities", dateCol: "start_date", source: "apple_health",
+        cols: "user_id, start_date, sport_type, distance, moving_time, average_speed, total_elevation_gain, average_heartrate, max_heartrate" },
     ];
 
     let all: NormalizedActivity[] = [];
     for (const s of sources) {
       const { data, error } = await admin
         .from(s.table)
-        .select(`user_id, ${s.dateCol}, sport_type, activity_type, name, distance, distance_meters, moving_time, duration_seconds, elapsed_time, average_speed, total_elevation_gain, elevation_gain, average_heartrate, average_hr, max_heartrate, max_hr`)
+        .select(s.cols)
         .gte(s.dateCol, startDate)
         .lte(s.dateCol, endDate);
       if (error) {
         console.error(`[export-coach-training-data] ${s.table} error:`, error);
         continue;
       }
-      const normalized = normalizeActivities(data || [], s.source, s.dateCol);
+      // Polar uses different HR/duration column names — normalize before passing through.
+      const rows = (data || []).map((r: any) => ({
+        ...r,
+        moving_time: r.moving_time ?? r.duration,
+        average_heartrate: r.average_heartrate ?? r.average_heart_rate,
+        max_heartrate: r.max_heartrate ?? r.maximum_heart_rate,
+      }));
+      const normalized = normalizeActivities(rows, s.source, s.dateCol);
       all = all.concat(normalized);
     }
 

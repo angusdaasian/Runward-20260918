@@ -35,12 +35,19 @@ Deno.serve(async (req) => {
       .maybeSingle();
     if (!role) return json(403, { error: "forbidden" });
 
-    if (req.method !== "GET") return json(405, { error: "method not allowed" });
+    if (!["GET", "POST"].includes(req.method)) return json(405, { error: "method not allowed" });
 
-    const url = new URL(req.url);
-    const parsed = QuerySchema.safeParse({ job_name: url.searchParams.get("job_name") });
+    let job_name: string | null = null;
+    if (req.method === "GET") {
+      const url = new URL(req.url);
+      job_name = url.searchParams.get("job_name");
+    } else {
+      const body = await req.json().catch(() => ({}));
+      const parsed = QuerySchema.safeParse(body);
+      if (parsed.success) job_name = parsed.data.job_name;
+    }
+    const parsed = QuerySchema.safeParse({ job_name });
     if (!parsed.success) return json(400, { error: parsed.error.flatten() });
-    const { job_name } = parsed.data;
 
     const projectId = Deno.env.get("GOOGLE_VERTEX_TRAINING_PROJECT_ID")!;
     const location = Deno.env.get("GOOGLE_VERTEX_TRAINING_LOCATION") || "us-central1";
@@ -48,7 +55,9 @@ Deno.serve(async (req) => {
 
     const token = await getVertexAccessToken(TRAINING_SA);
     const baseUrl = `https://${location}-aiplatform.googleapis.com/v1`;
-    const jobUrl = job_name.startsWith("projects/") ? `${baseUrl}/${job_name}` : `${baseUrl}/projects/${projectId}/locations/${location}/tuningJobs/${job_name}`;
+    const jobUrl = parsed.data.job_name.startsWith("projects/")
+      ? `${baseUrl}/${parsed.data.job_name}`
+      : `${baseUrl}/projects/${projectId}/locations/${location}/tuningJobs/${parsed.data.job_name}`;
 
     const resp = await fetch(jobUrl, {
       headers: { Authorization: `Bearer ${token}` },
@@ -80,3 +89,4 @@ Deno.serve(async (req) => {
     return json(500, { error: String((e as Error)?.message ?? e) });
   }
 });
+

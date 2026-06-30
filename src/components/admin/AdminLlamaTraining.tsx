@@ -122,8 +122,7 @@ const AdminLlamaTraining = () => {
     setJobStatus(null);
     try {
       const { data, error } = await supabase.functions.invoke("check-tuning-job", {
-        body: {},
-        query: { job_name: name },
+        body: { job_name: name },
       });
       if (error) throw error;
       if (!data?.success) throw new Error(data?.error || "Check failed");

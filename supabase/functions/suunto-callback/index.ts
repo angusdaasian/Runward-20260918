@@ -1,5 +1,43 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { SUUNTO_API_BASE, workoutRow, SuuntoWorkout } from "../_shared/suunto.ts";
+import { maybeTrainCoachOnce } from "../_shared/trainCoachOnce.ts";
+
+async function backfillSuuntoSevenDays(
+  supabase: any,
+  userId: string,
+  accessToken: string,
+  subKey: string,
+) {
+  try {
+    const until = Date.now();
+    const since = until - 7 * 24 * 60 * 60 * 1000;
+    const url = `${SUUNTO_API_BASE}/workouts?since=${since}&until=${until}`;
+    const res = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Ocp-Apim-Subscription-Key": subKey,
+      },
+    });
+    const text = await res.text();
+    if (!res.ok) {
+      console.error("[suunto-callback] backfill fetch failed", res.status, text);
+      return;
+    }
+    const payload = JSON.parse(text);
+    const workouts: SuuntoWorkout[] = payload?.payload ?? payload?.workouts ?? [];
+    for (const w of workouts) {
+      if (!w?.workoutKey) continue;
+      await supabase
+        .from("suunto_activities")
+        .upsert(workoutRow(userId, w), { onConflict: "suunto_workout_key" });
+    }
+    console.log(`[suunto-callback] backfilled ${workouts.length} workouts user=${userId}`);
+    await maybeTrainCoachOnce(supabase, userId);
+  } catch (e) {
+    console.error("[suunto-callback] backfill error", e);
+  }
+}
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',

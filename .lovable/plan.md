@@ -1,51 +1,72 @@
+# Train Llama 3.1 8B LoRA on Old Vertex Account (Free Trial Credit, Expires July 3)
 
-## Goal
+Goal: burn the $2,160.31 expiring Vertex Free Trial credit on a one-time supervised fine-tune of Llama 3.1 8B Instruct, using our 2026 runner data. Export LoRA weights to GCS. Decide hosting (Mac Mini vs Runpod) after eval. Live app keeps using Gemini 3.1 Pro on the current Vertex account — no user-facing changes.
 
-After a user connects a fitness provider, automatically pull the last 7 days of activities so `maybeTrainCoachOnce` runs immediately and the personalized coach is trained on real data.
+## Why this works across accounts
 
-## Status check (per provider)
+Vertex AI tuning is account-scoped, but the output is a portable LoRA adapter (safetensors + adapter_config.json) that runs anywhere with the open Llama 3.1 8B base. The current account stays clean for inference. We just need the service-account JSON from the old project.
 
-| Provider | Auto 7-day backfill on connect today? | Action |
-|---|---|---|
-| Polar | ✅ `polar-callback` already invokes `polar-sync` with `since_days: 7` | None |
-| Terra | ✅ `terra-confirm` already calls `/v2/activity?start_date=weekAgo&end_date=today&to_webhook=true` (the historical-data endpoint from the docs link) | None |
-| Strava | ❌ | Fix |
-| Suunto | ❌ | Fix |
-| Intervals.icu | ❌ | Fix |
+## Timeline (must finish before July 3 credit expiry)
 
-Terra and Polar are already correct — earlier analysis was wrong about Terra. No changes needed there.
+- Today: export dataset, upload to GCS, kick off tuning job.
+- Job runs: ~4–10 hours for 8B LoRA on ~10–20k examples.
+- After export: download weights, run eval comparison, decide hosting.
 
-## Strava gate status (answer to your question)
+## Secrets needed
 
-Queried `strava_apps`:
-- 1 active app (`client_id 215250`), `max_athletes = 10`, `STRAVA_APP_RESERVED_SLOTS = 1` → effective limit **9**
-- Currently **8** connections
-- Next new user fills slot 9. The **10th** signup will be blocked by `ALL_APPS_FULL` ("Strava connection is hitting its limit…").
+- `GOOGLE_VERTEX_TRAINING_SA_JSON` — service account JSON for the **old** GCP project (paste the whole JSON).
+- `GOOGLE_VERTEX_TRAINING_PROJECT_ID` — old GCP project ID.
+- `GOOGLE_VERTEX_TRAINING_BUCKET` — GCS bucket name in the old project (e.g., `runner-llama-training`).
+- `GOOGLE_VERTEX_TRAINING_LOCATION` — region, default `us-central1`.
 
-So yes, the gate is on and you have exactly **1 free slot** before new Strava connects start being rejected. You'll want a second approved app row added (or Strava bump approval) before that 9th user lands.
+Existing inference secrets (`GOOGLE_VERTEX_SERVICE_ACCOUNT_JSON`, `GOOGLE_VERTEX_PROJECT_ID`, etc.) are untouched.
 
-## Changes
+## Steps
 
-### 1. `supabase/functions/strava-callback/index.ts`
-After the successful upsert, fire-and-forget a 7-day activity fetch directly against Strava's `GET /api/v3/athlete/activities?after=<unix_ts_7d_ago>&per_page=50` (inline, since `strava-sync` requires the user JWT and the per-window args differ from what we need here). Upsert each into `strava_activities`, then call `maybeTrainCoachOnce(supabase, user.id)`. Errors logged but not surfaced — connection still succeeds.
+### 1. New edge function: `export-coach-training-data`
+Admin-only. Reads all 2026 activities across the 7 provider tables, joins to `profiles` and `ai_coach_insights`, and emits JSONL for 4 task types matching our structured Gemini calls:
 
-### 2. `supabase/functions/suunto-callback/index.ts`
-After the upsert, fire-and-forget call to `GET https://cloudapi.suunto.com/v2/workouts?since=<ms_7d_ago>&until=<now_ms>` using the new access token + `Ocp-Apim-Subscription-Key` (same pattern as `suunto-sync`). Upsert via the shared `workoutRow` helper into `suunto_activities`, then `maybeTrainCoachOnce`. Reference: [Suunto Workouts API](https://apizone.suunto.com/api-details#api=suunto-workout-api&operation=export-workout-fit) — uses the same `/workouts` listing endpoint we already use in `suunto-sync`.
+- `analyze_activity` — input: single activity + recent context; target: analysis JSON from `activity_analyses`.
+- `suggest_workout` — input: user context + day; target: workout JSON from recent Gemini outputs.
+- `predict_race_time` — input: profile + recent training; target: predicted times from existing records.
+- `finetune_plan_week` — input: plan + feedback; target: adjusted week from existing records.
 
-### 3. `supabase/functions/intervals-callback/index.ts`
-After the upsert, fire-and-forget call to `GET https://intervals.icu/api/v1/athlete/<athlete_id>/activities?oldest=<YYYY-MM-DD 7d ago>&newest=<YYYY-MM-DD today>&limit=200` using the fresh access token. Reuse `mapIntervalsActivity` to upsert into `intervals_activities`, then `maybeTrainCoachOnce`. (Intervals.icu's documented activities endpoint accepts `oldest`/`newest` date params — same pattern `intervals-sync` already uses.)
+Estimated ~10–20k examples. Uploads `gs://$BUCKET/datasets/coach-train-{ts}.jsonl` via a signed REST upload with the training SA token.
 
-### 4. No changes to Terra or Polar.
+### 2. New edge function: `submit-llama-tuning-job`
+Admin-only. POSTs to the old project's Vertex AI tuning endpoint for `meta/llama3-1-8b-instruct-maas` with LoRA rank 16, 3 epochs, learning rate 1e-4. Output dir: `gs://$BUCKET/models/coach-lora-{ts}/`. Returns the tuning job resource name.
 
-## Behavior
+### 3. New edge function: `check-tuning-job`
+Admin-only. Polls a tuning job's status and returns progress + final GCS path of LoRA weights.
 
-- All backfills are fire-and-forget inside the callback (don't block OAuth response).
-- All write through `service_role` Supabase client.
-- All call `maybeTrainCoachOnce` after upsert so the personalized coach trains on first connect.
-- Failures are logged via `console.error` only — connection state is not affected.
+### 4. Admin UI panel (Settings → Admin → Llama Training)
+- Button: Export training dataset → shows row count and GCS path.
+- Button: Submit tuning job → shows job name.
+- Status: polls `check-tuning-job` every 30s, shows state and final weights URI.
+
+No A/B wiring, no shadow calls, no model switch in this plan. Pure training pipeline.
+
+## After training (separate plan)
+
+Once weights land in GCS, we'll do a follow-up plan covering: download from GCS, host on Mac Mini or Runpod, build the A/B shadow harness, and decide whether to switch any edge functions off Gemini.
 
 ## Out of scope
 
-- Touching the Strava 9-slot gate (separate task: add a second `strava_apps` row).
-- Changing existing on-demand sync behavior in Activities tab.
-- Apple Health (push-based, can't backfill from server).
+- Hosting / serving the trained model
+- A/B comparison harness or admin rater UI
+- Switching any edge function off Gemini 3.1 Pro
+- Cohort reference model
+- Touching the current Vertex account or inference path
+- GenAI App Builder credit
+
+## Technical details
+
+- Tuning endpoint: `https://{LOCATION}-aiplatform.googleapis.com/v1/projects/{OLD_PROJECT}/locations/{LOCATION}/tuningJobs` with `baseModel: "meta/llama3-1-8b-instruct-maas"`.
+- Auth: reuse `_shared/vertex-auth.ts` pattern, parameterized to accept a different SA JSON env name so these 3 functions use the training SA.
+- All 3 new functions: admin-gated via `has_role(auth.uid(), 'admin')`, `verify_jwt = false` with in-code JWT validation (matches existing pattern).
+- No new DB tables. Job state lives in Vertex; the UI polls.
+- Dataset export streams JSONL to avoid edge function memory limits (chunked GCS resumable upload).
+
+## Risk
+
+If the credit expires mid-job or Vertex Llama tuning quota is hit, the durable JSONL dataset remains in GCS and can be re-run on any GPU host later. The dataset is the reusable artifact.

@@ -142,6 +142,10 @@ serve(async (req) => {
       throw new Error(`DB error: ${dbError.message}`);
     }
 
+    // Fire-and-forget 7-day activity backfill + coach training.
+    const backfillTask = backfillStravaSevenDays(supabase, user.id, tokenData.access_token);
+    try { (globalThis as any).EdgeRuntime?.waitUntil?.(backfillTask); } catch (_) { /* ignore */ }
+
     return new Response(JSON.stringify({ success: true, athlete: tokenData.athlete }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

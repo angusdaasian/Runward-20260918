@@ -418,6 +418,8 @@ const AdminPanel = () => {
     switch (activeTab) {
       case "users":
         return renderUsersTab();
+      case "llama":
+        return <AdminLlamaTraining />;
       case "notifications":
         return <NotificationManager />;
       case "announcements":

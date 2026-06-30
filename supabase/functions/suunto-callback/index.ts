@@ -142,6 +142,11 @@ serve(async (req) => {
 
     if (dbError) throw new Error(`DB error: ${dbError.message}`);
 
+    // Fire-and-forget 7-day backfill + coach training.
+    const subKey = Deno.env.get('SUUNTO_SUBSCRIPTION_KEY') || clientId;
+    const backfillTask = backfillSuuntoSevenDays(supabase, user.id, tokenData.access_token, subKey);
+    try { (globalThis as any).EdgeRuntime?.waitUntil?.(backfillTask); } catch (_) { /* ignore */ }
+
     return new Response(JSON.stringify({ success: true, username }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

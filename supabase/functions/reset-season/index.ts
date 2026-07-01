@@ -165,13 +165,35 @@ Deno.serve(async (req) => {
       console.log(`[reset-season] assigned ${availableCode.code_string} to ${winner.user_id} (${(winner as any).display_name})`);
     }
 
-    // Reset all monthly_xp to 0 and reset ranks (only rows that need it)
-    const { error: resetErr } = await supabase
-      .from("profiles")
-      .update({ monthly_xp: 0, rank_tier: "Bronze", division: "V" })
-      .gt("monthly_xp", 0);
-    if (resetErr) {
-      console.error("[reset-season] xp reset error:", resetErr);
+    // Reset all monthly_xp to 0 and reset ranks. Retry + verify so we never
+    // silently leave the leaderboard un-reset again.
+    let resetOk = false;
+    let lastResetErr: unknown = null;
+    for (let attempt = 1; attempt <= 3 && !resetOk; attempt++) {
+      const { error: resetErr } = await supabase
+        .from("profiles")
+        .update({ monthly_xp: 0, rank_tier: "Bronze", division: "V" })
+        .gt("monthly_xp", 0);
+      if (resetErr) {
+        lastResetErr = resetErr;
+        console.error(`[reset-season] xp reset attempt ${attempt} failed:`, resetErr);
+        await new Promise((r) => setTimeout(r, 500 * attempt));
+        continue;
+      }
+      const { count: remaining } = await supabase
+        .from("profiles")
+        .select("user_id", { count: "exact", head: true })
+        .gt("monthly_xp", 0);
+      if ((remaining ?? 0) === 0) {
+        resetOk = true;
+        console.log(`[reset-season] xp reset attempt ${attempt} ok`);
+      } else {
+        console.warn(`[reset-season] xp reset attempt ${attempt} left ${remaining} rows with xp>0, retrying`);
+        await new Promise((r) => setTimeout(r, 500 * attempt));
+      }
+    }
+    if (!resetOk) {
+      throw new Error(`xp reset failed after retries: ${(lastResetErr as any)?.message ?? "unknown"}`);
     }
 
     console.log(`[reset-season] done month=${monthYear} codes_assigned=${codesAssigned}`);

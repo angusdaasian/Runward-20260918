@@ -13,19 +13,19 @@ Deno.serve(async (req) => {
   const lang = url.searchParams.get("lang") ?? "en";
 
   if (action === "list") {
-    // List templates for the business account
-    // First fetch WABA id via phone number
-    const phoneRes = await fetch(`https://graph.facebook.com/${GRAPH}/${PHONE}?fields=whatsapp_business_account`, {
+    const phoneRes = await fetch(`https://graph.facebook.com/${GRAPH}/${PHONE}?fields=display_phone_number,verified_name,quality_rating,name_status`, {
       headers: { Authorization: `Bearer ${TOKEN}` },
     });
     const phoneData = await phoneRes.json();
-    const wabaId = phoneData?.whatsapp_business_account?.id;
-    if (!wabaId) return json({ error: "no waba", phoneData });
-    const tplRes = await fetch(`https://graph.facebook.com/${GRAPH}/${wabaId}/message_templates?fields=name,status,language,category&limit=100`, {
-      headers: { Authorization: `Bearer ${TOKEN}` },
-    });
-    const tplData = await tplRes.json();
-    return json({ wabaId, templates: tplData });
+    const wabaId = url.searchParams.get("waba");
+    let templates: any = null;
+    if (wabaId) {
+      const tplRes = await fetch(`https://graph.facebook.com/${GRAPH}/${wabaId}/message_templates?fields=name,status,language,category&limit=200`, {
+        headers: { Authorization: `Bearer ${TOKEN}` },
+      });
+      templates = await tplRes.json();
+    }
+    return json({ phoneData, templates, hint: "pass ?waba=<id> to list templates" });
   }
 
   const res = await fetch(`https://graph.facebook.com/${GRAPH}/${PHONE}/messages`, {

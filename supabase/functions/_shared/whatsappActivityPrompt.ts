@@ -149,10 +149,13 @@ export async function waSendTemplate(
     );
     if (res.ok) {
       const data = await res.json().catch(() => null) as any;
-      return data?.messages?.[0]?.id ?? null;
+      const msgId = data?.messages?.[0]?.id ?? null;
+      const status = data?.messages?.[0]?.message_status ?? "n/a";
+      console.log(`[wa] template accepted template=${templateName} lang=${languageCode} to=${waId} id=${msgId} status=${status}`);
+      return msgId;
     }
     const errText = (await res.text()).slice(0, 600);
-    console.warn(`[wa] template send failed status=${res.status} template=${templateName}`, errText);
+    console.warn(`[wa] template send failed status=${res.status} template=${templateName} lang=${languageCode} to=${waId}`, errText);
     return null;
   } catch (e) {
     console.error("[wa] template send error", e);

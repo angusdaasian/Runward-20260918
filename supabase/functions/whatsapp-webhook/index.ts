@@ -192,6 +192,17 @@ Deno.serve(async (req) => {
         const changes = Array.isArray(entry?.changes) ? entry.changes : [];
         for (const change of changes) {
           const value = change?.value ?? {};
+          const statuses = Array.isArray(value?.statuses) ? value.statuses : [];
+          for (const statusEvent of statuses) {
+            const messageId = String(statusEvent?.id ?? "");
+            const status = String(statusEvent?.status ?? "");
+            const recipientId = String(statusEvent?.recipient_id ?? "");
+            const error = Array.isArray(statusEvent?.errors) ? statusEvent.errors[0] : null;
+            const errorText = error
+              ? ` error_code=${error.code ?? "n/a"} error_title=${error.title ?? "n/a"} error_message=${error.message ?? "n/a"}`
+              : "";
+            console.log(`[wa-webhook] status id=${messageId} status=${status} recipient=${recipientId}${errorText}`);
+          }
           const messages = Array.isArray(value?.messages) ? value.messages : [];
           for (const message of messages) {
             if (message.type !== "text") continue;

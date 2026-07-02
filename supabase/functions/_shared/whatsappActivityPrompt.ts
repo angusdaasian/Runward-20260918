@@ -268,7 +268,7 @@ export async function maybeSendWhatsappActivityPrompt(summary: ActivitySummary):
       : `${km > 0 ? km.toFixed(2) : "—"} km in ${min > 0 ? min.toFixed(0) : "—"} min, pace ${paceStr}`;
 
     // Send approved Utility template first (bypasses 24h window).
-    const templateName = lang === "zh" ? "activity_prompt_cn" : "activity_prompt_en";
+    const templateName = lang === "zh" ? "activity_prompt_hk" : "activity_prompt_en";
     const langCode = lang === "zh" ? "zh_HK" : "en";
     let messageId = await waSendTemplate(profile.whatsapp_wa_id as string, templateName, langCode, oneLine);
     if (!messageId) {

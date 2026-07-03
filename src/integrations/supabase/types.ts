@@ -418,6 +418,21 @@ export type Database = {
         }
         Relationships: []
       }
+      dedup_debounce: {
+        Row: {
+          last_fired_at: string
+          user_id: string
+        }
+        Insert: {
+          last_fired_at?: string
+          user_id: string
+        }
+        Update: {
+          last_fired_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       free_training_plans: {
         Row: {
           created_at: string

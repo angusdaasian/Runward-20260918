@@ -206,6 +206,35 @@ async function dedupUser(supabase: any, userId: string, sinceIso: string, dryRun
     }
   }
 
+  // Intra-source dedup for apple_health only (Nike-in-Apple-Health case).
+  // Rule: same source, |Δstart| ≤ 15 min, distance within 10%.
+  // Keep row with more richness (moving_time / HR / calories populated); tiebreak: longer distance.
+  const apple = rows.filter((r) => r.source === "apple_health" && !dropped.has(`apple_health:${r.id}`));
+  for (let i = 0; i < apple.length; i++) {
+    const a = apple[i];
+    if (dropped.has(`apple_health:${a.id}`)) continue;
+    for (let j = i + 1; j < apple.length; j++) {
+      const b = apple[j];
+      if ((b.startMs - a.startMs) > 15 * 60_000) break;
+      if (dropped.has(`apple_health:${b.id}`)) continue;
+      const distMax = Math.max(a.distanceM, b.distanceM);
+      const distMin = Math.min(a.distanceM, b.distanceM);
+      if (distMax < 100) continue;
+      if (distMin / distMax < 0.9) continue;
+      const { keep, drop } = chooseWinner(a, b); // same source ⇒ falls through to richness/distance
+      const keyDrop = `apple_health:${drop.id}`;
+      dropped.add(keyDrop);
+      details.push({
+        keep: `apple_health:${keep.id}`,
+        drop: keyDrop,
+        reason: `apple-intra time≈(${(Math.abs(a.startMs - b.startMs) / 60000).toFixed(1)}m) dist≈(${((distMin / distMax) * 100).toFixed(1)}%)`,
+      });
+      if (drop === a) break;
+    }
+  }
+
+
+
   let deleted = 0;
   if (!dryRun && dropped.size > 0) {
     // Group by table then delete in chunks.

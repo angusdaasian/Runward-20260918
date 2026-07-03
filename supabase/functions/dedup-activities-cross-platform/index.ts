@@ -32,16 +32,17 @@ interface Row {
   richness: number;         // fill-score for tiebreak
 }
 
-// Higher = prefer to keep.
+// Higher = prefer to keep. Terra is highest — richest normalized data.
 const SOURCE_PRIORITY: Record<Src, number> = {
-  garmin: 100,
-  suunto: 90,
-  polar: 85,
-  strava: 80,
-  terra: 60,
+  terra: 100,
+  garmin: 90,
+  suunto: 80,
+  polar: 75,
+  strava: 70,
   apple_health: 40,
   intervals: 30,
 };
+
 
 const RUN_SPORTS = new Set([
   "Run", "TrailRun", "VirtualRun", "Treadmill", "Workout",
@@ -272,9 +273,12 @@ serve(async (req) => {
     const supabase = createClient(SUPABASE_URL, SERVICE);
     const body = await req.json().catch(() => ({}));
     const userId: string | undefined = body?.userId;
+    const sinceHours: number | undefined = body?.sinceHours ? Math.max(1, Number(body.sinceHours)) : undefined;
     const sinceDays: number = Math.max(1, Number(body?.sinceDays ?? 90));
     const dryRun: boolean = body?.dryRun !== false ? body?.dryRun === true : false; // default false
-    const sinceIso = new Date(Date.now() - sinceDays * 86_400_000).toISOString();
+    const sinceMs = sinceHours ? sinceHours * 3_600_000 : sinceDays * 86_400_000;
+    const sinceIso = new Date(Date.now() - sinceMs).toISOString();
+
 
     const results: UserResult[] = [];
 

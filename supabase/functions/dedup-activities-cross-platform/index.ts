@@ -32,16 +32,17 @@ interface Row {
   richness: number;         // fill-score for tiebreak
 }
 
-// Higher = prefer to keep.
+// Higher = prefer to keep. Terra is highest — richest normalized data.
 const SOURCE_PRIORITY: Record<Src, number> = {
-  garmin: 100,
-  suunto: 90,
-  polar: 85,
-  strava: 80,
-  terra: 60,
+  terra: 100,
+  garmin: 90,
+  suunto: 80,
+  polar: 75,
+  strava: 70,
   apple_health: 40,
   intervals: 30,
 };
+
 
 const RUN_SPORTS = new Set([
   "Run", "TrailRun", "VirtualRun", "Treadmill", "Workout",

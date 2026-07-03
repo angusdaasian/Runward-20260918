@@ -71,6 +71,10 @@ const Support = () => {
       toast({ title: lang === "zh" ? "提交失敗，請稍後再試" : "Failed to submit. Please try again.", variant: "destructive" });
     } else {
       toast({ title: lang === "zh" ? "✅ 已成功提交！" : "✅ Ticket submitted!" });
+      // Fire-and-forget admin push notification
+      supabase.functions.invoke("notify-admin-feedback", {
+        body: { title: payload.title, name: payload.name },
+      }).catch((e) => console.warn("notify-admin-feedback failed", e));
       setName(""); setTitle(""); setDescription("");
       loadTickets();
     }

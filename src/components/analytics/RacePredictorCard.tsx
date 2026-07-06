@@ -210,7 +210,19 @@ const RacePredictorCard = ({ lang }: Props) => {
         <div className="space-y-1">
           {DISTANCES.map((d) => {
             const locked = !isPremium && !d.freeTier;
-            const result = predictRace(vdot, d.meters, slowdown);
+            const slowdown = weatherSlowdown(
+              weather?.temperature ?? null,
+              weather?.humidity ?? null,
+              d.meters,
+            );
+            const result = predictRace({
+              vdot,
+              meters: d.meters,
+              anchor,
+              vol,
+              slowdown,
+              freshness,
+            });
             const pacePerKm = result.adjustedTime / (d.meters / 1000);
             return (
               <div

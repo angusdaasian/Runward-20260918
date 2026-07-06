@@ -50,7 +50,7 @@ Deno.serve(async (req) => {
             lang,
             todayDate: today,
             workoutType: "auto",
-            simple: false,
+            simple: true, // short 2-3 sentence line to fit WhatsApp template variable {{1}}
           }),
         });
 
@@ -61,20 +61,27 @@ Deno.serve(async (req) => {
           continue;
         }
         const data = await resp.json();
-        const suggestion: string = data?.suggestion ?? "";
+        let suggestion: string = data?.suggestion ?? "";
         if (!suggestion) { failed++; continue; }
+
+        // Sanitize for WhatsApp template variable rules:
+        // no newlines, no tabs, no 4+ consecutive spaces, strip markdown emphasis.
+        suggestion = suggestion
+          .replace(/[*_`#>]/g, "")
+          .replace(/\s+/g, " ")
+          .trim();
+        if (suggestion.length > 700) suggestion = suggestion.slice(0, 697) + "...";
 
         const templateName = lang === "zh" ? "daily_suggestion_cn" : "daily_suggestion_en";
         const langCode = lang === "zh" ? "zh_HK" : "en";
-        let ok = !!(await waSendTemplate(u.whatsapp_wa_id as string, templateName, langCode, suggestion));
-        if (!ok) {
-          // Fallback to free-form (only delivers within 24h customer service window)
-          const header = lang === "zh"
-            ? `🏃‍♂️ *今日跑步建議*\n\n`
-            : `🏃‍♂️ *Today's Run Suggestion*\n\n`;
-          ok = !!(await waSendText(u.whatsapp_wa_id as string, header + suggestion));
+        console.log(`[wa-daily] sending user=${u.user_id} lang=${lang} template=${templateName} varLen=${suggestion.length} preview="${suggestion.slice(0, 80)}"`);
+        const msgId = await waSendTemplate(u.whatsapp_wa_id as string, templateName, langCode, suggestion);
+        if (msgId) {
+          sent++;
+        } else {
+          console.warn(`[wa-daily] template send returned null for user=${u.user_id}`);
+          failed++;
         }
-        if (ok) sent++; else failed++;
       } catch (e) {
         console.error("[wa-daily] error for user", u.user_id, e);
         failed++;

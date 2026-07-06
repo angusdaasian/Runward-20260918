@@ -8,13 +8,17 @@ import { usePremium } from "@/contexts/PremiumContext";
 import PlanComparisonDialog from "@/components/PlanComparisonDialog";
 import { formatTime, formatPace } from "@/lib/vdot";
 import {
-  bestPbScore,
+  bestAnchorPb,
   effectiveVdot,
+  freshnessAdj,
   predictRace,
+  predictionConfidence,
   recentVdot,
+  volumeStats,
   weatherSlowdown,
   type PB,
 } from "@/lib/racePrediction";
+import { buildWeeklyLoadSeries } from "@/lib/trainingLoad";
 
 interface Props {
   lang: Lang;
@@ -48,12 +52,12 @@ const RacePredictorCard = ({ lang }: Props) => {
   const [draftCity, setDraftCity] = useState(city);
   const [showUpgrade, setShowUpgrade] = useState(false);
 
-  // Load PBs
+  // Load PBs (including race_date so we can age-decay)
   useEffect(() => {
     if (!user) return;
     supabase
       .from("personal_bests")
-      .select("distance,hours,minutes,seconds")
+      .select("distance,hours,minutes,seconds,race_date")
       .eq("user_id", user.id)
       .then(({ data }) => setPbs((data ?? []) as PB[]));
   }, [user]);
@@ -85,15 +89,50 @@ const RacePredictorCard = ({ lang }: Props) => {
     return () => { cancelled = true; };
   }, [city]);
 
-  const pbScore = useMemo(() => bestPbScore(pbs), [pbs]);
+  const anchor = useMemo(() => bestAnchorPb(pbs), [pbs]);
+  const pbScore = anchor?.decayedScore ?? null;
   const recentScore = useMemo(() => recentVdot(activities as any, 30), [activities]);
   const vdot = useMemo(
     () => effectiveVdot(recentScore, pbScore),
     [recentScore, pbScore]
   );
-  const slowdown = useMemo(
-    () => weatherSlowdown(weather?.temperature ?? null, weather?.humidity ?? null),
-    [weather]
+  const vol = useMemo(() => volumeStats(activities as any), [activities]);
+
+  // Freshness from weekly training-load series (last week's TSB / "form").
+  const freshness = useMemo(() => {
+    try {
+      const series = buildWeeklyLoadSeries(
+        (activities as any).map((a: any) => ({
+          start_date: a.start_date,
+          moving_time: a.moving_time,
+          average_heartrate: a.average_heartrate,
+          max_heartrate: a.max_heartrate,
+          sport_type: a.sport_type,
+          source: a.source,
+          garmin_training_load: a.garmin_training_load ?? null,
+        })),
+        (profile as any)?.age ?? null,
+        12,
+      );
+      const last = series[series.length - 1];
+      return freshnessAdj(last?.form ?? null);
+    } catch {
+      return 1;
+    }
+  }, [activities, profile]);
+
+  const confidence = useMemo(
+    () =>
+      predictionConfidence({
+        hasPb: !!anchor,
+        pbAgeDays: anchor?.ageDays ?? null,
+        hasRecent: recentScore !== null,
+        sessions4wk: vol.sessions4wk,
+        weeklyKm4wk: vol.weeklyKm4wk,
+        targetMeters: 21097.5,
+        longestRunKm90d: vol.longestRunKm90d,
+      }),
+    [anchor, recentScore, vol],
   );
 
   const tt = (en: string, zh: string) => (lang === "zh" ? zh : en);
@@ -113,8 +152,29 @@ const RacePredictorCard = ({ lang }: Props) => {
           <h3 className="text-xs font-semibold text-muted-foreground tracking-wider uppercase">
             {tt("Race Predictor", "比賽預測")}
           </h3>
-          <p className="text-[11px] text-muted-foreground mt-0.5">
-            {tt("Weather-adjusted predictions", "已根據天氣調整")}
+          <p className="text-[11px] text-muted-foreground mt-0.5 flex items-center gap-1.5">
+            <span>{tt("Weather-adjusted predictions", "已根據天氣調整")}</span>
+            {vdot !== null && (
+              <span
+                className={`px-1.5 py-0.5 rounded text-[9px] font-semibold uppercase tracking-wider ${
+                  confidence === "high"
+                    ? "bg-emerald-500/15 text-emerald-600"
+                    : confidence === "medium"
+                      ? "bg-amber-500/15 text-amber-600"
+                      : "bg-muted text-muted-foreground"
+                }`}
+                title={tt(
+                  "Confidence reflects how much of your data (PBs, recent volume, long runs) feeds the prediction.",
+                  "信心度反映預測所用資料量(個人最佳、近期里程、長課)。",
+                )}
+              >
+                {confidence === "high"
+                  ? tt("High confidence", "高信心")
+                  : confidence === "medium"
+                    ? tt("Medium confidence", "中等信心")
+                    : tt("Low confidence", "信心較低")}
+              </span>
+            )}
           </p>
         </div>
         {vdot !== null && (
@@ -171,7 +231,19 @@ const RacePredictorCard = ({ lang }: Props) => {
         <div className="space-y-1">
           {DISTANCES.map((d) => {
             const locked = !isPremium && !d.freeTier;
-            const result = predictRace(vdot, d.meters, slowdown);
+            const slowdown = weatherSlowdown(
+              weather?.temperature ?? null,
+              weather?.humidity ?? null,
+              d.meters,
+            );
+            const result = predictRace({
+              vdot,
+              meters: d.meters,
+              anchor,
+              vol,
+              slowdown,
+              freshness,
+            });
             const pacePerKm = result.adjustedTime / (d.meters / 1000);
             return (
               <div

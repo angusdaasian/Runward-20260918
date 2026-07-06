@@ -152,8 +152,29 @@ const RacePredictorCard = ({ lang }: Props) => {
           <h3 className="text-xs font-semibold text-muted-foreground tracking-wider uppercase">
             {tt("Race Predictor", "比賽預測")}
           </h3>
-          <p className="text-[11px] text-muted-foreground mt-0.5">
-            {tt("Weather-adjusted predictions", "已根據天氣調整")}
+          <p className="text-[11px] text-muted-foreground mt-0.5 flex items-center gap-1.5">
+            <span>{tt("Weather-adjusted predictions", "已根據天氣調整")}</span>
+            {vdot !== null && (
+              <span
+                className={`px-1.5 py-0.5 rounded text-[9px] font-semibold uppercase tracking-wider ${
+                  confidence === "high"
+                    ? "bg-emerald-500/15 text-emerald-600"
+                    : confidence === "medium"
+                      ? "bg-amber-500/15 text-amber-600"
+                      : "bg-muted text-muted-foreground"
+                }`}
+                title={tt(
+                  "Confidence reflects how much of your data (PBs, recent volume, long runs) feeds the prediction.",
+                  "信心度反映預測所用資料量(個人最佳、近期里程、長課)。",
+                )}
+              >
+                {confidence === "high"
+                  ? tt("High confidence", "高信心")
+                  : confidence === "medium"
+                    ? tt("Medium confidence", "中等信心")
+                    : tt("Low confidence", "信心較低")}
+              </span>
+            )}
           </p>
         </div>
         {vdot !== null && (

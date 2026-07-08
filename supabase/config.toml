@@ -156,3 +156,7 @@ verify_jwt = false
 
 [functions.wa-daily-debug]
 verify_jwt = false
+
+[functions.wa-test-templates]
+verify_jwt = false
+

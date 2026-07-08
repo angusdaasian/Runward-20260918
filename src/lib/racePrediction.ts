@@ -394,7 +394,21 @@ export function predictRace(input: PredictInputs | number, ...rest: any[]): Race
 
 
 
-  const adjustedTime = baseTime * slowdown * freshness;
+  // If a recent (≤30d) same-distance effort drives the prediction, the
+  // ambient weather is already baked into that time — don't double-charge
+  // for heat. Older efforts get partial weather adjustment; no direct
+  // effort → full adjustment.
+  let effectiveSlowdown = slowdown;
+  if (directEffort) {
+    if (directEffort.ageDays !== null && directEffort.ageDays <= 30) {
+      effectiveSlowdown = 1;
+    } else {
+      // Half weight for older efforts (fitness may have shifted).
+      effectiveSlowdown = 1 + (slowdown - 1) * 0.5;
+    }
+  }
+
+  const adjustedTime = baseTime * effectiveSlowdown * freshness;
   return {
     meters,
     baseTime,

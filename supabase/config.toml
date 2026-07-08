@@ -153,3 +153,6 @@ verify_jwt = false
 [functions.dedup-activities-cross-platform]
 verify_jwt = false
 
+
+[functions.wa-daily-debug]
+verify_jwt = false

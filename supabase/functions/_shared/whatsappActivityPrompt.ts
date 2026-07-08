@@ -154,25 +154,26 @@ export async function waSendTemplate(
     console.warn("[wa] template send skipped: missing token/phone id");
     return null;
   }
-  // Meta rejects real newline / tab / 4+ space runs in template body
-  // parameters (error 132018). To keep visual line breaks we swap real
-  // newlines for U+2028 LINE SEPARATOR, which the WhatsApp client renders as
-  // a soft line break and Meta's validator does not flag as "\n".
+  // Meta rejects real newline / tab / 4+ consecutive spaces in template body
+  // parameters (error 132018). Since we can't inject real line breaks, we
+  // replace them with visible separators that read naturally in one paragraph:
+  //   - blank-line (paragraph break)   -> "  —  "
+  //   - newline right before "• " (bullet) -> "   " (spaces; bullet already
+  //     marks a new item, so no extra glyph needed)
+  //   - any other newline              -> " "
   let v = (variable ?? "")
     .replace(/\r\n?/g, "\n")
     .replace(/\t+/g, " ")
-    .replace(/ {4,}/g, "   ")
-    .replace(/\n{3,}/g, "\n\n")
     .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{2,}/g, "§P§")           // paragraph break marker
+    .replace(/\n(?=•)/g, "§B§")          // newline before bullet
+    .replace(/\n(?=\d+\)\s)/g, "§B§")    // newline before "1) " numbered item
+    .replace(/\n/g, " ")                 // remaining single newlines -> space
+    .replace(/§P§/g, "  —  ")
+    .replace(/§B§/g, "   ")
+    .replace(/ {4,}/g, "   ")
     .trim();
-  if (v.length > 900) {
-    let cut = v.slice(0, 897);
-    const lastBreak = cut.lastIndexOf("\n");
-    if (lastBreak > 600) cut = cut.slice(0, lastBreak);
-    v = cut.trimEnd() + "…";
-  }
-  // Now swap \n -> U+2028 so Meta accepts it but WhatsApp still renders lines.
-  v = v.replace(/\n/g, "\u2028");
+  if (v.length > 900) v = v.slice(0, 897).trimEnd() + "…";
   if (!v) v = "—";
   const payload = {
     messaging_product: "whatsapp",

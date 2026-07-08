@@ -65,36 +65,13 @@ Deno.serve(async (req) => {
         if (!suggestion) { failed++; continue; }
 
         // Format for WhatsApp: preserve line breaks so the message reads like
-        // the in-window rich message. WhatsApp template body variables allow
-        // newlines for utility/marketing templates, but disallow tabs and
-        // 4+ consecutive spaces. Convert markdown -> WhatsApp formatting
-        // (**bold** -> *bold*, ## Heading -> *Heading*, keep bullets/numbers).
-        suggestion = suggestion
-          // strip horizontal rules
-          .replace(/^\s*---+\s*$/gm, "")
-          // bold FIRST (before ## / bullet passes touch asterisks):
-          //   **text** -> *text*  (WhatsApp uses single asterisks for bold)
-          .replace(/\*\*(.+?)\*\*/g, "§B§$1§B§")
-          // headings: "## Title" (optional trailing colon) -> "*Title*"
-          .replace(/^\s{0,3}#{1,6}\s+(.+?)\s*:?\s*$/gm, "§B§$1§B§")
-          // list bullets: "- item" or "* item" -> "• item"
-          .replace(/^\s*[-*]\s+/gm, "• ")
-          // numbered list: "1. item" -> "1) item"
-          .replace(/^\s*(\d+)\.\s+/gm, "$1) ")
-          // strip stray inline markdown noise
-          .replace(/`+/g, "")
-          .replace(/^>\s?/gm, "")
-          // restore bold markers as WhatsApp single-asterisk
-          .replace(/§B§/g, "*")
-          // tabs -> single space
-          .replace(/\t+/g, " ")
-          // collapse 3+ blank lines -> single blank line
-          .replace(/\n{3,}/g, "\n\n")
-          // keep runs of spaces under Meta's 4-space limit
-          .replace(/ {4,}/g, "   ")
-          // trim trailing whitespace on each line
-          .replace(/[ \t]+\n/g, "\n")
-          .trim();
+        // the in-window rich message. Same formatter is applied to in-window
+        // text sends via waSendText, so both paths look identical.
+        // WhatsApp template body variables allow newlines for utility/marketing
+        // templates, but disallow 4+ consecutive spaces.
+        suggestion = formatWhatsAppMarkdown(suggestion)
+          // keep runs of spaces under Meta's 4-space limit (template only)
+          .replace(/ {4,}/g, "   ");
 
         // Meta template parameter cap ~1024 chars. Leave margin.
         if (suggestion.length > 900) {
@@ -103,6 +80,7 @@ Deno.serve(async (req) => {
           if (lastBreak > 600) cut = cut.slice(0, lastBreak);
           suggestion = cut.trimEnd() + "…";
         }
+
 
         const templateName = lang === "zh" ? "daily_suggestion_cn" : "daily_suggestion_en";
         const langCode = lang === "zh" ? "zh_HK" : "en";

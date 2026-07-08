@@ -234,16 +234,20 @@ export function weatherSlowdown(
 ): number {
   if (tempC === null || tempC === undefined) return 1;
   const wbgt = estimateWBGT(tempC, humidity);
-  const excess = Math.max(0, wbgt - 10);
+  // Threshold nudged up to 12 °C — most trained runners are unaffected below this.
+  const excess = Math.max(0, wbgt - 12);
 
+  // Ely et al. 2007 / Tan et al. 2022 field data: ~2 % slowdown at WBGT ~20 for
+  // HM, ~5–6 % at WBGT 25. Previous coefficients (0.006 HM / 0.008 M) roughly
+  // doubled published values — recalibrated below.
   let k: number;
-  if (meters <= 5500) k = 0.003;
-  else if (meters <= 12000) k = 0.004;
-  else if (meters <= 25000) k = 0.006;
-  else k = 0.008;
+  if (meters <= 5500) k = 0.0015;
+  else if (meters <= 12000) k = 0.0022;
+  else if (meters <= 25000) k = 0.0035;
+  else k = 0.005;
 
-  // Cap slowdown at +15% (avoid runaway at extreme heat).
-  return Math.min(1.15, 1 + k * excess);
+  // Cap slowdown at +8 % (races in extreme heat still don't blow up by 15 %).
+  return Math.min(1.08, 1 + k * excess);
 }
 
 // ---------- Freshness ----------
@@ -256,9 +260,47 @@ export function weatherSlowdown(
  */
 export function freshnessAdj(tsb: number | null | undefined): number {
   if (tsb === null || tsb === undefined || !isFinite(tsb)) return 1;
-  // TSB in TRIMP units. Roughly: −30 = deeply fatigued, +15 = well tapered.
-  const raw = 1 - tsb / 800;
-  return Math.max(0.99, Math.min(1.03, raw));
+  // TSB in TRIMP units. Negative TSB after a hard race is a transient state
+  // that shouldn't be modelled as race-day form — cap the fatigue penalty at
+  // +1 %, and give up to +2 % for well-tapered runners.
+  const raw = 1 - tsb / 1200;
+  return Math.max(0.98, Math.min(1.01, raw));
+}
+
+/**
+ * Best recent race-quality effort at (or near) the target distance. Used as
+ * a direct anchor so a recent time trial / race dominates the prediction for
+ * that specific distance.
+ *
+ * Distance band: 85 % – 130 % of target. Look-back: 90 days.
+ */
+export function bestRecentEffortAt(
+  activities: ScoringActivity[],
+  targetMeters: number,
+  days = 90,
+): AnchorPB | null {
+  const cutoff = Date.now() - days * 86400000;
+  let best: AnchorPB | null = null;
+  for (const a of activities) {
+    if (a.sport_type && !/run|treadmill/i.test(a.sport_type)) continue;
+    if (!a.distance || !a.moving_time) continue;
+    const t = new Date(a.start_date).getTime();
+    if (!isFinite(t) || t < cutoff) continue;
+    if (a.distance < targetMeters * 0.85 || a.distance > targetMeters * 1.3) continue;
+    const score = calculateRunningScore(a.distance, a.moving_time);
+    if (!isFinite(score) || score < 20 || score > 90) continue;
+    const ageDays = (Date.now() - t) / 86400000;
+    if (!best || score > best.rawScore) {
+      best = {
+        meters: a.distance,
+        timeSec: a.moving_time,
+        rawScore: score,
+        decayedScore: score,
+        ageDays,
+      };
+    }
+  }
+  return best;
 }
 
 // ---------- Prediction ----------
@@ -276,24 +318,31 @@ export interface PredictInputs {
   vdot: number;
   meters: number;
   anchor?: AnchorPB | null;
+  /**
+   * Best recent effort at (or very near) this specific target distance.
+   * When present, dominates the prediction — a recent 1:50 HM should predict
+   * a ~1:50 HM, not a VDOT-blended estimate driven by short-distance PBs.
+   */
+  directEffort?: AnchorPB | null;
   vol?: VolumeStats;
   slowdown?: number;
   freshness?: number;
 }
 
 /**
- * Blended prediction:
- *   • Daniels VDOT → physiological baseline
- *   • Riegel from best PB with volume-adjusted exponent → durability reality
- * We take the SLOWER of the two as the base for distances ≥ 10K (a runner
- * without long-run mileage should not get an optimistic marathon time), and
- * the mean for shorter races where VDOT is well-behaved.
+ * Prediction preference order:
+ *   1. Recent effort at the same distance (directEffort) — trumps everything
+ *      but is Riegel-scaled to the exact target and lightly blended (75/25)
+ *      with the VDOT estimate to guard against a single fluke.
+ *   2. Otherwise: blended Daniels VDOT + Riegel-from-PB with volume-adjusted
+ *      exponent. Endurance races (≥10K) take the SLOWER of the two.
  */
 export function predictRace(input: PredictInputs | number, ...rest: any[]): RacePrediction {
   // Back-compat: old signature predictRace(vdot, meters, slowdown)
   let vdot: number;
   let meters: number;
   let anchor: AnchorPB | null = null;
+  let directEffort: AnchorPB | null = null;
   let vol: VolumeStats | undefined;
   let slowdown = 1;
   let freshness = 1;
@@ -306,6 +355,7 @@ export function predictRace(input: PredictInputs | number, ...rest: any[]): Race
     vdot = input.vdot;
     meters = input.meters;
     anchor = input.anchor ?? null;
+    directEffort = input.directEffort ?? null;
     vol = input.vol;
     slowdown = input.slowdown ?? 1;
     freshness = input.freshness ?? 1;
@@ -316,7 +366,18 @@ export function predictRace(input: PredictInputs | number, ...rest: any[]): Race
   let method: RacePrediction["method"] = "vdot";
   let exponent: number | undefined;
 
-  if (anchor && vol) {
+  if (directEffort) {
+    // Scale the recent effort to the exact target distance with a mild
+    // Riegel exponent. If the effort *is* the target distance this is
+    // essentially just that time.
+    const exp = vol ? riegelExponent(meters, vol) : 1.06;
+    const scaled =
+      directEffort.timeSec * Math.pow(meters / directEffort.meters, exp);
+    // 75 % recent effort / 25 % VDOT estimate as a sanity blend.
+    baseTime = 0.75 * scaled + 0.25 * vdotTime;
+    method = "blended";
+    exponent = exp;
+  } else if (anchor && vol) {
     exponent = riegelExponent(meters, vol);
     const riegelTime = anchor.timeSec * Math.pow(meters / anchor.meters, exponent);
 
@@ -331,7 +392,23 @@ export function predictRace(input: PredictInputs | number, ...rest: any[]): Race
     }
   }
 
-  const adjustedTime = baseTime * slowdown * freshness;
+
+
+  // If a recent (≤30d) same-distance effort drives the prediction, the
+  // ambient weather is already baked into that time — don't double-charge
+  // for heat. Older efforts get partial weather adjustment; no direct
+  // effort → full adjustment.
+  let effectiveSlowdown = slowdown;
+  if (directEffort) {
+    if (directEffort.ageDays !== null && directEffort.ageDays <= 30) {
+      effectiveSlowdown = 1;
+    } else {
+      // Half weight for older efforts (fitness may have shifted).
+      effectiveSlowdown = 1 + (slowdown - 1) * 0.5;
+    }
+  }
+
+  const adjustedTime = baseTime * effectiveSlowdown * freshness;
   return {
     meters,
     baseTime,

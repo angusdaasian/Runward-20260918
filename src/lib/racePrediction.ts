@@ -260,9 +260,47 @@ export function weatherSlowdown(
  */
 export function freshnessAdj(tsb: number | null | undefined): number {
   if (tsb === null || tsb === undefined || !isFinite(tsb)) return 1;
-  // TSB in TRIMP units. Roughly: −30 = deeply fatigued, +15 = well tapered.
-  const raw = 1 - tsb / 800;
-  return Math.max(0.99, Math.min(1.03, raw));
+  // TSB in TRIMP units. Negative TSB after a hard race is a transient state
+  // that shouldn't be modelled as race-day form — cap the fatigue penalty at
+  // +1 %, and give up to +2 % for well-tapered runners.
+  const raw = 1 - tsb / 1200;
+  return Math.max(0.98, Math.min(1.01, raw));
+}
+
+/**
+ * Best recent race-quality effort at (or near) the target distance. Used as
+ * a direct anchor so a recent time trial / race dominates the prediction for
+ * that specific distance.
+ *
+ * Distance band: 85 % – 130 % of target. Look-back: 90 days.
+ */
+export function bestRecentEffortAt(
+  activities: ScoringActivity[],
+  targetMeters: number,
+  days = 90,
+): AnchorPB | null {
+  const cutoff = Date.now() - days * 86400000;
+  let best: AnchorPB | null = null;
+  for (const a of activities) {
+    if (a.sport_type && !/run|treadmill/i.test(a.sport_type)) continue;
+    if (!a.distance || !a.moving_time) continue;
+    const t = new Date(a.start_date).getTime();
+    if (!isFinite(t) || t < cutoff) continue;
+    if (a.distance < targetMeters * 0.85 || a.distance > targetMeters * 1.3) continue;
+    const score = calculateRunningScore(a.distance, a.moving_time);
+    if (!isFinite(score) || score < 20 || score > 90) continue;
+    const ageDays = (Date.now() - t) / 86400000;
+    if (!best || score > best.rawScore) {
+      best = {
+        meters: a.distance,
+        timeSec: a.moving_time,
+        rawScore: score,
+        decayedScore: score,
+        ageDays,
+      };
+    }
+  }
+  return best;
 }
 
 // ---------- Prediction ----------

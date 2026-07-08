@@ -50,7 +50,7 @@ Deno.serve(async (req) => {
             lang,
             todayDate: today,
             workoutType: "auto",
-            simple: true, // short 2-3 sentence line to fit WhatsApp template variable {{1}}
+            simple: false, // rich full suggestion (same as in-window message)
           }),
         });
 
@@ -64,13 +64,31 @@ Deno.serve(async (req) => {
         let suggestion: string = data?.suggestion ?? "";
         if (!suggestion) { failed++; continue; }
 
-        // Sanitize for WhatsApp template variable rules:
-        // no newlines, no tabs, no 4+ consecutive spaces, strip markdown emphasis.
+        // WhatsApp template body parameters disallow newlines, tabs, and
+        // 4+ consecutive spaces. Convert markdown structure into a single
+        // readable line while preserving the semantic breaks.
         suggestion = suggestion
+          // strip horizontal rules
+          .replace(/^\s*---+\s*$/gm, "")
+          // headings: "## Title" -> "Title:"
+          .replace(/^#{1,6}\s+(.+?)\s*$/gm, "$1:")
+          // list bullets: "- item" or "* item" -> "• item"
+          .replace(/^\s*[-*]\s+/gm, "• ")
+          // numbered list: "1. item" -> "1) item"
+          .replace(/^\s*(\d+)\.\s+/gm, "$1) ")
+          // bold/italic/code markers
+          .replace(/\*\*(.+?)\*\*/g, "$1")
           .replace(/[*_`#>]/g, "")
-          .replace(/\s+/g, " ")
+          // paragraph breaks -> " | "
+          .replace(/\n{2,}/g, " | ")
+          // single newline -> space
+          .replace(/[\n\r\t]+/g, " ")
+          // collapse whitespace runs (keep to <4 spaces)
+          .replace(/ {2,}/g, " ")
           .trim();
-        if (suggestion.length > 700) suggestion = suggestion.slice(0, 697) + "...";
+
+        // Meta template parameter cap ~1024 chars. Leave margin.
+        if (suggestion.length > 900) suggestion = suggestion.slice(0, 897) + "...";
 
         const templateName = lang === "zh" ? "daily_suggestion_cn" : "daily_suggestion_en";
         const langCode = lang === "zh" ? "zh_HK" : "en";

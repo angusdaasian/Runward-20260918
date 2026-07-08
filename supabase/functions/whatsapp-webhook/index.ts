@@ -338,9 +338,63 @@ async function handleIncoming(supabase: any, waId: string, text: string) {
   }
 
   if (lower === "help" || lower === "/help") {
-    await waSendText(waId, "*RunWard Coach*\nLINK <code> — link\nFEEDBACK — toggle post-run prompts\nSTOP — unlink");
+    await waSendText(waId, "*RunWard Coach*\nLINK <code> — link\nFEEDBACK — toggle post-run prompts\nDETAIL — get today's full workout breakdown\nSTOP — unlink");
     return;
   }
+
+  // DETAIL / YES / 詳細 — send the full rich daily workout suggestion (in-window).
+  // Matches short replies to the compact daily suggestion.
+  if (/^(yes|y|detail|more|full|詳細|詳情|想要|要|好|好的|是|係)[\s!.?。！？]*$/i.test(text)) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("user_id, lang")
+      .eq("whatsapp_wa_id", waId)
+      .maybeSingle();
+    if (profile) {
+      const lang = await getUserLang(supabase, profile.user_id, (profile as any).lang);
+      // Only treat as "want daily detail" when there's no pending activity RPE prompt
+      // or plan-change suggestion waiting on this same yes.
+      const { data: pendingActivity } = await supabase
+        .from("whatsapp_pending_prompts")
+        .select("id")
+        .eq("wa_id", waId)
+        .is("responded_at", null)
+        .gt("expires_at", new Date().toISOString())
+        .limit(1)
+        .maybeSingle();
+      if (!pendingActivity) {
+        await waSendText(waId, lang === "zh" ? "🧠 正在生成完整訓練建議…" : "🧠 Generating your full workout breakdown…");
+        try {
+          const today = new Date().toISOString().slice(0, 10);
+          const resp = await fetch(`${SUPABASE_URL}/functions/v1/generate-suggested-workout`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${SERVICE_KEY}`,
+              "x-internal-secret": SERVICE_KEY,
+            },
+            body: JSON.stringify({
+              internalUserId: profile.user_id,
+              lang, todayDate: today, workoutType: "auto", simple: false,
+            }),
+          });
+          const data = await resp.json().catch(() => ({} as any));
+          const suggestion: string = data?.suggestion ?? "";
+          if (resp.ok && suggestion) {
+            const header = lang === "zh" ? "🏃 *今日完整訓練建議*\n\n" : "🏃 *Today's Full Workout Suggestion*\n\n";
+            await waSendText(waId, header + suggestion);
+          } else {
+            await waSendText(waId, lang === "zh" ? "⚠️ 生成失敗，請稍後再試。" : "⚠️ Couldn't generate detail. Try again shortly.");
+          }
+        } catch (e) {
+          console.error("[wa-webhook] detail request error", e);
+          await waSendText(waId, lang === "zh" ? "⚠️ 生成錯誤。" : "⚠️ Generation error.");
+        }
+        return;
+      }
+    }
+  }
+
 
   // Free-form text → check for pending RPE prompt
   const { data: activityPrompt } = await supabase

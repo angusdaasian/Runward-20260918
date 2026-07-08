@@ -154,9 +154,21 @@ export async function waSendTemplate(
     console.warn("[wa] template send skipped: missing token/phone id");
     return null;
   }
-  // Template parameters are capped (~1024 chars). Truncate safely.
-  let v = (variable ?? "").replace(/\s+/g, " ").trim();
-  if (v.length > 900) v = v.slice(0, 897) + "...";
+  // Template parameters are capped (~1024 chars). Preserve newlines so the
+  // formatted message keeps its structure; only normalise tabs and runs of
+  // 4+ spaces (Meta rejects those in template variables).
+  let v = (variable ?? "")
+    .replace(/\t+/g, " ")
+    .replace(/ {4,}/g, "   ")
+    .replace(/\n{3,}/g, "\n\n")
+    .replace(/[ \t]+\n/g, "\n")
+    .trim();
+  if (v.length > 900) {
+    let cut = v.slice(0, 897);
+    const lastBreak = cut.lastIndexOf("\n");
+    if (lastBreak > 600) cut = cut.slice(0, lastBreak);
+    v = cut.trimEnd() + "…";
+  }
   if (!v) v = "—";
   const payload = {
     messaging_product: "whatsapp",

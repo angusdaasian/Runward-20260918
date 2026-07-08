@@ -318,24 +318,31 @@ export interface PredictInputs {
   vdot: number;
   meters: number;
   anchor?: AnchorPB | null;
+  /**
+   * Best recent effort at (or very near) this specific target distance.
+   * When present, dominates the prediction — a recent 1:50 HM should predict
+   * a ~1:50 HM, not a VDOT-blended estimate driven by short-distance PBs.
+   */
+  directEffort?: AnchorPB | null;
   vol?: VolumeStats;
   slowdown?: number;
   freshness?: number;
 }
 
 /**
- * Blended prediction:
- *   • Daniels VDOT → physiological baseline
- *   • Riegel from best PB with volume-adjusted exponent → durability reality
- * We take the SLOWER of the two as the base for distances ≥ 10K (a runner
- * without long-run mileage should not get an optimistic marathon time), and
- * the mean for shorter races where VDOT is well-behaved.
+ * Prediction preference order:
+ *   1. Recent effort at the same distance (directEffort) — trumps everything
+ *      but is Riegel-scaled to the exact target and lightly blended (75/25)
+ *      with the VDOT estimate to guard against a single fluke.
+ *   2. Otherwise: blended Daniels VDOT + Riegel-from-PB with volume-adjusted
+ *      exponent. Endurance races (≥10K) take the SLOWER of the two.
  */
 export function predictRace(input: PredictInputs | number, ...rest: any[]): RacePrediction {
   // Back-compat: old signature predictRace(vdot, meters, slowdown)
   let vdot: number;
   let meters: number;
   let anchor: AnchorPB | null = null;
+  let directEffort: AnchorPB | null = null;
   let vol: VolumeStats | undefined;
   let slowdown = 1;
   let freshness = 1;
@@ -348,6 +355,7 @@ export function predictRace(input: PredictInputs | number, ...rest: any[]): Race
     vdot = input.vdot;
     meters = input.meters;
     anchor = input.anchor ?? null;
+    directEffort = input.directEffort ?? null;
     vol = input.vol;
     slowdown = input.slowdown ?? 1;
     freshness = input.freshness ?? 1;
@@ -358,7 +366,18 @@ export function predictRace(input: PredictInputs | number, ...rest: any[]): Race
   let method: RacePrediction["method"] = "vdot";
   let exponent: number | undefined;
 
-  if (anchor && vol) {
+  if (directEffort) {
+    // Scale the recent effort to the exact target distance with a mild
+    // Riegel exponent. If the effort *is* the target distance this is
+    // essentially just that time.
+    const exp = vol ? riegelExponent(meters, vol) : 1.06;
+    const scaled =
+      directEffort.timeSec * Math.pow(meters / directEffort.meters, exp);
+    // 75 % recent effort / 25 % VDOT estimate as a sanity blend.
+    baseTime = 0.75 * scaled + 0.25 * vdotTime;
+    method = "blended";
+    exponent = exp;
+  } else if (anchor && vol) {
     exponent = riegelExponent(meters, vol);
     const riegelTime = anchor.timeSec * Math.pow(meters / anchor.meters, exponent);
 
@@ -372,6 +391,8 @@ export function predictRace(input: PredictInputs | number, ...rest: any[]): Race
       method = "blended";
     }
   }
+
+
 
   const adjustedTime = baseTime * slowdown * freshness;
   return {

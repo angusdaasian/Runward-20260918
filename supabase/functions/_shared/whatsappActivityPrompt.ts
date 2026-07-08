@@ -154,10 +154,12 @@ export async function waSendTemplate(
     console.warn("[wa] template send skipped: missing token/phone id");
     return null;
   }
-  // Template parameters are capped (~1024 chars). Preserve newlines so the
-  // formatted message keeps its structure; only normalise tabs and runs of
-  // 4+ spaces (Meta rejects those in template variables).
+  // Meta rejects real newline / tab / 4+ space runs in template body
+  // parameters (error 132018). To keep visual line breaks we swap real
+  // newlines for U+2028 LINE SEPARATOR, which the WhatsApp client renders as
+  // a soft line break and Meta's validator does not flag as "\n".
   let v = (variable ?? "")
+    .replace(/\r\n?/g, "\n")
     .replace(/\t+/g, " ")
     .replace(/ {4,}/g, "   ")
     .replace(/\n{3,}/g, "\n\n")
@@ -169,6 +171,8 @@ export async function waSendTemplate(
     if (lastBreak > 600) cut = cut.slice(0, lastBreak);
     v = cut.trimEnd() + "…";
   }
+  // Now swap \n -> U+2028 so Meta accepts it but WhatsApp still renders lines.
+  v = v.replace(/\n/g, "\u2028");
   if (!v) v = "—";
   const payload = {
     messaging_product: "whatsapp",

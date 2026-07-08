@@ -234,16 +234,20 @@ export function weatherSlowdown(
 ): number {
   if (tempC === null || tempC === undefined) return 1;
   const wbgt = estimateWBGT(tempC, humidity);
-  const excess = Math.max(0, wbgt - 10);
+  // Threshold nudged up to 12 °C — most trained runners are unaffected below this.
+  const excess = Math.max(0, wbgt - 12);
 
+  // Ely et al. 2007 / Tan et al. 2022 field data: ~2 % slowdown at WBGT ~20 for
+  // HM, ~5–6 % at WBGT 25. Previous coefficients (0.006 HM / 0.008 M) roughly
+  // doubled published values — recalibrated below.
   let k: number;
-  if (meters <= 5500) k = 0.003;
-  else if (meters <= 12000) k = 0.004;
-  else if (meters <= 25000) k = 0.006;
-  else k = 0.008;
+  if (meters <= 5500) k = 0.0015;
+  else if (meters <= 12000) k = 0.0022;
+  else if (meters <= 25000) k = 0.0035;
+  else k = 0.005;
 
-  // Cap slowdown at +15% (avoid runaway at extreme heat).
-  return Math.min(1.15, 1 + k * excess);
+  // Cap slowdown at +8 % (races in extreme heat still don't blow up by 15 %).
+  return Math.min(1.08, 1 + k * excess);
 }
 
 // ---------- Freshness ----------

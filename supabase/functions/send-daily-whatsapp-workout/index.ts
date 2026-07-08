@@ -1,7 +1,7 @@
 // Cron-triggered: sends daily running workout suggestions to opted-in WhatsApp users.
 // Mirrors send-daily-telegram-workout. Calls generate-suggested-workout per user.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { waSendText, waSendTemplate } from "../_shared/whatsappActivityPrompt.ts";
+import { waSendText, waSendTemplate, formatWhatsAppMarkdown } from "../_shared/whatsappActivityPrompt.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",

@@ -237,10 +237,12 @@ const RacePredictorCard = ({ lang }: Props) => {
               weather?.humidity ?? null,
               d.meters,
             );
+            const directEffort = bestRecentEffortAt(activities as any, d.meters, 90);
             const result = predictRace({
               vdot,
               meters: d.meters,
               anchor,
+              directEffort,
               vol,
               slowdown,
               freshness,

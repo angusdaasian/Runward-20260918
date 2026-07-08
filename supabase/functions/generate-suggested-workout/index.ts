@@ -171,6 +171,7 @@ serve(async (req) => {
     const workoutTypeLabel: string = typeof body?.workoutTypeLabel === "string" ? body.workoutTypeLabel : workoutType;
     const weather: any = body?.weather ?? null;
     const simple: boolean = body?.simple === true;
+    const compact: boolean = body?.compact === true;
     const isZh = lang === "zh";
 
     // ── Translate-only mode: take an existing suggestion and translate it ──

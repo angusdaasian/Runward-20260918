@@ -120,6 +120,23 @@ export async function waSendTemplate(
   let v = (variable ?? "").replace(/\s+/g, " ").trim();
   if (v.length > 900) v = v.slice(0, 897) + "...";
   if (!v) v = "—";
+  const payload = {
+    messaging_product: "whatsapp",
+    recipient_type: "individual",
+    to: waId,
+    type: "template",
+    template: {
+      name: templateName,
+      language: { code: languageCode },
+      components: [
+        {
+          type: "body",
+          parameters: [{ type: "text", text: v }],
+        },
+      ],
+    },
+  };
+  console.log(`[wa] template request template=${templateName} lang=${languageCode} to=${waId} varLen=${v.length} payload=${JSON.stringify(payload).slice(0, 1000)}`);
   try {
     const res = await fetch(
       `https://graph.facebook.com/${GRAPH_VERSION}/${PHONE_NUMBER_ID}/messages`,
@@ -129,29 +146,15 @@ export async function waSendTemplate(
           "Content-Type": "application/json",
           Authorization: `Bearer ${ACCESS_TOKEN}`,
         },
-        body: JSON.stringify({
-          messaging_product: "whatsapp",
-          recipient_type: "individual",
-          to: waId,
-          type: "template",
-          template: {
-            name: templateName,
-            language: { code: languageCode },
-            components: [
-              {
-                type: "body",
-                parameters: [{ type: "text", text: v }],
-              },
-            ],
-          },
-        }),
+        body: JSON.stringify(payload),
       },
     );
     if (res.ok) {
-      const data = await res.json().catch(() => null) as any;
+      const bodyText = await res.text();
+      const data = (() => { try { return JSON.parse(bodyText); } catch { return null; } })() as any;
       const msgId = data?.messages?.[0]?.id ?? null;
       const status = data?.messages?.[0]?.message_status ?? "n/a";
-      console.log(`[wa] template accepted template=${templateName} lang=${languageCode} to=${waId} id=${msgId} status=${status}`);
+      console.log(`[wa] template accepted template=${templateName} lang=${languageCode} to=${waId} id=${msgId} status=${status} body=${bodyText.slice(0, 400)}`);
       return msgId;
     }
     const errText = (await res.text()).slice(0, 600);

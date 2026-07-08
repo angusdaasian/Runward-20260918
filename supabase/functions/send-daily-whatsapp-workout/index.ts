@@ -50,7 +50,7 @@ Deno.serve(async (req) => {
             lang,
             todayDate: today,
             workoutType: "auto",
-            simple: false, // rich full suggestion (same as in-window message)
+            compact: true, // short structured summary — user can request full detail via reply
           }),
         });
 
@@ -64,13 +64,13 @@ Deno.serve(async (req) => {
         let suggestion: string = data?.suggestion ?? "";
         if (!suggestion) { failed++; continue; }
 
-        // Format for WhatsApp: preserve line breaks so the message reads like
-        // the in-window rich message. Same formatter is applied to in-window
-        // text sends via waSendText, so both paths look identical.
-        // WhatsApp template body variables allow newlines for utility/marketing
-        // templates, but disallow 4+ consecutive spaces.
+        // Append the "want detail?" call-to-action.
+        const ctaZh = "\n\n想要更詳細的建議（包含配速理由、天氣建議、教練提醒）？回覆 *YES* 或 *詳細*。";
+        const ctaEn = "\n\nWant a fuller breakdown (pacing rationale, weather timing, coach notes)? Reply *YES* or *DETAIL*.";
+        suggestion = suggestion + (lang === "zh" ? ctaZh : ctaEn);
+
+        // Format for WhatsApp.
         suggestion = formatWhatsAppMarkdown(suggestion)
-          // keep runs of spaces under Meta's 4-space limit (template only)
           .replace(/ {4,}/g, "   ");
 
         // Meta template parameter cap ~1024 chars. Leave margin.

@@ -9,6 +9,7 @@ import PlanComparisonDialog from "@/components/PlanComparisonDialog";
 import { formatTime, formatPace } from "@/lib/vdot";
 import {
   bestAnchorPb,
+  bestRecentEffortAt,
   effectiveVdot,
   freshnessAdj,
   predictRace,

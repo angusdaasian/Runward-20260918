@@ -1,7 +1,7 @@
 // Cron-triggered: sends daily running workout suggestions to opted-in WhatsApp users.
 // Mirrors send-daily-telegram-workout. Calls generate-suggested-workout per user.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { waSendText, waSendTemplate } from "../_shared/whatsappActivityPrompt.ts";
+import { waSendText, waSendTemplate, formatWhatsAppMarkdown } from "../_shared/whatsappActivityPrompt.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -64,31 +64,23 @@ Deno.serve(async (req) => {
         let suggestion: string = data?.suggestion ?? "";
         if (!suggestion) { failed++; continue; }
 
-        // WhatsApp template body parameters disallow newlines, tabs, and
-        // 4+ consecutive spaces. Convert markdown structure into a single
-        // readable line while preserving the semantic breaks.
-        suggestion = suggestion
-          // strip horizontal rules
-          .replace(/^\s*---+\s*$/gm, "")
-          // headings: "## Title" -> "Title:"
-          .replace(/^#{1,6}\s+(.+?)\s*$/gm, "$1:")
-          // list bullets: "- item" or "* item" -> "• item"
-          .replace(/^\s*[-*]\s+/gm, "• ")
-          // numbered list: "1. item" -> "1) item"
-          .replace(/^\s*(\d+)\.\s+/gm, "$1) ")
-          // bold/italic/code markers
-          .replace(/\*\*(.+?)\*\*/g, "$1")
-          .replace(/[*_`#>]/g, "")
-          // paragraph breaks -> " | "
-          .replace(/\n{2,}/g, " | ")
-          // single newline -> space
-          .replace(/[\n\r\t]+/g, " ")
-          // collapse whitespace runs (keep to <4 spaces)
-          .replace(/ {2,}/g, " ")
-          .trim();
+        // Format for WhatsApp: preserve line breaks so the message reads like
+        // the in-window rich message. Same formatter is applied to in-window
+        // text sends via waSendText, so both paths look identical.
+        // WhatsApp template body variables allow newlines for utility/marketing
+        // templates, but disallow 4+ consecutive spaces.
+        suggestion = formatWhatsAppMarkdown(suggestion)
+          // keep runs of spaces under Meta's 4-space limit (template only)
+          .replace(/ {4,}/g, "   ");
 
         // Meta template parameter cap ~1024 chars. Leave margin.
-        if (suggestion.length > 900) suggestion = suggestion.slice(0, 897) + "...";
+        if (suggestion.length > 900) {
+          let cut = suggestion.slice(0, 897);
+          const lastBreak = cut.lastIndexOf("\n");
+          if (lastBreak > 600) cut = cut.slice(0, lastBreak);
+          suggestion = cut.trimEnd() + "…";
+        }
+
 
         const templateName = lang === "zh" ? "daily_suggestion_cn" : "daily_suggestion_en";
         const langCode = lang === "zh" ? "zh_HK" : "en";

@@ -37,11 +37,49 @@ function fmtSummary(s: ActivitySummary, lang: "zh" | "en"): string {
   return `📏 Distance: ${kmStr} km\n⏱️ Time: ${minStr} min\n🏃 Pace: ${paceStr}`;
 }
 
+/**
+ * Convert markdown-ish text (from LLM output) into WhatsApp-friendly text.
+ * WhatsApp uses *bold*, _italic_, ~strike~ and ```mono``` — NOT markdown's
+ * **bold** or ## Headings. Also normalises bullets/numbered lists so the
+ * message looks the same whether it's sent in-window (text) or out-of-window
+ * (template body variable).
+ */
+export function formatWhatsAppMarkdown(input: string): string {
+  if (!input) return input;
+  return input
+    // strip horizontal rules
+    .replace(/^\s*---+\s*$/gm, "")
+    // bold FIRST via placeholder so later passes don't eat asterisks
+    .replace(/\*\*(.+?)\*\*/g, "§B§$1§B§")
+    // headings "## Title" (optional trailing colon) -> "*Title*"
+    .replace(/^\s{0,3}#{1,6}\s+(.+?)\s*:?\s*$/gm, "§B§$1§B§")
+    // list bullets: "- item" or "* item" -> "• item"
+    .replace(/^\s*[-*]\s+/gm, "• ")
+    // numbered list: "1. item" -> "1) item"
+    .replace(/^\s*(\d+)\.\s+/gm, "$1) ")
+    // strip stray inline markdown noise
+    .replace(/`+/g, "")
+    .replace(/^>\s?/gm, "")
+    // restore bold markers as WhatsApp single-asterisk
+    .replace(/§B§/g, "*")
+    // tabs -> single space
+    .replace(/\t+/g, " ")
+    // collapse 3+ blank lines -> single blank line
+    .replace(/\n{3,}/g, "\n\n")
+    // trim trailing whitespace on each line
+    .replace(/[ \t]+\n/g, "\n")
+    .trim();
+}
+
 export async function waSendText(waId: string, text: string): Promise<string | null> {
   if (!ACCESS_TOKEN || !PHONE_NUMBER_ID) {
     console.warn("[wa] send skipped: WHATSAPP_ACCESS_TOKEN or WHATSAPP_PHONE_NUMBER_ID is missing");
     return null;
   }
+  // Normalise markdown -> WhatsApp formatting so in-window and template
+  // messages look identical.
+  text = formatWhatsAppMarkdown(text);
+
   try {
     // WhatsApp text limit is 4096 chars
     const chunks: string[] = [];

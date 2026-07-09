@@ -1,8 +1,9 @@
 import { useMemo, useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import {
-  Clock, MapPin, Heart, TrendingUp, Mountain, Timer, Footprints, Gauge, Flame, Calendar,
+  Clock, MapPin, Heart, TrendingUp, Mountain, Timer, Footprints, Gauge, Flame, Calendar, Sparkles,
 } from "lucide-react";
+import { shareActivityToGemini } from "@/lib/shareToGemini";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from "recharts";
 import ActivityMap from "@/components/activities/ActivityMap";
 import HrZoneBars from "@/components/activities/HrZoneBars";

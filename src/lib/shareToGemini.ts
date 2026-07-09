@@ -109,7 +109,10 @@ function installReturnCleanup() {
 
   const cleanup = () => unfreezeUI();
   const cleanupWhenVisible = () => {
-    if (document.visibilityState === "visible") cleanup();
+    if (document.visibilityState === "visible") {
+      cleanup();
+      document.removeEventListener("visibilitychange", cleanupWhenVisible);
+    }
   };
 
   // Run cleanup independently of navigator.share() settling. Some Android/Gemini
@@ -118,12 +121,6 @@ function installReturnCleanup() {
   window.addEventListener("focus", cleanup, { once: true });
   window.addEventListener("pageshow", cleanup, { once: true });
   document.addEventListener("visibilitychange", cleanupWhenVisible);
-
-  setTimeout(() => {
-    window.removeEventListener("focus", cleanup);
-    window.removeEventListener("pageshow", cleanup);
-    document.removeEventListener("visibilitychange", cleanupWhenVisible);
-  }, 10000);
 }
 
 export async function shareActivityToGemini(activity: StravaActivity, lang: Lang = "en") {

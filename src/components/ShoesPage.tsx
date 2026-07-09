@@ -215,11 +215,12 @@ function AddShoeSheet({
   lang, onClose, onAdded,
 }: { lang: Lang; onClose: () => void; onAdded: () => void }) {
   const { user } = useAuth();
+  const { isAdmin } = useAdmin();
   const { toast } = useToast();
   const t = (en: string, zh: string) => (lang === "zh" ? zh : en);
 
   const [tab, setTab] = useState<"catalog" | "custom">("catalog");
-  const [query, setQuery] = useState("");
+  const [brandFilter, setBrandFilter] = useState<string>("");
   const [catalog, setCatalog] = useState<ShoeCatalogItem[]>([]);
   const [loadingCat, setLoadingCat] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -237,13 +238,16 @@ function AddShoeSheet({
   };
   useMemo(() => { void loadCatalog(); }, []);
 
+  const brands = useMemo(() => {
+    const set = new Set<string>();
+    for (const c of catalog) if (c.brand) set.add(c.brand);
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [catalog]);
+
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return catalog;
-    return catalog.filter((c) =>
-      c.brand.toLowerCase().includes(q) || c.model.toLowerCase().includes(q)
-    );
-  }, [catalog, query]);
+    if (!brandFilter) return catalog;
+    return catalog.filter((c) => c.brand === brandFilter);
+  }, [catalog, brandFilter]);
 
   const addFromCatalog = async (c: ShoeCatalogItem) => {
     if (!user?.id) return;

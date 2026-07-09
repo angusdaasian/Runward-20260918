@@ -518,6 +518,22 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps, onNavig
           </button>
         )}
 
+        {/* Shoes */}
+        {user && (
+          <button
+            onClick={onNavigateShoes}
+            className="w-full bg-card border border-border rounded-xl p-4 flex items-center justify-between"
+          >
+            <div className="flex items-center gap-3">
+              <Footprints size={20} className="text-primary" />
+              <span className="font-medium text-foreground">{lang === "zh" ? "跑鞋" : "Shoes"}</span>
+            </div>
+            <ChevronRight size={18} className="text-muted-foreground" />
+          </button>
+        )}
+
+
+
         {/* Activity Push Notifications */}
         {user && (
           <div className="bg-card border border-border rounded-xl p-4">

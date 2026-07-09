@@ -35,7 +35,7 @@ export function keepUIUnlockedForShare() {
   removeClassTimer = window.setTimeout(() => {
     document.documentElement.classList.remove(SHARE_UNLOCK_CLASS);
     removeClassTimer = null;
-  }, 60000);
+  }, 30 * 60 * 1000);
 
   window.dispatchEvent(new Event(SHARE_UNLOCK_EVENT));
 }

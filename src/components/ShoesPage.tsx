@@ -1,8 +1,9 @@
 import { useMemo, useState } from "react";
-import { ArrowLeft, Plus, Search, Trash2, RefreshCw, AlertTriangle, Footprints } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, RefreshCw, AlertTriangle, Footprints } from "lucide-react";
 import { Lang } from "@/lib/i18n";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useAdmin } from "@/hooks/use-admin";
 import {
   useUserShoes, useShoeDefaults, useShoeAssignments,
   shoeLabel, computeShoeKm, RUN_TYPES, RunTypeKey,
@@ -214,11 +215,12 @@ function AddShoeSheet({
   lang, onClose, onAdded,
 }: { lang: Lang; onClose: () => void; onAdded: () => void }) {
   const { user } = useAuth();
+  const { isAdmin } = useAdmin();
   const { toast } = useToast();
   const t = (en: string, zh: string) => (lang === "zh" ? zh : en);
 
   const [tab, setTab] = useState<"catalog" | "custom">("catalog");
-  const [query, setQuery] = useState("");
+  const [brandFilter, setBrandFilter] = useState<string>("");
   const [catalog, setCatalog] = useState<ShoeCatalogItem[]>([]);
   const [loadingCat, setLoadingCat] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -236,13 +238,16 @@ function AddShoeSheet({
   };
   useMemo(() => { void loadCatalog(); }, []);
 
+  const brands = useMemo(() => {
+    const set = new Set<string>();
+    for (const c of catalog) if (c.brand) set.add(c.brand);
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [catalog]);
+
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return catalog;
-    return catalog.filter((c) =>
-      c.brand.toLowerCase().includes(q) || c.model.toLowerCase().includes(q)
-    );
-  }, [catalog, query]);
+    if (!brandFilter) return catalog;
+    return catalog.filter((c) => c.brand === brandFilter);
+  }, [catalog, brandFilter]);
 
   const addFromCatalog = async (c: ShoeCatalogItem) => {
     if (!user?.id) return;
@@ -310,23 +315,26 @@ function AddShoeSheet({
         {tab === "catalog" ? (
           <div className="flex-1 overflow-y-auto">
             <div className="p-3 flex gap-2 items-center border-b border-border sticky top-0 bg-background">
-              <div className="flex-1 relative">
-                <Search size={14} className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                <input
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder={t("Search brand or model", "搜尋品牌或型號")}
-                  className="w-full bg-muted rounded pl-7 pr-2 py-1.5 text-sm"
-                />
-              </div>
-              <button
-                onClick={refreshCatalog}
-                disabled={refreshing}
-                title={t("Refresh catalog via AI", "透過 AI 更新目錄")}
-                className="text-xs flex items-center gap-1 text-primary disabled:opacity-50"
+              <select
+                value={brandFilter}
+                onChange={(e) => setBrandFilter(e.target.value)}
+                className="flex-1 bg-muted rounded px-2 py-1.5 text-sm"
               >
-                <RefreshCw size={12} className={refreshing ? "animate-spin" : ""} /> {t("AI refresh", "AI 更新")}
-              </button>
+                <option value="">{t("All brands", "全部品牌")}</option>
+                {brands.map((b) => (
+                  <option key={b} value={b}>{b}</option>
+                ))}
+              </select>
+              {isAdmin && (
+                <button
+                  onClick={refreshCatalog}
+                  disabled={refreshing}
+                  title={t("Refresh catalog via AI (admin)", "透過 AI 更新目錄（管理員）")}
+                  className="text-xs flex items-center gap-1 text-primary disabled:opacity-50"
+                >
+                  <RefreshCw size={12} className={refreshing ? "animate-spin" : ""} /> {t("AI refresh", "AI 更新")}
+                </button>
+              )}
             </div>
             {loadingCat ? (
               <div className="p-6 text-center text-sm text-muted-foreground">{t("Loading…", "載入中…")}</div>

@@ -39,7 +39,6 @@ export function buildActivitySummary(activity: StravaActivity, lang: Lang = "en"
   if ((activity as any).calories) lines.push(`- Calories: ${Math.round((activity as any).calories)} kcal`);
   if ((activity as any).avg_cadence) lines.push(`- Avg cadence: ${Math.round((activity as any).avg_cadence)} spm`);
 
-  // Laps
   const laps: any[] = Array.isArray((activity as any).laps) ? (activity as any).laps : [];
   if (laps.length > 0) {
     lines.push("");
@@ -56,7 +55,6 @@ export function buildActivitySummary(activity: StravaActivity, lang: Lang = "en"
     });
   }
 
-  // Downsampled HR + elevation timeline (max ~40 points)
   const hrSamples: any[] = Array.isArray((activity as any).hr_samples) ? (activity as any).hr_samples : [];
   const distSamples: any[] = Array.isArray((activity as any).distance_samples) ? (activity as any).distance_samples : [];
   const elevSamples: any[] = Array.isArray((activity as any).elevation_samples) ? (activity as any).elevation_samples : [];
@@ -85,59 +83,58 @@ export function buildActivitySummary(activity: StravaActivity, lang: Lang = "en"
   return lines.join("\n");
 }
 
-// Clear any lingering pointer-events:none that Radix leaves on <body>
-// after a dropdown/dialog item triggers navigation to an external tab —
-// otherwise the page looks frozen when the user returns.
+// Clear any lingering pointer-events:none / scroll locks that Radix leaves
+// on <body> after a dropdown/dialog item triggers a native share sheet.
 function unfreezeUI() {
   try {
     document.body.style.pointerEvents = "";
     document.documentElement.style.pointerEvents = "";
-    // Remove Radix data attributes that can leave overlays interactive-blocking
+    document.body.style.overflow = "";
     document.body.removeAttribute("data-scroll-locked");
+    // Radix sometimes leaves aria-hidden on the root
+    document.querySelectorAll("[data-aria-hidden='true']").forEach((el) => {
+      el.removeAttribute("aria-hidden");
+      el.removeAttribute("data-aria-hidden");
+    });
   } catch {
     // ignore
   }
 }
 
-function isNativeWebview() {
-  const ua = navigator.userAgent || "";
-  return /Despia|Capacitor|wv\)/i.test(ua) || (window as any).Capacitor != null;
-}
-
 export async function shareActivityToGemini(activity: StravaActivity, lang: Lang = "en") {
   const zh = lang === "zh";
   const text = buildActivitySummary(activity, lang);
+  const title = activity.name || (zh ? "跑步活動" : "Run activity");
 
   // Defer so the dropdown/menu that triggered us fully unmounts first.
-  // Radix cleans up pointer-events on close; running heavy sync work
-  // (clipboard + window.open + navigator.share) inside the click freezes the UI.
+  // Radix cleans up pointer-events on close; running the share sync
+  // inside the click can leave the UI in a locked state on return.
   setTimeout(async () => {
     try {
+      if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
+        try {
+          await navigator.share({ title, text });
+          return;
+        } catch (err: any) {
+          // AbortError = user dismissed the sheet — that's fine, just unfreeze.
+          if (err?.name === "AbortError") return;
+          // Fall through to clipboard fallback on other errors.
+        }
+      }
+
+      // Fallback for browsers without Web Share API (mostly desktop)
       try {
         await navigator.clipboard.writeText(text);
+        toast.success(
+          zh
+            ? "活動資料已複製 — 貼到你的 AI 聊天工具"
+            : "Activity data copied — paste into your AI chat",
+          { duration: 5000 }
+        );
       } catch {
-        // ignore
-      }
-
-      toast.success(
-        zh
-          ? "活動資料已複製到剪貼簿 — 貼到 Gemini 並問你的問題"
-          : "Activity data copied — paste into Gemini and ask your question",
-        { duration: 6000 }
-      );
-
-      if (isNativeWebview()) {
-        // In native webviews window.open can hijack the app view.
-        // Just copy to clipboard; the user opens Gemini themselves.
-        return;
-      }
-
-      const win = window.open("https://gemini.google.com/app", "_blank", "noopener,noreferrer");
-      if (!win) {
-        // Popup blocked — user can still paste from clipboard
+        toast.error(zh ? "無法分享" : "Unable to share");
       }
     } finally {
-      // Belt & suspenders: ensure UI stays interactive on return
       unfreezeUI();
       setTimeout(unfreezeUI, 300);
       setTimeout(unfreezeUI, 1500);

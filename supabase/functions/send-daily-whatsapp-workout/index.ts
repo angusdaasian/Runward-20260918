@@ -36,7 +36,10 @@ Deno.serve(async (req) => {
     for (const u of users) {
       try {
         const lang = String(u.lang ?? "").toLowerCase().startsWith("zh") ? "zh" : "en";
-        const today = new Date().toISOString().slice(0, 10);
+        // Use Hong Kong local date (UTC+8) so early-morning cron runs (which
+        // are still "yesterday" in UTC) generate TODAY's suggestion, not
+        // yesterday's. Matches ai-running-coach's hkToday().
+        const today = new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
         const resp = await fetch(`${SUPABASE_URL}/functions/v1/generate-suggested-workout`, {
           method: "POST",

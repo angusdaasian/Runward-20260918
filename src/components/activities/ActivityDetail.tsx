@@ -921,7 +921,7 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
           {lang === "zh" ? "返回" : "Back"}
         </button>
         <div className="flex items-center gap-1">
-          <DropdownMenu>
+          <DropdownMenu modal={false}>
             <DropdownMenuTrigger asChild>
               <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-primary hover:bg-primary/10 transition-colors">
                 <Share2 size={14} />

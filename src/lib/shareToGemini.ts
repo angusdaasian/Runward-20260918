@@ -87,18 +87,40 @@ export function buildActivitySummary(activity: StravaActivity, lang: Lang = "en"
 // on <body> after a dropdown/dialog item triggers a native share sheet.
 function unfreezeUI() {
   try {
-    document.body.style.pointerEvents = "";
-    document.documentElement.style.pointerEvents = "";
-    document.body.style.overflow = "";
+    document.body.style.removeProperty("pointer-events");
+    document.documentElement.style.removeProperty("pointer-events");
+    document.body.style.removeProperty("overflow");
     document.body.removeAttribute("data-scroll-locked");
+    document.documentElement.removeAttribute("data-scroll-locked");
+
     // Radix sometimes leaves aria-hidden on the root
     document.querySelectorAll("[data-aria-hidden='true']").forEach((el) => {
       el.removeAttribute("aria-hidden");
       el.removeAttribute("data-aria-hidden");
     });
+    document.getElementById("root")?.removeAttribute("aria-hidden");
   } catch {
     // ignore
   }
+}
+
+function installReturnCleanup() {
+  if (typeof window === "undefined" || typeof document === "undefined") return;
+
+  const cleanup = () => unfreezeUI();
+  const cleanupWhenVisible = () => {
+    if (document.visibilityState === "visible") {
+      cleanup();
+      document.removeEventListener("visibilitychange", cleanupWhenVisible);
+    }
+  };
+
+  // Run cleanup independently of navigator.share() settling. Some Android/Gemini
+  // share targets keep the share promise pending even after the user returns.
+  [0, 100, 300, 800, 1500, 3000, 6000].forEach((delay) => setTimeout(cleanup, delay));
+  window.addEventListener("focus", cleanup, { once: true });
+  window.addEventListener("pageshow", cleanup, { once: true });
+  document.addEventListener("visibilitychange", cleanupWhenVisible);
 }
 
 export async function shareActivityToGemini(activity: StravaActivity, lang: Lang = "en") {
@@ -110,9 +132,12 @@ export async function shareActivityToGemini(activity: StravaActivity, lang: Lang
   // Radix cleans up pointer-events on close; running the share sync
   // inside the click can leave the UI in a locked state on return.
   setTimeout(async () => {
+    installReturnCleanup();
+
     try {
       if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
         try {
+          unfreezeUI();
           await navigator.share({ title, text });
           return;
         } catch (err: any) {

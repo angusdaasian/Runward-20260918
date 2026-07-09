@@ -1,72 +1,41 @@
-# Train Llama 3.1 8B LoRA on Old Vertex Account (Free Trial Credit, Expires July 3)
+## Goal
 
-Goal: burn the $2,160.31 expiring Vertex Free Trial credit on a one-time supervised fine-tune of Llama 3.1 8B Instruct, using our 2026 runner data. Export LoRA weights to GCS. Decide hosting (Mac Mini vs Runpod) after eval. Live app keeps using Gemini 3.1 Pro on the current Vertex account — no user-facing changes.
+Reformat the WhatsApp daily suggestion template body so each field is on its own indented line, in both English and Traditional Chinese, then trigger a test send.
 
-## Why this works across accounts
+## Target format
 
-Vertex AI tuning is account-scoped, but the output is a portable LoRA adapter (safetensors + adapter_config.json) that runs anywhere with the open Llama 3.1 8B base. The current account stays clean for inference. We just need the service-account JSON from the old project.
+```
+Today Training, Type: Easy Run
+   Distance: 5.0 km
+   Pace Suggestion: 6:00 min/km
+   Heart Rate Suggestion: 130 bpm - 145 bpm
+Enter YES or DETAIL to know more.
+```
 
-## Timeline (must finish before July 3 credit expiry)
+Chinese equivalent:
+```
+今日訓練，類型：輕鬆跑
+   距離：5.0 公里
+   建議配速：6:00 min/km
+   建議心率：130 bpm - 145 bpm
+回覆 YES 或 詳細 以了解更多。
+```
 
-- Today: export dataset, upload to GCS, kick off tuning job.
-- Job runs: ~4–10 hours for 8B LoRA on ~10–20k examples.
-- After export: download weights, run eval comparison, decide hosting.
+## Changes
 
-## Secrets needed
+1. **`supabase/functions/generate-suggested-workout/index.ts`** — rewrite the `compact` branch prompts (en + zh) so the model returns exactly the plain-text 5-line shape above (no Markdown, no bullets, three-space indent on the middle 3 lines). Include Heart Rate range derived from recent runs / plan.
 
-- `GOOGLE_VERTEX_TRAINING_SA_JSON` — service account JSON for the **old** GCP project (paste the whole JSON).
-- `GOOGLE_VERTEX_TRAINING_PROJECT_ID` — old GCP project ID.
-- `GOOGLE_VERTEX_TRAINING_BUCKET` — GCS bucket name in the old project (e.g., `runner-llama-training`).
-- `GOOGLE_VERTEX_TRAINING_LOCATION` — region, default `us-central1`.
+2. **`supabase/functions/send-daily-whatsapp-workout/index.ts`** — since output is already plain text, drop `formatWhatsAppMarkdown` (which would strip our leading spaces via the `{4,}` collapse) and also stop appending the "Want a fuller breakdown…" CTA (the new template body already contains the YES/DETAIL line). Keep the 900-char safety cap.
 
-Existing inference secrets (`GOOGLE_VERTEX_SERVICE_ACCOUNT_JSON`, `GOOGLE_VERTEX_PROJECT_ID`, etc.) are untouched.
+3. **Test send** — after deploying, call the `wa-test-templates` edge function (or a targeted invocation of `send-daily-whatsapp-workout` for the single test user `angchenghk@gmail.com` / wa_id `85291588020`) via `supabase--curl_edge_functions` and report the Meta message IDs + preview of the rendered body for both `daily_suggestion_en` and `daily_suggestion_cn`.
 
-## Steps
+## Notes / risks
 
-### 1. New edge function: `export-coach-training-data`
-Admin-only. Reads all 2026 activities across the 7 provider tables, joins to `profiles` and `ai_coach_insights`, and emits JSONL for 4 task types matching our structured Gemini calls:
-
-- `analyze_activity` — input: single activity + recent context; target: analysis JSON from `activity_analyses`.
-- `suggest_workout` — input: user context + day; target: workout JSON from recent Gemini outputs.
-- `predict_race_time` — input: profile + recent training; target: predicted times from existing records.
-- `finetune_plan_week` — input: plan + feedback; target: adjusted week from existing records.
-
-Estimated ~10–20k examples. Uploads `gs://$BUCKET/datasets/coach-train-{ts}.jsonl` via a signed REST upload with the training SA token.
-
-### 2. New edge function: `submit-llama-tuning-job`
-Admin-only. POSTs to the old project's Vertex AI tuning endpoint for `meta/llama3-1-8b-instruct-maas` with LoRA rank 16, 3 epochs, learning rate 1e-4. Output dir: `gs://$BUCKET/models/coach-lora-{ts}/`. Returns the tuning job resource name.
-
-### 3. New edge function: `check-tuning-job`
-Admin-only. Polls a tuning job's status and returns progress + final GCS path of LoRA weights.
-
-### 4. Admin UI panel (Settings → Admin → Llama Training)
-- Button: Export training dataset → shows row count and GCS path.
-- Button: Submit tuning job → shows job name.
-- Status: polls `check-tuning-job` every 30s, shows state and final weights URI.
-
-No A/B wiring, no shadow calls, no model switch in this plan. Pure training pipeline.
-
-## After training (separate plan)
-
-Once weights land in GCS, we'll do a follow-up plan covering: download from GCS, host on Mac Mini or Runpod, build the A/B shadow harness, and decide whether to switch any edge functions off Gemini.
+- WhatsApp collapses runs of regular spaces in rendered messages on some clients. If indentation doesn't visibly stick, fallback is to use a no-break space (`\u00A0`) for the indent. I'll verify from the test-send screenshot/response and switch to NBSP if needed.
+- Meta template body variable accepts newlines; no template re-approval needed since only the `{{1}}` variable content changes.
+- No frontend changes.
 
 ## Out of scope
 
-- Hosting / serving the trained model
-- A/B comparison harness or admin rater UI
-- Switching any edge function off Gemini 3.1 Pro
-- Cohort reference model
-- Touching the current Vertex account or inference path
-- GenAI App Builder credit
-
-## Technical details
-
-- Tuning endpoint: `https://{LOCATION}-aiplatform.googleapis.com/v1/projects/{OLD_PROJECT}/locations/{LOCATION}/tuningJobs` with `baseModel: "meta/llama3-1-8b-instruct-maas"`.
-- Auth: reuse `_shared/vertex-auth.ts` pattern, parameterized to accept a different SA JSON env name so these 3 functions use the training SA.
-- All 3 new functions: admin-gated via `has_role(auth.uid(), 'admin')`, `verify_jwt = false` with in-code JWT validation (matches existing pattern).
-- No new DB tables. Job state lives in Vertex; the UI polls.
-- Dataset export streams JSONL to avoid edge function memory limits (chunked GCS resumable upload).
-
-## Risk
-
-If the credit expires mid-job or Vertex Llama tuning quota is hit, the durable JSONL dataset remains in GCS and can be re-run on any GPU host later. The dataset is the reusable artifact.
+- Template category/structure changes in Meta Business Manager.
+- Changes to activity_prompt templates.

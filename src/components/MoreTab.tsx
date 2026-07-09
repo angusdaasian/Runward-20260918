@@ -67,7 +67,7 @@ function formatCountdown(expiresAt: Date): string {
   return `${hours}h ${mins}m`;
 }
 
-const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps, onNavigateMessaging }: Props) => {
+const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps, onNavigateMessaging, onNavigateShoes }: Props) => {
   // Mandatory skeleton on every mount
   const [skeletonDone, setSkeletonDone] = useState(false);
   useEffect(() => {

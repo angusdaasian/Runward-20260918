@@ -4,6 +4,7 @@ import { ArrowLeft, Clock, MapPin, Zap, Heart, TrendingUp, Mountain, Timer, Foot
 import { exportActivityFit } from "@/lib/fitExport";
 import { shareActivity, shareSplits, shareCharts } from "@/lib/shareActivity";
 import { shareActivityAnalysis } from "@/lib/shareActivityAnalysis";
+import { shareActivityToGemini } from "@/lib/shareToGemini";
 import AiPosterDialog from "./AiPosterDialog";
 import CustomShareDialog from "./CustomShareDialog";
 import RouteVideoDialog from "./RouteVideoDialog";
@@ -928,6 +929,12 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-52">
+              <DropdownMenuItem onClick={() => shareActivityToGemini(activity, lang)}>
+                <span className="flex items-center gap-2 w-full">
+                  <Sparkles size={12} className="text-primary" />
+                  {lang === "zh" ? "分享到 Gemini 提問" : "Ask Gemini about this run"}
+                </span>
+              </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={() =>
                   shareActivity({

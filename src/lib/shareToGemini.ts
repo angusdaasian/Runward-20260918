@@ -117,7 +117,13 @@ function installReturnCleanup() {
   [0, 100, 300, 800, 1500, 3000, 6000].forEach((delay) => setTimeout(cleanup, delay));
   window.addEventListener("focus", cleanup, { once: true });
   window.addEventListener("pageshow", cleanup, { once: true });
-  document.addEventListener("visibilitychange", cleanupWhenVisible, { once: true });
+  document.addEventListener("visibilitychange", cleanupWhenVisible);
+
+  setTimeout(() => {
+    window.removeEventListener("focus", cleanup);
+    window.removeEventListener("pageshow", cleanup);
+    document.removeEventListener("visibilitychange", cleanupWhenVisible);
+  }, 10000);
 }
 
 export async function shareActivityToGemini(activity: StravaActivity, lang: Lang = "en") {

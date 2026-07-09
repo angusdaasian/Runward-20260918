@@ -1,8 +1,9 @@
 import { useMemo, useState } from "react";
-import { ArrowLeft, Plus, Search, Trash2, RefreshCw, AlertTriangle, Footprints } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, RefreshCw, AlertTriangle, Footprints } from "lucide-react";
 import { Lang } from "@/lib/i18n";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useAdmin } from "@/hooks/use-admin";
 import {
   useUserShoes, useShoeDefaults, useShoeAssignments,
   shoeLabel, computeShoeKm, RUN_TYPES, RunTypeKey,

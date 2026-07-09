@@ -1,7 +1,17 @@
 // deno-lint-ignore-file no-explicit-any
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-import { buildVertexAuth, getVertexLocation, getVertexProjectId } from "../_shared/vertex-auth.ts";
+import { buildVertexAuth } from "../_shared/vertex-auth.ts";
+
+function getVertexProjectId(): string {
+  return Deno.env.get("GOOGLE_VERTEX_PROJECT_ID")
+    || Deno.env.get("GOOGLE_CLOUD_PROJECT")
+    || Deno.env.get("GCLOUD_PROJECT")
+    || "inbound-isotope-500908-n8";
+}
+function getVertexLocation(): string {
+  return Deno.env.get("GOOGLE_VERTEX_LOCATION") || "global";
+}
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -17,7 +27,7 @@ const DEFAULT_BRANDS = [
   "Craft", "Under Armour", "Reebok", "Skechers", "Kailas", "Norda", "Speedland",
 ];
 
-async function callGemini(apiKey: string, prompt: string, timeoutMs = 120_000): Promise<string> {
+async function callGemini(apiKey: string, prompt: string, timeoutMs = 180_000): Promise<string> {
   const model = "gemini-3.1-pro-preview";
   const baseUrl = `https://aiplatform.googleapis.com/v1/projects/${getVertexProjectId()}/locations/${getVertexLocation()}/publishers/google/models/${model}:generateContent`;
   const { url, headers } = await buildVertexAuth(baseUrl, apiKey);
@@ -26,6 +36,8 @@ async function callGemini(apiKey: string, prompt: string, timeoutMs = 120_000): 
     generationConfig: {
       thinkingConfig: { thinkingLevel: "low" },
       responseMimeType: "application/json",
+      maxOutputTokens: 32768,
+      temperature: 0.4,
     },
   };
   const ctrl = new AbortController();
@@ -68,7 +80,8 @@ serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const brands: string[] = Array.isArray(body?.brands) && body.brands.length ? body.brands : DEFAULT_BRANDS;
-    const modelsPerBrand: number = Math.min(Math.max(Number(body?.modelsPerBrand) || 6, 3), 12);
+    const modelsPerBrand: number = Math.min(Math.max(Number(body?.modelsPerBrand) || 10, 3), 20);
+    const brandsPerBatch: number = Math.min(Math.max(Number(body?.brandsPerBatch) || 4, 1), 8);
 
     // Admin/cron gate: allow either service-role internal secret or admin user
     const internalSecret = req.headers.get("x-internal-secret");
@@ -82,32 +95,48 @@ serve(async (req) => {
       if (!role) return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: corsHeaders });
     }
 
-    const prompt = `You are a running-shoe catalog builder. For each brand below, list up to ${modelsPerBrand} of the LATEST (2024-2026) running shoe models actively sold. Cover the whole training spectrum where possible: daily trainers, easy runs, tempo/uptempo, intervals/speedwork, race-day carbon plated, trail, and recovery/max-cushion.
+    const buildPrompt = (batch: string[]) => `You are a running-shoe catalog builder. For EACH brand below, list up to ${modelsPerBrand} of the LATEST (2024-2026) running shoe models actively sold. Be exhaustive within that cap — include the newest flagship releases (e.g. Asics Superblast 3, Metaspeed Sky/Edge Paris, Novablast 5, Gel-Nimbus 27; New Balance SC Elite v5, SC Trainer v3, Rebel v5, 1080v14, Fuelcell SuperComp Pacer v2; Li-Ning 赤兔/Red Hare 9 & 9 Ultra, 飞电 Feidian 5/5 Ultra, 绝影 Jueying Elite/Essential; Nike Vaporfly 4, Alphafly 3, Pegasus Premium/41, Streakfly 2; Adidas Adios Pro 4, Boston 13, Evo SL, Takumi Sen 11; Hoka Rocket X 3, Cielo X1 2.0, Mach 6/X 2, Skyward X; On Cloudboom Strike/Echo 3, Cloudmonster 2, Cloudsurfer Next; Puma Deviate Nitro Elite 3/Fast-R Nitro Elite 3, Velocity Nitro 3; Saucony Endorphin Elite 2, Pro 5, Speed 5, Kinvara Pro 2; Brooks Hyperion Elite 5, Ghost Max 2, Glycerin Max; Mizuno Wave Rebellion Pro 3/Flash 2, Neo Vista 2; Xtep 160X 6 Pro/5.0 Pro; Anta C202 GT Pro/Kelvin Kiptum; 361 Flame 2/Furious Future; Altra Vanish Carbon 2, FWD Experience; Salomon S/Lab Phantasm 2, Aero Glide 3; The North Face Summit Vectiv Pro 3; Kailas Fuga; Norda 001/002; Speedland SL/RTA, SL/HSV). Cover the whole spectrum: daily trainer, easy, tempo, interval/speed, race (carbon-plated), trail, recovery/max-cushion.
 
-Brands: ${brands.join(", ")}
+Brands: ${batch.join(", ")}
 
 Return a JSON array only. Each item:
-{
-  "brand": "Nike",
-  "model": "Vaporfly 3",
-  "category": "race",        // one of: daily, easy, tempo, interval, race, trail, recovery
-  "year": 2024,
-  "description": "Carbon-plated racing shoe with ZoomX foam; marathon PR shoe."
-}
+{ "brand": "Nike", "model": "Vaporfly 4", "category": "race", "year": 2025, "description": "Carbon-plated racing shoe with ZoomX foam." }
 
 Rules:
-- Use the official brand name spelling (e.g. "Li-Ning", "New Balance", "Hoka", "Topo Athletic", "361 Degrees").
-- No duplicates.
-- Description under 140 chars.
+- Category must be one of: daily, easy, tempo, interval, race, trail, recovery.
+- Use official spelling: "Li-Ning", "New Balance", "Hoka", "Topo Athletic", "361 Degrees", "The North Face", "Under Armour".
+- No duplicates. Description under 140 chars.
+- Include every well-known 2024-2026 model per brand up to the cap — do NOT skip flagships.
 - Return the JSON array with no prose, no code fences.`;
 
-    const raw = await callGemini(VERTEX_API_KEY, prompt);
-    const items = safeParseJson(raw);
-    if (!items.length) {
-      return new Response(JSON.stringify({ error: "empty_ai_result", raw: raw.slice(0, 500) }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    // Batch brands to avoid output truncation & long single calls
+    const batches: string[][] = [];
+    for (let i = 0; i < brands.length; i += brandsPerBatch) batches.push(brands.slice(i, i + brandsPerBatch));
+
+    const allItems: any[] = [];
+    const errors: string[] = [];
+    // Process batches with limited concurrency (2 at a time)
+    const CONCURRENCY = 2;
+    for (let i = 0; i < batches.length; i += CONCURRENCY) {
+      const slice = batches.slice(i, i + CONCURRENCY);
+      const results = await Promise.allSettled(slice.map((b) => callGemini(VERTEX_API_KEY, buildPrompt(b))));
+      for (let j = 0; j < results.length; j++) {
+        const r = results[j];
+        if (r.status === "fulfilled") {
+          const parsed = safeParseJson(r.value);
+          allItems.push(...parsed);
+        } else {
+          errors.push(`batch ${i + j}: ${String((r as any).reason?.message || r.reason)}`);
+        }
+      }
     }
 
-    const rows = items
+    if (!allItems.length) {
+      return new Response(JSON.stringify({ error: "empty_ai_result", errors }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    const seen = new Set<string>();
+    const rows = allItems
       .map((it: any) => ({
         brand: String(it?.brand || "").trim(),
         model: String(it?.model || "").trim(),
@@ -118,13 +147,19 @@ Rules:
         active: true,
         refreshed_at: new Date().toISOString(),
       }))
-      .filter((r) => r.brand && r.model);
+      .filter((r) => {
+        if (!r.brand || !r.model) return false;
+        const key = `${r.brand.toLowerCase()}|${r.model.toLowerCase()}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
 
     // Upsert on (brand, model)
     const { error: upErr } = await svc.from("shoes_catalog").upsert(rows, { onConflict: "brand,model" });
     if (upErr) throw upErr;
 
-    return new Response(JSON.stringify({ ok: true, inserted: rows.length }), {
+    return new Response(JSON.stringify({ ok: true, inserted: rows.length, batches: batches.length, errors }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {

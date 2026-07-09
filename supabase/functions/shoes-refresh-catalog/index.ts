@@ -1,7 +1,17 @@
 // deno-lint-ignore-file no-explicit-any
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-import { buildVertexAuth, getVertexLocation, getVertexProjectId } from "../_shared/vertex-auth.ts";
+import { buildVertexAuth } from "../_shared/vertex-auth.ts";
+
+function getVertexProjectId(): string {
+  return Deno.env.get("GOOGLE_VERTEX_PROJECT_ID")
+    || Deno.env.get("GOOGLE_CLOUD_PROJECT")
+    || Deno.env.get("GCLOUD_PROJECT")
+    || "inbound-isotope-500908-n8";
+}
+function getVertexLocation(): string {
+  return Deno.env.get("GOOGLE_VERTEX_LOCATION") || "global";
+}
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",

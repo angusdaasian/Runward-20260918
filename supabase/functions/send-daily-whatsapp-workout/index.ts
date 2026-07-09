@@ -67,14 +67,9 @@ Deno.serve(async (req) => {
         let suggestion: string = data?.suggestion ?? "";
         if (!suggestion) { failed++; continue; }
 
-        // Append the "want detail?" call-to-action.
-        const ctaZh = "\n\n想要更詳細的建議（包含配速理由、天氣建議、教練提醒）？回覆 *YES* 或 *詳細*。";
-        const ctaEn = "\n\nWant a fuller breakdown (pacing rationale, weather timing, coach notes)? Reply *YES* or *DETAIL*.";
-        suggestion = suggestion + (lang === "zh" ? ctaZh : ctaEn);
-
-        // Format for WhatsApp.
-        suggestion = formatWhatsAppMarkdown(suggestion)
-          .replace(/ {4,}/g, "   ");
+        // Compact mode already returns the exact 5-line template body
+        // (with YES/DETAIL CTA). Do NOT run formatWhatsAppMarkdown —
+        // it would collapse our indentation spaces.
 
         // Meta template parameter cap ~1024 chars. Leave margin.
         if (suggestion.length > 900) {
@@ -83,6 +78,7 @@ Deno.serve(async (req) => {
           if (lastBreak > 600) cut = cut.slice(0, lastBreak);
           suggestion = cut.trimEnd() + "…";
         }
+
 
 
         const templateName = lang === "zh" ? "daily_suggestion_cn" : "daily_suggestion_en";

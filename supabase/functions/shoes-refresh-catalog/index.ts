@@ -147,13 +147,19 @@ Rules:
         active: true,
         refreshed_at: new Date().toISOString(),
       }))
-      .filter((r) => r.brand && r.model);
+      .filter((r) => {
+        if (!r.brand || !r.model) return false;
+        const key = `${r.brand.toLowerCase()}|${r.model.toLowerCase()}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
 
     // Upsert on (brand, model)
     const { error: upErr } = await svc.from("shoes_catalog").upsert(rows, { onConflict: "brand,model" });
     if (upErr) throw upErr;
 
-    return new Response(JSON.stringify({ ok: true, inserted: rows.length }), {
+    return new Response(JSON.stringify({ ok: true, inserted: rows.length, batches: batches.length, errors }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {

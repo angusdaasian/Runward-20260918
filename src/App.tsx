@@ -9,6 +9,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { isNativeApp } from "@/lib/nativeDetection";
 import { registerShareIntent } from "@/lib/shareIntent";
 import { useAuth } from "@/contexts/AuthContext";
+import { installGlobalUIUnlockGuard } from "@/lib/uiUnlock";
 
 // Lazy-load route pages so initial bundle only includes what the first paint needs.
 const Index = lazy(() => import("./pages/Index.tsx"));
@@ -35,6 +36,7 @@ const ConnectedApps = lazy(() => import("./pages/ConnectedApps.tsx"));
 const queryClient = new QueryClient();
 const native = isNativeApp();
 registerShareIntent();
+installGlobalUIUnlockGuard();
 
 // Detect OAuth-return URLs synchronously (before Supabase consumes the hash).
 const initialHash = typeof window !== "undefined" ? (window.location.hash || "") : "";

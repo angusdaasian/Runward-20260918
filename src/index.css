@@ -125,6 +125,16 @@
   }
 }
 
+html.runward-share-unlock,
+html.runward-share-unlock body,
+html.runward-share-unlock #root {
+  pointer-events: auto !important;
+}
+
+html.runward-share-unlock body {
+  overflow: auto !important;
+}
+
 @layer utilities {
   @keyframes runner-bob {
     0%, 100% { transform: translateY(0) rotate(-1deg); }

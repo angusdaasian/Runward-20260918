@@ -1,6 +1,7 @@
 import { toast } from "sonner";
 import type { StravaActivity } from "@/hooks/use-activities";
 import type { Lang } from "@/lib/i18n";
+import { forceUnlockUI, keepUIUnlockedForShare } from "@/lib/uiUnlock";
 
 function fmtPace(metersPerSec: number) {
   if (!metersPerSec) return "—";
@@ -83,31 +84,10 @@ export function buildActivitySummary(activity: StravaActivity, lang: Lang = "en"
   return lines.join("\n");
 }
 
-// Clear any lingering pointer-events:none / scroll locks that Radix leaves
-// on <body> after a dropdown/dialog item triggers a native share sheet.
-function unfreezeUI() {
-  try {
-    document.body.style.removeProperty("pointer-events");
-    document.documentElement.style.removeProperty("pointer-events");
-    document.body.style.removeProperty("overflow");
-    document.body.removeAttribute("data-scroll-locked");
-    document.documentElement.removeAttribute("data-scroll-locked");
-
-    // Radix sometimes leaves aria-hidden on the root
-    document.querySelectorAll("[data-aria-hidden='true']").forEach((el) => {
-      el.removeAttribute("aria-hidden");
-      el.removeAttribute("data-aria-hidden");
-    });
-    document.getElementById("root")?.removeAttribute("aria-hidden");
-  } catch {
-    // ignore
-  }
-}
-
 function installReturnCleanup() {
   if (typeof window === "undefined" || typeof document === "undefined") return;
 
-  const cleanup = () => unfreezeUI();
+  const cleanup = () => forceUnlockUI();
   const cleanupWhenVisible = () => {
     if (document.visibilityState === "visible") {
       cleanup();
@@ -132,12 +112,13 @@ export async function shareActivityToGemini(activity: StravaActivity, lang: Lang
   // Radix cleans up pointer-events on close; running the share sync
   // inside the click can leave the UI in a locked state on return.
   setTimeout(async () => {
+    keepUIUnlockedForShare();
     installReturnCleanup();
 
     try {
       if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
         try {
-          unfreezeUI();
+          forceUnlockUI();
           await navigator.share({ title, text });
           return;
         } catch (err: any) {
@@ -160,9 +141,9 @@ export async function shareActivityToGemini(activity: StravaActivity, lang: Lang
         toast.error(zh ? "無法分享" : "Unable to share");
       }
     } finally {
-      unfreezeUI();
-      setTimeout(unfreezeUI, 300);
-      setTimeout(unfreezeUI, 1500);
+      forceUnlockUI();
+      setTimeout(forceUnlockUI, 300);
+      setTimeout(forceUnlockUI, 1500);
     }
   }, 50);
 }

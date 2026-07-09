@@ -228,7 +228,17 @@ export default function DashboardActivityDetail({
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-6xl max-h-[92vh] overflow-y-auto p-0">
         <div className="sticky top-0 z-10 bg-card/95 backdrop-blur border-b border-border px-6 py-4">
-          <DialogTitle className="font-display text-xl font-bold pr-8">{activity.name}</DialogTitle>
+          <div className="flex items-start justify-between gap-3 pr-8">
+            <DialogTitle className="font-display text-xl font-bold">{activity.name}</DialogTitle>
+            <button
+              onClick={() => shareActivityToGemini(activity, lang)}
+              className="shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+              title={zh ? "分享到 Gemini 提問" : "Ask Gemini about this run"}
+            >
+              <Sparkles className="h-3.5 w-3.5" />
+              {zh ? "問 Gemini" : "Ask Gemini"}
+            </button>
+          </div>
           <div className="mt-1 text-xs text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1">
             <span className="flex items-center gap-1"><Calendar className="h-3 w-3" />{dateStr}</span>
             <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{timeStr}</span>
@@ -241,6 +251,7 @@ export default function DashboardActivityDetail({
             )}
           </div>
         </div>
+
 
         <div className="px-6 py-5 space-y-5">
           {/* Stat tiles */}

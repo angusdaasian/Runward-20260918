@@ -160,3 +160,8 @@ verify_jwt = false
 [functions.wa-test-templates]
 verify_jwt = false
 
+[functions.shoes-refresh-catalog]
+verify_jwt = false
+
+
+

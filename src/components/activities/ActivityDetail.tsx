@@ -4,6 +4,7 @@ import { ArrowLeft, Clock, MapPin, Zap, Heart, TrendingUp, Mountain, Timer, Foot
 import { exportActivityFit } from "@/lib/fitExport";
 import { shareActivity, shareSplits, shareCharts } from "@/lib/shareActivity";
 import { shareActivityAnalysis } from "@/lib/shareActivityAnalysis";
+import { shareActivityToGemini } from "@/lib/shareToGemini";
 import AiPosterDialog from "./AiPosterDialog";
 import CustomShareDialog from "./CustomShareDialog";
 import RouteVideoDialog from "./RouteVideoDialog";

@@ -290,7 +290,7 @@ const Index = () => {
             <AnalyticsTab lang={lang} />
           </Suspense>
         </div>
-        {activeTab === "more" && !showConnectApps && !showMessaging && (
+        {activeTab === "more" && !showConnectApps && !showMessaging && !showShoes && (
           <Suspense fallback={<SettingsSkeleton />}>
             <MoreTab
               lang={lang}
@@ -302,6 +302,7 @@ const Index = () => {
               }}
               onNavigateConnectApps={() => setShowConnectApps(true)}
               onNavigateMessaging={() => setShowMessaging(true)}
+              onNavigateShoes={() => setShowShoes(true)}
             />
           </Suspense>
         )}
@@ -315,6 +316,12 @@ const Index = () => {
             <MessagingSettingsPage lang={lang} onBack={() => setShowMessaging(false)} />
           </Suspense>
         )}
+        {activeTab === "more" && showShoes && (
+          <Suspense fallback={<TabPageSkeleton />}>
+            <ShoesPage lang={lang} onBack={() => setShowShoes(false)} />
+          </Suspense>
+        )}
+
         {activeTab === "races" && (
           <Suspense fallback={<TabPageSkeleton />}>
             <RaceTab lang={lang} />

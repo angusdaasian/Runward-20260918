@@ -85,39 +85,62 @@ export function buildActivitySummary(activity: StravaActivity, lang: Lang = "en"
   return lines.join("\n");
 }
 
+// Clear any lingering pointer-events:none that Radix leaves on <body>
+// after a dropdown/dialog item triggers navigation to an external tab —
+// otherwise the page looks frozen when the user returns.
+function unfreezeUI() {
+  try {
+    document.body.style.pointerEvents = "";
+    document.documentElement.style.pointerEvents = "";
+    // Remove Radix data attributes that can leave overlays interactive-blocking
+    document.body.removeAttribute("data-scroll-locked");
+  } catch {
+    // ignore
+  }
+}
+
+function isNativeWebview() {
+  const ua = navigator.userAgent || "";
+  return /Despia|Capacitor|wv\)/i.test(ua) || (window as any).Capacitor != null;
+}
+
 export async function shareActivityToGemini(activity: StravaActivity, lang: Lang = "en") {
   const zh = lang === "zh";
   const text = buildActivitySummary(activity, lang);
 
-  // Try native share first (mobile)
-  const nav: any = navigator;
-  const canShare = typeof nav.share === "function";
-
-  try {
-    await navigator.clipboard.writeText(text);
-  } catch {
-    // ignore; we'll still open Gemini
-  }
-
-  if (canShare) {
+  // Defer so the dropdown/menu that triggered us fully unmounts first.
+  // Radix cleans up pointer-events on close; running heavy sync work
+  // (clipboard + window.open + navigator.share) inside the click freezes the UI.
+  setTimeout(async () => {
     try {
-      await nav.share({
-        title: activity.name,
-        text,
-      });
-      toast.success(zh ? "已分享" : "Shared");
-      return;
-    } catch (e: any) {
-      if (e?.name === "AbortError") return;
-      // fall through to open Gemini
-    }
-  }
+      try {
+        await navigator.clipboard.writeText(text);
+      } catch {
+        // ignore
+      }
 
-  toast.success(
-    zh
-      ? "活動資料已複製到剪貼簿 — 貼到 Gemini 並問你的問題"
-      : "Activity data copied — paste into Gemini and ask your question",
-    { duration: 6000 }
-  );
-  window.open("https://gemini.google.com/app", "_blank", "noopener,noreferrer");
+      toast.success(
+        zh
+          ? "活動資料已複製到剪貼簿 — 貼到 Gemini 並問你的問題"
+          : "Activity data copied — paste into Gemini and ask your question",
+        { duration: 6000 }
+      );
+
+      if (isNativeWebview()) {
+        // In native webviews window.open can hijack the app view.
+        // Just copy to clipboard; the user opens Gemini themselves.
+        return;
+      }
+
+      const win = window.open("https://gemini.google.com/app", "_blank", "noopener,noreferrer");
+      if (!win) {
+        // Popup blocked — user can still paste from clipboard
+      }
+    } finally {
+      // Belt & suspenders: ensure UI stays interactive on return
+      unfreezeUI();
+      setTimeout(unfreezeUI, 300);
+      setTimeout(unfreezeUI, 1500);
+    }
+  }, 50);
 }

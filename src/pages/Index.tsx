@@ -23,6 +23,8 @@ const MoreTab = lazy(() => import("@/components/MoreTab"));
 const AnalyticsTab = lazy(() => import("@/components/AnalyticsTab"));
 const ConnectApps = lazy(() => import("@/components/ConnectApps"));
 const MessagingSettingsPage = lazy(() => import("@/components/MessagingSettingsPage"));
+const ShoesPage = lazy(() => import("@/components/ShoesPage"));
+
 const RewardsTab = lazy(() => import("@/components/RewardsTab"));
 const RaceTab = lazy(() => import("@/components/RaceTab"));
 const FloatingChatButton = lazy(() => import("@/components/coach/FloatingChatButton"));
@@ -49,6 +51,8 @@ const Index = () => {
     const p = searchParams.get("page");
     return p === "messaging" || p === "telegram" || p === "whatsapp";
   });
+  const [showShoes, setShowShoes] = useState(() => searchParams.get("page") === "shoes");
+
   const [promoTrigger, setPromoTrigger] = useState(0);
   const [runningScore, setRunningScore] = useState<number | null>(null);
   const [lang, setLangState] = useState<Lang>(() => (localStorage.getItem("app_lang") as Lang) || "en");
@@ -286,7 +290,7 @@ const Index = () => {
             <AnalyticsTab lang={lang} />
           </Suspense>
         </div>
-        {activeTab === "more" && !showConnectApps && !showMessaging && (
+        {activeTab === "more" && !showConnectApps && !showMessaging && !showShoes && (
           <Suspense fallback={<SettingsSkeleton />}>
             <MoreTab
               lang={lang}
@@ -298,6 +302,7 @@ const Index = () => {
               }}
               onNavigateConnectApps={() => setShowConnectApps(true)}
               onNavigateMessaging={() => setShowMessaging(true)}
+              onNavigateShoes={() => setShowShoes(true)}
             />
           </Suspense>
         )}
@@ -311,6 +316,12 @@ const Index = () => {
             <MessagingSettingsPage lang={lang} onBack={() => setShowMessaging(false)} />
           </Suspense>
         )}
+        {activeTab === "more" && showShoes && (
+          <Suspense fallback={<TabPageSkeleton />}>
+            <ShoesPage lang={lang} onBack={() => setShowShoes(false)} />
+          </Suspense>
+        )}
+
         {activeTab === "races" && (
           <Suspense fallback={<TabPageSkeleton />}>
             <RaceTab lang={lang} />

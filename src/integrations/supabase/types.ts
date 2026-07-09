@@ -80,6 +80,53 @@ export type Database = {
         }
         Relationships: []
       }
+      activity_shoe_assignments: {
+        Row: {
+          activity_id: string
+          activity_source: string
+          auto_assigned: boolean
+          created_at: string
+          distance_meters: number
+          id: string
+          run_type: Database["public"]["Enums"]["run_type_enum"] | null
+          updated_at: string
+          user_id: string
+          user_shoe_id: string
+        }
+        Insert: {
+          activity_id: string
+          activity_source: string
+          auto_assigned?: boolean
+          created_at?: string
+          distance_meters?: number
+          id?: string
+          run_type?: Database["public"]["Enums"]["run_type_enum"] | null
+          updated_at?: string
+          user_id: string
+          user_shoe_id: string
+        }
+        Update: {
+          activity_id?: string
+          activity_source?: string
+          auto_assigned?: boolean
+          created_at?: string
+          distance_meters?: number
+          id?: string
+          run_type?: Database["public"]["Enums"]["run_type_enum"] | null
+          updated_at?: string
+          user_id?: string
+          user_shoe_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activity_shoe_assignments_user_shoe_id_fkey"
+            columns: ["user_shoe_id"]
+            isOneToOne: false
+            referencedRelation: "user_shoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_coach_conversations: {
         Row: {
           content: string
@@ -1498,6 +1545,48 @@ export type Database = {
         }
         Relationships: []
       }
+      shoes_catalog: {
+        Row: {
+          active: boolean
+          brand: string
+          category: Database["public"]["Enums"]["shoe_category_enum"]
+          created_at: string
+          description: string | null
+          id: string
+          image_url: string | null
+          model: string
+          refreshed_at: string
+          source: string
+          year: number | null
+        }
+        Insert: {
+          active?: boolean
+          brand: string
+          category?: Database["public"]["Enums"]["shoe_category_enum"]
+          created_at?: string
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          model: string
+          refreshed_at?: string
+          source?: string
+          year?: number | null
+        }
+        Update: {
+          active?: boolean
+          brand?: string
+          category?: Database["public"]["Enums"]["shoe_category_enum"]
+          created_at?: string
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          model?: string
+          refreshed_at?: string
+          source?: string
+          year?: number | null
+        }
+        Relationships: []
+      }
       social_rewards_claimed: {
         Row: {
           claimed_at: string
@@ -2747,6 +2836,85 @@ export type Database = {
         }
         Relationships: []
       }
+      user_shoe_defaults: {
+        Row: {
+          run_type: Database["public"]["Enums"]["run_type_enum"]
+          updated_at: string
+          user_id: string
+          user_shoe_id: string
+        }
+        Insert: {
+          run_type: Database["public"]["Enums"]["run_type_enum"]
+          updated_at?: string
+          user_id: string
+          user_shoe_id: string
+        }
+        Update: {
+          run_type?: Database["public"]["Enums"]["run_type_enum"]
+          updated_at?: string
+          user_id?: string
+          user_shoe_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_shoe_defaults_user_shoe_id_fkey"
+            columns: ["user_shoe_id"]
+            isOneToOne: false
+            referencedRelation: "user_shoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_shoes: {
+        Row: {
+          catalog_id: string | null
+          created_at: string
+          custom_brand: string | null
+          custom_model: string | null
+          id: string
+          max_km: number
+          nickname: string | null
+          purchase_date: string | null
+          retired: boolean
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          catalog_id?: string | null
+          created_at?: string
+          custom_brand?: string | null
+          custom_model?: string | null
+          id?: string
+          max_km?: number
+          nickname?: string | null
+          purchase_date?: string | null
+          retired?: boolean
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          catalog_id?: string | null
+          created_at?: string
+          custom_brand?: string | null
+          custom_model?: string | null
+          id?: string
+          max_km?: number
+          nickname?: string | null
+          purchase_date?: string | null
+          retired?: boolean
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_shoes_catalog_id_fkey"
+            columns: ["catalog_id"]
+            isOneToOne: false
+            referencedRelation: "shoes_catalog"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       webhook_deliveries: {
         Row: {
           app_id: string
@@ -3026,6 +3194,21 @@ export type Database = {
     Enums: {
       app_role: "admin" | "user"
       oauth_app_status: "pending" | "active" | "suspended" | "rejected"
+      run_type_enum:
+        | "Recovery"
+        | "Easy"
+        | "Long"
+        | "Tempo"
+        | "Interval"
+        | "Race"
+      shoe_category_enum:
+        | "daily"
+        | "easy"
+        | "tempo"
+        | "interval"
+        | "race"
+        | "trail"
+        | "recovery"
       webhook_delivery_status: "pending" | "delivered" | "failed" | "dead"
     }
     CompositeTypes: {
@@ -3156,6 +3339,16 @@ export const Constants = {
     Enums: {
       app_role: ["admin", "user"],
       oauth_app_status: ["pending", "active", "suspended", "rejected"],
+      run_type_enum: ["Recovery", "Easy", "Long", "Tempo", "Interval", "Race"],
+      shoe_category_enum: [
+        "daily",
+        "easy",
+        "tempo",
+        "interval",
+        "race",
+        "trail",
+        "recovery",
+      ],
       webhook_delivery_status: ["pending", "delivered", "failed", "dead"],
     },
   },

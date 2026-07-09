@@ -42,7 +42,9 @@ interface Props {
   onLoginRequest?: () => void;
   onNavigateConnectApps?: () => void;
   onNavigateMessaging?: () => void;
+  onNavigateShoes?: () => void;
 }
+
 
 const definitions = [
   { nameKey: "Easy" as const, nameZhKey: "輕鬆跑", defKey: "easyDef" as const },
@@ -65,7 +67,7 @@ function formatCountdown(expiresAt: Date): string {
   return `${hours}h ${mins}m`;
 }
 
-const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps, onNavigateMessaging }: Props) => {
+const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps, onNavigateMessaging, onNavigateShoes }: Props) => {
   // Mandatory skeleton on every mount
   const [skeletonDone, setSkeletonDone] = useState(false);
   useEffect(() => {
@@ -515,6 +517,22 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps, onNavig
             <ChevronRight size={18} className="text-muted-foreground" />
           </button>
         )}
+
+        {/* Shoes */}
+        {user && (
+          <button
+            onClick={onNavigateShoes}
+            className="w-full bg-card border border-border rounded-xl p-4 flex items-center justify-between"
+          >
+            <div className="flex items-center gap-3">
+              <Footprints size={20} className="text-primary" />
+              <span className="font-medium text-foreground">{lang === "zh" ? "跑鞋" : "Shoes"}</span>
+            </div>
+            <ChevronRight size={18} className="text-muted-foreground" />
+          </button>
+        )}
+
+
 
         {/* Activity Push Notifications */}
         {user && (

@@ -38,6 +38,8 @@ import { computeZonePct, estimateMaxHr, estimateRestingHr, zoneBoundaries, ZONE_
 import HrZoneBars from "./HrZoneBars";
 import PlanNextWorkoutCard from "./PlanNextWorkoutCard";
 import PlanComparisonDialog from "@/components/PlanComparisonDialog";
+import ActivityShoePicker from "./ActivityShoePicker";
+
 
 interface StravaActivity {
   id: string;

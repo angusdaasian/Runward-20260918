@@ -315,23 +315,26 @@ function AddShoeSheet({
         {tab === "catalog" ? (
           <div className="flex-1 overflow-y-auto">
             <div className="p-3 flex gap-2 items-center border-b border-border sticky top-0 bg-background">
-              <div className="flex-1 relative">
-                <Search size={14} className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                <input
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder={t("Search brand or model", "搜尋品牌或型號")}
-                  className="w-full bg-muted rounded pl-7 pr-2 py-1.5 text-sm"
-                />
-              </div>
-              <button
-                onClick={refreshCatalog}
-                disabled={refreshing}
-                title={t("Refresh catalog via AI", "透過 AI 更新目錄")}
-                className="text-xs flex items-center gap-1 text-primary disabled:opacity-50"
+              <select
+                value={brandFilter}
+                onChange={(e) => setBrandFilter(e.target.value)}
+                className="flex-1 bg-muted rounded px-2 py-1.5 text-sm"
               >
-                <RefreshCw size={12} className={refreshing ? "animate-spin" : ""} /> {t("AI refresh", "AI 更新")}
-              </button>
+                <option value="">{t("All brands", "全部品牌")}</option>
+                {brands.map((b) => (
+                  <option key={b} value={b}>{b}</option>
+                ))}
+              </select>
+              {isAdmin && (
+                <button
+                  onClick={refreshCatalog}
+                  disabled={refreshing}
+                  title={t("Refresh catalog via AI (admin)", "透過 AI 更新目錄（管理員）")}
+                  className="text-xs flex items-center gap-1 text-primary disabled:opacity-50"
+                >
+                  <RefreshCw size={12} className={refreshing ? "animate-spin" : ""} /> {t("AI refresh", "AI 更新")}
+                </button>
+              )}
             </div>
             {loadingCat ? (
               <div className="p-6 text-center text-sm text-muted-foreground">{t("Loading…", "載入中…")}</div>

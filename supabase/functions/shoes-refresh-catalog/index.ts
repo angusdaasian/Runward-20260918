@@ -23,8 +23,9 @@ const CATEGORIES = ["daily", "easy", "tempo", "interval", "race", "trail", "reco
 const DEFAULT_BRANDS = [
   "Nike", "Adidas", "Puma", "New Balance", "Saucony", "On", "Topo Athletic",
   "Asics", "Salomon", "Hoka", "The North Face", "Xtep", "Anta", "Li-Ning",
-  "Bmai", "Dynafit", "Mizuno", "Brooks", "361 Degrees", "Altra", "Merrell",
+  "Bmai", "Dynafish", "Dynafit", "Mizuno", "Brooks", "361 Degrees", "Altra", "Merrell",
   "Craft", "Under Armour", "Reebok", "Skechers", "Kailas", "Norda", "Speedland",
+  "Do-Win", "Qiaodan", "Peak", "Erke", "Kappa", "Mount to Mount",
 ];
 
 async function callGemini(apiKey: string, prompt: string, timeoutMs = 180_000): Promise<string> {

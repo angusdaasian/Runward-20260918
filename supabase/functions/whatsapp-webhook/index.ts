@@ -354,7 +354,8 @@ async function handleIncoming(supabase: any, waId: string, text: string) {
       const lang = await getUserLang(supabase, profile.user_id, (profile as any).lang);
       await waSendText(waId, lang === "zh" ? "🧠 正在生成完整訓練建議…" : "🧠 Generating your full workout breakdown…");
       try {
-        const today = new Date().toISOString().slice(0, 10);
+        // HK local date (UTC+8) so date matches what the user sees.
+        const today = new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString().slice(0, 10);
         const resp = await fetch(`${SUPABASE_URL}/functions/v1/generate-suggested-workout`, {
           method: "POST",
           headers: {

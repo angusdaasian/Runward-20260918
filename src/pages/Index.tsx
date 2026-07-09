@@ -23,6 +23,8 @@ const MoreTab = lazy(() => import("@/components/MoreTab"));
 const AnalyticsTab = lazy(() => import("@/components/AnalyticsTab"));
 const ConnectApps = lazy(() => import("@/components/ConnectApps"));
 const MessagingSettingsPage = lazy(() => import("@/components/MessagingSettingsPage"));
+const ShoesPage = lazy(() => import("@/components/ShoesPage"));
+
 const RewardsTab = lazy(() => import("@/components/RewardsTab"));
 const RaceTab = lazy(() => import("@/components/RaceTab"));
 const FloatingChatButton = lazy(() => import("@/components/coach/FloatingChatButton"));

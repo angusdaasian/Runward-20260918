@@ -1374,9 +1374,15 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
           </p>
         </div>
       )}
+      {isRunningActivity && (
+        <div className="mt-4">
+          <ActivityShoePicker lang={lang} activity={activity as any} />
+        </div>
+      )}
 
       {/* Intervals Table — Garmin-style */}
       {isRunningActivity && splits && splits.length > 0 && (
+
         <div className="bg-white rounded-2xl overflow-hidden mt-4 shadow-[0_4px_20px_-8px_rgba(15,23,42,0.15)] ring-1 ring-slate-200/70">
           <div className="px-5 pt-4 pb-3">
             <h3 className="font-display font-bold text-slate-900 text-sm">

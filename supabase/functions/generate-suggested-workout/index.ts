@@ -403,36 +403,25 @@ serve(async (req) => {
 
     const systemPrompt = compact
       ? (isZh
-        ? `你是專業跑步教練 AI。根據跑者訓練計劃、最近表現與今日天氣，給出**今日**簡潔訓練建議。使用 Markdown，格式如下（僅列出必要項目，不要多餘說明、不要理由段落）：
+        ? `你是專業跑步教練 AI。根據跑者訓練計劃、最近表現與今日天氣，給出**今日**簡潔訓練建議。
 
-## 今日建議訓練
-- **類型**：（例如 輕鬆跑 / 間歇 / 長跑 / 節奏跑）
-- **距離**：X 公里
+嚴格按以下 5 行純文字格式輸出（不要 Markdown、不要星號、不要項目符號、不要多餘文字、不要理由段落；中間三行以三個半形空格開頭作縮排）：
 
-若是間歇 / 節奏跑等結構化訓練，加入：
-- **暖身**：X 公里 @ X:XX /km
-- **主課表**：具體組數與距離 @ 目標配速（例如 6 × 800m @ 4:10 /km，組間慢跑 400m）
-- **收操**：X 公里 @ X:XX /km
+今日訓練，類型：<類型，例如 輕鬆跑 / 間歇 / 長跑 / 節奏跑>
+   距離：<X.X> 公里
+   建議配速：<X:XX> min/km（若間歇/節奏跑可寫範圍如 4:10-4:20）
+   建議心率：<XXX> bpm - <XXX> bpm
+回覆 YES 或 詳細 以了解更多。`
+        : `You are a professional running coach AI. Based on the runner's plan, recent performance and today's weather, give a concise workout for TODAY.
 
-若是輕鬆跑 / 長跑，只需：
-- **配速**：X:XX–X:XX /km
+Output EXACTLY these 5 plain-text lines (no Markdown, no asterisks, no bullets, no extra text, no rationale; the middle three lines start with three ASCII spaces as indentation):
 
-保持簡短，不要理由、不要教練提醒、不要天氣分析。`
-        : `You are a professional running coach AI. Based on the runner's plan, recent performance and today's weather, give a **concise** workout suggestion for TODAY. Use Markdown with only the essentials (no rationale, no coach notes, no weather analysis):
+Today Training, Type: <e.g. Easy Run / Intervals / Long Run / Tempo>
+   Distance: <X.X> km
+   Pace Suggestion: <X:XX> min/km (range like 4:10-4:20 is fine for intervals/tempo)
+   Heart Rate Suggestion: <XXX> bpm - <XXX> bpm
+Enter YES or DETAIL to know more.`)
 
-## Today's Workout
-- **Type**: (e.g. Easy / Intervals / Long / Tempo)
-- **Distance**: X km
-
-If intervals / tempo / structured, add:
-- **Warm-up**: X km @ X:XX /km
-- **Main set**: sets × distance @ target pace (e.g. 6 × 800m @ 4:10 /km, 400m jog recovery)
-- **Cool-down**: X km @ X:XX /km
-
-If easy / long, just add:
-- **Pace**: X:XX–X:XX /km
-
-Keep it short. No "why", no reminders, no weather commentary.`)
       : simple
       ? (isZh
         ? `你是專業跑步教練 AI。根據跑者最近表現、今日天氣，給出簡短訓練建議。請用 2-3 句話，包含：建議距離（公里）+ 配速 + 今日最佳跑步時段（根據天氣），以及一條簡短跑步小貼士（例如呼吸節奏、姿勢提醒、或熱身建議）。不要 Markdown、不要列表、不要標題。例子：「今日建議 5 公里、配速約 6:00 /km，傍晚 6 點左右天氣較涼最適合。跑步時保持輕鬆呼吸，落地輕盈，避免腳跟重重著地。」`

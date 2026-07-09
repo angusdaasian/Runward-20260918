@@ -44,6 +44,8 @@ export function installGlobalUIUnlockGuard() {
   if (typeof window === "undefined" || typeof document === "undefined" || installed) return;
   installed = true;
 
+  forceUnlockUI();
+
   const unlock = () => forceUnlockUI();
   const unlockWhenVisible = () => {
     if (document.visibilityState === "visible") unlock();

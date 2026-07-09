@@ -8,7 +8,6 @@ export function forceUnlockUI() {
   if (typeof document === "undefined") return;
 
   try {
-    document.documentElement.classList.add(SHARE_UNLOCK_CLASS);
     document.body.style.removeProperty("pointer-events");
     document.documentElement.style.removeProperty("pointer-events");
     document.body.style.removeProperty("overflow");
@@ -29,6 +28,7 @@ export function forceUnlockUI() {
 export function keepUIUnlockedForShare() {
   if (typeof window === "undefined" || typeof document === "undefined") return;
 
+  document.documentElement.classList.add(SHARE_UNLOCK_CLASS);
   forceUnlockUI();
 
   if (removeClassTimer != null) window.clearTimeout(removeClassTimer);

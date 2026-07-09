@@ -42,7 +42,9 @@ interface Props {
   onLoginRequest?: () => void;
   onNavigateConnectApps?: () => void;
   onNavigateMessaging?: () => void;
+  onNavigateShoes?: () => void;
 }
+
 
 const definitions = [
   { nameKey: "Easy" as const, nameZhKey: "輕鬆跑", defKey: "easyDef" as const },

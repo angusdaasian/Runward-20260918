@@ -27,7 +27,7 @@ const DEFAULT_BRANDS = [
   "Craft", "Under Armour", "Reebok", "Skechers", "Kailas", "Norda", "Speedland",
 ];
 
-async function callGemini(apiKey: string, prompt: string, timeoutMs = 120_000): Promise<string> {
+async function callGemini(apiKey: string, prompt: string, timeoutMs = 180_000): Promise<string> {
   const model = "gemini-3.1-pro-preview";
   const baseUrl = `https://aiplatform.googleapis.com/v1/projects/${getVertexProjectId()}/locations/${getVertexLocation()}/publishers/google/models/${model}:generateContent`;
   const { url, headers } = await buildVertexAuth(baseUrl, apiKey);
@@ -36,6 +36,8 @@ async function callGemini(apiKey: string, prompt: string, timeoutMs = 120_000): 
     generationConfig: {
       thinkingConfig: { thinkingLevel: "low" },
       responseMimeType: "application/json",
+      maxOutputTokens: 32768,
+      temperature: 0.4,
     },
   };
   const ctrl = new AbortController();

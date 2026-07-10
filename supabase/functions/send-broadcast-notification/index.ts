@@ -27,12 +27,15 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({} as any));
     const title = (body?.title ?? "").toString().trim();
     const message = (body?.message ?? "").toString().trim();
-    const audience: "all" | "free" | "free_no_trial_this_month" =
+    const audience: "all" | "free" | "free_no_trial_this_month" | "premium" =
       body?.audience === "free" ? "free"
       : body?.audience === "free_no_trial_this_month" ? "free_no_trial_this_month"
+      : body?.audience === "premium" ? "premium"
       : "all";
     const langFilter: "en" | "zh" | null =
       body?.lang === "en" ? "en" : body?.lang === "zh" ? "zh" : null;
+    const platformFilter: "ios" | "android" | null =
+      body?.platform === "ios" ? "ios" : body?.platform === "android" ? "android" : null;
     const selfUnschedule: string | null =
       typeof body?.self_unschedule === "string" && body.self_unschedule.length > 0
         ? body.self_unschedule

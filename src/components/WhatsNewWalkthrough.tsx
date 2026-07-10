@@ -242,7 +242,7 @@ const MessagingIllustration = ({ lang }: { lang: Lang }) => (
           <div className="w-8 h-8 rounded-full bg-[#229ED9] flex items-center justify-center text-white">
             <Send size={14} />
           </div>
-          <div className="text-[11px] font-semibold text-foreground">Telegram</div>
+          <div className="text-[11px] font-semibold text-foreground">Telegram (Beta)</div>
         </div>
         <div className="mt-2 rounded-md bg-muted/60 p-1.5 text-[9px] text-foreground/80 leading-snug">
           {tx(lang, "Chat with your AI coach", "與 AI 教練對話")}

@@ -929,12 +929,6 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-52">
-              <DropdownMenuItem onClick={() => shareActivityToGemini(activity, lang)}>
-                <span className="flex items-center gap-2 w-full">
-                  <Sparkles size={12} className="text-primary" />
-                  {lang === "zh" ? "分享到 Gemini 提問" : "Ask Gemini about this run"}
-                </span>
-              </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={() =>
                   shareActivity({
@@ -950,7 +944,10 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
                   })
                 }
               >
-                {lang === "zh" ? "分享活動卡片" : "Share activity card"}
+                <span className="flex items-center gap-2 w-full">
+                  <ImageIcon size={12} className="text-primary" />
+                  {lang === "zh" ? "分享活動卡片" : "Share activity card"}
+                </span>
               </DropdownMenuItem>
               <DropdownMenuItem
                 disabled={!splits || splits.length === 0}

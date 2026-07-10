@@ -87,8 +87,33 @@ const Tile = ({ id, lang, onOpen }: Props) => {
     if (!last14.length) return null;
     const target = 8 * 3600;
     const debt = last14.reduce((s, r) => s + Math.max(0, target - (r.sleep_seconds || 0)), 0);
-    return { hours: debt / 3600, nights: last14.length };
+    return { hours: debt / 3600, nights: last14.length, perNightHours: debt / 3600 / last14.length };
   }, [garminRows]);
+
+  const hrvZ = useMemo<number | null>(() => {
+    const hrv = garminRows.filter((r) => r.hrv != null).map((r) => Number(r.hrv));
+    if (hrv.length < 8) return null;
+    const last60 = hrv.slice(-60);
+    const last7 = hrv.slice(-7);
+    if (last60.length < 5 || last7.length < 3) return null;
+    const ln = (x: number[]) => x.map((v) => Math.log(v));
+    const mean = (x: number[]) => x.reduce((a, b) => a + b, 0) / x.length;
+    const sd = (x: number[]) => {
+      if (x.length < 2) return 0;
+      const m = mean(x);
+      return Math.sqrt(mean(x.map((v) => (v - m) ** 2)));
+    };
+    const baseLn = mean(ln(last60));
+    const baseSd = Math.max(sd(ln(last60)), 0.05);
+    return (mean(ln(last7)) - baseLn) / baseSd;
+  }, [garminRows]);
+
+  const ctlRampPerWeek = useMemo(() => {
+    if (series.length < 2) return 0;
+    const last = series[series.length - 1]?.fitness ?? 0;
+    const prev = series[Math.max(0, series.length - 2)]?.fitness ?? last;
+    return last - prev;
+  }, [series]);
 
   function startOfDay(d: Date) {
     const x = new Date(d);

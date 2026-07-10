@@ -847,6 +847,9 @@ const ConnectApps = ({ lang, onBack }: Props) => {
             await handleConnectIntervals();
           }}
         />
+        </>
+        );
+        })()}
 
       </div>
 

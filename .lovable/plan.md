@@ -1,41 +1,54 @@
+
 ## Goal
+One-off push notifications today at **11:15 AM HKT (03:15 UTC)**:
+- **Free users, iOS only** → EN + ZH (Traditional) upgrade prompt
+- **Premium users, iOS + Android** → EN + ZH (Traditional) restart-app notice
 
-Reformat the WhatsApp daily suggestion template body so each field is on its own indented line, in both English and Traditional Chinese, then trigger a test send.
+Traditional Chinese (standard, not Cantonese), with emojis.
 
-## Target format
+## Copy
 
-```
-Today Training, Type: Easy Run
-   Distance: 5.0 km
-   Pace Suggestion: 6:00 min/km
-   Heart Rate Suggestion: 130 bpm - 145 bpm
-Enter YES or DETAIL to know more.
-```
+### Free users (iOS only)
+**EN**
+- Title: `🎉 Version Update`
+- Message: `📱 WhatsApp & Telegram are now live for Premium users! 🚀 Enter code WHATSAPP for a limited 2-week free trial. Please reopen the app to use the latest features. 🔄`
 
-Chinese equivalent:
-```
-今日訓練，類型：輕鬆跑
-   距離：5.0 公里
-   建議配速：6:00 min/km
-   建議心率：130 bpm - 145 bpm
-回覆 YES 或 詳細 以了解更多。
-```
+**ZH (Traditional)**
+- Title: `🎉 版本更新`
+- Message: `📱 WhatsApp 與 Telegram 功能已為 Premium 用戶推出！🚀 輸入優惠碼 WHATSAPP 即可獲得 2 週免費試用。請重新打開APP使用最新功能 🔄`
+
+### Premium users (iOS + Android)
+**EN**
+- Title: `🎉 Version Update`
+- Message: `📱 WhatsApp & Telegram integration is now live! ✨ Please reopen the app to use the latest features. 🔄`
+
+**ZH (Traditional)**
+- Title: `🎉 版本更新`
+- Message: `📱 WhatsApp 與 Telegram 功能已推出！✨ 請重新打開APP使用最新功能 🔄`
 
 ## Changes
 
-1. **`supabase/functions/generate-suggested-workout/index.ts`** — rewrite the `compact` branch prompts (en + zh) so the model returns exactly the plain-text 5-line shape above (no Markdown, no bullets, three-space indent on the middle 3 lines). Include Heart Rate range derived from recent runs / plan.
+### 1. Extend `supabase/functions/send-broadcast-notification/index.ts`
+- Add optional `platform` param (`"ios" | "android" | null`). When set, add OneSignal `filters: [{"field":"device_type","relation":"=","value":"0" or "1"}]` alongside `include_external_user_ids` (iOS = `0`, Android = `1`).
+- Add `"premium"` to the `audience` union → keeps only users with an unexpired `premium_subscriptions.expires_at`.
+- Everything else (lang filter, chunked sends, `self_unschedule`) unchanged.
 
-2. **`supabase/functions/send-daily-whatsapp-workout/index.ts`** — since output is already plain text, drop `formatWhatsAppMarkdown` (which would strip our leading spaces via the `{4,}` collapse) and also stop appending the "Want a fuller breakdown…" CTA (the new template body already contains the YES/DETAIL line). Keep the 900-char safety cap.
+### 2. Schedule 4 one-off cron jobs via `supabase--insert` (`pg_cron` + `pg_net`)
 
-3. **Test send** — after deploying, call the `wa-test-templates` edge function (or a targeted invocation of `send-daily-whatsapp-workout` for the single test user `angchenghk@gmail.com` / wa_id `85291588020`) via `supabase--curl_edge_functions` and report the Meta message IDs + preview of the rendered body for both `daily_suggestion_en` and `daily_suggestion_cn`.
+All fire at `15 3 * * *` (03:15 UTC = 11:15 HKT) and self-unschedule after firing once:
 
-## Notes / risks
+| Job name | audience | lang | platform |
+|---|---|---|---|
+| `push-free-ios-en-<date>` | free | en | ios |
+| `push-free-ios-zh-<date>` | free | zh | ios |
+| `push-premium-all-en-<date>` | premium | en | null (all) |
+| `push-premium-all-zh-<date>` | premium | zh | null (all) |
 
-- WhatsApp collapses runs of regular spaces in rendered messages on some clients. If indentation doesn't visibly stick, fallback is to use a no-break space (`\u00A0`) for the indent. I'll verify from the test-send screenshot/response and switch to NBSP if needed.
-- Meta template body variable accepts newlines; no template re-approval needed since only the `{{1}}` variable content changes.
-- No frontend changes.
+Each POST body carries its matching title/message and its own `self_unschedule` job name.
+
+## Technical notes
+- `lang` filter reads `profiles.lang` (`en` / `zh`); users without `lang` set are excluded from both language sends (existing behavior).
+- If 03:15 UTC has already passed when approved, jobs fire tomorrow at 11:15 HKT.
 
 ## Out of scope
-
-- Template category/structure changes in Meta Business Manager.
-- Changes to activity_prompt templates.
+- No UI changes; no changes to admin `send-notification`.

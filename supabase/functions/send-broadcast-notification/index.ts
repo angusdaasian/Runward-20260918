@@ -27,12 +27,15 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({} as any));
     const title = (body?.title ?? "").toString().trim();
     const message = (body?.message ?? "").toString().trim();
-    const audience: "all" | "free" | "free_no_trial_this_month" =
+    const audience: "all" | "free" | "free_no_trial_this_month" | "premium" =
       body?.audience === "free" ? "free"
       : body?.audience === "free_no_trial_this_month" ? "free_no_trial_this_month"
+      : body?.audience === "premium" ? "premium"
       : "all";
     const langFilter: "en" | "zh" | null =
       body?.lang === "en" ? "en" : body?.lang === "zh" ? "zh" : null;
+    const platformFilter: "ios" | "android" | null =
+      body?.platform === "ios" ? "ios" : body?.platform === "android" ? "android" : null;
     const selfUnschedule: string | null =
       typeof body?.self_unschedule === "string" && body.self_unschedule.length > 0
         ? body.self_unschedule
@@ -65,7 +68,7 @@ Deno.serve(async (req) => {
     if (pErr) throw pErr;
     let userIds: string[] = (profiles || []).map((p: any) => p.user_id).filter(Boolean);
 
-    if (audience === "free" || audience === "free_no_trial_this_month") {
+    if (audience === "free" || audience === "free_no_trial_this_month" || audience === "premium") {
       const { data: subs, error: sErr } = await supabase
         .from("premium_subscriptions")
         .select("user_id, expires_at, is_trial, activated_at");
@@ -76,7 +79,11 @@ Deno.serve(async (req) => {
           .filter((s: any) => s.expires_at && new Date(s.expires_at).getTime() > nowMs)
           .map((s: any) => s.user_id),
       );
-      userIds = userIds.filter((id) => !activePremium.has(id));
+      if (audience === "premium") {
+        userIds = userIds.filter((id) => activePremium.has(id));
+      } else {
+        userIds = userIds.filter((id) => !activePremium.has(id));
+      }
 
       if (audience === "free_no_trial_this_month") {
         const now = new Date();
@@ -94,7 +101,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    console.log(`[send-broadcast-notification] audience=${audience} lang=${langFilter ?? "any"} recipients=${userIds.length}`);
+    console.log(`[send-broadcast-notification] audience=${audience} lang=${langFilter ?? "any"} platform=${platformFilter ?? "any"} recipients=${userIds.length}`);
 
     // Chunk to respect OneSignal include_external_user_ids limit (~2000)
     const CHUNK = 2000;
@@ -102,18 +109,24 @@ Deno.serve(async (req) => {
     const errors: string[] = [];
     for (let i = 0; i < userIds.length; i += CHUNK) {
       const chunk = userIds.slice(i, i + CHUNK);
+      const payload: Record<string, unknown> = {
+        app_id: onesignalAppId,
+        include_external_user_ids: chunk,
+        headings: { en: title, zh: title, "zh-Hant": title },
+        contents: { en: message, zh: message, "zh-Hant": message },
+      };
+      if (platformFilter) {
+        payload.filters = [
+          { field: "device_type", relation: "=", value: platformFilter === "ios" ? "0" : "1" },
+        ];
+      }
       const resp = await fetch("https://onesignal.com/api/v1/notifications", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Basic ${onesignalApiKey}`,
         },
-        body: JSON.stringify({
-          app_id: onesignalAppId,
-          include_external_user_ids: chunk,
-          headings: { en: title, zh: title, "zh-Hant": title },
-          contents: { en: message, zh: message, "zh-Hant": message },
-        }),
+        body: JSON.stringify(payload),
       });
       const json = await resp.json().catch(() => ({}));
       console.log(`[send-broadcast-notification] chunk ${i}: ${resp.status}`, JSON.stringify(json));

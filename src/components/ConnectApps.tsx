@@ -816,18 +816,16 @@ const ConnectApps = ({ lang, onBack }: Props) => {
               <button
                 onClick={() => setIntervalsIntroOpen(true)}
                 disabled={!!intervalsBusy || intervalsDisabledByOther}
-                title={intervalsDisabledByOther ? (lang === "zh" ? "請先中斷其他健身應用連結" : "Disconnect your other fitness app first") : undefined}
-                className="text-xs font-medium px-3 py-1 rounded-full text-primary-foreground bg-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                className={`text-xs font-medium px-3 py-1 rounded-full disabled:cursor-not-allowed ${
+                  intervalsDisabledByOther
+                    ? "bg-muted text-muted-foreground"
+                    : "bg-primary text-primary-foreground disabled:opacity-50"
+                }`}
               >
                 {intervalsBusy === "connect" ? "..." : (lang === "zh" ? "連結" : "Connect")}
               </button>
             )}
           </div>
-          {intervalsDisabledByOther && (
-            <p className="text-xs text-muted-foreground mt-2">
-              {lang === "zh" ? "請先中斷其他健身應用連結，才能連接 intervals.icu。" : "Disconnect your other fitness app before connecting intervals.icu."}
-            </p>
-          )}
           {!intervalsConnected && (
             <button
               onClick={() => setIntervalsIntroOpen(true)}

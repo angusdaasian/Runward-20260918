@@ -16,6 +16,7 @@ import {
 import { useTerraConnections } from "@/hooks/use-terra-daily-health";
 import { usePremium } from "@/contexts/PremiumContext";
 import { loadForActivity, isCardio, isRunning, buildWeeklyLoadSeries } from "@/lib/trainingLoad";
+import { computeInjuryRisk, injuryBand as injuryBandFn } from "@/lib/analyticsExplain";
 
 interface Props {
   id: WidgetId;
@@ -86,8 +87,33 @@ const Tile = ({ id, lang, onOpen }: Props) => {
     if (!last14.length) return null;
     const target = 8 * 3600;
     const debt = last14.reduce((s, r) => s + Math.max(0, target - (r.sleep_seconds || 0)), 0);
-    return { hours: debt / 3600, nights: last14.length };
+    return { hours: debt / 3600, nights: last14.length, perNightHours: debt / 3600 / last14.length };
   }, [garminRows]);
+
+  const hrvZ = useMemo<number | null>(() => {
+    const hrv = garminRows.filter((r) => r.hrv != null).map((r) => Number(r.hrv));
+    if (hrv.length < 8) return null;
+    const last60 = hrv.slice(-60);
+    const last7 = hrv.slice(-7);
+    if (last60.length < 5 || last7.length < 3) return null;
+    const ln = (x: number[]) => x.map((v) => Math.log(v));
+    const mean = (x: number[]) => x.reduce((a, b) => a + b, 0) / x.length;
+    const sd = (x: number[]) => {
+      if (x.length < 2) return 0;
+      const m = mean(x);
+      return Math.sqrt(mean(x.map((v) => (v - m) ** 2)));
+    };
+    const baseLn = mean(ln(last60));
+    const baseSd = Math.max(sd(ln(last60)), 0.05);
+    return (mean(ln(last7)) - baseLn) / baseSd;
+  }, [garminRows]);
+
+  const ctlRampPerWeek = useMemo(() => {
+    if (series.length < 2) return 0;
+    const last = series[series.length - 1]?.fitness ?? 0;
+    const prev = series[Math.max(0, series.length - 2)]?.fitness ?? last;
+    return last - prev;
+  }, [series]);
 
   function startOfDay(d: Date) {
     const x = new Date(d);
@@ -123,49 +149,22 @@ const Tile = ({ id, lang, onOpen }: Props) => {
     };
   }, [loadActs, ageForLoad]);
 
-  const injury = useMemo(() => {
-    let score = 0;
-    const drivers: { en: string; zh: string; weight: number }[] = [];
-    if (loadStats.acwr > 1.5) {
-      const w = Math.min(35, (loadStats.acwr - 1.5) * 60);
-      score += w;
-      drivers.push({ en: "ACWR spike", zh: "急性負荷過高", weight: w });
-    } else if (loadStats.acwr > 0 && loadStats.acwr < 0.5 && loadStats.acute > 0) {
-      score += 15;
-      drivers.push({ en: "Detraining", zh: "訓練不足", weight: 15 });
-    }
-    if (loadStats.monotony > 2) {
-      const w = Math.min(20, (loadStats.monotony - 2) * 20);
-      score += w;
-      drivers.push({ en: "High monotony", zh: "訓練單一", weight: w });
-    }
-    if (sleepDebt14 && sleepDebt14.hours > 4) {
-      const w = Math.min(25, (sleepDebt14.hours - 4) * 3);
-      score += w;
-      drivers.push({ en: "Sleep debt severe", zh: "睡眠不足嚴重", weight: w });
-    }
-    if (tsb < -20) {
-      const w = Math.min(20, (-20 - tsb) * 1.2);
-      score += w;
-      drivers.push({ en: "Deep fatigue (TSB)", zh: "深度疲勞", weight: w });
-    }
-    if (readiness && readiness.score < 35) {
-      score += 15;
-      drivers.push({ en: "Low readiness", zh: "準備度低", weight: 15 });
-    }
-    score = Math.max(0, Math.min(100, Math.round(score)));
-    drivers.sort((a, b) => b.weight - a.weight);
-    return { score, drivers };
-  }, [loadStats, sleepDebt14, tsb, readiness]);
+  const injury = useMemo(
+    () =>
+      computeInjuryRisk({
+        acwr: loadStats.acwr,
+        monotony: loadStats.monotony,
+        acute: loadStats.acute,
+        tsb,
+        ctlRampPerWeek,
+        hrvZ,
+        sleepDebtPerNightHours: sleepDebt14?.perNightHours ?? null,
+        readinessScore: readiness?.score ?? null,
+      }),
+    [loadStats, tsb, ctlRampPerWeek, hrvZ, sleepDebt14, readiness],
+  );
 
-  const injuryBand =
-    injury.score < 25
-      ? { label: zh(lang) ? "低" : "Low", color: "text-emerald-600" }
-      : injury.score < 50
-        ? { label: zh(lang) ? "中等" : "Moderate", color: "text-amber-500" }
-        : injury.score < 75
-          ? { label: zh(lang) ? "偏高" : "Elevated", color: "text-orange-500" }
-          : { label: zh(lang) ? "高" : "High", color: "text-rose-600" };
+  const injuryBand = injuryBandFn(injury.score, lang);
 
   const acwrLabel =
     loadStats.acwr === 0

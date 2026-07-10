@@ -231,7 +231,7 @@ const MessagingIllustration = ({ lang }: { lang: Lang }) => (
           <div className="w-8 h-8 rounded-full bg-[#25D366] flex items-center justify-center text-white">
             <MessageSquare size={14} />
           </div>
-          <div className="text-[11px] font-semibold text-foreground">WhatsApp</div>
+          <div className="text-[11px] font-semibold text-foreground">WhatsApp (Beta)</div>
         </div>
         <div className="mt-2 rounded-md bg-muted/60 p-1.5 text-[9px] text-foreground/80 leading-snug">
           {tx(lang, "Daily AI workout & chat", "每日 AI 訓練與聊天")}
@@ -242,7 +242,7 @@ const MessagingIllustration = ({ lang }: { lang: Lang }) => (
           <div className="w-8 h-8 rounded-full bg-[#229ED9] flex items-center justify-center text-white">
             <Send size={14} />
           </div>
-          <div className="text-[11px] font-semibold text-foreground">Telegram</div>
+          <div className="text-[11px] font-semibold text-foreground">Telegram (Beta)</div>
         </div>
         <div className="mt-2 rounded-md bg-muted/60 p-1.5 text-[9px] text-foreground/80 leading-snug">
           {tx(lang, "Chat with your AI coach", "與 AI 教練對話")}
@@ -380,7 +380,7 @@ const WhatsNewWalkthrough = ({ lang, enabled, manualOpen, onManualOpenChange }: 
 
   const steps = [
     {
-      title: tx(lang, "Connect WhatsApp & Telegram", "連接 WhatsApp 與 Telegram"),
+      title: tx(lang, "Connect WhatsApp (Beta) & Telegram (Beta)", "連接 WhatsApp (Beta) 與 Telegram (Beta)"),
       desc: tx(
         lang,
         "Bring RunWard into your favourite chat app. Get a daily AI workout suggestion each morning, share how a run felt to get instant coach feedback, or chat with your AI coach anytime — all inside WhatsApp or Telegram. Open it from More → Messaging Apps.",

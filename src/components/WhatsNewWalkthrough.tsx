@@ -380,7 +380,7 @@ const WhatsNewWalkthrough = ({ lang, enabled, manualOpen, onManualOpenChange }: 
 
   const steps = [
     {
-      title: tx(lang, "Connect WhatsApp & Telegram", "連接 WhatsApp 與 Telegram"),
+      title: tx(lang, "Connect WhatsApp (Beta) & Telegram (Beta)", "連接 WhatsApp (Beta) 與 Telegram (Beta)"),
       desc: tx(
         lang,
         "Bring RunWard into your favourite chat app. Get a daily AI workout suggestion each morning, share how a run felt to get instant coach feedback, or chat with your AI coach anytime — all inside WhatsApp or Telegram. Open it from More → Messaging Apps.",

@@ -342,6 +342,38 @@ async function handleIncoming(supabase: any, waId: string, text: string) {
     return;
   }
 
+  // Pending plan-change confirmations must be handled before DETAIL / YES shortcuts.
+  // Otherwise a plain "YES" / "是" can be misread as "send today's full suggestion".
+  const { data: linkedProfileForPlan } = await supabase
+    .from("profiles")
+    .select("user_id, lang")
+    .eq("whatsapp_wa_id", waId)
+    .maybeSingle();
+  if (linkedProfileForPlan) {
+    const pendingPlanSuggestion = await getPendingSuggestion(supabase, linkedProfileForPlan.user_id, "whatsapp");
+    if (pendingPlanSuggestion) {
+      const verdict = classifyConfirmation(text);
+      const lang = await getUserLang(supabase, linkedProfileForPlan.user_id, (linkedProfileForPlan as any).lang);
+      if (verdict === "yes") {
+        const res = await applyPendingSuggestion(linkedProfileForPlan.user_id, pendingPlanSuggestion);
+        await clearPendingSuggestion(supabase, linkedProfileForPlan.user_id, "whatsapp");
+        await waSendText(waId, res.ok
+          ? (lang === "zh"
+            ? `✅ 已更新 ${res.days_updated ?? pendingPlanSuggestion.changes.length} 天的訓練計劃。`
+            : `✅ Updated ${res.days_updated ?? pendingPlanSuggestion.changes.length} day(s) in your training plan.`)
+          : (lang === "zh"
+            ? `⚠️ 更新計劃失敗：${res.error ?? ""}`
+            : `⚠️ Failed to update plan: ${res.error ?? ""}`));
+        return;
+      }
+      if (verdict === "no") {
+        await clearPendingSuggestion(supabase, linkedProfileForPlan.user_id, "whatsapp");
+        await waSendText(waId, lang === "zh" ? "👌 已保留原計劃。" : "👌 Plan kept as-is.");
+        return;
+      }
+    }
+  }
+
   // DETAIL / YES / 詳細 — send the full rich daily workout suggestion (in-window).
   // Matches short replies to the compact daily suggestion.
   // IMPORTANT: skip this when there's a pending plan-change suggestion, so

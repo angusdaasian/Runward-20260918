@@ -1381,7 +1381,7 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
           </p>
         </div>
       )}
-      {isRunningActivity && (
+      {false && isRunningActivity && (
         <div className="mt-4">
           <ActivityShoePicker lang={lang} activity={activity as any} />
         </div>

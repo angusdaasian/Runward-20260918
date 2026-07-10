@@ -518,8 +518,8 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps, onNavig
           </button>
         )}
 
-        {/* Shoes */}
-        {user && (
+        {/* Shoes — temporarily hidden */}
+        {false && user && (
           <button
             onClick={onNavigateShoes}
             className="w-full bg-card border border-border rounded-xl p-4 flex items-center justify-between"

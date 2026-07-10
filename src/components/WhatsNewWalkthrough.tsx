@@ -383,8 +383,8 @@ const WhatsNewWalkthrough = ({ lang, enabled, manualOpen, onManualOpenChange }: 
       title: tx(lang, "Connect WhatsApp (Beta) & Telegram (Beta)", "連接 WhatsApp (Beta) 與 Telegram (Beta)"),
       desc: tx(
         lang,
-        "Bring RunWard into your favourite chat app. Get a daily AI workout suggestion each morning, share how a run felt to get instant coach feedback, or chat with your AI coach anytime — all inside WhatsApp or Telegram. Open it from More → Messaging Apps.",
-        "把 RunWard 帶進你常用的聊天工具。每天早上收到 AI 訓練建議、跑完即時分享感受獲得教練回饋，或隨時與 AI 教練對話 — 全部在 WhatsApp 或 Telegram 內完成。從「更多 → 通訊應用程式」開啟。"
+        "🎉 7-day open beta — free for everyone until Jul 17, 2026! Bring RunWard into your favourite chat app. Get a daily AI workout suggestion each morning, share how a run felt to get instant coach feedback, or chat with your AI coach anytime — all inside WhatsApp or Telegram. Open it from More → Messaging Apps. After the beta ends, this feature will be Premium-only.",
+        "🎉 7 天公開 Beta — 2026 年 7 月 17 日前所有用戶免費！把 RunWard 帶進你常用的聊天工具。每天早上收到 AI 訓練建議、跑完即時分享感受獲得教練回饋，或隨時與 AI 教練對話 — 全部在 WhatsApp 或 Telegram 內完成。從「更多 → 通訊應用程式」開啟。Beta 結束後將只限 Premium 用戶使用。"
       ),
       illustration: <MessagingIllustration lang={lang} />,
     },

@@ -163,5 +163,9 @@ verify_jwt = false
 [functions.shoes-refresh-catalog]
 verify_jwt = false
 
+[functions.disconnect-free-messaging]
+verify_jwt = false
+
+
 
 

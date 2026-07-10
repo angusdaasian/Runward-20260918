@@ -19,7 +19,7 @@ export type PlanSuggestion = {
   }>;
 };
 
-const YES_RE = /^\s*(yes|y|yeah|yep|sure|ok|okay|confirm|update|apply|do it|go|👍|✅|是|好|可以|更新|確認|确认|更改|改|同意|要)\s*[.!。！]*\s*$/i;
+const YES_RE = /^\s*(yes|y|yeah|yep|sure|ok|okay|confirm|update|apply|do it|go|👍|✅|是|是的|好|好的|可以|更新|確認|确认|更改|改|同意|要|係)\s*[.!。！]*\s*$/i;
 const NO_RE = /^\s*(no|n|nope|cancel|don'?t|dont|skip|nah|❌|🚫|不|不要|取消|不用|算了|保留|唔好|否)\s*[.!。！]*\s*$/i;
 
 export function classifyConfirmation(text: string): "yes" | "no" | null {

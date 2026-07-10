@@ -777,6 +777,7 @@ const ConnectApps = ({ lang, onBack }: Props) => {
         {(() => {
           const intervalsDisabledByOther = (stravaConnected || garminConnected || suuntoConnected || hasTerraConn) && !intervalsConnected;
           return (
+        <>
         <div className={`bg-card border border-border rounded-xl p-4 ${intervalsDisabledByOther ? "opacity-50" : ""}`}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">

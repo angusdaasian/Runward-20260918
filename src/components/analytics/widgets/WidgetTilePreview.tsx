@@ -16,6 +16,7 @@ import {
 import { useTerraConnections } from "@/hooks/use-terra-daily-health";
 import { usePremium } from "@/contexts/PremiumContext";
 import { loadForActivity, isCardio, isRunning, buildWeeklyLoadSeries } from "@/lib/trainingLoad";
+import { computeInjuryRisk, injuryBand as injuryBandFn } from "@/lib/analyticsExplain";
 
 interface Props {
   id: WidgetId;

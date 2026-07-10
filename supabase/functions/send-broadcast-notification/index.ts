@@ -109,18 +109,24 @@ Deno.serve(async (req) => {
     const errors: string[] = [];
     for (let i = 0; i < userIds.length; i += CHUNK) {
       const chunk = userIds.slice(i, i + CHUNK);
+      const payload: Record<string, unknown> = {
+        app_id: onesignalAppId,
+        include_external_user_ids: chunk,
+        headings: { en: title, zh: title, "zh-Hant": title },
+        contents: { en: message, zh: message, "zh-Hant": message },
+      };
+      if (platformFilter) {
+        payload.filters = [
+          { field: "device_type", relation: "=", value: platformFilter === "ios" ? "0" : "1" },
+        ];
+      }
       const resp = await fetch("https://onesignal.com/api/v1/notifications", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Basic ${onesignalApiKey}`,
         },
-        body: JSON.stringify({
-          app_id: onesignalAppId,
-          include_external_user_ids: chunk,
-          headings: { en: title, zh: title, "zh-Hant": title },
-          contents: { en: message, zh: message, "zh-Hant": message },
-        }),
+        body: JSON.stringify(payload),
       });
       const json = await resp.json().catch(() => ({}));
       console.log(`[send-broadcast-notification] chunk ${i}: ${resp.status}`, JSON.stringify(json));

@@ -355,7 +355,7 @@ async function handleIncoming(supabase: any, waId: string, text: string) {
   const hasPendingPlanSuggestion = pendingCheckProfile
     ? !!(await getPendingSuggestion(supabase, pendingCheckProfile.user_id, "whatsapp"))
     : false;
-  if (!hasPendingPlanSuggestion && /^(detail|more|full|詳細|詳情|想要|完整)[\s!.?。！？]*$/i.test(text)) {
+  if (!hasPendingPlanSuggestion && /^(yes|y|detail|more|full|詳細|詳情|想要|要|好|好的|是|係)[\s!.?。！？]*$/i.test(text)) {
     const { data: profile } = await supabase
       .from("profiles")
       .select("user_id, lang")

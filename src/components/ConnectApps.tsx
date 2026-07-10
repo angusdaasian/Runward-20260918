@@ -774,7 +774,11 @@ const ConnectApps = ({ lang, onBack }: Props) => {
         })()}
 
         {/* intervals.icu */}
-        <div className="bg-card border border-border rounded-xl p-4">
+        {(() => {
+          const intervalsDisabledByOther = (stravaConnected || garminConnected || suuntoConnected || hasTerraConn) && !intervalsConnected;
+          return (
+        <>
+        <div className={`bg-card border border-border rounded-xl p-4 ${intervalsDisabledByOther ? "opacity-50" : ""}`}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-lg overflow-hidden flex items-center justify-center bg-background">
@@ -811,13 +815,19 @@ const ConnectApps = ({ lang, onBack }: Props) => {
             ) : (
               <button
                 onClick={() => setIntervalsIntroOpen(true)}
-                disabled={!!intervalsBusy}
-                className="text-xs font-medium px-3 py-1 rounded-full text-primary-foreground bg-primary disabled:opacity-50"
+                disabled={!!intervalsBusy || intervalsDisabledByOther}
+                title={intervalsDisabledByOther ? (lang === "zh" ? "請先中斷其他健身應用連結" : "Disconnect your other fitness app first") : undefined}
+                className="text-xs font-medium px-3 py-1 rounded-full text-primary-foreground bg-primary disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {intervalsBusy === "connect" ? "..." : (lang === "zh" ? "連結" : "Connect")}
               </button>
             )}
           </div>
+          {intervalsDisabledByOther && (
+            <p className="text-xs text-muted-foreground mt-2">
+              {lang === "zh" ? "請先中斷其他健身應用連結，才能連接 intervals.icu。" : "Disconnect your other fitness app before connecting intervals.icu."}
+            </p>
+          )}
           {!intervalsConnected && (
             <button
               onClick={() => setIntervalsIntroOpen(true)}
@@ -837,6 +847,9 @@ const ConnectApps = ({ lang, onBack }: Props) => {
             await handleConnectIntervals();
           }}
         />
+        </>
+        );
+        })()}
 
       </div>
 

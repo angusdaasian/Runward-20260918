@@ -344,7 +344,18 @@ async function handleIncoming(supabase: any, waId: string, text: string) {
 
   // DETAIL / YES / 詳細 — send the full rich daily workout suggestion (in-window).
   // Matches short replies to the compact daily suggestion.
-  if (/^(yes|y|detail|more|full|詳細|詳情|想要|要|好|好的|是|係)[\s!.?。！？]*$/i.test(text)) {
+  // IMPORTANT: skip this when there's a pending plan-change suggestion, so
+  // YES/是/好 goes to the plan-update flow (handled further below) instead of
+  // being consumed as a "send me today's detail" request.
+  const { data: pendingCheckProfile } = await supabase
+    .from("profiles")
+    .select("user_id")
+    .eq("whatsapp_wa_id", waId)
+    .maybeSingle();
+  const hasPendingPlanSuggestion = pendingCheckProfile
+    ? !!(await getPendingSuggestion(supabase, pendingCheckProfile.user_id, "whatsapp"))
+    : false;
+  if (!hasPendingPlanSuggestion && /^(detail|more|full|詳細|詳情|想要|完整)[\s!.?。！？]*$/i.test(text)) {
     const { data: profile } = await supabase
       .from("profiles")
       .select("user_id, lang")

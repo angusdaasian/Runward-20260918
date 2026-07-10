@@ -997,6 +997,7 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
                 }}
               >
                 <span className="flex items-center gap-2 w-full">
+                  <LineChartIcon size={12} className="text-primary" />
                   {lang === "zh" ? "分享圖表" : "Share charts"}
                   {!isPremium && <Lock size={12} className="ml-auto text-muted-foreground" />}
                 </span>

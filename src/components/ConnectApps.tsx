@@ -774,7 +774,10 @@ const ConnectApps = ({ lang, onBack }: Props) => {
         })()}
 
         {/* intervals.icu */}
-        <div className="bg-card border border-border rounded-xl p-4">
+        {(() => {
+          const intervalsDisabledByOther = (stravaConnected || garminConnected || suuntoConnected || hasTerraConn) && !intervalsConnected;
+          return (
+        <div className={`bg-card border border-border rounded-xl p-4 ${intervalsDisabledByOther ? "opacity-50" : ""}`}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-lg overflow-hidden flex items-center justify-center bg-background">

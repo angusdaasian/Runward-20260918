@@ -68,7 +68,7 @@ Deno.serve(async (req) => {
     if (pErr) throw pErr;
     let userIds: string[] = (profiles || []).map((p: any) => p.user_id).filter(Boolean);
 
-    if (audience === "free" || audience === "free_no_trial_this_month") {
+    if (audience === "free" || audience === "free_no_trial_this_month" || audience === "premium") {
       const { data: subs, error: sErr } = await supabase
         .from("premium_subscriptions")
         .select("user_id, expires_at, is_trial, activated_at");
@@ -79,7 +79,11 @@ Deno.serve(async (req) => {
           .filter((s: any) => s.expires_at && new Date(s.expires_at).getTime() > nowMs)
           .map((s: any) => s.user_id),
       );
-      userIds = userIds.filter((id) => !activePremium.has(id));
+      if (audience === "premium") {
+        userIds = userIds.filter((id) => activePremium.has(id));
+      } else {
+        userIds = userIds.filter((id) => !activePremium.has(id));
+      }
 
       if (audience === "free_no_trial_this_month") {
         const now = new Date();
@@ -97,7 +101,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    console.log(`[send-broadcast-notification] audience=${audience} lang=${langFilter ?? "any"} recipients=${userIds.length}`);
+    console.log(`[send-broadcast-notification] audience=${audience} lang=${langFilter ?? "any"} platform=${platformFilter ?? "any"} recipients=${userIds.length}`);
 
     // Chunk to respect OneSignal include_external_user_ids limit (~2000)
     const CHUNK = 2000;

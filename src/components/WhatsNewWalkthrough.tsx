@@ -231,7 +231,7 @@ const MessagingIllustration = ({ lang }: { lang: Lang }) => (
           <div className="w-8 h-8 rounded-full bg-[#25D366] flex items-center justify-center text-white">
             <MessageSquare size={14} />
           </div>
-          <div className="text-[11px] font-semibold text-foreground">WhatsApp</div>
+          <div className="text-[11px] font-semibold text-foreground">WhatsApp (Beta)</div>
         </div>
         <div className="mt-2 rounded-md bg-muted/60 p-1.5 text-[9px] text-foreground/80 leading-snug">
           {tx(lang, "Daily AI workout & chat", "每日 AI 訓練與聊天")}

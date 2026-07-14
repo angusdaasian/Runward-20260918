@@ -91,12 +91,21 @@ Deno.serve(async (req) => {
       });
     }
 
-    let profileQuery = supabase.from("profiles").select("user_id, lang");
+    let profileQuery = supabase.from("profiles").select("user_id, lang, is_premium");
     if (langFilter) profileQuery = profileQuery.eq("lang", langFilter);
     if (testUserId) profileQuery = profileQuery.eq("user_id", testUserId);
     const { data: profiles, error: pErr } = await profileQuery;
     if (pErr) throw pErr;
-    let userIds: string[] = (profiles || []).map((p: any) => p.user_id).filter(Boolean);
+    const afterLangCount = (profiles || []).length;
+
+    // Belt-and-suspenders lang filter: reject any row whose lang doesn't match,
+    // in case the DB query somehow returned unfiltered results.
+    let scoped = (profiles || []).filter((p: any) => {
+      if (!p?.user_id) return false;
+      if (langFilter && p.lang !== langFilter) return false;
+      return true;
+    });
+    let userIds: string[] = scoped.map((p: any) => p.user_id);
 
     if (audience === "free" || audience === "free_no_trial_this_month" || audience === "premium") {
       const { data: subs, error: sErr } = await supabase
@@ -109,10 +118,19 @@ Deno.serve(async (req) => {
           .filter((s: any) => s.expires_at && new Date(s.expires_at).getTime() > nowMs)
           .map((s: any) => s.user_id),
       );
+
+      // Belt-and-suspenders: also treat profiles.is_premium=true as premium,
+      // so a stale/missing premium_subscriptions row can't leak a paid user
+      // into a "free" broadcast.
+      const isPremiumFlagged = new Set(
+        scoped.filter((p: any) => p.is_premium === true).map((p: any) => p.user_id),
+      );
+      const premiumUnion = new Set<string>([...activePremium, ...isPremiumFlagged]);
+
       if (audience === "premium") {
-        userIds = userIds.filter((id) => activePremium.has(id));
+        userIds = userIds.filter((id) => premiumUnion.has(id));
       } else {
-        userIds = userIds.filter((id) => !activePremium.has(id));
+        userIds = userIds.filter((id) => !premiumUnion.has(id));
       }
 
       if (audience === "free_no_trial_this_month") {
@@ -129,9 +147,31 @@ Deno.serve(async (req) => {
         );
         userIds = userIds.filter((id) => !trialThisMonth.has(id));
       }
+
+      // Hard guard: if a "free"-style broadcast somehow ends up with a recipient
+      // list that still contains every language-scoped profile, that's a filter
+      // regression — refuse to send rather than blast paid users again.
+      if (!testUserId && userIds.length >= afterLangCount && afterLangCount > 0) {
+        console.error(
+          `[send-broadcast-notification] REFUSED: audience=${audience} produced ${userIds.length} recipients out of ${afterLangCount} scoped profiles — premium filter appears to have failed.`,
+        );
+        return new Response(
+          JSON.stringify({
+            error: "safety_check_failed",
+            reason: "premium_filter_did_not_reduce_recipients",
+            audience,
+            lang: langFilter,
+            scoped_profiles: afterLangCount,
+            recipients: userIds.length,
+          }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
     }
 
-    console.log(`[send-broadcast-notification] audience=${audience} lang=${langFilter ?? "any"} platform=${platformFilter ?? "any"} test_user=${testUserId ?? "none"} dry_run=${dryRun} recipients=${userIds.length}`);
+    console.log(
+      `[send-broadcast-notification] audience=${audience} lang=${langFilter ?? "any"} platform=${platformFilter ?? "any"} test_user=${testUserId ?? "none"} dry_run=${dryRun} scoped_profiles=${afterLangCount} recipients=${userIds.length}`,
+    );
 
     if (dryRun) {
       return new Response(

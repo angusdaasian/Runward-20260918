@@ -3,6 +3,7 @@ import { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { preloadHeaderProfile } from "@/components/AppHeader";
 import despia from "despia-native";
+import { syncPlatformToProfile } from "@/lib/detectPlatform";
 
 const LAST_ACTIVE_KEY = "runward_last_active";
 const WARM_RESUME_MS = 5 * 60 * 1000; // 5 minutes
@@ -114,6 +115,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 .then(({ error }) => {
                   if (error) console.warn("[Auth] last_login update failed:", error.message);
                 });
+              syncPlatformToProfile(uid);
             }, 0);
           }
         }
@@ -179,6 +181,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         } catch (e) {
           console.warn("[Push] Failed to set OneSignal player ID:", e);
         }
+        syncPlatformToProfile(initialSession.user.id);
       }
       // Resolve immediately — getSession() has already restored from storage.
       setLoading(false);

@@ -91,12 +91,21 @@ Deno.serve(async (req) => {
       });
     }
 
-    let profileQuery = supabase.from("profiles").select("user_id, lang");
+    let profileQuery = supabase.from("profiles").select("user_id, lang, is_premium");
     if (langFilter) profileQuery = profileQuery.eq("lang", langFilter);
     if (testUserId) profileQuery = profileQuery.eq("user_id", testUserId);
     const { data: profiles, error: pErr } = await profileQuery;
     if (pErr) throw pErr;
-    let userIds: string[] = (profiles || []).map((p: any) => p.user_id).filter(Boolean);
+    const afterLangCount = (profiles || []).length;
+
+    // Belt-and-suspenders lang filter: reject any row whose lang doesn't match,
+    // in case the DB query somehow returned unfiltered results.
+    let scoped = (profiles || []).filter((p: any) => {
+      if (!p?.user_id) return false;
+      if (langFilter && p.lang !== langFilter) return false;
+      return true;
+    });
+    let userIds: string[] = scoped.map((p: any) => p.user_id);
 
     if (audience === "free" || audience === "free_no_trial_this_month" || audience === "premium") {
       const { data: subs, error: sErr } = await supabase

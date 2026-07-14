@@ -1247,6 +1247,8 @@ export type Database = {
           monthly_goal_km: number
           monthly_xp: number
           onboarding_completed: boolean
+          platform: string | null
+          platform_updated_at: string | null
           rank_tier: string
           resting_heartrate: number | null
           runs_per_week: number | null
@@ -1291,6 +1293,8 @@ export type Database = {
           monthly_goal_km?: number
           monthly_xp?: number
           onboarding_completed?: boolean
+          platform?: string | null
+          platform_updated_at?: string | null
           rank_tier?: string
           resting_heartrate?: number | null
           runs_per_week?: number | null
@@ -1335,6 +1339,8 @@ export type Database = {
           monthly_goal_km?: number
           monthly_xp?: number
           onboarding_completed?: boolean
+          platform?: string | null
+          platform_updated_at?: string | null
           rank_tier?: string
           resting_heartrate?: number | null
           runs_per_week?: number | null

@@ -1,54 +1,37 @@
-
 ## Goal
-One-off push notifications today at **11:15 AM HKT (03:15 UTC)**:
-- **Free users, iOS only** → EN + ZH (Traditional) upgrade prompt
-- **Premium users, iOS + Android** → EN + ZH (Traditional) restart-app notice
 
-Traditional Chinese (standard, not Cantonese), with emojis.
+One-off push notification today at **12:00 PM HKT (04:00 UTC)** to **free users who have NOT used a trial this month**, on **iOS + Android**, in each user's opted-in language (EN or ZH-Traditional).
 
 ## Copy
 
-### Free users (iOS only)
-**EN**
-- Title: `🎉 Version Update`
-- Message: `📱 WhatsApp & Telegram are now live for Premium users! 🚀 Enter code WHATSAPP for a limited 2-week free trial. Please reopen the app to use the latest features. 🔄`
+### English (audience: `lang = en`)
+- Title: `🎁 Free 2-Week Premium Trial`
+- Message: `Help us test our new WhatsApp & Telegram features! 🚀 Use code WHATSAPP to unlock 2 weeks of Premium for free. Redeem via "Enter Coupon Code" in the Settings tab. ⏰ Limited time.`
 
-**ZH (Traditional)**
-- Title: `🎉 版本更新`
-- Message: `📱 WhatsApp 與 Telegram 功能已為 Premium 用戶推出！🚀 輸入優惠碼 WHATSAPP 即可獲得 2 週免費試用。請重新打開APP使用最新功能 🔄`
-
-### Premium users (iOS + Android)
-**EN**
-- Title: `🎉 Version Update`
-- Message: `📱 WhatsApp & Telegram integration is now live! ✨ Please reopen the app to use the latest features. 🔄`
-
-**ZH (Traditional)**
-- Title: `🎉 版本更新`
-- Message: `📱 WhatsApp 與 Telegram 功能已推出！✨ 請重新打開APP使用最新功能 🔄`
+### 繁體中文 (audience: `lang = zh`)
+- Title: `🎁 免費 2 週 Premium 試用`
+- Message: `幫我們測試全新 WhatsApp 與 Telegram 功能！🚀 輸入優惠碼 WHATSAPP 即可免費解鎖 2 週 Premium。請於「設定」分頁的「輸入優惠碼」中兌換。⏰ 限時優惠。`
 
 ## Changes
 
-### 1. Extend `supabase/functions/send-broadcast-notification/index.ts`
-- Add optional `platform` param (`"ios" | "android" | null`). When set, add OneSignal `filters: [{"field":"device_type","relation":"=","value":"0" or "1"}]` alongside `include_external_user_ids` (iOS = `0`, Android = `1`).
-- Add `"premium"` to the `audience` union → keeps only users with an unexpired `premium_subscriptions.expires_at`.
-- Everything else (lang filter, chunked sends, `self_unschedule`) unchanged.
+Schedule **2 one-off cron jobs** via `supabase--insert` (`pg_cron` + `pg_net`), both hitting the existing `send-broadcast-notification` edge function (no code changes — it already supports `audience: "free_no_trial_this_month"` and `lang` filtering, and iOS+Android is its default when `platform` is omitted).
 
-### 2. Schedule 4 one-off cron jobs via `supabase--insert` (`pg_cron` + `pg_net`)
-
-All fire at `15 3 * * *` (03:15 UTC = 11:15 HKT) and self-unschedule after firing once:
+Both fire at `0 4 * * *` (04:00 UTC = 12:00 HKT) and self-unschedule after firing once:
 
 | Job name | audience | lang | platform |
 |---|---|---|---|
-| `push-free-ios-en-<date>` | free | en | ios |
-| `push-free-ios-zh-<date>` | free | zh | ios |
-| `push-premium-all-en-<date>` | premium | en | null (all) |
-| `push-premium-all-zh-<date>` | premium | zh | null (all) |
+| `push-free-notrial-en-2026-07-14` | free_no_trial_this_month | en | (all) |
+| `push-free-notrial-zh-2026-07-14` | free_no_trial_this_month | zh | (all) |
 
 Each POST body carries its matching title/message and its own `self_unschedule` job name.
 
 ## Technical notes
-- `lang` filter reads `profiles.lang` (`en` / `zh`); users without `lang` set are excluded from both language sends (existing behavior).
-- If 03:15 UTC has already passed when approved, jobs fire tomorrow at 11:15 HKT.
+
+- Uses existing `send-broadcast-notification` function — no edge-function edits, no migrations.
+- `lang` filter reads `profiles.lang`; users without `lang` set are excluded from both sends (existing behavior).
+- Free = no active `premium_subscriptions.expires_at`; "no trial this month" = no `is_trial` sub activated since the 1st of this UTC month.
+- If 04:00 UTC has already passed when approved, I'll shift the cron expression to a few minutes from now so it still fires today.
 
 ## Out of scope
-- No UI changes; no changes to admin `send-notification`.
+
+- No UI changes, no admin panel changes, no edge-function code changes.

@@ -26,20 +26,49 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => ({} as any));
     const title = (body?.title ?? "").toString().trim();
-    const message = (body?.message ?? "").toString().trim();
-    const audience: "all" | "free" | "free_no_trial_this_month" | "premium" =
-      body?.audience === "free" ? "free"
-      : body?.audience === "free_no_trial_this_month" ? "free_no_trial_this_month"
-      : body?.audience === "premium" ? "premium"
-      : "all";
+    const message = (body?.message ?? body?.body ?? "").toString().trim();
+    const rawAudience = typeof body?.audience === "string" ? body.audience.trim() : "";
+    const audience: "all" | "free" | "free_no_trial_this_month" | "premium" | null =
+      rawAudience === "all" ? "all"
+      : rawAudience === "free" ? "free"
+      : rawAudience === "free_no_trial_this_month" ? "free_no_trial_this_month"
+      : rawAudience === "premium" ? "premium"
+      : null;
+    const rawLang = typeof body?.lang === "string" ? body.lang : body?.langFilter;
     const langFilter: "en" | "zh" | null =
-      body?.lang === "en" ? "en" : body?.lang === "zh" ? "zh" : null;
+      rawLang === "en" ? "en" : rawLang === "zh" ? "zh" : null;
     const platformFilter: "ios" | "android" | null =
       body?.platform === "ios" ? "ios" : body?.platform === "android" ? "android" : null;
+    const dryRun = body?.dry_run === true;
+    const testUserId: string | null =
+      typeof body?.test_user_id === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(body.test_user_id)
+        ? body.test_user_id
+        : null;
     const selfUnschedule: string | null =
       typeof body?.self_unschedule === "string" && body.self_unschedule.length > 0
         ? body.self_unschedule
         : null;
+
+    if (!audience) {
+      return new Response(JSON.stringify({ error: "valid audience required" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if ((rawLang || body?.langFilter) && !langFilter) {
+      return new Response(JSON.stringify({ error: "valid lang required" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (body?.test_user_id && !testUserId) {
+      return new Response(JSON.stringify({ error: "valid test_user_id required" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     if (!title || !message) {
       return new Response(JSON.stringify({ error: "title and message required" }), {
@@ -64,6 +93,7 @@ Deno.serve(async (req) => {
 
     let profileQuery = supabase.from("profiles").select("user_id, lang");
     if (langFilter) profileQuery = profileQuery.eq("lang", langFilter);
+    if (testUserId) profileQuery = profileQuery.eq("user_id", testUserId);
     const { data: profiles, error: pErr } = await profileQuery;
     if (pErr) throw pErr;
     let userIds: string[] = (profiles || []).map((p: any) => p.user_id).filter(Boolean);
@@ -101,7 +131,14 @@ Deno.serve(async (req) => {
       }
     }
 
-    console.log(`[send-broadcast-notification] audience=${audience} lang=${langFilter ?? "any"} platform=${platformFilter ?? "any"} recipients=${userIds.length}`);
+    console.log(`[send-broadcast-notification] audience=${audience} lang=${langFilter ?? "any"} platform=${platformFilter ?? "any"} test_user=${testUserId ?? "none"} dry_run=${dryRun} recipients=${userIds.length}`);
+
+    if (dryRun) {
+      return new Response(
+        JSON.stringify({ ok: true, dry_run: true, audience, lang: langFilter, platform: platformFilter, test_user_id: testUserId, recipients: userIds.length }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
 
     // Chunk to respect OneSignal include_external_user_ids limit (~2000)
     const CHUNK = 2000;

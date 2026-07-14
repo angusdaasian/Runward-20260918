@@ -181,6 +181,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         } catch (e) {
           console.warn("[Push] Failed to set OneSignal player ID:", e);
         }
+        syncPlatformToProfile(initialSession.user.id);
       }
       // Resolve immediately — getSession() has already restored from storage.
       setLoading(false);

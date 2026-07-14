@@ -115,6 +115,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 .then(({ error }) => {
                   if (error) console.warn("[Auth] last_login update failed:", error.message);
                 });
+              syncPlatformToProfile(uid);
             }, 0);
           }
         }

@@ -14,6 +14,7 @@ import { installGlobalUIUnlockGuard } from "@/lib/uiUnlock";
 // Lazy-load route pages so initial bundle only includes what the first paint needs.
 const Index = lazy(() => import("./pages/Index.tsx"));
 const Landing = lazy(() => import("./pages/Landing.tsx"));
+const ReviewLanding = lazy(() => import("./pages/ReviewLanding.tsx"));
 const NotFound = lazy(() => import("./pages/NotFound.tsx"));
 const AdminPanel = lazy(() => import("./pages/AdminPanel.tsx"));
 const AppleCallback = lazy(() => import("./pages/AppleCallback.tsx"));

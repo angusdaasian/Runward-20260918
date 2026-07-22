@@ -28,6 +28,7 @@ interface Props {
 const TerritoryTab = ({ lang }: Props) => {
   const { user } = useAuth();
   const [hexes, setHexes] = useState<Hex[]>([]);
+  const [totalHexes, setTotalHexes] = useState(0);
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [autoSynced, setAutoSynced] = useState(false);
@@ -36,11 +37,26 @@ const TerritoryTab = ({ lang }: Props) => {
 
   const loadHexes = useCallback(async () => {
     setLoading(true);
-    const { data, error } = await supabase
+    // Get accurate global count (PostgREST default caps row fetches at 1000).
+    const { count } = await supabase
       .from("territory_hexes")
-      .select("hex_id, region, owner_user_id, owner_display_name, captured_at, capture_count, city_slug")
-      .order("captured_at", { ascending: false })
-      .limit(10000);
+      .select("hex_id", { count: "exact", head: true });
+    setTotalHexes(count ?? 0);
+
+    // Paginate rows in 1000-row pages to bypass the PostgREST max-rows cap.
+    const pageSize = 1000;
+    const all: Hex[] = [];
+    for (let from = 0; ; from += pageSize) {
+      const { data, error } = await supabase
+        .from("territory_hexes")
+        .select("hex_id, region, owner_user_id, owner_display_name, captured_at, capture_count, city_slug")
+        .order("captured_at", { ascending: false })
+        .range(from, from + pageSize - 1);
+      if (error || !data || data.length === 0) break;
+      all.push(...(data as Hex[]));
+      if (data.length < pageSize) break;
+      if (all.length >= 20000) break; // hard safety cap
+    }
     let myCaptured = new Set<string>();
     if (user) {
       const { data: caps } = await supabase
@@ -49,11 +65,10 @@ const TerritoryTab = ({ lang }: Props) => {
         .eq("user_id", user.id);
       myCaptured = new Set((caps ?? []).map((r: any) => r.hex_id as string));
     }
-    if (!error && data) {
-      setHexes((data as Hex[]).map((h) => ({ ...h, iOwn: myCaptured.has(h.hex_id) })));
-    }
+    setHexes(all.map((h) => ({ ...h, iOwn: myCaptured.has(h.hex_id) })));
     setLoading(false);
   }, [user]);
+
 
   useEffect(() => { loadHexes(); }, [loadHexes]);
 
@@ -89,7 +104,7 @@ const TerritoryTab = ({ lang }: Props) => {
   }, [user, autoSynced, sync]);
 
   const myHexes = hexes.filter((h) => h.iOwn).length;
-  const totalHexes = hexes.length;
+
 
   if (!user) {
     return (

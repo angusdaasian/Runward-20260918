@@ -38,9 +38,6 @@ const ReviewLanding = () => {
   };
 
   const hero = zh ? heroZh.url : heroEn.url;
-  const shot1 = zh ? screenshot1Zh.url : screenshot1En.url;
-  const shot2 = zh ? screenshot2Zh.url : screenshot2En.url;
-  const shot3 = zh ? screenshot3Zh.url : screenshot3En.url;
 
   const features = [
     {
@@ -49,7 +46,6 @@ const ReviewLanding = () => {
       desc: zh
         ? "上載一段短片,逐幀分析步頻、著地方式、身體傾斜與擺臂,幫你改善跑步技術、減少受傷風險。"
         : "Upload a short video and get a frame-by-frame breakdown of cadence, foot strike, torso lean and arm swing to refine your form.",
-      shot: shot1,
     },
     {
       icon: Shield,
@@ -57,7 +53,6 @@ const ReviewLanding = () => {
       desc: zh
         ? "把訓練量、恢復狀態與睡眠整合成清晰的受傷風險指標,在小痛變成大傷之前提前調整。"
         : "Combines training load, recovery and sleep into a single injury-risk indicator so you can back off before small niggles turn into real injuries.",
-      shot: shot2,
     },
     {
       icon: MapPin,
@@ -65,7 +60,6 @@ const ReviewLanding = () => {
       desc: zh
         ? "把每次跑步變成城市探索遊戲,解鎖新街道、新地區,鼓勵你走出家門、認識自己的城市。"
         : "Turns every run into a city exploration game. Unlock new streets and districts as you run, and rediscover your neighbourhood on foot.",
-      shot: shot3,
     },
   ];
 

@@ -76,6 +76,7 @@ const App = () => (
             <Suspense fallback={<RouteFallback />}>
               <Routes>
                 <Route path="/" element={<RootRoute />} />
+                <Route path="/full" element={<Landing />} />
                 <Route path="/callback/apple" element={<AppleCallback />} />
                 <Route path="/admin" element={<AdminPanel />} />
                 <Route path="/support" element={<Support />} />

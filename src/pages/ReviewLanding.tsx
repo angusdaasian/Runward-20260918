@@ -196,37 +196,25 @@ const ReviewLanding = () => {
       </section>
 
       {/* Features */}
-      <section id="features" className="max-w-6xl mx-auto px-5 md:px-8 py-16 md:py-24 space-y-24 md:space-y-32">
-        {features.map((f, idx) => {
-          const reverse = idx % 2 === 1;
-          return (
+      <section id="features" className="max-w-6xl mx-auto px-5 md:px-8 py-16 md:py-24">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          {features.map((f) => (
             <div
               key={f.title}
-              className={`grid md:grid-cols-2 gap-10 md:gap-16 items-center ${
-                reverse ? "md:[direction:rtl]" : ""
-              }`}
+              className="rounded-2xl border border-border bg-card/60 p-6 md:p-8"
             >
-              <div className="md:[direction:ltr]">
-                <div className="w-11 h-11 rounded-xl bg-primary/10 text-primary flex items-center justify-center mb-5">
-                  <f.icon size={22} />
-                </div>
-                <h2 className="font-display text-3xl md:text-4xl font-bold mb-4 leading-tight tracking-tight">
-                  {f.title}
-                </h2>
-                <p className="text-muted-foreground leading-relaxed text-base md:text-lg max-w-md">
-                  {f.desc}
-                </p>
+              <div className="w-11 h-11 rounded-xl bg-primary/10 text-primary flex items-center justify-center mb-5">
+                <f.icon size={22} />
               </div>
-              <div className="flex justify-center md:[direction:ltr]">
-                <IPhoneFrame
-                  src={f.shot}
-                  alt={f.title}
-                  className="w-[220px] md:w-[260px]"
-                />
-              </div>
+              <h2 className="font-display text-xl md:text-2xl font-bold mb-3 leading-tight tracking-tight">
+                {f.title}
+              </h2>
+              <p className="text-muted-foreground leading-relaxed text-sm md:text-base">
+                {f.desc}
+              </p>
             </div>
-          );
-        })}
+          ))}
+        </div>
       </section>
 
       {/* Works with */}

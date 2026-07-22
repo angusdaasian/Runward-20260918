@@ -55,14 +55,14 @@ const RouteFallback = () => (
 );
 
 const RootRoute = () => {
-  const { session, loading } = useAuth();
+  const { loading } = useAuth();
   // Only the native app shell can access the in-app Index experience.
   if (native) return <Index />;
   // OAuth/in-app redirects still need to hit Index so callbacks complete.
   if (hadOAuthReturn) return <Index />;
-  // All browser users (desktop + mobile Safari/Chrome) get the marketing site.
-  if (loading) return <Landing />;
-  return <Landing />;
+  // Public web visitors see the review-friendly landing page.
+  if (loading) return <ReviewLanding />;
+  return <ReviewLanding />;
 };
 
 const App = () => (

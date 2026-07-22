@@ -5,12 +5,6 @@ import appStoreBadge from "@/assets/app-store-badge.png";
 import IPhoneFrame from "@/components/landing/IPhoneFrame";
 import heroEn from "@/assets/appstore/hero-en.png.asset.json";
 import heroZh from "@/assets/appstore/hero-zh.png.asset.json";
-import screenshot1En from "@/assets/appstore/en-1.png.asset.json";
-import screenshot2En from "@/assets/appstore/en-2.png.asset.json";
-import screenshot3En from "@/assets/appstore/en-3.png.asset.json";
-import screenshot1Zh from "@/assets/appstore/zh-1.png.asset.json";
-import screenshot2Zh from "@/assets/appstore/zh-2.png.asset.json";
-import screenshot3Zh from "@/assets/appstore/zh-3.png.asset.json";
 import poweredByStrava from "@/assets/brands/powered-by-strava.svg.asset.json";
 import suuntoLogo from "@/assets/brands/suunto.png.asset.json";
 import garminLogo from "@/assets/brands/garmin.png.asset.json";
@@ -44,9 +38,6 @@ const ReviewLanding = () => {
   };
 
   const hero = zh ? heroZh.url : heroEn.url;
-  const shot1 = zh ? screenshot1Zh.url : screenshot1En.url;
-  const shot2 = zh ? screenshot2Zh.url : screenshot2En.url;
-  const shot3 = zh ? screenshot3Zh.url : screenshot3En.url;
 
   const features = [
     {
@@ -55,7 +46,6 @@ const ReviewLanding = () => {
       desc: zh
         ? "上載一段短片,逐幀分析步頻、著地方式、身體傾斜與擺臂,幫你改善跑步技術、減少受傷風險。"
         : "Upload a short video and get a frame-by-frame breakdown of cadence, foot strike, torso lean and arm swing to refine your form.",
-      shot: shot1,
     },
     {
       icon: Shield,
@@ -63,7 +53,6 @@ const ReviewLanding = () => {
       desc: zh
         ? "把訓練量、恢復狀態與睡眠整合成清晰的受傷風險指標,在小痛變成大傷之前提前調整。"
         : "Combines training load, recovery and sleep into a single injury-risk indicator so you can back off before small niggles turn into real injuries.",
-      shot: shot2,
     },
     {
       icon: MapPin,
@@ -71,7 +60,6 @@ const ReviewLanding = () => {
       desc: zh
         ? "把每次跑步變成城市探索遊戲,解鎖新街道、新地區,鼓勵你走出家門、認識自己的城市。"
         : "Turns every run into a city exploration game. Unlock new streets and districts as you run, and rediscover your neighbourhood on foot.",
-      shot: shot3,
     },
   ];
 
@@ -208,37 +196,25 @@ const ReviewLanding = () => {
       </section>
 
       {/* Features */}
-      <section id="features" className="max-w-6xl mx-auto px-5 md:px-8 py-16 md:py-24 space-y-24 md:space-y-32">
-        {features.map((f, idx) => {
-          const reverse = idx % 2 === 1;
-          return (
+      <section id="features" className="max-w-6xl mx-auto px-5 md:px-8 py-16 md:py-24">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          {features.map((f) => (
             <div
               key={f.title}
-              className={`grid md:grid-cols-2 gap-10 md:gap-16 items-center ${
-                reverse ? "md:[direction:rtl]" : ""
-              }`}
+              className="rounded-2xl border border-border bg-card/60 p-6 md:p-8"
             >
-              <div className="md:[direction:ltr]">
-                <div className="w-11 h-11 rounded-xl bg-primary/10 text-primary flex items-center justify-center mb-5">
-                  <f.icon size={22} />
-                </div>
-                <h2 className="font-display text-3xl md:text-4xl font-bold mb-4 leading-tight tracking-tight">
-                  {f.title}
-                </h2>
-                <p className="text-muted-foreground leading-relaxed text-base md:text-lg max-w-md">
-                  {f.desc}
-                </p>
+              <div className="w-11 h-11 rounded-xl bg-primary/10 text-primary flex items-center justify-center mb-5">
+                <f.icon size={22} />
               </div>
-              <div className="flex justify-center md:[direction:ltr]">
-                <IPhoneFrame
-                  src={f.shot}
-                  alt={f.title}
-                  className="w-[220px] md:w-[260px]"
-                />
-              </div>
+              <h2 className="font-display text-xl md:text-2xl font-bold mb-3 leading-tight tracking-tight">
+                {f.title}
+              </h2>
+              <p className="text-muted-foreground leading-relaxed text-sm md:text-base">
+                {f.desc}
+              </p>
             </div>
-          );
-        })}
+          ))}
+        </div>
       </section>
 
       {/* Works with */}

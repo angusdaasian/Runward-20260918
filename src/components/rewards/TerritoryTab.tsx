@@ -104,7 +104,7 @@ const TerritoryTab = ({ lang }: Props) => {
   }, [user, autoSynced, sync]);
 
   const myHexes = hexes.filter((h) => h.iOwn).length;
-  const totalHexes = hexes.length;
+
 
   if (!user) {
     return (

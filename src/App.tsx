@@ -14,6 +14,7 @@ import { installGlobalUIUnlockGuard } from "@/lib/uiUnlock";
 // Lazy-load route pages so initial bundle only includes what the first paint needs.
 const Index = lazy(() => import("./pages/Index.tsx"));
 const Landing = lazy(() => import("./pages/Landing.tsx"));
+const ReviewLanding = lazy(() => import("./pages/ReviewLanding.tsx"));
 const NotFound = lazy(() => import("./pages/NotFound.tsx"));
 const AdminPanel = lazy(() => import("./pages/AdminPanel.tsx"));
 const AppleCallback = lazy(() => import("./pages/AppleCallback.tsx"));
@@ -54,14 +55,14 @@ const RouteFallback = () => (
 );
 
 const RootRoute = () => {
-  const { session, loading } = useAuth();
+  const { loading } = useAuth();
   // Only the native app shell can access the in-app Index experience.
   if (native) return <Index />;
   // OAuth/in-app redirects still need to hit Index so callbacks complete.
   if (hadOAuthReturn) return <Index />;
-  // All browser users (desktop + mobile Safari/Chrome) get the marketing site.
-  if (loading) return <Landing />;
-  return <Landing />;
+  // Public web visitors see the review-friendly landing page.
+  if (loading) return <ReviewLanding />;
+  return <ReviewLanding />;
 };
 
 const App = () => (
@@ -75,6 +76,7 @@ const App = () => (
             <Suspense fallback={<RouteFallback />}>
               <Routes>
                 <Route path="/" element={<RootRoute />} />
+                <Route path="/full" element={<Landing />} />
                 <Route path="/callback/apple" element={<AppleCallback />} />
                 <Route path="/admin" element={<AdminPanel />} />
                 <Route path="/support" element={<Support />} />

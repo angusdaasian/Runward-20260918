@@ -60,10 +60,11 @@ const RootRoute = () => {
   if (native) return <Index />;
   // OAuth/in-app redirects still need to hit Index so callbacks complete.
   if (hadOAuthReturn) return <Index />;
-  // Public web visitors see the review-friendly landing page.
-  if (loading) return <ReviewLanding />;
-  return <ReviewLanding />;
+  // Public web visitors see the original landing page.
+  if (loading) return <Landing />;
+  return <Landing />;
 };
+
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -77,6 +78,8 @@ const App = () => (
               <Routes>
                 <Route path="/" element={<RootRoute />} />
                 <Route path="/full" element={<Landing />} />
+                <Route path="/review" element={<ReviewLanding />} />
+
                 <Route path="/callback/apple" element={<AppleCallback />} />
                 <Route path="/admin" element={<AdminPanel />} />
                 <Route path="/support" element={<Support />} />

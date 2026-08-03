@@ -661,8 +661,11 @@ Return ONLY valid JSON, no markdown, no explanation.`;
     try {
       planData = JSON.parse(content);
     } catch {
-      console.error("Failed to parse AI response as JSON:", content.substring(0, 500));
-      planData = [];
+      planData = repairTruncatedJsonArray(content);
+      console.error(
+        `Failed to parse AI response as JSON (recovered ${Array.isArray(planData) ? planData.length : 0} weeks):`,
+        content.substring(0, 300),
+      );
     }
 
     // Trail race plans are business-critical and the model sometimes returns

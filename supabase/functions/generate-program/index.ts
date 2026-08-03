@@ -49,9 +49,44 @@ async function callVertexAI(opts: { apiKey: string; model?: string; messages: Ar
   const vRes = await fetch(url, { method: "POST", headers: __vxHeaders, body: JSON.stringify(body) });
   if (!vRes.ok) return new Response(await vRes.text(), { status: vRes.status });
   const vData = await vRes.json();
+  const finishReason = vData?.candidates?.[0]?.finishReason;
+  if (finishReason && finishReason !== "STOP") console.warn("Vertex finishReason:", finishReason);
   const text = vData?.candidates?.[0]?.content?.parts?.map((p: any) => p.text || "").join("") || "";
   return new Response(JSON.stringify({ choices: [{ message: { content: text } }] }), { status: 200, headers: __vxHeaders });
 }
+
+// Recover a usable weeks array from a truncated JSON array response by
+// cutting back to the last complete top-level object and closing the array.
+function repairTruncatedJsonArray(raw: string): any[] {
+  const s = raw.trim();
+  const start = s.indexOf("[");
+  if (start < 0) return [];
+  let depth = 0, inStr = false, esc = false, lastGood = -1;
+  for (let i = start; i < s.length; i++) {
+    const c = s[i];
+    if (inStr) {
+      if (esc) esc = false;
+      else if (c === "\\") esc = true;
+      else if (c === '"') inStr = false;
+      continue;
+    }
+    if (c === '"') inStr = true;
+    else if (c === "{" || c === "[") depth++;
+    else if (c === "}" || c === "]") {
+      depth--;
+      if (depth === 1 && c === "}") lastGood = i;
+    }
+  }
+  if (lastGood < 0) return [];
+  try {
+    const arr = JSON.parse(s.slice(start, lastGood + 1) + "]");
+    return Array.isArray(arr) ? arr : [];
+  } catch {
+    return [];
+  }
+}
+
+
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {

@@ -168,5 +168,3 @@ verify_jwt = false
 
 
 
-[functions.vertex-model-probe]
-verify_jwt = false

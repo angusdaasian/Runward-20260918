@@ -39,8 +39,9 @@ async function callVertexAI(opts: { apiKey: string; model?: string; messages: Ar
     contents,
     generationConfig: {
       // Medium thinking budget to keep latency under edge function CPU limit
-      thinkingConfig: { thinkingBudget: 4096 },
-      maxOutputTokens: 16384,
+      thinkingConfig: { thinkingBudget: 1024 },
+      maxOutputTokens: 65536,
+      responseMimeType: "application/json",
       temperature: 0.7,
     },
   };
@@ -48,9 +49,44 @@ async function callVertexAI(opts: { apiKey: string; model?: string; messages: Ar
   const vRes = await fetch(url, { method: "POST", headers: __vxHeaders, body: JSON.stringify(body) });
   if (!vRes.ok) return new Response(await vRes.text(), { status: vRes.status });
   const vData = await vRes.json();
+  const finishReason = vData?.candidates?.[0]?.finishReason;
+  if (finishReason && finishReason !== "STOP") console.warn("Vertex finishReason:", finishReason);
   const text = vData?.candidates?.[0]?.content?.parts?.map((p: any) => p.text || "").join("") || "";
   return new Response(JSON.stringify({ choices: [{ message: { content: text } }] }), { status: 200, headers: __vxHeaders });
 }
+
+// Recover a usable weeks array from a truncated JSON array response by
+// cutting back to the last complete top-level object and closing the array.
+function repairTruncatedJsonArray(raw: string): any[] {
+  const s = raw.trim();
+  const start = s.indexOf("[");
+  if (start < 0) return [];
+  let depth = 0, inStr = false, esc = false, lastGood = -1;
+  for (let i = start; i < s.length; i++) {
+    const c = s[i];
+    if (inStr) {
+      if (esc) esc = false;
+      else if (c === "\\") esc = true;
+      else if (c === '"') inStr = false;
+      continue;
+    }
+    if (c === '"') inStr = true;
+    else if (c === "{" || c === "[") depth++;
+    else if (c === "}" || c === "]") {
+      depth--;
+      if (depth === 1 && c === "}") lastGood = i;
+    }
+  }
+  if (lastGood < 0) return [];
+  try {
+    const arr = JSON.parse(s.slice(start, lastGood + 1) + "]");
+    return Array.isArray(arr) ? arr : [];
+  } catch {
+    return [];
+  }
+}
+
+
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -487,7 +523,7 @@ Return ONLY valid JSON, no markdown.`;
       let fitContent = fitData.choices?.[0]?.message?.content || "[]";
       fitContent = fitContent.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
       let fitPlan: any[] = [];
-      try { fitPlan = JSON.parse(fitContent); } catch { fitPlan = []; }
+      try { fitPlan = JSON.parse(fitContent); } catch { fitPlan = repairTruncatedJsonArray(fitContent); }
       if (!Array.isArray(fitPlan) || fitPlan.length === 0) {
         return new Response(JSON.stringify({ error: "AI did not return a valid fitness plan" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
@@ -625,8 +661,11 @@ Return ONLY valid JSON, no markdown, no explanation.`;
     try {
       planData = JSON.parse(content);
     } catch {
-      console.error("Failed to parse AI response as JSON:", content.substring(0, 500));
-      planData = [];
+      planData = repairTruncatedJsonArray(content);
+      console.error(
+        `Failed to parse AI response as JSON (recovered ${Array.isArray(planData) ? planData.length : 0} weeks):`,
+        content.substring(0, 300),
+      );
     }
 
     // Trail race plans are business-critical and the model sometimes returns

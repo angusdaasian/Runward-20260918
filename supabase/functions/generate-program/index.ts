@@ -523,7 +523,7 @@ Return ONLY valid JSON, no markdown.`;
       let fitContent = fitData.choices?.[0]?.message?.content || "[]";
       fitContent = fitContent.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
       let fitPlan: any[] = [];
-      try { fitPlan = JSON.parse(fitContent); } catch { fitPlan = []; }
+      try { fitPlan = JSON.parse(fitContent); } catch { fitPlan = repairTruncatedJsonArray(fitContent); }
       if (!Array.isArray(fitPlan) || fitPlan.length === 0) {
         return new Response(JSON.stringify({ error: "AI did not return a valid fitness plan" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }

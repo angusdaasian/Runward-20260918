@@ -39,8 +39,9 @@ async function callVertexAI(opts: { apiKey: string; model?: string; messages: Ar
     contents,
     generationConfig: {
       // Medium thinking budget to keep latency under edge function CPU limit
-      thinkingConfig: { thinkingBudget: 4096 },
-      maxOutputTokens: 16384,
+      thinkingConfig: { thinkingBudget: 1024 },
+      maxOutputTokens: 65536,
+      responseMimeType: "application/json",
       temperature: 0.7,
     },
   };

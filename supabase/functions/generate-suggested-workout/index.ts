@@ -75,9 +75,9 @@ function isRunningActivity(activityType?: unknown, activityName?: unknown): bool
 // ── Vertex AI helper ──
 async function callVertexAI(opts: { apiKey: string; model?: string; messages: Array<{ role: string; content: any }>; timeoutMs?: number; thinkingLevel?: "minimal" | "low" | "medium" | "high" }): Promise<Response> {
   const VERTEX_MODEL_MAP: Record<string, string> = {
-    "google/gemini-3.1-flash-lite-preview": "gemini-3.1-flash-lite-preview",
+    "google/gemini-3.1-flash-lite-preview": "gemini-flash-lite-latest",
   };
-  const model = VERTEX_MODEL_MAP[opts.model || ""] || (opts.model || "gemini-3.1-flash-lite-preview").replace(/^google\//, "");
+  const model = VERTEX_MODEL_MAP[opts.model || ""] || (opts.model || "gemini-flash-lite-latest").replace(/^google\//, "");
   const __baseUrl = `https://aiplatform.googleapis.com/v1/projects/${getVertexProjectId()}/locations/${getVertexLocation()}/publishers/google/models/${model}:generateContent`;
   const { url, headers: __vxHeaders } = await buildVertexAuth(__baseUrl, opts.apiKey);
   const systemParts: any[] = [];

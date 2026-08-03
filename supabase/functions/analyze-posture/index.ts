@@ -26,7 +26,7 @@ async function callVertexAI(opts: {
   const VERTEX_MODEL_MAP: Record<string, string> = {
     "google/gemini-3.1-pro-preview": "gemini-3.1-pro-preview",
     "google/gemini-3.1-flash-preview": "gemini-3-flash-preview",
-    "google/gemini-3.1-flash-lite-preview": "gemini-3.1-flash-lite-preview",
+    "google/gemini-3.1-flash-lite-preview": "gemini-flash-lite-latest",
     "google/gemini-3-flash-preview": "gemini-3-flash-preview",
   };
   const model = VERTEX_MODEL_MAP[opts.model || ""] || (opts.model || "gemini-3-flash-preview").replace(/^google\//, "");

@@ -105,7 +105,7 @@ Return STRICT JSON only, no prose, no code fences:
 
     const raw = await callVertexAI({
       apiKey: VERTEX_API_KEY,
-      model: "gemini-3.1-flash-lite-preview",
+      model: "gemini-flash-lite-latest",
       messages: [
         { role: "system", content: "You are a precise running performance predictor. Return only valid JSON." },
         { role: "user", content: prompt },

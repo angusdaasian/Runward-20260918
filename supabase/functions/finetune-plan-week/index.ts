@@ -26,7 +26,7 @@ function getVertexLocation(): string {
   return Deno.env.get("GOOGLE_VERTEX_LOCATION") || "global";
 }
 
-const MODEL = "gemini-3.1-flash-lite-preview";
+const MODEL = "gemini-flash-lite-latest";
 
 async function callGemini(systemPrompt: string, userPrompt: string): Promise<string> {
   const __baseUrl = `https://aiplatform.googleapis.com/v1/projects/${getVertexProjectId()}/locations/${getVertexLocation()}/publishers/google/models/${MODEL}:generateContent`;

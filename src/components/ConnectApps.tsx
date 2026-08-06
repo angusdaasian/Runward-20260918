@@ -59,7 +59,7 @@ const ConnectApps = ({ lang, onBack }: Props) => {
   const garmin = useGarmin(lang);
   const [garminDialogOpen, setGarminDialogOpen] = useState(false);
 
-  // A fitness app = Strava, Garmin, or native Suunto connection.
+  // A fitness app = Strava or native Suunto connection (legacy direct Garmin rows are ignored).
   // Users can only have one of: Strava | native Suunto | Terra (any provider).
   const hasFitnessApp = stravaConnected || suuntoConnected;
 

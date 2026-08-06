@@ -1,0 +1,1 @@
+DELETE FROM public.garmin_connections WHERE user_id = '11e2c986-7a4f-4e2b-8d43-5180bab6c869';

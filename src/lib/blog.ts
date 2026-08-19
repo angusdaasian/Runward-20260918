@@ -8,6 +8,7 @@ export interface BlogPost {
   content: string;
   coverImage: string | null;
   author: string;
+  tags: string[];
   date: string; // ISO
   source: "markdown" | "database";
 }
@@ -42,6 +43,10 @@ export function getMarkdownPosts(): BlogPost[] {
         content: body,
         coverImage: data.coverImage || data.cover_image || null,
         author: data.author || "Runward",
+        tags: (data.tags || "")
+          .split(",")
+          .map((t) => t.trim())
+          .filter(Boolean),
         date: data.date ? new Date(data.date).toISOString() : new Date().toISOString(),
         source: "markdown" as const,
       };
@@ -52,7 +57,7 @@ export function getMarkdownPosts(): BlogPost[] {
 export async function fetchDatabasePosts(): Promise<BlogPost[]> {
   const { data, error } = await supabase
     .from("blog_posts")
-    .select("slug,title,excerpt,content,cover_image_url,author,published_at,created_at")
+    .select("slug,title,excerpt,content,cover_image_url,author,tags,published_at,created_at")
     .eq("published", true)
     .order("published_at", { ascending: false })
     .limit(200);
@@ -66,6 +71,7 @@ export async function fetchDatabasePosts(): Promise<BlogPost[]> {
     content: row.content || "",
     coverImage: row.cover_image_url || null,
     author: row.author || "Runward",
+    tags: (row as { tags?: string[] | null }).tags ?? [],
     date: new Date(row.published_at || row.created_at).toISOString(),
     source: "database" as const,
   }));

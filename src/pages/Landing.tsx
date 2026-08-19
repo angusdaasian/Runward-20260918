@@ -58,6 +58,12 @@ const Landing = () => {
             >
               {zh ? "比較" : "Compare"}
             </Link>
+            <Link
+              to="/blog"
+              className="hidden sm:inline-block text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              {zh ? "博客" : "Blog"}
+            </Link>
             <button
               onClick={toggleLang}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-card border border-border text-sm text-muted-foreground hover:text-foreground transition-colors"
@@ -479,6 +485,9 @@ const Landing = () => {
             <img src={poweredByStrava.url} alt="Powered by Strava" className="h-5" />
           </div>
           <div className="flex gap-6">
+            <Link to="/blog" className="hover:text-foreground transition-colors">
+              {zh ? "博客" : "Blog"}
+            </Link>
             <Link to="/privacy" state={{ from: currentRoute }} className="hover:text-foreground transition-colors">
               {zh ? "隱私政策" : "Privacy Policy"}
             </Link>

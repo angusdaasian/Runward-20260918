@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Runward Blog</title>
+    <link>https://angustest.site/blog</link>
+    <description>Running training, pacing and posture guides from Runward.</description>
+    <language>en</language>
+    <atom:link href="https://angustest.site/feed.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>How to pace your first half marathon</title>
+      <link>https://angustest.site/blog/how-to-pace-your-first-half-marathon</link>
+      <guid isPermaLink="true">https://angustest.site/blog/how-to-pace-your-first-half-marathon</guid>
+      <pubDate>Wed, 12 Aug 2026 00:00:00 GMT</pubDate>
+      <description>A practical pacing plan for your first 21.1 km — how to pick a realistic goal pace, split the race into thirds, and avoid the classic 15 km fade.</description>
+    </item>
+    <item>
+      <title>Why running posture matters more than mileage</title>
+      <link>https://angustest.site/blog/why-running-posture-matters</link>
+      <guid isPermaLink="true">https://angustest.site/blog/why-running-posture-matters</guid>
+      <pubDate>Wed, 05 Aug 2026 00:00:00 GMT</pubDate>
+      <description>Cadence, torso lean, and arm carriage change how much load each step puts through your legs. Here is what to look for when you film yourself running.</description>
+    </item>
+  </channel>
+</rss>

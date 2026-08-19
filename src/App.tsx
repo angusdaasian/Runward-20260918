@@ -15,6 +15,9 @@ import { installGlobalUIUnlockGuard } from "@/lib/uiUnlock";
 const Index = lazy(() => import("./pages/Index.tsx"));
 const Landing = lazy(() => import("./pages/Landing.tsx"));
 const ReviewLanding = lazy(() => import("./pages/ReviewLanding.tsx"));
+const Blog = lazy(() => import("./pages/Blog.tsx"));
+const BlogPost = lazy(() => import("./pages/BlogPost.tsx"));
+const BlogAdmin = lazy(() => import("./pages/BlogAdmin.tsx"));
 const NotFound = lazy(() => import("./pages/NotFound.tsx"));
 const AdminPanel = lazy(() => import("./pages/AdminPanel.tsx"));
 const AppleCallback = lazy(() => import("./pages/AppleCallback.tsx"));
@@ -79,6 +82,9 @@ const App = () => (
                 <Route path="/" element={<RootRoute />} />
                 <Route path="/full" element={<Landing />} />
                 <Route path="/review" element={<ReviewLanding />} />
+                <Route path="/blog" element={<Blog />} />
+                <Route path="/blog/:slug" element={<BlogPost />} />
+                <Route path="/admin/blog" element={<BlogAdmin />} />
 
                 <Route path="/callback/apple" element={<AppleCallback />} />
                 <Route path="/admin" element={<AdminPanel />} />

@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "predev": "node scripts/blog-static.mjs sitemap",
+    "prebuild": "node scripts/blog-static.mjs sitemap",
+    "build": "vite build && node scripts/blog-static.mjs prerender",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview",

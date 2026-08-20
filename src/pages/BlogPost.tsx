@@ -151,7 +151,11 @@ const BlogPostPage = () => {
                 {post.content}
               </ReactMarkdown>
             </div>
+            {raceForSlug(post.slug) && (
+              <BlogPaceCalculator race={raceForSlug(post.slug)!} lang={post.lang} />
+            )}
           </article>
+
         )}
       </main>
     </div>

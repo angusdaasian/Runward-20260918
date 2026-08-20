@@ -90,12 +90,9 @@ const Dashboard = () => {
   const gateLang: Lang = (localStorage.getItem("app_lang") as Lang) || "en";
   const gateZh = gateLang === "zh";
 
-  // Dashboard access: admins + explicit email/user-id allowlist (beta).
-  const DASHBOARD_ALLOWED_EMAILS = ["angchenghk@gmail.com"];
-  const DASHBOARD_ALLOWED_USER_IDS = ["c7a7d1ca-c7bf-4288-bb9d-794006a04087"];
-  const emailAllowed = !!user?.email && DASHBOARD_ALLOWED_EMAILS.includes(user.email.toLowerCase());
-  const idAllowed = !!user?.id && DASHBOARD_ALLOWED_USER_IDS.includes(user.id);
-  const canAccessDashboard = isAdmin || emailAllowed || idAllowed;
+  // Dashboard access: admins only (public.user_roles + has_role RPC).
+  const canAccessDashboard = isAdmin;
+
 
   // Redirect signed-in users who aren't allowlisted back to home,
   // so the sign-in flow completes without being trapped on a gate screen.
@@ -159,6 +156,43 @@ const Dashboard = () => {
       </div>
     );
   }
+
+  // Signed-out visitors never see the dashboard shell — sign-in first, then the
+  // admin/allowlist check above decides whether they stay.
+  if (!user) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-background px-6 text-center">
+        <img src={appIcon} alt="Runward" className="h-12 w-12 rounded-xl ring-1 ring-border" />
+        <div>
+          <h1 className="font-display text-xl font-bold">
+            {gateZh ? "此儀表板僅供管理員使用" : "Dashboard is admin-only"}
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {gateZh
+              ? "請使用管理員帳戶登入以繼續。"
+              : "Sign in with an administrator account to continue."}
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Button onClick={openAuth}>{gateZh ? "登入" : "Sign in"}</Button>
+          <Button variant="outline" onClick={() => navigate("/")}>
+            {gateZh ? "返回首頁" : "Back to home"}
+          </Button>
+        </div>
+        {showAuth && (
+          <Suspense fallback={<TabPageSkeleton />}>
+            <DashboardAuth
+              lang={gateLang}
+              onSuccess={() => setShowAuth(false)}
+              onGuest={() => setShowAuth(false)}
+              onClose={() => setShowAuth(false)}
+            />
+          </Suspense>
+        )}
+      </div>
+    );
+  }
+
 
   return (
     <SidebarProvider>

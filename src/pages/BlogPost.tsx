@@ -25,17 +25,30 @@ const BlogPostPage = () => {
 
   useEffect(() => {
     if (!post) return;
+    document.documentElement.lang = post.lang === "zh" ? "zh-HK" : "en";
     applySeoHead({
       title: `${post.title} — Runward Blog`,
       description: post.excerpt,
       canonical: `/blog/${post.slug}`,
       image: post.coverImage,
       type: "article",
+      alternates: [
+        { hrefLang: post.lang === "zh" ? "zh-HK" : "en", href: `/blog/${post.slug}` },
+        ...(post.translationSlug
+          ? [
+              {
+                hrefLang: post.lang === "zh" ? "en" : "zh-HK",
+                href: `/blog/${post.translationSlug}`,
+              },
+            ]
+          : []),
+      ],
       jsonLd: {
         "@context": "https://schema.org",
         "@type": "Article",
         headline: post.title,
         description: post.excerpt,
+        inLanguage: post.lang === "zh" ? "zh-HK" : "en",
         datePublished: post.date,
         author: { "@type": "Organization", name: post.author },
         publisher: { "@type": "Organization", name: "Runward" },
@@ -48,14 +61,22 @@ const BlogPostPage = () => {
   return (
     <div className="min-h-screen bg-background text-foreground font-body">
       <header className="border-b border-border/50">
-        <div className="max-w-3xl mx-auto px-6 py-6">
+        <div className="max-w-3xl mx-auto px-6 py-6 flex items-center justify-between">
           <Link
             to="/blog"
             className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
           >
             <ArrowLeft size={16} />
-            All articles
+            {post?.lang === "zh" ? "所有文章" : "All articles"}
           </Link>
+          {post?.translationSlug && (
+            <Link
+              to={`/blog/${post.translationSlug}`}
+              className="text-sm px-3 py-1.5 rounded-full border border-border text-muted-foreground hover:text-foreground transition-colors"
+            >
+              {post.lang === "zh" ? "English" : "中文"}
+            </Link>
+          )}
         </div>
       </header>
 
@@ -72,7 +93,7 @@ const BlogPostPage = () => {
         ) : (
           <article>
             <div className="text-sm text-muted-foreground">
-              {formatPostDate(post.date)} · {post.author}
+              {formatPostDate(post.date, post.lang)} · {post.author}
             </div>
             <h1 className="mt-3 font-display text-3xl sm:text-4xl font-bold tracking-tight leading-tight">
               {post.title}

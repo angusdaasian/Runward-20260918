@@ -10,6 +10,9 @@ export interface BlogPost {
   author: string;
   tags: string[];
   date: string; // ISO
+  lang: "en" | "zh";
+  /** Slug of the same article in the other language, when available. */
+  translationSlug: string | null;
   source: "markdown" | "database";
 }
 
@@ -48,10 +51,18 @@ export function getMarkdownPosts(): BlogPost[] {
           .map((t) => t.trim())
           .filter(Boolean),
         date: data.date ? new Date(data.date).toISOString() : new Date().toISOString(),
+        lang: data.lang === "zh" ? ("zh" as const) : ("en" as const),
+        translationSlug: data.translationSlug || data.translation_slug || null,
         source: "markdown" as const,
       };
     })
     .sort((a, b) => b.date.localeCompare(a.date));
+}
+
+/** Database posts have no explicit language column: infer from the slug suffix or CJK title. */
+function inferLang(slug: string, title: string): "en" | "zh" {
+  if (/-(zh|cn|hk)$/i.test(slug)) return "zh";
+  return /[\u4e00-\u9fff]/.test(title || "") ? "zh" : "en";
 }
 
 export async function fetchDatabasePosts(): Promise<BlogPost[]> {
@@ -73,6 +84,8 @@ export async function fetchDatabasePosts(): Promise<BlogPost[]> {
     author: row.author || "Runward",
     tags: (row as { tags?: string[] | null }).tags ?? [],
     date: new Date(row.published_at || row.created_at).toISOString(),
+    lang: inferLang(row.slug, row.title),
+    translationSlug: null,
     source: "database" as const,
   }));
 }
@@ -94,8 +107,13 @@ export async function getPostBySlug(slug: string): Promise<BlogPost | null> {
   return dbPosts.find((p) => p.slug === slug) ?? null;
 }
 
-export function formatPostDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("en-GB", {
+export function postsForLang(posts: BlogPost[], lang: "en" | "zh"): BlogPost[] {
+  const matching = posts.filter((p) => p.lang === lang);
+  return matching.length > 0 ? matching : posts;
+}
+
+export function formatPostDate(iso: string, lang: "en" | "zh" = "en"): string {
+  return new Date(iso).toLocaleDateString(lang === "zh" ? "zh-HK" : "en-GB", {
     year: "numeric",
     month: "long",
     day: "numeric",

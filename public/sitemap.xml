@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
   <url>
     <loc>https://angustest.site/</loc>
     <changefreq>weekly</changefreq>
@@ -41,15 +41,83 @@
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://angustest.site/blog/how-to-pace-your-first-half-marathon</loc>
-    <lastmod>2026-08-12</lastmod>
+    <loc>https://angustest.site/blog/how-to-start-long-distance-running-zh</loc>
+    <lastmod>2026-08-20</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="zh-HK" href="https://angustest.site/blog/how-to-start-long-distance-running-zh" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://angustest.site/blog/how-to-start-long-distance-running" />
   </url>
   <url>
-    <loc>https://angustest.site/blog/why-running-posture-matters</loc>
-    <lastmod>2026-08-05</lastmod>
+    <loc>https://angustest.site/blog/how-to-start-long-distance-running</loc>
+    <lastmod>2026-08-20</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://angustest.site/blog/how-to-start-long-distance-running" />
+    <xhtml:link rel="alternate" hreflang="zh-HK" href="https://angustest.site/blog/how-to-start-long-distance-running-zh" />
+  </url>
+  <url>
+    <loc>https://angustest.site/blog/how-to-train-for-your-first-10k-zh</loc>
+    <lastmod>2026-08-19</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="zh-HK" href="https://angustest.site/blog/how-to-train-for-your-first-10k-zh" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://angustest.site/blog/how-to-train-for-your-first-10k" />
+  </url>
+  <url>
+    <loc>https://angustest.site/blog/how-to-train-for-your-first-10k</loc>
+    <lastmod>2026-08-19</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://angustest.site/blog/how-to-train-for-your-first-10k" />
+    <xhtml:link rel="alternate" hreflang="zh-HK" href="https://angustest.site/blog/how-to-train-for-your-first-10k-zh" />
+  </url>
+  <url>
+    <loc>https://angustest.site/blog/how-to-train-for-your-first-half-marathon-zh</loc>
+    <lastmod>2026-08-18</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="zh-HK" href="https://angustest.site/blog/how-to-train-for-your-first-half-marathon-zh" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://angustest.site/blog/how-to-train-for-your-first-half-marathon" />
+  </url>
+  <url>
+    <loc>https://angustest.site/blog/how-to-train-for-your-first-half-marathon</loc>
+    <lastmod>2026-08-18</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://angustest.site/blog/how-to-train-for-your-first-half-marathon" />
+    <xhtml:link rel="alternate" hreflang="zh-HK" href="https://angustest.site/blog/how-to-train-for-your-first-half-marathon-zh" />
+  </url>
+  <url>
+    <loc>https://angustest.site/blog/how-to-train-for-your-first-marathon-zh</loc>
+    <lastmod>2026-08-17</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="zh-HK" href="https://angustest.site/blog/how-to-train-for-your-first-marathon-zh" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://angustest.site/blog/how-to-train-for-your-first-marathon" />
+  </url>
+  <url>
+    <loc>https://angustest.site/blog/how-to-train-for-your-first-marathon</loc>
+    <lastmod>2026-08-17</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://angustest.site/blog/how-to-train-for-your-first-marathon" />
+    <xhtml:link rel="alternate" hreflang="zh-HK" href="https://angustest.site/blog/how-to-train-for-your-first-marathon-zh" />
+  </url>
+  <url>
+    <loc>https://angustest.site/blog/how-to-use-runward-to-train-zh</loc>
+    <lastmod>2026-08-16</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="zh-HK" href="https://angustest.site/blog/how-to-use-runward-to-train-zh" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://angustest.site/blog/how-to-use-runward-to-train" />
+  </url>
+  <url>
+    <loc>https://angustest.site/blog/how-to-use-runward-to-train</loc>
+    <lastmod>2026-08-16</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://angustest.site/blog/how-to-use-runward-to-train" />
+    <xhtml:link rel="alternate" hreflang="zh-HK" href="https://angustest.site/blog/how-to-use-runward-to-train-zh" />
   </url>
 </urlset>

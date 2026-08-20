@@ -83,6 +83,8 @@ function markdownPosts() {
         author: data.author || "Runward",
         tags: (data.tags || "").split(",").map((t) => t.trim()).filter(Boolean),
         date: data.date ? new Date(data.date).toISOString() : new Date().toISOString(),
+        lang: data.lang === "zh" ? "zh" : "en",
+        translationSlug: data.translationSlug || data.translation_slug || null,
       };
     });
 }
@@ -107,6 +109,10 @@ async function databasePosts() {
       author: row.author || "Runward",
       tags: row.tags || [],
       date: new Date(row.published_at || row.created_at).toISOString(),
+      lang: /-(zh|cn|hk)$/i.test(row.slug || "") || /[\u4e00-\u9fff]/.test(row.title || "")
+        ? "zh"
+        : "en",
+      translationSlug: null,
     }));
   } catch {
     return [];
@@ -127,6 +133,10 @@ function writeSitemap(posts) {
     ...STATIC_ROUTES,
     ...posts.map((p) => ({
       path: `/blog/${p.slug}`,
+      alternate: p.translationSlug
+        ? { hrefLang: p.lang === "zh" ? "en" : "zh-HK", path: `/blog/${p.translationSlug}` }
+        : null,
+      lang: p.lang,
       lastmod: p.date.slice(0, 10),
       changefreq: "monthly",
       priority: "0.7",
@@ -134,7 +144,7 @@ function writeSitemap(posts) {
   ];
   const xml = [
     `<?xml version="1.0" encoding="UTF-8"?>`,
-    `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">`,
+    `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">`,
     ...entries.map((e) =>
       [
         `  <url>`,
@@ -142,6 +152,12 @@ function writeSitemap(posts) {
         e.lastmod ? `    <lastmod>${e.lastmod}</lastmod>` : null,
         e.changefreq ? `    <changefreq>${e.changefreq}</changefreq>` : null,
         e.priority ? `    <priority>${e.priority}</priority>` : null,
+        e.lang
+          ? `    <xhtml:link rel="alternate" hreflang="${e.lang === "zh" ? "zh-HK" : "en"}" href="${BASE_URL}${e.path}" />`
+          : null,
+        e.alternate
+          ? `    <xhtml:link rel="alternate" hreflang="${e.alternate.hrefLang}" href="${BASE_URL}${e.alternate.path}" />`
+          : null,
         `  </url>`,
       ]
         .filter(Boolean)
@@ -183,7 +199,7 @@ ${items}
   console.log(`feed.xml written (${posts.length} items)`);
 }
 
-function headTags({ title, description, canonical, image, type, jsonLd }) {
+function headTags({ title, description, canonical, image, type, jsonLd, lang, alternates }) {
   const absoluteImage = image ? (image.startsWith("http") ? image : `${BASE_URL}${image}`) : null;
   return [
     `<title>${escapeHtml(title)}</title>`,
@@ -198,6 +214,10 @@ function headTags({ title, description, canonical, image, type, jsonLd }) {
     `<meta name="twitter:title" content="${escapeHtml(title)}" />`,
     `<meta name="twitter:description" content="${escapeHtml(description)}" />`,
     absoluteImage ? `<meta name="twitter:image" content="${absoluteImage}" />` : null,
+    lang ? `<meta property="og:locale" content="${lang === "zh" ? "zh_HK" : "en_US"}" />` : null,
+    ...(alternates ?? []).map(
+      (a) => `<link rel="alternate" hreflang="${a.hrefLang}" href="${BASE_URL}${a.href}" />`,
+    ),
     `<link rel="alternate" type="application/rss+xml" title="Runward Blog" href="${BASE_URL}/feed.xml" />`,
     `<script type="application/ld+json">${JSON.stringify(jsonLd)}</script>`,
   ]
@@ -242,9 +262,9 @@ async function prerender() {
     )
     .join("")}</ul></main>`;
   const indexHead = headTags({
-    title: "Runward Blog — Running training, pacing & posture guides",
+    title: "Runward Blog — Running training guides for 10K, half marathon & marathon",
     description:
-      "Practical running articles from Runward: pacing strategy, training structure, posture and injury prevention for road and trail runners.",
+      "Practical running training guides from Runward: how to start long distance running, 10K, half marathon and marathon plans, pacing and posture — in English and Chinese.",
     canonical: `${BASE_URL}/blog`,
     image: null,
     type: "website",
@@ -269,11 +289,24 @@ async function prerender() {
       canonical,
       image: post.coverImage,
       type: "article",
+      lang: post.lang,
+      alternates: [
+        { hrefLang: post.lang === "zh" ? "zh-HK" : "en", href: `/blog/${post.slug}` },
+        ...(post.translationSlug
+          ? [
+              {
+                hrefLang: post.lang === "zh" ? "en" : "zh-HK",
+                href: `/blog/${post.translationSlug}`,
+              },
+            ]
+          : []),
+      ],
       jsonLd: {
         "@context": "https://schema.org",
         "@type": "Article",
         headline: post.title,
         description: post.excerpt,
+        inLanguage: post.lang === "zh" ? "zh-HK" : "en",
         datePublished: post.date,
         author: { "@type": "Organization", name: post.author },
         publisher: { "@type": "Organization", name: "Runward" },

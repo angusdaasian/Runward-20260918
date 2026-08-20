@@ -4,6 +4,7 @@ slug: "how-to-train-for-your-first-marathon"
 lang: "en"
 translationSlug: "how-to-train-for-your-first-marathon-zh"
 date: "2026-08-17"
+coverImage: "/blog/marathon.jpg"
 author: "Runward"
 tags: "Marathon, Training Plan"
 excerpt: "A 16-week marathon training plan for first-time marathoners: long run progression to 32 km, marathon-pace work, fuelling to avoid the wall, the three-week taper, and realistic goal setting."
@@ -36,10 +37,10 @@ Before week one you should be running 30–40 km a week comfortably, with a long
 | 7 | 6 × 1 km at 10K pace | 18 km (easier) | ~48 km |
 | 8 | 2 × 20 min tempo | 26 km | ~60 km |
 | 9 | 40 min tempo | 28 km | ~64 km |
-| 10 | 20 km with 12 km at marathon pace | 20 km (that session) | ~60 km |
+| 10 | 20 km with 12 km at marathon pace | 20 km (the quality session doubles as the long run) | ~60 km |
 | 11 | 3 × 3 km at half pace | 30 km | ~68 km |
 | 12 | 40 min tempo | 24 km (easier) | ~58 km |
-| 13 | 25 km with 15 km at marathon pace | 32 km peak long run | ~70 km |
+| 13 | 25 km with 15 km at marathon pace | 32 km (peak long run) | ~70 km |
 | 14 | 30 min tempo | 22 km | ~55 km |
 | 15 | 4 × 1 km at 10K pace | 16 km | ~42 km |
 | 16 | 3 × 1 km at marathon pace | Race day | ~25 km |

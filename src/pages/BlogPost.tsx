@@ -118,7 +118,7 @@ const BlogPostPage = () => {
                 className="mt-8 w-full rounded-2xl border border-border object-cover"
               />
             )}
-            <div className="prose prose-invert mt-8 max-w-none prose-headings:font-display prose-a:text-primary prose-table:my-6 prose-th:text-left prose-th:font-semibold">
+            <div className="prose prose-neutral dark:prose-invert mt-8 prose-headings:text-foreground prose-p:text-foreground/90 prose-li:text-foreground/90 prose-strong:text-foreground max-w-none prose-headings:font-display prose-a:text-primary prose-table:my-6 prose-th:text-left prose-th:font-semibold">
               <ReactMarkdown
                 remarkPlugins={[remarkGfm]}
                 components={{

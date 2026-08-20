@@ -7,6 +7,20 @@
     <language>en</language>
     <atom:link href="https://runward.site/feed.xml" rel="self" type="application/rss+xml" />
     <item>
+      <title>How to Use Runward to Train Smarter: Every Feature Explained</title>
+      <link>https://runward.site/blog/how-to-use-runward-to-train</link>
+      <guid isPermaLink="true">https://runward.site/blog/how-to-use-runward-to-train</guid>
+      <pubDate>Thu, 20 Aug 2026 06:10:27 GMT</pubDate>
+      <description>A full walkthrough of Runward: activity sync from Strava, Garmin and Apple Health, training load and HRV insights, personalised training plans, race prediction, posture analysis, the injury dashboard, CityHunter and community leaderboards.</description>
+    </item>
+    <item>
+      <title>如何用 Runward 幫助訓練：全部功能一次講清</title>
+      <link>https://runward.site/blog/how-to-use-runward-to-train-zh</link>
+      <guid isPermaLink="true">https://runward.site/blog/how-to-use-runward-to-train-zh</guid>
+      <pubDate>Thu, 20 Aug 2026 06:10:19 GMT</pubDate>
+      <description>Runward 完整功能導覽：Strava／Garmin／Apple Health 同步、訓練負荷與 HRV 洞察、個人化訓練計劃、比賽時間預測、跑姿分析、傷患儀表板、CityHunter 與社群排行榜。</description>
+    </item>
+    <item>
       <title>長跑入門指南：新手如何開始長距離跑步</title>
       <link>https://runward.site/blog/how-to-start-long-distance-running-zh</link>
       <guid isPermaLink="true">https://runward.site/blog/how-to-start-long-distance-running-zh</guid>
@@ -61,20 +75,6 @@
       <guid isPermaLink="true">https://runward.site/blog/how-to-train-for-your-first-marathon</guid>
       <pubDate>Mon, 17 Aug 2026 00:00:00 GMT</pubDate>
       <description>A 16-week marathon training plan for first-time marathoners: long run progression to 32 km, marathon-pace work, fuelling to avoid the wall, the three-week taper, and realistic goal setting.</description>
-    </item>
-    <item>
-      <title>如何用 Runward 幫助訓練：全部功能一次講清</title>
-      <link>https://runward.site/blog/how-to-use-runward-to-train-zh</link>
-      <guid isPermaLink="true">https://runward.site/blog/how-to-use-runward-to-train-zh</guid>
-      <pubDate>Sun, 16 Aug 2026 00:00:00 GMT</pubDate>
-      <description>Runward 完整功能導覽：Strava／Garmin／Apple Health 同步、訓練負荷與 HRV 洞察、個人化訓練計劃、比賽時間預測、跑姿分析、傷患Dashboard、CityHunter 與社群排行榜。</description>
-    </item>
-    <item>
-      <title>How to Use Runward to Train Smarter: Every Feature Explained</title>
-      <link>https://runward.site/blog/how-to-use-runward-to-train</link>
-      <guid isPermaLink="true">https://runward.site/blog/how-to-use-runward-to-train</guid>
-      <pubDate>Sun, 16 Aug 2026 00:00:00 GMT</pubDate>
-      <description>A full walkthrough of Runward: activity sync from Strava, Garmin and Apple Health, training load and HRV insights, personalised training plans, race prediction, posture analysis, the injury dashboard, CityHunter and community leaderboards.</description>
     </item>
   </channel>
 </rss>

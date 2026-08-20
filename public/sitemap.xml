@@ -41,6 +41,22 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://runward.site/blog/how-to-use-runward-to-train</loc>
+    <lastmod>2026-08-20</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://runward.site/blog/how-to-use-runward-to-train" />
+    <xhtml:link rel="alternate" hreflang="zh-HK" href="https://runward.site/blog/how-to-use-runward-to-train-zh" />
+  </url>
+  <url>
+    <loc>https://runward.site/blog/how-to-use-runward-to-train-zh</loc>
+    <lastmod>2026-08-20</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="zh-HK" href="https://runward.site/blog/how-to-use-runward-to-train-zh" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://runward.site/blog/how-to-use-runward-to-train" />
+  </url>
+  <url>
     <loc>https://runward.site/blog/how-to-start-long-distance-running-zh</loc>
     <lastmod>2026-08-20</lastmod>
     <changefreq>monthly</changefreq>
@@ -103,21 +119,5 @@
     <priority>0.7</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://runward.site/blog/how-to-train-for-your-first-marathon" />
     <xhtml:link rel="alternate" hreflang="zh-HK" href="https://runward.site/blog/how-to-train-for-your-first-marathon-zh" />
-  </url>
-  <url>
-    <loc>https://runward.site/blog/how-to-use-runward-to-train-zh</loc>
-    <lastmod>2026-08-16</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.7</priority>
-    <xhtml:link rel="alternate" hreflang="zh-HK" href="https://runward.site/blog/how-to-use-runward-to-train-zh" />
-    <xhtml:link rel="alternate" hreflang="en" href="https://runward.site/blog/how-to-use-runward-to-train" />
-  </url>
-  <url>
-    <loc>https://runward.site/blog/how-to-use-runward-to-train</loc>
-    <lastmod>2026-08-16</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.7</priority>
-    <xhtml:link rel="alternate" hreflang="en" href="https://runward.site/blog/how-to-use-runward-to-train" />
-    <xhtml:link rel="alternate" hreflang="zh-HK" href="https://runward.site/blog/how-to-use-runward-to-train-zh" />
   </url>
 </urlset>

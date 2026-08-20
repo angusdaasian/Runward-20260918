@@ -25,6 +25,7 @@ import {
   RefreshCw,
   Code2,
   Brain,
+  Newspaper,
 } from "lucide-react";
 import {
   Sidebar,
@@ -52,6 +53,7 @@ import SuuntoSyncTester from "@/components/admin/SuuntoSyncTester";
 import PolarSyncTester from "@/components/admin/PolarSyncTester";
 import DeveloperAppsManager from "@/components/admin/DeveloperAppsManager";
 import AdminLlamaTraining from "@/components/admin/AdminLlamaTraining";
+import BlogManager from "@/components/admin/BlogManager";
 
 interface UserRow {
   user_id: string;
@@ -77,6 +79,7 @@ type TabKey =
   | "races"
   | "pending"
   | "feedback"
+  | "blog"
   | "terra"
   | "strava"
   | "suunto"
@@ -93,6 +96,7 @@ const TABS: { key: TabKey; label: string; icon: React.ComponentType<{ className?
   { key: "races", label: "Races", icon: Flag },
   { key: "pending", label: "Pending Races", icon: ClipboardList },
   { key: "feedback", label: "Feedback", icon: MessageSquare },
+  { key: "blog", label: "Blog", icon: Newspaper },
   { key: "terra", label: "Terra Sync", icon: RefreshCw },
   { key: "strava", label: "Strava Apps", icon: RefreshCw },
   { key: "suunto", label: "Suunto Sync", icon: RefreshCw },
@@ -434,6 +438,8 @@ const AdminPanel = () => {
         return <PendingRaceManager />;
       case "feedback":
         return <FeedbackManager />;
+      case "blog":
+        return <BlogManager />;
       case "terra":
         return <TerraSyncTester />;
       case "strava":

@@ -11,7 +11,7 @@ import { readFileSync, readdirSync, existsSync, mkdirSync, writeFileSync } from 
 import { resolve, join } from "node:path";
 import { marked } from "marked";
 
-const BASE_URL = "https://angustest.site";
+const BASE_URL = "https://runward.site";
 const MAX_PRERENDERED_POSTS = 200;
 const CONTENT_DIR = resolve("src/content/blog");
 

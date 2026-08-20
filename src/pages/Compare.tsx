@@ -285,7 +285,7 @@ const Compare = () => {
               to="/dashboard"
               className="inline-flex items-center gap-2 px-5 py-3 rounded-full bg-card border border-border text-sm font-semibold hover:bg-muted transition-colors"
             >
-              {zh ? "開啟網頁儀表板" : "Open Web Dashboard"}
+              {zh ? "開啟網頁Dashboard" : "Open Web Dashboard"}
             </Link>
           </div>
         </div>

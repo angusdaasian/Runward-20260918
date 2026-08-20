@@ -49,7 +49,7 @@ const ReviewLanding = () => {
     },
     {
       icon: Shield,
-      title: zh ? "受傷儀表板" : "Injury Dashboard",
+      title: zh ? "受傷Dashboard" : "Injury Dashboard",
       desc: zh
         ? "把訓練量、恢復狀態與睡眠整合成清晰的受傷風險指標,在小痛變成大傷之前提前調整。"
         : "Combines training load, recovery and sleep into a single injury-risk indicator so you can back off before small niggles turn into real injuries.",

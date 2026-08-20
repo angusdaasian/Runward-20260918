@@ -241,7 +241,7 @@ const AnalyticsTab = ({ lang }: Props) => {
                     className="mt-6 w-full flex items-center justify-center gap-2 py-3 text-sm font-semibold text-primary hover:bg-primary/5 rounded-lg transition-colors"
                   >
                     <Pencil size={14} />
-                    {lang === "zh" ? "自訂儀表板" : "Customize dashboard"}
+                    {lang === "zh" ? "自訂Dashboard" : "Customize dashboard"}
                   </button>
                 </>
               ) : (

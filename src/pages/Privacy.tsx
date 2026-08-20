@@ -154,7 +154,7 @@ const Privacy = () => {
             </li>
             <li>
               {lang === "zh"
-                ? "僅限運動員查看:您的健身資料僅顯示於您的個人儀表板中,絕不會與其他用戶或第三方分享,也不會用於將您與其他運動員排名或比較。"
+                ? "僅限運動員查看:您的健身資料僅顯示於您的個人Dashboard中,絕不會與其他用戶或第三方分享,也不會用於將您與其他運動員排名或比較。"
                 : "Athlete-Only Display: Your fitness data is displayed only within your personal dashboard and is never shared with other users or third parties, and is never used to rank or compare you against other athletes."}
             </li>
             <li>

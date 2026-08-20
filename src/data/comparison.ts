@@ -118,7 +118,7 @@ export const garminComparison: CompetitorComparison = {
     },
     {
       label_en: "Web dashboard",
-      label_zh: "網頁版儀表板",
+      label_zh: "網頁版Dashboard",
       runward: yes(),
       competitor_free: yes(),
       competitor_premium: yes(),
@@ -227,7 +227,7 @@ export const stravaComparison: CompetitorComparison = {
     },
     {
       label_en: "Web dashboard",
-      label_zh: "網頁版儀表板",
+      label_zh: "網頁版Dashboard",
       runward: yes(),
       competitor_free: yes(),
       competitor_premium: yes(),

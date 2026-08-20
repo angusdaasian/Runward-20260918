@@ -237,6 +237,9 @@ function renderShell(template, head, bodyHtml) {
     "",
   );
   html = html.replace(/<meta\s+name="twitter:(?:title|description|image)"[^>]*>\s*/gi, "");
+  html = html.replace(/<link\s+rel="canonical"[^>]*>\s*/gi, "");
+  html = html.replace(/<link\s+rel="alternate"\s+type="application\/rss\+xml"[^>]*>\s*/gi, "");
+  html = html.replace(/<script type="application\/ld\+json">[\s\S]*?<\/script>\s*/i, "");
   html = html.replace("</head>", `  ${head}\n  </head>`);
   html = html.replace(
     /<div id="root">\s*<\/div>/,

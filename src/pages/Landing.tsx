@@ -83,7 +83,7 @@ const Landing = () => {
               className="hidden sm:inline-flex items-center gap-2 px-4 py-2 rounded-full bg-card border border-border text-sm font-semibold text-foreground hover:bg-muted transition-colors"
             >
               <Target size={14} />
-              {zh ? "儀表板" : "Dashboard"}
+              {zh ? "Dashboard" : "Dashboard"}
             </Link>
             <a
               href={APP_STORE_URL}

@@ -43,14 +43,14 @@ export default function DashboardPreview({ lang }: Props) {
       <div className="max-w-6xl mx-auto">
         <div className="text-center mb-12 md:mb-16">
           <span className="inline-block px-3 py-1 rounded-full bg-primary/15 text-primary text-xs font-semibold tracking-wide uppercase mb-4">
-            {zh ? "網頁儀表板" : "Web Dashboard"}
+            {zh ? "網頁Dashboard" : "Web Dashboard"}
           </span>
           <h2 className="font-display text-3xl md:text-5xl font-bold tracking-tight">
             {zh ? "在任何瀏覽器深入分析。" : "Go deeper. In any browser."}
           </h2>
           <p className="text-muted-foreground mt-3 max-w-xl mx-auto">
             {zh
-              ? "全螢幕的訓練儀表板 — 隨時查看每週負荷、最近活動與即將到來的訓練。"
+              ? "全螢幕的訓練Dashboard — 隨時查看每週負荷、最近活動與即將到來的訓練。"
               : "A full-screen training dashboard for weekly load, recent runs, and what's next."}
           </p>
         </div>
@@ -69,7 +69,7 @@ export default function DashboardPreview({ lang }: Props) {
                 {zh ? "即將推出" : "Coming Soon"}
               </span>
               <h3 className="font-display text-2xl md:text-4xl font-bold tracking-tight">
-                {zh ? "網頁儀表板開發中" : "Web Dashboard in the works"}
+                {zh ? "網頁Dashboard開發中" : "Web Dashboard in the works"}
               </h3>
               <p className="text-sm md:text-base text-muted-foreground mt-2 max-w-md mx-auto">
                 {zh ? "我們正在打造完整的瀏覽器體驗,敬請期待。" : "We're building the full browser experience. Stay tuned."}

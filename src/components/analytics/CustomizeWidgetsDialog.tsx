@@ -53,7 +53,7 @@ const CustomizeWidgetsDialog = ({ open, onOpenChange, prefs, onSave, lang, label
       <DialogContent className="max-w-md p-0 max-h-[85vh] flex flex-col">
         <div className="px-5 pt-5 pb-3 border-b border-border">
           <DialogTitle className="font-display text-lg font-bold">
-            {lang === "zh" ? "自訂儀表板" : "Customize dashboard"}
+            {lang === "zh" ? "自訂Dashboard" : "Customize dashboard"}
           </DialogTitle>
           <p className="text-xs text-muted-foreground mt-1">
             {lang === "zh" ? "重新排序與顯示/隱藏小工具" : "Reorder and show/hide widgets"}

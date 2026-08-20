@@ -165,7 +165,7 @@ const Dashboard = () => {
         <img src={appIcon} alt="Runward" className="h-12 w-12 rounded-xl ring-1 ring-border" />
         <div>
           <h1 className="font-display text-xl font-bold">
-            {gateZh ? "此儀表板僅供管理員使用" : "Dashboard is admin-only"}
+            {gateZh ? "此Dashboard僅供管理員使用" : "Dashboard is admin-only"}
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
             {gateZh

@@ -27,14 +27,11 @@ Four sessions a week is the sweet spot for a first 10K:
 
 Add two short strength sessions and at least one full rest day.
 
-## Finding your target paces
+## Find your Pace
 
-Take a recent 5K time (or run a 5K time trial). From it:
+Turn your goal 10K finish time into per-kilometre targets for every interval and tempo session in the plan below.
 
-- **Easy pace:** 60–90 seconds per km slower than 5K pace.
-- **10K goal pace:** roughly 10–15 seconds per km slower than 5K pace.
-- **Interval pace:** 5K pace or slightly quicker.
-- **Tempo pace:** 20–30 seconds per km slower than 10K pace.
+<!-- pace-calculator -->
 
 ## The 8-week plan
 

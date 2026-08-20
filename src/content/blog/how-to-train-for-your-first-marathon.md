@@ -24,6 +24,12 @@ Before week one you should be running 30–40 km a week comfortably, with a long
 4. **Easy volume** — 75–80% of your week, conversational.
 5. **Strength and sleep** — what keeps the other four possible.
 
+## Find your Pace
+
+Turn your goal marathon time into per-kilometre targets for the marathon-pace, tempo and long-run sessions in the plan below.
+
+<!-- pace-calculator -->
+
 ## The 16-week plan (4–5 runs per week)
 
 | Week | Key quality session | Long run | Weekly total |

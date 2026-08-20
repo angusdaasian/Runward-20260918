@@ -128,32 +128,46 @@ const BlogPostPage = () => {
                 className="mt-8 w-full rounded-2xl border border-border object-cover"
               />
             )}
-            <div className="prose prose-neutral dark:prose-invert mt-8 prose-headings:text-foreground prose-p:text-foreground/90 prose-li:text-foreground/90 prose-strong:text-foreground max-w-none prose-headings:font-display prose-a:text-primary prose-table:my-6 prose-th:text-left prose-th:font-semibold">
-              <ReactMarkdown
-                remarkPlugins={[remarkGfm]}
-                components={{
-                  table: ({ children }) => (
-                    <div className="my-6 overflow-x-auto rounded-xl border border-border">
-                      <table className="w-full text-sm border-collapse m-0">{children}</table>
-                    </div>
-                  ),
-                  thead: ({ children }) => <thead className="bg-muted/60">{children}</thead>,
-                  th: ({ children }) => (
-                    <th className="px-3 py-2 text-left font-semibold whitespace-nowrap border-b border-border">
-                      {children}
-                    </th>
-                  ),
-                  td: ({ children }) => (
-                    <td className="px-3 py-2 align-top border-b border-border/60">{children}</td>
-                  ),
-                }}
-              >
-                {post.content}
-              </ReactMarkdown>
-            </div>
-            {raceForSlug(post.slug) && (
-              <BlogPaceCalculator race={raceForSlug(post.slug)!} lang={post.lang} />
-            )}
+            {(() => {
+              const race = raceForSlug(post.slug);
+              const MARKER = "<!-- pace-calculator -->";
+              const idx = race ? post.content.indexOf(MARKER) : -1;
+              const before = idx >= 0 ? post.content.slice(0, idx) : post.content;
+              const after = idx >= 0 ? post.content.slice(idx + MARKER.length) : "";
+              const renderMd = (src: string) => (
+                <div className="prose prose-neutral dark:prose-invert mt-8 prose-headings:text-foreground prose-p:text-foreground/90 prose-li:text-foreground/90 prose-strong:text-foreground max-w-none prose-headings:font-display prose-a:text-primary prose-table:my-6 prose-th:text-left prose-th:font-semibold">
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm]}
+                    components={{
+                      table: ({ children }) => (
+                        <div className="my-6 overflow-x-auto rounded-xl border border-border">
+                          <table className="w-full text-sm border-collapse m-0">{children}</table>
+                        </div>
+                      ),
+                      thead: ({ children }) => <thead className="bg-muted/60">{children}</thead>,
+                      th: ({ children }) => (
+                        <th className="px-3 py-2 text-left font-semibold whitespace-nowrap border-b border-border">
+                          {children}
+                        </th>
+                      ),
+                      td: ({ children }) => (
+                        <td className="px-3 py-2 align-top border-b border-border/60">{children}</td>
+                      ),
+                    }}
+                  >
+                    {src}
+                  </ReactMarkdown>
+                </div>
+              );
+              return (
+                <>
+                  {renderMd(before)}
+                  {race && idx >= 0 && <BlogPaceCalculator race={race} lang={post.lang} />}
+                  {after && renderMd(after)}
+                  {race && idx < 0 && <BlogPaceCalculator race={race} lang={post.lang} />}
+                </>
+              );
+            })()}
           </article>
 
         )}

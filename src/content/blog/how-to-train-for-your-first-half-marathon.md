@@ -23,6 +23,12 @@ Comfortably running 8–10 km and covering 20–25 km a week is the right launch
 - **Efficiency** — from strides, intervals and strength work.
 - **Fuelling practice** — most runners need 30–60 g of carbohydrate per hour beyond 75 minutes.
 
+## Find your Pace
+
+Turn your goal half marathon time into per-kilometre targets for the tempo, interval and long-run sessions in the plan below.
+
+<!-- pace-calculator -->
+
 ## The 12-week plan (4 runs per week)
 
 | Week | Tempo / interval | Long run | Weekly total |

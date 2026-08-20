@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Calculator } from "lucide-react";
+import { Calculator, ChevronDown } from "lucide-react";
 import {
   calculateRunningScore,
   predictTime,
@@ -20,9 +20,7 @@ const RACES: Record<RaceKey, { meters: number; label: string; labelZh: string; d
 
 const T = {
   en: {
-    heading: "Work out your training paces",
-    intro: (race: string) =>
-      `Enter your goal ${race} finish time and every session in the plan above gets a target pace. Paces use the Daniels VDOT model — the same engine Runward uses in the app.`,
+    toggle: "Calculate your training paces",
     goal: "Goal finish time",
     h: "h",
     m: "min",
@@ -34,6 +32,8 @@ const T = {
     note: "Easy pace is a range on purpose — run the slow end when tired. Rep times are per repetition, not per km.",
     invalid: "Enter a realistic goal time to see your paces.",
     goalPace: "Goal race pace",
+    appNote:
+      "This is a general estimate from a single goal time. For paces tailored to your actual training data, use the Pace & Prediction tool in the Runward app.",
     names: {
       Easy: "Easy",
       Marathon: "Marathon pace",
@@ -44,9 +44,7 @@ const T = {
     } as Record<string, string>,
   },
   zh: {
-    heading: "計算你的訓練配速",
-    intro: (race: string) =>
-      `輸入你的${race}目標完成時間，上面訓練計劃中的每一課都會得出目標配速。計算採用 Daniels VDOT 模型，與 Runward 應用程式內的引擎相同。`,
+    toggle: "計算你的訓練配速",
     goal: "目標完成時間",
     h: "小時",
     m: "分",
@@ -58,6 +56,8 @@ const T = {
     note: "輕鬆跑刻意以區間顯示：疲累時跑慢端。重複跑時間為每一組的時間，不是每公里。",
     invalid: "請輸入合理的目標時間以計算配速。",
     goalPace: "比賽目標配速",
+    appNote:
+      "以上為根據單一目標時間的概括估算。想得到貼合你真實訓練數據的配速，請使用 Runward 應用程式內的「配速與預測」工具。",
     names: {
       Easy: "輕鬆跑",
       Marathon: "馬拉松配速",
@@ -79,6 +79,7 @@ const EQUIV = [
 const BlogPaceCalculator = ({ race, lang }: { race: RaceKey; lang: "en" | "zh" }) => {
   const cfg = RACES[race];
   const t = T[lang];
+  const [open, setOpen] = useState(false);
   const [h, setH] = useState(String(cfg.defaults[0]));
   const [m, setM] = useState(String(cfg.defaults[1]));
   const [s, setS] = useState(String(cfg.defaults[2]));
@@ -99,8 +100,6 @@ const BlogPaceCalculator = ({ race, lang }: { race: RaceKey; lang: "en" | "zh" }
       goalPace: formatPace((totalSeconds / cfg.meters) * 1000),
     };
   }, [totalSeconds, cfg.meters]);
-
-  const raceLabel = lang === "zh" ? cfg.labelZh : cfg.label;
 
   const numberInput = (
     value: string,
@@ -123,121 +122,136 @@ const BlogPaceCalculator = ({ race, lang }: { race: RaceKey; lang: "en" | "zh" }
   );
 
   return (
-    <section className="not-prose my-10 rounded-2xl border border-border bg-card/60 p-5 sm:p-6">
-      <div className="flex items-start gap-3">
-        <span className="mt-0.5 rounded-xl bg-primary/10 p-2 text-primary">
-          <Calculator size={18} />
+    <section className="not-prose my-6">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        className="flex w-full items-center justify-between gap-3 rounded-2xl border border-border bg-card/60 px-4 py-3 text-left transition-colors hover:bg-card"
+      >
+        <span className="flex items-center gap-2.5">
+          <span className="rounded-xl bg-primary/10 p-2 text-primary">
+            <Calculator size={18} />
+          </span>
+          <span className="font-display text-base font-bold text-foreground">{t.toggle}</span>
         </span>
-        <div>
-          <h2 className="font-display text-xl font-bold text-foreground">{t.heading}</h2>
-          <p className="mt-1 text-sm text-muted-foreground">{t.intro(raceLabel)}</p>
-        </div>
-      </div>
+        <ChevronDown
+          size={18}
+          className={`shrink-0 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`}
+        />
+      </button>
 
-      <div className="mt-5">
-        <div className="text-sm font-semibold text-foreground">
-          {t.goal} — {raceLabel}
-        </div>
-        <div className="mt-2 flex flex-wrap items-end gap-3">
-          {numberInput(h, setH, t.h, 9)}
-          {numberInput(m, setM, t.m, 59)}
-          {numberInput(s, setS, t.s, 59)}
-          {result && (
-            <div className="ml-auto text-right">
-              <div className="text-xs text-muted-foreground">{t.goalPace}</div>
-              <div className="font-display text-2xl font-bold text-primary">{result.goalPace}<span className="text-sm font-normal text-muted-foreground"> /km</span></div>
+      {open && (
+        <div className="mt-3 rounded-2xl border border-border bg-card/40 p-5 sm:p-6">
+          <div className="text-sm font-semibold text-foreground">
+            {t.goal} — {lang === "zh" ? cfg.labelZh : cfg.label}
+          </div>
+          <div className="mt-2 flex flex-wrap items-end gap-3">
+            {numberInput(h, setH, t.h, 9)}
+            {numberInput(m, setM, t.m, 59)}
+            {numberInput(s, setS, t.s, 59)}
+            {result && (
+              <div className="ml-auto text-right">
+                <div className="text-xs text-muted-foreground">{t.goalPace}</div>
+                <div className="font-display text-2xl font-bold text-primary">
+                  {result.goalPace}
+                  <span className="text-sm font-normal text-muted-foreground"> /km</span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {!result ? (
+            <p className="mt-5 text-sm text-muted-foreground">{t.invalid}</p>
+          ) : (
+            <div className="mt-6 space-y-6">
+              <div>
+                <h3 className="text-sm font-semibold text-foreground">{t.paces}</h3>
+                <div className="mt-2 overflow-x-auto rounded-xl border border-border">
+                  <table className="w-full border-collapse text-sm">
+                    <tbody>
+                      {result.main.map((p) => (
+                        <tr key={p.name} className="border-b border-border/60 last:border-0">
+                          <td className="px-3 py-2 text-foreground">{t.names[p.name] ?? p.name}</td>
+                          <td className="whitespace-nowrap px-3 py-2 text-right font-semibold text-foreground">
+                            {p.kmPace} /km
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div>
+                <h3 className="text-sm font-semibold text-foreground">{t.reps}</h3>
+                <div className="mt-2 overflow-x-auto rounded-xl border border-border">
+                  <table className="w-full border-collapse text-sm">
+                    <thead className="bg-muted/60">
+                      <tr>
+                        <th className="px-3 py-2 text-left font-semibold">{t.pace}</th>
+                        <th className="px-3 py-2 text-right font-semibold">1200m</th>
+                        <th className="px-3 py-2 text-right font-semibold">800m</th>
+                        <th className="px-3 py-2 text-right font-semibold">600m</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {result.mid.map((p) => (
+                        <tr key={p.name} className="border-b border-border/60 last:border-0">
+                          <td className="px-3 py-2 text-foreground">{t.names[p.name] ?? p.name}</td>
+                          {p.times.map((time, i) => (
+                            <td key={i} className="whitespace-nowrap px-3 py-2 text-right font-semibold text-foreground">
+                              {time}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="mt-2 overflow-x-auto rounded-xl border border-border">
+                  <table className="w-full border-collapse text-sm">
+                    <thead className="bg-muted/60">
+                      <tr>
+                        <th className="px-3 py-2 text-left font-semibold">{t.pace}</th>
+                        <th className="px-3 py-2 text-right font-semibold">400m</th>
+                        <th className="px-3 py-2 text-right font-semibold">300m</th>
+                        <th className="px-3 py-2 text-right font-semibold">200m</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {result.short.map((p) => (
+                        <tr key={p.name} className="border-b border-border/60 last:border-0">
+                          <td className="px-3 py-2 text-foreground">{t.names[p.name] ?? p.name}</td>
+                          {p.times.map((time, i) => (
+                            <td key={i} className="whitespace-nowrap px-3 py-2 text-right font-semibold text-foreground">
+                              {time}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div>
+                <h3 className="text-sm font-semibold text-foreground">{t.equiv}</h3>
+                <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  {result.equiv.map((e) => (
+                    <div key={e.label} className="rounded-xl border border-border px-3 py-2">
+                      <div className="text-xs text-muted-foreground">{lang === "zh" ? e.labelZh : e.label}</div>
+                      <div className="font-display text-lg font-bold text-foreground">{e.time}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <p className="text-xs text-muted-foreground">{t.note}</p>
             </div>
           )}
-        </div>
-      </div>
 
-      {!result ? (
-        <p className="mt-5 text-sm text-muted-foreground">{t.invalid}</p>
-      ) : (
-        <div className="mt-6 space-y-6">
-          <div>
-            <h3 className="text-sm font-semibold text-foreground">{t.paces}</h3>
-            <div className="mt-2 overflow-x-auto rounded-xl border border-border">
-              <table className="w-full border-collapse text-sm">
-                <tbody>
-                  {result.main.map((p) => (
-                    <tr key={p.name} className="border-b border-border/60 last:border-0">
-                      <td className="px-3 py-2 text-foreground">{t.names[p.name] ?? p.name}</td>
-                      <td className="whitespace-nowrap px-3 py-2 text-right font-semibold text-foreground">
-                        {p.kmPace} /km
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          <div>
-            <h3 className="text-sm font-semibold text-foreground">{t.reps}</h3>
-            <div className="mt-2 overflow-x-auto rounded-xl border border-border">
-              <table className="w-full border-collapse text-sm">
-                <thead className="bg-muted/60">
-                  <tr>
-                    <th className="px-3 py-2 text-left font-semibold">{t.pace}</th>
-                    <th className="px-3 py-2 text-right font-semibold">1200m</th>
-                    <th className="px-3 py-2 text-right font-semibold">800m</th>
-                    <th className="px-3 py-2 text-right font-semibold">600m</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {result.mid.map((p) => (
-                    <tr key={p.name} className="border-b border-border/60 last:border-0">
-                      <td className="px-3 py-2 text-foreground">{t.names[p.name] ?? p.name}</td>
-                      {p.times.map((time, i) => (
-                        <td key={i} className="whitespace-nowrap px-3 py-2 text-right font-semibold text-foreground">
-                          {time}
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <div className="mt-2 overflow-x-auto rounded-xl border border-border">
-              <table className="w-full border-collapse text-sm">
-                <thead className="bg-muted/60">
-                  <tr>
-                    <th className="px-3 py-2 text-left font-semibold">{t.pace}</th>
-                    <th className="px-3 py-2 text-right font-semibold">400m</th>
-                    <th className="px-3 py-2 text-right font-semibold">300m</th>
-                    <th className="px-3 py-2 text-right font-semibold">200m</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {result.short.map((p) => (
-                    <tr key={p.name} className="border-b border-border/60 last:border-0">
-                      <td className="px-3 py-2 text-foreground">{t.names[p.name] ?? p.name}</td>
-                      {p.times.map((time, i) => (
-                        <td key={i} className="whitespace-nowrap px-3 py-2 text-right font-semibold text-foreground">
-                          {time}
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          <div>
-            <h3 className="text-sm font-semibold text-foreground">{t.equiv}</h3>
-            <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
-              {result.equiv.map((e) => (
-                <div key={e.label} className="rounded-xl border border-border px-3 py-2">
-                  <div className="text-xs text-muted-foreground">{lang === "zh" ? e.labelZh : e.label}</div>
-                  <div className="font-display text-lg font-bold text-foreground">{e.time}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <p className="text-xs text-muted-foreground">{t.note}</p>
+          <p className="mt-5 border-t border-border/60 pt-3 text-xs italic text-muted-foreground">{t.appNote}</p>
         </div>
       )}
     </section>

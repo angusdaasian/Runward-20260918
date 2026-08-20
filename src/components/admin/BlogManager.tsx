@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -54,6 +54,8 @@ const BlogManager = () => {
   const [draft, setDraft] = useState<Draft>(emptyDraft);
   const [saving, setSaving] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  const autoImported = useRef(false);
 
   const load = async () => {
     const { data, error } = await supabase
@@ -65,11 +67,22 @@ const BlogManager = () => {
       return;
     }
     setRows((data ?? []) as Row[]);
+    setLoaded(true);
   };
 
   useEffect(() => {
     load();
   }, []);
+
+  // Auto-sync bundled repo posts into the table once, so every post is editable here.
+  useEffect(() => {
+    if (!loaded || autoImported.current) return;
+    const dbSlugSet = new Set(rows.map((r) => r.slug));
+    if (getMarkdownPosts().every((p) => dbSlugSet.has(p.slug))) return;
+    autoImported.current = true;
+    void importRepoPosts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loaded, rows]);
 
   const dbSlugs = new Set(rows.map((r) => r.slug));
   const missingSlugs = getMarkdownPosts()

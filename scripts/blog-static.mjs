@@ -316,9 +316,11 @@ async function prerender() {
     });
     const body = `<main><article><h1>${escapeHtml(post.title)}</h1><p>${escapeHtml(
       post.author,
-    )} — <time datetime="${post.date}">${post.date.slice(0, 10)}</time></p>${marked.parse(
-      post.content,
-    )}</article></main>`;
+    )} — <time datetime="${post.date}">${post.date.slice(0, 10)}</time></p>${
+      post.coverImage
+        ? `<img src="${escapeHtml(post.coverImage)}" alt="${escapeHtml(post.title)}" width="1600" height="900" loading="lazy" />`
+        : ""
+    }${marked.parse(post.content)}</article></main>`;
     const dir = resolve(`dist/blog/${post.slug}`);
     mkdirSync(dir, { recursive: true });
     writeFileSync(join(dir, "index.html"), renderShell(template, head, body));

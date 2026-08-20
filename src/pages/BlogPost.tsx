@@ -5,11 +5,21 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { getPostBySlug, formatPostDate, type BlogPost as Post } from "@/lib/blog";
 import { applySeoHead, SITE_URL } from "@/lib/seoHead";
+import BlogPaceCalculator, { type RaceKey } from "@/components/blog/BlogPaceCalculator";
+
+/** Posts that describe a specific race distance get an interactive pace calculator. */
+function raceForSlug(slug: string): RaceKey | null {
+  if (/10k/i.test(slug)) return "10K";
+  if (/half-marathon/i.test(slug)) return "HM";
+  if (/marathon/i.test(slug)) return "FM";
+  return null;
+}
 
 const BlogPostPage = () => {
   const { slug = "" } = useParams<{ slug: string }>();
   const [post, setPost] = useState<Post | null>(null);
   const [loading, setLoading] = useState(true);
+
 
   useEffect(() => {
     let cancelled = false;
@@ -141,7 +151,11 @@ const BlogPostPage = () => {
                 {post.content}
               </ReactMarkdown>
             </div>
+            {raceForSlug(post.slug) && (
+              <BlogPaceCalculator race={raceForSlug(post.slug)!} lang={post.lang} />
+            )}
           </article>
+
         )}
       </main>
     </div>

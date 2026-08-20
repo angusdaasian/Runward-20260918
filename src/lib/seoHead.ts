@@ -11,6 +11,7 @@ interface SeoOptions {
   image?: string | null;
   type?: "website" | "article";
   jsonLd?: Record<string, unknown> | null;
+  alternates?: { hrefLang: string; href: string }[];
 }
 
 function upsertMeta(attr: "name" | "property", key: string, content: string) {
@@ -30,6 +31,7 @@ export function applySeoHead({
   image,
   type = "website",
   jsonLd,
+  alternates,
 }: SeoOptions) {
   if (typeof document === "undefined") return;
 
@@ -61,6 +63,16 @@ export function applySeoHead({
     }
     link.href = url;
   }
+
+  document.head.querySelectorAll('link[data-seo-alt="true"]').forEach((n) => n.remove());
+  (alternates ?? []).forEach(({ hrefLang, href }) => {
+    const link = document.createElement("link");
+    link.rel = "alternate";
+    link.hreflang = hrefLang;
+    link.href = href.startsWith("http") ? href : `${SITE_URL}${href}`;
+    link.dataset.seoAlt = "true";
+    document.head.appendChild(link);
+  });
 
   document.head.querySelectorAll('script[data-seo-jsonld="true"]').forEach((n) => n.remove());
   if (jsonLd) {

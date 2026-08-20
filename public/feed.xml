@@ -2,77 +2,77 @@
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
     <title>Runward Blog</title>
-    <link>https://angustest.site/blog</link>
+    <link>https://runward.site/blog</link>
     <description>Running training, pacing and posture guides from Runward.</description>
     <language>en</language>
-    <atom:link href="https://angustest.site/feed.xml" rel="self" type="application/rss+xml" />
+    <atom:link href="https://runward.site/feed.xml" rel="self" type="application/rss+xml" />
     <item>
       <title>長跑入門指南：新手如何開始長距離跑步</title>
-      <link>https://angustest.site/blog/how-to-start-long-distance-running-zh</link>
-      <guid isPermaLink="true">https://angustest.site/blog/how-to-start-long-distance-running-zh</guid>
+      <link>https://runward.site/blog/how-to-start-long-distance-running-zh</link>
+      <guid isPermaLink="true">https://runward.site/blog/how-to-start-long-distance-running-zh</guid>
       <pubDate>Thu, 20 Aug 2026 00:00:00 GMT</pubDate>
       <description>長跑新手完整入門指南：第一週應該跑多少、輕鬆跑要有多慢、如何安全增加跑量，以及如何避開令大部分初跑者放棄的傷患。</description>
     </item>
     <item>
       <title>How to Start Long Distance Running: A Beginner&apos;s Guide</title>
-      <link>https://angustest.site/blog/how-to-start-long-distance-running</link>
-      <guid isPermaLink="true">https://angustest.site/blog/how-to-start-long-distance-running</guid>
+      <link>https://runward.site/blog/how-to-start-long-distance-running</link>
+      <guid isPermaLink="true">https://runward.site/blog/how-to-start-long-distance-running</guid>
       <pubDate>Thu, 20 Aug 2026 00:00:00 GMT</pubDate>
       <description>A step-by-step guide to starting long distance running: how far to run in week one, how slow easy runs should feel, how to build mileage safely, and how to avoid the injuries that stop most beginners.</description>
     </item>
     <item>
       <title>第一次跑 10 公里：8 星期訓練計劃</title>
-      <link>https://angustest.site/blog/how-to-train-for-your-first-10k-zh</link>
-      <guid isPermaLink="true">https://angustest.site/blog/how-to-train-for-your-first-10k-zh</guid>
+      <link>https://runward.site/blog/how-to-train-for-your-first-10k-zh</link>
+      <guid isPermaLink="true">https://runward.site/blog/how-to-train-for-your-first-10k-zh</guid>
       <pubDate>Wed, 19 Aug 2026 00:00:00 GMT</pubDate>
       <description>為初次挑戰 10 公里而設的 8 星期訓練計劃：每週安排、間歇與節奏跑的目標配速、賽前減量，以及比賽日分段配速策略，讓你越跑越強而不是後段崩盤。</description>
     </item>
     <item>
       <title>How to Train for Your First 10K: An 8-Week Plan</title>
-      <link>https://angustest.site/blog/how-to-train-for-your-first-10k</link>
-      <guid isPermaLink="true">https://angustest.site/blog/how-to-train-for-your-first-10k</guid>
+      <link>https://runward.site/blog/how-to-train-for-your-first-10k</link>
+      <guid isPermaLink="true">https://runward.site/blog/how-to-train-for-your-first-10k</guid>
       <pubDate>Wed, 19 Aug 2026 00:00:00 GMT</pubDate>
       <description>An 8-week 10K training plan for first-timers: weekly structure, interval and tempo sessions with target paces, taper week, and race-day pacing so you finish strong instead of fading.</description>
     </item>
     <item>
       <title>第一次跑半馬：12 星期半程馬拉松訓練計劃</title>
-      <link>https://angustest.site/blog/how-to-train-for-your-first-half-marathon-zh</link>
-      <guid isPermaLink="true">https://angustest.site/blog/how-to-train-for-your-first-half-marathon-zh</guid>
+      <link>https://runward.site/blog/how-to-train-for-your-first-half-marathon-zh</link>
+      <guid isPermaLink="true">https://runward.site/blog/how-to-train-for-your-first-half-marathon-zh</guid>
       <pubDate>Tue, 18 Aug 2026 00:00:00 GMT</pubDate>
       <description>初次挑戰半程馬拉松的完整 12 星期訓練計劃：長課遞進、節奏跑與間歇課、補給策略、兩星期減量，以及 21.1 公里平均配速的比賽策略。</description>
     </item>
     <item>
       <title>How to Train for Your First Half Marathon: A 12-Week Plan</title>
-      <link>https://angustest.site/blog/how-to-train-for-your-first-half-marathon</link>
-      <guid isPermaLink="true">https://angustest.site/blog/how-to-train-for-your-first-half-marathon</guid>
+      <link>https://runward.site/blog/how-to-train-for-your-first-half-marathon</link>
+      <guid isPermaLink="true">https://runward.site/blog/how-to-train-for-your-first-half-marathon</guid>
       <pubDate>Tue, 18 Aug 2026 00:00:00 GMT</pubDate>
       <description>A complete 12-week half marathon training plan for first-timers: long run progression, tempo and interval sessions, fuelling, the two-week taper, and how to pace 21.1 km evenly.</description>
     </item>
     <item>
       <title>第一次跑全馬：16 星期馬拉松訓練計劃</title>
-      <link>https://angustest.site/blog/how-to-train-for-your-first-marathon-zh</link>
-      <guid isPermaLink="true">https://angustest.site/blog/how-to-train-for-your-first-marathon-zh</guid>
+      <link>https://runward.site/blog/how-to-train-for-your-first-marathon-zh</link>
+      <guid isPermaLink="true">https://runward.site/blog/how-to-train-for-your-first-marathon-zh</guid>
       <pubDate>Mon, 17 Aug 2026 00:00:00 GMT</pubDate>
       <description>初次挑戰全程馬拉松的 16 星期訓練計劃：長課遞進至 32 公里、馬拉松配速課、避免撞牆的補給策略、三星期減量，以及如何設定實際的目標時間。</description>
     </item>
     <item>
       <title>How to Train for Your First Marathon: A 16-Week Plan</title>
-      <link>https://angustest.site/blog/how-to-train-for-your-first-marathon</link>
-      <guid isPermaLink="true">https://angustest.site/blog/how-to-train-for-your-first-marathon</guid>
+      <link>https://runward.site/blog/how-to-train-for-your-first-marathon</link>
+      <guid isPermaLink="true">https://runward.site/blog/how-to-train-for-your-first-marathon</guid>
       <pubDate>Mon, 17 Aug 2026 00:00:00 GMT</pubDate>
       <description>A 16-week marathon training plan for first-time marathoners: long run progression to 32 km, marathon-pace work, fuelling to avoid the wall, the three-week taper, and realistic goal setting.</description>
     </item>
     <item>
       <title>如何用 Runward 幫助訓練：全部功能一次講清</title>
-      <link>https://angustest.site/blog/how-to-use-runward-to-train-zh</link>
-      <guid isPermaLink="true">https://angustest.site/blog/how-to-use-runward-to-train-zh</guid>
+      <link>https://runward.site/blog/how-to-use-runward-to-train-zh</link>
+      <guid isPermaLink="true">https://runward.site/blog/how-to-use-runward-to-train-zh</guid>
       <pubDate>Sun, 16 Aug 2026 00:00:00 GMT</pubDate>
       <description>Runward 完整功能導覽：Strava／Garmin／Apple Health 同步、訓練負荷與 HRV 洞察、個人化訓練計劃、比賽時間預測、跑姿分析、傷患儀表板、CityHunter 與社群排行榜。</description>
     </item>
     <item>
       <title>How to Use Runward to Train Smarter: Every Feature Explained</title>
-      <link>https://angustest.site/blog/how-to-use-runward-to-train</link>
-      <guid isPermaLink="true">https://angustest.site/blog/how-to-use-runward-to-train</guid>
+      <link>https://runward.site/blog/how-to-use-runward-to-train</link>
+      <guid isPermaLink="true">https://runward.site/blog/how-to-use-runward-to-train</guid>
       <pubDate>Sun, 16 Aug 2026 00:00:00 GMT</pubDate>
       <description>A full walkthrough of Runward: activity sync from Strava, Garmin and Apple Health, training load and HRV insights, personalised training plans, race prediction, posture analysis, the injury dashboard, CityHunter and community leaderboards.</description>
     </item>

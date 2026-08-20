@@ -13,4 +13,4 @@ Allow: /
 User-agent: *
 Allow: /
 
-Sitemap: https://angustest.site/sitemap.xml
+Sitemap: https://runward.site/sitemap.xml

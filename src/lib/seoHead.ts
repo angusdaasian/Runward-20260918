@@ -2,7 +2,7 @@
  * Client-side head updates for SPA routes. Crawler-visible head tags for
  * /blog routes are injected at build time by scripts/blog-static.mjs.
  */
-export const SITE_URL = "https://angustest.site";
+export const SITE_URL = "https://runward.site";
 
 interface SeoOptions {
   title: string;

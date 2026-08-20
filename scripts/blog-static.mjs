@@ -95,7 +95,7 @@ async function databasePosts() {
   if (!url || !key) return [];
   try {
     const res = await fetch(
-      `${url}/rest/v1/blog_posts?select=slug,title,excerpt,content,cover_image_url,author,tags,published_at,created_at&published=eq.true&order=published_at.desc&limit=${MAX_PRERENDERED_POSTS}`,
+      `${url}/rest/v1/blog_posts?select=slug,title,excerpt,content,cover_image_url,author,tags,lang,translation_slug,published_at,created_at&published=eq.true&order=published_at.desc&limit=${MAX_PRERENDERED_POSTS}`,
       { headers: { apikey: key, Authorization: `Bearer ${key}` } },
     );
     if (!res.ok) return [];
@@ -109,10 +109,13 @@ async function databasePosts() {
       author: row.author || "Runward",
       tags: row.tags || [],
       date: new Date(row.published_at || row.created_at).toISOString(),
-      lang: /-(zh|cn|hk)$/i.test(row.slug || "") || /[\u4e00-\u9fff]/.test(row.title || "")
-        ? "zh"
-        : "en",
-      translationSlug: null,
+      lang:
+        row.lang === "zh" || row.lang === "en"
+          ? row.lang
+          : /-(zh|cn|hk)$/i.test(row.slug || "") || /[\u4e00-\u9fff]/.test(row.title || "")
+            ? "zh"
+            : "en",
+      translationSlug: row.translation_slug || null,
     }));
   } catch {
     return [];
@@ -120,9 +123,10 @@ async function databasePosts() {
 }
 
 async function allPosts() {
+  // Database rows win: the table is the source of truth, bundled markdown is a fallback.
   const bySlug = new Map();
-  for (const post of await databasePosts()) bySlug.set(post.slug, post);
   for (const post of markdownPosts()) bySlug.set(post.slug, post);
+  for (const post of await databasePosts()) bySlug.set(post.slug, post);
   return [...bySlug.values()]
     .sort((a, b) => b.date.localeCompare(a.date))
     .slice(0, MAX_PRERENDERED_POSTS);

@@ -68,7 +68,7 @@ function inferLang(slug: string, title: string): "en" | "zh" {
 export async function fetchDatabasePosts(): Promise<BlogPost[]> {
   const { data, error } = await supabase
     .from("blog_posts")
-    .select("slug,title,excerpt,content,cover_image_url,author,tags,published_at,created_at")
+    .select("slug,title,excerpt,content,cover_image_url,author,tags,lang,translation_slug,published_at,created_at")
     .eq("published", true)
     .order("published_at", { ascending: false })
     .limit(200);
@@ -84,27 +84,36 @@ export async function fetchDatabasePosts(): Promise<BlogPost[]> {
     author: row.author || "Runward",
     tags: (row as { tags?: string[] | null }).tags ?? [],
     date: new Date(row.published_at || row.created_at).toISOString(),
-    lang: inferLang(row.slug, row.title),
-    translationSlug: null,
+    lang:
+      (row as { lang?: string | null }).lang === "zh"
+        ? ("zh" as const)
+        : (row as { lang?: string | null }).lang === "en"
+          ? ("en" as const)
+          : inferLang(row.slug, row.title),
+    translationSlug: (row as { translation_slug?: string | null }).translation_slug ?? null,
     source: "database" as const,
   }));
 }
 
-/** Markdown posts win on slug collisions (they're the prerendered canonical version). */
+/**
+ * Database posts win on slug collisions: the table is the source of truth so admin
+ * edits show up immediately. Bundled markdown is only a fallback for slugs that
+ * have not been imported into the database yet.
+ */
 export async function getAllPosts(): Promise<BlogPost[]> {
   const markdown = getMarkdownPosts();
   const dbPosts = await fetchDatabasePosts();
   const bySlug = new Map<string, BlogPost>();
-  for (const post of dbPosts) bySlug.set(post.slug, post);
   for (const post of markdown) bySlug.set(post.slug, post);
+  for (const post of dbPosts) bySlug.set(post.slug, post);
   return [...bySlug.values()].sort((a, b) => b.date.localeCompare(a.date));
 }
 
 export async function getPostBySlug(slug: string): Promise<BlogPost | null> {
-  const markdown = getMarkdownPosts().find((p) => p.slug === slug);
-  if (markdown) return markdown;
   const dbPosts = await fetchDatabasePosts();
-  return dbPosts.find((p) => p.slug === slug) ?? null;
+  const dbPost = dbPosts.find((p) => p.slug === slug);
+  if (dbPost) return dbPost;
+  return getMarkdownPosts().find((p) => p.slug === slug) ?? null;
 }
 
 export function postsForLang(posts: BlogPost[], lang: "en" | "zh"): BlogPost[] {

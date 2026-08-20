@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
+import { getMarkdownPosts } from "@/lib/blog";
 
 interface Row {
   id: string;
@@ -17,6 +18,8 @@ interface Row {
   cover_image_url: string | null;
   author: string;
   tags: string[];
+  lang: string | null;
+  translation_slug: string | null;
   published: boolean;
   published_at: string | null;
   created_at: string;
@@ -31,6 +34,8 @@ const emptyDraft = {
   cover_image_url: "",
   author: "Runward",
   tagsText: "",
+  lang: "en",
+  translation_slug: "",
   published: false,
 };
 
@@ -48,6 +53,7 @@ const BlogManager = () => {
   const [rows, setRows] = useState<Row[]>([]);
   const [draft, setDraft] = useState<Draft>(emptyDraft);
   const [saving, setSaving] = useState(false);
+  const [importing, setImporting] = useState(false);
 
   const load = async () => {
     const { data, error } = await supabase
@@ -65,6 +71,11 @@ const BlogManager = () => {
     load();
   }, []);
 
+  const dbSlugs = new Set(rows.map((r) => r.slug));
+  const missingSlugs = getMarkdownPosts()
+    .map((p) => p.slug)
+    .filter((slug) => !dbSlugs.has(slug));
+
   const edit = (row: Row) =>
     setDraft({
       id: row.id,
@@ -75,6 +86,8 @@ const BlogManager = () => {
       cover_image_url: row.cover_image_url ?? "",
       author: row.author ?? "Runward",
       tagsText: (row.tags ?? []).join(", "),
+      lang: row.lang === "zh" ? "zh" : "en",
+      translation_slug: row.translation_slug ?? "",
       published: row.published,
     });
 
@@ -95,6 +108,8 @@ const BlogManager = () => {
         .split(",")
         .map((t) => t.trim())
         .filter(Boolean),
+      lang: draft.lang === "zh" ? "zh" : "en",
+      translation_slug: draft.translation_slug.trim() || null,
       published: draft.published,
       published_at: draft.published ? new Date().toISOString() : null,
     };
@@ -113,6 +128,35 @@ const BlogManager = () => {
     load();
   };
 
+  /** Upsert the markdown posts bundled in the repo into the table so they become editable. */
+  const importRepoPosts = async () => {
+    setImporting(true);
+    const posts = getMarkdownPosts();
+    const payload = posts.map((post) => ({
+      slug: post.slug,
+      title: post.title,
+      excerpt: post.excerpt || null,
+      content: post.content,
+      cover_image_url: post.coverImage,
+      author: post.author,
+      tags: post.tags,
+      lang: post.lang,
+      translation_slug: post.translationSlug,
+      published: true,
+      published_at: post.date,
+    }));
+    const { error } = await supabase
+      .from("blog_posts")
+      .upsert(payload, { onConflict: "slug", ignoreDuplicates: true });
+    setImporting(false);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    toast.success(`Imported ${payload.length} repo posts`);
+    load();
+  };
+
   const remove = async (id: string) => {
     const { error } = await supabase.from("blog_posts").delete().eq("id", id);
     if (error) {
@@ -127,9 +171,16 @@ const BlogManager = () => {
   return (
     <div className="grid gap-10 lg:grid-cols-[1fr_320px]">
       <section className="space-y-4">
-        <h2 className="text-xl font-bold text-foreground">
-          {draft.id ? "Edit post" : "New post"}
-        </h2>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-xl font-bold text-foreground">
+            {draft.id ? "Edit post" : "New post"}
+          </h2>
+          {missingSlugs.length > 0 && (
+            <Button variant="outline" onClick={importRepoPosts} disabled={importing}>
+              {importing ? "Importing…" : `Import ${missingSlugs.length} repo posts`}
+            </Button>
+          )}
+        </div>
 
         <div className="space-y-2">
           <Label htmlFor="blog-title">Title</Label>
@@ -175,6 +226,27 @@ const BlogManager = () => {
               id="blog-tags"
               value={draft.tagsText}
               onChange={(e) => setDraft({ ...draft, tagsText: e.target.value })}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="blog-lang">Language</Label>
+            <select
+              id="blog-lang"
+              className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+              value={draft.lang}
+              onChange={(e) => setDraft({ ...draft, lang: e.target.value })}
+            >
+              <option value="en">English</option>
+              <option value="zh">中文</option>
+            </select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="blog-translation">Translation slug</Label>
+            <Input
+              id="blog-translation"
+              placeholder="same-article-in-other-language"
+              value={draft.translation_slug}
+              onChange={(e) => setDraft({ ...draft, translation_slug: e.target.value })}
             />
           </div>
         </div>
@@ -229,7 +301,8 @@ const BlogManager = () => {
               <button className="text-left" onClick={() => edit(row)}>
                 <div className="font-semibold text-sm">{row.title}</div>
                 <div className="text-xs text-muted-foreground mt-1">
-                  /blog/{row.slug} · {row.published ? "published" : "draft"}
+                  /blog/{row.slug} · {row.lang === "zh" ? "中文" : "EN"} ·{" "}
+                  {row.published ? "published" : "draft"}
                 </div>
               </button>
               <button

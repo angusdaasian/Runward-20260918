@@ -196,7 +196,7 @@ const Calculators = () => {
                   </button>
                 ))}
               </div>
-              <BlogPaceCalculator race={targetRace} lang={lang} />
+              <BlogPaceCalculator race={targetRace} lang={lang} defaultOpen />
             </Card>
           </TabsContent>
 

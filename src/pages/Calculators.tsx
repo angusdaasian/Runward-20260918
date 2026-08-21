@@ -16,7 +16,7 @@ type Lang = "en" | "zh";
 const Calculators = () => {
   const [lang, setLang] = useState<Lang>(() => (localStorage.getItem("app_lang") as Lang) || "zh");
   const zh = lang === "zh";
-  const [score, setScore] = useState<number | null>(null);
+  
   const [targetRace, setTargetRace] = useState<RaceKey>("HM");
 
   const toggleLang = () => {

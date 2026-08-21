@@ -76,10 +76,11 @@ const EQUIV = [
   { meters: 42195, label: "Marathon", labelZh: "全馬" },
 ];
 
-const BlogPaceCalculator = ({ race, lang }: { race: RaceKey; lang: "en" | "zh" }) => {
+const BlogPaceCalculator = ({ race, lang, defaultOpen = false }: { race: RaceKey; lang: "en" | "zh"; defaultOpen?: boolean }) => {
   const cfg = RACES[race];
   const t = T[lang];
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
+
   const [h, setH] = useState(String(cfg.defaults[0]));
   const [m, setM] = useState(String(cfg.defaults[1]));
   const [s, setS] = useState(String(cfg.defaults[2]));

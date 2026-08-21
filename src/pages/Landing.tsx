@@ -59,10 +59,10 @@ const Landing = () => {
               {zh ? "比較" : "Compare"}
             </Link>
             <Link
-              to="/calculators"
+              to="/tools"
               className="hidden sm:inline-block text-sm text-muted-foreground hover:text-foreground transition-colors"
             >
-              {zh ? "實用計算機" : "Useful Calculators"}
+              {zh ? "實用小工具" : "Tools"}
             </Link>
             <Link
               to="/blog"

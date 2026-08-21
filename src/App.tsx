@@ -1,6 +1,6 @@
 import { lazy, Suspense } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -51,7 +51,7 @@ const hadOAuthHash =
   initialHash.includes("refresh_token=") ||
   initialHash.includes("type=recovery");
 const hadOAuthReturn = hadOAuthHash || initialParams.has("code") || initialParams.has("error");
-const Calculators = lazy(() => import("./pages/Calculators"));
+const Tools = lazy(() => import("./pages/Tools"));
 
 const RouteFallback = () => (
   <div className="flex flex-col items-center justify-center min-h-screen bg-background gap-3">
@@ -100,7 +100,8 @@ const App = () => (
                 <Route path="/polar/callback" element={<PolarReturn />} />
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/compare" element={<Compare />} />
-                <Route path="/calculators" element={<Calculators />} />
+                <Route path="/tools" element={<Tools />} />
+                <Route path="/calculators" element={<Navigate to="/tools" replace />} />
                 <Route path="/auth" element={<AuthCallback />} />
                 <Route path="/auth/callback" element={<StravaCallback />} />
                 <Route path="/intervals-callback" element={<IntervalsCallback />} />

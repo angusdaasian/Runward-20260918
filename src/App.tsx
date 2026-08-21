@@ -51,6 +51,8 @@ const hadOAuthHash =
   initialHash.includes("refresh_token=") ||
   initialHash.includes("type=recovery");
 const hadOAuthReturn = hadOAuthHash || initialParams.has("code") || initialParams.has("error");
+const Calculators = lazy(() => import("./pages/Calculators"));
+
 const RouteFallback = () => (
   <div className="flex flex-col items-center justify-center min-h-screen bg-background gap-3">
     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
@@ -98,6 +100,7 @@ const App = () => (
                 <Route path="/polar/callback" element={<PolarReturn />} />
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/compare" element={<Compare />} />
+                <Route path="/calculators" element={<Calculators />} />
                 <Route path="/auth" element={<AuthCallback />} />
                 <Route path="/auth/callback" element={<StravaCallback />} />
                 <Route path="/intervals-callback" element={<IntervalsCallback />} />

@@ -59,11 +59,18 @@ const Landing = () => {
               {zh ? "比較" : "Compare"}
             </Link>
             <Link
+              to="/calculators"
+              className="hidden sm:inline-block text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              {zh ? "實用計算機" : "Useful Calculators"}
+            </Link>
+            <Link
               to="/blog"
               className="hidden sm:inline-block text-sm text-muted-foreground hover:text-foreground transition-colors"
             >
               {zh ? "博客" : "Blog"}
             </Link>
+
             <button
               onClick={toggleLang}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-card border border-border text-sm text-muted-foreground hover:text-foreground transition-colors"

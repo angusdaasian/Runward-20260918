@@ -105,18 +105,10 @@ const Calculators = () => {
           <TabsList className="flex flex-wrap h-auto gap-1">
             <TabsTrigger value="pace" className="gap-1.5">
               <Gauge className="h-3.5 w-3.5" />
-              {zh ? "配速計算" : "Pace"}
-            </TabsTrigger>
-            <TabsTrigger value="level" className="gap-1.5">
-              <Activity className="h-3.5 w-3.5" />
-              {zh ? "跑力等級" : "Running Level"}
-            </TabsTrigger>
-            <TabsTrigger value="equivalent" className="gap-1.5">
-              <Timer className="h-3.5 w-3.5" />
-              {zh ? "同等成績" : "Equivalent Times"}
+              {zh ? "配速 · 跑力 · 同等成績" : "Pace, Level & Equivalents"}
             </TabsTrigger>
             <TabsTrigger value="training" className="gap-1.5">
-              <Gauge className="h-3.5 w-3.5" />
+              <Activity className="h-3.5 w-3.5" />
               {zh ? "訓練配速" : "Training Paces"}
             </TabsTrigger>
             <TabsTrigger value="fuel" className="gap-1.5">
@@ -128,44 +120,17 @@ const Calculators = () => {
           <TabsContent value="pace" className="mt-5">
             <Card className="p-6">
               <SectionHeader
-                title={zh ? "配速計算器" : "Pace Calculator"}
+                title={zh ? "配速與跑力計算器" : "Pace & Running Level Calculator"}
                 desc={
                   zh
-                    ? "在配速、時間與距離之間轉換,並產生分段表"
-                    : "Convert between pace, time and distance, plus generate split tables"
+                    ? "一次輸入距離與時間(或目標配速),即得配速、平均速度、跑力分數、各距離同等成績與分段表"
+                    : "Enter a distance with a time (or target pace) once to get pace, speed, running level score, equivalent race times and split tables"
                 }
               />
-              <DesktopPaceCalculator lang={lang} />
+              <DesktopPaceLab lang={lang} />
             </Card>
           </TabsContent>
 
-          <TabsContent value="level" className="mt-5">
-            <Card className="p-6">
-              <SectionHeader
-                title={zh ? "跑力等級計算器" : "Running Level Calculator"}
-                desc={
-                  zh
-                    ? "輸入一次比賽成績或配速,計算你的跑力分數"
-                    : "Enter a race result or pace to get your running level score"
-                }
-              />
-              <CalculatorTab score={score} setScore={setScore} lang={lang} />
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="equivalent" className="mt-5">
-            <Card className="p-6">
-              <SectionHeader
-                title={zh ? "同等成績預測" : "Equivalent Race Times"}
-                desc={
-                  zh
-                    ? "根據跑力分數換算各項公路與田徑距離的同等成績"
-                    : "Convert a running level score into equivalent road and track times"
-                }
-              />
-              <EquivalentTab score={score} lang={lang} />
-            </Card>
-          </TabsContent>
 
           <TabsContent value="training" className="mt-5">
             <Card className="p-6">

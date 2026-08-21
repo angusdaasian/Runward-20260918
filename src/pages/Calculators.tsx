@@ -8,8 +8,8 @@ import DesktopPaceCalculator from "@/components/dashboard/DesktopPaceCalculator"
 import CalculatorTab from "@/components/CalculatorTab";
 import EquivalentTab from "@/components/EquivalentTab";
 import { RaceFuelCalculator } from "@/components/FuelingGuide";
-import BlogPaceCalculator from "@/components/blog/BlogPaceCalculator";
-import { setSeo } from "@/lib/seoHead";
+import BlogPaceCalculator, { type RaceKey } from "@/components/blog/BlogPaceCalculator";
+import { applySeoHead } from "@/lib/seoHead";
 
 const APP_STORE_URL = "https://apps.apple.com/us/app/runward/id6761060757";
 
@@ -19,7 +19,7 @@ const Calculators = () => {
   const [lang, setLang] = useState<Lang>(() => (localStorage.getItem("app_lang") as Lang) || "zh");
   const zh = lang === "zh";
   const [score, setScore] = useState<number | null>(null);
-  const [targetRace, setTargetRace] = useState<"10k" | "hm" | "fm">("hm");
+  const [targetRace, setTargetRace] = useState<RaceKey>("HM");
 
   const toggleLang = () => {
     const next = lang === "en" ? "zh" : "en";
@@ -28,7 +28,7 @@ const Calculators = () => {
   };
 
   useEffect(() => {
-    setSeo({
+    applySeoHead({
       title: zh
         ? "免費跑步計算機 — 配速、跑力等級、補給 | Runward"
         : "Free Running Calculators — Pace, Running Level, Nutrition | Runward",
@@ -179,9 +179,9 @@ const Calculators = () => {
               />
               <div className="flex gap-1 bg-muted/50 p-1 rounded-lg mb-5 max-w-xs">
                 {([
-                  { k: "10k", label: "10K" },
-                  { k: "hm", label: zh ? "半馬" : "Half" },
-                  { k: "fm", label: zh ? "全馬" : "Marathon" },
+                  { k: "10K" as RaceKey, label: "10K" },
+                  { k: "HM" as RaceKey, label: zh ? "半馬" : "Half" },
+                  { k: "FM" as RaceKey, label: zh ? "全馬" : "Marathon" },
                 ] as const).map((r) => (
                   <button
                     key={r.k}

@@ -1,12 +1,10 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { Globe, Smartphone, ArrowLeft, Gauge, Beaker, Activity, Timer, Calculator } from "lucide-react";
+import { Globe, Smartphone, ArrowLeft, Gauge, Beaker, Activity, Calculator } from "lucide-react";
 import appIcon from "@/assets/app-icon.png";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import DesktopPaceCalculator from "@/components/dashboard/DesktopPaceCalculator";
-import CalculatorTab from "@/components/CalculatorTab";
-import EquivalentTab from "@/components/EquivalentTab";
+import DesktopPaceLab from "@/components/dashboard/DesktopPaceLab";
 import { RaceFuelCalculator } from "@/components/FuelingGuide";
 import BlogPaceCalculator, { type RaceKey } from "@/components/blog/BlogPaceCalculator";
 import { applySeoHead } from "@/lib/seoHead";

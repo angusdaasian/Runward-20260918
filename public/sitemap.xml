@@ -36,11 +36,6 @@
     <priority>0.3</priority>
   </url>
   <url>
-    <loc>https://runward.site/tools</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.7</priority>
-  </url>
-  <url>
     <loc>https://runward.site/blog</loc>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
@@ -78,6 +73,23 @@
     <xhtml:link rel="alternate" hreflang="zh-HK" href="https://runward.site/blog/how-to-start-long-distance-running-zh" />
   </url>
   <url>
+    <loc>https://runward.site/blog/race-fueling-guide</loc>
+    <lastmod>2026-08-25</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://runward.site/blog/race-fueling-guide" />
+    <xhtml:link rel="alternate" hreflang="zh-HK" href="https://runward.site/blog/race-fueling-guide-zh" />
+  </url>
+  <url>
+    <loc>https://runward.site/blog/race-fueling-guide-zh</loc>
+    <lastmod>2026-08-25</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="zh-HK" href="https://runward.site/blog/race-fueling-guide-zh" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://runward.site/blog/race-fueling-guide" />
+  </url>
+  <url>
+
     <loc>https://runward.site/blog/how-to-train-for-your-first-10k-zh</loc>
     <lastmod>2026-08-19</lastmod>
     <changefreq>monthly</changefreq>

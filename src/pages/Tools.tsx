@@ -110,7 +110,7 @@ const Tools = () => {
           </p>
         </header>
 
-        <Tabs defaultValue="pace" className="w-full">
+        <Tabs value={tab} onValueChange={(v) => setTab(v as TabKey)} className="w-full">
           <TabsList className="print:hidden flex flex-wrap h-auto gap-1">
             <TabsTrigger value="pace" className="gap-1.5">
               <Gauge className="h-3.5 w-3.5" />

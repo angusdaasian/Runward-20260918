@@ -14,11 +14,21 @@ const APP_STORE_URL = "https://apps.apple.com/us/app/runward/id6761060757";
 
 type Lang = "en" | "zh";
 
+const VALID_TABS = ["pace", "training", "fuel", "checklist"] as const;
+type TabKey = (typeof VALID_TABS)[number];
+
 const Tools = () => {
   const [lang, setLang] = useState<Lang>(() => (localStorage.getItem("app_lang") as Lang) || "zh");
   const zh = lang === "zh";
-  
+
+  const [tab, setTab] = useState<TabKey>(() => {
+    const params = new URLSearchParams(window.location.search);
+    const requested = (params.get("tab") || window.location.hash.replace("#", "")) as TabKey;
+    return VALID_TABS.includes(requested) ? requested : "pace";
+  });
+
   const [targetRace, setTargetRace] = useState<RaceKey>("HM");
+
 
   const toggleLang = () => {
     const next = lang === "en" ? "zh" : "en";

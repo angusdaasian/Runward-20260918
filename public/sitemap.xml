@@ -36,11 +36,6 @@
     <priority>0.3</priority>
   </url>
   <url>
-    <loc>https://runward.site/tools</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.7</priority>
-  </url>
-  <url>
     <loc>https://runward.site/blog</loc>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>

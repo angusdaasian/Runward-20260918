@@ -1,8 +1,13 @@
 # Runward Watch (MoYoung/CRP SDK) — path to a single app
 
-## What Despia told us changes the recommendation
+## What Despia told us + what the repo shows
 
-Despia's position: the wrapper (v3 web view) is deliberately a thin native shell, and BLE/OEM SDK work does not belong in it. They are splitting into two products — the wrapper business, and a **native development platform** with native UI, native SDKs, SwiftUI / Jetpack Compose — and existing wrapper customers can migrate to the native runtime **for free** when it ships.
+Despia's position: the wrapper (v3 web view) is a thin native shell, and BLE/OEM SDK work does not belong in it. They are splitting into a wrapper business and a native development platform; existing wrapper customers can migrate to the native runtime for free when it ships.
+
+The open-source repo (github.com/despia-native/despia) confirms this is **new and early**. It is `Despia` the framework: a new language called **DSX** that compiles to real SwiftUI / Jetpack Compose / DOM, v0.0.1, "first public release," actively developed by the full Despia team. Apps are authored as `.dsx` documents (not React/TypeScript). There is a `Convert` migration path for existing web apps, but the whole runtime is pre-GA. So:
+
+- The Despia Custom Extension / native-runtime route is **future, not today**. Watching/starring the repo gives the GA signal, but it is not a host we can build the watch integration on right now.
+- That leaves **Capacitor** as the single-app path that works today, with the Despia native runtime as a later migration once it's GA and "Convert" can carry the existing Runward React app across.
 
 So the Despia Custom Extension route is off the table as the intended path, and the question becomes *which native host* Runward uses.
 

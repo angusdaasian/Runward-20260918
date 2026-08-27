@@ -1,72 +1,65 @@
-# Own-brand watch (LC323) integration — architecture decision plan
+# Own-brand watch (LC323) — Capacitor native shell + SDK bridge
 
-Goal: make the Runward-branded LC323 connect to Runward the way a Garmin watch connects to Garmin Connect — activities, daily health, workout push, and (later) live data.
+The OEM provides a **native iOS SDK** (Swift). Runward's app is a Vite/React web app inside the Despia WebView, which cannot load vendor native SDKs. The chosen path: wrap the existing Runward web app in a **Capacitor iOS shell** that hosts the OEM SDK and bridges it to the web layer. All Runward UI stays exactly as-is; only the watch transport is native.
 
-No code is written yet. This plan is the decision framework plus the exact list of things to demand from the OEM before building.
-
-## What the spec sheet tells us
-
-The LC323 is a JieLi JL7074A7S based round watch: 1.39" 360x360, 400mAh, 1ATM, BT calling, real GPS (CC1165W, 5 constellations), HR (VC30F-S), compass, optional barometric altitude, 100+ sport modes with GPS running/cycling, workout records stored on-watch, plus sleep / SpO2 / stress / optional BP.
-
-Sensor-wise this is genuinely good enough to be a running watch: GPS track, HR, distance, calories, cadence-capable accelerometer, and elevation if you pay for the SPL07-003.
-
-Two things the spec does **not** contain, and they decide the whole project:
-
-1. No mention of a device cloud or Open API — JieLi-platform watches in this class are almost always paired with a BLE-only mobile SDK from the software house (the same code behind apps like FitCloudPro / WearFit / Da Fit). Assume **BLE-only** until proven otherwise.
-2. No data-export detail: whether a workout can be pulled as a track (per-second lat/lon + HR) or only as a summary row (distance, duration, avg HR, calories).
-
-If it is BLE-only with summary-only export, the watch cannot power Runward's analytics — no map, no splits, no HR zones, no training load. That is the single biggest risk to check first.
-
-## The constraint that shapes everything
-
-Runward's mobile app is a web app (Vite + React) inside the Despia WebView. A WebView cannot link a vendor BLE SDK, cannot hold a background Bluetooth connection, and cannot run a background sync service.
-
-- **Cloud/Open API path** → drops straight into the current app, zero native work.
-- **BLE SDK path (expected here)** → needs a real native shell (Swift/Kotlin) hosting the SDK, exposing it to the WebView via a JS bridge. That is a separate native workstream, not a Lovable change.
-
-## Questions to send the OEM now
-
-1. Is there a device cloud with a documented REST/OAuth API, or is the SDK BLE-only?
-2. Per-workout export: full GPS track (per-second lat/lon), HR series, laps/splits, cadence, elevation — or summary only? What format (FIT / GPX / proprietary binary / JSON)?
-3. Which platforms does the SDK cover, and can it be used inside a third-party app we build ourselves (not their white-label app)?
-4. Daily health exposure: steps, sleep stages, resting HR, HRV, SpO2, stress — which are readable via SDK, at what granularity?
-5. Can we push a structured workout to the watch (steps, repeats, target pace/HR zones)? If not, can we at least push a text/plan reminder or a custom watch face?
-6. Live data: is there a standard BLE HR broadcast profile (so any app can read live HR), or SDK-only?
-7. Watch-face + boot-logo branding, and can we ship a Runward face by default? Firmware/OTA — does OTA require their app?
-8. Commercials: SDK licence terms, per-device fee, source or binary, and who maintains it against iOS/Android updates.
-9. Is the GPS chip's raw NMEA/track accessible, and is barometric altitude (SPL07-003) worth adding for elevation gain?
-
-## Recommended architecture
-
-Whatever the transport, the server and UI layers are the same, and mirror the five provider implementations the codebase already has (Strava, Terra, Suunto, Polar, Intervals).
+## Architecture
 
 ```text
-LC323 ──BLE──> native shell (SDK) ──> Runward edge functions ──> Postgres ──> app UI
-   or
-LC323 ──BLE──> OEM cloud ──webhook/poll──> same edge functions
-                                              ^
-                            workout push ─────┘
+LC323 ──BLE──> Capacitor iOS shell (OEM SDK plugin)
+                    │  JS bridge: pair / listActivities / fetchActivity / fetchDailyHealth
+                    ▼
+        Runward web app (existing UI, unchanged)
+                    │  POST normalised payloads
+                    ▼
+        Edge functions: watch-sync, watch-disconnect, watch-push-workout*
+                    ▼
+        Postgres: runward_watch_connections / _activities / _daily_health
+                    ▼
+        Existing pipelines: dedup, training load, race prediction, XP/territory
 ```
 
-- New tables: `runward_watch_connections`, `runward_watch_activities`, `runward_watch_daily_health` — same shape as the `terra_*` trio, RLS scoped to `auth.uid()`, with grants.
-- New edge functions: `watch-pair`, `watch-sync` (accepts normalised activity payloads), `watch-webhook` (cloud path only), `watch-disconnect`, `watch-push-workout`.
-- Reuse unchanged: activity normalisation, `dedup-activities-cross-platform`, training-load, race prediction, `pushed_workouts`.
-- Connect UI: one more provider card in `src/components/ConnectApps.tsx` and `src/components/dashboard/DashboardConnect.tsx`, placed first and styled as the first-party device.
-- Exclusivity: **exempt**. The own-brand watch is not added to the `user_has_other_fitness_provider` guard and the `enforce_single_fitness_provider_*` triggers stay untouched, so users can keep Strava/Garmin alongside it; dedup prevents double-counted runs.
+(*workout push is unconfirmed — most JieLi-platform firmware has no structured-workout support; kept behind a capability flag until the SDK is reviewed.)
 
-## Feature feasibility against this hardware
+## Phase 1 — Capacitor shell (can start now, no SDK needed)
 
-| Feature | If cloud API exists | BLE-only (expected) |
-| --- | --- | --- |
-| Activities with GPS track + HR | Ready to build | Native shell required; also depends on Q2 |
-| Daily health (steps/sleep/HR/SpO2) | Ready to build | Native shell required |
-| Push workouts to watch | Only if OEM exposes a queue | Native shell, and firmware must support structured workouts — most JieLi watches do not |
-| Live / real-time in-run | Not possible via cloud | Native shell, or standard BLE HR broadcast if firmware offers it |
+1. Install `@capacitor/core`, `@capacitor/cli`, `@capacitor/ios`; run `npx cap init` (appId `app.lovable.p3a023ac5b83840b88629845cf040337f`, appName `welcome-ward-start`) with a `server.url` pointing at the sandbox preview URL for hot reload during development.
+2. Add iOS platform: user exports the project to GitHub, `git pull`, `npm install`, `npx cap add ios`, `npx cap update ios`, `npm run build`, `npx cap sync`, `npx cap run ios` on a Mac with Xcode.
+3. Add a thin platform-detection layer: `isCapacitorNative()` alongside the existing `isNativeApp()`/`detectPlatform()`, so watch features only render in the Capacitor shell and the current Despia build keeps working untouched.
+4. Native entitlements/config to prepare: Bluetooth usage descriptions (`NSBluetoothAlwaysUsageDescription`), background modes (`bluetooth-central`, `background-processing`) — required regardless of which OEM SDK ships.
 
-Structured workout push is the least likely feature on this platform. Treat it as phase 2 and do not put it in launch marketing until the SDK is reviewed.
+## Phase 2 — Server + UI layer (can start now, SDK-agnostic)
+
+Mirror the existing provider pattern (Strava/Terra/Polar/etc.):
+
+- Migration: `runward_watch_connections`, `runward_watch_activities`, `runward_watch_daily_health` — shaped like the `terra_*` trio, GRANTs, RLS scoped to `auth.uid()`. The watch is **exempt** from `user_has_other_fitness_provider` and the `enforce_single_fitness_provider_*` triggers stay untouched, so it can coexist with Strava/Garmin; `dedup-activities-cross-platform` handles double-counted runs.
+- Edge functions: `watch-sync` (accepts normalised activity + daily-health payloads from the native layer), `watch-disconnect`, and a stub `watch-push-workout` behind a capability flag.
+- A shared `watchBridge` TS module defining the bridge contract the Swift plugin must implement: `isAvailable()`, `pair()`, `unpair()`, `listActivities(since)`, `fetchActivity(id)` (track + HR series + laps), `fetchDailyHealth(date)`. The web layer only ever talks to this module, never to native code directly.
+- Connect UI: a first-party "Runward Watch" card added to `src/components/ConnectApps.tsx` and `src/components/dashboard/DashboardConnect.tsx` — placed first, distinct styling, visible only when `isCapacitorNative()` is true (or hidden with an explanatory note on web/desktop).
+
+## Phase 3 — Native SDK bridge (starts when the SDK arrives; needs Xcode)
+
+1. Drop the OEM iOS SDK into the Capacitor app, write a small Swift Capacitor plugin implementing the `watchBridge` contract over the SDK's pairing/sync APIs.
+2. Auth model decision once the SDK is reviewed: bind the watch to the Runward account by pairing inside a signed-in app (pair token = user id), no separate OEM account — Garmin-Connect-style.
+3. Sync UX: manual "Sync now" + foreground auto-sync on app open. True background BLE sync is possible but deferred (iOS background BLE is flaky and App-Store-scrutinised).
+
+## Open items the OEM must confirm (send before Phase 3)
+
+1. Per-workout export detail: full GPS track (per-second lat/lon), HR series, laps/splits, cadence, elevation — or summary only? Format (FIT/GPX/proprietary/JSON)?
+2. Daily health via SDK: steps, sleep stages, resting HR, HRV, SpO2, stress — which are readable, at what granularity?
+3. Structured workout push to the watch — supported at all?
+4. Standard BLE HR broadcast for live data, or SDK-only?
+5. Android SDK availability and parity (the plan is iOS-first as specified; Android is its own plugin later).
+6. SDK licence/white-label terms, and who maintains it against iOS updates.
+7. Watch-face + boot-logo branding: can we ship a Runward face by default?
+
+## Risks
+
+- If workout export is summary-only, the watch can't feed maps/splits/HR-zones/training-load — it becomes a steps-and-distance tracker only. Check first.
+- Live in-run data on watch screens depends on firmware; not promised for launch.
+- Android: OEM said "iOS SDK" — if no Android SDK exists, Android users stay on Strava/Terra connections.
 
 ## Suggested next steps
 
-1. Get the SDK package + docs and answers to the nine questions, especially Q1 and Q2.
-2. Ask for one sample unit and one sample exported workout file so the data quality can be judged before tooling is built.
-3. Share the SDK docs here; I'll convert them into a concrete build plan (schema, edge functions, UI, and the native-bridge contract if BLE).
+1. Approve, and I'll build Phase 1 + Phase 2 (Capacitor scaffold, tables, edge functions, bridge contract, connect card).
+2. Send the OEM the seven questions; get a sample unit and one exported workout file.
+3. When the SDK lands, Phase 3 is a focused Swift plugin task.

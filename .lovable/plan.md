@@ -1,118 +1,45 @@
-# Watch Integration Architecture — BLE Sync via Separate Backend
+# Runward Watch (MoYoung/CRP SDK) — Findings from both development guides
 
-## Critical constraint: BLE cannot run in the cloud
+I read the English guides for iOS SDK 3.19.2 and Android CRPBandSDK 1.8.5. Both are the same product family (MoYoung "CRP" BLE protocol), with mirrored APIs.
 
-The OEM SDK communicates with the watch via **Bluetooth (BLE)**. BLE requires a
-physical Bluetooth radio within a few meters of the watch. A cloud-hosted
-backend (Railway, Render, etc.) has no Bluetooth hardware and cannot run a
-native iOS/Android BLE SDK.
+## What the SDKs are
 
-So the architecture must split into two layers:
+- Pure **BLE-only** SDKs. There is no cloud API, no OAuth, no server endpoint anywhere in either guide. The phone talks to the watch over Bluetooth; nothing else can.
+- Proprietary CRP protocol on top of GATT (`com.crrepa.ble.*` / `CRPSmartBand.framework`), plus vendor DFU services (Realtek, SiFli) for firmware. This is **not** readable through a generic BLE bridge — the byte protocol is undocumented and lives inside the SDK binaries.
+- iOS requires `CRPSmartBand.framework` as an embedded binary, CoreBluetooth background mode, and Bluetooth Always usage description. Android requires the `.aar`, BLUETOOTH_SCAN/CONNECT + coarse location, and declared DFU services.
+- Guides say plainly: "a certain watch only supports part of the functions" — per-feature support must be confirmed with the OEM for the LC323.
 
-```
- ┌──────────┐    BLE     ┌───────────────┐   HTTPS POST   ┌──────────────┐   webhook/HTTP   ┌──────────┐
- │  Watch   │◄──────────►│  Phone (app)  │───────────────►│  Cloud relay │◄───────────────►│ Runward  │
- │ LC323    │  Bluetooth │  runs OEM SDK  │  JSON payload  │  (Railway)   │   fetch data    │ (Despia)  │
- └──────────┘            └───────────────┘                └──────────────┘                 └──────────┘
-```
+## Capabilities relevant to Runward
 
-- **Phone layer** — a native iOS/Android app (or Despia's built-in BLE bridge)
-  that physically connects to the watch via Bluetooth and reads workout/health data.
-- **Cloud relay** (optional) — a server on Railway that receives POSTed data from
-  the phone, normalizes it, stores it, and exposes webhooks for Runward to fetch.
-- **Runward** — your existing Despia web app fetches watch data via HTTP from
-  the relay (or directly from Supabase if the phone POSTs there).
+Running / workout data:
+- Historical workout records: iOS `getSportRecordList()` → `receiveSportList([CRPSportRecord])`, then `getSportRecordData(id:)`. Android `queryHistoryTraining()` → `queryTraining(id)`.
+- Per-workout payload (`CRPNewSportModel`): start/end time, valid time, sport type, steps, distance, kcal, **heart-rate array**, **cadence array (per 10 s)**, **stride array (per 10 s, cm)**.
+- GPS track: `getGPSDataRecordList()` → start-time list, then `getGPSRecordData(time:)` / Android `queryHistoryGps()` + `queryGpsDetail(time)`. Track is **latitude/longitude only, one point every 2 seconds**. No per-point pace/altitude/HR — those come from the separate arrays and must be time-aligned.
+- Live session: real-time steps, real-time HR, `CRPNewSportingModel` (state, steps, sport time, live HR) while a workout runs; app can start/pause/resume/stop sport mode on the watch.
+- Daily: steps (today + history — **only last 3 days, 7 on SiFli watches**), sleep incl. naps, HR records, dynamic HR, HRV, SpO2, stress, temperature, blood pressure, ECG on supporting models.
+- Extras usable for branding: watch faces (incl. custom background upload), notification push, weather push, alarms, contacts, world clock, EPO/GPS assist file upload, OTA firmware.
 
-## Two viable paths (depends on SDK review)
+Important limits for our use case:
+- **No structured-workout push.** The SDK can only switch the watch into a sport mode by type; there is no way to send a Runward interval plan (warmup/reps/paces) to the watch. That is the single biggest gap versus Garmin.
+- **No cloud sync.** Data only exists on the watch until a paired phone with the SDK pulls it. A Railway/Supabase backend can never fetch it by itself.
+- Short history retention means the phone must sync often or data is lost.
+- Android SDK (1.8.5, dated 0911) is older than iOS (3.19.2); ask the OEM for the latest Android build and the LC323 feature matrix.
 
-### Path A: Despia built-in BLE (simplest, if the watch uses standard GATT profiles)
+## What this means for the architecture
 
-Despia has a full BLE central stack accessible from JavaScript:
-- `despia('bluetooth://scan?services=...')` — scan for the watch
-- `despia('bluetooth://connect?id=...')` — connect
-- `despia('bluetooth://discover?id=...')` — enumerate services/characteristics
-- `despia('bluetooth://read?...')` / `despia('bluetooth://write?...')` — read/write
-- `despia('bluetooth://subscribe?...')` — subscribe to notifications (HR, etc.)
-- `despia('bluetooth://connect?...&server=<URL>')` — **auto-POST every notification
-  and state change to your backend as JSON, even when the app is backgrounded**
+The earlier conclusion holds and is now confirmed by the guides: the SDK must run on the phone, so we need a native host. Options, unchanged:
 
-This means your existing Despia app could talk to the watch directly and POST data
-to a Supabase edge function — no separate app, no Capacitor, no Railway relay.
+- **Path B (recommended):** a thin native iOS + Android "Runward Watch Sync" app that embeds the SDK, does pairing and background sync, normalizes each workout (summary + HR/cadence/stride arrays + GPS points) and POSTs it to a Supabase edge function. Runward stays on Despia and simply reads the new tables like it reads Terra/Strava.
+- **Path A (ruled out):** Despia's raw BLE bridge cannot speak the CRP protocol, so this is not viable without the OEM releasing the byte-level spec.
 
-**Works only if** the watch exposes standard BLE GATT profiles (Heart Rate 0x180D,
-Running Speed/Cadence 0x1814, Battery 0x180F, etc.) or documented custom
-characteristics that can be read/parsed in JavaScript.
+## Questions for the OEM before we build
 
-**Fails if** the OEM SDK uses proprietary protocol: encrypted payloads, custom
-handshake/auth sequences, or binary parsing that requires native code.
+1. LC323 feature matrix: which of GPS track, new-version sport records (`CRPNewSportModel`), cadence/stride arrays, HRV, stress, SpO2, temperature are actually enabled?
+2. Protocol version (V1 or V2)? V2 is required for the richer sport records.
+3. Latest Android SDK build, and Swift Package/CocoaPods distribution for iOS if available.
+4. Any structured-workout / training-plan push capability on the roadmap?
+5. Licensing terms for shipping the SDK in our own branded app, and white-label watch-face tooling.
 
-### Path B: Separate sync app + cloud relay (if OEM SDK is required)
+## Next step
 
-If the SDK does proprietary BLE work that can't be replicated with raw BLE:
-
-1. **Build a separate native iOS app** ("Runward Watch Sync") that:
-   - Runs the OEM iOS SDK to pair/sync with the watch via BLE
-   - Authenticates the user (links to their Runward account via a pairing code
-     or shared Supabase auth)
-   - POSTs synced workout/health data to the cloud relay (or directly to Supabase)
-
-2. **Cloud relay** (Railway, optional):
-   - Receives POSTed data from the sync app
-   - Normalizes the OEM data format into Runward's schema
-   - Stores in Supabase (shared instance) or its own DB
-   - Exposes webhook endpoints for Runward to pull data
-
-3. **Runward** (existing Despia app):
-   - Fetches watch activities from the relay/Supabase via HTTP
-   - Displays them in the existing activity list alongside Strava/Terra/etc.
-
-4. Repeat for **Android SDK** when available (separate Android sync app).
-
-**Tradeoff**: users install two apps (Runward + Watch Sync). The sync app runs in
-the background to pull data from the watch and push it to the cloud. More complex
-UX but works with any proprietary SDK.
-
-## What the SDK review must answer
-
-When you send the SDKs, I need to determine:
-
-1. **BLE protocol type** — Does the SDK use standard GATT profiles, or proprietary
-   commands/encryption? (Determines Path A vs Path B)
-2. **Data export format** — What does a synced workout look like? GPS track,
-   HR samples, lap splits, or just summary metrics?
-3. **Pairing/auth flow** — How does the SDK pair with the watch? BLE bonding,
-   PIN, or custom handshake?
-4. **Background sync** — Can the SDK sync in the background, or only foreground?
-5. **Daily health data** — Does the SDK expose sleep, SpO2, stress, steps, or
-   only workout records?
-6. **Workout push** — Can the SDK push structured workouts TO the watch, or
-   only read FROM it?
-7. **Live data** — Can the SDK stream live HR/pace during a workout, or only
-   post-workout sync?
-8. **Android parity** — Does the Android SDK have the same capabilities?
-
-## Recommendation
-
-1. **Send the SDKs** — I'll review the API surface and determine which path is viable.
-2. **If Path A is viable** — use Despia's built-in BLE. No new app, no Capacitor,
-   no Railway. Your existing app scans, connects, and POSTs to Supabase. This is
-   by far the simplest.
-3. **If Path B is required** — build a separate Watch Sync app per platform (iOS
-   first, then Android). A Railway relay is optional; the sync app can POST
-   directly to Supabase edge functions if the data format is simple enough.
-4. **First-party watch exemption** — the watch is your own brand, so it should be
-   exempt from the existing "one fitness provider" mutual-exclusion rule that
-   blocks Strava/Terra/Intervals/etc. from coexisting.
-
-## Technical details
-
-- **Despia BLE access**: requires emailing ble@despia.com to enable the feature.
-  Background BLE requires enabling the Bluetooth addon in Despia Editor + fresh
-  native build. Foreground BLE works out of the box.
-- **Server POST from Despia**: fire-and-forget, best-effort delivery. Include a
-  user identifier in the POST (e.g., the Supabase user ID) so the backend can
-  attribute data. Add a shared secret header for auth.
-- **Supabase tables**: new `watch_activities` and `watch_daily_health` tables,
-  following the same pattern as `garmin_activities`, `terra_activities`, etc.
-  RLS owner-scoped, with edge functions for ingestion.
-- **No Capacitor**: the existing Despia setup is preserved. No migration needed.
+If you confirm Path B, I'll write the implementation plan: Supabase tables (`watch_devices`, `watch_workouts`, `watch_workout_streams`, `watch_daily_metrics`) with GRANTs and RLS, a device-token-authenticated `watch-ingest` edge function, the Runward UI (pair/sync status in Connect Apps, provider-exclusivity handling), and the native sync-app spec for each platform.

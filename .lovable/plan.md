@@ -1,45 +1,61 @@
-# Runward Watch (MoYoung/CRP SDK) — Findings from both development guides
+# Runward Watch — single-app path via Despia Custom Extensions
 
-I read the English guides for iOS SDK 3.19.2 and Android CRPBandSDK 1.8.5. Both are the same product family (MoYoung "CRP" BLE protocol), with mirrored APIs.
+## Answer: yes, one app is possible — via a Despia Custom Extension
 
-## What the SDKs are
+Despia supports **Custom Code Extensions**: you write native Swift/Kotlin that is compiled directly into your existing Despia app binary, exposed to your web app through `despia('scheme://...')` calls and `window.on_*` event callbacks. Despia's own docs show "OEM Bluetooth device integration" as the headline example. This means:
 
-- Pure **BLE-only** SDKs. There is no cloud API, no OAuth, no server endpoint anywhere in either guide. The phone talks to the watch over Bluetooth; nothing else can.
-- Proprietary CRP protocol on top of GATT (`com.crrepa.ble.*` / `CRPSmartBand.framework`), plus vendor DFU services (Realtek, SiFli) for firmware. This is **not** readable through a generic BLE bridge — the byte protocol is undocumented and lives inside the SDK binaries.
-- iOS requires `CRPSmartBand.framework` as an embedded binary, CoreBluetooth background mode, and Bluetooth Always usage description. Android requires the `.aar`, BLUETOOTH_SCAN/CONNECT + coarse location, and declared DFU services.
-- Guides say plainly: "a certain watch only supports part of the functions" — per-feature support must be confirmed with the OEM for the LC323.
+- No second app, no App Store restructure — Runward stays the single app on Despia.
+- The extension hosts the watch SDK natively and reports data to the existing React UI, which POSTs to Supabase like today.
 
-## Capabilities relevant to Runward
+## The one blocker: SDK distribution format
 
-Running / workout data:
-- Historical workout records: iOS `getSportRecordList()` → `receiveSportList([CRPSportRecord])`, then `getSportRecordData(id:)`. Android `queryHistoryTraining()` → `queryTraining(id)`.
-- Per-workout payload (`CRPNewSportModel`): start/end time, valid time, sport type, steps, distance, kcal, **heart-rate array**, **cadence array (per 10 s)**, **stride array (per 10 s, cm)**.
-- GPS track: `getGPSDataRecordList()` → start-time list, then `getGPSRecordData(time:)` / Android `queryHistoryGps()` + `queryGpsDetail(time)`. Track is **latitude/longitude only, one point every 2 seconds**. No per-point pace/altitude/HR — those come from the separate arrays and must be time-aligned.
-- Live session: real-time steps, real-time HR, `CRPNewSportingModel` (state, steps, sport time, live HR) while a workout runs; app can start/pause/resume/stop sport mode on the watch.
-- Daily: steps (today + history — **only last 3 days, 7 on SiFli watches**), sleep incl. naps, HR records, dynamic HR, HRV, SpO2, stress, temperature, blood pressure, ECG on supporting models.
-- Extras usable for branding: watch faces (incl. custom background upload), notification push, weather push, alarms, contacts, world clock, EPO/GPS assist file upload, OTA firmware.
+Despia extension `dependencies` resolve only:
+- **iOS:** Swift Package Manager (git URL + version)
+- **Android:** Maven artifact (`group:name:version`)
 
-Important limits for our use case:
-- **No structured-workout push.** The SDK can only switch the watch into a sport mode by type; there is no way to send a Runward interval plan (warmup/reps/paces) to the watch. That is the single biggest gap versus Garmin.
-- **No cloud sync.** Data only exists on the watch until a paired phone with the SDK pulls it. A Railway/Supabase backend can never fetch it by itself.
-- Short history retention means the phone must sync often or data is lost.
-- Android SDK (1.8.5, dated 0911) is older than iOS (3.19.2); ask the OEM for the latest Android build and the LC323 feature matrix.
+The OEM gave us a raw `CRPSmartBand.framework` (iOS) and `crpblelib-*.aar` (Android) — neither is on SPM or Maven. So before committing we must either:
+1. Ask the OEM for SPM + Maven (or XCFramework binary target) distribution — many BLE vendors do publish these (e.g. Nordic, Realtek DFU are on SPM/Maven); or
+2. Ask Despia support whether a vendored `.framework`/`.aar` can be bundled in an extension; or
+3. Vendor the binaries in a thin Swift Package / local Maven repo we host ourselves.
 
-## What this means for the architecture
+Until that is answered, the fallback remains the separate native sync-app plan.
 
-The earlier conclusion holds and is now confirmed by the guides: the SDK must run on the phone, so we need a native host. Options, unchanged:
+## What the extension would look like
 
-- **Path B (recommended):** a thin native iOS + Android "Runward Watch Sync" app that embeds the SDK, does pairing and background sync, normalizes each workout (summary + HR/cadence/stride arrays + GPS points) and POSTs it to a Supabase edge function. Runward stays on Despia and simply reads the new tables like it reads Terra/Strava.
-- **Path A (ruled out):** Despia's raw BLE bridge cannot speak the CRP protocol, so this is not viable without the OEM releasing the byte-level spec.
+```text
+Despia Extension "runwardwatch"
+├── despia-extension.json        scheme: runwardwatch, hosts + events below
+├── Sources/ios/WatchBridge.swift      embeds CRPSmartBand.framework
+└── Sources/android/WatchBridge.kt     embeds crpblelib aar
 
-## Questions for the OEM before we build
+Actions (despia('runwardwatch://...')):
+  scan, connect(deviceId), unbind, syncSteps, syncSleep,
+  syncWorkoutList, getWorkoutDetail(id), getGpsTrack(startTime),
+  setUserInfo, syncTime, getBattery, getFirmwareVersion
 
-1. LC323 feature matrix: which of GPS track, new-version sport records (`CRPNewSportModel`), cadence/stride arrays, HRV, stress, SpO2, temperature are actually enabled?
-2. Protocol version (V1 or V2)? V2 is required for the richer sport records.
-3. Latest Android SDK build, and Swift Package/CocoaPods distribution for iOS if available.
-4. Any structured-workout / training-plan push capability on the roadmap?
-5. Licensing terms for shipping the SDK in our own branded app, and white-label watch-face tooling.
+Events (window.on_*):
+  on_watch_connected / on_watch_disconnected
+  on_watch_sync_progress(stage, percent)
+  on_watch_workout_ready(summary)      → web app POSTs to watch-ingest
+  on_watch_live_hr(bpm)                (optional, live mode)
+```
+
+- Background sync: requires the Despia Bluetooth addon (email ble@despia.com) plus a fresh native build; CoreBluetooth background mode is already declared by the SDK's requirements.
+- Data flows into the same Supabase tables/edge function as the separate-app plan — that part doesn't change.
+
+## Backend (shared either way)
+
+- Tables: `watch_devices`, `watch_workouts`, `watch_workout_streams` (HR/cadence/stride arrays + 2s GPS points), `watch_daily_metrics` — with GRANTs + RLS.
+- `watch-ingest` edge function validating the user's JWT and upserting normalized workouts (idempotent on watch_id + startTime).
+- Connect Apps UI: "Runward Watch" entry gated to native, first-party exemption from the provider-exclusivity trigger.
+
+## Open questions (in priority order)
+
+1. **OEM:** SPM / Maven / XCFramework distribution for both SDKs?
+2. **Despia support:** can an extension bundle a vendored binary framework/AAR? (Email them — the BLE addon is also gated via ble@despia.com anyway.)
+3. **OEM:** LC323 feature matrix + protocol V1/V2 + latest Android SDK build.
+4. **OEM:** structured-workout push on roadmap?
 
 ## Next step
 
-If you confirm Path B, I'll write the implementation plan: Supabase tables (`watch_devices`, `watch_workouts`, `watch_workout_streams`, `watch_daily_metrics`) with GRANTs and RLS, a device-token-authenticated `watch-ingest` edge function, the Runward UI (pair/sync status in Connect Apps, provider-exclusivity handling), and the native sync-app spec for each platform.
+I'll draft the extension skeleton (`despia-extension.json` + Swift/Kotlin bridge stubs mapping every SDK call we need) once you confirm, and you can start the two vendor conversations in parallel.

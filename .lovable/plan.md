@@ -9,7 +9,7 @@ The open-source repo (github.com/despia-native/despia) confirms this is **new an
 - The Despia Custom Extension / native-runtime route is **future, not today**. Watching/starring the repo gives the GA signal, but it is not a host we can build the watch integration on right now.
 - That leaves **Capacitor** as the single-app path that works today, with the Despia native runtime as a later migration once it's GA and "Convert" can carry the existing Runward React app across.
 
-So the Despia Custom Extension route is off the table as the intended path, and the question becomes *which native host* Runward uses.
+
 
 ## Confirmed facts about the SDKs (from both development guides)
 

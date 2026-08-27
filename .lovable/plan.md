@@ -23,17 +23,17 @@ The open-source repo (github.com/despia-native/despia) confirms this is **new an
 
 ## Options for the native host (pick one)
 
-**A. Wait for / migrate to the Despia native runtime (recommended if the timeline fits)**
-- Free migration, one app, native UI + native SDK support, and Despia stays the build/publish pipeline you already know.
-- Cost: parts of the UI move from React to SwiftUI/Compose, so this is a real rewrite of the shell — ask Despia for the ship date, what "migrate for free" covers, whether the existing React app can still be hosted inside it during transition, and whether arbitrary vendor `.framework`/`.aar` binaries can be embedded.
-
-**B. Capacitor shell for Runward (single app, available today)**
+**A. Capacitor shell for Runward (recommended — single app, available today)**
 - Keep the entire existing React/Vite UI unchanged; Capacitor wraps it and hosts a small Swift/Kotlin plugin embedding the CRP SDK, exposed to JS as `pair()`, `sync()`, plus listener events.
-- Single app in the stores, no rewrite, works now. Cost: we own the iOS/Android build and release pipeline instead of Despia.
+- Single app in the stores, no rewrite, works now. Cost: we own the iOS/Android build and release pipeline instead of Despia; you'd export to GitHub and run `npx cap` from your machine.
 
-**C. Companion sync app (two apps)**
+**B. Wait for the Despia native runtime (DSX), migrate later**
+- Free migration for existing wrapper customers, single app, native UI + native SDKs, and Despia stays the build/publish pipeline you know. Watch/star the repo for the GA signal.
+- But: pre-GA today (v0.0.1), the runtime is a new language (DSX, not React), and "Convert" maturity is unknown. Not a host we can build the watch integration on yet. Build the backend now so it's ready the day it lands.
+
+**C. Companion sync app (two apps) — fallback only**
 - Runward stays on the Despia wrapper; a thin native "Runward Watch Sync" app runs the SDK and POSTs to Supabase.
-- Lowest risk to the current app, worst user experience — rejected unless A and B both stall.
+- Lowest risk to the current app, worst user experience (two installs). Only if A and B both stall.
 
 ## Backend and app work (identical in all three options)
 

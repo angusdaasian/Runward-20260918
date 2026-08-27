@@ -1,61 +1,48 @@
-# Runward Watch — single-app path via Despia Custom Extensions
+# Runward Watch (MoYoung/CRP SDK) — path to a single app
 
-## Answer: yes, one app is possible — via a Despia Custom Extension
+## What Despia told us changes the recommendation
 
-Despia supports **Custom Code Extensions**: you write native Swift/Kotlin that is compiled directly into your existing Despia app binary, exposed to your web app through `despia('scheme://...')` calls and `window.on_*` event callbacks. Despia's own docs show "OEM Bluetooth device integration" as the headline example. This means:
+Despia's position: the wrapper (v3 web view) is deliberately a thin native shell, and BLE/OEM SDK work does not belong in it. They are splitting into two products — the wrapper business, and a **native development platform** with native UI, native SDKs, SwiftUI / Jetpack Compose — and existing wrapper customers can migrate to the native runtime **for free** when it ships.
 
-- No second app, no App Store restructure — Runward stays the single app on Despia.
-- The extension hosts the watch SDK natively and reports data to the existing React UI, which POSTs to Supabase like today.
+So the Despia Custom Extension route is off the table as the intended path, and the question becomes *which native host* Runward uses.
 
-## The one blocker: SDK distribution format
+## Confirmed facts about the SDKs (from both development guides)
 
-Despia extension `dependencies` resolve only:
-- **iOS:** Swift Package Manager (git URL + version)
-- **Android:** Maven artifact (`group:name:version`)
+- iOS 3.19.2 (`CRPSmartBand.framework`) and Android 1.8.5 (`crpblelib-*.aar`) are the same MoYoung "CRP" proprietary BLE protocol, mirrored APIs. **BLE only — no cloud API, no OAuth, no server endpoint.** A Railway/Supabase backend can never fetch watch data by itself; a phone must pull it.
+- Workout history: iOS `getSportRecordList()` → `getSportRecordData(id:)`; Android `queryHistoryTraining()` → `queryTraining(id)`. Payload: start/end, sport type, steps, distance, kcal, **HR array, cadence per 10 s, stride per 10 s**.
+- GPS track: `getGPSDataRecordList()` / `queryHistoryGps()` then detail by start time — **lat/lng only, one point per 2 s**; align to the HR/cadence arrays by time.
+- Live session: real-time steps and HR, start/pause/resume/stop sport mode from the app.
+- Daily: steps (**history only last 3 days, 7 on SiFli**), sleep + naps, HR, HRV, SpO2, stress, temperature, BP/ECG on supporting models.
+- Extras: watch faces incl. custom background upload, notification/weather push, alarms, contacts, EPO GPS-assist upload, OTA firmware.
+- **No structured-workout push** — the app can only set a sport mode by type, so Runward interval plans cannot be sent to the watch. Biggest gap vs Garmin.
 
-The OEM gave us a raw `CRPSmartBand.framework` (iOS) and `crpblelib-*.aar` (Android) — neither is on SPM or Maven. So before committing we must either:
-1. Ask the OEM for SPM + Maven (or XCFramework binary target) distribution — many BLE vendors do publish these (e.g. Nordic, Realtek DFU are on SPM/Maven); or
-2. Ask Despia support whether a vendored `.framework`/`.aar` can be bundled in an extension; or
-3. Vendor the binaries in a thin Swift Package / local Maven repo we host ourselves.
+## Options for the native host (pick one)
 
-Until that is answered, the fallback remains the separate native sync-app plan.
+**A. Wait for / migrate to the Despia native runtime (recommended if the timeline fits)**
+- Free migration, one app, native UI + native SDK support, and Despia stays the build/publish pipeline you already know.
+- Cost: parts of the UI move from React to SwiftUI/Compose, so this is a real rewrite of the shell — ask Despia for the ship date, what "migrate for free" covers, whether the existing React app can still be hosted inside it during transition, and whether arbitrary vendor `.framework`/`.aar` binaries can be embedded.
 
-## What the extension would look like
+**B. Capacitor shell for Runward (single app, available today)**
+- Keep the entire existing React/Vite UI unchanged; Capacitor wraps it and hosts a small Swift/Kotlin plugin embedding the CRP SDK, exposed to JS as `pair()`, `sync()`, plus listener events.
+- Single app in the stores, no rewrite, works now. Cost: we own the iOS/Android build and release pipeline instead of Despia.
 
-```text
-Despia Extension "runwardwatch"
-├── despia-extension.json        scheme: runwardwatch, hosts + events below
-├── Sources/ios/WatchBridge.swift      embeds CRPSmartBand.framework
-└── Sources/android/WatchBridge.kt     embeds crpblelib aar
+**C. Companion sync app (two apps)**
+- Runward stays on the Despia wrapper; a thin native "Runward Watch Sync" app runs the SDK and POSTs to Supabase.
+- Lowest risk to the current app, worst user experience — rejected unless A and B both stall.
 
-Actions (despia('runwardwatch://...')):
-  scan, connect(deviceId), unbind, syncSteps, syncSleep,
-  syncWorkoutList, getWorkoutDetail(id), getGpsTrack(startTime),
-  setUserInfo, syncTime, getBattery, getFirmwareVersion
+## Backend and app work (identical in all three options)
 
-Events (window.on_*):
-  on_watch_connected / on_watch_disconnected
-  on_watch_sync_progress(stage, percent)
-  on_watch_workout_ready(summary)      → web app POSTs to watch-ingest
-  on_watch_live_hr(bpm)                (optional, live mode)
-```
+- Tables `watch_devices`, `watch_workouts`, `watch_workout_streams` (HR / cadence / stride arrays + 2 s GPS points), `watch_daily_metrics`, each with GRANTs and RLS scoped to `auth.uid()`.
+- `watch-ingest` edge function: validates the user's JWT, upserts normalized workouts idempotently on (device_id, start_time), writes streams and daily metrics.
+- Sync layer in the native host: pair → sync steps/sleep → workout list → per-workout detail + GPS → POST → mark synced. Must run often because of the 3-day retention.
+- Runward UI: "Runward Watch" entry in Connect Apps (native only) with pair/sync status and last-sync time; first-party exemption from the existing provider-exclusivity trigger on `user_connections`.
 
-- Background sync: requires the Despia Bluetooth addon (email ble@despia.com) plus a fresh native build; CoreBluetooth background mode is already declared by the SDK's requirements.
-- Data flows into the same Supabase tables/edge function as the separate-app plan — that part doesn't change.
+## Questions to settle first
 
-## Backend (shared either way)
+Despia: native runtime ship date; what free migration includes; can vendor binary frameworks/AARs be embedded; can the existing web UI be hosted during transition.
 
-- Tables: `watch_devices`, `watch_workouts`, `watch_workout_streams` (HR/cadence/stride arrays + 2s GPS points), `watch_daily_metrics` — with GRANTs + RLS.
-- `watch-ingest` edge function validating the user's JWT and upserting normalized workouts (idempotent on watch_id + startTime).
-- Connect Apps UI: "Runward Watch" entry gated to native, first-party exemption from the provider-exclusivity trigger.
-
-## Open questions (in priority order)
-
-1. **OEM:** SPM / Maven / XCFramework distribution for both SDKs?
-2. **Despia support:** can an extension bundle a vendored binary framework/AAR? (Email them — the BLE addon is also gated via ble@despia.com anyway.)
-3. **OEM:** LC323 feature matrix + protocol V1/V2 + latest Android SDK build.
-4. **OEM:** structured-workout push on roadmap?
+OEM: LC323 feature matrix (GPS track, new-version sport records, cadence/stride, HRV, stress, SpO2); protocol V1 or V2; latest Android SDK build (1.8.5 lags iOS 3.19.2); SPM/Maven or XCFramework distribution; structured-workout push on the roadmap; licensing for shipping the SDK in our own branded app.
 
 ## Next step
 
-I'll draft the extension skeleton (`despia-extension.json` + Swift/Kotlin bridge stubs mapping every SDK call we need) once you confirm, and you can start the two vendor conversations in parallel.
+Tell me which host you want. If you pick B, I'll start with the Supabase tables + `watch-ingest` function and the Connect Apps UI (all doable here), and hand you the Capacitor plugin spec for the native side. If you pick A, we build the same backend now so it's ready when the native runtime lands.

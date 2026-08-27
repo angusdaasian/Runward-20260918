@@ -1,10 +1,15 @@
 # Runward Watch (MoYoung/CRP SDK) — path to a single app
 
-## What Despia told us changes the recommendation
+## What Despia told us + what the repo shows
 
-Despia's position: the wrapper (v3 web view) is deliberately a thin native shell, and BLE/OEM SDK work does not belong in it. They are splitting into two products — the wrapper business, and a **native development platform** with native UI, native SDKs, SwiftUI / Jetpack Compose — and existing wrapper customers can migrate to the native runtime **for free** when it ships.
+Despia's position: the wrapper (v3 web view) is a thin native shell, and BLE/OEM SDK work does not belong in it. They are splitting into a wrapper business and a native development platform; existing wrapper customers can migrate to the native runtime for free when it ships.
 
-So the Despia Custom Extension route is off the table as the intended path, and the question becomes *which native host* Runward uses.
+The open-source repo (github.com/despia-native/despia) confirms this is **new and early**. It is `Despia` the framework: a new language called **DSX** that compiles to real SwiftUI / Jetpack Compose / DOM, v0.0.1, "first public release," actively developed by the full Despia team. Apps are authored as `.dsx` documents (not React/TypeScript). There is a `Convert` migration path for existing web apps, but the whole runtime is pre-GA. So:
+
+- The Despia Custom Extension / native-runtime route is **future, not today**. Watching/starring the repo gives the GA signal, but it is not a host we can build the watch integration on right now.
+- That leaves **Capacitor** as the single-app path that works today, with the Despia native runtime as a later migration once it's GA and "Convert" can carry the existing Runward React app across.
+
+
 
 ## Confirmed facts about the SDKs (from both development guides)
 
@@ -18,17 +23,17 @@ So the Despia Custom Extension route is off the table as the intended path, and 
 
 ## Options for the native host (pick one)
 
-**A. Wait for / migrate to the Despia native runtime (recommended if the timeline fits)**
-- Free migration, one app, native UI + native SDK support, and Despia stays the build/publish pipeline you already know.
-- Cost: parts of the UI move from React to SwiftUI/Compose, so this is a real rewrite of the shell — ask Despia for the ship date, what "migrate for free" covers, whether the existing React app can still be hosted inside it during transition, and whether arbitrary vendor `.framework`/`.aar` binaries can be embedded.
-
-**B. Capacitor shell for Runward (single app, available today)**
+**A. Capacitor shell for Runward (recommended — single app, available today)**
 - Keep the entire existing React/Vite UI unchanged; Capacitor wraps it and hosts a small Swift/Kotlin plugin embedding the CRP SDK, exposed to JS as `pair()`, `sync()`, plus listener events.
-- Single app in the stores, no rewrite, works now. Cost: we own the iOS/Android build and release pipeline instead of Despia.
+- Single app in the stores, no rewrite, works now. Cost: we own the iOS/Android build and release pipeline instead of Despia; you'd export to GitHub and run `npx cap` from your machine.
 
-**C. Companion sync app (two apps)**
+**B. Wait for the Despia native runtime (DSX), migrate later**
+- Free migration for existing wrapper customers, single app, native UI + native SDKs, and Despia stays the build/publish pipeline you know. Watch/star the repo for the GA signal.
+- But: pre-GA today (v0.0.1), the runtime is a new language (DSX, not React), and "Convert" maturity is unknown. Not a host we can build the watch integration on yet. Build the backend now so it's ready the day it lands.
+
+**C. Companion sync app (two apps) — fallback only**
 - Runward stays on the Despia wrapper; a thin native "Runward Watch Sync" app runs the SDK and POSTs to Supabase.
-- Lowest risk to the current app, worst user experience — rejected unless A and B both stall.
+- Lowest risk to the current app, worst user experience (two installs). Only if A and B both stall.
 
 ## Backend and app work (identical in all three options)
 

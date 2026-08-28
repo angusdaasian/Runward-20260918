@@ -37,6 +37,7 @@ import { loadForActivity, isRunning } from "@/lib/trainingLoad";
 import { calculateRunningScore } from "@/lib/vdot";
 import { computeZonePct, estimateMaxHr, estimateRestingHr, zoneBoundaries, ZONE_LABELS, isValidCustomZones } from "@/lib/hrZones";
 import HrZoneBars from "./HrZoneBars";
+import RpeSlider from "./RpeSlider";
 import PlanNextWorkoutCard from "./PlanNextWorkoutCard";
 import PlanComparisonDialog from "@/components/PlanComparisonDialog";
 import ActivityShoePicker from "./ActivityShoePicker";

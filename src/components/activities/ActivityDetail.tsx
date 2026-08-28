@@ -367,7 +367,8 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
   };
 
   const handleRpeSubmit = () => {
-    const val = parseInt(rpeInput, 10);
+    const parsed = parseFloat(rpeInput);
+    const val = Math.round(parsed * 2) / 2;
     if (isNaN(val) || val < 1 || val > 10) {
       toast.error(lang === "zh" ? "請輸入 1-10 之間的數字" : "Please enter a number between 1 and 10");
       return;

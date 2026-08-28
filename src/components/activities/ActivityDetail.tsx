@@ -1700,7 +1700,7 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
             </label>
             <RpeSlider
               lang={lang}
-              value={rpeInput ? parseInt(rpeInput, 10) : null}
+              value={rpeInput ? parseFloat(rpeInput) : null}
               onChange={(v) => setRpeInput(String(v))}
             />
             <button

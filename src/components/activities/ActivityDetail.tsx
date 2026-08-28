@@ -384,8 +384,8 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
 
   const handleRegenerateAnalysis = () => {
     if (needsRpe) {
-      const val = parseInt(rpeInput, 10);
-      runAiAnalysis(splits, isNaN(val) ? undefined : val, { forceRefresh: true });
+      const val = parseFloat(rpeInput);
+      runAiAnalysis(splits, isNaN(val) ? undefined : Math.round(val * 2) / 2, { forceRefresh: true });
     } else {
       runAiAnalysis(splits, undefined, { forceRefresh: true });
     }

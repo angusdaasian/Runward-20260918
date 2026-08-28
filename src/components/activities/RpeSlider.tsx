@@ -43,24 +43,40 @@ interface Props {
   className?: string;
 }
 
-/** Colour-coded RPE bar (1–10). Tap or drag along the bar to pick effort. */
+const STEP = 0.5;
+
+/** Colour-coded RPE bar (1–10, in 0.5 steps). Tap or drag along the bar to pick effort. */
 const RpeSlider = ({ lang, value, onChange, className }: Props) => {
   const zh = lang === "zh";
   const trackRef = useRef<HTMLDivElement>(null);
   const [dragging, setDragging] = useState(false);
 
-  const active = value ? RPE_LEVELS[value - 1] : null;
+  const isHalf = value != null && value % 1 !== 0;
+  // Highlight the bar the thumb sits in (round half-up ⇒ ceil for .5 values).
+  const activeIdx = value != null ? Math.round(value) : null;
+  const active = activeIdx != null ? RPE_LEVELS[activeIdx - 1] : null;
+  const floorLvl = value != null ? RPE_LEVELS[Math.floor(value) - 1] : null;
 
   const pick = (clientX: number) => {
     const el = trackRef.current;
     if (!el) return;
     const rect = el.getBoundingClientRect();
     const ratio = (clientX - rect.left) / rect.width;
-    const next = Math.min(10, Math.max(1, Math.ceil(ratio * 10)));
+    const raw = 1 + ratio * 9;
+    const next = Math.min(10, Math.max(1, Math.round(raw / STEP) * STEP));
     if (next !== value) onChange(next);
   };
 
-  const hint = value ? HINTS[value] : undefined;
+  const hint = value ? HINTS[Math.round(value)] : undefined;
+  const word = active
+    ? isHalf && floorLvl
+      ? zh
+        ? `${floorLvl.zh}–${active.zh}`
+        : `${floorLvl.en}–${active.en}`
+      : zh
+        ? active.zh
+        : active.en
+    : "";
 
   return (
     <div className={cn("select-none", className)}>
@@ -72,6 +88,7 @@ const RpeSlider = ({ lang, value, onChange, className }: Props) => {
         aria-valuemin={1}
         aria-valuemax={10}
         aria-valuenow={value ?? undefined}
+        aria-valuetext={value != null ? `RPE ${value}` : undefined}
         className="flex gap-1 cursor-pointer touch-none py-1"
         onPointerDown={(e) => {
           setDragging(true);
@@ -84,25 +101,30 @@ const RpeSlider = ({ lang, value, onChange, className }: Props) => {
         onKeyDown={(e) => {
           if (e.key === "ArrowLeft" || e.key === "ArrowDown") {
             e.preventDefault();
-            onChange(Math.max(1, (value ?? 5) - 1));
+            onChange(Math.max(1, (value ?? 5) - STEP));
           } else if (e.key === "ArrowRight" || e.key === "ArrowUp") {
             e.preventDefault();
-            onChange(Math.min(10, (value ?? 5) + 1));
+            onChange(Math.min(10, (value ?? 5) + STEP));
           }
         }}
       >
         {RPE_LEVELS.map((lvl) => {
-          const filled = value !== null && lvl.rpe <= value;
-          const isCurrent = value === lvl.rpe;
+          const rpe = lvl.rpe;
+          const fillFrac = value == null ? 0 : Math.max(0, Math.min(1, value - (rpe - 1)));
+          const isCurrent = value != null && rpe === activeIdx;
           return (
             <div key={lvl.rpe} className="flex-1 flex flex-col items-center gap-1">
               <div
                 className={cn(
-                  "w-full rounded-full transition-all",
+                  "w-full rounded-full bg-muted overflow-hidden transition-all",
                   isCurrent ? "h-6" : "h-4",
-                  filled ? lvl.bar : "bg-muted",
                 )}
-              />
+              >
+                <div
+                  className={cn("h-full rounded-full transition-all", fillFrac > 0 && lvl.bar)}
+                  style={{ width: `${fillFrac * 100}%` }}
+                />
+              </div>
               <span
                 className={cn(
                   "text-[10px] font-mono tabular-nums transition-colors",
@@ -120,7 +142,7 @@ const RpeSlider = ({ lang, value, onChange, className }: Props) => {
         {active ? (
           <div className={cn("inline-flex flex-col rounded-lg border px-3 py-1.5", active.chip)}>
             <span className={cn("text-sm font-semibold", active.text)}>
-              RPE {active.rpe} · {zh ? active.zh : active.en}
+              RPE {value} · {word}
             </span>
             {hint && (
               <span className="text-[11px] text-muted-foreground">{zh ? hint.zh : hint.en}</span>
@@ -128,7 +150,7 @@ const RpeSlider = ({ lang, value, onChange, className }: Props) => {
           </div>
         ) : (
           <p className="text-xs text-muted-foreground">
-            {zh ? "拖動或點擊上方色條選擇強度（1 = 非常輕鬆，10 = 全力衝刺）" : "Drag or tap the bar to rate the effort (1 = very easy, 10 = max effort)"}
+            {zh ? "拖動或點擊上方色條選擇強度（1 = 非常輕鬆，10 = 全力衝刺，可半級微調）" : "Drag or tap the bar to rate the effort (1 = very easy, 10 = max effort, 0.5 steps)"}
           </p>
         )}
       </div>

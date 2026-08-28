@@ -367,7 +367,8 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
   };
 
   const handleRpeSubmit = () => {
-    const val = parseInt(rpeInput, 10);
+    const parsed = parseFloat(rpeInput);
+    const val = Math.round(parsed * 2) / 2;
     if (isNaN(val) || val < 1 || val > 10) {
       toast.error(lang === "zh" ? "請輸入 1-10 之間的數字" : "Please enter a number between 1 and 10");
       return;
@@ -383,8 +384,8 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
 
   const handleRegenerateAnalysis = () => {
     if (needsRpe) {
-      const val = parseInt(rpeInput, 10);
-      runAiAnalysis(splits, isNaN(val) ? undefined : val, { forceRefresh: true });
+      const val = parseFloat(rpeInput);
+      runAiAnalysis(splits, isNaN(val) ? undefined : Math.round(val * 2) / 2, { forceRefresh: true });
     } else {
       runAiAnalysis(splits, undefined, { forceRefresh: true });
     }
@@ -1699,7 +1700,7 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
             </label>
             <RpeSlider
               lang={lang}
-              value={rpeInput ? parseInt(rpeInput, 10) : null}
+              value={rpeInput ? parseFloat(rpeInput) : null}
               onChange={(v) => setRpeInput(String(v))}
             />
             <button

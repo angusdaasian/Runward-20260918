@@ -1696,25 +1696,18 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
             <label className="text-xs font-medium text-foreground mb-1.5 block">
               {lang === "zh" ? "這次訓練的 RPE 是多少？(1-10)" : "How hard did this workout feel? (RPE 1-10)"}
             </label>
-            <div className="flex items-center gap-2">
-              <Input
-                type="number"
-                min={1}
-                max={10}
-                value={rpeInput}
-                onChange={(e) => setRpeInput(e.target.value)}
-                placeholder={lang === "zh" ? "輸入 1-10" : "Enter 1-10"}
-                className="w-24 text-center"
-                onKeyDown={(e) => { if (e.key === "Enter") handleRpeSubmit(); }}
-              />
-              <button
-                onClick={handleRpeSubmit}
-                disabled={!rpeInput}
-                className="px-4 py-2 rounded-lg text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
-              >
-                {lang === "zh" ? "分析" : "Analyze"}
-              </button>
-            </div>
+            <RpeSlider
+              lang={lang}
+              value={rpeInput ? parseInt(rpeInput, 10) : null}
+              onChange={(v) => setRpeInput(String(v))}
+            />
+            <button
+              onClick={handleRpeSubmit}
+              disabled={!rpeInput}
+              className="mt-2 px-4 py-2 rounded-lg text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
+            >
+              {lang === "zh" ? "分析" : "Analyze"}
+            </button>
           </div>
           )
         ) : aiLoading ? (

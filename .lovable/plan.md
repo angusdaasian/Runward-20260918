@@ -1,53 +1,58 @@
-# Runward Watch (MoYoung/CRP SDK) — path to a single app
+# Runward — Feature Evaluation & Proposed Additions
 
-## What Despia told us + what the repo shows
+## What Runward has today
 
-Despia's position: the wrapper (v3 web view) is a thin native shell, and BLE/OEM SDK work does not belong in it. They are splitting into a wrapper business and a native development platform; existing wrapper customers can migrate to the native runtime for free when it ships.
+A mature, full-featured running companion. Current surface area:
 
-The open-source repo (github.com/despia-native/despia) confirms this is **new and early**. It is `Despia` the framework: a new language called **DSX** that compiles to real SwiftUI / Jetpack Compose / DOM, v0.0.1, "first public release," actively developed by the full Despia team. Apps are authored as `.dsx` documents (not React/TypeScript). There is a `Convert` migration path for existing web apps, but the whole runtime is pre-GA. So:
+- **Multi-platform sync**: Strava, Garmin, Suunto, COROS, Polar, Apple Health, Fitbit, Intervals.icu, Terra (mutually-exclusive fitness provider).
+- **Activities**: detail view with map, HR-zone bars, splits, FIT export, bulk export, calendar, year heatmap, monthly stats, AI share posters, RPE slider (0.5 steps), suggested next workout.
+- **AI**: running coach chat (24/7), activity analysis, posture analysis (video), personalized training-program generation, weekly plan review, race-time prediction (VDOT + HR-based, with weather WBGT and TSB freshness adjustments).
+- **Training**: AI plans, plan editor, weekly review modal, training-load charts (CTL/ATL/TSB), training score.
+- **Analytics**: race predictor, HR zones, HRV readiness (Terra), injury-load cards (injury risk + readiness combined), trends, Garmin health card, customizable reorderable widget grid.
+- **Races**: scraped race calendar, user races, race fueling calculator.
+- **Gamification/Community**: Arena (chat, public/private leaderboards), XP/ranks/tiers/divisions, city badges, territory (CityHunter), monthly road quest, season reset.
+- **Messaging**: WhatsApp + Telegram daily workout delivery (compact-to-rich tiered), broadcast notifications.
+- **Web**: SSR bilingual blog (SEO, sitemap, RSS), landing + pricing, `/tools` (Pace Lab, race-day checklist, fueling calculator), `/review` Strava-compliant page, developer OAuth/API, admin panel.
+- **Localization**: EN + ZH + JA (client-side SPA).
 
-- The Despia Custom Extension / native-runtime route is **future, not today**. Watching/starring the repo gives the GA signal, but it is not a host we can build the watch integration on right now.
-- That leaves **Capacitor** as the single-app path that works today, with the Despia native runtime as a later migration once it's GA and "Convert" can carry the existing Runward React app across.
+## Confirmed gaps
 
+1. **No taper / race-peak planner.** Plans have rest/recovery days and a generic "post-injury" preset, but there is no explicit final-2-to-3-week taper generator tied to a target race date.
+2. **No single "Train Today?" gate.** Injury risk, HRV readiness, and TSB are computed in separate widgets — there is no one-line daily recommendation ("Ready / Easy / Rest") combining them.
+3. **No pacing/split analysis.** Splits are stored and shown, but never analyzed for negative-split tendency, fade, or bank-time risk. No race split planner with guardrails.
+4. **No plan-adherence tracking.** The app builds a plan and tracks activities, but never compares completed workouts against the scheduled plan (completion %, missed key sessions, streak).
+5. **No gear mileage surfacing.** Shoe tables exist (hidden); no wear/mileage alert when shoes are due for replacement.
+6. **No weather-adjusted "today's pace."** Weather slowdown exists only inside race prediction, not surfaced as a recommended training pace for today's conditions.
 
+## Proposed features (ranked by value-to-effort)
 
-## Confirmed facts about the SDKs (from both development guides)
+### A. "Train Today?" readiness gate — recommended, high value, low effort
+A single daily card combining existing TSB + HRV readiness + recent RPE + injury-risk band into one verdict: **Ready / Go easy / Rest**. Reuses `computeReadiness`, `computeInjuryRisk`, `buildWeeklyLoadSeries` already in the codebase. Lives at the top of Activities/Training tab. No new data model.
+- Why: closes the loop between the metrics users already see and a decision they actually make every morning. Highest "feels smart" payoff per line of code.
 
-- iOS 3.19.2 (`CRPSmartBand.framework`) and Android 1.8.5 (`crpblelib-*.aar`) are the same MoYoung "CRP" proprietary BLE protocol, mirrored APIs. **BLE only — no cloud API, no OAuth, no server endpoint.** A Railway/Supabase backend can never fetch watch data by itself; a phone must pull it.
-- Workout history: iOS `getSportRecordList()` → `getSportRecordData(id:)`; Android `queryHistoryTraining()` → `queryTraining(id)`. Payload: start/end, sport type, steps, distance, kcal, **HR array, cadence per 10 s, stride per 10 s**.
-- GPS track: `getGPSDataRecordList()` / `queryHistoryGps()` then detail by start time — **lat/lng only, one point per 2 s**; align to the HR/cadence arrays by time.
-- Live session: real-time steps and HR, start/pause/resume/stop sport mode from the app.
-- Daily: steps (**history only last 3 days, 7 on SiFli**), sleep + naps, HR, HRV, SpO2, stress, temperature, BP/ECG on supporting models.
-- Extras: watch faces incl. custom background upload, notification/weather push, alarms, contacts, EPO GPS-assist upload, OTA firmware.
-- **No structured-workout push** — the app can only set a sport mode by type, so Runward interval plans cannot be sent to the watch. Biggest gap vs Garmin.
+### B. Race split planner with bank-time guardrails — high value, medium effort
+Enter a target finish time + course; get per-km/mile splits with a max "bank" limit (e.g. don't run any km more than X sec faster than average) and a negative-split option. Reuses `predictTime` / VDOT engine. Could also power a "splits band" view inside an existing activity to flag where the runner faded vs. their plan.
+- Why: runners obsess over race splits; no major running app ships an explicit bank-time guard. Strong SEO + shareable.
 
-## Options for the native host (pick one)
+### C. Taper & peak-week planner — high value, medium effort
+Given a target race date + distance, auto-generate the final 14–21 day taper (volume reduction curve, last hard session, carb-load note) and append it to the user's AI plan. Reuses plan-generation Edge Function + VDOT paces. Adds a `taper_phase` concept to `planTypes.ts`.
+- Why: genuine hole — every marathoner needs a taper; Runward plans up to race day but not the taper itself.
 
-**A. Capacitor shell for Runward (recommended — single app, available today)**
-- Keep the entire existing React/Vite UI unchanged; Capacitor wraps it and hosts a small Swift/Kotlin plugin embedding the CRP SDK, exposed to JS as `pair()`, `sync()`, plus listener events.
-- Single app in the stores, no rewrite, works now. Cost: we own the iOS/Android build and release pipeline instead of Despia; you'd export to GitHub and run `npx cap` from your machine.
+### D. Plan adherence / schedule streak — medium value, medium effort
+Compare completed activities to scheduled plan workouts (date + type match) → completion %, missed key sessions, current streak. New lightweight `plan_completions` table or derive from existing activities vs. plan JSON. Surfaced in Training tab + Rewards XP.
+- Why: turns the plan from a PDF into a living checklist; boosts retention/XP loop.
 
-**B. Wait for the Despia native runtime (DSX), migrate later**
-- Free migration for existing wrapper customers, single app, native UI + native SDKs, and Despia stays the build/publish pipeline you know. Watch/star the repo for the GA signal.
-- But: pre-GA today (v0.0.1), the runtime is a new language (DSX, not React), and "Convert" maturity is unknown. Not a host we can build the watch integration on yet. Build the backend now so it's ready the day it lands.
+### E. "Today's adjusted pace" weather card — medium value, low effort
+Pull today's weather (existing `get-weather` + `weatherSlowdown`) and show recommended easy/interval/tempo paces adjusted for heat & humidity, beside the raw VDOT paces.
+- Why: the math already exists; surfacing it is cheap and immediately useful in summer (Hong Kong/Taiwan heat).
 
-**C. Companion sync app (two apps) — fallback only**
-- Runward stays on the Despia wrapper; a thin native "Runward Watch Sync" app runs the SDK and POSTs to Supabase.
-- Lowest risk to the current app, worst user experience (two installs). Only if A and B both stall.
+### F. Shoe replacement alerts (un-hide + extend) — low value, low effort
+Re-surface the hidden shoe system: show mileage per shoe + alert when a shoe crosses ~500–800 km. Minimal new logic.
 
-## Backend and app work (identical in all three options)
+## Recommendation
 
-- Tables `watch_devices`, `watch_workouts`, `watch_workout_streams` (HR / cadence / stride arrays + 2 s GPS points), `watch_daily_metrics`, each with GRANTs and RLS scoped to `auth.uid()`.
-- `watch-ingest` edge function: validates the user's JWT, upserts normalized workouts idempotently on (device_id, start_time), writes streams and daily metrics.
-- Sync layer in the native host: pair → sync steps/sleep → workout list → per-workout detail + GPS → POST → mark synced. Must run often because of the 3-day retention.
-- Runward UI: "Runward Watch" entry in Connect Apps (native only) with pair/sync status and last-sync time; first-party exemption from the existing provider-exclusivity trigger on `user_connections`.
-
-## Questions to settle first
-
-Despia: native runtime ship date; what free migration includes; can vendor binary frameworks/AARs be embedded; can the existing web UI be hosted during transition.
-
-OEM: LC323 feature matrix (GPS track, new-version sport records, cadence/stride, HRV, stress, SpO2); protocol V1 or V2; latest Android SDK build (1.8.5 lags iOS 3.19.2); SPM/Maven or XCFramework distribution; structured-workout push on the roadmap; licensing for shipping the SDK in our own branded app.
+Build **A (Train Today?)** and **E (weather-adjusted pace)** first — both reuse existing engines, are low-effort, and deliver high perceived intelligence. Then **C (taper planner)** and **B (split planner)** as the next premium-tier differentiators. **D (adherence)** and **F (shoes)** are good retention features to slot in afterward.
 
 ## Next step
 
-Tell me which host you want. If you pick B, I'll start with the Supabase tables + `watch-ingest` function and the Connect Apps UI (all doable here), and hand you the Capacitor plugin spec for the native side. If you pick A, we build the same backend now so it's ready when the native runtime lands.
+Pick which of A–F to build now (or pick a subset), and I'll scope a concrete implementation plan for those.

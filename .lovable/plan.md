@@ -76,27 +76,35 @@ Both features share the same engine — the adherence audit, the Gemini rewrite,
 
 **Database**
 - `training_plans`: add `auto_adjust_enabled boolean not null default false`.
-- New table `plan_auto_adjustments`: `id`, `user_id`, `plan_id`, `triggered_at`, `trigger_reason` (text), `deviation jsonb` (assigned vs actual detail), `plan_data_before jsonb`, `plan_data_after jsonb`, `summary_en`, `summary_zh`, `status` (`applied` / `reverted`), `created_at`. RLS scoped to `auth.uid()`, with `GRANT`s for `authenticated` + `service_role`.
+- New table `plan_auto_adjustments`: `id`, `user_id`, `plan_id`, `triggered_at`, `kind` (`auto` / `recalibration`), `trigger_reason` (text), `deviation jsonb` (assigned vs actual detail), `audit jsonb` (per-week/per-day adherence audit, recalibration only), `plan_data_before jsonb`, `plan_data_after jsonb`, `summary_en`, `summary_zh`, `revised_target_time` (text, nullable), `status` (`applied` / `reverted`), `created_at`. RLS scoped to `auth.uid()`, with `GRANT`s for `authenticated` + `service_role`.
+- Plan days gain optional audit fields (`actual_distance_km`, `actual_type`, `adherence`) written by recalibration — additive only, so existing `PlanDay` readers keep working.
 
 **Shared logic**
-- Extract the planned-vs-actual matching from `weekly-plan-review` into `supabase/functions/_shared/planAdherence.ts` (`fetchActivities`, `fetchHealth`, plus new `classifyDeviation` / `shouldAdjust`) and have both functions import it, so scoring stays consistent.
+- Extract the planned-vs-actual matching from `weekly-plan-review` into `supabase/functions/_shared/planAdherence.ts` (`fetchActivities`, `fetchHealth`, plus new `classifyDeviation` / `shouldAdjust` / `auditPlanHistory`) and have all three functions import it, so scoring stays consistent.
+- `auditPlanHistory` walks every past week of `plan_data`, matches days to activities, and returns per-day adherence labels plus per-week rollups — the shared input for both the nightly nudge and the full recalibration.
 
 **Edge Function `plan-auto-adjust`**
-- Modes: `evaluate` (detect only, no write — used for previews and testing), `run` (detect + regenerate + apply), `revert` (restore a snapshot).
+- Modes: `evaluate` (detect only, no write — previews and testing), `run` (detect + regenerate + apply), `recalibrate` (full audit + rebuild remaining weeks; returns a preview unless `apply: true`), `revert` (restore a snapshot).
 - Auth: user JWT for manual calls; `x-webhook-key` for the automated path.
 - Gemini via the existing Vertex helper (`buildVertexAuth`), `gemini-flash-lite-latest` for detection-side summaries and `gemini-3-flash-preview` for regeneration, `responseMimeType: "application/json"`, generous `maxOutputTokens`, and the existing truncated-JSON repair path.
-- Debounce and rate limit checked against `plan_auto_adjustments` before doing any model call.
+- Recalibration is the heavier call (whole block in context, several weeks out) — it streams/chunks by week if the output risks truncation, and reuses `repairTruncatedJsonArray`.
+- Debounce and rate limit checked against `plan_auto_adjustments` before any model call; recalibration is additionally limited to a small number of runs per plan.
 
 **Trigger**
-- A nightly cron per user timezone window (HKT-aware, like the daily workout jobs) that evaluates active plans with `auto_adjust_enabled = true`. Nightly is preferred over firing on activity insert so a user logging two runs in a day gets one coherent adjustment, not two competing rewrites.
+- Auto-adjust: a nightly cron per user timezone window (HKT-aware, like the daily workout jobs) that evaluates active plans with `auto_adjust_enabled = true`. Nightly is preferred over firing on activity insert so a user logging two runs in a day gets one coherent adjustment, not two competing rewrites.
+- Recalibration: user-triggered only — no cron.
 
 **Frontend**
-- `ProgramsTab.tsx` / `TrainingTab.tsx`: the opt-in toggle, an "Auto-adjusted" badge on changed days, and an adjustment history sheet with Undo.
+- `ProgramsTab.tsx` / `TrainingTab.tsx`: the opt-in toggle, a **Recalibrate program** button, an "Auto-adjusted" badge on changed days, adherence markers on past days, and an adjustment history sheet with Undo.
+- A recalibration preview dialog: audit summary, proposed remaining weeks, optional revised target time, Apply / Cancel.
 - Reuse `notifyPlanChanged()` after any apply or revert so the calendar and planned-workout views refresh.
 - EN/ZH strings added to `src/lib/i18n.ts`.
 
 ## Decisions to confirm
 
 - Premium-only, or available to free users? (`finetune-plan-week` is currently premium-gated.)
-- Fully automatic, or "propose and ask" — send the suggestion and only apply after the user confirms (the existing `PlanSuggestionCard` pattern already does propose-then-apply)?
+- Auto-adjust: fully automatic, or "propose and ask" — send the suggestion and only apply after the user confirms (the existing `PlanSuggestionCard` pattern already does propose-then-apply)?
 - Should overshooting (running much more than assigned) also trigger a rewrite, or only undershooting?
+- For recalibration, should past assigned days be **annotated** with what actually happened (recommended — keeps an honest record), or **overwritten** to match the actual runs so the plan reads as if it were followed?
+- If the audit shows the original target time is no longer realistic, should recalibration auto-apply the revised target, or only suggest it and let the user decide?
+

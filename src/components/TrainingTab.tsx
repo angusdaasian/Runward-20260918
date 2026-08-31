@@ -33,6 +33,7 @@ import {
 } from "@dnd-kit/core";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
 import WeeklyReviewModal from "@/components/training/WeeklyReviewModal";
+import AutoAdjustCard from "@/components/training/AutoAdjustCard";
 import EditWorkoutDialog from "@/components/training/EditWorkoutDialog";
 import { useSimpleMode } from "@/hooks/use-simple-mode";
 const CalculatorTab = lazy(() => import("@/components/CalculatorTab"));
@@ -3542,6 +3543,15 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                             </div>
 
                           </div>
+
+                          {/* Auto-adjust / recalibration controls */}
+                          {existingPlan?.id && (
+                            <AutoAdjustCard
+                              lang={lang}
+                              planId={existingPlan.id}
+                              autoAdjustEnabled={!!existingPlan.auto_adjust_enabled}
+                            />
+                          )}
 
                           {/* Finetune based on HRV/RHR */}
                           {!simpleMode && (

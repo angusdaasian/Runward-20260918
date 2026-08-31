@@ -31,6 +31,14 @@ import {
   type PlanAudit,
   type WeekPlan,
 } from "../_shared/planAdherence.ts";
+import {
+  applyDaySwaps,
+  detectWeekSwaps,
+  habitLines,
+  swapLines,
+  weekdayHabits,
+  type DaySwap,
+} from "../_shared/planDaySwaps.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -220,6 +228,7 @@ interface AdjustResult {
   reason?: string;
   adjustment_id?: string;
   weeks_rewritten?: number;
+  day_swaps?: unknown;
   revised_target_time?: string | null;
   summary_en?: string | null;
   summary_zh?: string | null;
@@ -253,6 +262,15 @@ async function runAdjust(
   const audit = auditPlanHistory(planData, activities, todayISO);
   const curIdx = audit.current_week_index;
   const curWeek = audit.weeks[curIdx];
+
+  // ── day-of-week rescheduling ──
+  // Sessions the runner shifted to another day inside the same week are a preference, not a
+  // miss: rewrite those past days so the calendar matches reality, and feed the runner's real
+  // weekday habits to the model so current/future weeks land on the days they actually train.
+  const swaps: DaySwap[] = audit.weeks.flatMap((w) => detectWeekSwaps(w.week_index, w.days, todayISO));
+  const allPastDays: DayDeviation[] = audit.weeks.flatMap((w) => w.days).filter((d) => d.date < todayISO);
+  const habits = weekdayHabits(allPastDays);
+  const basePlan = applyDaySwaps(planData, swaps);
 
   // ── decide ──
   let reason = "Manual recalibration requested.";
@@ -303,6 +321,8 @@ HARD RULES:
 - The race date is FIXED. Days already marked as a LOCKED RACE in the skeleton must stay a race — do not schedule hard work the 2 days before them.
 - Never increase weekly volume by more than 10% week over week from the runner's REAL recent weekly volume (${audit.totals.recent_4w_km}km over the last 4 weeks, average ${audit.totals.avg_weekly_km}km/week). Do not "catch up" missed mileage.
 - Keep the same number of running days per week the runner has actually been managing.
+- YOU MAY AND SHOULD MOVE SESSIONS TO DIFFERENT WEEKDAYS. Use the runner's real weekday habits below: put key sessions (Tempo/Interval/Long Run) on the weekdays they consistently train hard or long, and put Rest on the weekdays they consistently do not run. Do not keep a session on a weekday the runner repeatedly skips.
+- Keep at least one easy/rest day between two hard sessions after any reshuffle.
 - Interval descriptions must use the format "{dist}m x {reps} at {pace}/km, rest {time} between sets".
 - Preserve a proper taper in the final 2 weeks before the race.
 - Write "title" and "description" in BOTH not required — write them in Traditional Chinese if the runner's plan text is Chinese, otherwise English. Match the language of the existing plan text shown below.
@@ -335,11 +355,17 @@ Overall so far: planned ${audit.totals.planned_km}km, ran ${audit.totals.actual_
 Estimated current fitness (VDOT) from best recent effort: ${vdot ?? "unknown"}${realisticTime ? ` → equivalent ${plan.distance} time ≈ ${realisticTime}` : ""}.
 ${goalSecs && realisticTime ? `Original goal ${plan.target_time} vs fitness-based estimate ${realisticTime}.` : ""}
 
+RUNNER'S REAL WEEKDAY HABITS (use these to schedule the weekdays)
+${habitLines(habits)}
+
+SESSIONS THE RUNNER SHIFTED TO ANOTHER DAY (already re-dated on the calendar for past weeks)
+${swapLines(swaps)}
+
 DEVIATIONS IN THE CURRENT WEEK
 ${deviationLines(curWeek?.days ?? []) || "- none"}
 
 YOUR TASK
-Rebuild the remaining ${remainingWeeks} weeks from the runner's REAL current fitness, not from the original assumptions. If the block was under-executed, lower volume and intensity to a base the runner can actually hold and be honest in "revised_target_time". If it was over-executed, protect against injury rather than piling on more. Rebuild progression logically toward race day.
+Rebuild the remaining ${remainingWeeks} weeks from the runner's REAL current fitness and their REAL weekly rhythm, not from the original assumptions. If they consistently do their hard or long work on different weekdays than the plan assumed, reschedule the weekdays to match them. If the block was under-executed, lower volume and intensity to a base the runner can actually hold and be honest in "revised_target_time". If it was over-executed, protect against injury rather than piling on more. Rebuild progression logically toward race day.
 
 CALENDAR SKELETON (weeks you must fill, in order)
 ${futureWeekSkeleton(planData, fromIndex)}
@@ -364,11 +390,16 @@ ${deviationLines(curWeek?.days ?? []) || "- none"}
 
 RECENT WEEKS
 ${weekSummaryLines(audit, curIdx)}
+RUNNER'S REAL WEEKDAY HABITS (use these to schedule the weekdays)
+${habitLines(habits)}
+
+SESSIONS THE RUNNER SHIFTED TO ANOTHER DAY (already re-dated on the calendar for past weeks)
+${swapLines(swaps)}
 
 Real recent load: ${audit.totals.recent_4w_km}km in the last 4 weeks (avg ${audit.totals.avg_weekly_km}km/week). Estimated fitness VDOT ${vdot ?? "unknown"}${realisticTime ? ` (≈ ${realisticTime} for ${plan.distance})` : ""}.
 
 YOUR TASK
-The runner cut short or skipped work — treat that as a signal of fatigue, illness, or life load, not laziness. Rebuild the remaining ${remainingWeeks} weeks so the next 3-5 days are gentler, then progression resumes at a realistic level. Do NOT reschedule missed mileage into the coming days. Keep the race date and taper intact.
+The runner cut short or skipped work — treat that as a signal of fatigue, illness, or life load, not laziness. Rebuild the remaining ${remainingWeeks} weeks so the next 3-5 days are gentler, moving sessions onto the weekdays the runner actually trains on, then progression resumes at a realistic level. Do NOT reschedule missed mileage into the coming days. Keep the race date and taper intact.
 
 CALENDAR SKELETON (weeks you must fill, in order)
 ${futureWeekSkeleton(planData, fromIndex)}
@@ -383,6 +414,7 @@ ${commonRules}`;
       status: "dry_run",
       reason,
       weeks_rewritten: remainingWeeks,
+      day_swaps: swaps,
       revised_target_time: realisticTime,
       audit: { totals: audit.totals, current_week: curWeek },
     };
@@ -395,7 +427,7 @@ ${commonRules}`;
     return { status: "failed", reason: "The coach model did not return a usable plan." };
   }
 
-  let after = stitchFutureWeeks(planData, aiWeeks, fromIndex, todayISO);
+  let after = stitchFutureWeeks(basePlan, aiWeeks, fromIndex, todayISO);
   if (kind === "recalibrate") after = reconcilePastDays(after, audit, todayISO);
 
   const revised = typeof parsed?.revised_target_time === "string" && parseDurationStr(parsed.revised_target_time)
@@ -410,8 +442,8 @@ ${commonRules}`;
       kind,
       status: "applied",
       trigger_reason: `${reasonCode}: ${reason}`,
-      deviation: { reason_code: reasonCode, days: curWeek?.days ?? [] },
-      audit: { totals: audit.totals, weeks: audit.weeks.map(({ days, ...w }) => w), vdot, fitness_based_time: realisticTime },
+      deviation: { reason_code: reasonCode, days: curWeek?.days ?? [], day_swaps: swaps },
+      audit: { totals: audit.totals, weeks: audit.weeks.map(({ days, ...w }) => w), vdot, fitness_based_time: realisticTime, weekday_habits: habits },
       plan_data_before: planData,
       plan_data_after: after,
       revised_target_time: revised,
@@ -433,6 +465,7 @@ ${commonRules}`;
     reason,
     adjustment_id: adj?.id,
     weeks_rewritten: aiWeeks.length,
+    day_swaps: swaps,
     revised_target_time: revised,
     summary_en: parsed?.summary_en ?? null,
     summary_zh: parsed?.summary_zh ?? null,

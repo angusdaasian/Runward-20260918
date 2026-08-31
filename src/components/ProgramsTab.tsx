@@ -983,7 +983,14 @@ const ProgramsTab = ({ lang, onLoginRequest }: Props) => {
           )}
         </div>
       )}
-
+      {/* Auto-adjust / recalibration controls */}
+      {existingPlan?.id && (
+        <AutoAdjustCard
+          lang={lang}
+          planId={existingPlan.id}
+          autoAdjustEnabled={!!existingPlan.auto_adjust_enabled}
+        />
+      )}
 
 
       {/* Day list */}

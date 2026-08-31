@@ -1033,8 +1033,9 @@ const RaceSchedulePanel: React.FC<RaceSchedulePanelProps> = ({
 
 const ProgramHeader: React.FC<ProgramHeaderProps> = ({
   lang, weeks, distance, targetTime, currentWeekIdx, weekDays, activities,
-  daysPerWeek, longRunDay, restDays, weeklyKm, onRegenerate, regenerating,
+  daysPerWeek, longRunDay, restDays, weeklyKm, onRegenerate, regenerating, children,
   races, currentRaces, racesDrift, onUpdateRacePriority, onRemoveRace, onRegenerateForRaces,
+
 }) => {
   
   const [editingKm, setEditingKm] = useState(false);

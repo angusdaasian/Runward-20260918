@@ -6,6 +6,10 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+const HEAVY = `Create a 16-week marathon training program for a target time of 3:45:00, 5 running days per week, long run on Sunday, rest on Monday, weekly volume 55-60 km.
+Return a JSON array of 16 weeks. Each week has "week" and "days" (exactly 7, Mon..Sun). Each day: "day","type","title","description","distance_km","pace","color","elevation_m","eph".
+Return ONLY valid JSON, no markdown.`;
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   const url = new URL(req.url);
@@ -21,8 +25,10 @@ serve(async (req) => {
       method: "POST",
       headers,
       body: JSON.stringify({
-        contents: [{ role: "user", parts: [{ text: 'Return JSON array [{"week":1}] only.' }] }],
-        generationConfig: { maxOutputTokens: 256, responseMimeType: "application/json", temperature: 0.7 },
+        contents: [{ role: "user", parts: [{ text: url.searchParams.get("heavy") ? HEAVY : 'Return JSON array [{"week":1}] only.' }] }],
+        generationConfig: url.searchParams.get("heavy")
+          ? { thinkingConfig: { thinkingBudget: 1024 }, maxOutputTokens: 65536, responseMimeType: "application/json", temperature: 0.7 }
+          : { maxOutputTokens: 256, responseMimeType: "application/json", temperature: 0.7 },
       }),
     });
     out.status = res.status;

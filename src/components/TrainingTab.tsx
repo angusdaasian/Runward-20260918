@@ -3497,40 +3497,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                             restDays={restDaysCur}
                             onRegenerate={handleRegeneratePlan}
                             regenerating={regeneratingTime}
-                          />
-                          {existingPlan.goal !== "fitness" && existingPlan.distance !== "FT" && (
-                            <RaceSchedulePanel
-                              lang={lang}
-                              races={savedSnap as any}
-                              currentRaces={currentSnap as any}
-                              racesDrift={racesDrift}
-                              regenerating={regeneratingTime}
-                              onUpdateRacePriority={async (raceId, priority) => {
-                                if (!user) return;
-                                await (supabase.from("user_races" as any) as any).update({ priority }).eq("id", raceId).eq("user_id", user.id);
-                                await queryClient.invalidateQueries({ queryKey: ["user-races"] });
-                                await handleRegeneratePlan({});
-                              }}
-                              onRemoveRace={async (raceId) => {
-                                if (!user) return;
-                                await supabase.from("user_races" as any).delete().eq("id", raceId).eq("user_id", user.id);
-                                await queryClient.invalidateQueries({ queryKey: ["user-races"] });
-                                await handleRegeneratePlan({});
-                              }}
-                              onRegenerateForRaces={() => handleRegeneratePlan({})}
-                            />
-                          )}
-                           {!simpleMode && (
-                           <Button
-                             variant="outline"
-                             className="w-full mb-4 border-primary/30 text-primary hover:bg-primary/10"
-                             onClick={() => setShowWeeklyReview(true)}
-                           >
-                             <Sparkles size={14} className="mr-2" />
-                             {lang === "zh" ? "週訓練回顧" : "Weekly Review"}
-                           </Button>
-                           )}
-
+                          >
                            {/* ─── Race Time Predictor (HR-zone + VDOT, deterministic) ─── */}
                            {canPredictRaceTime && (() => {
                              const targetSec = parseTargetToSec(existingPlan.target_time);
@@ -3620,6 +3587,40 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                                 </details>
                               );
                             })()}
+                          </ProgramHeader>
+                          {existingPlan.goal !== "fitness" && existingPlan.distance !== "FT" && (
+                            <RaceSchedulePanel
+                              lang={lang}
+                              races={savedSnap as any}
+                              currentRaces={currentSnap as any}
+                              racesDrift={racesDrift}
+                              regenerating={regeneratingTime}
+                              onUpdateRacePriority={async (raceId, priority) => {
+                                if (!user) return;
+                                await (supabase.from("user_races" as any) as any).update({ priority }).eq("id", raceId).eq("user_id", user.id);
+                                await queryClient.invalidateQueries({ queryKey: ["user-races"] });
+                                await handleRegeneratePlan({});
+                              }}
+                              onRemoveRace={async (raceId) => {
+                                if (!user) return;
+                                await supabase.from("user_races" as any).delete().eq("id", raceId).eq("user_id", user.id);
+                                await queryClient.invalidateQueries({ queryKey: ["user-races"] });
+                                await handleRegeneratePlan({});
+                              }}
+                              onRegenerateForRaces={() => handleRegeneratePlan({})}
+                            />
+                          )}
+                           {!simpleMode && (
+                           <Button
+                             variant="outline"
+                             className="w-full mb-4 border-primary/30 text-primary hover:bg-primary/10"
+                             onClick={() => setShowWeeklyReview(true)}
+                           >
+                             <Sparkles size={14} className="mr-2" />
+                             {lang === "zh" ? "週訓練回顧" : "Weekly Review"}
+                           </Button>
+                           )}
+
 
 
                            <div className={`bg-card border rounded-xl p-3 mb-4 ${goalWeekIdx === currentWeekIdx ? "border-primary ring-1 ring-primary/40" : "border-border"}`}>

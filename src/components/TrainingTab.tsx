@@ -583,11 +583,95 @@ const WorkoutDetails = ({ day, lang, hrBounds }: { day: DayPlan; lang: Lang; hrB
   );
 };
 
+
+
+// ─── Planned vs actual comparison ───
+export interface ActualRun {
+  name?: string | null;
+  sport_type?: string | null;
+  distance_km: number;
+  moving_time?: number | null;
+  pace?: string | null;
+}
+
+const formatPaceFromKmSec = (km: number, sec?: number | null): string | null => {
+  if (!km || !sec || km <= 0 || sec <= 0) return null;
+  const per = sec / km;
+  const m = Math.floor(per / 60);
+  const s = Math.round(per % 60);
+  return `${m}:${String(s).padStart(2, "0")}/km`;
+};
+
+const PlannedVsActual = ({
+  day, actual, isPast, lang,
+}: { day: DayPlan; actual: ActualRun[]; isPast: boolean; lang: Lang }) => {
+  const zh = lang === "zh";
+  const L = (en: string, z: string) => (zh ? z : en);
+  const plannedKm = Number(day?.distance_km) || 0;
+  const isRest = isRestWorkoutDay(day);
+  const hasActual = actual.length > 0;
+
+  if (!isPast && !hasActual) return null;
+  if (isRest && !hasActual) return null;
+
+  if (!hasActual) {
+    return (
+      <div className="ml-12 mb-1 flex items-center gap-1.5 text-[11px] text-rose-600 dark:text-rose-400">
+        <X size={11} />
+        <span className="font-medium">{L("Missed", "未完成")}</span>
+        <span className="text-muted-foreground">
+          · {L("planned", "計劃")} {localizeTitle(day.type || "Run", lang)}
+          {plannedKm ? ` ${plannedKm} km` : ""}{day.pace ? ` @ ${day.pace}` : ""}
+        </span>
+      </div>
+    );
+  }
+
+  const actualKm = actual.reduce((s, a) => s + (a.distance_km || 0), 0);
+  const actualSec = actual.reduce((s, a) => s + (a.moving_time || 0), 0);
+  const actualPace = actual.length === 1
+    ? (actual[0].pace || formatPaceFromKmSec(actual[0].distance_km, actual[0].moving_time))
+    : formatPaceFromKmSec(actualKm, actualSec);
+  const delta = plannedKm ? actualKm - plannedKm : null;
+  const deltaLabel = delta === null ? null
+    : `${delta >= 0 ? "+" : "−"}${Math.abs(delta).toFixed(1)} km`;
+  const onTarget = delta !== null && Math.abs(delta) <= Math.max(1, plannedKm * 0.1);
+  const tone = plannedKm === 0
+    ? "text-sky-600 dark:text-sky-400"
+    : onTarget
+      ? "text-emerald-600 dark:text-emerald-400"
+      : "text-amber-600 dark:text-amber-400";
+
+  return (
+    <div className="ml-12 mb-1 space-y-0.5">
+      <div className={`flex items-center gap-1.5 text-[11px] ${tone}`}>
+        <Check size={11} />
+        <span className="font-medium">
+          {L("Actual", "實際")}: {actual.map((a) => a.name || a.sport_type || L("Run", "跑步")).join(" + ")}
+        </span>
+      </div>
+      <div className="text-[11px] text-muted-foreground pl-[18px]">
+        {actualKm.toFixed(1)} km{actualPace ? ` @ ${actualPace}` : ""}
+        {plannedKm ? (
+          <> · {L("planned", "計劃")} {plannedKm} km{day.pace ? ` @ ${day.pace}` : ""}
+            {deltaLabel ? <span className={`ml-1 font-medium ${tone}`}>({deltaLabel})</span> : null}
+          </>
+        ) : (
+          <> · {L("no workout planned", "當日無計劃訓練")}</>
+        )}
+      </div>
+    </div>
+  );
+};
+
+
+
 // Draggable + droppable day row for the AI calendar (long-press to swap)
 const DraggableDay = ({
   id, idx, day, lang, isToday, dayNum, hrBounds,
   onEditClick, onAddClick,
   isPushed, isPushing, onPushDay, watchProvider,
+  actual, isPast,
 }: {
   id: string;
   idx: number;
@@ -602,6 +686,8 @@ const DraggableDay = ({
   isPushing?: boolean;
   onPushDay?: (idx: number) => void;
   watchProvider?: string | null;
+  actual?: ActualRun[];
+  isPast?: boolean;
 }) => {
   const { attributes, listeners, setNodeRef: setDragRef, isDragging, transform } = useDraggable({ id });
   const { setNodeRef: setDropRef, isOver } = useDroppable({ id });
@@ -619,6 +705,7 @@ const DraggableDay = ({
   };
 
   return (
+    <div>
     <div ref={setRefs} style={style} className={`flex items-stretch gap-2 rounded-lg ${isOver && !isDragging ? "ring-2 ring-primary bg-primary/5" : ""}`}>
       <div className="w-10 flex-shrink-0 flex flex-col items-center pt-3">
         <span className="text-[10px] font-medium text-muted-foreground uppercase">{labelForDay(day, idx)}</span>
@@ -709,13 +796,15 @@ const DraggableDay = ({
         </div>
       )}
     </div>
+    <PlannedVsActual day={day} actual={actual ?? []} isPast={!!isPast} lang={lang} />
+    </div>
   );
 };
 
 // Calendar day list with long-press drag-to-swap (within a week)
 const CalendarDayList = ({
   days, weekIdx, lang, hrBounds, onSwap, onAddClick, onEditClick,
-  pushedSet, pushingIdx, onPushDay, watchProvider,
+  pushedSet, pushingIdx, onPushDay, watchProvider, actualByDate,
 }: {
   days: DayPlan[];
   weekIdx: number;
@@ -728,6 +817,7 @@ const CalendarDayList = ({
   pushingIdx?: number | null;
   onPushDay?: (idx: number) => void;
   watchProvider?: string | null;
+  actualByDate?: Map<string, ActualRun[]>;
 }) => {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { delay: 250, tolerance: 5 } }),
@@ -752,6 +842,7 @@ const CalendarDayList = ({
           const dateObj = day.date ? new Date(day.date + "T00:00:00") : null;
           const dayNum = dateObj ? dateObj.getDate() : "";
           const isToday = day.date === todayStr;
+          const isPast = !!day.date && day.date < todayStr;
           return (
             <DraggableDay
               key={`${weekIdx}:${i}`}
@@ -768,6 +859,8 @@ const CalendarDayList = ({
               isPushing={pushingIdx === i}
               onPushDay={onPushDay}
               watchProvider={watchProvider}
+              actual={day.date ? actualByDate?.get(day.date) : undefined}
+              isPast={isPast}
             />
           );
         })}
@@ -1377,6 +1470,25 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
   const { online } = useOnlineStatus();
   const { activities: allActivities, userRaces } = useActivities();
   const queryClient = useQueryClient();
+
+  // Map of actual completed runs by local date, for planned-vs-actual comparison
+  const actualByDate = useMemo(() => {
+    const m = new Map<string, ActualRun[]>();
+    for (const a of (allActivities || []) as any[]) {
+      const d = String((a as any).start_date_local || a.start_date || "").slice(0, 10);
+      if (!d) continue;
+      const entry: ActualRun = {
+        name: a.name ?? null,
+        sport_type: a.sport_type ?? null,
+        distance_km: (Number(a.distance) || 0) / 1000,
+        moving_time: Number(a.moving_time) || null,
+      };
+      if (!m.has(d)) m.set(d, []);
+      m.get(d)!.push(entry);
+    }
+    return m;
+  }, [allActivities]);
+
 
   // Paces view
   const [view, setView] = useState<"paces" | "equivalent">("paces");
@@ -2754,6 +2866,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                 {isPremium ? (
                   <>
                     <CalendarDayList
+                      actualByDate={actualByDate}
                       days={currentWeek.days}
                       weekIdx={currentWeekIdx}
                       lang={lang}
@@ -3578,6 +3691,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
 
 
                           <CalendarDayList
+                            actualByDate={actualByDate}
                             days={currentWeek.days}
                             weekIdx={currentWeekIdx}
                             lang={lang}
@@ -3710,6 +3824,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                 </div>
 
                 <CalendarDayList
+                  actualByDate={actualByDate}
                   days={currentWeek.days}
                   weekIdx={customWeekIdx}
                   lang={lang}

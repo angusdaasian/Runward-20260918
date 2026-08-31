@@ -53,7 +53,26 @@ The response is sanitized field-by-field against the original days (same approac
 ### 5. Notification and undo
 When an adjustment lands, the user gets a message through their existing channel (WhatsApp / Telegram / push) summarizing what changed and why, in their language. The previous `plan_data` is snapshotted, so an **Undo** button restores the old plan. An adjustment history list in the Training tab shows each change, the reason, and the trigger.
 
+## Part 2: Full-program recalibration (one-off, user-triggered)
+
+Auto-adjust only helps from the day it is switched on. For a runner already at week 9 of 12 with months of untracked drift, a separate **"Recalibrate my program"** action re-analyzes the whole block at once.
+
+### What it does
+1. **Audit every past week** in the plan against actual activities — per week and per day, label each assigned session `completed` / `partial` / `missed` / `overshot` / `substituted`, and roll it up into real numbers: actual weekly volume, key sessions actually hit, pace and HR trend, longest run achieved, current fitness (`recentVdot` from the existing engine).
+2. **Reconcile the past** so the plan stops lying: past days are rewritten to record what actually happened alongside what was assigned, and the summary reads "week 6: 42 km assigned / 24 km done, long run missed" instead of showing a clean schedule that never occurred. Past *assignments* are preserved for honesty — the audit is written as actual-vs-assigned, not by silently overwriting history.
+3. **Rebuild the remaining weeks** from the real starting point, not the original assumption — Gemini gets the full audit, current fitness, weeks left to race day, and target time, and regenerates weeks 9–12 with a realistic ramp from where the runner actually is.
+4. **Report honestly on the goal.** If the achieved training no longer supports the original target time, the recalibration says so and proposes a revised realistic target (using the existing `predictRace` / VDOT engine) rather than quietly writing a plan that cannot deliver it.
+
+### How the user experiences it
+A button in the Training tab: **Recalibrate program**. It shows a preview first — an audit summary (weeks completed, volume achieved vs planned, missed key sessions), the proposed new remaining weeks, and any target-time revision — with **Apply** / **Cancel**. Nothing is written until the user applies. Fully reversible via the same snapshot + Undo mechanism as auto-adjust.
+
+Guardrails: the ramp into the new weeks is capped so recalibration can never prescribe a jump the runner is not conditioned for, taper weeks stay protected, and race date never moves.
+
+### Relationship to Part 1
+Both features share the same engine — the adherence audit, the Gemini rewrite, the snapshot/undo, and the history log. The difference is scope and trigger: auto-adjust is a nightly single-day nudge, recalibration is an on-demand whole-block rebuild. Recalibration is the natural onboarding step *into* auto-adjust: run it once to clean up the past, then leave auto-adjust on so it never drifts that far again.
+
 ## Technical plan
+
 
 **Database**
 - `training_plans`: add `auto_adjust_enabled boolean not null default false`.

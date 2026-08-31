@@ -335,7 +335,10 @@ const labelForDay = (day: any, i: number): string => {
   return DAY_LABELS[i] || (day?.day?.substring(0, 3).toUpperCase() ?? "");
 };
 
-const isRestWorkoutDay = (day: DayPlan | null | undefined) => !day || day.type === "Rest" || (!day.type && !day.distance_km);
+// A day labelled "Rest" is a rest day even if a stale distance/pace lingers on it.
+const isRestWorkoutDay = (day: DayPlan | null | undefined) =>
+  !day || /rest|off|休息/i.test(String(day.type || "")) || (!day.type && !day.distance_km);
+
 
 const sessionFromLegacyDay = (day: DayPlan): WorkoutSession | null => {
   if (isRestWorkoutDay(day)) return null;

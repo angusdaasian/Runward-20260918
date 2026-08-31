@@ -168,6 +168,3 @@ verify_jwt = false
 
 
 
-
-[functions.vertex-probe]
-verify_jwt = false

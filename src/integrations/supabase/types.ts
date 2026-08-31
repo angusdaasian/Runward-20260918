@@ -1087,6 +1087,71 @@ export type Database = {
         }
         Relationships: []
       }
+      plan_auto_adjustments: {
+        Row: {
+          audit: Json | null
+          created_at: string
+          deviation: Json
+          id: string
+          kind: string
+          plan_data_after: Json
+          plan_data_before: Json
+          plan_id: string
+          revised_target_time: string | null
+          status: string
+          summary_en: string | null
+          summary_zh: string | null
+          trigger_reason: string | null
+          triggered_at: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          audit?: Json | null
+          created_at?: string
+          deviation?: Json
+          id?: string
+          kind?: string
+          plan_data_after?: Json
+          plan_data_before?: Json
+          plan_id: string
+          revised_target_time?: string | null
+          status?: string
+          summary_en?: string | null
+          summary_zh?: string | null
+          trigger_reason?: string | null
+          triggered_at?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          audit?: Json | null
+          created_at?: string
+          deviation?: Json
+          id?: string
+          kind?: string
+          plan_data_after?: Json
+          plan_data_before?: Json
+          plan_id?: string
+          revised_target_time?: string | null
+          status?: string
+          summary_en?: string | null
+          summary_zh?: string | null
+          trigger_reason?: string | null
+          triggered_at?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plan_auto_adjustments_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "training_plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       polar_activities: {
         Row: {
           average_heart_rate: number | null
@@ -2727,6 +2792,7 @@ export type Database = {
       }
       training_plans: {
         Row: {
+          auto_adjust_enabled: boolean
           created_at: string
           distance: string
           goal: string
@@ -2741,6 +2807,7 @@ export type Database = {
           weeks: number
         }
         Insert: {
+          auto_adjust_enabled?: boolean
           created_at?: string
           distance: string
           goal: string
@@ -2755,6 +2822,7 @@ export type Database = {
           weeks: number
         }
         Update: {
+          auto_adjust_enabled?: boolean
           created_at?: string
           distance?: string
           goal?: string

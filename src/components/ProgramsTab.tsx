@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { notifyPlanChanged, subscribePlanChanged } from "@/lib/planEvents";
 import EditWorkoutDialog from "@/components/training/EditWorkoutDialog";
+import AutoAdjustCard from "@/components/training/AutoAdjustCard";
 import PlanComparisonDialog from "@/components/PlanComparisonDialog";
 import { useActivities } from "@/hooks/use-activities";
 
@@ -982,7 +983,14 @@ const ProgramsTab = ({ lang, onLoginRequest }: Props) => {
           )}
         </div>
       )}
-
+      {/* Auto-adjust / recalibration controls */}
+      {existingPlan?.id && (
+        <AutoAdjustCard
+          lang={lang}
+          planId={existingPlan.id}
+          autoAdjustEnabled={!!existingPlan.auto_adjust_enabled}
+        />
+      )}
 
 
       {/* Day list */}

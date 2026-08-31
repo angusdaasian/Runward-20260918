@@ -663,7 +663,7 @@ const PlannedVsActual = ({
       <div className="text-[11px] text-muted-foreground pl-[18px]">
         {actualKm.toFixed(1)} km{actualPace ? ` @ ${actualPace}` : ""}
         {plannedKm ? (
-          <> · {L("planned", "計劃")} {plannedKm} km{day.pace ? ` @ ${day.pace}` : ""}
+          <> · {L("planned", "計劃")} {plannedKm} km{plannedPace ? ` @ ${plannedPace}` : ""}
             {deltaLabel ? <span className={`ml-1 font-medium ${tone}`}>({deltaLabel})</span> : null}
           </>
         ) : (

@@ -32,6 +32,7 @@ import {
   type WeekPlan,
 } from "../_shared/planAdherence.ts";
 import {
+  alignPastDaysToActual,
   applyDaySwaps,
   detectWeekSwaps,
   habitLines,
@@ -136,13 +137,17 @@ function stitchFutureWeeks(before: WeekPlan[], aiWeeks: any[], fromIndex: number
       if (protectFromDate && orig.date && orig.date < protectFromDate) continue;
       if (orig.type === "Race" || orig.type === "Trail Race") continue;
       const type = String(incoming.type || orig.type || "Easy Run");
+      const isRestType = /rest|off|休息/i.test(type);
       target.days[d] = {
         ...orig,
         type,
         title: incoming.title ?? orig.title,
         description: incoming.description ?? orig.description,
-        distance_km: incoming.distance_km === undefined ? orig.distance_km : incoming.distance_km,
-        pace: incoming.pace === undefined ? orig.pace : incoming.pace,
+        // A Rest day never carries a distance or pace, even if the model omitted them
+        // (otherwise a stale assignment would linger and be scored as "missed").
+        distance_km: isRestType ? null : (incoming.distance_km === undefined ? orig.distance_km : incoming.distance_km),
+        pace: isRestType ? null : (incoming.pace === undefined ? orig.pace : incoming.pace),
+        sessions: isRestType ? undefined : (incoming.sessions ?? orig.sessions),
         elevation_m: incoming.elevation_m ?? orig.elevation_m ?? null,
         eph: incoming.eph ?? orig.eph ?? null,
         color: incoming.color || COLOR_BY_TYPE[type] || orig.color || "#4CAF50",
@@ -229,6 +234,7 @@ interface AdjustResult {
   adjustment_id?: string;
   weeks_rewritten?: number;
   day_swaps?: unknown;
+  past_days_rewritten?: number;
   revised_target_time?: string | null;
   summary_en?: string | null;
   summary_zh?: string | null;
@@ -270,7 +276,15 @@ async function runAdjust(
   const swaps: DaySwap[] = audit.weeks.flatMap((w) => detectWeekSwaps(w.week_index, w.days, todayISO));
   const allPastDays: DayDeviation[] = audit.weeks.flatMap((w) => w.days).filter((d) => d.date < todayISO);
   const habits = weekdayHabits(allPastDays);
-  const basePlan = applyDaySwaps(planData, swaps);
+  const swapped = applyDaySwaps(planData, swaps);
+  // Past weeks should read like a logbook, not a wish list: rewrite elapsed days to the
+  // work that actually happened. This also stops a skipped hard session from standing
+  // next to the rescheduled one (e.g. two intervals in the same week).
+  const planIsZh = /[\u4e00-\u9fff]/.test(
+    JSON.stringify(planData.slice(0, 2)).slice(0, 4000),
+  );
+  const aligned = alignPastDaysToActual(swapped, allPastDays, todayISO, planIsZh ? "zh" : "en");
+  const basePlan = aligned.plan;
 
   // ── decide ──
   let reason = "Manual recalibration requested.";
@@ -323,6 +337,7 @@ HARD RULES:
 - Keep the same number of running days per week the runner has actually been managing.
 - YOU MAY AND SHOULD MOVE SESSIONS TO DIFFERENT WEEKDAYS. Use the runner's real weekday habits below: put key sessions (Tempo/Interval/Long Run) on the weekdays they consistently train hard or long, and put Rest on the weekdays they consistently do not run. Do not keep a session on a weekday the runner repeatedly skips.
 - Keep at least one easy/rest day between two hard sessions after any reshuffle.
+- Count the key sessions ALREADY COMPLETED earlier in the current week (see the day-by-day list). Do not schedule a second Tempo/Interval/Long Run in the remainder of that week if the same kind of session was already done — make the remaining days Easy Run, Recovery or Rest instead.
 - Interval descriptions must use the format "{dist}m x {reps} at {pace}/km, rest {time} between sets".
 - Preserve a proper taper in the final 2 weeks before the race.
 - Write "title" and "description" in BOTH not required — write them in Traditional Chinese if the runner's plan text is Chinese, otherwise English. Match the language of the existing plan text shown below.
@@ -415,6 +430,7 @@ ${commonRules}`;
       reason,
       weeks_rewritten: remainingWeeks,
       day_swaps: swaps,
+      past_days_rewritten: aligned.rewritten,
       revised_target_time: realisticTime,
       audit: { totals: audit.totals, current_week: curWeek },
     };
@@ -442,7 +458,7 @@ ${commonRules}`;
       kind,
       status: "applied",
       trigger_reason: `${reasonCode}: ${reason}`,
-      deviation: { reason_code: reasonCode, days: curWeek?.days ?? [], day_swaps: swaps },
+      deviation: { reason_code: reasonCode, days: curWeek?.days ?? [], day_swaps: swaps, past_days_rewritten: aligned.rewritten },
       audit: { totals: audit.totals, weeks: audit.weeks.map(({ days, ...w }) => w), vdot, fitness_based_time: realisticTime, weekday_habits: habits },
       plan_data_before: planData,
       plan_data_after: after,
@@ -466,6 +482,7 @@ ${commonRules}`;
     adjustment_id: adj?.id,
     weeks_rewritten: aiWeeks.length,
     day_swaps: swaps,
+    past_days_rewritten: aligned.rewritten,
     revised_target_time: revised,
     summary_en: parsed?.summary_en ?? null,
     summary_zh: parsed?.summary_zh ?? null,

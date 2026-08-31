@@ -335,7 +335,10 @@ const labelForDay = (day: any, i: number): string => {
   return DAY_LABELS[i] || (day?.day?.substring(0, 3).toUpperCase() ?? "");
 };
 
-const isRestWorkoutDay = (day: DayPlan | null | undefined) => !day || day.type === "Rest" || (!day.type && !day.distance_km);
+// A day labelled "Rest" is a rest day even if a stale distance/pace lingers on it.
+const isRestWorkoutDay = (day: DayPlan | null | undefined) =>
+  !day || /rest|off|休息/i.test(String(day.type || "")) || (!day.type && !day.distance_km);
+
 
 const sessionFromLegacyDay = (day: DayPlan): WorkoutSession | null => {
   if (isRestWorkoutDay(day)) return null;
@@ -607,8 +610,14 @@ const PlannedVsActual = ({
 }: { day: DayPlan; actual: ActualRun[]; isPast: boolean; lang: Lang }) => {
   const zh = lang === "zh";
   const L = (en: string, z: string) => (zh ? z : en);
-  const plannedKm = Number(day?.distance_km) || 0;
-  const isRest = isRestWorkoutDay(day);
+  const d = day as any;
+  // After a recalibration the past day carries the real work, and the original
+  // assignment is kept in planned_* — compare against that when it exists.
+  const hasSnapshot = d?.planned_type !== undefined;
+  const plannedType = hasSnapshot ? (d.planned_type ?? null) : (day.type ?? null);
+  const plannedPace = hasSnapshot ? (d.planned_pace ?? null) : (day.pace ?? null);
+  const plannedKm = Number(hasSnapshot ? d.planned_km : day.distance_km) || 0;
+  const isRest = plannedKm === 0 && (!plannedType || /rest|off|休息/i.test(String(plannedType)));
   const hasActual = actual.length > 0;
 
   if (!isPast && !hasActual) return null;
@@ -620,12 +629,13 @@ const PlannedVsActual = ({
         <X size={11} />
         <span className="font-medium">{L("Missed", "未完成")}</span>
         <span className="text-muted-foreground">
-          · {L("planned", "計劃")} {localizeTitle(day.type || "Run", lang)}
-          {plannedKm ? ` ${plannedKm} km` : ""}{day.pace ? ` @ ${day.pace}` : ""}
+          · {L("planned", "計劃")} {localizeTitle(plannedType || "Run", lang)}
+          {plannedKm ? ` ${plannedKm} km` : ""}{plannedPace ? ` @ ${plannedPace}` : ""}
         </span>
       </div>
     );
   }
+
 
   const actualKm = actual.reduce((s, a) => s + (a.distance_km || 0), 0);
   const actualSec = actual.reduce((s, a) => s + (a.moving_time || 0), 0);
@@ -653,7 +663,7 @@ const PlannedVsActual = ({
       <div className="text-[11px] text-muted-foreground pl-[18px]">
         {actualKm.toFixed(1)} km{actualPace ? ` @ ${actualPace}` : ""}
         {plannedKm ? (
-          <> · {L("planned", "計劃")} {plannedKm} km{day.pace ? ` @ ${day.pace}` : ""}
+          <> · {L("planned", "計劃")} {plannedKm} km{plannedPace ? ` @ ${plannedPace}` : ""}
             {deltaLabel ? <span className={`ml-1 font-medium ${tone}`}>({deltaLabel})</span> : null}
           </>
         ) : (

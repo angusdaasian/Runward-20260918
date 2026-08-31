@@ -2866,6 +2866,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                 {isPremium ? (
                   <>
                     <CalendarDayList
+                      actualByDate={actualByDate}
                       days={currentWeek.days}
                       weekIdx={currentWeekIdx}
                       lang={lang}
@@ -3690,6 +3691,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
 
 
                           <CalendarDayList
+                            actualByDate={actualByDate}
                             days={currentWeek.days}
                             weekIdx={currentWeekIdx}
                             lang={lang}
@@ -3822,6 +3824,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                 </div>
 
                 <CalendarDayList
+                  actualByDate={actualByDate}
                   days={currentWeek.days}
                   weekIdx={customWeekIdx}
                   lang={lang}

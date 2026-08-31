@@ -1456,7 +1456,10 @@ const ProgramHeader: React.FC<ProgramHeaderProps> = ({
               />
             </div>
           </div>
+
+          {children}
         </div>
+
       )}
     </div>
   );

@@ -251,11 +251,13 @@ export function isKeySession(type: string | null | undefined, distanceKm?: numbe
   return (distanceKm ?? 0) >= 18;
 }
 
-function isRest(type: string | null | undefined, km: number | null | undefined): boolean {
+export function isRest(type: string | null | undefined, km: number | null | undefined): boolean {
+  // A day explicitly labelled Rest is a rest day even if a stale distance is still attached.
+  if (type && /rest|off|休息/i.test(type)) return true;
   if (km && km > 0) return false;
-  if (!type) return true;
-  return /rest|off|休息/i.test(type);
+  return !type;
 }
+
 
 /** Classify a single plan day against the activities recorded on that date. */
 export function classifyDeviation(day: PlannedDay, dayActivities: NormActivity[], isPast: boolean): DayDeviation {

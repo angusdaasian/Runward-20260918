@@ -1471,6 +1471,25 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
   const { activities: allActivities, userRaces } = useActivities();
   const queryClient = useQueryClient();
 
+  // Map of actual completed runs by local date, for planned-vs-actual comparison
+  const actualByDate = useMemo(() => {
+    const m = new Map<string, ActualRun[]>();
+    for (const a of (allActivities || []) as any[]) {
+      const d = String((a as any).start_date_local || a.start_date || "").slice(0, 10);
+      if (!d) continue;
+      const entry: ActualRun = {
+        name: a.name ?? null,
+        sport_type: a.sport_type ?? null,
+        distance_km: (Number(a.distance) || 0) / 1000,
+        moving_time: Number(a.moving_time) || null,
+      };
+      if (!m.has(d)) m.set(d, []);
+      m.get(d)!.push(entry);
+    }
+    return m;
+  }, [allActivities]);
+
+
   // Paces view
   const [view, setView] = useState<"paces" | "equivalent">("paces");
   const [showPacesResult, setShowPacesResult] = useState(false);

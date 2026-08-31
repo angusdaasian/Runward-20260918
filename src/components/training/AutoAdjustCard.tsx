@@ -13,6 +13,23 @@ interface Props {
   autoAdjustEnabled: boolean;
 }
 
+// Mobile WebViews (iOS "Load failed" / Chrome "Failed to fetch") occasionally drop a
+// request at the network layer. These are safe to retry once — PostgREST PATCHes are idempotent.
+const isNetworkError = (msg: string) =>
+  /load failed|failed to fetch|network ?error|networkrequest failed|fetch failed/i.test(msg);
+
+async function withRetry<T>(fn: () => Promise<T>, retries = 2, delayMs = 700): Promise<T> {
+  try {
+    return await fn();
+  } catch (e: any) {
+    if (retries > 0 && isNetworkError(e?.message ?? "")) {
+      await new Promise((r) => setTimeout(r, delayMs));
+      return withRetry(fn, retries - 1, delayMs * 2);
+    }
+    throw e;
+  }
+}
+
 interface AdjustmentRow {
   id: string;
   kind: string;

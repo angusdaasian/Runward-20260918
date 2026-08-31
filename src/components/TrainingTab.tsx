@@ -796,6 +796,8 @@ const DraggableDay = ({
         </div>
       )}
     </div>
+    <PlannedVsActual day={day} actual={actual ?? []} isPast={!!isPast} lang={lang} />
+    </div>
   );
 };
 

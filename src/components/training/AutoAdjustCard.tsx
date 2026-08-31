@@ -67,10 +67,22 @@ const AutoAdjustCard = ({ lang, planId, autoAdjustEnabled }: Props) => {
   const toggle = async (next: boolean) => {
     setEnabled(next);
     setSaving(true);
-    const { error } = await supabase
-      .from("training_plans")
-      .update({ auto_adjust_enabled: next })
-      .eq("id", planId);
+    // supabase-js returns fetch failures as a resolved { error } instead of throwing,
+    // so throw network errors ourselves to make them retryable.
+    const doUpdate = async () => {
+      const { error } = await supabase
+        .from("training_plans")
+        .update({ auto_adjust_enabled: next })
+        .eq("id", planId);
+      if (error && isNetworkError(error.message)) throw error;
+      return error;
+    };
+    let error: any = null;
+    try {
+      error = await withRetry(doUpdate);
+    } catch (e: any) {
+      error = e;
+    }
     setSaving(false);
     if (error) {
       setEnabled(!next);

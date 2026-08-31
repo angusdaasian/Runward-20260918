@@ -186,21 +186,8 @@ const AutoAdjustCard = ({ lang, planId, autoAdjustEnabled }: Props) => {
           {zh ? "重新校準整個計劃（分析過去所有訓練）" : "Recalibrate whole program from past training"}
         </Button>
 
-        {enabled && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="h-9 text-xs justify-start"
-            disabled={running !== null}
-            onClick={() => invoke("detect")}
-          >
-            {running === "detect"
-              ? <Loader2 size={14} className="mr-2 animate-spin" />
-              : <Wand2 size={14} className="mr-2" />}
-            {zh ? "立即檢查本週偏差" : "Check this week now"}
-          </Button>
-        )}
+
+
 
         {hasApplied && (
           <Button

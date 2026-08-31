@@ -167,3 +167,123 @@ export function swapLines(swaps: DaySwap[]): string {
     )
     .join("\n");
 }
+
+// ---------------------------------------------------------------------------
+// Past-week reconciliation: rewrite already-elapsed days so the calendar shows
+// what the runner really did, instead of an assignment that never happened.
+// The original assignment is kept in planned_* fields so the UI can still show
+// a planned-vs-actual comparison.
+// ---------------------------------------------------------------------------
+
+const REST_RE = /rest|off|休息/i;
+const RACE_TYPES = new Set(["Race", "Trail Race"]);
+
+function paceStr(secPerKm: number | null | undefined): string | null {
+  if (!secPerKm || secPerKm <= 0) return null;
+  const m = Math.floor(secPerKm / 60);
+  const s = Math.round(secPerKm % 60);
+  return `${m}:${String(s).padStart(2, "0")}/km`;
+}
+
+const TYPE_COLORS: Record<string, string> = {
+  "Easy Run": "#4CAF50",
+  "Tempo Run": "#FF9800",
+  "Interval": "#F44336",
+  "Long Run": "#2196F3",
+  "Recovery": "#9C27B0",
+  "Rest": "#607D8B",
+};
+
+/** Infer the type of a completed run from its distance and pace vs the runner's own norms. */
+function inferActualType(dev: DayDeviation, medianPaceSec: number | null, longKm: number): string {
+  const planned = String(dev.assigned_type ?? "");
+  if (RACE_TYPES.has(planned)) return planned;
+  // If the planned session was essentially executed, keep its label.
+  if (dev.adherence === "ON_TRACK" || dev.adherence === "OVERSHOT") {
+    if (planned && !REST_RE.test(planned)) return planned;
+  }
+  if (dev.actual_km >= longKm) return "Long Run";
+  if (medianPaceSec && dev.actual_pace_sec && dev.actual_pace_sec <= medianPaceSec * 0.93) return "Tempo Run";
+  if (dev.actual_km <= 6 && medianPaceSec && dev.actual_pace_sec && dev.actual_pace_sec >= medianPaceSec * 1.07) return "Recovery";
+  return "Easy Run";
+}
+
+/**
+ * Rewrite every past day of the plan to reflect the actual training.
+ * - nothing recorded  → Rest (so a skipped key session is not left standing as a duplicate)
+ * - something recorded → actual distance / pace, with a sensible type label
+ */
+export function alignPastDaysToActual(
+  plan: WeekPlan[],
+  pastDays: DayDeviation[],
+  todayISO: string,
+  lang: "en" | "zh" = "en",
+): { plan: WeekPlan[]; rewritten: number } {
+  const byDate = new Map(pastDays.map((d) => [d.date, d]));
+  const paces = pastDays
+    .map((d) => d.actual_pace_sec)
+    .filter((v): v is number => typeof v === "number" && v > 0)
+    .sort((a, b) => a - b);
+  const medianPaceSec = paces.length ? paces[Math.floor(paces.length / 2)] : null;
+  const longKm = Math.max(12, pastDays.reduce((m, d) => Math.max(m, d.actual_km), 0) * 0.8);
+
+  const out: WeekPlan[] = JSON.parse(JSON.stringify(plan));
+  let rewritten = 0;
+
+  for (const w of out) {
+    if (!Array.isArray(w.days)) continue;
+    for (const day of w.days as any[]) {
+      if (!day?.date || day.date >= todayISO) continue;
+      if (RACE_TYPES.has(String(day.type ?? ""))) continue;
+      const dev = byDate.get(day.date);
+      if (!dev) continue;
+
+      // Snapshot the original assignment once.
+      if (day.planned_type === undefined) {
+        day.planned_type = day.type ?? null;
+        day.planned_km = day.distance_km ?? null;
+        day.planned_pace = day.pace ?? null;
+        day.planned_title = day.title ?? null;
+        day.planned_description = day.description ?? null;
+      }
+
+      if (dev.actual_km < 0.5) {
+        if (REST_RE.test(String(day.type ?? "")) && !day.distance_km) continue;
+        day.type = "Rest";
+        day.title = lang === "zh" ? "休息" : "Rest";
+        day.description = lang === "zh" ? "當日沒有訓練紀錄，已改為休息。" : "No training recorded — recorded as a rest day.";
+        day.distance_km = null;
+        day.pace = null;
+        day.color = TYPE_COLORS["Rest"];
+        day.elevation_m = null;
+        day.eph = null;
+        delete day.sessions;
+        day.aligned_to_actual = true;
+        rewritten++;
+        continue;
+      }
+
+      const type = inferActualType(dev, medianPaceSec, longKm);
+      const km = Math.round(dev.actual_km * 10) / 10;
+      const pace = paceStr(dev.actual_pace_sec);
+      const sameAsPlanned =
+        day.type === type &&
+        Math.abs((Number(day.distance_km) || 0) - km) < 0.15 &&
+        (day.pace ?? null) === pace;
+      day.type = type;
+      day.title = day.planned_title && day.planned_type === type ? day.planned_title : type;
+      day.distance_km = km;
+      day.pace = pace ?? day.pace ?? null;
+      day.color = TYPE_COLORS[type] ?? day.color ?? "#4CAF50";
+      if (day.planned_type !== type) {
+        day.description = lang === "zh"
+          ? `實際完成 ${km} 公里${pace ? `，平均配速 ${pace}` : ""}。`
+          : `Actually completed ${km} km${pace ? ` at ${pace}` : ""}.`;
+        delete day.sessions;
+      }
+      day.aligned_to_actual = true;
+      if (!sameAsPlanned) rewritten++;
+    }
+  }
+  return { plan: out, rewritten };
+}

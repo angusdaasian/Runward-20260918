@@ -581,6 +581,9 @@ const WorkoutDetails = ({ day, lang, hrBounds }: { day: DayPlan; lang: Lang; hrB
       <Row label={isZh ? "心率" : "HR"} value={hr ? `${zoneLabel} · ${hr}` : zoneLabel} />
     </div>
   );
+};
+
+
 
 // ─── Planned vs actual comparison ───
 export interface ActualRun {

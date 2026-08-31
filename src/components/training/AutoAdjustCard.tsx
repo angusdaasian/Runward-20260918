@@ -13,6 +13,23 @@ interface Props {
   autoAdjustEnabled: boolean;
 }
 
+// Mobile WebViews (iOS "Load failed" / Chrome "Failed to fetch") occasionally drop a
+// request at the network layer. These are safe to retry once — PostgREST PATCHes are idempotent.
+const isNetworkError = (msg: string) =>
+  /load failed|failed to fetch|network ?error|networkrequest failed|fetch failed/i.test(msg);
+
+async function withRetry<T>(fn: () => Promise<T>, retries = 2, delayMs = 700): Promise<T> {
+  try {
+    return await fn();
+  } catch (e: any) {
+    if (retries > 0 && isNetworkError(e?.message ?? "")) {
+      await new Promise((r) => setTimeout(r, delayMs));
+      return withRetry(fn, retries - 1, delayMs * 2);
+    }
+    throw e;
+  }
+}
+
 interface AdjustmentRow {
   id: string;
   kind: string;
@@ -50,10 +67,22 @@ const AutoAdjustCard = ({ lang, planId, autoAdjustEnabled }: Props) => {
   const toggle = async (next: boolean) => {
     setEnabled(next);
     setSaving(true);
-    const { error } = await supabase
-      .from("training_plans")
-      .update({ auto_adjust_enabled: next })
-      .eq("id", planId);
+    // supabase-js returns fetch failures as a resolved { error } instead of throwing,
+    // so throw network errors ourselves to make them retryable.
+    const doUpdate = async () => {
+      const { error } = await supabase
+        .from("training_plans")
+        .update({ auto_adjust_enabled: next })
+        .eq("id", planId);
+      if (error && isNetworkError(error.message)) throw error;
+      return error;
+    };
+    let error: any = null;
+    try {
+      error = await withRetry(doUpdate);
+    } catch (e: any) {
+      error = e;
+    }
     setSaving(false);
     if (error) {
       setEnabled(!next);
@@ -73,9 +102,11 @@ const AutoAdjustCard = ({ lang, planId, autoAdjustEnabled }: Props) => {
   const invoke = async (action: "detect" | "recalibrate" | "revert") => {
     setRunning(action);
     try {
-      const { data, error } = await supabase.functions.invoke("plan-auto-adjust", {
-        body: { action, plan_id: planId },
-      });
+      const { data, error } = await withRetry(() =>
+        supabase.functions.invoke("plan-auto-adjust", {
+          body: { action, plan_id: planId },
+        })
+      );
       if (error) throw error;
       const status = (data as any)?.status;
       const summary = zh ? (data as any)?.summary_zh : (data as any)?.summary_en;

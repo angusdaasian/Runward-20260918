@@ -1,58 +1,83 @@
-# Runward — Feature Evaluation & Proposed Additions
+# Auto Program Adjust
 
-## What Runward has today
+Let the training plan adapt itself when the runner's actual training drifts from what was assigned — instead of the user manually editing days.
 
-A mature, full-featured running companion. Current surface area:
+Example: plan says 18 km tempo, user runs 8 km easy. The system reads that as "bad day / life got in the way", and regenerates the remaining plan with Gemini instead of leaving a broken schedule behind.
 
-- **Multi-platform sync**: Strava, Garmin, Suunto, COROS, Polar, Apple Health, Fitbit, Intervals.icu, Terra (mutually-exclusive fitness provider).
-- **Activities**: detail view with map, HR-zone bars, splits, FIT export, bulk export, calendar, year heatmap, monthly stats, AI share posters, RPE slider (0.5 steps), suggested next workout.
-- **AI**: running coach chat (24/7), activity analysis, posture analysis (video), personalized training-program generation, weekly plan review, race-time prediction (VDOT + HR-based, with weather WBGT and TSB freshness adjustments).
-- **Training**: AI plans, plan editor, weekly review modal, training-load charts (CTL/ATL/TSB), training score.
-- **Analytics**: race predictor, HR zones, HRV readiness (Terra), injury-load cards (injury risk + readiness combined), trends, Garmin health card, customizable reorderable widget grid.
-- **Races**: scraped race calendar, user races, race fueling calculator.
-- **Gamification/Community**: Arena (chat, public/private leaderboards), XP/ranks/tiers/divisions, city badges, territory (CityHunter), monthly road quest, season reset.
-- **Messaging**: WhatsApp + Telegram daily workout delivery (compact-to-rich tiered), broadcast notifications.
-- **Web**: SSR bilingual blog (SEO, sitemap, RSS), landing + pricing, `/tools` (Pace Lab, race-day checklist, fueling calculator), `/review` Strava-compliant page, developer OAuth/API, admin panel.
-- **Localization**: EN + ZH + JA (client-side SPA).
+## What exists today (verified)
 
-## Confirmed gaps
+- `training_plans.plan_data` holds `[{ week, startDate, days: [...] }]`; days follow `PlanDay` in `src/lib/planTypes.ts` (legacy `type`/`distance_km`/`pace` + optional `sessions[]`).
+- `weekly-plan-review` already contains the exact matching engine needed: `fetchActivities` (merges Strava/Garmin/Terra/Apple + dedups by day), `fetchHealth`, and `scoreWeek` (planned vs actual km, completion %, pace score). It only *reports*, never edits the plan.
+- `finetune-plan-week` already rewrites one week's `days` via Gemini, but is driven by HRV/RHR recovery data and requires the user to press a button and confirm.
+- Activity ingest already fires webhooks on insert (`tg_trigger_cross_platform_dedup` uses `net.http_post` with a 60s debounce) — the same pattern can trigger adjustment.
+- No deviation detection and no automatic plan rewrite exists anywhere.
 
-1. **No taper / race-peak planner.** Plans have rest/recovery days and a generic "post-injury" preset, but there is no explicit final-2-to-3-week taper generator tied to a target race date.
-2. **No single "Train Today?" gate.** Injury risk, HRV readiness, and TSB are computed in separate widgets — there is no one-line daily recommendation ("Ready / Easy / Rest") combining them.
-3. **No pacing/split analysis.** Splits are stored and shown, but never analyzed for negative-split tendency, fade, or bank-time risk. No race split planner with guardrails.
-4. **No plan-adherence tracking.** The app builds a plan and tracks activities, but never compares completed workouts against the scheduled plan (completion %, missed key sessions, streak).
-5. **No gear mileage surfacing.** Shoe tables exist (hidden); no wear/mileage alert when shoes are due for replacement.
-6. **No weather-adjusted "today's pace."** Weather slowdown exists only inside race prediction, not surfaced as a recommended training pace for today's conditions.
+## How it works
 
-## Proposed features (ranked by value-to-effort)
+### 1. Opt-in
+A toggle in the Training/Programs tab: **"Auto-adjust my plan"**, off by default. Stored per plan so a user can have it on for a marathon block and off otherwise. A short explainer states the plan may be rewritten automatically and that adjustments can be undone.
 
-### A. "Train Today?" readiness gate — recommended, high value, low effort
-A single daily card combining existing TSB + HRV readiness + recent RPE + injury-risk band into one verdict: **Ready / Go easy / Rest**. Reuses `computeReadiness`, `computeInjuryRisk`, `buildWeeklyLoadSeries` already in the codebase. Lives at the top of Activities/Training tab. No new data model.
-- Why: closes the loop between the metrics users already see and a decision they actually make every morning. Highest "feels smart" payoff per line of code.
+### 2. Deviation detection
+After a run syncs (debounced), the system compares that day's assigned workout against what was actually done and classifies it:
 
-### B. Race split planner with bank-time guardrails — high value, medium effort
-Enter a target finish time + course; get per-km/mile splits with a max "bank" limit (e.g. don't run any km more than X sec faster than average) and a negative-split option. Reuses `predictTime` / VDOT engine. Could also power a "splits band" view inside an existing activity to flag where the runner faded vs. their plan.
-- Why: runners obsess over race splits; no major running app ships an explicit bank-time guard. Strong SEO + shareable.
+```text
+assigned 18km Tempo   actual 8km Easy    -> UNDERSHOT_HARD  (big miss on a key session)
+assigned 10km Easy    actual 10km Easy   -> ON_TRACK        (no action)
+assigned 12km Easy    actual 20km Long   -> OVERSHOT        (flag, risk of overreach)
+assigned Rest         actual 14km        -> UNPLANNED_LOAD
+assigned 16km Long    actual nothing     -> MISSED          (only after the day passes)
+```
 
-### C. Taper & peak-week planner — high value, medium effort
-Given a target race date + distance, auto-generate the final 14–21 day taper (volume reduction curve, last hard session, carb-load note) and append it to the user's AI plan. Reuses plan-generation Edge Function + VDOT paces. Adds a `taper_phase` concept to `planTypes.ts`.
-- Why: genuine hole — every marathoner needs a taper; Runward plans up to race day but not the taper itself.
+Signals used: distance ratio, run type (existing `classifyRun` / HR zones), pace vs assigned pace, and RPE if the user logged it. Deviation is only "actionable" when it clears a threshold (e.g. distance under ~60% or over ~140% of assigned on a key session, or a key session skipped).
 
-### D. Plan adherence / schedule streak — medium value, medium effort
-Compare completed activities to scheduled plan workouts (date + type match) → completion %, missed key sessions, current streak. New lightweight `plan_completions` table or derive from existing activities vs. plan JSON. Surfaced in Training tab + Rewards XP.
-- Why: turns the plan from a PDF into a living checklist; boosts retention/XP loop.
+### 3. Trigger rule
+Adjustment does not fire on every wobble. It fires when:
+- a **key session** (Tempo / Interval / Long) is significantly missed or downgraded, or
+- two or more sessions in the current week deviate, or
+- the week's cumulative volume is well under or over plan.
 
-### E. "Today's adjusted pace" weather card — medium value, low effort
-Pull today's weather (existing `get-weather` + `weatherSlowdown`) and show recommended easy/interval/tempo paces adjusted for heat & humidity, beside the raw VDOT paces.
-- Why: the math already exists; surfacing it is cheap and immediately useful in summer (Hong Kong/Taiwan heat).
+Guardrails: at most one auto-adjustment per rolling 72 hours, minimum one adjustment gap between runs, and a hard skip during the final taper weeks unless the miss is severe.
 
-### F. Shoe replacement alerts (un-hide + extend) — low value, low effort
-Re-surface the hidden shoe system: show mileage per shoe + alert when a shoe crosses ~500–800 km. Minimal new logic.
+### 4. Regeneration with Gemini
+A new `plan-auto-adjust` Edge Function builds the context — recent planned vs actual days, deviation labels, recovery data, race date, target time, weeks remaining — and asks Gemini to rewrite **only the remaining days**, with strict rules in the prompt:
 
-## Recommendation
+- Never modify past days.
+- Keep race date and target time fixed.
+- Keep the weekly structure (same training days the user selected).
+- Do not "make up" missed mileage by spiking the next week; cap week-over-week volume growth.
+- If the miss looks like fatigue or illness, insert recovery before returning to intensity.
+- Return the same day JSON shape so existing UI keeps working.
 
-Build **A (Train Today?)** and **E (weather-adjusted pace)** first — both reuse existing engines, are low-effort, and deliver high perceived intelligence. Then **C (taper planner)** and **B (split planner)** as the next premium-tier differentiators. **D (adherence)** and **F (shoes)** are good retention features to slot in afterward.
+The response is sanitized field-by-field against the original days (same approach `finetune-plan-week` already uses) before it is written back.
 
-## Next step
+### 5. Notification and undo
+When an adjustment lands, the user gets a message through their existing channel (WhatsApp / Telegram / push) summarizing what changed and why, in their language. The previous `plan_data` is snapshotted, so an **Undo** button restores the old plan. An adjustment history list in the Training tab shows each change, the reason, and the trigger.
 
-Pick which of A–F to build now (or pick a subset), and I'll scope a concrete implementation plan for those.
+## Technical plan
+
+**Database**
+- `training_plans`: add `auto_adjust_enabled boolean not null default false`.
+- New table `plan_auto_adjustments`: `id`, `user_id`, `plan_id`, `triggered_at`, `trigger_reason` (text), `deviation jsonb` (assigned vs actual detail), `plan_data_before jsonb`, `plan_data_after jsonb`, `summary_en`, `summary_zh`, `status` (`applied` / `reverted`), `created_at`. RLS scoped to `auth.uid()`, with `GRANT`s for `authenticated` + `service_role`.
+
+**Shared logic**
+- Extract the planned-vs-actual matching from `weekly-plan-review` into `supabase/functions/_shared/planAdherence.ts` (`fetchActivities`, `fetchHealth`, plus new `classifyDeviation` / `shouldAdjust`) and have both functions import it, so scoring stays consistent.
+
+**Edge Function `plan-auto-adjust`**
+- Modes: `evaluate` (detect only, no write — used for previews and testing), `run` (detect + regenerate + apply), `revert` (restore a snapshot).
+- Auth: user JWT for manual calls; `x-webhook-key` for the automated path.
+- Gemini via the existing Vertex helper (`buildVertexAuth`), `gemini-flash-lite-latest` for detection-side summaries and `gemini-3-flash-preview` for regeneration, `responseMimeType: "application/json"`, generous `maxOutputTokens`, and the existing truncated-JSON repair path.
+- Debounce and rate limit checked against `plan_auto_adjustments` before doing any model call.
+
+**Trigger**
+- A nightly cron per user timezone window (HKT-aware, like the daily workout jobs) that evaluates active plans with `auto_adjust_enabled = true`. Nightly is preferred over firing on activity insert so a user logging two runs in a day gets one coherent adjustment, not two competing rewrites.
+
+**Frontend**
+- `ProgramsTab.tsx` / `TrainingTab.tsx`: the opt-in toggle, an "Auto-adjusted" badge on changed days, and an adjustment history sheet with Undo.
+- Reuse `notifyPlanChanged()` after any apply or revert so the calendar and planned-workout views refresh.
+- EN/ZH strings added to `src/lib/i18n.ts`.
+
+## Decisions to confirm
+
+- Premium-only, or available to free users? (`finetune-plan-week` is currently premium-gated.)
+- Fully automatic, or "propose and ask" — send the suggestion and only apply after the user confirms (the existing `PlanSuggestionCard` pattern already does propose-then-apply)?
+- Should overshooting (running much more than assigned) also trigger a rewrite, or only undershooting?

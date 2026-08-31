@@ -234,6 +234,7 @@ interface AdjustResult {
   adjustment_id?: string;
   weeks_rewritten?: number;
   day_swaps?: unknown;
+  past_days_rewritten?: number;
   revised_target_time?: string | null;
   summary_en?: string | null;
   summary_zh?: string | null;
@@ -336,6 +337,7 @@ HARD RULES:
 - Keep the same number of running days per week the runner has actually been managing.
 - YOU MAY AND SHOULD MOVE SESSIONS TO DIFFERENT WEEKDAYS. Use the runner's real weekday habits below: put key sessions (Tempo/Interval/Long Run) on the weekdays they consistently train hard or long, and put Rest on the weekdays they consistently do not run. Do not keep a session on a weekday the runner repeatedly skips.
 - Keep at least one easy/rest day between two hard sessions after any reshuffle.
+- Count the key sessions ALREADY COMPLETED earlier in the current week (see the day-by-day list). Do not schedule a second Tempo/Interval/Long Run in the remainder of that week if the same kind of session was already done — make the remaining days Easy Run, Recovery or Rest instead.
 - Interval descriptions must use the format "{dist}m x {reps} at {pace}/km, rest {time} between sets".
 - Preserve a proper taper in the final 2 weeks before the race.
 - Write "title" and "description" in BOTH not required — write them in Traditional Chinese if the runner's plan text is Chinese, otherwise English. Match the language of the existing plan text shown below.
@@ -428,6 +430,7 @@ ${commonRules}`;
       reason,
       weeks_rewritten: remainingWeeks,
       day_swaps: swaps,
+      past_days_rewritten: aligned.rewritten,
       revised_target_time: realisticTime,
       audit: { totals: audit.totals, current_week: curWeek },
     };
@@ -455,7 +458,7 @@ ${commonRules}`;
       kind,
       status: "applied",
       trigger_reason: `${reasonCode}: ${reason}`,
-      deviation: { reason_code: reasonCode, days: curWeek?.days ?? [], day_swaps: swaps },
+      deviation: { reason_code: reasonCode, days: curWeek?.days ?? [], day_swaps: swaps, past_days_rewritten: aligned.rewritten },
       audit: { totals: audit.totals, weeks: audit.weeks.map(({ days, ...w }) => w), vdot, fitness_based_time: realisticTime, weekday_habits: habits },
       plan_data_before: planData,
       plan_data_after: after,
@@ -479,6 +482,7 @@ ${commonRules}`;
     adjustment_id: adj?.id,
     weeks_rewritten: aiWeeks.length,
     day_swaps: swaps,
+    past_days_rewritten: aligned.rewritten,
     revised_target_time: revised,
     summary_en: parsed?.summary_en ?? null,
     summary_zh: parsed?.summary_zh ?? null,

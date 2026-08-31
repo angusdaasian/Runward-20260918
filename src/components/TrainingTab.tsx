@@ -705,6 +705,7 @@ const DraggableDay = ({
   };
 
   return (
+    <div>
     <div ref={setRefs} style={style} className={`flex items-stretch gap-2 rounded-lg ${isOver && !isDragging ? "ring-2 ring-primary bg-primary/5" : ""}`}>
       <div className="w-10 flex-shrink-0 flex flex-col items-center pt-3">
         <span className="text-[10px] font-medium text-muted-foreground uppercase">{labelForDay(day, idx)}</span>

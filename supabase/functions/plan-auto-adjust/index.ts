@@ -81,7 +81,7 @@ async function callGemini(system: string, user: string, model = "gemini-3-flash-
       contents: [{ role: "user", parts: [{ text: user }] }],
       generationConfig: {
         thinkingConfig: { thinkingBudget: 1024 },
-        maxOutputTokens: 65536,
+        maxOutputTokens: 65535,
         responseMimeType: "application/json",
         temperature: 0.6,
       },

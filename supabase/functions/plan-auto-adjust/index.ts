@@ -32,6 +32,7 @@ import {
   type WeekPlan,
 } from "../_shared/planAdherence.ts";
 import {
+  alignPastDaysToActual,
   applyDaySwaps,
   detectWeekSwaps,
   habitLines,
@@ -136,13 +137,17 @@ function stitchFutureWeeks(before: WeekPlan[], aiWeeks: any[], fromIndex: number
       if (protectFromDate && orig.date && orig.date < protectFromDate) continue;
       if (orig.type === "Race" || orig.type === "Trail Race") continue;
       const type = String(incoming.type || orig.type || "Easy Run");
+      const isRestType = /rest|off|休息/i.test(type);
       target.days[d] = {
         ...orig,
         type,
         title: incoming.title ?? orig.title,
         description: incoming.description ?? orig.description,
-        distance_km: incoming.distance_km === undefined ? orig.distance_km : incoming.distance_km,
-        pace: incoming.pace === undefined ? orig.pace : incoming.pace,
+        // A Rest day never carries a distance or pace, even if the model omitted them
+        // (otherwise a stale assignment would linger and be scored as "missed").
+        distance_km: isRestType ? null : (incoming.distance_km === undefined ? orig.distance_km : incoming.distance_km),
+        pace: isRestType ? null : (incoming.pace === undefined ? orig.pace : incoming.pace),
+        sessions: isRestType ? undefined : (incoming.sessions ?? orig.sessions),
         elevation_m: incoming.elevation_m ?? orig.elevation_m ?? null,
         eph: incoming.eph ?? orig.eph ?? null,
         color: incoming.color || COLOR_BY_TYPE[type] || orig.color || "#4CAF50",
@@ -270,7 +275,15 @@ async function runAdjust(
   const swaps: DaySwap[] = audit.weeks.flatMap((w) => detectWeekSwaps(w.week_index, w.days, todayISO));
   const allPastDays: DayDeviation[] = audit.weeks.flatMap((w) => w.days).filter((d) => d.date < todayISO);
   const habits = weekdayHabits(allPastDays);
-  const basePlan = applyDaySwaps(planData, swaps);
+  const swapped = applyDaySwaps(planData, swaps);
+  // Past weeks should read like a logbook, not a wish list: rewrite elapsed days to the
+  // work that actually happened. This also stops a skipped hard session from standing
+  // next to the rescheduled one (e.g. two intervals in the same week).
+  const planIsZh = /[\u4e00-\u9fff]/.test(
+    JSON.stringify(planData.slice(0, 2)).slice(0, 4000),
+  );
+  const aligned = alignPastDaysToActual(swapped, allPastDays, todayISO, planIsZh ? "zh" : "en");
+  const basePlan = aligned.plan;
 
   // ── decide ──
   let reason = "Manual recalibration requested.";

@@ -3302,6 +3302,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      invoke_plan_auto_adjust: {
+        Args: { p_dry_run?: boolean; p_limit?: number }
+        Returns: number
+      }
       invoke_reset_season: { Args: { p_month_year?: string }; Returns: number }
       set_strava_app_secret: {
         Args: { p_app_id: string; p_kind: string; p_value: string }

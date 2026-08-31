@@ -27,7 +27,7 @@ serve(async (req) => {
       body: JSON.stringify({
         contents: [{ role: "user", parts: [{ text: url.searchParams.get("heavy") ? HEAVY : 'Return JSON array [{"week":1}] only.' }] }],
         generationConfig: url.searchParams.get("heavy")
-          ? { thinkingConfig: { thinkingBudget: 1024 }, maxOutputTokens: 65536, responseMimeType: "application/json", temperature: 0.7 }
+          ? { thinkingConfig: { thinkingBudget: 1024 }, maxOutputTokens: 65535, responseMimeType: "application/json", temperature: 0.7 }
           : { maxOutputTokens: 256, responseMimeType: "application/json", temperature: 0.7 },
       }),
     });

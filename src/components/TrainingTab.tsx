@@ -909,6 +909,8 @@ interface ProgramHeaderProps {
     weeklyKm?: number;
   }) => Promise<void> | void;
   regenerating?: boolean;
+  children?: React.ReactNode;
+
   races?: RaceSchedItemUI[];
   currentRaces?: RaceSchedItemUI[];
   racesDrift?: boolean;

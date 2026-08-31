@@ -671,6 +671,7 @@ const DraggableDay = ({
   id, idx, day, lang, isToday, dayNum, hrBounds,
   onEditClick, onAddClick,
   isPushed, isPushing, onPushDay, watchProvider,
+  actual, isPast,
 }: {
   id: string;
   idx: number;
@@ -685,6 +686,8 @@ const DraggableDay = ({
   isPushing?: boolean;
   onPushDay?: (idx: number) => void;
   watchProvider?: string | null;
+  actual?: ActualRun[];
+  isPast?: boolean;
 }) => {
   const { attributes, listeners, setNodeRef: setDragRef, isDragging, transform } = useDraggable({ id });
   const { setNodeRef: setDropRef, isOver } = useDroppable({ id });

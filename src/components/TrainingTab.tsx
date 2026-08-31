@@ -581,7 +581,87 @@ const WorkoutDetails = ({ day, lang, hrBounds }: { day: DayPlan; lang: Lang; hrB
       <Row label={isZh ? "心率" : "HR"} value={hr ? `${zoneLabel} · ${hr}` : zoneLabel} />
     </div>
   );
+
+// ─── Planned vs actual comparison ───
+export interface ActualRun {
+  name?: string | null;
+  sport_type?: string | null;
+  distance_km: number;
+  moving_time?: number | null;
+  pace?: string | null;
+}
+
+const formatPaceFromKmSec = (km: number, sec?: number | null): string | null => {
+  if (!km || !sec || km <= 0 || sec <= 0) return null;
+  const per = sec / km;
+  const m = Math.floor(per / 60);
+  const s = Math.round(per % 60);
+  return `${m}:${String(s).padStart(2, "0")}/km`;
 };
+
+const PlannedVsActual = ({
+  day, actual, isPast, lang,
+}: { day: DayPlan; actual: ActualRun[]; isPast: boolean; lang: Lang }) => {
+  const zh = lang === "zh";
+  const L = (en: string, z: string) => (zh ? z : en);
+  const plannedKm = Number(day?.distance_km) || 0;
+  const isRest = isRestWorkoutDay(day);
+  const hasActual = actual.length > 0;
+
+  if (!isPast && !hasActual) return null;
+  if (isRest && !hasActual) return null;
+
+  if (!hasActual) {
+    return (
+      <div className="ml-12 mb-1 flex items-center gap-1.5 text-[11px] text-rose-600 dark:text-rose-400">
+        <X size={11} />
+        <span className="font-medium">{L("Missed", "未完成")}</span>
+        <span className="text-muted-foreground">
+          · {L("planned", "計劃")} {localizeTitle(day.type || "Run", lang)}
+          {plannedKm ? ` ${plannedKm} km` : ""}{day.pace ? ` @ ${day.pace}` : ""}
+        </span>
+      </div>
+    );
+  }
+
+  const actualKm = actual.reduce((s, a) => s + (a.distance_km || 0), 0);
+  const actualSec = actual.reduce((s, a) => s + (a.moving_time || 0), 0);
+  const actualPace = actual.length === 1
+    ? (actual[0].pace || formatPaceFromKmSec(actual[0].distance_km, actual[0].moving_time))
+    : formatPaceFromKmSec(actualKm, actualSec);
+  const delta = plannedKm ? actualKm - plannedKm : null;
+  const deltaLabel = delta === null ? null
+    : `${delta >= 0 ? "+" : "−"}${Math.abs(delta).toFixed(1)} km`;
+  const onTarget = delta !== null && Math.abs(delta) <= Math.max(1, plannedKm * 0.1);
+  const tone = plannedKm === 0
+    ? "text-sky-600 dark:text-sky-400"
+    : onTarget
+      ? "text-emerald-600 dark:text-emerald-400"
+      : "text-amber-600 dark:text-amber-400";
+
+  return (
+    <div className="ml-12 mb-1 space-y-0.5">
+      <div className={`flex items-center gap-1.5 text-[11px] ${tone}`}>
+        <Check size={11} />
+        <span className="font-medium">
+          {L("Actual", "實際")}: {actual.map((a) => a.name || a.sport_type || L("Run", "跑步")).join(" + ")}
+        </span>
+      </div>
+      <div className="text-[11px] text-muted-foreground pl-[18px]">
+        {actualKm.toFixed(1)} km{actualPace ? ` @ ${actualPace}` : ""}
+        {plannedKm ? (
+          <> · {L("planned", "計劃")} {plannedKm} km{day.pace ? ` @ ${day.pace}` : ""}
+            {deltaLabel ? <span className={`ml-1 font-medium ${tone}`}>({deltaLabel})</span> : null}
+          </>
+        ) : (
+          <> · {L("no workout planned", "當日無計劃訓練")}</>
+        )}
+      </div>
+    </div>
+  );
+};
+
+
 
 // Draggable + droppable day row for the AI calendar (long-press to swap)
 const DraggableDay = ({

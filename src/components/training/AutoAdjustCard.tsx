@@ -102,9 +102,11 @@ const AutoAdjustCard = ({ lang, planId, autoAdjustEnabled }: Props) => {
   const invoke = async (action: "detect" | "recalibrate" | "revert") => {
     setRunning(action);
     try {
-      const { data, error } = await supabase.functions.invoke("plan-auto-adjust", {
-        body: { action, plan_id: planId },
-      });
+      const { data, error } = await withRetry(() =>
+        supabase.functions.invoke("plan-auto-adjust", {
+          body: { action, plan_id: planId },
+        })
+      );
       if (error) throw error;
       const status = (data as any)?.status;
       const summary = zh ? (data as any)?.summary_zh : (data as any)?.summary_en;

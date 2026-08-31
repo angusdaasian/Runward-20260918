@@ -842,6 +842,7 @@ const CalendarDayList = ({
           const dateObj = day.date ? new Date(day.date + "T00:00:00") : null;
           const dayNum = dateObj ? dateObj.getDate() : "";
           const isToday = day.date === todayStr;
+          const isPast = !!day.date && day.date < todayStr;
           return (
             <DraggableDay
               key={`${weekIdx}:${i}`}
@@ -858,6 +859,8 @@ const CalendarDayList = ({
               isPushing={pushingIdx === i}
               onPushDay={onPushDay}
               watchProvider={watchProvider}
+              actual={day.date ? actualByDate?.get(day.date) : undefined}
+              isPast={isPast}
             />
           );
         })}

@@ -1093,6 +1093,7 @@ export type Database = {
           created_at: string
           deviation: Json
           id: string
+          input_fingerprint: string | null
           kind: string
           plan_data_after: Json
           plan_data_before: Json
@@ -1111,6 +1112,7 @@ export type Database = {
           created_at?: string
           deviation?: Json
           id?: string
+          input_fingerprint?: string | null
           kind?: string
           plan_data_after?: Json
           plan_data_before?: Json
@@ -1129,6 +1131,7 @@ export type Database = {
           created_at?: string
           deviation?: Json
           id?: string
+          input_fingerprint?: string | null
           kind?: string
           plan_data_after?: Json
           plan_data_before?: Json

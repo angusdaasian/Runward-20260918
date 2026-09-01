@@ -383,7 +383,7 @@ DEVIATIONS IN THE CURRENT WEEK
 ${deviationLines(curWeek?.days ?? []) || "- none"}
 
 YOUR TASK
-Rebuild the remaining ${remainingWeeks} weeks from the runner's REAL current fitness and their REAL weekly rhythm, not from the original assumptions. If they consistently do their hard or long work on different weekdays than the plan assumed, reschedule the weekdays to match them. If the block was under-executed, lower volume and intensity to a base the runner can actually hold and be honest in "revised_target_time". If it was over-executed, protect against injury rather than piling on more. Rebuild progression logically toward race day.
+Rebuild the remaining ${remainingWeeks} weeks from the runner's REAL current fitness and their REAL weekly rhythm, not from the original assumptions. If they consistently do their hard or long work on different weekdays than the plan assumed, reschedule the weekdays to match them. If the block was under-executed, lower volume and intensity to a base the runner can actually hold. If it was over-executed, protect against injury rather than piling on more. Rebuild progression logically toward race day.
 
 CALENDAR SKELETON (weeks you must fill, in order)
 ${futureWeekSkeleton(planData, fromIndex)}
@@ -414,7 +414,7 @@ ${habitLines(habits)}
 SESSIONS THE RUNNER SHIFTED TO ANOTHER DAY (already re-dated on the calendar for past weeks)
 ${swapLines(swaps)}
 
-Real recent load: ${audit.totals.recent_4w_km}km in the last 4 weeks (avg ${audit.totals.avg_weekly_km}km/week). Estimated fitness VDOT ${vdot ?? "unknown"}${realisticTime ? ` (≈ ${realisticTime} for ${plan.distance})` : ""}.
+Real recent load: ${audit.totals.recent_4w_km}km in the last 4 weeks (avg ${audit.totals.avg_weekly_km}km/week). Estimated fitness VDOT ${vdot ?? "unknown"} (use for training paces only; never comment on finishing times).
 
 YOUR TASK
 The runner cut short or skipped work — treat that as a signal of fatigue, illness, or life load, not laziness. Rebuild the remaining ${remainingWeeks} weeks so the next 3-5 days are gentler, moving sessions onto the weekdays the runner actually trains on, then progression resumes at a realistic level. Do NOT reschedule missed mileage into the coming days. Keep the race date and taper intact.

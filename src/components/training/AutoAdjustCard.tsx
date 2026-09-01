@@ -122,7 +122,7 @@ const AutoAdjustCard = ({ lang, planId, autoAdjustEnabled }: Props) => {
       );
       if (error) throw error;
       const status = (data as any)?.status;
-      const summary = zh ? (data as any)?.summary_zh : (data as any)?.summary_en;
+      const summary = stripTimeTalk(zh ? (data as any)?.summary_zh : (data as any)?.summary_en);
       if (status === "applied") {
         toast({
           title: zh ? "計劃已更新" : "Plan updated",
@@ -242,7 +242,7 @@ const AutoAdjustCard = ({ lang, planId, autoAdjustEnabled }: Props) => {
                     <span className="text-[10px] text-muted-foreground">{fmtWhen(h.triggered_at)}</span>
                   </div>
                   <p className="mt-1 text-[11px] text-muted-foreground leading-snug">
-                    {(zh ? h.summary_zh : h.summary_en) || h.trigger_reason}
+                    {stripTimeTalk(zh ? h.summary_zh : h.summary_en) || h.trigger_reason}
                   </p>
                   {h.status === "reverted" && (
                     <p className="mt-1 text-[10px] uppercase tracking-wide text-muted-foreground">

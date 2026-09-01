@@ -35,6 +35,7 @@ import {
   alignPastDaysToActual,
   applyDaySwaps,
   detectWeekSwaps,
+  enforceAdjustedSchedule,
   habitLines,
   swapLines,
   weekdayHabits,
@@ -156,7 +157,13 @@ const COLOR_BY_TYPE: Record<string, string> = {
  * original calendar dates, week numbers and day labels intact. Race days already on the
  * calendar are preserved so a rewrite can never delete a race.
  */
-function stitchFutureWeeks(before: WeekPlan[], aiWeeks: any[], fromIndex: number, protectFromDate?: string): WeekPlan[] {
+function stitchFutureWeeks(
+  before: WeekPlan[],
+  aiWeeks: any[],
+  fromIndex: number,
+  protectFromDate?: string,
+  completedDates = new Set<string>(),
+): WeekPlan[] {
   const out: WeekPlan[] = JSON.parse(JSON.stringify(before));
   for (let i = 0; i < aiWeeks.length; i++) {
     const targetIdx = fromIndex + i;
@@ -169,7 +176,7 @@ function stitchFutureWeeks(before: WeekPlan[], aiWeeks: any[], fromIndex: number
       const incoming = srcDays[d];
       if (!incoming) continue;
       // Never rewrite a day that already happened, or a calendar race.
-      if (protectFromDate && orig.date && orig.date < protectFromDate) continue;
+      if (protectFromDate && orig.date && (orig.date < protectFromDate || completedDates.has(orig.date))) continue;
       if (orig.type === "Race" || orig.type === "Trail Race") continue;
       const type = String(incoming.type || orig.type || "Easy Run");
       const isRestType = /rest|off|休息/i.test(type);
@@ -182,7 +189,11 @@ function stitchFutureWeeks(before: WeekPlan[], aiWeeks: any[], fromIndex: number
         // (otherwise a stale assignment would linger and be scored as "missed").
         distance_km: isRestType ? null : (incoming.distance_km === undefined ? orig.distance_km : incoming.distance_km),
         pace: isRestType ? null : (incoming.pace === undefined ? orig.pace : incoming.pace),
-        sessions: isRestType ? undefined : (incoming.sessions ?? orig.sessions),
+        // Never retain nested steps from the old workout when its type changes. This was
+        // the source of "ghost" Interval sessions after an Interval became Recovery/Easy.
+        sessions: isRestType || type !== String(orig.type ?? "")
+          ? incoming.sessions
+          : (incoming.sessions ?? orig.sessions),
         elevation_m: incoming.elevation_m ?? orig.elevation_m ?? null,
         eph: incoming.eph ?? orig.eph ?? null,
         // Color always follows the (possibly new) type so a rewritten session
@@ -509,7 +520,11 @@ ${commonRules}`;
     return { status: "failed", reason: "The coach model did not return a usable plan." };
   }
 
-  let after = stitchFutureWeeks(basePlan, aiWeeks, fromIndex, todayISO);
+  // A run already recorded today is completed work, not a slot the regenerated plan may
+  // overwrite. Protect all activity dates as well as earlier calendar days.
+  const completedDates = new Set(activities.map((activity) => activity.date));
+  let after = stitchFutureWeeks(basePlan, aiWeeks, fromIndex, todayISO, completedDates);
+  after = enforceAdjustedSchedule(basePlan, after, todayISO, planIsZh ? "zh" : "en");
   if (kind === "recalibrate") after = reconcilePastDays(after, audit, todayISO);
 
   // We never surface a finishing time with adjustments — the plan keeps the runner's own

@@ -194,6 +194,106 @@ const TYPE_COLORS: Record<string, string> = {
   "Rest": "#607D8B",
 };
 
+const INTERVAL_RE = /interval|intervals|間歇/i;
+const HARD_RE = /tempo|interval|intervals|threshold|race pace|progression|節奏|間歇|乳酸閾值|比賽配速|漸進/i;
+
+function sessionLooksInterval(day: any): boolean {
+  if (INTERVAL_RE.test(String(day?.type ?? ""))) return true;
+  return Array.isArray(day?.sessions) && day.sessions.some((session: any) =>
+    INTERVAL_RE.test(String(session?.type ?? "")) ||
+    (Array.isArray(session?.steps) && session.steps.some((step: any) => step?.kind === "interval"))
+  );
+}
+
+function hardDay(day: any): boolean {
+  return HARD_RE.test(String(day?.type ?? "")) || sessionLooksInterval(day);
+}
+
+function recoveryDay(day: any, lang: "en" | "zh"): any {
+  const previousKm = Number(day?.distance_km) || 0;
+  return {
+    ...day,
+    type: "Recovery",
+    title: lang === "zh" ? "恢復跑" : "Recovery Run",
+    description: lang === "zh" ? "輕鬆恢復，為下一課重點訓練保留體力。" : "Easy recovery to leave enough space before the next key session.",
+    distance_km: previousKm > 0 ? Math.min(8, Math.max(3, Math.round(previousKm * 0.6 * 10) / 10)) : 5,
+    pace: null,
+    color: TYPE_COLORS["Recovery"],
+    elevation_m: null,
+    eph: null,
+    sessions: undefined,
+    auto_adjusted: true,
+  };
+}
+
+/**
+ * Enforce safety invariants after model output has been stitched onto the plan.
+ * Model instructions alone are not sufficient: stale nested sessions can make a day
+ * remain an Interval after its top-level type changed, and a model may return two
+ * explicit Interval days in one week.
+ */
+export function enforceAdjustedSchedule(
+  before: WeekPlan[],
+  adjusted: WeekPlan[],
+  todayISO: string,
+  lang: "en" | "zh" = "en",
+): WeekPlan[] {
+  const out: WeekPlan[] = JSON.parse(JSON.stringify(adjusted));
+
+  for (let weekIndex = 0; weekIndex < out.length; weekIndex++) {
+    const week = out[weekIndex];
+    if (!Array.isArray(week?.days)) continue;
+    const originalDays = Array.isArray(before[weekIndex]?.days) ? before[weekIndex].days as any[] : [];
+    const days = week.days as any[];
+
+    // A changed top-level workout must never inherit the old workout's nested session.
+    for (let i = 0; i < days.length; i++) {
+      const original = originalDays[i] as any;
+      const day = days[i];
+      if (original && day && String(original.type ?? "") !== String(day.type ?? "")) {
+        const nestedMatchesType = Array.isArray(day.sessions) && day.sessions.every((session: any) =>
+          String(session?.type ?? "").toLowerCase().includes(String(day.type ?? "").toLowerCase().split(" ")[0])
+        );
+        if (!nestedMatchesType) delete day.sessions;
+      }
+    }
+
+    const intervals = days.map((day, index) => ({ day, index })).filter(({ day }) => sessionLooksInterval(day));
+    if (intervals.length > 1) {
+      const completed = intervals.find(({ day }) => day?.date && day.date < todayISO);
+      const originalIntervalIndexes = originalDays
+        .map((day, index) => sessionLooksInterval(day) ? index : -1)
+        .filter((index) => index >= 0);
+      const keep = completed ?? intervals
+        .slice()
+        .sort((a, b) => {
+          const distanceToOriginal = (index: number) => originalIntervalIndexes.length
+            ? Math.min(...originalIntervalIndexes.map((originalIndex) => Math.abs(originalIndex - index)))
+            : index;
+          return distanceToOriginal(a.index) - distanceToOriginal(b.index) || a.index - b.index;
+        })[0];
+      for (const candidate of intervals) {
+        if (candidate.index !== keep.index && (!candidate.day?.date || candidate.day.date >= todayISO)) {
+          days[candidate.index] = recoveryDay(candidate.day, lang);
+        }
+      }
+    }
+
+    // Keep a recovery buffer between key intensity sessions. Past days are immutable;
+    // when a conflict involves one, only the upcoming workout is softened.
+    for (let i = 1; i < days.length; i++) {
+      if (!hardDay(days[i - 1]) || !hardDay(days[i])) continue;
+      if (!days[i]?.date || days[i].date >= todayISO) {
+        days[i] = recoveryDay(days[i], lang);
+      } else if (!days[i - 1]?.date || days[i - 1].date >= todayISO) {
+        days[i - 1] = recoveryDay(days[i - 1], lang);
+      }
+    }
+  }
+
+  return out;
+}
+
 /** Infer the type of a completed run from its distance and pace vs the runner's own norms. */
 function inferActualType(dev: DayDeviation, medianPaceSec: number | null, longKm: number): string {
   const planned = String(dev.assigned_type ?? "");

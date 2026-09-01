@@ -35,6 +35,13 @@ function fmtHm(seconds: number, isZh: boolean): string {
   return isZh ? `${h}時${m}分` : `${h}h ${m}m`;
 }
 
+function fmtPace(secondsPerKm: number): string {
+  if (!isFinite(secondsPerKm) || secondsPerKm <= 0) return "--";
+  const m = Math.floor(secondsPerKm / 60);
+  const s = Math.round(secondsPerKm % 60);
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
+
 export async function shareMonthlyStats(input: ShareMonthlyStatsInput): Promise<void> {
   const isZh = input.lang === "zh";
   const W = 1080, H = 1440;
@@ -139,11 +146,12 @@ export async function shareMonthlyStats(input: ShareMonthlyStatsInput): Promise<
   ctx.font = `800 40px ${FONT_DISPLAY}`;
   ctx.fillText(isZh ? "本月總覽" : "Monthly Stats", cardX + 44, statsTitleY);
 
+  const avgPace = input.totalKm > 0 ? input.totalSeconds / input.totalKm : 0;
   const tiles = [
     { label: isZh ? "總距離" : "Distance", value: input.totalKm.toFixed(1), unit: "km" },
     { label: isZh ? "跑步次數" : "Runs", value: String(input.runCount), unit: isZh ? "次" : "runs" },
     { label: isZh ? "總時長" : "Total Time", value: fmtHm(input.totalSeconds, isZh), unit: "" },
-    { label: isZh ? "週均距離" : "Avg / Week", value: input.avgWeeklyKm.toFixed(1), unit: "km" },
+    { label: isZh ? "平均配速" : "Avg Pace", value: fmtPace(avgPace), unit: isZh ? "/公里" : "/km" },
   ];
 
   const gridTopY = statsTitleY + 44;

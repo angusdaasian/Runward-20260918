@@ -30,7 +30,20 @@ async function withRetry<T>(fn: () => Promise<T>, retries = 2, delayMs = 700): P
   }
 }
 
+// Adjustments never revise the runner's goal time, so drop any finishing-time talk that
+// older summaries (generated before that rule) still carry.
+const stripTimeTalk = (text: string | null | undefined): string => {
+  if (!text) return "";
+  const bad = /(target|goal|finish(ing)?|predicted|realistic)\s*(race\s*)?time|\b\d{1,2}:\d{2}(:\d{2})?\b|目標時間|完賽時間|預計時間|預測時間|成績目標/i;
+  return text
+    .split(/(?<=[.!?。！？])\s*/)
+    .filter((s) => s.trim() && !bad.test(s))
+    .join(" ")
+    .trim();
+};
+
 interface AdjustmentRow {
+
   id: string;
   kind: string;
   status: string;
@@ -109,7 +122,7 @@ const AutoAdjustCard = ({ lang, planId, autoAdjustEnabled }: Props) => {
       );
       if (error) throw error;
       const status = (data as any)?.status;
-      const summary = zh ? (data as any)?.summary_zh : (data as any)?.summary_en;
+      const summary = stripTimeTalk(zh ? (data as any)?.summary_zh : (data as any)?.summary_en);
       if (status === "applied") {
         toast({
           title: zh ? "計劃已更新" : "Plan updated",
@@ -229,7 +242,7 @@ const AutoAdjustCard = ({ lang, planId, autoAdjustEnabled }: Props) => {
                     <span className="text-[10px] text-muted-foreground">{fmtWhen(h.triggered_at)}</span>
                   </div>
                   <p className="mt-1 text-[11px] text-muted-foreground leading-snug">
-                    {(zh ? h.summary_zh : h.summary_en) || h.trigger_reason}
+                    {stripTimeTalk(zh ? h.summary_zh : h.summary_en) || h.trigger_reason}
                   </p>
                   {h.status === "reverted" && (
                     <p className="mt-1 text-[10px] uppercase tracking-wide text-muted-foreground">

@@ -1,0 +1,2 @@
+ALTER TABLE public.plan_auto_adjustments ADD COLUMN IF NOT EXISTS input_fingerprint text;
+CREATE INDEX IF NOT EXISTS plan_auto_adjustments_plan_fp_idx ON public.plan_auto_adjustments (plan_id, input_fingerprint);

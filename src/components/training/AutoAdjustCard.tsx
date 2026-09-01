@@ -30,7 +30,20 @@ async function withRetry<T>(fn: () => Promise<T>, retries = 2, delayMs = 700): P
   }
 }
 
+// Adjustments never revise the runner's goal time, so drop any finishing-time talk that
+// older summaries (generated before that rule) still carry.
+const stripTimeTalk = (text: string | null | undefined): string => {
+  if (!text) return "";
+  const bad = /(target|goal|finish(ing)?|predicted|realistic)\s*(race\s*)?time|\b\d{1,2}:\d{2}(:\d{2})?\b|目標時間|完賽時間|預計時間|預測時間|成績目標/i;
+  return text
+    .split(/(?<=[.!?。！？])\s*/)
+    .filter((s) => s.trim() && !bad.test(s))
+    .join(" ")
+    .trim();
+};
+
 interface AdjustmentRow {
+
   id: string;
   kind: string;
   status: string;

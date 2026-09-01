@@ -35,6 +35,7 @@ import {
   alignPastDaysToActual,
   applyDaySwaps,
   detectWeekSwaps,
+  enforceAdjustedSchedule,
   habitLines,
   swapLines,
   weekdayHabits,
@@ -182,7 +183,11 @@ function stitchFutureWeeks(before: WeekPlan[], aiWeeks: any[], fromIndex: number
         // (otherwise a stale assignment would linger and be scored as "missed").
         distance_km: isRestType ? null : (incoming.distance_km === undefined ? orig.distance_km : incoming.distance_km),
         pace: isRestType ? null : (incoming.pace === undefined ? orig.pace : incoming.pace),
-        sessions: isRestType ? undefined : (incoming.sessions ?? orig.sessions),
+        // Never retain nested steps from the old workout when its type changes. This was
+        // the source of "ghost" Interval sessions after an Interval became Recovery/Easy.
+        sessions: isRestType || type !== String(orig.type ?? "")
+          ? incoming.sessions
+          : (incoming.sessions ?? orig.sessions),
         elevation_m: incoming.elevation_m ?? orig.elevation_m ?? null,
         eph: incoming.eph ?? orig.eph ?? null,
         // Color always follows the (possibly new) type so a rewritten session
@@ -510,6 +515,7 @@ ${commonRules}`;
   }
 
   let after = stitchFutureWeeks(basePlan, aiWeeks, fromIndex, todayISO);
+  after = enforceAdjustedSchedule(basePlan, after, todayISO, planIsZh ? "zh" : "en");
   if (kind === "recalibrate") after = reconcilePastDays(after, audit, todayISO);
 
   // We never surface a finishing time with adjustments — the plan keeps the runner's own

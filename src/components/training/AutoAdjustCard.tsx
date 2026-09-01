@@ -2,10 +2,21 @@ import { useCallback, useEffect, useState } from "react";
 import { Lang } from "@/lib/i18n";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { notifyPlanChanged } from "@/lib/planEvents";
-import { Loader2, Wand2, History, Undo2, ChevronDown, ChevronUp } from "lucide-react";
+import { Loader2, Wand2, History, Undo2, ChevronDown, ChevronUp, Trash2 } from "lucide-react";
 
 interface Props {
   lang: Lang;
@@ -62,6 +73,7 @@ const AutoAdjustCard = ({ lang, planId, autoAdjustEnabled }: Props) => {
   const [running, setRunning] = useState<"recalibrate" | "detect" | "revert" | null>(null);
   const [history, setHistory] = useState<AdjustmentRow[]>([]);
   const [showHistory, setShowHistory] = useState(false);
+  const [clearingHistory, setClearingHistory] = useState(false);
 
   useEffect(() => setEnabled(autoAdjustEnabled), [autoAdjustEnabled]);
 
@@ -76,6 +88,26 @@ const AutoAdjustCard = ({ lang, planId, autoAdjustEnabled }: Props) => {
   }, [planId]);
 
   useEffect(() => { void loadHistory(); }, [loadHistory]);
+
+  const clearHistory = async () => {
+    setClearingHistory(true);
+    const { error } = await supabase
+      .from("plan_auto_adjustments")
+      .delete()
+      .eq("plan_id", planId);
+    setClearingHistory(false);
+    if (error) {
+      toast({
+        title: zh ? "無法清除記錄" : "Could not clear history",
+        description: error.message,
+        variant: "destructive",
+      });
+      return;
+    }
+    setHistory([]);
+    setShowHistory(false);
+    toast({ title: zh ? "已清除調整記錄" : "Adjustment history cleared" });
+  };
 
   const toggle = async (next: boolean) => {
     setEnabled(next);
@@ -230,9 +262,10 @@ const AutoAdjustCard = ({ lang, planId, autoAdjustEnabled }: Props) => {
             {showHistory ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
           </button>
           {showHistory && (
-            <ul className="mt-2 space-y-2">
-              {history.map((h) => (
-                <li key={h.id} className="rounded-lg bg-muted/40 p-2.5">
+            <div className="mt-2">
+              <ul className="space-y-2">
+                {history.map((h) => (
+                  <li key={h.id} className="rounded-lg bg-muted/40 p-2.5">
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-[11px] font-semibold text-foreground">
                       {h.kind === "recalibrate"
@@ -249,9 +282,43 @@ const AutoAdjustCard = ({ lang, planId, autoAdjustEnabled }: Props) => {
                       {zh ? "已還原" : "Reverted"}
                     </p>
                   )}
-                </li>
-              ))}
-            </ul>
+                  </li>
+                ))}
+              </ul>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="mt-2 h-8 w-full justify-start text-xs text-destructive hover:text-destructive"
+                    disabled={clearingHistory || running !== null}
+                  >
+                    {clearingHistory ? <Loader2 size={14} className="mr-2 animate-spin" /> : <Trash2 size={14} className="mr-2" />}
+                    {zh ? "清除調整記錄" : "Clear adjustment history"}
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>{zh ? "清除所有調整記錄？" : "Clear all adjustment history?"}</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      {zh
+                        ? "這只會清除記錄，不會改變目前的訓練計劃。清除後將無法還原上一次調整。"
+                        : "This only clears the history; your current training plan will not change. You will no longer be able to undo the last adjustment."}
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>{zh ? "取消" : "Cancel"}</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={() => void clearHistory()}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    >
+                      {zh ? "清除" : "Clear"}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
           )}
         </div>
       )}

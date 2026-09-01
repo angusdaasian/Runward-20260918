@@ -370,8 +370,8 @@ WHAT ACTUALLY HAPPENED (full block audit)
 ${weekSummaryLines(audit, curIdx)}
 
 Overall so far: planned ${audit.totals.planned_km}km, ran ${audit.totals.actual_km}km (${audit.totals.adherence_pct}% adherence), ${audit.totals.missed_key_sessions} key sessions missed or downgraded, longest run ${audit.totals.longest_run_km}km.
-Estimated current fitness (VDOT) from best recent effort: ${vdot ?? "unknown"}${realisticTime ? ` → equivalent ${plan.distance} time ≈ ${realisticTime}` : ""}.
-${goalSecs && realisticTime ? `Original goal ${plan.target_time} vs fitness-based estimate ${realisticTime}.` : ""}
+Estimated current fitness (VDOT) from best recent effort: ${vdot ?? "unknown"}. Use it to set training paces only — do not comment on race finishing times.
+
 
 RUNNER'S REAL WEEKDAY HABITS (use these to schedule the weekdays)
 ${habitLines(habits)}

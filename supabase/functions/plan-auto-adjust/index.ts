@@ -68,7 +68,7 @@ function vertexLocation() {
   return Deno.env.get("GOOGLE_VERTEX_LOCATION") || "global";
 }
 
-async function callGemini(system: string, user: string, model = "gemini-3-flash-preview"): Promise<string> {
+async function callGemini(system: string, user: string, model = "gemini-3-flash-preview", temperature = 0.6): Promise<string> {
   const apiKey = Deno.env.get("GOOGLE_VERTEX_API_KEY");
   if (!apiKey) throw new Error("GOOGLE_VERTEX_API_KEY not configured");
   const base = `https://aiplatform.googleapis.com/v1/projects/${vertexProject()}/locations/${vertexLocation()}/publishers/google/models/${model}:generateContent`;
@@ -83,7 +83,7 @@ async function callGemini(system: string, user: string, model = "gemini-3-flash-
         thinkingConfig: { thinkingBudget: 1024 },
         maxOutputTokens: 65535,
         responseMimeType: "application/json",
-        temperature: 0.6,
+        temperature,
       },
     }),
   });
@@ -95,6 +95,41 @@ async function callGemini(system: string, user: string, model = "gemini-3-flash-
   const finish = data?.candidates?.[0]?.finishReason;
   if (finish && finish !== "STOP") console.warn("plan-auto-adjust finishReason:", finish);
   return data?.candidates?.[0]?.content?.parts?.map((p: any) => p.text || "").join("") || "";
+}
+
+/** Strip any finishing/goal/target-time talk the model slipped into a summary. */
+function stripTargetTimeTalk(text: string | null): string | null {
+  if (!text) return text;
+  const sentences = text.split(/(?<=[.!?。！？])\s*/);
+  const bad = /(target|goal|finish(ing)?|predicted|realistic)\s*(race\s*)?time|\b\d{1,2}:\d{2}(:\d{2})?\b|目標時間|完賽時間|預計時間|預測時間|成績目標/i;
+  const kept = sentences.filter((s) => s.trim() && !bad.test(s));
+  return (kept.join(" ").trim() || null);
+}
+
+/** Stable hash of everything that legitimately changes a recalibration outcome. */
+async function inputFingerprint(
+  plan: any,
+  todayISO: string,
+  audit: PlanAudit,
+  activities: NormActivity[],
+  kind: string,
+): Promise<string> {
+  const acts = activities
+    .map((a: any) => `${a.date ?? a.start_date ?? ""}|${Math.round((a.distance_km ?? 0) * 100)}|${Math.round(a.moving_time_sec ?? a.duration_sec ?? 0)}`)
+    .sort()
+    .join(";");
+  const payload = JSON.stringify({
+    kind,
+    plan: plan.id,
+    day: todayISO,
+    race: plan.race_date ?? null,
+    target: plan.target_time ?? null,
+    totals: audit.totals,
+    weeks: audit.weeks.map((w) => [w.week, w.planned_km, w.actual_km, w.completion_pct, w.missed_key_sessions]),
+    acts,
+  });
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(payload));
+  return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
 // ---------- plan stitching ----------
@@ -247,7 +282,7 @@ async function runAdjust(
   admin: any,
   plan: any,
   kind: "auto" | "recalibrate",
-  opts: { dryRun?: boolean; force?: boolean } = {},
+  opts: { dryRun?: boolean; force?: boolean; force_regenerate?: boolean } = {},
 ): Promise<AdjustResult> {
   const todayISO = hktToday();
   const planData: WeekPlan[] = Array.isArray(plan.plan_data) ? plan.plan_data : [];
@@ -497,8 +532,9 @@ ${commonRules}`;
       plan_data_before: planData,
       plan_data_after: after,
       revised_target_time: revised,
-      summary_en: parsed?.summary_en ?? null,
-      summary_zh: parsed?.summary_zh ?? null,
+      summary_en: summaryEn,
+      summary_zh: summaryZh,
+      input_fingerprint: fingerprint,
     })
     .select("id")
     .single();
@@ -518,8 +554,8 @@ ${commonRules}`;
     day_swaps: swaps,
     past_days_rewritten: aligned.rewritten,
     revised_target_time: revised,
-    summary_en: parsed?.summary_en ?? null,
-    summary_zh: parsed?.summary_zh ?? null,
+    summary_en: summaryEn,
+    summary_zh: summaryZh,
     audit: { totals: audit.totals },
   };
 }

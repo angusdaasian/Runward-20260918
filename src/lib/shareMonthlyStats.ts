@@ -71,11 +71,11 @@ export async function shareMonthlyStats(input: ShareMonthlyStatsInput): Promise<
   const calX = cardX + calPadX;
   const calW = cardW - calPadX * 2;
   const dowHeaderH = 40;
-  const calY = afterHeader + 30;
+  const calY = afterHeader + 16;
   const gap = 8;
   const cellW = (calW - gap * 6) / 7;
   const weeks = Math.ceil((firstDow + daysInMonth) / 7);
-  const cellH = 96;
+  const cellH = 88;
 
   // Day-of-week headers (Mon-first display)
   const DOW_EN = ["M", "T", "W", "T", "F", "S", "S"];
@@ -132,7 +132,7 @@ export async function shareMonthlyStats(input: ShareMonthlyStatsInput): Promise<
   const calBottom = gridTop + Math.ceil((startCol + daysInMonth) / 7) * (cellH + gap) - gap;
 
   // ---------- Stats ----------
-  const statsTitleY = calBottom + 44;
+  const statsTitleY = calBottom + 24;
   ctx.textAlign = "left";
   ctx.textBaseline = "top";
   ctx.fillStyle = "#0F172A";
@@ -146,10 +146,10 @@ export async function shareMonthlyStats(input: ShareMonthlyStatsInput): Promise<
     { label: isZh ? "週均距離" : "Avg / Week", value: input.avgWeeklyKm.toFixed(1), unit: "km" },
   ];
 
-  const gridTopY = statsTitleY + 62;
+  const gridTopY = statsTitleY + 44;
   const tileGap = 22;
   const tileW = (cardW - 44 * 2 - tileGap) / 2;
-  const tileH = 168;
+  const tileH = 158;
 
   tiles.forEach((t, i) => {
     const col = i % 2;

@@ -68,7 +68,7 @@ function vertexLocation() {
   return Deno.env.get("GOOGLE_VERTEX_LOCATION") || "global";
 }
 
-async function callGemini(system: string, user: string, model = "gemini-3-flash-preview"): Promise<string> {
+async function callGemini(system: string, user: string, model = "gemini-3-flash-preview", temperature = 0.6): Promise<string> {
   const apiKey = Deno.env.get("GOOGLE_VERTEX_API_KEY");
   if (!apiKey) throw new Error("GOOGLE_VERTEX_API_KEY not configured");
   const base = `https://aiplatform.googleapis.com/v1/projects/${vertexProject()}/locations/${vertexLocation()}/publishers/google/models/${model}:generateContent`;
@@ -83,7 +83,7 @@ async function callGemini(system: string, user: string, model = "gemini-3-flash-
         thinkingConfig: { thinkingBudget: 1024 },
         maxOutputTokens: 65535,
         responseMimeType: "application/json",
-        temperature: 0.6,
+        temperature,
       },
     }),
   });
@@ -95,6 +95,41 @@ async function callGemini(system: string, user: string, model = "gemini-3-flash-
   const finish = data?.candidates?.[0]?.finishReason;
   if (finish && finish !== "STOP") console.warn("plan-auto-adjust finishReason:", finish);
   return data?.candidates?.[0]?.content?.parts?.map((p: any) => p.text || "").join("") || "";
+}
+
+/** Strip any finishing/goal/target-time talk the model slipped into a summary. */
+function stripTargetTimeTalk(text: string | null): string | null {
+  if (!text) return text;
+  const sentences = text.split(/(?<=[.!?。！？])\s*/);
+  const bad = /(target|goal|finish(ing)?|predicted|realistic)\s*(race\s*)?time|\b\d{1,2}:\d{2}(:\d{2})?\b|目標時間|完賽時間|預計時間|預測時間|成績目標/i;
+  const kept = sentences.filter((s) => s.trim() && !bad.test(s));
+  return (kept.join(" ").trim() || null);
+}
+
+/** Stable hash of everything that legitimately changes a recalibration outcome. */
+async function inputFingerprint(
+  plan: any,
+  todayISO: string,
+  audit: PlanAudit,
+  activities: NormActivity[],
+  kind: string,
+): Promise<string> {
+  const acts = activities
+    .map((a) => `${a.date}|${Math.round(a.distance_m)}|${Math.round(a.seconds)}|${a.avg_hr ?? ""}`)
+    .sort()
+    .join(";");
+  const payload = JSON.stringify({
+    kind,
+    plan: plan.id,
+    day: todayISO,
+    race: plan.race_date ?? null,
+    target: plan.target_time ?? null,
+    totals: audit.totals,
+    weeks: audit.weeks.map((w) => [w.week, w.planned_km, w.actual_km, w.completion_pct, w.missed_key_sessions]),
+    acts,
+  });
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(payload));
+  return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
 // ---------- plan stitching ----------
@@ -247,7 +282,7 @@ async function runAdjust(
   admin: any,
   plan: any,
   kind: "auto" | "recalibrate",
-  opts: { dryRun?: boolean; force?: boolean } = {},
+  opts: { dryRun?: boolean; force?: boolean; force_regenerate?: boolean } = {},
 ): Promise<AdjustResult> {
   const todayISO = hktToday();
   const planData: WeekPlan[] = Array.isArray(plan.plan_data) ? plan.plan_data : [];
@@ -347,9 +382,10 @@ HARD RULES:
 Also return, alongside "weeks":
 - "summary_en": 2-3 sentences telling the runner plainly what changed and why.
 - "summary_zh": the same explanation in Traditional Chinese.
-- "revised_target_time": an honest goal time as "H:MM:SS" (or "MM:SS" for short races) based on real fitness, or null to keep the original goal.
+- NEVER mention, estimate, revise or comment on a finishing time, goal time, target time or predicted race time anywhere in the summaries. Talk only about the training changes (volume, session types, weekdays, recovery).
 
-Return a single JSON object: { "weeks": [...], "summary_en": "...", "summary_zh": "...", "revised_target_time": "..." | null }`;
+Return a single JSON object: { "weeks": [...], "summary_en": "...", "summary_zh": "..." }`;
+
 
   const sampleText = JSON.stringify(
     (planData[fromIndex]?.days as any[])?.slice(0, 3)?.map((d) => ({ type: d.type, title: d.title, description: d.description })) ?? [],
@@ -369,8 +405,8 @@ WHAT ACTUALLY HAPPENED (full block audit)
 ${weekSummaryLines(audit, curIdx)}
 
 Overall so far: planned ${audit.totals.planned_km}km, ran ${audit.totals.actual_km}km (${audit.totals.adherence_pct}% adherence), ${audit.totals.missed_key_sessions} key sessions missed or downgraded, longest run ${audit.totals.longest_run_km}km.
-Estimated current fitness (VDOT) from best recent effort: ${vdot ?? "unknown"}${realisticTime ? ` → equivalent ${plan.distance} time ≈ ${realisticTime}` : ""}.
-${goalSecs && realisticTime ? `Original goal ${plan.target_time} vs fitness-based estimate ${realisticTime}.` : ""}
+Estimated current fitness (VDOT) from best recent effort: ${vdot ?? "unknown"}. Use it to set training paces only — do not comment on race finishing times.
+
 
 RUNNER'S REAL WEEKDAY HABITS (use these to schedule the weekdays)
 ${habitLines(habits)}
@@ -382,7 +418,7 @@ DEVIATIONS IN THE CURRENT WEEK
 ${deviationLines(curWeek?.days ?? []) || "- none"}
 
 YOUR TASK
-Rebuild the remaining ${remainingWeeks} weeks from the runner's REAL current fitness and their REAL weekly rhythm, not from the original assumptions. If they consistently do their hard or long work on different weekdays than the plan assumed, reschedule the weekdays to match them. If the block was under-executed, lower volume and intensity to a base the runner can actually hold and be honest in "revised_target_time". If it was over-executed, protect against injury rather than piling on more. Rebuild progression logically toward race day.
+Rebuild the remaining ${remainingWeeks} weeks from the runner's REAL current fitness and their REAL weekly rhythm, not from the original assumptions. If they consistently do their hard or long work on different weekdays than the plan assumed, reschedule the weekdays to match them. If the block was under-executed, lower volume and intensity to a base the runner can actually hold. If it was over-executed, protect against injury rather than piling on more. Rebuild progression logically toward race day.
 
 CALENDAR SKELETON (weeks you must fill, in order)
 ${futureWeekSkeleton(planData, fromIndex)}
@@ -413,7 +449,7 @@ ${habitLines(habits)}
 SESSIONS THE RUNNER SHIFTED TO ANOTHER DAY (already re-dated on the calendar for past weeks)
 ${swapLines(swaps)}
 
-Real recent load: ${audit.totals.recent_4w_km}km in the last 4 weeks (avg ${audit.totals.avg_weekly_km}km/week). Estimated fitness VDOT ${vdot ?? "unknown"}${realisticTime ? ` (≈ ${realisticTime} for ${plan.distance})` : ""}.
+Real recent load: ${audit.totals.recent_4w_km}km in the last 4 weeks (avg ${audit.totals.avg_weekly_km}km/week). Estimated fitness VDOT ${vdot ?? "unknown"} (use for training paces only; never comment on finishing times).
 
 YOUR TASK
 The runner cut short or skipped work — treat that as a signal of fatigue, illness, or life load, not laziness. Rebuild the remaining ${remainingWeeks} weeks so the next 3-5 days are gentler, moving sessions onto the weekdays the runner actually trains on, then progression resumes at a realistic level. Do NOT reschedule missed mileage into the coming days. Keep the race date and taper intact.
@@ -438,7 +474,35 @@ ${commonRules}`;
     };
   }
 
-  const raw = await callGemini(system, userPrompt);
+  // ── consistency gate ──────────────────────────────────────────────────────
+  // Recalibration is a function of the runner's real training history, so clicking it
+  // twice with no new runs must NOT produce a different plan (each rebuild otherwise
+  // feeds on the previous rebuild and drifts). We fingerprint the inputs that legitimately
+  // change the outcome — the day, the audit of what was actually run, and the activity
+  // log itself — and short-circuit when an applied adjustment already used that exact input.
+  const fingerprint = await inputFingerprint(plan, todayISO, audit, activities, kind);
+  const { data: sameInput } = await admin
+    .from("plan_auto_adjustments")
+    .select("id,summary_en,summary_zh,triggered_at")
+    .eq("plan_id", plan.id)
+    .eq("status", "applied")
+    .eq("input_fingerprint", fingerprint)
+    .order("triggered_at", { ascending: false })
+    .limit(1);
+  const prior = sameInput?.[0];
+  if (prior && !opts.force_regenerate) {
+    return {
+      status: "no_change",
+      reason: "Your plan is already recalibrated against this training history — nothing new has been recorded since, so the result would be identical.",
+      adjustment_id: prior.id,
+      summary_en: prior.summary_en ?? null,
+      summary_zh: prior.summary_zh ?? null,
+      audit: { totals: audit.totals },
+    };
+  }
+
+  // temperature 0 → same inputs give the same rebuild.
+  const raw = await callGemini(system, userPrompt, "gemini-3-flash-preview", 0);
   const parsed = parseJsonLoose(raw.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim());
   const aiWeeks: any[] = Array.isArray(parsed) ? parsed : Array.isArray(parsed?.weeks) ? parsed.weeks : [];
   if (aiWeeks.length === 0) {
@@ -448,9 +512,12 @@ ${commonRules}`;
   let after = stitchFutureWeeks(basePlan, aiWeeks, fromIndex, todayISO);
   if (kind === "recalibrate") after = reconcilePastDays(after, audit, todayISO);
 
-  // We no longer surface a "suggested finishing time" with adjustments — the plan
-  // keeps the runner's own goal. The estimate is still kept internally in `audit`.
+  // We never surface a finishing time with adjustments — the plan keeps the runner's own
+  // goal, and any target-time talk the model slipped into its summary is stripped out.
   const revised: string | null = null;
+  const summaryEn = stripTargetTimeTalk(parsed?.summary_en ?? null);
+  const summaryZh = stripTargetTimeTalk(parsed?.summary_zh ?? null);
+
 
   const { data: adj, error: adjErr } = await admin
     .from("plan_auto_adjustments")
@@ -465,8 +532,9 @@ ${commonRules}`;
       plan_data_before: planData,
       plan_data_after: after,
       revised_target_time: revised,
-      summary_en: parsed?.summary_en ?? null,
-      summary_zh: parsed?.summary_zh ?? null,
+      summary_en: summaryEn,
+      summary_zh: summaryZh,
+      input_fingerprint: fingerprint,
     })
     .select("id")
     .single();
@@ -486,8 +554,8 @@ ${commonRules}`;
     day_swaps: swaps,
     past_days_rewritten: aligned.rewritten,
     revised_target_time: revised,
-    summary_en: parsed?.summary_en ?? null,
-    summary_zh: parsed?.summary_zh ?? null,
+    summary_en: summaryEn,
+    summary_zh: summaryZh,
     audit: { totals: audit.totals },
   };
 }
@@ -589,6 +657,7 @@ Deno.serve(async (req) => {
       const result = await runAdjust(admin, plan, kind as "auto" | "recalibrate", {
         dryRun: !!body.dry_run,
         force: kind === "auto" ? !!body.force : true,
+        force_regenerate: !!body.force_regenerate,
       });
       return json(result);
     }

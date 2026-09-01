@@ -231,11 +231,6 @@ const AutoAdjustCard = ({ lang, planId, autoAdjustEnabled }: Props) => {
                   <p className="mt-1 text-[11px] text-muted-foreground leading-snug">
                     {(zh ? h.summary_zh : h.summary_en) || h.trigger_reason}
                   </p>
-                  {h.revised_target_time && (
-                    <p className="mt-1 text-[11px] text-primary font-medium">
-                      {zh ? `建議目標時間：${h.revised_target_time}` : `Suggested goal time: ${h.revised_target_time}`}
-                    </p>
-                  )}
                   {h.status === "reverted" && (
                     <p className="mt-1 text-[10px] uppercase tracking-wide text-muted-foreground">
                       {zh ? "已還原" : "Reverted"}

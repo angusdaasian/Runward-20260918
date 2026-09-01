@@ -150,7 +150,9 @@ function stitchFutureWeeks(before: WeekPlan[], aiWeeks: any[], fromIndex: number
         sessions: isRestType ? undefined : (incoming.sessions ?? orig.sessions),
         elevation_m: incoming.elevation_m ?? orig.elevation_m ?? null,
         eph: incoming.eph ?? orig.eph ?? null,
-        color: incoming.color || COLOR_BY_TYPE[type] || orig.color || "#4CAF50",
+        // Color always follows the (possibly new) type so a rewritten session
+        // never keeps the old workout's color (e.g. Easy green on an Interval).
+        color: COLOR_BY_TYPE[type] || incoming.color || orig.color || "#4CAF50",
         // keep date + day label from the original calendar
         date: orig.date,
         day: orig.day ?? DAY_LABELS[d],
@@ -446,9 +448,9 @@ ${commonRules}`;
   let after = stitchFutureWeeks(basePlan, aiWeeks, fromIndex, todayISO);
   if (kind === "recalibrate") after = reconcilePastDays(after, audit, todayISO);
 
-  const revised = typeof parsed?.revised_target_time === "string" && parseDurationStr(parsed.revised_target_time)
-    ? parsed.revised_target_time
-    : null;
+  // We no longer surface a "suggested finishing time" with adjustments — the plan
+  // keeps the runner's own goal. The estimate is still kept internally in `audit`.
+  const revised: string | null = null;
 
   const { data: adj, error: adjErr } = await admin
     .from("plan_auto_adjustments")

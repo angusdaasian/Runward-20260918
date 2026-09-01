@@ -115,7 +115,7 @@ async function inputFingerprint(
   kind: string,
 ): Promise<string> {
   const acts = activities
-    .map((a: any) => `${a.date ?? a.start_date ?? ""}|${Math.round((a.distance_km ?? 0) * 100)}|${Math.round(a.moving_time_sec ?? a.duration_sec ?? 0)}`)
+    .map((a) => `${a.date}|${Math.round(a.distance_m)}|${Math.round(a.seconds)}|${a.avg_hr ?? ""}`)
     .sort()
     .join(";");
   const payload = JSON.stringify({
@@ -657,6 +657,7 @@ Deno.serve(async (req) => {
       const result = await runAdjust(admin, plan, kind as "auto" | "recalibrate", {
         dryRun: !!body.dry_run,
         force: kind === "auto" ? !!body.force : true,
+        force_regenerate: !!body.force_regenerate,
       });
       return json(result);
     }

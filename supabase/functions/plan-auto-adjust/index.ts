@@ -347,9 +347,10 @@ HARD RULES:
 Also return, alongside "weeks":
 - "summary_en": 2-3 sentences telling the runner plainly what changed and why.
 - "summary_zh": the same explanation in Traditional Chinese.
-- "revised_target_time": an honest goal time as "H:MM:SS" (or "MM:SS" for short races) based on real fitness, or null to keep the original goal.
+- NEVER mention, estimate, revise or comment on a finishing time, goal time, target time or predicted race time anywhere in the summaries. Talk only about the training changes (volume, session types, weekdays, recovery).
 
-Return a single JSON object: { "weeks": [...], "summary_en": "...", "summary_zh": "...", "revised_target_time": "..." | null }`;
+Return a single JSON object: { "weeks": [...], "summary_en": "...", "summary_zh": "..." }`;
+
 
   const sampleText = JSON.stringify(
     (planData[fromIndex]?.days as any[])?.slice(0, 3)?.map((d) => ({ type: d.type, title: d.title, description: d.description })) ?? [],

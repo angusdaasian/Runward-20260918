@@ -157,7 +157,13 @@ const COLOR_BY_TYPE: Record<string, string> = {
  * original calendar dates, week numbers and day labels intact. Race days already on the
  * calendar are preserved so a rewrite can never delete a race.
  */
-function stitchFutureWeeks(before: WeekPlan[], aiWeeks: any[], fromIndex: number, protectFromDate?: string): WeekPlan[] {
+function stitchFutureWeeks(
+  before: WeekPlan[],
+  aiWeeks: any[],
+  fromIndex: number,
+  protectFromDate?: string,
+  completedDates = new Set<string>(),
+): WeekPlan[] {
   const out: WeekPlan[] = JSON.parse(JSON.stringify(before));
   for (let i = 0; i < aiWeeks.length; i++) {
     const targetIdx = fromIndex + i;
@@ -170,7 +176,7 @@ function stitchFutureWeeks(before: WeekPlan[], aiWeeks: any[], fromIndex: number
       const incoming = srcDays[d];
       if (!incoming) continue;
       // Never rewrite a day that already happened, or a calendar race.
-      if (protectFromDate && orig.date && orig.date < protectFromDate) continue;
+      if (protectFromDate && orig.date && (orig.date < protectFromDate || completedDates.has(orig.date))) continue;
       if (orig.type === "Race" || orig.type === "Trail Race") continue;
       const type = String(incoming.type || orig.type || "Easy Run");
       const isRestType = /rest|off|休息/i.test(type);
@@ -514,7 +520,10 @@ ${commonRules}`;
     return { status: "failed", reason: "The coach model did not return a usable plan." };
   }
 
-  let after = stitchFutureWeeks(basePlan, aiWeeks, fromIndex, todayISO);
+  // A run already recorded today is completed work, not a slot the regenerated plan may
+  // overwrite. Protect all activity dates as well as earlier calendar days.
+  const completedDates = new Set(activities.map((activity) => activity.date));
+  let after = stitchFutureWeeks(basePlan, aiWeeks, fromIndex, todayISO, completedDates);
   after = enforceAdjustedSchedule(basePlan, after, todayISO, planIsZh ? "zh" : "en");
   if (kind === "recalibrate") after = reconcilePastDays(after, audit, todayISO);
 

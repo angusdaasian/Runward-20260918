@@ -38,4 +38,11 @@ describe("enforceAdjustedSchedule", () => {
     const result = enforceAdjustedSchedule(before as never, adjusted as never, "2026-09-01");
     expect(result[0].days?.map((item) => item.type)).toEqual(["Interval", "Recovery"]);
   });
+
+  it("does not alter two completed past key sessions", () => {
+    const before = [{ week: 1, days: [day("2026-08-30", "Interval"), day("2026-08-31", "Tempo Run")] }];
+    const adjusted = structuredClone(before);
+    const result = enforceAdjustedSchedule(before as never, adjusted as never, "2026-09-01");
+    expect(result[0].days?.map((item) => item.type)).toEqual(["Interval", "Tempo Run"]);
+  });
 });

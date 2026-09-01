@@ -87,13 +87,21 @@ const MonthlyStatsCard = ({ lang, year, month, activities, classifierCtx }: Prop
   const onShare = async () => {
     setSharing(true);
     try {
+      const kmByDay = new Map<number, number>();
+      for (const a of monthActs) {
+        const d = new Date(a.start_date).getDate();
+        kmByDay.set(d, (kmByDay.get(d) ?? 0) + (a.distance || 0) / 1000);
+      }
+      const dailyRuns = Array.from(kmByDay.entries()).map(([day, km]) => ({ day, km }));
       await shareMonthlyStats({
         monthLabel,
+        year,
+        month,
         totalKm,
         runCount,
         totalSeconds,
         avgWeeklyKm,
-        breakdown,
+        dailyRuns,
         lang,
       });
     } finally {

@@ -439,7 +439,35 @@ ${commonRules}`;
     };
   }
 
-  const raw = await callGemini(system, userPrompt);
+  // ── consistency gate ──────────────────────────────────────────────────────
+  // Recalibration is a function of the runner's real training history, so clicking it
+  // twice with no new runs must NOT produce a different plan (each rebuild otherwise
+  // feeds on the previous rebuild and drifts). We fingerprint the inputs that legitimately
+  // change the outcome — the day, the audit of what was actually run, and the activity
+  // log itself — and short-circuit when an applied adjustment already used that exact input.
+  const fingerprint = await inputFingerprint(plan, todayISO, audit, activities, kind);
+  const { data: sameInput } = await admin
+    .from("plan_auto_adjustments")
+    .select("id,summary_en,summary_zh,triggered_at")
+    .eq("plan_id", plan.id)
+    .eq("status", "applied")
+    .eq("input_fingerprint", fingerprint)
+    .order("triggered_at", { ascending: false })
+    .limit(1);
+  const prior = sameInput?.[0];
+  if (prior && !opts.force_regenerate) {
+    return {
+      status: "no_change",
+      reason: "Your plan is already recalibrated against this training history — nothing new has been recorded since, so the result would be identical.",
+      adjustment_id: prior.id,
+      summary_en: prior.summary_en ?? null,
+      summary_zh: prior.summary_zh ?? null,
+      audit: { totals: audit.totals },
+    };
+  }
+
+  // temperature 0 → same inputs give the same rebuild.
+  const raw = await callGemini(system, userPrompt, "gemini-3-flash-preview", 0);
   const parsed = parseJsonLoose(raw.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim());
   const aiWeeks: any[] = Array.isArray(parsed) ? parsed : Array.isArray(parsed?.weeks) ? parsed.weeks : [];
   if (aiWeeks.length === 0) {
@@ -449,9 +477,12 @@ ${commonRules}`;
   let after = stitchFutureWeeks(basePlan, aiWeeks, fromIndex, todayISO);
   if (kind === "recalibrate") after = reconcilePastDays(after, audit, todayISO);
 
-  // We no longer surface a "suggested finishing time" with adjustments — the plan
-  // keeps the runner's own goal. The estimate is still kept internally in `audit`.
+  // We never surface a finishing time with adjustments — the plan keeps the runner's own
+  // goal, and any target-time talk the model slipped into its summary is stripped out.
   const revised: string | null = null;
+  const summaryEn = stripTargetTimeTalk(parsed?.summary_en ?? null);
+  const summaryZh = stripTargetTimeTalk(parsed?.summary_zh ?? null);
+
 
   const { data: adj, error: adjErr } = await admin
     .from("plan_auto_adjustments")

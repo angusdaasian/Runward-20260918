@@ -461,6 +461,8 @@ ${weekSummaryLines(audit, curIdx)}
 Overall so far: planned ${audit.totals.planned_km}km, ran ${audit.totals.actual_km}km (${audit.totals.adherence_pct}% adherence), ${audit.totals.missed_key_sessions} key sessions missed or downgraded, longest run ${audit.totals.longest_run_km}km.
 Estimated current fitness (VDOT) from best recent effort: ${vdot ?? "unknown"}. Use it to set training paces only — do not comment on race finishing times.
 
+LOAD & RECOVERY (drives every volume decision)
+${loadContextLines(load)}
 
 RUNNER'S REAL WEEKDAY HABITS (use these to schedule the weekdays)
 ${habitLines(habits)}
@@ -472,7 +474,13 @@ DEVIATIONS IN THE CURRENT WEEK
 ${deviationLines(curWeek?.days ?? []) || "- none"}
 
 YOUR TASK
-Rebuild the remaining ${remainingWeeks} weeks from the runner's REAL current fitness and their REAL weekly rhythm, not from the original assumptions. If they consistently do their hard or long work on different weekdays than the plan assumed, reschedule the weekdays to match them. If the block was under-executed, lower volume and intensity to a base the runner can actually hold. If it was over-executed, protect against injury rather than piling on more. Rebuild progression logically toward race day.
+Rebuild the remaining ${remainingWeeks} weeks from the runner's REAL current load, recovery status and weekly rhythm — and from the plan's own intent (its planned peak week and the target race). If they consistently do their hard or long work on different weekdays than the plan assumed, reschedule the weekdays to match them.
+Volume logic, in priority order:
+1. If actual volume is at or above what the plan asked and recovery is normal/elevated, KEEP building toward the original planned peak (${load.planned_peak_km}km) — do not reduce mileage. This runner is following their own, higher, plan and it is working.
+2. If load is high AND recovery is suppressed (overreaching), cut volume and intensity and insert recovery.
+3. Only if the block was genuinely under-executed (much less running than planned) should you lower volume — and only to the level the runner is actually holding now, never below it.
+4. With ${load.weeks_to_race} week(s) to race day, place the peak load where it belongs and taper only in the final 1-2 weeks. Do not taper early.
+
 
 CALENDAR SKELETON (weeks you must fill, in order)
 ${futureWeekSkeleton(planData, fromIndex)}

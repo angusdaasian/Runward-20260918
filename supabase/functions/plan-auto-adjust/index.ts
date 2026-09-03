@@ -581,7 +581,12 @@ ${commonRules}`;
   const completedDates = new Set(activities.map((activity) => activity.date));
   let after = stitchFutureWeeks(basePlan, aiWeeks, fromIndex, todayISO, completedDates);
   after = enforceAdjustedSchedule(basePlan, after, todayISO, planIsZh ? "zh" : "en");
+  // Deterministic guardrail: the rebuild may not drop below the volume the runner is holding
+  // (nor blow past the ramp ceiling), regardless of what the model returned.
+  const bounded = enforceVolumeBounds(after, fromIndex, load, todayISO);
+  after = bounded.plan;
   if (kind === "recalibrate") after = reconcilePastDays(after, audit, todayISO);
+
 
   // We never surface a finishing time with adjustments — the plan keeps the runner's own
   // goal, and any target-time talk the model slipped into its summary is stripped out.

@@ -386,6 +386,27 @@ async function runAdjust(
     if (pred) realisticTime = fmtDuration(pred);
   }
 
+  // ── load + recovery context ──
+  // Volume decisions must come from real load (weekly km, TSS, acute:chronic) and recovery
+  // (HRV / resting HR) AND from the plan's own intent (planned peak week), not from the
+  // block average — otherwise a peak week gets rebuilt at base-phase mileage.
+  const maxHrSeen = activities.reduce((m, a) => Math.max(m, a.max_hr ?? 0), 0) || null;
+  const thresholdPaceSec = vdot ? (() => {
+    const t5k = predictTimeFromVdot(vdot, 5000);
+    return t5k ? (t5k / 5) * 1.06 : null; // ~threshold pace ≈ 6% slower than 5k pace
+  })() : null;
+  const hrvCtx = await fetchHrvContext(admin, plan.user_id, todayISO);
+  const load: LoadContext = buildLoadContext({
+    planData,
+    audit,
+    activities,
+    todayISO,
+    fromIndex,
+    hrv: hrvCtx,
+    thresholdPaceSec,
+    maxHr: maxHrSeen,
+  });
+
   const isZh = true; // both summaries are generated; UI picks by locale
 
   const system =

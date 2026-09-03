@@ -234,3 +234,59 @@ VOLUME GUARDRAILS (hard numbers you must respect)
 - Weekly volume ceiling for the first rebuilt week: ${ctx.volume_ceiling_km}km
 - Weekly volume floor (do NOT prescribe less unless tapering or recovery is suppressed): ${ctx.volume_floor_km}km`;
 }
+
+/**
+ * Deterministic safety net after the model returns: keep each rebuilt future week's volume
+ * inside [floor, ceiling-with-ramp]. Gemini occasionally ignores the numeric guardrails and
+ * halves a peak block; scaling the day distances proportionally fixes that without touching
+ * session structure, past days, races or rest days.
+ */
+export function enforceVolumeBounds(
+  plan: WeekPlan[],
+  fromIndex: number,
+  ctx: LoadContext,
+  todayISO: string,
+): { plan: WeekPlan[]; adjusted: number[] } {
+  const out: WeekPlan[] = JSON.parse(JSON.stringify(plan));
+  const adjusted: number[] = [];
+  const totalWeeks = out.length;
+  const suppressed = ctx.hrv.status === "suppressed" || ctx.overreaching;
+
+  for (let i = fromIndex; i < totalWeeks; i++) {
+    const w = out[i];
+    const days = (Array.isArray(w?.days) ? (w.days as any[]) : []);
+    if (!days.length) continue;
+    const weeksFromRace = totalWeeks - 1 - i; // 0 = race week
+    const isTaperWeek = weeksFromRace <= 1;
+    const step = i - fromIndex;
+
+    const editable = days.filter(
+      (d) => d?.date && d.date >= todayISO && Number(d.distance_km) > 0 && d.type !== "Race" && d.type !== "Trail Race",
+    );
+    if (!editable.length) continue;
+    const weekTotal = days.reduce((s, d) => s + (Number(d?.distance_km) || 0), 0);
+    if (weekTotal <= 0) continue;
+
+    const ramped = ctx.volume_ceiling_km * Math.pow(1.1, step);
+    const ceiling = Math.min(ramped, Math.max(ctx.planned_peak_km, ctx.volume_ceiling_km));
+    const floor = isTaperWeek || suppressed ? 0 : ctx.volume_floor_km;
+
+    let scale = 1;
+    if (floor > 0 && weekTotal < floor * 0.97) scale = floor / weekTotal;
+    else if (ceiling > 0 && weekTotal > ceiling * 1.03) scale = ceiling / weekTotal;
+    if (scale === 1) continue;
+
+    // Only the editable (future, non-race) distance can absorb the correction.
+    const editableTotal = editable.reduce((s, d) => s + Number(d.distance_km), 0);
+    const targetEditable = Math.max(0, weekTotal * scale - (weekTotal - editableTotal));
+    if (editableTotal <= 0 || targetEditable <= 0) continue;
+    const k = targetEditable / editableTotal;
+    if (Math.abs(k - 1) < 0.03) continue;
+    for (const d of editable) {
+      d.distance_km = Math.round(Number(d.distance_km) * k * 2) / 2;
+      d.volume_scaled = Math.round(k * 100) / 100;
+    }
+    adjusted.push(Number(w.week) || i + 1);
+  }
+  return { plan: out, adjusted };
+}

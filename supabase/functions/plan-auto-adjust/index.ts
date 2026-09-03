@@ -41,6 +41,14 @@ import {
   weekdayHabits,
   type DaySwap,
 } from "../_shared/planDaySwaps.ts";
+import {
+  buildLoadContext,
+  fetchHrvContext,
+  loadContextLines,
+  enforceVolumeBounds,
+  type LoadContext,
+} from "../_shared/planLoadContext.ts";
+
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -114,6 +122,7 @@ async function inputFingerprint(
   audit: PlanAudit,
   activities: NormActivity[],
   kind: string,
+  load?: LoadContext,
 ): Promise<string> {
   const acts = activities
     .map((a) => `${a.date}|${Math.round(a.distance_m)}|${Math.round(a.seconds)}|${a.avg_hr ?? ""}`)
@@ -127,11 +136,22 @@ async function inputFingerprint(
     target: plan.target_time ?? null,
     totals: audit.totals,
     weeks: audit.weeks.map((w) => [w.week, w.planned_km, w.actual_km, w.completion_pct, w.missed_key_sessions]),
+    load: load
+      ? [
+          load.volume_ceiling_km,
+          load.volume_floor_km,
+          load.tss.acute_7d,
+          load.tss.chronic_28d_avg,
+          load.hrv.status,
+          load.hrv.hrv_delta_pct,
+        ]
+      : null,
     acts,
   });
   const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(payload));
   return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
+
 
 // ---------- plan stitching ----------
 
@@ -367,6 +387,27 @@ async function runAdjust(
     if (pred) realisticTime = fmtDuration(pred);
   }
 
+  // ── load + recovery context ──
+  // Volume decisions must come from real load (weekly km, TSS, acute:chronic) and recovery
+  // (HRV / resting HR) AND from the plan's own intent (planned peak week), not from the
+  // block average — otherwise a peak week gets rebuilt at base-phase mileage.
+  const maxHrSeen = activities.reduce((m, a) => Math.max(m, a.max_hr ?? 0), 0) || null;
+  const thresholdPaceSec = vdot ? (() => {
+    const t5k = predictTimeFromVdot(vdot, 5000);
+    return t5k ? (t5k / 5) * 1.06 : null; // ~threshold pace ≈ 6% slower than 5k pace
+  })() : null;
+  const hrvCtx = await fetchHrvContext(admin, plan.user_id, todayISO);
+  const load: LoadContext = buildLoadContext({
+    planData,
+    audit,
+    activities,
+    todayISO,
+    fromIndex,
+    hrv: hrvCtx,
+    thresholdPaceSec,
+    maxHr: maxHrSeen,
+  });
+
   const isZh = true; // both summaries are generated; UI picks by locale
 
   const system =
@@ -381,8 +422,11 @@ HARD RULES:
 - Allowed types: "Easy Run", "Tempo Run", "Interval", "Long Run", "Recovery", "Rest", "Cross Training", "Race Pace", "Progression Run", "Trail Run", "Trail Race".
 - Colors: #4CAF50 Easy, #FF9800 Tempo, #F44336 Interval, #2196F3 Long Run, #9C27B0 Recovery, #607D8B Rest, #00BCD4 Cross Training, #E91E63 Race Pace, #FF5722 Progression, #84CC16 Trail Run.
 - The race date is FIXED. Days already marked as a LOCKED RACE in the skeleton must stay a race — do not schedule hard work the 2 days before them.
-- Never increase weekly volume by more than 10% week over week from the runner's REAL recent weekly volume (${audit.totals.recent_4w_km}km over the last 4 weeks, average ${audit.totals.avg_weekly_km}km/week). Do not "catch up" missed mileage.
+- VOLUME: obey the numeric guardrails in the LOAD & RECOVERY block. The first rebuilt week must be between ${load.volume_floor_km}km and ${load.volume_ceiling_km}km, then progress by at most 10% per week toward the plan's remaining peak (${load.planned_remaining_peak_km}km) before the taper. Do NOT "catch up" missed mileage, and do NOT cut a runner who is already holding high volume back to their block average.
+- Do NOT reduce weekly volume below what the runner has actually been running unless (a) it is a taper week, (b) recovery status is "suppressed", or (c) the acute:chronic ratio is above 1.4. If none of those apply, keep building toward the original planned peak.
+- If the runner has been running MORE than the plan asked with normal or elevated recovery, treat that as proven capacity: keep their volume and improve the structure/intensity distribution instead of lowering mileage.
 - Keep the same number of running days per week the runner has actually been managing.
+
 - YOU MAY AND SHOULD MOVE SESSIONS TO DIFFERENT WEEKDAYS. Use the runner's real weekday habits below: put key sessions (Tempo/Interval/Long Run) on the weekdays they consistently train hard or long, and put Rest on the weekdays they consistently do not run. Do not keep a session on a weekday the runner repeatedly skips.
 - Keep at least one easy/rest day between two hard sessions after any reshuffle.
 - Count the key sessions ALREADY COMPLETED earlier in the current week (see the day-by-day list). Do not schedule a second Tempo/Interval/Long Run in the remainder of that week if the same kind of session was already done — make the remaining days Easy Run, Recovery or Rest instead.
@@ -418,6 +462,8 @@ ${weekSummaryLines(audit, curIdx)}
 Overall so far: planned ${audit.totals.planned_km}km, ran ${audit.totals.actual_km}km (${audit.totals.adherence_pct}% adherence), ${audit.totals.missed_key_sessions} key sessions missed or downgraded, longest run ${audit.totals.longest_run_km}km.
 Estimated current fitness (VDOT) from best recent effort: ${vdot ?? "unknown"}. Use it to set training paces only — do not comment on race finishing times.
 
+LOAD & RECOVERY (drives every volume decision)
+${loadContextLines(load)}
 
 RUNNER'S REAL WEEKDAY HABITS (use these to schedule the weekdays)
 ${habitLines(habits)}
@@ -429,7 +475,13 @@ DEVIATIONS IN THE CURRENT WEEK
 ${deviationLines(curWeek?.days ?? []) || "- none"}
 
 YOUR TASK
-Rebuild the remaining ${remainingWeeks} weeks from the runner's REAL current fitness and their REAL weekly rhythm, not from the original assumptions. If they consistently do their hard or long work on different weekdays than the plan assumed, reschedule the weekdays to match them. If the block was under-executed, lower volume and intensity to a base the runner can actually hold. If it was over-executed, protect against injury rather than piling on more. Rebuild progression logically toward race day.
+Rebuild the remaining ${remainingWeeks} weeks from the runner's REAL current load, recovery status and weekly rhythm — and from the plan's own intent (its planned peak week and the target race). If they consistently do their hard or long work on different weekdays than the plan assumed, reschedule the weekdays to match them.
+Volume logic, in priority order:
+1. If actual volume is at or above what the plan asked and recovery is normal/elevated, KEEP building toward the original planned peak (${load.planned_peak_km}km) — do not reduce mileage. This runner is following their own, higher, plan and it is working.
+2. If load is high AND recovery is suppressed (overreaching), cut volume and intensity and insert recovery.
+3. Only if the block was genuinely under-executed (much less running than planned) should you lower volume — and only to the level the runner is actually holding now, never below it.
+4. With ${load.weeks_to_race} week(s) to race day, place the peak load where it belongs and taper only in the final 1-2 weeks. Do not taper early.
+
 
 CALENDAR SKELETON (weeks you must fill, in order)
 ${futureWeekSkeleton(planData, fromIndex)}
@@ -460,10 +512,14 @@ ${habitLines(habits)}
 SESSIONS THE RUNNER SHIFTED TO ANOTHER DAY (already re-dated on the calendar for past weeks)
 ${swapLines(swaps)}
 
-Real recent load: ${audit.totals.recent_4w_km}km in the last 4 weeks (avg ${audit.totals.avg_weekly_km}km/week). Estimated fitness VDOT ${vdot ?? "unknown"} (use for training paces only; never comment on finishing times).
+LOAD & RECOVERY (drives every volume decision)
+${loadContextLines(load)}
+
+Estimated fitness VDOT ${vdot ?? "unknown"} (use for training paces only; never comment on finishing times).
 
 YOUR TASK
-The runner cut short or skipped work — treat that as a signal of fatigue, illness, or life load, not laziness. Rebuild the remaining ${remainingWeeks} weeks so the next 3-5 days are gentler, moving sessions onto the weekdays the runner actually trains on, then progression resumes at a realistic level. Do NOT reschedule missed mileage into the coming days. Keep the race date and taper intact.
+The runner cut short or skipped work — treat that as a signal of fatigue, illness, or life load, not laziness. Rebuild the remaining ${remainingWeeks} weeks so the next 3-5 days are gentler, moving sessions onto the weekdays the runner actually trains on, then progression resumes and continues toward the plan's remaining peak (${load.planned_remaining_peak_km}km) unless recovery is suppressed. Do NOT reschedule missed mileage into the coming days, and do NOT permanently drop weekly volume below what the runner has been holding (${load.volume_floor_km}km) just because of one bad week. Keep the race date and taper intact.
+
 
 CALENDAR SKELETON (weeks you must fill, in order)
 ${futureWeekSkeleton(planData, fromIndex)}
@@ -481,7 +537,7 @@ ${commonRules}`;
       day_swaps: swaps,
       past_days_rewritten: aligned.rewritten,
       revised_target_time: realisticTime,
-      audit: { totals: audit.totals, current_week: curWeek },
+      audit: { totals: audit.totals, current_week: curWeek, load },
     };
   }
 
@@ -489,9 +545,10 @@ ${commonRules}`;
   // Recalibration is a function of the runner's real training history, so clicking it
   // twice with no new runs must NOT produce a different plan (each rebuild otherwise
   // feeds on the previous rebuild and drifts). We fingerprint the inputs that legitimately
-  // change the outcome — the day, the audit of what was actually run, and the activity
-  // log itself — and short-circuit when an applied adjustment already used that exact input.
-  const fingerprint = await inputFingerprint(plan, todayISO, audit, activities, kind);
+  // change the outcome — the day, the audit of what was actually run, the load/recovery
+  // context and the activity log itself.
+  const fingerprint = await inputFingerprint(plan, todayISO, audit, activities, kind, load);
+
   const { data: sameInput } = await admin
     .from("plan_auto_adjustments")
     .select("id,summary_en,summary_zh,triggered_at")
@@ -525,7 +582,12 @@ ${commonRules}`;
   const completedDates = new Set(activities.map((activity) => activity.date));
   let after = stitchFutureWeeks(basePlan, aiWeeks, fromIndex, todayISO, completedDates);
   after = enforceAdjustedSchedule(basePlan, after, todayISO, planIsZh ? "zh" : "en");
+  // Deterministic guardrail: the rebuild may not drop below the volume the runner is holding
+  // (nor blow past the ramp ceiling), regardless of what the model returned.
+  const bounded = enforceVolumeBounds(after, fromIndex, load, todayISO);
+  after = bounded.plan;
   if (kind === "recalibrate") after = reconcilePastDays(after, audit, todayISO);
+
 
   // We never surface a finishing time with adjustments — the plan keeps the runner's own
   // goal, and any target-time talk the model slipped into its summary is stripped out.
@@ -543,7 +605,7 @@ ${commonRules}`;
       status: "applied",
       trigger_reason: `${reasonCode}: ${reason}`,
       deviation: { reason_code: reasonCode, days: curWeek?.days ?? [], day_swaps: swaps, past_days_rewritten: aligned.rewritten },
-      audit: { totals: audit.totals, weeks: audit.weeks.map(({ days, ...w }) => w), vdot, fitness_based_time: realisticTime, weekday_habits: habits },
+      audit: { totals: audit.totals, weeks: audit.weeks.map(({ days, ...w }) => w), vdot, fitness_based_time: realisticTime, weekday_habits: habits, load, volume_bounded_weeks: bounded.adjusted },
       plan_data_before: planData,
       plan_data_after: after,
       revised_target_time: revised,

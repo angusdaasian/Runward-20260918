@@ -612,8 +612,10 @@ const PlannedVsActual = ({
   const L = (en: string, z: string) => (zh ? z : en);
   const d = day as any;
   // After a recalibration the past day carries the real work, and the original
-  // assignment is kept in planned_* — compare against that when it exists.
-  const hasSnapshot = d?.planned_type !== undefined;
+  // assignment is kept in planned_* — compare against that only while the day is
+  // still the one that was aligned to the actual run. Once the plan itself gets
+  // rewritten (e.g. 15km → 8km), the snapshot is stale and the live plan wins.
+  const hasSnapshot = d?.planned_type !== undefined && d?.aligned_to_actual === true;
   const plannedType = hasSnapshot ? (d.planned_type ?? null) : (day.type ?? null);
   const plannedPace = hasSnapshot ? (d.planned_pace ?? null) : (day.pace ?? null);
   const plannedKm = Number(hasSnapshot ? d.planned_km : day.distance_km) || 0;

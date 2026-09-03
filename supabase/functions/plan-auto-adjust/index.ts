@@ -200,8 +200,16 @@ function stitchFutureWeeks(
       if (orig.type === "Race" || orig.type === "Trail Race") continue;
       const type = String(incoming.type || orig.type || "Easy Run");
       const isRestType = /rest|off|休息/i.test(type);
+      // A rewritten day is a NEW assignment: any planned_* snapshot from an earlier
+      // alignment describes a plan that no longer exists, so the planned-vs-actual
+      // comparison must not keep quoting it (e.g. "planned 15 km" after a 8 km rewrite).
+      const {
+        planned_type: _pt, planned_km: _pk, planned_pace: _pp,
+        planned_title: _ptl, planned_description: _pd, aligned_to_actual: _ata,
+        ...cleanOrig
+      } = orig as Record<string, unknown>;
       target.days[d] = {
-        ...orig,
+        ...cleanOrig,
         type,
         title: incoming.title ?? orig.title,
         description: incoming.description ?? orig.description,

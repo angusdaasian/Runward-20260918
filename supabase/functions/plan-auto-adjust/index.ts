@@ -511,10 +511,14 @@ ${habitLines(habits)}
 SESSIONS THE RUNNER SHIFTED TO ANOTHER DAY (already re-dated on the calendar for past weeks)
 ${swapLines(swaps)}
 
-Real recent load: ${audit.totals.recent_4w_km}km in the last 4 weeks (avg ${audit.totals.avg_weekly_km}km/week). Estimated fitness VDOT ${vdot ?? "unknown"} (use for training paces only; never comment on finishing times).
+LOAD & RECOVERY (drives every volume decision)
+${loadContextLines(load)}
+
+Estimated fitness VDOT ${vdot ?? "unknown"} (use for training paces only; never comment on finishing times).
 
 YOUR TASK
-The runner cut short or skipped work — treat that as a signal of fatigue, illness, or life load, not laziness. Rebuild the remaining ${remainingWeeks} weeks so the next 3-5 days are gentler, moving sessions onto the weekdays the runner actually trains on, then progression resumes at a realistic level. Do NOT reschedule missed mileage into the coming days. Keep the race date and taper intact.
+The runner cut short or skipped work — treat that as a signal of fatigue, illness, or life load, not laziness. Rebuild the remaining ${remainingWeeks} weeks so the next 3-5 days are gentler, moving sessions onto the weekdays the runner actually trains on, then progression resumes and continues toward the plan's remaining peak (${load.planned_remaining_peak_km}km) unless recovery is suppressed. Do NOT reschedule missed mileage into the coming days, and do NOT permanently drop weekly volume below what the runner has been holding (${load.volume_floor_km}km) just because of one bad week. Keep the race date and taper intact.
+
 
 CALENDAR SKELETON (weeks you must fill, in order)
 ${futureWeekSkeleton(planData, fromIndex)}

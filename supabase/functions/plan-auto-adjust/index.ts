@@ -536,7 +536,7 @@ ${commonRules}`;
       day_swaps: swaps,
       past_days_rewritten: aligned.rewritten,
       revised_target_time: realisticTime,
-      audit: { totals: audit.totals, current_week: curWeek },
+      audit: { totals: audit.totals, current_week: curWeek, load },
     };
   }
 
@@ -544,9 +544,10 @@ ${commonRules}`;
   // Recalibration is a function of the runner's real training history, so clicking it
   // twice with no new runs must NOT produce a different plan (each rebuild otherwise
   // feeds on the previous rebuild and drifts). We fingerprint the inputs that legitimately
-  // change the outcome — the day, the audit of what was actually run, and the activity
-  // log itself — and short-circuit when an applied adjustment already used that exact input.
-  const fingerprint = await inputFingerprint(plan, todayISO, audit, activities, kind);
+  // change the outcome — the day, the audit of what was actually run, the load/recovery
+  // context and the activity log itself.
+  const fingerprint = await inputFingerprint(plan, todayISO, audit, activities, kind, load);
+
   const { data: sameInput } = await admin
     .from("plan_auto_adjustments")
     .select("id,summary_en,summary_zh,triggered_at")

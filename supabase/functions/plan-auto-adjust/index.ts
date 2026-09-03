@@ -421,8 +421,11 @@ HARD RULES:
 - Allowed types: "Easy Run", "Tempo Run", "Interval", "Long Run", "Recovery", "Rest", "Cross Training", "Race Pace", "Progression Run", "Trail Run", "Trail Race".
 - Colors: #4CAF50 Easy, #FF9800 Tempo, #F44336 Interval, #2196F3 Long Run, #9C27B0 Recovery, #607D8B Rest, #00BCD4 Cross Training, #E91E63 Race Pace, #FF5722 Progression, #84CC16 Trail Run.
 - The race date is FIXED. Days already marked as a LOCKED RACE in the skeleton must stay a race — do not schedule hard work the 2 days before them.
-- Never increase weekly volume by more than 10% week over week from the runner's REAL recent weekly volume (${audit.totals.recent_4w_km}km over the last 4 weeks, average ${audit.totals.avg_weekly_km}km/week). Do not "catch up" missed mileage.
+- VOLUME: obey the numeric guardrails in the LOAD & RECOVERY block. The first rebuilt week must be between ${load.volume_floor_km}km and ${load.volume_ceiling_km}km, then progress by at most 10% per week toward the plan's remaining peak (${load.planned_remaining_peak_km}km) before the taper. Do NOT "catch up" missed mileage, and do NOT cut a runner who is already holding high volume back to their block average.
+- Do NOT reduce weekly volume below what the runner has actually been running unless (a) it is a taper week, (b) recovery status is "suppressed", or (c) the acute:chronic ratio is above 1.4. If none of those apply, keep building toward the original planned peak.
+- If the runner has been running MORE than the plan asked with normal or elevated recovery, treat that as proven capacity: keep their volume and improve the structure/intensity distribution instead of lowering mileage.
 - Keep the same number of running days per week the runner has actually been managing.
+
 - YOU MAY AND SHOULD MOVE SESSIONS TO DIFFERENT WEEKDAYS. Use the runner's real weekday habits below: put key sessions (Tempo/Interval/Long Run) on the weekdays they consistently train hard or long, and put Rest on the weekdays they consistently do not run. Do not keep a session on a weekday the runner repeatedly skips.
 - Keep at least one easy/rest day between two hard sessions after any reshuffle.
 - Count the key sessions ALREADY COMPLETED earlier in the current week (see the day-by-day list). Do not schedule a second Tempo/Interval/Long Run in the remainder of that week if the same kind of session was already done — make the remaining days Easy Run, Recovery or Rest instead.

@@ -114,6 +114,7 @@ async function inputFingerprint(
   audit: PlanAudit,
   activities: NormActivity[],
   kind: string,
+  load?: LoadContext,
 ): Promise<string> {
   const acts = activities
     .map((a) => `${a.date}|${Math.round(a.distance_m)}|${Math.round(a.seconds)}|${a.avg_hr ?? ""}`)
@@ -127,11 +128,22 @@ async function inputFingerprint(
     target: plan.target_time ?? null,
     totals: audit.totals,
     weeks: audit.weeks.map((w) => [w.week, w.planned_km, w.actual_km, w.completion_pct, w.missed_key_sessions]),
+    load: load
+      ? [
+          load.volume_ceiling_km,
+          load.volume_floor_km,
+          load.tss.acute_7d,
+          load.tss.chronic_28d_avg,
+          load.hrv.status,
+          load.hrv.hrv_delta_pct,
+        ]
+      : null,
     acts,
   });
   const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(payload));
   return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
+
 
 // ---------- plan stitching ----------
 

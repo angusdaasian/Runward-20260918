@@ -41,6 +41,13 @@ import {
   weekdayHabits,
   type DaySwap,
 } from "../_shared/planDaySwaps.ts";
+import {
+  buildLoadContext,
+  fetchHrvContext,
+  loadContextLines,
+  type LoadContext,
+} from "../_shared/planLoadContext.ts";
+
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",

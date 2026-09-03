@@ -45,6 +45,7 @@ import {
   buildLoadContext,
   fetchHrvContext,
   loadContextLines,
+  enforceVolumeBounds,
   type LoadContext,
 } from "../_shared/planLoadContext.ts";
 
@@ -604,7 +605,7 @@ ${commonRules}`;
       status: "applied",
       trigger_reason: `${reasonCode}: ${reason}`,
       deviation: { reason_code: reasonCode, days: curWeek?.days ?? [], day_swaps: swaps, past_days_rewritten: aligned.rewritten },
-      audit: { totals: audit.totals, weeks: audit.weeks.map(({ days, ...w }) => w), vdot, fitness_based_time: realisticTime, weekday_habits: habits },
+      audit: { totals: audit.totals, weeks: audit.weeks.map(({ days, ...w }) => w), vdot, fitness_based_time: realisticTime, weekday_habits: habits, load, volume_bounded_weeks: bounded.adjusted },
       plan_data_before: planData,
       plan_data_after: after,
       revised_target_time: revised,

@@ -187,6 +187,7 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
   const [streams, setStreams] = useState<any[]>([]);
   const [showPlanCompare, setShowPlanCompare] = useState(false);
   const [splits, setSplits] = useState<Split[] | null>(null);
+  const [showKmSplits, setShowKmSplits] = useState(false);
   const [loading, setLoading] = useState(true);
   const [activeChart, setActiveChart] = useState<"pace" | "heartrate" | "altitude" | "cadence">("pace");
   const [deleting, setDeleting] = useState(false);
@@ -1392,10 +1393,35 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
       {isRunningActivity && splits && splits.length > 0 && (
 
         <div className="bg-white rounded-2xl overflow-hidden mt-4 shadow-[0_4px_20px_-8px_rgba(15,23,42,0.15)] ring-1 ring-slate-200/70">
-          <div className="px-5 pt-4 pb-3">
+          <div className="px-5 pt-4 pb-3 flex items-center justify-between">
             <h3 className="font-display font-bold text-slate-900 text-sm">
               {lang === "zh" ? "分段" : "Intervals"}
             </h3>
+            {(() => {
+              // Detect track-style laps (e.g. 400 m auto-laps) and offer a
+              // toggle to view them regrouped as 1 km splits.
+              const lapDists = splits.map((s) => s.distance || 0).filter((d) => d > 50);
+              const meanLapDist = lapDists.length >= 2
+                ? lapDists.reduce((a, b) => a + b, 0) / lapDists.length
+                : 0;
+              if (!(meanLapDist > 0 && meanLapDist < 900)) return null;
+              return (
+                <div className="flex rounded-lg bg-slate-100 p-0.5 text-[11px] font-semibold">
+                  <button
+                    onClick={() => setShowKmSplits(false)}
+                    className={`px-2.5 py-1 rounded-md transition-colors ${!showKmSplits ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}
+                  >
+                    {lang === "zh" ? "每圈" : "Laps"}
+                  </button>
+                  <button
+                    onClick={() => setShowKmSplits(true)}
+                    className={`px-2.5 py-1 rounded-md transition-colors ${showKmSplits ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}
+                  >
+                    1 km
+                  </button>
+                </div>
+              );
+            })()}
           </div>
           {/* Header row */}
           <div className="grid grid-cols-[36px_1fr_1fr_1fr_1fr_56px] items-end gap-2 px-5 py-2 text-[10px] font-semibold uppercase tracking-wide text-slate-500 border-b border-slate-200">
@@ -1417,11 +1443,45 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
             // unrealistic paces, e.g. 6m @ 2:44/km from a Garmin auto-lap glitch).
             const NOISE_DIST_M = 50;
             const NOISE_TIME_S = 10;
-            const visibleSplits = splits.filter((s) => {
+            const rawVisible = splits.filter((s) => {
               const d = s.distance || 0;
               const t = s.elapsed_time || 0;
               return !(d < NOISE_DIST_M && t < NOISE_TIME_S);
             });
+            // When "1 km" view is selected (track runs recorded as 400 m laps),
+            // regroup consecutive laps into ~1000 m chunks with weighted pace/HR.
+            let visibleSplits = rawVisible;
+            if (showKmSplits) {
+              const grouped: Split[] = [];
+              let acc: { distance: number; elapsed: number; hrWeighted: number; hrTime: number; elev: number } | null = null;
+              const flush = () => {
+                if (!acc || acc.distance <= 0 || acc.elapsed <= 0) { acc = null; return; }
+                grouped.push({
+                  distance: acc.distance,
+                  elapsed_time: acc.elapsed,
+                  moving_time: acc.elapsed,
+                  average_speed: acc.distance / acc.elapsed,
+                  average_heartrate: acc.hrTime > 0 ? acc.hrWeighted / acc.hrTime : undefined,
+                  elevation_difference: acc.elev,
+                  split: grouped.length + 1,
+                });
+                acc = null;
+              };
+              for (const s of rawVisible) {
+                const d = s.distance || 0;
+                const t = s.elapsed_time || 0;
+                if (d <= 0 || t <= 0) continue;
+                if (!acc) acc = { distance: 0, elapsed: 0, hrWeighted: 0, hrTime: 0, elev: 0 };
+                acc.distance += d;
+                acc.elapsed += t;
+                if (s.average_heartrate) { acc.hrWeighted += s.average_heartrate * t; acc.hrTime += t; }
+                acc.elev += s.elevation_difference || 0;
+                // Close the chunk once we cross 1000 m (avoid making ~1400 m groups).
+                if (acc.distance >= 1000) flush();
+              }
+              flush();
+              visibleSplits = grouped;
+            }
             // Detect interval workout from lap data using RELATIVE pace spread,
             // ignoring noise laps when computing fastest/slowest.
             const speeds = visibleSplits.map(s => s.average_speed).filter(v => v > 0);

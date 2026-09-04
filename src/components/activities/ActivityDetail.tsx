@@ -1513,10 +1513,13 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
               const t = s.elapsed_time || 0;
               return !(d < NOISE_DIST_M && t < NOISE_TIME_S);
             });
-            // When "1 km" view is selected (track runs recorded as 400 m laps),
-            // regroup consecutive laps into ~1000 m chunks with weighted pace/HR.
+            // When "1 km" view is selected, prefer exact 1000 m splits derived
+            // from Terra distance/time samples (interpolated at each km mark).
+            // Fall back to regrouping whole laps when stream data is missing.
             let visibleSplits = rawVisible;
-            if (showKmSplits) {
+            if (showKmSplits && exactKmSplits) {
+              visibleSplits = exactKmSplits;
+            } else if (showKmSplits) {
               const grouped: Split[] = [];
               let acc: { distance: number; elapsed: number; hrWeighted: number; hrTime: number; elev: number } | null = null;
               const flush = () => {

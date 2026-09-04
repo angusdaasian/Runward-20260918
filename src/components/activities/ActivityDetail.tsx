@@ -735,7 +735,72 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
   const hasHeartrate = chartData.some(d => d.heartrate);
   const hasAltitude = chartData.some(d => d.altitude !== undefined);
   const hasPace = chartData.some(d => d.pace);
-  const hasCadence = chartData.some(d => typeof d.cadence === "number" && d.cadence > 0);
+  const hasCadence = chartData.some(d => d.cadence === "number" && d.cadence > 0);
+
+  // Exact 1000 m splits derived from Terra distance/time samples.
+  // Interpolates elapsed time at each kilometer boundary so every split is
+  // exactly 1000 m (last one may be partial), instead of grouping whole laps.
+  const exactKmSplits = useMemo((): Split[] | null => {
+    const distSamples = Array.isArray(activity.distance_samples) ? activity.distance_samples : null;
+    if (!distSamples || distSamples.length < 10) return null;
+    const hrSamples = Array.isArray(activity.hr_samples) ? activity.hr_samples : [];
+    const ordered = [...distSamples].sort((a, b) => a.t - b.t).filter((s) => typeof s.d === "number");
+    if (ordered.length < 10) return null;
+    const out: Split[] = [];
+    let nextKm = 1000;
+    let prevCrossT = ordered[0].t;
+    let prevCrossD = ordered[0].d;
+    let hrIdx = 0;
+    const avgHrBetween = (t0: number, t1: number): number | undefined => {
+      if (!hrSamples.length) return undefined;
+      let sum = 0, n = 0;
+      while (hrIdx < hrSamples.length && hrSamples[hrIdx].t <= t0) hrIdx++;
+      let i = hrIdx;
+      while (i < hrSamples.length && hrSamples[i].t <= t1) { sum += hrSamples[i].bpm; n++; i++; }
+      return n > 0 ? sum / n : undefined;
+    };
+    for (let i = 1; i < ordered.length; i++) {
+      const cur = ordered[i];
+      const prev = ordered[i - 1];
+      if (cur.d < nextKm) continue;
+      if (cur.d > prev.d) {
+        const frac = (nextKm - prev.d) / (cur.d - prev.d);
+        const tCross = prev.t + frac * (cur.t - prev.t);
+        const elapsed = tCross - prevCrossT;
+        if (elapsed > 0) {
+          out.push({
+            distance: nextKm - prevCrossD,
+            elapsed_time: Math.round(elapsed),
+            moving_time: Math.round(elapsed),
+            average_speed: (nextKm - prevCrossD) / elapsed,
+            average_heartrate: avgHrBetween(prevCrossT, tCross),
+            elevation_difference: 0,
+            split: out.length + 1,
+          });
+        }
+        prevCrossT = tCross;
+        prevCrossD = nextKm;
+        nextKm += 1000;
+        i--; // same sample may also cross the next boundary
+      }
+    }
+    // Trailing partial kilometer
+    const last = ordered[ordered.length - 1];
+    const remD = last.d - prevCrossD;
+    const remT = last.t - prevCrossT;
+    if (remD > 30 && remT > 3) {
+      out.push({
+        distance: Math.round(remD),
+        elapsed_time: Math.round(remT),
+        moving_time: Math.round(remT),
+        average_speed: remD / remT,
+        average_heartrate: avgHrBetween(prevCrossT, last.t),
+        elevation_difference: 0,
+        split: out.length + 1,
+      });
+    }
+    return out.length >= 2 ? out : null;
+  }, [activity.distance_samples, activity.hr_samples]);
 
   const chartTabs = useMemo(() => {
     const tabs: { key: "pace" | "heartrate" | "altitude" | "cadence"; label: string }[] = [];

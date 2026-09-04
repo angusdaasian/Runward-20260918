@@ -1017,33 +1017,61 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
                   {lang === "zh" ? "分享活動卡片" : "Share activity card"}
                 </span>
               </DropdownMenuItem>
-              <DropdownMenuItem
-                disabled={!splits || splits.length === 0}
-                onClick={() => {
-                  if (!isPremium) {
-                    toast.error(lang === "zh" ? "升級 Premium 以解鎖" : "Upgrade to Premium to unlock");
-                    return;
-                  }
-                  if (!splits || splits.length === 0) return;
-                  shareSplits({
-                    name: activityName,
-                    startDate: activity.start_date,
-                    splits: splits.map((s) => ({
-                      distance: s.distance,
-                      elapsed_time: s.elapsed_time,
-                      average_speed: s.average_speed,
-                      average_heartrate: s.average_heartrate ?? null,
-                    })),
-                    lang,
-                  });
-                }}
-              >
-                <span className="flex items-center gap-2 w-full">
-                  <LayoutList size={12} className="text-primary" />
-                  {lang === "zh" ? "分享分段" : "Share splits"}
-                  {!isPremium && <Lock size={12} className="ml-auto text-muted-foreground" />}
-                </span>
-              </DropdownMenuItem>
+               {(() => {
+                 // Track-style activities (400 m auto-laps) get a choice:
+                 // share raw laps or exact 1 km splits derived from stream data.
+                 const lapDists = (splits || []).map((s) => s.distance || 0).filter((d) => d > 50);
+                 const isTrackLaps = lapDists.length >= 2
+                   && (lapDists.reduce((a, b) => a + b, 0) / lapDists.length) < 900;
+                 const doShare = (useKm: boolean) => {
+                   if (!isPremium) {
+                     toast.error(lang === "zh" ? "升級 Premium 以解鎖" : "Upgrade to Premium to unlock");
+                     return;
+                   }
+                   const src = useKm && exactKmSplits ? exactKmSplits : splits;
+                   if (!src || src.length === 0) return;
+                   shareSplits({
+                     name: activityName,
+                     startDate: activity.start_date,
+                     splits: src.map((s) => ({
+                       distance: s.distance,
+                       elapsed_time: s.elapsed_time,
+                       average_speed: s.average_speed,
+                       average_heartrate: s.average_heartrate ?? null,
+                     })),
+                     lang,
+                   });
+                 };
+                 if (isTrackLaps && exactKmSplits) {
+                   return (
+                     <>
+                       <DropdownMenuItem disabled={!splits || splits.length === 0} onClick={() => doShare(false)}>
+                         <span className="flex items-center gap-2 w-full">
+                           <LayoutList size={12} className="text-primary" />
+                           {lang === "zh" ? "分享分段（每圈 400m）" : "Share splits (laps)"}
+                           {!isPremium && <Lock size={12} className="ml-auto text-muted-foreground" />}
+                         </span>
+                       </DropdownMenuItem>
+                       <DropdownMenuItem onClick={() => doShare(true)}>
+                         <span className="flex items-center gap-2 w-full">
+                           <LayoutList size={12} className="text-primary" />
+                           {lang === "zh" ? "分享分段（每 1 公里）" : "Share splits (1 km)"}
+                           {!isPremium && <Lock size={12} className="ml-auto text-muted-foreground" />}
+                         </span>
+                       </DropdownMenuItem>
+                     </>
+                   );
+                 }
+                 return (
+                   <DropdownMenuItem disabled={!splits || splits.length === 0} onClick={() => doShare(false)}>
+                     <span className="flex items-center gap-2 w-full">
+                       <LayoutList size={12} className="text-primary" />
+                       {lang === "zh" ? "分享分段" : "Share splits"}
+                       {!isPremium && <Lock size={12} className="ml-auto text-muted-foreground" />}
+                     </span>
+                   </DropdownMenuItem>
+                 );
+               })()}
               <DropdownMenuItem
                 disabled={!chartData || chartData.length < 2}
                 onClick={() => {

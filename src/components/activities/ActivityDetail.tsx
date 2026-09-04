@@ -1443,11 +1443,45 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
             // unrealistic paces, e.g. 6m @ 2:44/km from a Garmin auto-lap glitch).
             const NOISE_DIST_M = 50;
             const NOISE_TIME_S = 10;
-            const visibleSplits = splits.filter((s) => {
+            const rawVisible = splits.filter((s) => {
               const d = s.distance || 0;
               const t = s.elapsed_time || 0;
               return !(d < NOISE_DIST_M && t < NOISE_TIME_S);
             });
+            // When "1 km" view is selected (track runs recorded as 400 m laps),
+            // regroup consecutive laps into ~1000 m chunks with weighted pace/HR.
+            let visibleSplits = rawVisible;
+            if (showKmSplits) {
+              const grouped: Split[] = [];
+              let acc: { distance: number; elapsed: number; hrWeighted: number; hrTime: number; elev: number } | null = null;
+              const flush = () => {
+                if (!acc || acc.distance <= 0 || acc.elapsed <= 0) { acc = null; return; }
+                grouped.push({
+                  distance: acc.distance,
+                  elapsed_time: acc.elapsed,
+                  moving_time: acc.elapsed,
+                  average_speed: acc.distance / acc.elapsed,
+                  average_heartrate: acc.hrTime > 0 ? acc.hrWeighted / acc.hrTime : undefined,
+                  elevation_difference: acc.elev,
+                  split: grouped.length + 1,
+                });
+                acc = null;
+              };
+              for (const s of rawVisible) {
+                const d = s.distance || 0;
+                const t = s.elapsed_time || 0;
+                if (d <= 0 || t <= 0) continue;
+                if (!acc) acc = { distance: 0, elapsed: 0, hrWeighted: 0, hrTime: 0, elev: 0 };
+                acc.distance += d;
+                acc.elapsed += t;
+                if (s.average_heartrate) { acc.hrWeighted += s.average_heartrate * t; acc.hrTime += t; }
+                acc.elev += s.elevation_difference || 0;
+                // Close the chunk once we cross 1000 m (avoid making ~1400 m groups).
+                if (acc.distance >= 1000) flush();
+              }
+              flush();
+              visibleSplits = grouped;
+            }
             // Detect interval workout from lap data using RELATIVE pace spread,
             // ignoring noise laps when computing fastest/slowest.
             const speeds = visibleSplits.map(s => s.average_speed).filter(v => v > 0);

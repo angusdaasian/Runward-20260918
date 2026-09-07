@@ -16,7 +16,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { notifyPlanChanged } from "@/lib/planEvents";
-import { Loader2, Wand2, History, Undo2, ChevronDown, ChevronUp, Trash2 } from "lucide-react";
+import { Loader2, Wand2, Undo2, ChevronDown, ChevronUp, Trash2 } from "lucide-react";
 
 interface Props {
   lang: Lang;

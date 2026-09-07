@@ -448,7 +448,7 @@ ${loadContextLines(load)}
 RUNNER'S REAL WEEKDAY HABITS (use these to schedule the weekdays)
 ${habitLines(habits)}
 
-SESSIONS THE RUNNER SHIFTED TO ANOTHER DAY (already re-dated on the calendar for past weeks)
+SESSIONS THE RUNNER SHIFTED TO ANOTHER DAY (past weeks stay as recorded — use this only to place future sessions)
 ${swapLines(swaps)}
 
 DEVIATIONS IN THE CURRENT WEEK
@@ -489,7 +489,7 @@ ${weekSummaryLines(audit, curIdx)}
 RUNNER'S REAL WEEKDAY HABITS (use these to schedule the weekdays)
 ${habitLines(habits)}
 
-SESSIONS THE RUNNER SHIFTED TO ANOTHER DAY (already re-dated on the calendar for past weeks)
+SESSIONS THE RUNNER SHIFTED TO ANOTHER DAY (past weeks stay as recorded — use this only to place future sessions)
 ${swapLines(swaps)}
 
 LOAD & RECOVERY (drives every volume decision)

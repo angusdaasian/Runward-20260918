@@ -50,8 +50,8 @@ const TerritoryMap = ({ hexes, currentUserId, focusCity }: Props) => {
       worldCopyJump: true,
     }).setView([20, 0], 2);
     L.tileLayer(
-      "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
-      { maxZoom: 19, subdomains: "abcd" },
+      "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+      { maxZoom: 19, attribution: "&copy; OpenStreetMap contributors" },
     ).addTo(map);
     mapRef.current = map;
     layerRef.current = L.layerGroup().addTo(map);

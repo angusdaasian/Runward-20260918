@@ -26,7 +26,7 @@ export const MAPBOX_ATTRIBUTION =
   '&copy; <a href="https://www.mapbox.com/about/maps/">Mapbox</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
 
 /** Raster tile URL template for Leaflet (512px tiles, retina). */
-export function mapboxRasterTemplate(token: string, styleId = "light-v11") {
+export function mapboxRasterTemplate(token: string, styleId = "outdoors-v12") {
   return `https://api.mapbox.com/styles/v1/mapbox/${styleId}/tiles/512/{z}/{x}/{y}@2x?access_token=${token}`;
 }
 
@@ -36,7 +36,7 @@ export function mapboxTileUrl(
   z: number,
   x: number,
   y: number,
-  styleId = "light-v11",
+  styleId = "outdoors-v12",
 ) {
   return `https://api.mapbox.com/styles/v1/mapbox/${styleId}/tiles/256/${z}/${x}/${y}@2x?access_token=${token}`;
 }
@@ -52,7 +52,7 @@ export const OSM_ATTRIBUTION = "&copy; OpenStreetMap contributors";
 export async function addMapboxBasemap(
   map: { addLayer: (l: unknown) => unknown },
   L: typeof import("leaflet"),
-  styleId = "light-v11",
+  styleId = "outdoors-v12",
 ) {
   try {
     const token = await getMapboxToken();

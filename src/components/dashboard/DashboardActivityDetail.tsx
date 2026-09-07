@@ -276,7 +276,7 @@ export default function DashboardActivityDetail({
             <div className="rounded-xl border border-border bg-card p-4">
               <h4 className="font-display font-semibold text-sm mb-3">{zh ? "路線" : "Route"}</h4>
               {activity.summary_polyline ? (
-                <ActivityMap polyline={activity.summary_polyline} className="h-72" />
+                <ActivityMap polyline={activity.summary_polyline} className="h-72" lang={lang} />
               ) : (
                 <div className="h-72 rounded-lg flex items-center justify-center text-sm text-muted-foreground bg-muted/30">
                   {zh ? "無路線資料" : "No route data"}

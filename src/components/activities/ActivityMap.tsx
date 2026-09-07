@@ -4,6 +4,7 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { Maximize2, X } from "lucide-react";
 import { addMapboxBasemap } from "@/lib/mapTiles";
+import type { Lang } from "@/lib/i18n";
 
 // Decode Google polyline encoding
 function decodePolyline(encoded: string): [number, number][] {
@@ -31,8 +32,8 @@ function decodePolyline(encoded: string): [number, number][] {
   return points;
 }
 
-function renderRoute(map: L.Map, coords: [number, number][], padding: [number, number]) {
-  void addMapboxBasemap(map, L);
+function renderRoute(map: L.Map, coords: [number, number][], padding: [number, number], lang: Lang) {
+  void addMapboxBasemap(map, L, "outdoors-v12", lang);
 
   L.polyline(coords, {
     color: '#FFFFFF',
@@ -67,9 +68,10 @@ function renderRoute(map: L.Map, coords: [number, number][], padding: [number, n
 interface Props {
   polyline: string;
   className?: string;
+  lang: Lang;
 }
 
-const ActivityMap = ({ polyline, className }: Props) => {
+const ActivityMap = ({ polyline, className, lang }: Props) => {
   const previewRef = useRef<HTMLDivElement>(null);
   const previewMapRef = useRef<L.Map | null>(null);
   const fullRef = useRef<HTMLDivElement>(null);
@@ -97,7 +99,7 @@ const ActivityMap = ({ polyline, className }: Props) => {
       touchZoom: false,
     });
     previewMapRef.current = map;
-    renderRoute(map, coords, [14, 14]);
+    renderRoute(map, coords, [14, 14], lang);
 
     return () => {
       if (previewMapRef.current) {
@@ -105,7 +107,7 @@ const ActivityMap = ({ polyline, className }: Props) => {
         previewMapRef.current = null;
       }
     };
-  }, [polyline]);
+  }, [polyline, lang]);
 
   // Fullscreen map (mounted only when overlay opens)
   useEffect(() => {
@@ -139,7 +141,7 @@ const ActivityMap = ({ polyline, className }: Props) => {
         touchZoom: true,
       });
       fullMapRef.current = map;
-      renderRoute(map, coords, [30, 30]);
+      renderRoute(map, coords, [30, 30], lang);
       requestAnimationFrame(() => map.invalidateSize());
     };
 
@@ -152,7 +154,7 @@ const ActivityMap = ({ polyline, className }: Props) => {
         fullMapRef.current = null;
       }
     };
-  }, [open, polyline]);
+  }, [open, polyline, lang]);
 
   return (
     <>

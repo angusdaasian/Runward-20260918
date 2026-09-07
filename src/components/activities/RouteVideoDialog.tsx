@@ -320,6 +320,7 @@ const RouteVideoDialog = ({
       const map = new mapboxgl.Map({
         container,
         style: "mapbox://styles/mapbox/outdoors-v12",
+        language: isZh ? "zh-Hant" : "en",
         center: [(minLon + maxLon) / 2, (minLat + maxLat) / 2],
         zoom: 13,
         pitch: 0,

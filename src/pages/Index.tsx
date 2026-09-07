@@ -1,5 +1,5 @@
 import { useState, useEffect, lazy, Suspense } from "react";
-import { Activity, Dumbbell, Loader2, BarChart3, Award, Trophy, WifiOff } from "lucide-react";
+import { Activity, Dumbbell, BarChart3, Award, Trophy, WifiOff } from "lucide-react";
 import { Lang, t } from "@/lib/i18n";
 import { useAuth } from "@/contexts/AuthContext";
 import { useOnlineStatus } from "@/hooks/use-online-status";
@@ -56,14 +56,9 @@ const Index = () => {
   const [promoTrigger, setPromoTrigger] = useState(0);
   const [runningScore, setRunningScore] = useState<number | null>(null);
   const [lang, setLangState] = useState<Lang>(() => (localStorage.getItem("app_lang") as Lang) || "en");
-  const [langSwitching, setLangSwitching] = useState(false);
   const setLang = (l: Lang) => {
-    setLangSwitching(true);
-    setTimeout(() => {
-      localStorage.setItem("app_lang", l);
-      setLangState(l);
-      setLangSwitching(false);
-    }, 4000);
+    localStorage.setItem("app_lang", l);
+    setLangState(l);
     // Persist to profile so server-side notifications (e.g. OneSignal) can localize
     if (user?.id) {
       import("@/integrations/supabase/client").then(({ supabase }) => {
@@ -271,11 +266,6 @@ const Index = () => {
         className="flex-1 overflow-y-auto relative"
         style={{ paddingBottom: 'calc(5rem + var(--safe-area-bottom, 0px))', display: activeTab === "activities" ? "none" : "block" }}
       >
-        {langSwitching && (
-          <div className="absolute inset-0 bg-background/80 z-50 flex items-center justify-center">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="animate-spin" size={16} />{lang === "zh" ? "Switching language..." : "切換語言中..."}</div>
-          </div>
-        )}
         {activeTab === "training" && (
           <Suspense fallback={<TrainingSkeleton />}>
             <TrainingTab score={runningScore} setScore={setRunningScore} lang={lang} onLoginRequest={() => {

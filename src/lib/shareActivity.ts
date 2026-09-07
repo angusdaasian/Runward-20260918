@@ -367,6 +367,7 @@ async function drawMapWithTiles(
   ctx: CanvasRenderingContext2D,
   coords: [number, number][],
   x: number, y: number, w: number, h: number,
+  lang: Lang,
 ): Promise<boolean> {
   if (coords.length < 2) return false;
   let minLat = Infinity, maxLat = -Infinity, minLng = Infinity, maxLng = -Infinity;
@@ -419,7 +420,7 @@ async function drawMapWithTiles(
   }
   const mapTileUrl = (z: number, tx: number, ty: number) =>
     mbToken
-      ? mapboxTileUrl(mbToken, z, tx, ty)
+      ? mapboxTileUrl(mbToken, z, tx, ty, "outdoors-v12", lang)
       : `https://tile.openstreetmap.org/${z}/${tx}/${ty}.png`;
 
   const tasks: Promise<{ tx: number; ty: number; img: HTMLImageElement | null }>[] = [];
@@ -586,7 +587,7 @@ async function renderShareCard(input: ShareActivityInput): Promise<Blob> {
     try {
       const coords = decodePolyline(input.summaryPolyline);
       if (coords.length >= 2) {
-        drewRoute = await drawMapWithTiles(ctx, coords, mapX, mapY, mapW, mapH);
+        drewRoute = await drawMapWithTiles(ctx, coords, mapX, mapY, mapW, mapH, input.lang);
       }
     } catch (err) {
       console.warn("[Share] map render failed:", err);
@@ -2019,7 +2020,7 @@ async function renderCustomCard(input: CustomShareInput): Promise<Blob> {
       try {
         const coords = decodePolyline(input.summaryPolyline!);
         if (coords.length >= 2) {
-          await drawMapWithTiles(ctx, coords, innerX, cy, innerW, MAP_H);
+          await drawMapWithTiles(ctx, coords, innerX, cy, innerW, MAP_H, input.lang);
         }
       } catch (err) {
         console.warn("[CustomShare] map render failed:", err);

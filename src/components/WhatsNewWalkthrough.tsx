@@ -433,6 +433,16 @@ const WhatsNewWalkthrough = ({ lang, enabled, manualOpen, onManualOpenChange }: 
 
   const steps = [
     {
+      title: tx(lang, "Your plan now recalibrates itself", "訓練計劃會自動重新調整"),
+      desc: tx(
+        lang,
+        "Life happens — you skip a long run, or swap Thursday's tempo to Friday. With auto recalibration switched on, RunWard reviews your recent training (distance, run type, pace, recovery signals like HRV and resting heart rate) and rebuilds your upcoming weeks around what you're actually doing. It only ever changes today and future sessions; anything you've already run stays untouched. You can also tap Recalibrate anytime, or undo the last change. Find it in the Training tab.",
+        "生活總有變化 — 可能長跑跑不成，或把星期四的節奏跑改到星期五。開啟自動調整後，RunWard 會分析你近期的訓練（距離、課表類型、配速，以及 HRV、靜息心率等恢復指標），再根據你真實的訓練狀況重建接下來幾週的計劃。系統只會調整今天及未來的課表，已完成的紀錄完全不會被改動。你也可以隨時手動按「重新調整」，或還原上一次的變更。可在「訓練」分頁找到。"
+      ),
+      illustration: <RecalibrateIllustration lang={lang} />,
+    },
+    {
+
       title: tx(lang, "Connect WhatsApp and Telegram (Beta)", "連接 WhatsApp 與 Telegram (Beta)"),
       desc: tx(
         lang,

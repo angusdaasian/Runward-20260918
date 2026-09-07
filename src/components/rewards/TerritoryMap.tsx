@@ -4,6 +4,7 @@ import "leaflet/dist/leaflet.css";
 import { addMapboxBasemap } from "@/lib/mapTiles";
 import { cellToBoundary, cellToLatLng } from "h3-js";
 import { supabase } from "@/integrations/supabase/client";
+import type { Lang } from "@/lib/i18n";
 
 interface Hex {
   hex_id: string;
@@ -24,6 +25,7 @@ interface Props {
   hexes: Hex[];
   currentUserId: string | null;
   focusCity?: FocusCity | null;
+  lang: Lang;
 }
 
 interface Landmark {
@@ -34,7 +36,7 @@ interface Landmark {
   category: string;
 }
 
-const TerritoryMap = ({ hexes, currentUserId, focusCity }: Props) => {
+const TerritoryMap = ({ hexes, currentUserId, focusCity, lang }: Props) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const layerRef = useRef<L.LayerGroup | null>(null);
@@ -50,7 +52,7 @@ const TerritoryMap = ({ hexes, currentUserId, focusCity }: Props) => {
       attributionControl: false,
       worldCopyJump: true,
     }).setView([20, 0], 2);
-    void addMapboxBasemap(map, L);
+    void addMapboxBasemap(map, L, "outdoors-v12", lang);
     mapRef.current = map;
     layerRef.current = L.layerGroup().addTo(map);
     landmarkLayerRef.current = L.layerGroup().addTo(map);
@@ -62,7 +64,7 @@ const TerritoryMap = ({ hexes, currentUserId, focusCity }: Props) => {
       landmarkLayerRef.current = null;
       fittedRef.current = false;
     };
-  }, []);
+  }, [lang]);
 
   // Load landmarks once and the user's captured landmark set
   useEffect(() => {

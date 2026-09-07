@@ -59,8 +59,10 @@ const Index = () => {
   const [langSwitching, setLangSwitching] = useState(false);
   const setLang = (l: Lang) => {
     setLangSwitching(true);
+    // Store immediately so maps and background renderers mounted during the
+    // transition always receive the newly selected language.
+    localStorage.setItem("app_lang", l);
     setTimeout(() => {
-      localStorage.setItem("app_lang", l);
       setLangState(l);
       setLangSwitching(false);
     }, 4000);

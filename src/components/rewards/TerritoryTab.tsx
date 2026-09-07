@@ -182,7 +182,7 @@ const TerritoryTab = ({ lang }: Props) => {
           <Loader2 className="animate-spin text-muted-foreground" size={20} />
         </div>
       ) : (
-        <TerritoryMap hexes={hexes} currentUserId={user.id} focusCity={focusedCity} />
+        <TerritoryMap hexes={hexes} currentUserId={user.id} focusCity={focusedCity} lang={lang} />
       )}
 
       <p className="text-[11px] text-muted-foreground text-center px-2">

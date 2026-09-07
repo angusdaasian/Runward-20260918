@@ -2,6 +2,7 @@
 // The public token (pk.*) is stored as a secret and served by the
 // get-mapbox-token edge function so it can be rotated without a redeploy.
 import { supabase } from "@/integrations/supabase/client";
+import type { Lang } from "@/lib/i18n";
 
 let cachedToken: string | null = null;
 let inflight: Promise<string> | null = null;
@@ -26,11 +27,11 @@ export const MAPBOX_ATTRIBUTION =
   '&copy; <a href="https://www.mapbox.com/about/maps/">Mapbox</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
 
 /** Map label language, derived from the app's selected language. */
-export function mapboxLanguage(): string {
+export function mapboxLanguage(lang?: Lang): string {
+  if (lang === "zh") return "zh-Hant";
   try {
-    const lang = localStorage.getItem("app_lang");
-    if (lang === "zh") return "zh-Hant";
-    if (lang === "ja") return "ja";
+    const savedLang = localStorage.getItem("app_lang");
+    if (savedLang === "zh") return "zh-Hant";
   } catch {
     /* ignore */
   }
@@ -38,8 +39,8 @@ export function mapboxLanguage(): string {
 }
 
 /** Raster tile URL template for Leaflet (512px tiles, retina). */
-export function mapboxRasterTemplate(token: string, styleId = "outdoors-v12") {
-  return `https://api.mapbox.com/styles/v1/mapbox/${styleId}/tiles/512/{z}/{x}/{y}@2x?access_token=${token}&language=${mapboxLanguage()}`;
+export function mapboxRasterTemplate(token: string, styleId = "outdoors-v12", lang?: Lang) {
+  return `https://api.mapbox.com/styles/v1/mapbox/${styleId}/tiles/512/{z}/{x}/{y}@2x?access_token=${token}&language=${encodeURIComponent(mapboxLanguage(lang))}`;
 }
 
 /** Single raster tile URL for canvas rendering (256px world grid, retina image). */
@@ -49,8 +50,9 @@ export function mapboxTileUrl(
   x: number,
   y: number,
   styleId = "outdoors-v12",
+  lang?: Lang,
 ) {
-  return `https://api.mapbox.com/styles/v1/mapbox/${styleId}/tiles/256/${z}/${x}/${y}@2x?access_token=${token}&language=${mapboxLanguage()}`;
+  return `https://api.mapbox.com/styles/v1/mapbox/${styleId}/tiles/256/${z}/${x}/${y}@2x?access_token=${token}&language=${encodeURIComponent(mapboxLanguage(lang))}`;
 }
 
 /** OpenStreetMap fallback used if the Mapbox token can't be loaded. */
@@ -65,10 +67,11 @@ export async function addMapboxBasemap(
   map: { addLayer: (l: unknown) => unknown },
   L: typeof import("leaflet"),
   styleId = "outdoors-v12",
+  lang?: Lang,
 ) {
   try {
     const token = await getMapboxToken();
-    L.tileLayer(mapboxRasterTemplate(token, styleId), {
+    L.tileLayer(mapboxRasterTemplate(token, styleId, lang), {
       maxZoom: 19,
       tileSize: 512,
       zoomOffset: -1,

@@ -1258,7 +1258,7 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
           {/* Map above stats for Apple Health (if polyline exists) */}
           {activity.summary_polyline && (
             <div className="mb-4">
-              <ActivityMap polyline={activity.summary_polyline} />
+              <ActivityMap polyline={activity.summary_polyline} lang={lang} />
             </div>
           )}
           <div className="grid grid-cols-3 gap-2 mb-4">
@@ -1327,7 +1327,7 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
           {/* Map below stats grid: prefer encoded polyline, fall back to Firecrawl screenshot for manual imports */}
           {activity.summary_polyline ? (
             <div className="mb-4">
-              <ActivityMap polyline={activity.summary_polyline} />
+              <ActivityMap polyline={activity.summary_polyline} lang={lang} />
             </div>
           ) : activity.map_screenshot_url ? (
             <div className="mb-4 rounded-lg overflow-hidden border border-border bg-muted">

@@ -18,6 +18,7 @@ import {
   auditPlanHistory,
   classifyDeviation,
   fetchActivities,
+  paceSecPerKm,
   parseDurationStr,
   fmtDuration,
   parseJsonLoose,
@@ -251,6 +252,29 @@ function weekSummaryLines(audit: PlanAudit, upToIndex: number): string {
     .join("\n");
 }
 
+// Raw log of the runner's actual sessions over the recent past. The audit gives weekly
+// totals; this gives the model the individual runs (weekday, distance, pace, HR) so it can
+// learn the runner's real training pattern before rebuilding the future weeks.
+function activityLogLines(activities: NormActivity[], todayISO: string, weeks = 8): string {
+  const cutoff = new Date(new Date(todayISO + "T00:00:00Z").getTime() - weeks * 7 * 86400000)
+    .toISOString().slice(0, 10);
+  const rows = activities
+    .filter((a) => a.date >= cutoff && a.date <= todayISO && a.distance_m > 300)
+    .sort((a, b) => a.date.localeCompare(b.date));
+  if (rows.length === 0) return "- no activities recorded";
+  const dow = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  return rows
+    .map((a) => {
+      const km = Math.round((a.distance_m / 1000) * 10) / 10;
+      const ps = paceSecPerKm(a.distance_m, a.seconds);
+      const pace = ps ? ` @ ${Math.floor(ps / 60)}:${String(Math.round(ps % 60)).padStart(2, "0")}/km` : "";
+      const hr = a.avg_hr ? `, HR ${a.avg_hr}` : "";
+      const wd = dow[new Date(a.date + "T00:00:00Z").getUTCDay()];
+      return `- ${a.date} (${wd}): ${km}km${pace}${hr}${a.type ? `, ${a.type}` : ""}`;
+    })
+    .join("\n");
+}
+
 function deviationLines(devs: DayDeviation[]): string {
   return devs
     .map((d) => {
@@ -448,6 +472,9 @@ ${loadContextLines(load)}
 RUNNER'S REAL WEEKDAY HABITS (use these to schedule the weekdays)
 ${habitLines(habits)}
 
+PAST ACTIVITY LOG (every run recorded in the last 8 weeks — learn the runner's pattern: weekday rhythm, typical distances, paces, how hard days follow easy days — and build the future weeks to fit it)
+${activityLogLines(activities, todayISO)}
+
 SESSIONS THE RUNNER SHIFTED TO ANOTHER DAY (past weeks stay as recorded — use this only to place future sessions)
 ${swapLines(swaps)}
 
@@ -488,6 +515,9 @@ RECENT WEEKS
 ${weekSummaryLines(audit, curIdx)}
 RUNNER'S REAL WEEKDAY HABITS (use these to schedule the weekdays)
 ${habitLines(habits)}
+
+PAST ACTIVITY LOG (every run recorded in the last 8 weeks — learn the runner's pattern: weekday rhythm, typical distances, paces, how hard days follow easy days — and build the future weeks to fit it)
+${activityLogLines(activities, todayISO)}
 
 SESSIONS THE RUNNER SHIFTED TO ANOTHER DAY (past weeks stay as recorded — use this only to place future sessions)
 ${swapLines(swaps)}

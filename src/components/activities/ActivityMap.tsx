@@ -107,6 +107,7 @@ async function createRouteMap(
     map.once("load", () => resolve());
     map.once("error", (event) => reject(event.error ?? new Error("Map failed to load")));
   });
+  map.setLanguage(mapboxLanguage(lang));
   addRoute(map, coords, padding);
   return map;
 }
@@ -162,6 +163,7 @@ const ActivityMap = ({ polyline, className, lang }: Props) => {
     if (coords.length === 0) return;
 
     let frame = 0;
+    let cancelled = false;
 
     const mountMap = () => {
       const container = fullRef.current;
@@ -179,6 +181,10 @@ const ActivityMap = ({ polyline, className, lang }: Props) => {
 
       void createRouteMap(container, coords, lang, true, 30)
         .then((map) => {
+          if (cancelled) {
+            map.remove();
+            return;
+          }
           fullMapRef.current = map;
           map.addControl(new mapboxgl.NavigationControl(), "bottom-right");
           requestAnimationFrame(() => map.resize());
@@ -189,6 +195,7 @@ const ActivityMap = ({ polyline, className, lang }: Props) => {
     frame = requestAnimationFrame(mountMap);
 
     return () => {
+      cancelled = true;
       cancelAnimationFrame(frame);
       if (fullMapRef.current) {
         fullMapRef.current.remove();

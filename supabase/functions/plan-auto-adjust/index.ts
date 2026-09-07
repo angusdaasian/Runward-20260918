@@ -5,9 +5,8 @@
 //  1. action:"detect"      — look at the current week of a runner's active plan, decide whether
 //                            real training drifted far enough from the assignment to justify a
 //                            rewrite, and if so regenerate the remaining weeks with Gemini.
-//  2. action:"recalibrate" — full-program audit: reconcile every past day against what actually
-//                            happened, then rebuild all remaining weeks from that real baseline
-//                            (and report an honest target time).
+//  2. action:"recalibrate" — full-program audit used as read-only context, then rebuild all
+//                            remaining (current + future) weeks. Past days are never modified.
 //  3. action:"revert"      — restore the plan snapshot taken before the latest applied adjustment.
 //
 // Cron mode: POST with header x-webhook-key: <WEBHOOK_AUTH_KEY> and body { cron: true } to run
@@ -32,8 +31,6 @@ import {
   type WeekPlan,
 } from "../_shared/planAdherence.ts";
 import {
-  alignPastDaysToActual,
-  applyDaySwaps,
   detectWeekSwaps,
   enforceAdjustedSchedule,
   habitLines,
@@ -238,28 +235,6 @@ function stitchFutureWeeks(
   return out;
 }
 
-/** Annotate past days with what actually happened so the calendar tells the truth. */
-function reconcilePastDays(plan: WeekPlan[], audit: PlanAudit, todayISO: string): WeekPlan[] {
-  const byDate = new Map<string, DayDeviation>();
-  for (const w of audit.weeks) for (const d of w.days) byDate.set(d.date, d);
-  const out: WeekPlan[] = JSON.parse(JSON.stringify(plan));
-  for (const w of out) {
-    if (!Array.isArray(w.days)) continue;
-    for (const day of w.days as any[]) {
-      if (!day?.date || day.date >= todayISO) continue;
-      const dev = byDate.get(day.date);
-      if (!dev) continue;
-      day.actual_km = dev.actual_km;
-      day.actual_pace_sec = dev.actual_pace_sec;
-      day.actual_avg_hr = dev.actual_avg_hr;
-      day.adherence = dev.adherence;
-      day.completed = dev.actual_km >= 0.5;
-      day.reconciled_at = new Date().toISOString();
-    }
-  }
-  return out;
-}
-
 // ---------- prompt building ----------
 
 function weekSummaryLines(audit: PlanAudit, upToIndex: number): string {
@@ -310,7 +285,6 @@ interface AdjustResult {
   adjustment_id?: string;
   weeks_rewritten?: number;
   day_swaps?: unknown;
-  past_days_rewritten?: number;
   revised_target_time?: string | null;
   summary_en?: string | null;
   summary_zh?: string | null;
@@ -352,15 +326,13 @@ async function runAdjust(
   const swaps: DaySwap[] = audit.weeks.flatMap((w) => detectWeekSwaps(w.week_index, w.days, todayISO));
   const allPastDays: DayDeviation[] = audit.weeks.flatMap((w) => w.days).filter((d) => d.date < todayISO);
   const habits = weekdayHabits(allPastDays);
-  const swapped = applyDaySwaps(planData, swaps);
-  // Past weeks should read like a logbook, not a wish list: rewrite elapsed days to the
-  // work that actually happened. This also stops a skipped hard session from standing
-  // next to the rescheduled one (e.g. two intervals in the same week).
   const planIsZh = /[\u4e00-\u9fff]/.test(
     JSON.stringify(planData.slice(0, 2)).slice(0, 4000),
   );
-  const aligned = alignPastDaysToActual(swapped, allPastDays, todayISO, planIsZh ? "zh" : "en");
-  const basePlan = aligned.plan;
+  // The past is never touched: elapsed days keep their original assignment and only the
+  // current/future weeks are rebuilt. Detected swaps and weekday habits are used purely
+  // as *context* for the model so future sessions land on the days the runner trains.
+  const basePlan = planData;
 
   // ── decide ──
   let reason = "Manual recalibration requested.";
@@ -476,7 +448,7 @@ ${loadContextLines(load)}
 RUNNER'S REAL WEEKDAY HABITS (use these to schedule the weekdays)
 ${habitLines(habits)}
 
-SESSIONS THE RUNNER SHIFTED TO ANOTHER DAY (already re-dated on the calendar for past weeks)
+SESSIONS THE RUNNER SHIFTED TO ANOTHER DAY (past weeks stay as recorded — use this only to place future sessions)
 ${swapLines(swaps)}
 
 DEVIATIONS IN THE CURRENT WEEK
@@ -517,7 +489,7 @@ ${weekSummaryLines(audit, curIdx)}
 RUNNER'S REAL WEEKDAY HABITS (use these to schedule the weekdays)
 ${habitLines(habits)}
 
-SESSIONS THE RUNNER SHIFTED TO ANOTHER DAY (already re-dated on the calendar for past weeks)
+SESSIONS THE RUNNER SHIFTED TO ANOTHER DAY (past weeks stay as recorded — use this only to place future sessions)
 ${swapLines(swaps)}
 
 LOAD & RECOVERY (drives every volume decision)
@@ -543,7 +515,6 @@ ${commonRules}`;
       reason,
       weeks_rewritten: remainingWeeks,
       day_swaps: swaps,
-      past_days_rewritten: aligned.rewritten,
       revised_target_time: realisticTime,
       audit: { totals: audit.totals, current_week: curWeek, load },
     };
@@ -594,7 +565,6 @@ ${commonRules}`;
   // (nor blow past the ramp ceiling), regardless of what the model returned.
   const bounded = enforceVolumeBounds(after, fromIndex, load, todayISO);
   after = bounded.plan;
-  if (kind === "recalibrate") after = reconcilePastDays(after, audit, todayISO);
 
 
   // We never surface a finishing time with adjustments — the plan keeps the runner's own
@@ -612,7 +582,7 @@ ${commonRules}`;
       kind,
       status: "applied",
       trigger_reason: `${reasonCode}: ${reason}`,
-      deviation: { reason_code: reasonCode, days: curWeek?.days ?? [], day_swaps: swaps, past_days_rewritten: aligned.rewritten },
+      deviation: { reason_code: reasonCode, days: curWeek?.days ?? [], day_swaps: swaps },
       audit: { totals: audit.totals, weeks: audit.weeks.map(({ days, ...w }) => w), vdot, fitness_based_time: realisticTime, weekday_habits: habits, load, volume_bounded_weeks: bounded.adjusted },
       plan_data_before: planData,
       plan_data_after: after,
@@ -637,7 +607,6 @@ ${commonRules}`;
     adjustment_id: adj?.id,
     weeks_rewritten: aiWeeks.length,
     day_swaps: swaps,
-    past_days_rewritten: aligned.rewritten,
     revised_target_time: revised,
     summary_en: summaryEn,
     summary_zh: summaryZh,

@@ -217,19 +217,7 @@ const AutoAdjustCard = ({ lang, planId, autoAdjustEnabled }: Props) => {
       </div>
 
       <div className="mt-4 grid grid-cols-1 gap-2">
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="h-9 text-xs justify-start"
-          disabled={running !== null}
-          onClick={() => invoke("recalibrate")}
-        >
-          {running === "recalibrate"
-            ? <Loader2 size={14} className="mr-2 animate-spin" />
-            : <History size={14} className="mr-2" />}
-          {zh ? "重新校準整個計劃（分析過去所有訓練）" : "Recalibrate whole program from past training"}
-        </Button>
+
 
 
 

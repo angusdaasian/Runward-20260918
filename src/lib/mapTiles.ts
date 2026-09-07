@@ -25,9 +25,21 @@ export async function getMapboxToken(): Promise<string> {
 export const MAPBOX_ATTRIBUTION =
   '&copy; <a href="https://www.mapbox.com/about/maps/">Mapbox</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
 
+/** Map label language, derived from the app's selected language. */
+export function mapboxLanguage(): string {
+  try {
+    const lang = localStorage.getItem("app_lang");
+    if (lang === "zh") return "zh-Hant";
+    if (lang === "ja") return "ja";
+  } catch {
+    /* ignore */
+  }
+  return "en";
+}
+
 /** Raster tile URL template for Leaflet (512px tiles, retina). */
 export function mapboxRasterTemplate(token: string, styleId = "outdoors-v12") {
-  return `https://api.mapbox.com/styles/v1/mapbox/${styleId}/tiles/512/{z}/{x}/{y}@2x?access_token=${token}`;
+  return `https://api.mapbox.com/styles/v1/mapbox/${styleId}/tiles/512/{z}/{x}/{y}@2x?access_token=${token}&language=${mapboxLanguage()}`;
 }
 
 /** Single raster tile URL for canvas rendering (256px world grid, retina image). */
@@ -38,7 +50,7 @@ export function mapboxTileUrl(
   y: number,
   styleId = "outdoors-v12",
 ) {
-  return `https://api.mapbox.com/styles/v1/mapbox/${styleId}/tiles/256/${z}/${x}/${y}@2x?access_token=${token}`;
+  return `https://api.mapbox.com/styles/v1/mapbox/${styleId}/tiles/256/${z}/${x}/${y}@2x?access_token=${token}&language=${mapboxLanguage()}`;
 }
 
 /** OpenStreetMap fallback used if the Mapbox token can't be loaded. */

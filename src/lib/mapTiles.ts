@@ -28,7 +28,7 @@ export const MAPBOX_ATTRIBUTION =
 
 /** Map label language, derived from the app's selected language. */
 export function mapboxLanguage(lang?: Lang): string {
-  if (lang === "zh") return "zh-Hant";
+  if (lang) return lang === "zh" ? "zh-Hant" : "en";
   try {
     const savedLang = localStorage.getItem("app_lang");
     if (savedLang === "zh") return "zh-Hant";

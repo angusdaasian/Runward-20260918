@@ -4,11 +4,12 @@ import { Button } from "@/components/ui/button";
 import {
   Sparkles, Menu, ArrowRight, ChevronRight, Settings2, Hand,
   Activity, BarChart3, Heart, Moon, Type, Link2, MessageSquare, Send,
-  Brain, LineChart, Database,
+  Brain, LineChart, Database, RefreshCw, CalendarCheck,
 } from "lucide-react";
 import { Lang } from "@/lib/i18n";
 
-const STORAGE_KEY = "walkthrough_v2026_06_ai_intervals_seen";
+const STORAGE_KEY = "walkthrough_v2026_09_auto_recalibrate_seen";
+
 
 
 interface Props {
@@ -341,7 +342,59 @@ const IntervalsIllustration = ({ lang }: { lang: Lang }) => (
   </div>
 );
 
+const RecalibrateIllustration = ({ lang }: { lang: Lang }) => (
+  <div className="relative w-full rounded-xl bg-muted/40 border border-border p-3 overflow-hidden">
+    <div className="flex items-center gap-2 rounded-lg bg-card border-2 border-primary p-2.5 shadow">
+      <div className="w-10 h-10 rounded-full bg-primary/15 flex items-center justify-center text-primary">
+        <RefreshCw size={18} />
+      </div>
+      <div className="flex-1">
+        <div className="text-[11px] font-semibold text-foreground">
+          {tx(lang, "Auto plan recalibration", "自動調整訓練計劃")}
+        </div>
+        <div className="text-[9px] text-muted-foreground">
+          {tx(lang, "Keeps upcoming weeks realistic", "讓未來幾週更符合實際狀況")}
+        </div>
+      </div>
+      <span className="inline-flex items-center w-7 h-4 rounded-full bg-primary">
+        <span className="block w-3 h-3 rounded-full bg-background shadow translate-x-[14px]" />
+      </span>
+    </div>
+    <div className="mt-2 grid grid-cols-2 gap-2">
+      <div className="rounded-lg bg-card border border-border p-2">
+        <div className="text-[9px] text-muted-foreground">{tx(lang, "Planned", "計劃")}</div>
+        <div className="text-[11px] font-bold text-foreground">15 km</div>
+      </div>
+      <div className="rounded-lg bg-card border border-primary/60 p-2">
+        <div className="text-[9px] text-muted-foreground">{tx(lang, "You ran", "實際")}</div>
+        <div className="text-[11px] font-bold text-primary">8 km</div>
+      </div>
+    </div>
+    <div className="mt-2.5 space-y-1.5">
+      <div className="flex items-center gap-1.5">
+        <CalendarCheck size={12} className="text-primary shrink-0" />
+        <span className="text-[10px] text-foreground/80">
+          {tx(lang, "Only future sessions change — past runs stay as recorded", "只調整未來的課表 — 已完成的紀錄不會被改動")}
+        </span>
+      </div>
+      <div className="flex items-center gap-1.5">
+        <ChevronRight size={12} className="text-primary shrink-0" />
+        <span className="text-[10px] text-foreground/80">
+          {tx(lang, "Learns your usual training days and mileage", "學習你習慣的訓練日與跑量")}
+        </span>
+      </div>
+      <div className="flex items-center gap-1.5">
+        <Settings2 size={12} className="text-primary shrink-0" />
+        <span className="text-[10px] text-foreground/80">
+          {tx(lang, "Turn it on in the Training tab", "在「訓練」分頁開啟")}
+        </span>
+      </div>
+    </div>
+  </div>
+);
+
 /* -------------------- Component -------------------- */
+
 
 
 
@@ -380,6 +433,16 @@ const WhatsNewWalkthrough = ({ lang, enabled, manualOpen, onManualOpenChange }: 
 
   const steps = [
     {
+      title: tx(lang, "Your plan now recalibrates itself", "訓練計劃會自動重新調整"),
+      desc: tx(
+        lang,
+        "Life happens — you skip a long run, or swap Thursday's tempo to Friday. With auto recalibration switched on, RunWard reviews your recent training (distance, run type, pace, recovery signals like HRV and resting heart rate) and rebuilds your upcoming weeks around what you're actually doing. It only ever changes today and future sessions; anything you've already run stays untouched. You can also tap Recalibrate anytime, or undo the last change. Find it in the Training tab.",
+        "生活總有變化 — 可能長跑跑不成，或把星期四的節奏跑改到星期五。開啟自動調整後，RunWard 會分析你近期的訓練（距離、課表類型、配速，以及 HRV、靜息心率等恢復指標），再根據你真實的訓練狀況重建接下來幾週的計劃。系統只會調整今天及未來的課表，已完成的紀錄完全不會被改動。你也可以隨時手動按「重新調整」，或還原上一次的變更。可在「訓練」分頁找到。"
+      ),
+      illustration: <RecalibrateIllustration lang={lang} />,
+    },
+    {
+
       title: tx(lang, "Connect WhatsApp and Telegram (Beta)", "連接 WhatsApp 與 Telegram (Beta)"),
       desc: tx(
         lang,

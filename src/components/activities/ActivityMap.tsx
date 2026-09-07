@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import L from "leaflet";
-import "leaflet/dist/leaflet.css";
+import mapboxgl from "mapbox-gl";
+import "mapbox-gl/dist/mapbox-gl.css";
 import { Maximize2, X } from "lucide-react";
-import { addMapboxBasemap } from "@/lib/mapTiles";
+import { getMapboxToken, mapboxLanguage } from "@/lib/mapTiles";
 import type { Lang } from "@/lib/i18n";
 
 // Decode Google polyline encoding
@@ -32,37 +32,84 @@ function decodePolyline(encoded: string): [number, number][] {
   return points;
 }
 
-function renderRoute(map: L.Map, coords: [number, number][], padding: [number, number], lang: Lang) {
-  void addMapboxBasemap(map, L, "outdoors-v12", lang);
+function addRoute(map: mapboxgl.Map, coords: [number, number][], padding: number) {
+  const route = coords.map(([lat, lng]) => [lng, lat]);
+  map.addSource("activity-route", {
+    type: "geojson",
+    data: { type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: route } },
+  });
+  map.addLayer({
+    id: "activity-route-outline",
+    type: "line",
+    source: "activity-route",
+    paint: { "line-color": "#FFFFFF", "line-width": 7, "line-opacity": 0.95 },
+    layout: { "line-join": "round", "line-cap": "round" },
+  });
+  map.addLayer({
+    id: "activity-route-line",
+    type: "line",
+    source: "activity-route",
+    paint: { "line-color": "#FC4C02", "line-width": 4 },
+    layout: { "line-join": "round", "line-cap": "round" },
+  });
 
-  L.polyline(coords, {
-    color: '#FFFFFF',
-    weight: 7,
-    opacity: 0.95,
-    lineJoin: 'round',
-    lineCap: 'round',
-  }).addTo(map);
+  const endpoints = [
+    { coordinates: route[0], color: "#10B981" },
+    { coordinates: route[route.length - 1], color: "#FC4C02" },
+  ];
+  map.addSource("activity-endpoints", {
+    type: "geojson",
+    data: {
+      type: "FeatureCollection",
+      features: endpoints.map(({ coordinates, color }) => ({
+        type: "Feature",
+        properties: { color },
+        geometry: { type: "Point", coordinates },
+      })),
+    },
+  });
+  map.addLayer({
+    id: "activity-endpoints",
+    type: "circle",
+    source: "activity-endpoints",
+    paint: {
+      "circle-radius": 5,
+      "circle-color": ["get", "color"],
+      "circle-stroke-color": "#FFFFFF",
+      "circle-stroke-width": 2,
+    },
+  });
 
-  const line = L.polyline(coords, {
-    color: '#FC4C02',
-    weight: 4,
-    opacity: 1,
-    lineJoin: 'round',
-    lineCap: 'round',
-  }).addTo(map);
+  const bounds = new mapboxgl.LngLatBounds();
+  route.forEach(([lng, lat]) => bounds.extend([lng, lat]));
+  map.fitBounds(bounds, { padding, duration: 0 });
+}
 
-  const dot = (latlng: [number, number], fill: string) =>
-    L.circleMarker(latlng, {
-      radius: 5,
-      weight: 2,
-      color: '#FFFFFF',
-      fillColor: fill,
-      fillOpacity: 1,
-    }).addTo(map);
-  dot(coords[0], '#10B981');
-  dot(coords[coords.length - 1], '#FC4C02');
-
-  map.fitBounds(line.getBounds(), { padding });
+async function createRouteMap(
+  container: HTMLDivElement,
+  coords: [number, number][],
+  lang: Lang,
+  interactive: boolean,
+  padding: number,
+): Promise<mapboxgl.Map> {
+  mapboxgl.accessToken = await getMapboxToken();
+  const [firstLat, firstLng] = coords[0];
+  const map = new mapboxgl.Map({
+    container,
+    style: "mapbox://styles/mapbox/outdoors-v12",
+    language: mapboxLanguage(lang),
+    center: [firstLng, firstLat],
+    zoom: 12,
+    interactive,
+    attributionControl: interactive,
+  });
+  await new Promise<void>((resolve, reject) => {
+    map.once("load", () => resolve());
+    map.once("error", (event) => reject(event.error ?? new Error("Map failed to load")));
+  });
+  map.setLanguage(mapboxLanguage(lang));
+  addRoute(map, coords, padding);
+  return map;
 }
 
 interface Props {
@@ -73,9 +120,9 @@ interface Props {
 
 const ActivityMap = ({ polyline, className, lang }: Props) => {
   const previewRef = useRef<HTMLDivElement>(null);
-  const previewMapRef = useRef<L.Map | null>(null);
+  const previewMapRef = useRef<mapboxgl.Map | null>(null);
   const fullRef = useRef<HTMLDivElement>(null);
-  const fullMapRef = useRef<L.Map | null>(null);
+  const fullMapRef = useRef<mapboxgl.Map | null>(null);
   const [open, setOpen] = useState(false);
 
   // Preview map
@@ -90,18 +137,17 @@ const ActivityMap = ({ polyline, className, lang }: Props) => {
     const coords = decodePolyline(polyline);
     if (coords.length === 0) return;
 
-    const map = L.map(previewRef.current, {
-      zoomControl: false,
-      attributionControl: false,
-      dragging: false,
-      scrollWheelZoom: false,
-      doubleClickZoom: false,
-      touchZoom: false,
-    });
-    previewMapRef.current = map;
-    renderRoute(map, coords, [14, 14], lang);
+    let cancelled = false;
+    const container = previewRef.current;
+    void createRouteMap(container, coords, lang, false, 14)
+      .then((map) => {
+        if (cancelled) map.remove();
+        else previewMapRef.current = map;
+      })
+      .catch((error) => console.error("Activity map failed to load", error));
 
     return () => {
+      cancelled = true;
       if (previewMapRef.current) {
         previewMapRef.current.remove();
         previewMapRef.current = null;
@@ -117,6 +163,7 @@ const ActivityMap = ({ polyline, className, lang }: Props) => {
     if (coords.length === 0) return;
 
     let frame = 0;
+    let cancelled = false;
 
     const mountMap = () => {
       const container = fullRef.current;
@@ -132,22 +179,23 @@ const ActivityMap = ({ polyline, className, lang }: Props) => {
         fullMapRef.current = null;
       }
 
-      const map = L.map(fullRef.current, {
-        zoomControl: true,
-        attributionControl: true,
-        dragging: true,
-        scrollWheelZoom: true,
-        doubleClickZoom: true,
-        touchZoom: true,
-      });
-      fullMapRef.current = map;
-      renderRoute(map, coords, [30, 30], lang);
-      requestAnimationFrame(() => map.invalidateSize());
+      void createRouteMap(container, coords, lang, true, 30)
+        .then((map) => {
+          if (cancelled) {
+            map.remove();
+            return;
+          }
+          fullMapRef.current = map;
+          map.addControl(new mapboxgl.NavigationControl(), "bottom-right");
+          requestAnimationFrame(() => map.resize());
+        })
+        .catch((error) => console.error("Expanded activity map failed to load", error));
     };
 
     frame = requestAnimationFrame(mountMap);
 
     return () => {
+      cancelled = true;
       cancelAnimationFrame(frame);
       if (fullMapRef.current) {
         fullMapRef.current.remove();

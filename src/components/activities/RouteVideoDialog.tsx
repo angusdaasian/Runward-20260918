@@ -6,6 +6,7 @@ import { Loader2, Download, Share2, Film } from "lucide-react";
 import { toast } from "sonner";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
+import { mapboxLanguage } from "@/lib/mapTiles";
 import { supabase } from "@/integrations/supabase/client";
 import appIcon from "@/assets/app-icon.png";
 
@@ -320,7 +321,7 @@ const RouteVideoDialog = ({
       const map = new mapboxgl.Map({
         container,
         style: "mapbox://styles/mapbox/outdoors-v12",
-        language: isZh ? "zh-Hant" : "en",
+        language: mapboxLanguage(lang),
         center: [(minLon + maxLon) / 2, (minLat + maxLat) / 2],
         zoom: 13,
         pitch: 0,
@@ -352,6 +353,7 @@ const RouteVideoDialog = ({
         map.once("load", () => resolve());
         map.once("error", (e) => reject(e.error || new Error("Map load failed")));
       });
+      map.setLanguage(mapboxLanguage(lang));
 
       // 3D terrain + sky for a cinematic flyover
       map.addSource("mapbox-dem", {

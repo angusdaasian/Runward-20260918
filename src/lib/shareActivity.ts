@@ -413,7 +413,7 @@ async function drawMapWithTiles(
   const tasks: Promise<{ tx: number; ty: number; img: HTMLImageElement | null }>[] = [];
   for (let ty = minTy; ty <= maxTy; ty++) {
     for (let tx = minTx; tx <= maxTx; tx++) {
-      const url = `https://tile.openstreetmap.org/${zoom}/${tx}/${ty}.png`;
+      const url = mapTileUrl(zoom, tx, ty);
       tasks.push(
         loadImage(url).then((img) => ({ tx, ty, img })).catch(() => ({ tx, ty, img: null as any })),
       );

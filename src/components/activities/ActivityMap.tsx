@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { Maximize2, X } from "lucide-react";
+import { addMapboxBasemap } from "@/lib/mapTiles";
 
 // Decode Google polyline encoding
 function decodePolyline(encoded: string): [number, number][] {
@@ -31,10 +32,7 @@ function decodePolyline(encoded: string): [number, number][] {
 }
 
 function renderRoute(map: L.Map, coords: [number, number][], padding: [number, number]) {
-  L.tileLayer(
-    'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-    { maxZoom: 19, attribution: '&copy; OpenStreetMap contributors' },
-  ).addTo(map);
+  void addMapboxBasemap(map, L);
 
   L.polyline(coords, {
     color: '#FFFFFF',

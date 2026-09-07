@@ -413,8 +413,7 @@ async function drawMapWithTiles(
   const tasks: Promise<{ tx: number; ty: number; img: HTMLImageElement | null }>[] = [];
   for (let ty = minTy; ty <= maxTy; ty++) {
     for (let tx = minTx; tx <= maxTx; tx++) {
-      const sub = "abcd"[(tx + ty) & 3];
-      const url = `https://${sub}.basemaps.cartocdn.com/rastertiles/voyager/${zoom}/${tx}/${ty}@2x.png`;
+      const url = `https://tile.openstreetmap.org/${zoom}/${tx}/${ty}.png`;
       tasks.push(
         loadImage(url).then((img) => ({ tx, ty, img })).catch(() => ({ tx, ty, img: null as any })),
       );

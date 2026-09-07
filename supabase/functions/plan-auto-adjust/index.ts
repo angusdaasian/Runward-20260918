@@ -18,6 +18,7 @@ import {
   auditPlanHistory,
   classifyDeviation,
   fetchActivities,
+  paceSecPerKm,
   parseDurationStr,
   fmtDuration,
   parseJsonLoose,

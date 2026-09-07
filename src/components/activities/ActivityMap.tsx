@@ -32,8 +32,8 @@ function decodePolyline(encoded: string): [number, number][] {
 
 function renderRoute(map: L.Map, coords: [number, number][], padding: [number, number]) {
   L.tileLayer(
-    'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-    { maxZoom: 19, subdomains: 'abcd' },
+    'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+    { maxZoom: 19, attribution: '&copy; OpenStreetMap contributors' },
   ).addTo(map);
 
   L.polyline(coords, {

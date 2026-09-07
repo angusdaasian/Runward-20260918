@@ -14,6 +14,7 @@
 import despia from "despia-native";
 import { Lang } from "@/lib/i18n";
 import { toast } from "sonner";
+import { getMapboxToken, mapboxTileUrl } from "@/lib/mapTiles";
 
 import appIcon from "@/assets/app-icon.png";
 import bg1 from "@/assets/share-bg-1.jpg";
@@ -410,10 +411,21 @@ async function drawMapWithTiles(
   const minTy = Math.floor(viewportOriginY / TILE);
   const maxTy = Math.floor(viewportEndY / TILE);
 
+  let mbToken: string | null = null;
+  try {
+    mbToken = await getMapboxToken();
+  } catch {
+    mbToken = null;
+  }
+  const mapTileUrl = (z: number, tx: number, ty: number) =>
+    mbToken
+      ? mapboxTileUrl(mbToken, z, tx, ty)
+      : `https://tile.openstreetmap.org/${z}/${tx}/${ty}.png`;
+
   const tasks: Promise<{ tx: number; ty: number; img: HTMLImageElement | null }>[] = [];
   for (let ty = minTy; ty <= maxTy; ty++) {
     for (let tx = minTx; tx <= maxTx; tx++) {
-      const url = `https://tile.openstreetmap.org/${zoom}/${tx}/${ty}.png`;
+      const url = mapTileUrl(zoom, tx, ty);
       tasks.push(
         loadImage(url).then((img) => ({ tx, ty, img })).catch(() => ({ tx, ty, img: null as any })),
       );

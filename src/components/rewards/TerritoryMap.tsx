@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { addMapboxBasemap } from "@/lib/mapTiles";
 import { cellToBoundary, cellToLatLng } from "h3-js";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -49,10 +50,7 @@ const TerritoryMap = ({ hexes, currentUserId, focusCity }: Props) => {
       attributionControl: false,
       worldCopyJump: true,
     }).setView([20, 0], 2);
-    L.tileLayer(
-      "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
-      { maxZoom: 19, attribution: "&copy; OpenStreetMap contributors" },
-    ).addTo(map);
+    void addMapboxBasemap(map, L);
     mapRef.current = map;
     layerRef.current = L.layerGroup().addTo(map);
     landmarkLayerRef.current = L.layerGroup().addTo(map);

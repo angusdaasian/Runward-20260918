@@ -741,81 +741,106 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
 
 
   // Exact 1000 m splits derived from Terra distance/time samples.
-  // Interpolates elapsed time at each kilometer boundary so every split is
-  // exactly 1000 m (last one may be partial), instead of grouping whole laps.
-  // For interval sessions the splits are continuous across the entire activity,
-  // so rest laps are included — each 1 km split reflects the true elapsed time
-  // including any rest that fell within that kilometre.
-  const exactKmSplits = useMemo((): Split[] | null => {
+  // Interpolates elapsed time at each kilometer boundary so every running split
+  // is exactly 1000 m (last one may be partial). For interval sessions the rest
+  // laps are kept as their own rows (Garmin style): running distance is grouped
+  // into 1 km blocks, and each recovery lap is listed separately in between.
+  const exactKmSplits = useMemo((): (Split & { isRest?: boolean })[] | null => {
     const distSamples = Array.isArray(activity.distance_samples) ? activity.distance_samples : null;
     if (!distSamples || distSamples.length < 10) return null;
     const hrSamples = Array.isArray(activity.hr_samples) ? activity.hr_samples : [];
     const ordered = [...distSamples].sort((a, b) => a.t - b.t).filter((s) => typeof s.d === "number");
     if (ordered.length < 10) return null;
 
-
-
-
-    const out: Split[] = [];
-    let splitDist = 0;    // distance inside the current 1 km split
-    let splitTime = 0;    // time inside the current 1 km split
-    let splitStartT = ordered[0].t;
-    let hrIdx = 0;
+    // --- helpers over the distance/time stream ---
+    const timeAtDistance = (target: number): number => {
+      if (target <= ordered[0].d) return ordered[0].t;
+      for (let i = 1; i < ordered.length; i++) {
+        if (ordered[i].d >= target) {
+          const prev = ordered[i - 1];
+          const cur = ordered[i];
+          const dd = cur.d - prev.d;
+          if (dd <= 0) return cur.t;
+          return prev.t + ((target - prev.d) / dd) * (cur.t - prev.t);
+        }
+      }
+      return ordered[ordered.length - 1].t;
+    };
     const avgHrBetween = (t0: number, t1: number): number | undefined => {
-      if (!hrSamples.length) return undefined;
+      if (!hrSamples.length || t1 <= t0) return undefined;
       let sum = 0, n = 0;
-      while (hrIdx < hrSamples.length && hrSamples[hrIdx].t <= t0) hrIdx++;
-      let i = hrIdx;
-      while (i < hrSamples.length && hrSamples[i].t <= t1) { sum += hrSamples[i].bpm; n++; i++; }
+      for (const s of hrSamples) {
+        if (s.t >= t0 && s.t <= t1) { sum += s.bpm; n++; }
+      }
       return n > 0 ? sum / n : undefined;
     };
-    const push = (endT: number) => {
-      if (splitDist <= 0 || splitTime <= 0) return;
+
+    const out: (Split & { isRest?: boolean })[] = [];
+    const pushRange = (d0: number, d1: number, isRest?: boolean) => {
+      const dist = d1 - d0;
+      if (dist <= 0) return;
+      const t0 = timeAtDistance(d0);
+      const t1 = timeAtDistance(d1);
+      const time = t1 - t0;
+      if (time <= 0) return;
       out.push({
-        distance: Math.round(splitDist),
-        elapsed_time: Math.round(splitTime),
-        moving_time: Math.round(splitTime),
-        average_speed: splitDist / splitTime,
-        average_heartrate: avgHrBetween(splitStartT, endT),
+        distance: Math.round(dist),
+        elapsed_time: Math.round(time),
+        moving_time: Math.round(time),
+        average_speed: dist / time,
+        average_heartrate: avgHrBetween(t0, t1),
         elevation_difference: 0,
         split: out.length + 1,
+        isRest,
       });
     };
 
-    for (let i = 1; i < ordered.length; i++) {
-      const prev = ordered[i - 1];
-      const cur = ordered[i];
-      const segD = cur.d - prev.d;
-      const segT = cur.t - prev.t;
-      if (segD <= 0 || segT <= 0) continue;
-      if (splitDist === 0) splitStartT = prev.t;
+    const totalD = ordered[ordered.length - 1].d - ordered[0].d;
+    const startD = ordered[0].d;
+    if (totalD < 200) return null;
 
-      let remainingD = segD;
-      let segStartT = prev.t;
-      while (remainingD > 0) {
-        const needed = 1000 - splitDist;
-        if (remainingD < needed) {
-          splitDist += remainingD;
-          splitTime += (remainingD / segD) * segT;
-          remainingD = 0;
-        } else {
-          const usedT = (needed / segD) * segT;
-          splitDist += needed;
-          splitTime += usedT;
-          const endT = segStartT + usedT;
-          push(endT);
-          splitDist = 0;
-          splitTime = 0;
-          splitStartT = endT;
-          segStartT = endT;
-          remainingD -= needed;
+    // Determine interval rest windows from lap data (if available).
+    const laps = (splits || []).filter((s) => (s.distance || 0) > 0 && (s.elapsed_time || 0) > 0);
+    const lapSpeeds = laps.map((l) => l.average_speed).filter((v) => v > 0);
+    const fastest = lapSpeeds.length ? Math.max(...lapSpeeds) : 0;
+    const slowest = lapSpeeds.length ? Math.min(...lapSpeeds) : 0;
+    const isInterval = lapSpeeds.length >= 3 && slowest > 0 && fastest / slowest >= 1.4;
+
+    if (isInterval) {
+      // Walk the laps, keeping distance ranges; merge consecutive work laps and
+      // slice them into 1 km blocks, emit rest laps as standalone rows.
+      let cum = startD;
+      let workStart: number | null = null;
+      const flushWork = (endD: number) => {
+        if (workStart == null) return;
+        for (let a = workStart; a < endD - 5; a += 1000) {
+          pushRange(a, Math.min(a + 1000, endD));
         }
+        workStart = null;
+      };
+      for (const lap of laps) {
+        const lapEnd = cum + (lap.distance || 0);
+        const rest = lap.average_speed > 0 && fastest > 0 && lap.average_speed < fastest * 0.7;
+        if (rest) {
+          flushWork(cum);
+          pushRange(cum, lapEnd, true);
+        } else if (workStart == null) {
+          workStart = cum;
+        }
+        cum = lapEnd;
       }
+      flushWork(Math.min(cum, startD + totalD));
+      return out.length >= 2 ? out : null;
     }
-    // Trailing partial kilometer
-    if (splitDist > 30 && splitTime > 3) push(ordered[ordered.length - 1].t);
+
+    // Non-interval: continuous 1 km splits across the whole activity.
+    const endD = startD + totalD;
+    for (let a = startD; a < endD - 30; a += 1000) {
+      pushRange(a, Math.min(a + 1000, endD));
+    }
     return out.length >= 2 ? out : null;
-  }, [activity.distance_samples, activity.hr_samples]);
+  }, [activity.distance_samples, activity.hr_samples, splits]);
+
 
 
   const chartTabs = useMemo(() => {

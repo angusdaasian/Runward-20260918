@@ -622,7 +622,19 @@ export function useActivities(options?: { limit?: number; enabled?: boolean }) {
     plannedWorkouts: workoutsQuery.data || [],
     userRaces: userRacesQuery.data || [],
     activitiesReady,
-    loading: activitiesQuery.isLoading || appleHealthQuery.isLoading || garminQuery.isLoading || terraQuery.isLoading || profileQuery.isLoading || connectionQuery.isLoading,
+    // A single loading flag: true only on a true first load (nothing cached
+    // and nothing merged yet). Background refreshes surface via isRefreshing
+    // so content is never replaced by a skeleton again.
+    loading:
+      (!activitiesReady || profileQuery.isLoading || connectionQuery.isLoading) &&
+      mergedActivities.length === 0 &&
+      !profileQuery.data,
+    isRefreshing:
+      terraQuery.isFetching ||
+      activitiesQuery.isFetching ||
+      appleHealthQuery.isFetching ||
+      garminQuery.isFetching ||
+      suuntoQuery.isFetching,
     invalidateAll,
   };
 }

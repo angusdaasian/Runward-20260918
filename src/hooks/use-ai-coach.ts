@@ -360,7 +360,11 @@ export function useAICoach(open: boolean) {
       try {
         await callFn("?action=apply_plan_suggestion", {
           method: "POST",
-          body: JSON.stringify({ plan_id: sug.plan_id, changes: sug.changes }),
+          body: JSON.stringify({
+            plan_id: sug.plan_id,
+            changes: sug.changes,
+            message_id: msg?.dbId || undefined,
+          }),
         });
         setMessages((arr) =>
           arr.map((x) =>

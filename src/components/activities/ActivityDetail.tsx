@@ -844,7 +844,7 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
     // Trailing partial kilometer
     if (splitDist > 30 && splitTime > 3) push(ordered[ordered.length - 1].t);
     return out.length >= 2 ? out : null;
-  }, [activity.distance_samples, activity.hr_samples, workWindows]);
+  }, [activity.distance_samples, activity.hr_samples]);
 
 
   const chartTabs = useMemo(() => {

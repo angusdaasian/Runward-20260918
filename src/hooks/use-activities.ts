@@ -419,10 +419,11 @@ export function useActivities(options?: { limit?: number; enabled?: boolean }) {
   const limit = options?.limit;
   const activityQueriesEnabled = !!user && (options?.enabled ?? true);
 
-  // Terra is the highest-priority source: load it first, then gate Strava /
-  // Apple Health / Garmin (Railway) until Terra's first fetch settles.
-  // This avoids painting a Garmin/Railway row first that later gets de-duped
-  // away when the matching Terra activity arrives.
+  // All sources are fetched in PARALLEL. Previously Strava / Apple Health /
+  // Garmin waited for Terra to settle, which turned cold start into a
+  // waterfall and made rows pop in one wave at a time. Dedup still happens
+  // once on the merged set (see mergedActivities below), and the list is only
+  // painted once every source has settled — so no more staggered pop-in.
   const terraQuery = useQuery({
     queryKey: ["terra-activities", user?.id, limit ?? "all"],
     queryFn: () => fetchTerraActivities(user!.id, limit),
@@ -431,13 +432,8 @@ export function useActivities(options?: { limit?: number; enabled?: boolean }) {
     gcTime: 10 * 60 * 1000,
   });
 
-  // Wait until Terra's CURRENT fetch settles (not just any prior fetch from
-  // cache). On a stale refetch isFetched is already true from the previous
-  // run, which would let Garmin/Railway return first and briefly replace the
-  // Terra row at the top of the list.
   const hasTerraForLatestView = !!limit && (terraQuery.data?.length ?? 0) > 0;
-  const secondaryEnabled =
-    activityQueriesEnabled && terraQuery.isFetched && !terraQuery.isFetching && !hasTerraForLatestView;
+  const secondaryEnabled = activityQueriesEnabled;
 
   const activitiesQuery = useQuery({
     queryKey: ["strava-activities", user?.id, limit ?? "all"],
@@ -510,74 +506,51 @@ export function useActivities(options?: { limit?: number; enabled?: boolean }) {
     staleTime: 5 * 60 * 1000,
   });
 
-  const activitiesReady = !activityQueriesEnabled || (
-    terraQuery.isFetched &&
-    !terraQuery.isFetching &&
-    (hasTerraForLatestView || (
-      activitiesQuery.isFetched &&
-      !activitiesQuery.isFetching &&
-      appleHealthQuery.isFetched &&
-      !appleHealthQuery.isFetching &&
-      garminQuery.isFetched &&
-      !garminQuery.isFetching
-    ))
-  );
+  // Every source runs in parallel now, so "ready" simply means all of them
+  // have settled at least once.
+  const allSourcesSettled =
+    terraQuery.isFetched && !terraQuery.isFetching &&
+    activitiesQuery.isFetched && !activitiesQuery.isFetching &&
+    appleHealthQuery.isFetched && !appleHealthQuery.isFetching &&
+    garminQuery.isFetched && !garminQuery.isFetching &&
+    suuntoQuery.isFetched && !suuntoQuery.isFetching;
 
-  // Merge Strava + Apple Health + Garmin + Terra activities (prefer Terra over duplicate Garmin imports)
-  // Wait until BOTH garmin and terra queries have completed at least once before
-  // running dedup. Otherwise on refocus one query may briefly return empty/stale
-  // data while the other has fresh data, causing activities to flicker/disappear.
+  const activitiesReady = !activityQueriesEnabled || allSourcesSettled;
+
+  // Merge Strava + Apple Health + Garmin + Terra + Suunto (prefer Terra over
+  // duplicate Garmin imports). The merge runs ONCE, only after every source
+  // has settled — while a refresh is in flight we keep showing the previous
+  // merged list, so rows never flicker, reshuffle or arrive in waves.
+  const lastMergedRef = useRef<StravaActivity[]>([]);
   const mergedActivities = useMemo(() => {
+    if (!allSourcesSettled) return lastMergedRef.current;
+
     const tr = terraQuery.data || [];
-    const terraReady = terraQuery.isFetched && !terraQuery.isFetching;
-    if (!terraReady) {
-      return [...tr].sort((a, b) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime());
-    }
     const terraOnlyLatestView = !!limit && tr.length > 0;
     const strava = terraOnlyLatestView ? [] : (activitiesQuery.data || []);
     const ah = terraOnlyLatestView ? [] : (appleHealthQuery.data || []);
     const gm = terraOnlyLatestView ? [] : (garminQuery.data || []);
 
-    // Wait for BOTH garmin and terra current fetches to settle before
-    // running dedup. isFetched alone is true from prior cached runs, so we
-    // also require !isFetching to avoid showing a stale garmin row that
-    // hasn't yet been deduped against the still-loading terra response.
-    const bothSettled =
-      terraReady && garminQuery.isFetched && !garminQuery.isFetching;
+    const filteredGarmin = gm.filter((g) => !tr.some((t) => {
+      const timeDiff = Math.abs(new Date(g.start_date).getTime() - new Date(t.start_date).getTime());
+      const distanceDiff = Math.abs((g.distance || 0) - (t.distance || 0));
+      const distanceTolerance = Math.max(250, Math.min(g.distance || 0, t.distance || 0) * 0.03);
+      return timeDiff < 10 * 60 * 1000 && distanceDiff < distanceTolerance;
+    }));
 
-    let filteredGarmin: StravaActivity[];
-    if (bothSettled) {
-      filteredGarmin = gm.filter((g) => !tr.some((t) => {
-        const timeDiff = Math.abs(new Date(g.start_date).getTime() - new Date(t.start_date).getTime());
-        const distanceDiff = Math.abs((g.distance || 0) - (t.distance || 0));
-        const distanceTolerance = Math.max(250, Math.min(g.distance || 0, t.distance || 0) * 0.03);
-        return timeDiff < 10 * 60 * 1000 && distanceDiff < distanceTolerance;
-      }));
-    } else if (terraQuery.isFetching && tr.length > 0) {
-      // Terra still loading: hide any garmin row newer-or-equal to the newest
-      // terra row we have, since it's likely a duplicate that will be deduped
-      // once terra finishes. This prevents garmin/railway from briefly
-      // replacing the latest terra activity at the top of the list.
-      const newestTerraTs = new Date(tr[0].start_date).getTime();
-      filteredGarmin = gm.filter((g) => new Date(g.start_date).getTime() < newestTerraTs);
-    } else {
-      filteredGarmin = gm;
-    }
     const su = suuntoQuery.data || [];
     const all = [...strava, ...ah, ...filteredGarmin, ...tr, ...su];
     all.sort((a, b) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime());
+    lastMergedRef.current = all;
     return all;
   }, [
+    allSourcesSettled,
     activitiesQuery.data,
     appleHealthQuery.data,
     garminQuery.data,
     terraQuery.data,
     suuntoQuery.data,
-    garminQuery.isFetching,
-    garminQuery.isFetched,
     limit,
-    terraQuery.isFetching,
-    terraQuery.isFetched,
   ]);
 
   // Auto-link races to activities: when an activity exists on a race day and
@@ -649,7 +622,19 @@ export function useActivities(options?: { limit?: number; enabled?: boolean }) {
     plannedWorkouts: workoutsQuery.data || [],
     userRaces: userRacesQuery.data || [],
     activitiesReady,
-    loading: activitiesQuery.isLoading || appleHealthQuery.isLoading || garminQuery.isLoading || terraQuery.isLoading || profileQuery.isLoading || connectionQuery.isLoading,
+    // A single loading flag: true only on a true first load (nothing cached
+    // and nothing merged yet). Background refreshes surface via isRefreshing
+    // so content is never replaced by a skeleton again.
+    loading:
+      (!activitiesReady || profileQuery.isLoading || connectionQuery.isLoading) &&
+      mergedActivities.length === 0 &&
+      !profileQuery.data,
+    isRefreshing:
+      terraQuery.isFetching ||
+      activitiesQuery.isFetching ||
+      appleHealthQuery.isFetching ||
+      garminQuery.isFetching ||
+      suuntoQuery.isFetching,
     invalidateAll,
   };
 }

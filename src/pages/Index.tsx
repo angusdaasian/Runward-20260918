@@ -5,7 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useOnlineStatus } from "@/hooks/use-online-status";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { confirmLeave } from "@/lib/unsavedGuard";
-import { TabPageSkeleton, SettingsSkeleton, CommunitySkeleton, PostureSkeleton, TrainingSkeleton } from "@/components/ui/PageSkeleton";
+import { TabPageSkeleton, SettingsSkeleton, CommunitySkeleton, PostureSkeleton, TrainingSkeleton, AppShellSkeleton } from "@/components/ui/PageSkeleton";
 import PullToRefreshContainer from "@/components/ui/PullToRefreshContainer";
 import { useSimpleMode } from "@/hooks/use-simple-mode";
 
@@ -87,6 +87,23 @@ const Index = () => {
     () => sessionStorage.getItem(ONBOARDING_SIGNUP_IN_PROGRESS_KEY) === "true"
   );
   const [aiChatDisabled, setAiChatDisabled] = useState(() => localStorage.getItem("ai_chat_disabled") === "true");
+  // Gate non-critical overlays (promo banner, what's-new, chat button) until
+  // after first paint so cold start renders in one step.
+  const [extrasReady, setExtrasReady] = useState(false);
+  useEffect(() => {
+    const w = window as any;
+    let idleId: any;
+    let timeoutId: any;
+    if (typeof w.requestIdleCallback === "function") {
+      idleId = w.requestIdleCallback(() => setExtrasReady(true), { timeout: 3000 });
+    } else {
+      timeoutId = setTimeout(() => setExtrasReady(true), 1200);
+    }
+    return () => {
+      if (idleId && typeof w.cancelIdleCallback === "function") w.cancelIdleCallback(idleId);
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, []);
   useEffect(() => {
     const sync = () => setAiChatDisabled(localStorage.getItem("ai_chat_disabled") === "true");
     window.addEventListener("ai-chat-toggle", sync);
@@ -197,16 +214,10 @@ const Index = () => {
 
   // Cold start: brief splash only while auth itself is resolving.
   const suppressAppLoading = sessionStorage.getItem(ONBOARDING_SIGNUP_IN_PROGRESS_KEY) === "true";
+  // ONE cold-start state: the app chrome with placeholders, identical for cold
+  // starts and warm resumes. No spinner → skeleton → content chain.
   if (loading && !suppressAppLoading) {
-    if (isWarmResume) {
-      return <TabPageSkeleton />;
-    }
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-background gap-3">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
-        <p className="text-xs text-muted-foreground animate-pulse">Loading...</p>
-      </div>
-    );
+    return <AppShellSkeleton />;
   }
 
   if (showOnboarding) {
@@ -367,17 +378,23 @@ const Index = () => {
         </div>
       </div>
 
-      <PromoBanner lang={lang} userId={user?.id ?? null} triggerKey={promoTrigger} />
+      {/* Non-essential overlays mount only after the first screen is interactive,
+          so they never compete with the initial paint. */}
+      {extrasReady && (
+        <>
+          <PromoBanner lang={lang} userId={user?.id ?? null} triggerKey={promoTrigger} />
 
-      <WhatsNewWalkthrough
-        lang={lang}
-        enabled={!!user && !isGuest && !showOnboarding && activeTab === "activities"}
-      />
+          <WhatsNewWalkthrough
+            lang={lang}
+            enabled={!!user && !isGuest && !showOnboarding && activeTab === "activities"}
+          />
 
-      {!isGuest && user && !aiChatDisabled && (
-        <Suspense fallback={null}>
-          <FloatingChatButton lang={lang} />
-        </Suspense>
+          {!isGuest && user && !aiChatDisabled && (
+            <Suspense fallback={null}>
+              <FloatingChatButton lang={lang} />
+            </Suspense>
+          )}
+        </>
       )}
     </div>
   );

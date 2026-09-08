@@ -1,5 +1,7 @@
 import { lazy, Suspense } from "react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient } from "@tanstack/react-query";
+import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
+import { queryPersister, shouldPersistQuery, QUERY_CACHE_BUSTER, QUERY_CACHE_MAX_AGE } from "@/lib/queryPersist";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
@@ -37,7 +39,16 @@ const OAuthAuthorize = lazy(() => import("./pages/OAuthAuthorize.tsx"));
 const ApiDocs = lazy(() => import("./pages/ApiDocs.tsx"));
 const ConnectedApps = lazy(() => import("./pages/ConnectedApps.tsx"));
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 60 * 1000,
+      gcTime: 30 * 60 * 1000,
+      refetchOnWindowFocus: false,
+      retry: 1,
+    },
+  },
+});
 const native = isNativeApp();
 registerShareIntent();
 installGlobalUIUnlockGuard();
@@ -72,7 +83,15 @@ const RootRoute = () => {
 
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
+  <PersistQueryClientProvider
+    client={queryClient}
+    persistOptions={{
+      persister: queryPersister,
+      buster: QUERY_CACHE_BUSTER,
+      maxAge: QUERY_CACHE_MAX_AGE,
+      dehydrateOptions: { shouldDehydrateQuery: shouldPersistQuery },
+    }}
+  >
     <TooltipProvider>
       <AuthProvider>
         <PremiumProvider>
@@ -116,7 +135,7 @@ const App = () => (
         </PremiumProvider>
       </AuthProvider>
     </TooltipProvider>
-  </QueryClientProvider>
+  </PersistQueryClientProvider>
 );
 
 export default App;

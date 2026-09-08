@@ -62,7 +62,7 @@ const Tools = () => {
               to="/blog"
               className="hidden sm:inline-block text-sm text-muted-foreground hover:text-foreground transition-colors"
             >
-              {zh ? "博客" : "Blog"}
+              {zh ? "跑步文章" : "Blog"}
             </Link>
             <button
               onClick={toggleLang}

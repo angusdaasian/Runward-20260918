@@ -819,8 +819,6 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
       const segD = cur.d - prev.d;
       const segT = cur.t - prev.t;
       if (segD <= 0 || segT <= 0) continue;
-      // Skip segments that fall inside a rest lap.
-      if (!inWork((prev.d + cur.d) / 2)) continue;
       if (splitDist === 0) splitStartT = prev.t;
 
       let remainingD = segD;

@@ -159,13 +159,7 @@ export function useAICoach(open: boolean) {
       localStorage.setItem(SESSION_KEY, resolvedSid);
       setSessionId(resolvedSid);
 
-      setMessages(
-        msgs.map((m: any) => ({
-          id: m.id || newId(),
-          role: m.role,
-          content: m.content,
-        })),
-      );
+      setMessages(msgs.map((m: any) => mapHistoryRow(m, newId())));
     } catch (e) {
       console.warn("coach load failed", e);
     } finally {

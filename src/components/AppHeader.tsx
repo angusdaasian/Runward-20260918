@@ -17,14 +17,41 @@ import { getRankFromXP, formatRank, getTierColor, type RankTier } from "@/lib/ra
 import { RANK_EMBLEMS } from "@/lib/rankEmblems";
 import { Progress } from "@/components/ui/progress";
 
-// Module-level cache — survives across remounts/tab switches
-let _headerProfile: { display_name: string | null; avatar_url: string | null; monthly_xp: number; rank_tier: string; division: string } | null = null;
-let _headerUserId: string | null = null;
+// Module-level cache — survives across remounts/tab switches.
+// It is also mirrored to localStorage so a cold start can paint the real
+// name / avatar / rank immediately instead of a placeholder.
+type HeaderProfile = { display_name: string | null; avatar_url: string | null; monthly_xp: number; rank_tier: string; division: string };
+const HEADER_CACHE_KEY = "cache:header-profile";
+
+function readPersistedHeader(): { userId: string; profile: HeaderProfile } | null {
+  try {
+    const raw = localStorage.getItem(HEADER_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (parsed?.userId && parsed?.profile) return parsed;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function persistHeader(userId: string, profile: HeaderProfile) {
+  try {
+    localStorage.setItem(HEADER_CACHE_KEY, JSON.stringify({ userId, profile }));
+  } catch {
+    /* storage full / disabled — ignore */
+  }
+}
+
+const _persisted = typeof window !== "undefined" ? readPersistedHeader() : null;
+let _headerProfile: HeaderProfile | null = _persisted?.profile ?? null;
+let _headerUserId: string | null = _persisted?.userId ?? null;
 let _fetchPromise: Promise<void> | null = null;
 
 /** Eagerly fetch profile into cache. Call as early as possible (e.g. when user is known). */
 export function preloadHeaderProfile(userId: string) {
-  if (_headerUserId === userId && _headerProfile) return;
+  // Always refresh in the background, even when a cached copy exists, so the
+  // persisted value never goes stale.
   if (_fetchPromise) return;
   _fetchPromise = Promise.resolve(
     supabase
@@ -34,8 +61,9 @@ export function preloadHeaderProfile(userId: string) {
       .single()
   ).then(({ data }) => {
     if (data) {
-      _headerProfile = data;
+      _headerProfile = data as HeaderProfile;
       _headerUserId = userId;
+      persistHeader(userId, _headerProfile);
     }
     _fetchPromise = null;
   }).catch(() => { _fetchPromise = null; });
@@ -52,6 +80,7 @@ export function updateHeaderCache(profile: { display_name: string | null; avatar
     division: profile.division ?? _headerProfile?.division ?? "V",
   };
   _headerUserId = userId;
+  persistHeader(userId, _headerProfile as HeaderProfile);
 }
 
 // ---------- Announcement Bell ----------

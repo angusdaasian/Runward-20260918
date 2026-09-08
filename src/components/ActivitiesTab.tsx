@@ -651,7 +651,17 @@ const ActivitiesTab = ({ lang, resetSignal }: Props) => {
     month: todayDate.getMonth(),
   });
 
-  // Start fetching Apple Health stats immediately (even during skeleton loading)
+  // When the Activities tab is tapped again while already active, the parent
+  // bumps `resetSignal`. Reset any nested view back to the homepage list.
+  const prevResetRef = useRef(resetSignal);
+  useEffect(() => {
+    if (resetSignal === prevResetRef.current) return;
+    prevResetRef.current = resetSignal;
+    setSelectedActivity(null);
+    setShowAllActivities(false);
+    setDateSheet(null);
+  }, [resetSignal]);
+
   const appleHealth = useAppleHealth(lang);
   const [ahConnected, setAhConnected] = useState(false);
 

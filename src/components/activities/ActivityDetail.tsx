@@ -737,37 +737,8 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
   const hasPace = chartData.some(d => d.pace);
   const hasCadence = chartData.some(d => d.cadence === "number" && d.cadence > 0);
 
-  // Detect an interval workout from the lap list and return the cumulative
-  // distance windows of the "work" laps only (rest/recovery laps excluded).
-  // Returns null when the activity doesn't look like an interval session.
-  const workWindows = useMemo((): { from: number; to: number }[] | null => {
-    const laps = (splits || []).filter((s) => (s.distance || 0) > 50 && (s.moving_time || s.elapsed_time || 0) > 5);
-    if (laps.length < 4) return null;
-    const speeds = laps.map((s) => (s.distance || 0) / (s.moving_time || s.elapsed_time || 1));
-    const sorted = [...speeds].sort((a, b) => a - b);
-    const median = sorted[Math.floor(sorted.length / 2)];
-    const fast = sorted.filter((v) => v >= median);
-    const fastMedian = fast[Math.floor(fast.length / 2)] || median;
-    const threshold = fastMedian * 0.82;
-    const isWork = speeds.map((v) => v >= threshold);
-    const restCount = isWork.filter((w) => !w).length;
-    const workCount = isWork.filter((w) => w).length;
-    if (restCount < 2 || workCount < 2) return null;
 
-    const windows: { from: number; to: number }[] = [];
-    let all = 0;
-    for (const s of splits || []) {
-      const from = all;
-      all += s.distance || 0;
-      const idx = laps.indexOf(s);
-      if (idx >= 0 && isWork[idx]) {
-        const last = windows[windows.length - 1];
-        if (last && Math.abs(last.to - from) < 1) last.to = all;
-        else windows.push({ from, to: all });
-      }
-    }
-    return windows.length > 0 ? windows : null;
-  }, [splits]);
+
 
   // Exact 1000 m splits derived from Terra distance/time samples.
   // Interpolates elapsed time at each kilometer boundary so every split is

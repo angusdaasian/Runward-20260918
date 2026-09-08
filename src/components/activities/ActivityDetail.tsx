@@ -1642,10 +1642,10 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
               const distMeters = split.distance || 0;
               // Rest if this lap's speed is <70% of the fastest lap's speed
               // (i.e. >~43% slower in pace terms).
-              const isRest = isIntervalWorkout
+              const isRest = (split as any).isRest ?? (isIntervalWorkout
                 && fastestSpeed > 0
                 && split.average_speed > 0
-                && split.average_speed < fastestSpeed * 0.7;
+                && split.average_speed < fastestSpeed * 0.7);
               const pace = formatPace(split.average_speed);
               const hr = split.average_heartrate ? Math.round(split.average_heartrate) : null;
               if (!isRest) runNum++;

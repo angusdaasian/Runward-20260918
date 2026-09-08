@@ -54,6 +54,7 @@ const Index = () => {
   const [showShoes, setShowShoes] = useState(() => searchParams.get("page") === "shoes");
 
   const [promoTrigger, setPromoTrigger] = useState(0);
+  const [activityResetSignal, setActivityResetSignal] = useState(0);
   const [runningScore, setRunningScore] = useState<number | null>(null);
   const [lang, setLangState] = useState<Lang>(() => (localStorage.getItem("app_lang") as Lang) || "en");
   const setLang = (l: Lang) => {

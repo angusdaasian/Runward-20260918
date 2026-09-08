@@ -3,6 +3,7 @@ import { Globe, Smartphone, ChevronRight, CheckCircle2, Check, X, Crown, Sparkle
 import { Link, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import appStoreBadge from "@/assets/app-store-badge.png";
+import googlePlayBadge from "@/assets/google-play-badge.png";
 import appIcon from "@/assets/app-icon.png";
 import poweredByStrava from "@/assets/brands/powered-by-strava.svg.asset.json";
 import IPhoneFrame from "@/components/landing/IPhoneFrame";
@@ -14,6 +15,7 @@ import BrandStrip from "@/components/landing/BrandStrip";
 
 
 const APP_STORE_URL = "https://apps.apple.com/us/app/runward/id6761060757";
+const GOOGLE_PLAY_URL = "https://play.google.com/store/apps/details?id=com.despia.runward";
 
 type Lang = "en" | "zh";
 
@@ -163,12 +165,15 @@ const Landing = () => {
                 <ChevronRight size={18} />
               </a>
               <a href={APP_STORE_URL} target="_blank" rel="noopener noreferrer" className="inline-block">
-                <img src={appStoreBadge} alt="Download on the App Store" className="h-12" />
+                <img src={appStoreBadge} alt="Download on the App Store" className="h-12" loading="lazy" />
+              </a>
+              <a href={GOOGLE_PLAY_URL} target="_blank" rel="noopener noreferrer" className="inline-block">
+                <img src={googlePlayBadge} alt="Get it on Google Play" className="h-12" loading="lazy" />
               </a>
             </div>
 
             <p className="text-xs text-muted-foreground mt-5">
-              {zh ? "iPhone · 免費下載 · 7 天 Premium 試用" : "iPhone · Free to download · 7-day Premium trial"}
+              {zh ? "iOS / Android · 免費下載 · 7 天 Premium 試用" : "iOS / Android · Free to download · 7-day Premium trial"}
             </p>
           </div>
 
@@ -476,9 +481,14 @@ const Landing = () => {
               ? "加入 Runward，讓 AI 幫助你達成跑步目標。"
               : "Join Runward and let AI help you reach your running goals."}
           </p>
-          <a href={APP_STORE_URL} target="_blank" rel="noopener noreferrer" className="inline-block">
-            <img src={appStoreBadge} alt="Download on the App Store" className="h-14 mx-auto" />
-          </a>
+          <div className="flex flex-wrap items-center justify-center gap-4">
+            <a href={APP_STORE_URL} target="_blank" rel="noopener noreferrer" className="inline-block">
+              <img src={appStoreBadge} alt="Download on the App Store" className="h-14" />
+            </a>
+            <a href={GOOGLE_PLAY_URL} target="_blank" rel="noopener noreferrer" className="inline-block">
+              <img src={googlePlayBadge} alt="Get it on Google Play" className="h-14" loading="lazy" />
+            </a>
+          </div>
         </motion.div>
       </section>
 

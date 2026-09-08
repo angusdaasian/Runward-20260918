@@ -133,6 +133,8 @@ export type Database = {
           created_at: string
           id: string
           metadata: Json | null
+          plan_suggestion: Json | null
+          plan_suggestion_status: string | null
           role: string
           session_id: string
           user_id: string
@@ -142,6 +144,8 @@ export type Database = {
           created_at?: string
           id?: string
           metadata?: Json | null
+          plan_suggestion?: Json | null
+          plan_suggestion_status?: string | null
           role: string
           session_id: string
           user_id: string
@@ -151,6 +155,8 @@ export type Database = {
           created_at?: string
           id?: string
           metadata?: Json | null
+          plan_suggestion?: Json | null
+          plan_suggestion_status?: string | null
           role?: string
           session_id?: string
           user_id?: string

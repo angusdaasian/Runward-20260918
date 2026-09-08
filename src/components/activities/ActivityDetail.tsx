@@ -772,8 +772,9 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
   // Exact 1000 m splits derived from Terra distance/time samples.
   // Interpolates elapsed time at each kilometer boundary so every split is
   // exactly 1000 m (last one may be partial), instead of grouping whole laps.
-  // For interval sessions only the running (work) laps are counted — rest laps
-  // are skipped, so the 1 km splits reflect the work effort only.
+  // For interval sessions the splits are continuous across the entire activity,
+  // so rest laps are included — each 1 km split reflects the true elapsed time
+  // including any rest that fell within that kilometre.
   const exactKmSplits = useMemo((): Split[] | null => {
     const distSamples = Array.isArray(activity.distance_samples) ? activity.distance_samples : null;
     if (!distSamples || distSamples.length < 10) return null;

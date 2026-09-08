@@ -581,6 +581,8 @@ serve(async (req) => {
     if (action === "apply_plan_suggestion" && req.method === "POST") {
       const body = await req.json().catch(() => ({}));
       const planId: string | undefined = body?.plan_id;
+      const messageId: string | undefined =
+        typeof body?.message_id === "string" && UUID_RE.test(body.message_id) ? body.message_id : undefined;
       const changes: Array<any> = Array.isArray(body?.changes) ? body.changes : [];
       if (!planId || changes.length === 0) {
         return json({ error: "plan_id and changes required" }, 400);

@@ -637,6 +637,13 @@ serve(async (req) => {
         .eq("id", planId)
         .eq("user_id", user.id);
       if (upErr) return json({ error: upErr.message }, 500);
+      if (messageId) {
+        await admin
+          .from("ai_coach_conversations")
+          .update({ plan_suggestion_status: "applied" })
+          .eq("id", messageId)
+          .eq("user_id", user.id);
+      }
       return json({ ok: true, days_updated: touched });
     }
 

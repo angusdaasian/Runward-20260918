@@ -419,10 +419,11 @@ export function useActivities(options?: { limit?: number; enabled?: boolean }) {
   const limit = options?.limit;
   const activityQueriesEnabled = !!user && (options?.enabled ?? true);
 
-  // Terra is the highest-priority source: load it first, then gate Strava /
-  // Apple Health / Garmin (Railway) until Terra's first fetch settles.
-  // This avoids painting a Garmin/Railway row first that later gets de-duped
-  // away when the matching Terra activity arrives.
+  // All sources are fetched in PARALLEL. Previously Strava / Apple Health /
+  // Garmin waited for Terra to settle, which turned cold start into a
+  // waterfall and made rows pop in one wave at a time. Dedup still happens
+  // once on the merged set (see mergedActivities below), and the list is only
+  // painted once every source has settled — so no more staggered pop-in.
   const terraQuery = useQuery({
     queryKey: ["terra-activities", user?.id, limit ?? "all"],
     queryFn: () => fetchTerraActivities(user!.id, limit),
@@ -431,13 +432,8 @@ export function useActivities(options?: { limit?: number; enabled?: boolean }) {
     gcTime: 10 * 60 * 1000,
   });
 
-  // Wait until Terra's CURRENT fetch settles (not just any prior fetch from
-  // cache). On a stale refetch isFetched is already true from the previous
-  // run, which would let Garmin/Railway return first and briefly replace the
-  // Terra row at the top of the list.
   const hasTerraForLatestView = !!limit && (terraQuery.data?.length ?? 0) > 0;
-  const secondaryEnabled =
-    activityQueriesEnabled && terraQuery.isFetched && !terraQuery.isFetching && !hasTerraForLatestView;
+  const secondaryEnabled = activityQueriesEnabled;
 
   const activitiesQuery = useQuery({
     queryKey: ["strava-activities", user?.id, limit ?? "all"],

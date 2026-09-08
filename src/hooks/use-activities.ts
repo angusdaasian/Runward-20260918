@@ -506,18 +506,16 @@ export function useActivities(options?: { limit?: number; enabled?: boolean }) {
     staleTime: 5 * 60 * 1000,
   });
 
-  const activitiesReady = !activityQueriesEnabled || (
-    terraQuery.isFetched &&
-    !terraQuery.isFetching &&
-    (hasTerraForLatestView || (
-      activitiesQuery.isFetched &&
-      !activitiesQuery.isFetching &&
-      appleHealthQuery.isFetched &&
-      !appleHealthQuery.isFetching &&
-      garminQuery.isFetched &&
-      !garminQuery.isFetching
-    ))
-  );
+  // Every source runs in parallel now, so "ready" simply means all of them
+  // have settled at least once.
+  const allSourcesSettled =
+    terraQuery.isFetched && !terraQuery.isFetching &&
+    activitiesQuery.isFetched && !activitiesQuery.isFetching &&
+    appleHealthQuery.isFetched && !appleHealthQuery.isFetching &&
+    garminQuery.isFetched && !garminQuery.isFetching &&
+    suuntoQuery.isFetched && !suuntoQuery.isFetching;
+
+  const activitiesReady = !activityQueriesEnabled || allSourcesSettled;
 
   // Merge Strava + Apple Health + Garmin + Terra activities (prefer Terra over duplicate Garmin imports)
   // Wait until BOTH garmin and terra queries have completed at least once before

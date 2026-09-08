@@ -782,10 +782,8 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
     const ordered = [...distSamples].sort((a, b) => a.t - b.t).filter((s) => typeof s.d === "number");
     if (ordered.length < 10) return null;
 
-    const inWork = (d: number): boolean => {
-      if (!workWindows) return true;
-      return workWindows.some((w) => d >= w.from && d <= w.to);
-    };
+
+
 
     const out: Split[] = [];
     let splitDist = 0;    // distance inside the current 1 km split

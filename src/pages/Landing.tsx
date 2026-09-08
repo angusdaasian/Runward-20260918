@@ -155,20 +155,11 @@ const Landing = () => {
 
             {/* CTA */}
             <div className="mt-8 md:mt-10 flex flex-wrap items-center gap-4">
-              <a
-                href={APP_STORE_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 px-6 py-3.5 rounded-full bg-primary text-primary-foreground text-base font-semibold hover:bg-primary/90 transition-colors shadow-lg shadow-primary/25"
-              >
-                {zh ? "免費開始使用" : "Get started, it's free"}
-                <ChevronRight size={18} />
-              </a>
               <a href={APP_STORE_URL} target="_blank" rel="noopener noreferrer" className="inline-block">
-                <img src={appStoreBadge} alt="Download on the App Store" className="h-12" loading="lazy" />
+                <img src={appStoreBadge} alt="Download on the App Store" className="h-14" loading="lazy" />
               </a>
               <a href={GOOGLE_PLAY_URL} target="_blank" rel="noopener noreferrer" className="inline-block">
-                <img src={googlePlayBadge} alt="Get it on Google Play" className="h-12" loading="lazy" />
+                <img src={googlePlayBadge} alt="Get it on Google Play" className="h-14" loading="lazy" />
               </a>
             </div>
 

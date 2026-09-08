@@ -286,13 +286,7 @@ export function useAICoach(open: boolean) {
           method: "GET",
         });
         const msgs = histRes.messages || [];
-        setMessages(
-          msgs.map((m: any) => ({
-            id: m.id || newId(),
-            role: m.role,
-            content: m.content,
-          })),
-        );
+        setMessages(msgs.map((m: any) => mapHistoryRow(m, newId())));
       } catch (e) {
         toast.error(getLang() === "zh" ? "載入失敗" : "Failed to load");
       } finally {

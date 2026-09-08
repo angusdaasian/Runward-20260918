@@ -360,6 +360,11 @@ const Index = () => {
               key={id}
               onClick={() => {
                 if (id !== activeTab && !confirmLeave(lang === "zh" ? "您的訓練計劃有未儲存的變更。確定要離開嗎？" : "You have unsaved changes to your training plan. Leave without saving?")) return;
+                // Tapping the already-active Activities tab pops back to the
+                // homepage list (closes activity detail / all-activities view).
+                if (id === "activities" && activeTab === "activities") {
+                  setActivityResetSignal((n) => n + 1);
+                }
                 setActiveTab(id);
                 setShowConnectApps(false);
                 setShowMessaging(false);

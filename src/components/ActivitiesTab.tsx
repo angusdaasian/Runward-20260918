@@ -46,6 +46,7 @@ import { useSimpleMode } from "@/hooks/use-simple-mode";
 
 interface Props {
   lang: Lang;
+  resetSignal?: number;
 }
 
 function formatDuration(seconds: number): string {
@@ -586,7 +587,7 @@ const AllActivitiesView = ({
 // ---------- Main Component ----------
 
 
-const ActivitiesTab = ({ lang }: Props) => {
+const ActivitiesTab = ({ lang, resetSignal }: Props) => {
   const { user } = useAuth();
   const { isPremium } = usePremium();
   const [simpleMode] = useSimpleMode();
@@ -650,7 +651,17 @@ const ActivitiesTab = ({ lang }: Props) => {
     month: todayDate.getMonth(),
   });
 
-  // Start fetching Apple Health stats immediately (even during skeleton loading)
+  // When the Activities tab is tapped again while already active, the parent
+  // bumps `resetSignal`. Reset any nested view back to the homepage list.
+  const prevResetRef = useRef(resetSignal);
+  useEffect(() => {
+    if (resetSignal === prevResetRef.current) return;
+    prevResetRef.current = resetSignal;
+    setSelectedActivity(null);
+    setShowAllActivities(false);
+    setDateSheet(null);
+  }, [resetSignal]);
+
   const appleHealth = useAppleHealth(lang);
   const [ahConnected, setAhConnected] = useState(false);
 

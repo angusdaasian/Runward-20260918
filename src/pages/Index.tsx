@@ -54,6 +54,7 @@ const Index = () => {
   const [showShoes, setShowShoes] = useState(() => searchParams.get("page") === "shoes");
 
   const [promoTrigger, setPromoTrigger] = useState(0);
+  const [activityResetSignal, setActivityResetSignal] = useState(0);
   const [runningScore, setRunningScore] = useState<number | null>(null);
   const [lang, setLangState] = useState<Lang>(() => (localStorage.getItem("app_lang") as Lang) || "en");
   const setLang = (l: Lang) => {
@@ -341,7 +342,7 @@ const Index = () => {
           display: activeTab === "activities" ? "block" : "none",
         }}
       >
-        <ActivitiesTab lang={lang} />
+        <ActivitiesTab lang={lang} resetSignal={activityResetSignal} />
       </div>
 
       <div className="bottom-nav fixed bottom-0 left-0 right-0 bg-card border-t border-border" style={{ paddingBottom: 'var(--safe-area-bottom, 0px)' }}>
@@ -359,6 +360,11 @@ const Index = () => {
               key={id}
               onClick={() => {
                 if (id !== activeTab && !confirmLeave(lang === "zh" ? "您的訓練計劃有未儲存的變更。確定要離開嗎？" : "You have unsaved changes to your training plan. Leave without saving?")) return;
+                // Tapping the already-active Activities tab pops back to the
+                // homepage list (closes activity detail / all-activities view).
+                if (id === "activities" && activeTab === "activities") {
+                  setActivityResetSignal((n) => n + 1);
+                }
                 setActiveTab(id);
                 setShowConnectApps(false);
                 setShowMessaging(false);

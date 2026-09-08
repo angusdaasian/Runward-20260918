@@ -222,6 +222,7 @@ export function useAICoach(open: boolean) {
             x.id === placeholder.id
               ? {
                   ...x,
+                  dbId: data.assistant_message_id || null,
                   content: data.response || "",
                   pending: false,
                   planSuggestion: data.plan_suggestion || null,
@@ -229,7 +230,6 @@ export function useAICoach(open: boolean) {
                 }
               : x,
           ),
-
         );
         // Refresh insights + sessions in background
         callFn("?action=insights", { method: "GET" })

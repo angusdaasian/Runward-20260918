@@ -1319,9 +1319,20 @@ Rules: date MUST be one of the planned dates above. Keep changes minimal — onl
       }
     }
 
+    // Persist the pending suggestion on the assistant message so the "Update
+    // plan?" card (and its applied/dismissed state) survives reopening the chat.
+    if (planSuggestion && assistantMessageId) {
+      await admin
+        .from("ai_coach_conversations")
+        .update({ plan_suggestion: planSuggestion, plan_suggestion_status: "pending" })
+        .eq("id", assistantMessageId)
+        .eq("user_id", user.id);
+    }
+
     return json({
       response: aiText,
       session_id: sessionId,
+      assistant_message_id: assistantMessageId,
       remaining_messages_today: Math.max(0, dailyLimit - (usedToday + 1)),
       limit: dailyLimit,
       thinking_level: thinkingLevel,

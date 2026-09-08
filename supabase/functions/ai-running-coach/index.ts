@@ -506,11 +506,11 @@ serve(async (req) => {
 
       const { data } = await admin
         .from("ai_coach_conversations")
-        .select("id, role, content, session_id, created_at")
+        .select("id, role, content, session_id, created_at, plan_suggestion, plan_suggestion_status")
         .eq("user_id", user.id)
         .eq("session_id", resolvedSession)
         .order("created_at", { ascending: true })
-        .limit(50);
+        .limit(500);
       return json({ messages: data || [], session_id: resolvedSession });
     }
 
@@ -581,6 +581,8 @@ serve(async (req) => {
     if (action === "apply_plan_suggestion" && req.method === "POST") {
       const body = await req.json().catch(() => ({}));
       const planId: string | undefined = body?.plan_id;
+      const messageId: string | undefined =
+        typeof body?.message_id === "string" && UUID_RE.test(body.message_id) ? body.message_id : undefined;
       const changes: Array<any> = Array.isArray(body?.changes) ? body.changes : [];
       if (!planId || changes.length === 0) {
         return json({ error: "plan_id and changes required" }, 400);
@@ -635,6 +637,13 @@ serve(async (req) => {
         .eq("id", planId)
         .eq("user_id", user.id);
       if (upErr) return json({ error: upErr.message }, 500);
+      if (messageId) {
+        await admin
+          .from("ai_coach_conversations")
+          .update({ plan_suggestion_status: "applied" })
+          .eq("id", messageId)
+          .eq("user_id", user.id);
+      }
       return json({ ok: true, days_updated: touched });
     }
 
@@ -1091,9 +1100,10 @@ PLAN ADHERENCE RULES:
 - If the runner asks for a workout on a date covered by the plan, restate the planned workout (with pace/HR guidance) instead of proposing something new.
 - Only suggest a fully different workout when (a) there is no active plan, (b) the date is outside the plan window, or (c) the runner explicitly asks to deviate / replace the planned session.
 
-PLAN EDITS (IMPORTANT):
-- You CAN update the runner's in-app training plan. When the runner asks to change, skip, swap, move, or rest any planned day (or confirms a change you proposed), DO NOT say you have no access or ask them to edit it manually.
-- Instead, briefly confirm the change in plain language (e.g. "Got it — making Thu and Fri rest days") and stop. The app will automatically show an "Update plan?" confirmation card/prompt so the runner can apply the change with one tap or reply YES on WhatsApp/Telegram.
+PLAN EDITS (IMPORTANT — BE HONEST ABOUT WHAT HAS HAPPENED):
+- You CAN prepare updates to the runner's in-app training plan. When the runner asks to change, skip, swap, move, or rest any planned day (or confirms a change you proposed), DO NOT say you have no access or ask them to edit it manually.
+- You CANNOT save the change yourself. The plan only changes after the runner taps "Update plan" on the confirmation card the app shows below your reply (or replies YES on WhatsApp/Telegram).
+- So NEVER write that the plan "has been updated", "is now saved", "I've changed it", or anything in the past tense. Instead state the proposed change and that it needs one tap, e.g. "Here's the change: Thu and Fri become rest days — tap Update plan below to save it."
 - Never tell the user the system can't modify the plan. Never instruct them to open the app to manually skip or delete days.
 
 COACHING STYLE:
@@ -1134,14 +1144,19 @@ If the user has no preferences set yet, ask ONE friendly onboarding question per
 
     // Persist messages + usage (write under current thinking level so future
     // ratio conversions stay consistent)
-    const { error: insertError } = await admin.from("ai_coach_conversations").insert([
-      { user_id: user.id, session_id: sessionId, role: "user", content: message },
-      { user_id: user.id, session_id: sessionId, role: "assistant", content: aiText },
-    ]);
+    const { data: insertedRows, error: insertError } = await admin
+      .from("ai_coach_conversations")
+      .insert([
+        { user_id: user.id, session_id: sessionId, role: "user", content: message },
+        { user_id: user.id, session_id: sessionId, role: "assistant", content: aiText },
+      ])
+      .select("id, role, created_at");
     if (insertError) {
       console.error("failed to persist ai coach conversation", insertError);
       return json({ error: "Failed to save conversation" }, 500);
     }
+    const assistantMessageId: string | null =
+      (insertedRows || []).filter((r: any) => r.role === "assistant").pop()?.id ?? null;
     await admin
       .from("ai_coach_usage")
       .upsert(
@@ -1305,9 +1320,20 @@ Rules: date MUST be one of the planned dates above. Keep changes minimal — onl
       }
     }
 
+    // Persist the pending suggestion on the assistant message so the "Update
+    // plan?" card (and its applied/dismissed state) survives reopening the chat.
+    if (planSuggestion && assistantMessageId) {
+      await admin
+        .from("ai_coach_conversations")
+        .update({ plan_suggestion: planSuggestion, plan_suggestion_status: "pending" })
+        .eq("id", assistantMessageId)
+        .eq("user_id", user.id);
+    }
+
     return json({
       response: aiText,
       session_id: sessionId,
+      assistant_message_id: assistantMessageId,
       remaining_messages_today: Math.max(0, dailyLimit - (usedToday + 1)),
       limit: dailyLimit,
       thinking_level: thinkingLevel,

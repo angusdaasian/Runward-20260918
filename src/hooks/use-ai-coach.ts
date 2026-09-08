@@ -19,12 +19,28 @@ export type PlanSuggestion = {
 
 export type CoachMessage = {
   id: string;
+  /** Database row id (present for messages loaded from / saved to history). */
+  dbId?: string | null;
   role: "user" | "assistant";
   content: string;
   pending?: boolean;
   planSuggestion?: PlanSuggestion | null;
   planSuggestionStatus?: "pending" | "applied" | "dismissed";
 };
+
+function mapHistoryRow(m: any, fallbackId: string): CoachMessage {
+  const sug = m.plan_suggestion || null;
+  return {
+    id: m.id || fallbackId,
+    dbId: m.id || null,
+    role: m.role,
+    content: m.content,
+    planSuggestion: sug,
+    planSuggestionStatus: sug
+      ? ((m.plan_suggestion_status as CoachMessage["planSuggestionStatus"]) || "pending")
+      : undefined,
+  };
+}
 
 
 export type ThinkingLevel = "minimal" | "low" | "medium" | "high";
@@ -143,13 +159,7 @@ export function useAICoach(open: boolean) {
       localStorage.setItem(SESSION_KEY, resolvedSid);
       setSessionId(resolvedSid);
 
-      setMessages(
-        msgs.map((m: any) => ({
-          id: m.id || newId(),
-          role: m.role,
-          content: m.content,
-        })),
-      );
+      setMessages(msgs.map((m: any) => mapHistoryRow(m, newId())));
     } catch (e) {
       console.warn("coach load failed", e);
     } finally {
@@ -212,6 +222,7 @@ export function useAICoach(open: boolean) {
             x.id === placeholder.id
               ? {
                   ...x,
+                  dbId: data.assistant_message_id || null,
                   content: data.response || "",
                   pending: false,
                   planSuggestion: data.plan_suggestion || null,
@@ -219,7 +230,6 @@ export function useAICoach(open: boolean) {
                 }
               : x,
           ),
-
         );
         // Refresh insights + sessions in background
         callFn("?action=insights", { method: "GET" })
@@ -276,13 +286,7 @@ export function useAICoach(open: boolean) {
           method: "GET",
         });
         const msgs = histRes.messages || [];
-        setMessages(
-          msgs.map((m: any) => ({
-            id: m.id || newId(),
-            role: m.role,
-            content: m.content,
-          })),
-        );
+        setMessages(msgs.map((m: any) => mapHistoryRow(m, newId())));
       } catch (e) {
         toast.error(getLang() === "zh" ? "載入失敗" : "Failed to load");
       } finally {
@@ -356,7 +360,11 @@ export function useAICoach(open: boolean) {
       try {
         await callFn("?action=apply_plan_suggestion", {
           method: "POST",
-          body: JSON.stringify({ plan_id: sug.plan_id, changes: sug.changes }),
+          body: JSON.stringify({
+            plan_id: sug.plan_id,
+            changes: sug.changes,
+            message_id: msg?.dbId || undefined,
+          }),
         });
         setMessages((arr) =>
           arr.map((x) =>

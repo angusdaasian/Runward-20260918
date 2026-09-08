@@ -587,7 +587,7 @@ const AllActivitiesView = ({
 // ---------- Main Component ----------
 
 
-const ActivitiesTab = ({ lang }: Props) => {
+const ActivitiesTab = ({ lang, resetSignal }: Props) => {
   const { user } = useAuth();
   const { isPremium } = usePremium();
   const [simpleMode] = useSimpleMode();

@@ -506,11 +506,11 @@ serve(async (req) => {
 
       const { data } = await admin
         .from("ai_coach_conversations")
-        .select("id, role, content, session_id, created_at")
+        .select("id, role, content, session_id, created_at, plan_suggestion, plan_suggestion_status")
         .eq("user_id", user.id)
         .eq("session_id", resolvedSession)
         .order("created_at", { ascending: true })
-        .limit(50);
+        .limit(500);
       return json({ messages: data || [], session_id: resolvedSession });
     }
 

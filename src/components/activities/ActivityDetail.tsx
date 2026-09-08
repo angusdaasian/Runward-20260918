@@ -787,8 +787,6 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
     };
 
     const out: Split[] = [];
-    let accDist = 0;      // accumulated work distance
-    let accTime = 0;      // accumulated work time
     let splitDist = 0;    // distance inside the current 1 km split
     let splitTime = 0;    // time inside the current 1 km split
     let splitStartT = ordered[0].t;
@@ -831,15 +829,11 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
         if (remainingD < needed) {
           splitDist += remainingD;
           splitTime += (remainingD / segD) * segT;
-          accDist += remainingD;
-          accTime += (remainingD / segD) * segT;
           remainingD = 0;
         } else {
           const usedT = (needed / segD) * segT;
           splitDist += needed;
           splitTime += usedT;
-          accDist += needed;
-          accTime += usedT;
           const endT = segStartT + usedT;
           push(endT);
           splitDist = 0;
@@ -850,7 +844,6 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
         }
       }
     }
-    void accDist; void accTime;
     // Trailing partial kilometer
     if (splitDist > 30 && splitTime > 3) push(ordered[ordered.length - 1].t);
     return out.length >= 2 ? out : null;

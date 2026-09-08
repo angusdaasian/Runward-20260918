@@ -30,6 +30,7 @@ const ACTIVITY_KEYS = new Set([
 
 /** Persist small profile/plan queries + the "latest activity" (limit 1) queries. */
 export function shouldPersistQuery(query: Query): boolean {
+  if (query.state.status !== "success") return false;
   const key = query.queryKey as unknown[];
   const root = typeof key[0] === "string" ? (key[0] as string) : "";
   if (PERSISTED_KEYS.has(root)) return true;

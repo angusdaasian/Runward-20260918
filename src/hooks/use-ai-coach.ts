@@ -19,12 +19,28 @@ export type PlanSuggestion = {
 
 export type CoachMessage = {
   id: string;
+  /** Database row id (present for messages loaded from / saved to history). */
+  dbId?: string | null;
   role: "user" | "assistant";
   content: string;
   pending?: boolean;
   planSuggestion?: PlanSuggestion | null;
   planSuggestionStatus?: "pending" | "applied" | "dismissed";
 };
+
+function mapHistoryRow(m: any, fallbackId: string): CoachMessage {
+  const sug = m.plan_suggestion || null;
+  return {
+    id: m.id || fallbackId,
+    dbId: m.id || null,
+    role: m.role,
+    content: m.content,
+    planSuggestion: sug,
+    planSuggestionStatus: sug
+      ? ((m.plan_suggestion_status as CoachMessage["planSuggestionStatus"]) || "pending")
+      : undefined,
+  };
+}
 
 
 export type ThinkingLevel = "minimal" | "low" | "medium" | "high";

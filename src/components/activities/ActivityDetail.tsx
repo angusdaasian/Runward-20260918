@@ -755,21 +755,17 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
     if (restCount < 2 || workCount < 2) return null;
 
     const windows: { from: number; to: number }[] = [];
-    let cum = 0;
     let all = 0;
     for (const s of splits || []) {
-      const d = s.distance || 0;
       const from = all;
-      all += d;
+      all += s.distance || 0;
       const idx = laps.indexOf(s);
       if (idx >= 0 && isWork[idx]) {
         const last = windows[windows.length - 1];
         if (last && Math.abs(last.to - from) < 1) last.to = all;
         else windows.push({ from, to: all });
       }
-      cum = all;
     }
-    void cum;
     return windows.length > 0 ? windows : null;
   }, [splits]);
 

@@ -46,6 +46,7 @@ import { useSimpleMode } from "@/hooks/use-simple-mode";
 
 interface Props {
   lang: Lang;
+  resetSignal?: number;
 }
 
 function formatDuration(seconds: number): string {

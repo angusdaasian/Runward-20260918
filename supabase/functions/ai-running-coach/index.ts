@@ -1143,14 +1143,19 @@ If the user has no preferences set yet, ask ONE friendly onboarding question per
 
     // Persist messages + usage (write under current thinking level so future
     // ratio conversions stay consistent)
-    const { error: insertError } = await admin.from("ai_coach_conversations").insert([
-      { user_id: user.id, session_id: sessionId, role: "user", content: message },
-      { user_id: user.id, session_id: sessionId, role: "assistant", content: aiText },
-    ]);
+    const { data: insertedRows, error: insertError } = await admin
+      .from("ai_coach_conversations")
+      .insert([
+        { user_id: user.id, session_id: sessionId, role: "user", content: message },
+        { user_id: user.id, session_id: sessionId, role: "assistant", content: aiText },
+      ])
+      .select("id, role, created_at");
     if (insertError) {
       console.error("failed to persist ai coach conversation", insertError);
       return json({ error: "Failed to save conversation" }, 500);
     }
+    const assistantMessageId: string | null =
+      (insertedRows || []).filter((r: any) => r.role === "assistant").pop()?.id ?? null;
     await admin
       .from("ai_coach_usage")
       .upsert(

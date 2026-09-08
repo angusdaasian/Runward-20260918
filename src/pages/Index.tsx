@@ -342,7 +342,7 @@ const Index = () => {
           display: activeTab === "activities" ? "block" : "none",
         }}
       >
-        <ActivitiesTab lang={lang} />
+        <ActivitiesTab lang={lang} resetSignal={activityResetSignal} />
       </div>
 
       <div className="bottom-nav fixed bottom-0 left-0 right-0 bg-card border-t border-border" style={{ paddingBottom: 'var(--safe-area-bottom, 0px)' }}>

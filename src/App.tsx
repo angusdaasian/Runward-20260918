@@ -39,7 +39,16 @@ const OAuthAuthorize = lazy(() => import("./pages/OAuthAuthorize.tsx"));
 const ApiDocs = lazy(() => import("./pages/ApiDocs.tsx"));
 const ConnectedApps = lazy(() => import("./pages/ConnectedApps.tsx"));
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 60 * 1000,
+      gcTime: 30 * 60 * 1000,
+      refetchOnWindowFocus: false,
+      retry: 1,
+    },
+  },
+});
 const native = isNativeApp();
 registerShareIntent();
 installGlobalUIUnlockGuard();
@@ -74,7 +83,15 @@ const RootRoute = () => {
 
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
+  <PersistQueryClientProvider
+    client={queryClient}
+    persistOptions={{
+      persister: queryPersister,
+      buster: QUERY_CACHE_BUSTER,
+      maxAge: QUERY_CACHE_MAX_AGE,
+      dehydrateOptions: { shouldDehydrateQuery: shouldPersistQuery },
+    }}
+  >
     <TooltipProvider>
       <AuthProvider>
         <PremiumProvider>
@@ -118,7 +135,7 @@ const App = () => (
         </PremiumProvider>
       </AuthProvider>
     </TooltipProvider>
-  </QueryClientProvider>
+  </PersistQueryClientProvider>
 );
 
 export default App;

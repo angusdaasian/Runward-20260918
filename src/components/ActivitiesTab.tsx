@@ -665,6 +665,7 @@ const ActivitiesTab = ({ lang, resetSignal }: Props) => {
   }, [resetSignal]);
 
   const appleHealth = useAppleHealth(lang);
+  const terraToday = useTerraTodayStats();
   const [ahConnected, setAhConnected] = useState(false);
 
   useEffect(() => {

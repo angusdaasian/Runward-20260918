@@ -42,6 +42,7 @@ import FadeIn from "@/components/ui/FadeIn";
 import { ActivityListSkeleton } from "@/components/ui/PageSkeleton";
 import { useAppleHealth, type HealthStats } from "@/hooks/use-apple-health";
 import { useTerraTodayStats } from "@/hooks/use-terra-daily-health";
+import { useGarminDailyHealth } from "@/hooks/use-garmin-daily-health";
 import { useSimpleMode } from "@/hooks/use-simple-mode";
 
 
@@ -667,6 +668,11 @@ const ActivitiesTab = ({ lang, resetSignal }: Props) => {
 
   const appleHealth = useAppleHealth(lang);
   const { stats: terraToday, ready: terraTodayReady } = useTerraTodayStats();
+  const { data: garminHealth, isFetched: garminHealthReady } = useGarminDailyHealth();
+  const garminSleepMinutes = useMemo(() => {
+    const sleepSeconds = garminHealth?.find((row) => row.sleep_seconds != null)?.sleep_seconds;
+    return sleepSeconds != null ? Math.round(sleepSeconds / 60) : 0;
+  }, [garminHealth]);
   // Seed from cache so the Today card doesn't pop in late on cold start.
   const [ahConnected, setAhConnected] = useState<boolean>(() => {
     try { return localStorage.getItem("ah-connected") === "1"; } catch { return false; }
@@ -702,7 +708,7 @@ const ActivitiesTab = ({ lang, resetSignal }: Props) => {
     return () => { cancelled = true; };
   }, [user?.id]);
 
-  const homeDataReady = !loading && terraTodayReady && appleHealthReady && !premiumLoading;
+  const homeDataReady = !loading && terraTodayReady && garminHealthReady && appleHealthReady && !premiumLoading;
   useEffect(() => {
     if (homeDataReady) setInitialHomeReady(true);
   }, [homeDataReady]);
@@ -1267,13 +1273,32 @@ const ActivitiesTab = ({ lang, resetSignal }: Props) => {
                 caloriesBurned: terraToday.caloriesBurned,
                 walkRunDistanceKm: terraToday.walkRunDistanceKm,
                 sleepMinutes:
-                  terraToday.sleepMinutes > 0
+                  garminSleepMinutes > 0
+                    ? garminSleepMinutes
+                    : terraToday.sleepMinutes > 0
                     ? terraToday.sleepMinutes
                     : (ahConnected ? appleHealth.healthStats?.sleepMinutes ?? 0 : 0),
               }
             : ahConnected
-              ? appleHealth.healthStats
-              : null
+              ? {
+                  ...(appleHealth.healthStats ?? {
+                    steps: 0,
+                    caloriesBurned: 0,
+                    walkRunDistanceKm: 0,
+                    sleepMinutes: 0,
+                  }),
+                  sleepMinutes: garminSleepMinutes > 0
+                    ? garminSleepMinutes
+                    : appleHealth.healthStats?.sleepMinutes ?? 0,
+                }
+              : garminSleepMinutes > 0
+                ? {
+                    steps: 0,
+                    caloriesBurned: 0,
+                    walkRunDistanceKm: 0,
+                    sleepMinutes: garminSleepMinutes,
+                  }
+                : null
         }
       />
 

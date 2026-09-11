@@ -38,6 +38,7 @@ const Developers = lazy(() => import("./pages/Developers.tsx"));
 const OAuthAuthorize = lazy(() => import("./pages/OAuthAuthorize.tsx"));
 const ApiDocs = lazy(() => import("./pages/ApiDocs.tsx"));
 const ConnectedApps = lazy(() => import("./pages/ConnectedApps.tsx"));
+const JoinLeaderboardGroup = lazy(() => import("./pages/JoinLeaderboardGroup.tsx"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -127,6 +128,7 @@ const App = () => (
                 <Route path="/developers" element={<Developers />} />
                 <Route path="/developers/docs" element={<ApiDocs />} />
                 <Route path="/settings/connected-apps" element={<ConnectedApps />} />
+                <Route path="/join/:code" element={<JoinLeaderboardGroup />} />
                 <Route path="/oauth/authorize" element={<OAuthAuthorize />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>

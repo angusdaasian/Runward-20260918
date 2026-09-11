@@ -3542,6 +3542,10 @@ export type Database = {
         Returns: number
       }
       invoke_reset_season: { Args: { p_month_year?: string }; Returns: number }
+      is_leaderboard_group_member: {
+        Args: { p_group_id: string; p_user_id?: string }
+        Returns: boolean
+      }
       join_group_by_code: {
         Args: { p_code: string }
         Returns: {

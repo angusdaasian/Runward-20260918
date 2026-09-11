@@ -666,7 +666,11 @@ export function useActivities(options?: { limit?: number; enabled?: boolean }) {
     // so content is never replaced by a skeleton again.
     loading:
       mergedActivities.length === 0 &&
-      (!activitiesReady || profileQuery.isLoading || connectionQuery.isLoading),
+      (!activitiesReady ||
+        profileQuery.isLoading ||
+        connectionQuery.isLoading ||
+        workoutsQuery.isLoading ||
+        userRacesQuery.isLoading),
     isRefreshing:
       terraLightQuery.isFetching ||
       activitiesQuery.isFetching ||

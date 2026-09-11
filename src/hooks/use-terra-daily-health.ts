@@ -108,10 +108,11 @@ function writeCachedTodayStats(stats: TerraTodayStats | null) {
 
 let _cachedTodayStats: TerraTodayStats | null = null;
 
-export function useTerraTodayStats(): TerraTodayStats | null {
-  const { data: rows, isLoading } = useTerraDailyHealth();
+export function useTerraTodayStats(): { stats: TerraTodayStats | null; ready: boolean } {
+  const { user } = useAuth();
+  const { data: rows, isLoading, isFetched } = useTerraDailyHealth();
 
-  return useMemo(() => {
+  const stats = useMemo(() => {
     // While the first fetch is in flight, serve the same-day cached stats so the
     // Today card renders instantly instead of popping in late.
     if (!rows) {
@@ -162,6 +163,11 @@ export function useTerraTodayStats(): TerraTodayStats | null {
     writeCachedTodayStats(stats);
     return stats;
   }, [rows, isLoading]);
+
+  return {
+    stats,
+    ready: !user || isFetched,
+  };
 }
 
 

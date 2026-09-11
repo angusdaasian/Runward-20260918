@@ -36,6 +36,7 @@ export const PremiumProvider = ({ children }: { children: ReactNode }) => {
   const [plan, setPlan] = useState<string | null>(null);
   const [rcEntitlement, setRcEntitlement] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [subscriptionLoading, setSubscriptionLoading] = useState(true);
   const purchaseListeners = useRef<Set<() => void>>(new Set());
 
   const onPurchaseConfirmed = useCallback((cb: () => void) => {
@@ -48,12 +49,14 @@ export const PremiumProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const fetchSubscription = useCallback(async (): Promise<boolean> => {
+    setSubscriptionLoading(true);
     if (!user) {
       setIsPremium(false);
       setIsTrial(false);
       setExpiresAt(null);
       setPlan(null);
       setRcEntitlement(null);
+      setSubscriptionLoading(false);
       return false;
     }
 
@@ -79,6 +82,7 @@ export const PremiumProvider = ({ children }: { children: ReactNode }) => {
             }
             notifyPurchaseListeners();
           }
+          setSubscriptionLoading(false);
           return true;
         }
       }
@@ -104,6 +108,7 @@ export const PremiumProvider = ({ children }: { children: ReactNode }) => {
         await supabase.from("profiles").update({ is_premium: true }).eq("user_id", user.id);
         notifyPurchaseListeners();
       }
+      setSubscriptionLoading(false);
       return true;
     } else {
       const wasPremium = isPremium;
@@ -136,6 +141,7 @@ export const PremiumProvider = ({ children }: { children: ReactNode }) => {
           console.warn("Failed to clear messaging subscriptions on premium loss:", err);
         }
       }
+      setSubscriptionLoading(false);
       return false;
     }
   }, [user, isPremium, notifyPurchaseListeners]);
@@ -178,7 +184,7 @@ export const PremiumProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <PremiumContext.Provider value={{ isPremium, isTrial, expiresAt, plan, rcEntitlement, activatePremium, refreshSubscription: fetchSubscription, onPurchaseConfirmed, loading }}>
+    <PremiumContext.Provider value={{ isPremium, isTrial, expiresAt, plan, rcEntitlement, activatePremium, refreshSubscription: fetchSubscription, onPurchaseConfirmed, loading: loading || subscriptionLoading }}>
       {children}
     </PremiumContext.Provider>
   );

@@ -591,7 +591,7 @@ const AllActivitiesView = ({
 
 const ActivitiesTab = ({ lang, resetSignal }: Props) => {
   const { user } = useAuth();
-  const { isPremium } = usePremium();
+  const { isPremium, loading: premiumLoading } = usePremium();
   const [simpleMode] = useSimpleMode();
   // Homepage shows ONLY the latest activity → tiny, fast query.
   // The full history is loaded in the background and used by the calendar,
@@ -666,30 +666,46 @@ const ActivitiesTab = ({ lang, resetSignal }: Props) => {
   }, [resetSignal]);
 
   const appleHealth = useAppleHealth(lang);
-  const terraToday = useTerraTodayStats();
+  const { stats: terraToday, ready: terraTodayReady } = useTerraTodayStats();
   // Seed from cache so the Today card doesn't pop in late on cold start.
   const [ahConnected, setAhConnected] = useState<boolean>(() => {
     try { return localStorage.getItem("ah-connected") === "1"; } catch { return false; }
   });
+  const [appleHealthReady, setAppleHealthReady] = useState(false);
+  const [initialHomeReady, setInitialHomeReady] = useState(false);
 
   useEffect(() => {
-    if (!user) return;
-    supabase
-      .from("apple_health_connections")
-      .select("id")
-      .eq("user_id", user.id)
-      .maybeSingle()
-      .then(({ data }) => {
+    if (!user) {
+      setAppleHealthReady(true);
+      return;
+    }
+
+    let cancelled = false;
+    setAppleHealthReady(false);
+    void (async () => {
+      try {
+        const { data } = await supabase
+          .from("apple_health_connections")
+          .select("id")
+          .eq("user_id", user.id)
+          .maybeSingle();
+        if (cancelled) return;
         try { localStorage.setItem("ah-connected", data ? "1" : "0"); } catch { /* ignore */ }
-        if (!data) setAhConnected(false);
+        setAhConnected(!!data);
         if (data) {
-          setAhConnected(true);
-          if (!appleHealth.syncing) {
-            appleHealth.syncHealthData();
-          }
+          await appleHealth.syncHealthData();
         }
-      });
-  }, [user]);
+      } finally {
+        if (!cancelled) setAppleHealthReady(true);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [user?.id]);
+
+  const homeDataReady = !loading && terraTodayReady && appleHealthReady && !premiumLoading;
+  useEffect(() => {
+    if (homeDataReady) setInitialHomeReady(true);
+  }, [homeDataReady]);
 
   // Realtime subscription
   useEffect(() => {
@@ -1193,7 +1209,7 @@ const ActivitiesTab = ({ lang, resetSignal }: Props) => {
     setResyncing(false);
   }, [user, resyncing, appleHealth, invalidateAll, lang]);
 
-  if (loading) return <ActivityListSkeleton />;
+  if (!initialHomeReady) return <ActivityListSkeleton />;
 
   if (selectedActivity) {
     return (

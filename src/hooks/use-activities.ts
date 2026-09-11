@@ -443,6 +443,17 @@ export function useActivities(options?: { limit?: number; enabled?: boolean }) {
   // waterfall and made rows pop in one wave at a time. Dedup still happens
   // once on the merged set (see mergedActivities below), and the list is only
   // painted once every source has settled — so no more staggered pop-in.
+  // Terra is fetched in two phases: a light summary query that paints the UI
+  // almost immediately, then the full query (with sample streams) hydrating in
+  // the background for the detail view / exports.
+  const terraLightQuery = useQuery({
+    queryKey: ["terra-activities-light", user?.id, limit ?? "all"],
+    queryFn: () => fetchTerraActivitiesLight(user!.id, limit),
+    enabled: activityQueriesEnabled,
+    staleTime: 30 * 1000,
+    gcTime: 10 * 60 * 1000,
+  });
+
   const terraQuery = useQuery({
     queryKey: ["terra-activities", user?.id, limit ?? "all"],
     queryFn: () => fetchTerraActivities(user!.id, limit),
@@ -451,7 +462,8 @@ export function useActivities(options?: { limit?: number; enabled?: boolean }) {
     gcTime: 10 * 60 * 1000,
   });
 
-  const hasTerraForLatestView = !!limit && (terraQuery.data?.length ?? 0) > 0;
+  const hasTerraForLatestView = !!limit && ((terraLightQuery.data?.length ?? terraQuery.data?.length ?? 0) > 0);
+
   const secondaryEnabled = activityQueriesEnabled;
 
   const activitiesQuery = useQuery({

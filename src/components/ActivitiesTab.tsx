@@ -1265,6 +1265,20 @@ const ActivitiesTab = ({ lang, resetSignal }: Props) => {
   // Keep the homepage card pinned to the latest-only query. The full-history
   // background load must never replace it with a secondary-source row.
   const latestActivity = homepage.activities[0] || activities[0] || null;
+  const appleToday = ahConnected ? appleHealth.healthStats : null;
+  const todayHealthStats: HealthStats | null = terraToday || appleToday || garminSleepMinutes > 0
+    ? {
+        // Resolve each metric independently. A Terra row may contain only some
+        // daily fields, so missing values must not suppress Apple Health data.
+        steps: terraToday?.steps ?? appleToday?.steps ?? 0,
+        caloriesBurned: terraToday?.caloriesBurned ?? appleToday?.caloriesBurned ?? 0,
+        walkRunDistanceKm: terraToday?.walkRunDistanceKm ?? appleToday?.walkRunDistanceKm ?? 0,
+        sleepMinutes:
+          garminSleepMinutes > 0
+            ? garminSleepMinutes
+            : terraToday?.sleepMinutes ?? appleToday?.sleepMinutes ?? 0,
+      }
+    : null;
 
   return (
     <FadeIn className="px-5 pt-6 max-w-lg mx-auto">
@@ -1272,40 +1286,7 @@ const ActivitiesTab = ({ lang, resetSignal }: Props) => {
       {/* Today Stats: wearable (Terra) daily data wins, Apple Health as fallback */}
       <TodayStats
         lang={lang}
-        healthStats={
-          terraToday
-            ? {
-                steps: terraToday.steps,
-                caloriesBurned: terraToday.caloriesBurned,
-                walkRunDistanceKm: terraToday.walkRunDistanceKm,
-                sleepMinutes:
-                  garminSleepMinutes > 0
-                    ? garminSleepMinutes
-                    : terraToday.sleepMinutes > 0
-                    ? terraToday.sleepMinutes
-                    : (ahConnected ? appleHealth.healthStats?.sleepMinutes ?? 0 : 0),
-              }
-            : ahConnected
-              ? {
-                  ...(appleHealth.healthStats ?? {
-                    steps: 0,
-                    caloriesBurned: 0,
-                    walkRunDistanceKm: 0,
-                    sleepMinutes: 0,
-                  }),
-                  sleepMinutes: garminSleepMinutes > 0
-                    ? garminSleepMinutes
-                    : appleHealth.healthStats?.sleepMinutes ?? 0,
-                }
-              : garminSleepMinutes > 0
-                ? {
-                    steps: 0,
-                    caloriesBurned: 0,
-                    walkRunDistanceKm: 0,
-                    sleepMinutes: garminSleepMinutes,
-                  }
-                : null
-        }
+        healthStats={todayHealthStats}
       />
 
 

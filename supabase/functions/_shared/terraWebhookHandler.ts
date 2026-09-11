@@ -884,7 +884,18 @@ async function processWebhook(
             .eq("date", date)
             .maybeSingle();
           const newRestingHr = toFiniteNumber(d?.heart_rate_data?.summary?.resting_hr_bpm);
-          const newSteps = toFiniteNumber(d?.distance_data?.steps);
+          const newSteps =
+            toFiniteNumber(d?.distance_data?.steps) ??
+            toFiniteNumber(d?.distance_data?.summary?.steps);
+          const newCalories =
+            toFiniteNumber(d?.calories_data?.total_burned_calories) ??
+            toFiniteNumber(d?.calories_data?.net_activity_calories);
+          const newDistanceMetres =
+            toFiniteNumber(d?.distance_data?.distance_metres) ??
+            toFiniteNumber(d?.distance_data?.summary?.distance_metres);
+          const newActiveSeconds =
+            toFiniteNumber(d?.active_durations_data?.activity_seconds) ??
+            toFiniteNumber(d?.active_durations_data?.active_seconds);
           const vo2SamplesArr = Array.isArray(d?.oxygen_data?.vo2_samples) ? d.oxygen_data.vo2_samples : [];
           const lastVo2 = vo2SamplesArr.length > 0
             ? toFiniteNumber(vo2SamplesArr[vo2SamplesArr.length - 1]?.vo2max_ml_per_min_per_kg)

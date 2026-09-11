@@ -13,6 +13,7 @@ import {
   RefreshCw,
   Flame,
   Timer,
+  Loader2,
 } from "lucide-react";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
@@ -617,6 +618,7 @@ const ActivitiesTab = ({ lang, resetSignal }: Props) => {
 
   const profile = homepage.profile;
   const connected = homepage.connected;
+  const connectionLoading = homepage.connectionLoading;
   const fitnessAppConnected = homepage.fitnessAppConnected;
   const plannedWorkouts = homepage.plannedWorkouts;
   const userRaces = homepage.userRaces;
@@ -1296,19 +1298,37 @@ const ActivitiesTab = ({ lang, resetSignal }: Props) => {
 
 
         {!latestActivity && activities.length === 0 ? (
-          <div className="bg-accent/50 border border-border rounded-xl p-5 text-center">
-            <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mx-auto mb-3">
-              <Activity size={24} className="text-muted-foreground" />
+          connectionLoading ? (
+            // Connection status still resolving — don't flash the connect
+            // prompt for users who are already linked to a fitness app.
+            <div className="bg-accent/30 border border-border rounded-xl p-5 text-center">
+              <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mx-auto mb-3">
+                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+              </div>
+              <p className="text-sm text-muted-foreground">
+                {lang === "zh" ? "正在載入活動…" : "Loading activities…"}
+              </p>
             </div>
-            <h3 className="text-base font-semibold text-foreground mb-1">
-              {lang === "zh" ? "連結健身應用以同步活動" : "Connect a Fitness App to Sync Activities"}
-            </h3>
-            <p className="text-sm text-muted-foreground">
-              {lang === "zh"
-                ? "前往設定 → 連結應用來連結 Strava 或其他健身平台。"
-                : "Go to Settings → Connect Apps to link Strava or other fitness platforms."}
-            </p>
-          </div>
+          ) : !connected ? (
+            <div className="bg-accent/50 border border-border rounded-xl p-5 text-center">
+              <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mx-auto mb-3">
+                <Activity size={24} className="text-muted-foreground" />
+              </div>
+              <h3 className="text-base font-semibold text-foreground mb-1">
+                {lang === "zh" ? "連結健身應用以同步活動" : "Connect a Fitness App to Sync Activities"}
+              </h3>
+              <p className="text-sm text-muted-foreground">
+                {lang === "zh"
+                  ? "前往設定 → 連結應用來連結 Strava 或其他健身平台。"
+                  : "Go to Settings → Connect Apps to link Strava or other fitness platforms."}
+              </p>
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <Activity size={36} className="mx-auto text-muted-foreground mb-2" />
+              <p className="text-muted-foreground text-sm">{lang === "zh" ? "暫無活動" : "No activities yet"}</p>
+            </div>
+          )
         ) : latestActivity ? (
           <div className="space-y-3">
             <div className="rounded-lg border border-border bg-muted/40 px-3 py-2 text-[11px] leading-relaxed text-muted-foreground">

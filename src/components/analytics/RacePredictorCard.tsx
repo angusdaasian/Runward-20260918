@@ -85,14 +85,15 @@ const RacePredictorCard = ({ lang }: Props) => {
     return () => { cancelled = true; };
   }, [city]);
 
-  const anchor = useMemo(() => bestAnchorPb(pbs), [pbs]);
-  const pbScore = anchor?.decayedScore ?? null;
-  const recentScore = useMemo(() => recentVdot(activities as any, 30), [activities]);
-  const vdot = useMemo(
-    () => effectiveVdot(recentScore, pbScore),
-    [recentScore, pbScore]
-  );
-  const vol = useMemo(() => volumeStats(activities as any), [activities]);
+  // HR zone bounds so training runs can be classified by effort.
+  const hrBounds = useMemo(() => {
+    const p: any = profile || {};
+    const max = estimateMaxHr(p.age, p.max_heartrate);
+    const rest = estimateRestingHr(p.resting_heartrate);
+    const custom = isValidCustomZones(p.custom_hr_zones) ? (p.custom_hr_zones as number[]) : null;
+    return zoneBoundaries(max, rest, custom);
+  }, [profile]);
+
 
   // Freshness from weekly training-load series (last week's TSB / "form").
   const freshness = useMemo(() => {

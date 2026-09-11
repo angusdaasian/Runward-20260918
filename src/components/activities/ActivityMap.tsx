@@ -148,17 +148,23 @@ const ActivityMap = ({ polyline, className, lang }: Props) => {
   const fullMapRef = useRef<mapboxgl.Map | null>(null);
   const [open, setOpen] = useState(false);
   const [visible, setVisible] = useState(false);
+  const visibleRef = useRef(false);
 
   // Only build the preview map while it's near the viewport
   useEffect(() => {
     const container = previewRef.current;
     if (!container) return;
     if (typeof IntersectionObserver === "undefined") {
+      visibleRef.current = true;
       setVisible(true);
       return;
     }
     const observer = new IntersectionObserver(
-      (entries) => setVisible(entries.some((entry) => entry.isIntersecting)),
+      (entries) => {
+        const isVisible = entries.some((entry) => entry.isIntersecting);
+        visibleRef.current = isVisible;
+        setVisible(isVisible);
+      },
       { rootMargin: "300px 0px" },
     );
     observer.observe(container);
@@ -180,12 +186,15 @@ const ActivityMap = ({ polyline, className, lang }: Props) => {
     let cancelled = false;
     const container = previewRef.current;
     const release = () => {
+      if (visibleRef.current) return false;
       if (previewMapRef.current) {
         previewMapRef.current.remove();
         previewMapRef.current = null;
       }
       setVisible(false);
+      return true;
     };
+
 
     void createRouteMap(container, coords, lang, false, 14)
       .then((map) => {

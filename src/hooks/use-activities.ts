@@ -657,6 +657,7 @@ export function useActivities(options?: { limit?: number; enabled?: boolean }) {
     profile: profileQuery.data,
     connected: connectionQuery.data?.any ?? false,
     fitnessAppConnected: connectionQuery.data?.fitnessApp ?? false,
+    connectionLoading: connectionQuery.isLoading,
     plannedWorkouts: workoutsQuery.data || [],
     userRaces: userRacesQuery.data || [],
     activitiesReady,

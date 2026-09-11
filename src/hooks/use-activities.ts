@@ -668,7 +668,7 @@ export function useActivities(options?: { limit?: number; enabled?: boolean }) {
       mergedActivities.length === 0 &&
       !profileQuery.data,
     isRefreshing:
-      terraQuery.isFetching ||
+      terraLightQuery.isFetching ||
       activitiesQuery.isFetching ||
       appleHealthQuery.isFetching ||
       garminQuery.isFetching ||

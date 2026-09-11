@@ -112,6 +112,21 @@ async function createRouteMap(
   return map;
 }
 
+// Build a Mapbox Static Images URL for the preview — one lightweight PNG
+// instead of a full WebGL map per activity row.
+async function buildStaticUrl(polyline: string, lang: Lang): Promise<string | null> {
+  const coords = decodePolyline(polyline);
+  if (coords.length === 0) return null;
+  const token = await getMapboxToken();
+  const [startLat, startLng] = coords[0];
+  const [endLat, endLng] = coords[coords.length - 1];
+  const path = `path-5+FC4C02-0.9(${encodeURIComponent(polyline)})`;
+  const pins = `pin-s-a+10B981(${startLng},${startLat}),pin-s-b+FC4C02(${endLng},${endLat})`;
+  const overlay = `${path},${pins}`;
+  const language = encodeURIComponent(mapboxLanguage(lang));
+  return `https://api.mapbox.com/styles/v1/mapbox/outdoors-v12/static/${overlay}/auto/640x320@2x?access_token=${encodeURIComponent(token)}&language=${language}&attribution=false&logo=false`;
+}
+
 interface Props {
   polyline: string;
   className?: string;
@@ -119,43 +134,22 @@ interface Props {
 }
 
 const ActivityMap = ({ polyline, className, lang }: Props) => {
-  const previewRef = useRef<HTMLDivElement>(null);
-  const previewMapRef = useRef<mapboxgl.Map | null>(null);
   const fullRef = useRef<HTMLDivElement>(null);
   const fullMapRef = useRef<mapboxgl.Map | null>(null);
   const [open, setOpen] = useState(false);
+  const [staticUrl, setStaticUrl] = useState<string | null>(null);
 
-  // Preview map
+  // Lightweight static preview image
   useEffect(() => {
-    if (!previewRef.current || !polyline) return;
-
-    if (previewMapRef.current) {
-      previewMapRef.current.remove();
-      previewMapRef.current = null;
-    }
-
-    const coords = decodePolyline(polyline);
-    if (coords.length === 0) return;
-
+    if (!polyline) return;
     let cancelled = false;
-    const container = previewRef.current;
-    void createRouteMap(container, coords, lang, false, 14)
-      .then((map) => {
-        if (cancelled) map.remove();
-        else previewMapRef.current = map;
-      })
-      .catch((error) => console.error("Activity map failed to load", error));
-
-    return () => {
-      cancelled = true;
-      if (previewMapRef.current) {
-        previewMapRef.current.remove();
-        previewMapRef.current = null;
-      }
-    };
+    void buildStaticUrl(polyline, lang)
+      .then((url) => { if (!cancelled) setStaticUrl(url); })
+      .catch((error) => console.error("Activity map preview failed to load", error));
+    return () => { cancelled = true; };
   }, [polyline, lang]);
 
-  // Fullscreen map (mounted only when overlay opens)
+  // Fullscreen interactive map (mounted only when overlay opens)
   useEffect(() => {
     if (!open || !fullRef.current || !polyline) return;
 
@@ -212,11 +206,16 @@ const ActivityMap = ({ polyline, className, lang }: Props) => {
         aria-label="Expand map"
         className="relative w-full mt-2 group cursor-pointer"
       >
-        <div
-          ref={previewRef}
-          className={`w-full rounded-lg overflow-hidden ${className || "h-32"}`}
-          style={{ zIndex: 0 }}
-        />
+        <div className={`w-full rounded-lg overflow-hidden bg-muted ${className || "h-32"}`}>
+          {staticUrl && (
+            <img
+              src={staticUrl}
+              alt="Route map"
+              loading="lazy"
+              className="h-full w-full object-cover"
+            />
+          )}
+        </div>
         <div className="absolute top-2 right-2 bg-background/90 backdrop-blur-sm rounded-md p-1.5 shadow-md opacity-80 group-hover:opacity-100 transition-opacity">
           <Maximize2 className="w-3.5 h-3.5 text-foreground" />
         </div>

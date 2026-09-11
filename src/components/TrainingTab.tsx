@@ -3545,7 +3545,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                                       <div className="text-xs text-muted-foreground mt-0.5">
                                         <span className="font-semibold text-primary">{predictedLabel}</span>
                                         <span className="mx-1">·</span>
-                                        <span>{lang === "zh" ? "根據過去 30 天跑步估算" : "Based on your last 30 days of running"}</span>
+                                        <span>{lang === "zh" ? "綜合個人最佳、近期成績與目前訓練估算" : "From your PBs, recent efforts and current training"}</span>
                                       </div>
                                     </div>
                                     <ChevronDown size={18} className="text-muted-foreground transition-transform group-open:rotate-180 flex-shrink-0" />
@@ -3563,8 +3563,8 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                                       <div className="text-[11px] text-muted-foreground">
                                         {racePrediction
                                           ? (lang === "zh"
-                                              ? `${racePrediction.totalRuns} 次跑步`
-                                              : `${racePrediction.totalRuns} runs`)
+                                              ? `${racePrediction.trainingRuns} 次跑步`
+                                              : `${racePrediction.trainingRuns} runs`)
                                           : (lang === "zh" ? "需要更多跑步資料" : "Not enough run data yet")}
                                       </div>
                                     </div>
@@ -3573,7 +3573,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                                   {racePrediction && (
                                     <div className="mt-3 rounded-lg border border-border bg-background p-3">
                                       <div className="text-[11px] font-medium uppercase text-muted-foreground mb-2">
-                                        {lang === "zh" ? "跑步類型分佈（30 天）" : "Run types (30d)"}
+                                        {lang === "zh" ? "跑步類型分佈（42 天）" : "Run types (42d)"}
                                       </div>
                                       <div className="flex flex-wrap gap-2">
                                         {typeOrder.map((t) => {

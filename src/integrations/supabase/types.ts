@@ -834,6 +834,94 @@ export type Database = {
         }
         Relationships: []
       }
+      leaderboard_group_members: {
+        Row: {
+          group_id: string
+          joined_at: string
+          role: string
+          user_id: string
+        }
+        Insert: {
+          group_id: string
+          joined_at?: string
+          role?: string
+          user_id: string
+        }
+        Update: {
+          group_id?: string
+          joined_at?: string
+          role?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "leaderboard_group_members_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "leaderboard_groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leaderboard_group_members_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "leaderboard_view"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "leaderboard_group_members_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      leaderboard_groups: {
+        Row: {
+          created_at: string
+          emoji: string | null
+          id: string
+          invite_code: string
+          name: string
+          owner_user_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          emoji?: string | null
+          id?: string
+          invite_code?: string
+          name: string
+          owner_user_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          emoji?: string | null
+          id?: string
+          invite_code?: string
+          name?: string
+          owner_user_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "leaderboard_groups_owner_user_id_fkey"
+            columns: ["owner_user_id"]
+            isOneToOne: false
+            referencedRelation: "leaderboard_view"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "leaderboard_groups_owner_user_id_fkey"
+            columns: ["owner_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
       oauth_apps: {
         Row: {
           approved_at: string | null
@@ -1717,6 +1805,45 @@ export type Database = {
           year?: number | null
         }
         Relationships: []
+      }
+      social_prefs: {
+        Row: {
+          created_at: string
+          leaderboard_opt_in: boolean
+          social_opt_in: boolean
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          leaderboard_opt_in?: boolean
+          social_opt_in?: boolean
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          leaderboard_opt_in?: boolean
+          social_opt_in?: boolean
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "social_prefs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "leaderboard_view"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "social_prefs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
       }
       social_rewards_claimed: {
         Row: {
@@ -3275,6 +3402,21 @@ export type Database = {
           signature_header: string
         }[]
       }
+      community_activity_rows: {
+        Args: never
+        Returns: {
+          activity_name: string
+          activity_type: string
+          distance_m: number
+          duration_s: number
+          elevation_m: number
+          source: string
+          source_id: string
+          started_at: string
+          summary_polyline: string
+          user_id: string
+        }[]
+      }
       consume_rate_limit: {
         Args: { p_app_id: string }
         Returns: {
@@ -3282,6 +3424,44 @@ export type Database = {
           remaining_15min: number
           remaining_day: number
           retry_after_seconds: number
+        }[]
+      }
+      create_leaderboard_group: {
+        Args: { p_emoji?: string; p_name: string }
+        Returns: {
+          emoji: string
+          id: string
+          invite_code: string
+          name: string
+        }[]
+      }
+      get_group_by_code: {
+        Args: { p_code: string }
+        Returns: {
+          emoji: string
+          id: string
+          member_count: number
+          name: string
+        }[]
+      }
+      get_group_leaderboard: {
+        Args: { p_group_id: string; p_month?: string }
+        Returns: {
+          avatar_url: string
+          display_name: string
+          distance_km: number
+          run_count: number
+          user_id: string
+        }[]
+      }
+      get_km_leaderboard: {
+        Args: { p_limit?: number; p_month?: string }
+        Returns: {
+          avatar_url: string
+          display_name: string
+          distance_km: number
+          run_count: number
+          user_id: string
         }[]
       }
       get_leaderboard: {
@@ -3294,6 +3474,24 @@ export type Database = {
           user_id: string
         }[]
       }
+      get_my_leaderboard_groups: {
+        Args: never
+        Returns: {
+          emoji: string
+          id: string
+          invite_code: string
+          member_count: number
+          name: string
+          owner_user_id: string
+        }[]
+      }
+      get_my_month_km: {
+        Args: { p_month?: string }
+        Returns: {
+          distance_km: number
+          run_count: number
+        }[]
+      }
       get_posture_averages: {
         Args: never
         Returns: {
@@ -3304,6 +3502,25 @@ export type Database = {
           avg_torso: number
           avg_upper_limb: number
           total_count: number
+        }[]
+      }
+      get_social_feed: {
+        Args: { p_limit?: number; p_offset?: number }
+        Returns: {
+          activity_name: string
+          activity_type: string
+          avatar_url: string
+          display_name: string
+          distance_km: number
+          duration_s: number
+          elevation_m: number
+          source: string
+          source_id: string
+          start_lat_rounded: number
+          start_lng_rounded: number
+          started_at: string
+          summary_polyline: string
+          user_id: string
         }[]
       }
       get_strava_app_secrets: {
@@ -3325,6 +3542,15 @@ export type Database = {
         Returns: number
       }
       invoke_reset_season: { Args: { p_month_year?: string }; Returns: number }
+      join_group_by_code: {
+        Args: { p_code: string }
+        Returns: {
+          emoji: string
+          id: string
+          name: string
+        }[]
+      }
+      rotate_group_code: { Args: { p_group_id: string }; Returns: string }
       set_strava_app_secret: {
         Args: { p_app_id: string; p_kind: string; p_value: string }
         Returns: undefined

@@ -41,6 +41,7 @@ import { useActivities, type StravaActivity } from "@/hooks/use-activities";
 import FadeIn from "@/components/ui/FadeIn";
 import { ActivityListSkeleton } from "@/components/ui/PageSkeleton";
 import { useAppleHealth, type HealthStats } from "@/hooks/use-apple-health";
+import { useTerraTodayStats } from "@/hooks/use-terra-daily-health";
 import { useSimpleMode } from "@/hooks/use-simple-mode";
 
 
@@ -665,6 +666,7 @@ const ActivitiesTab = ({ lang, resetSignal }: Props) => {
   }, [resetSignal]);
 
   const appleHealth = useAppleHealth(lang);
+  const terraToday = useTerraTodayStats();
   const [ahConnected, setAhConnected] = useState(false);
 
   useEffect(() => {
@@ -1234,8 +1236,25 @@ const ActivitiesTab = ({ lang, resetSignal }: Props) => {
   return (
     <FadeIn className="px-5 pt-6 max-w-lg mx-auto">
 
-      {/* Today Stats from Apple HealthKit */}
-      <TodayStats lang={lang} healthStats={ahConnected ? appleHealth.healthStats : null} />
+      {/* Today Stats: wearable (Terra) daily data wins, Apple Health as fallback */}
+      <TodayStats
+        lang={lang}
+        healthStats={
+          terraToday
+            ? {
+                steps: terraToday.steps,
+                caloriesBurned: terraToday.caloriesBurned,
+                walkRunDistanceKm: terraToday.walkRunDistanceKm,
+                sleepMinutes:
+                  terraToday.sleepMinutes > 0
+                    ? terraToday.sleepMinutes
+                    : (ahConnected ? appleHealth.healthStats?.sleepMinutes ?? 0 : 0),
+              }
+            : ahConnected
+              ? appleHealth.healthStats
+              : null
+        }
+      />
 
 
 

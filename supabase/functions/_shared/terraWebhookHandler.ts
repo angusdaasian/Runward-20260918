@@ -884,7 +884,18 @@ async function processWebhook(
             .eq("date", date)
             .maybeSingle();
           const newRestingHr = toFiniteNumber(d?.heart_rate_data?.summary?.resting_hr_bpm);
-          const newSteps = toFiniteNumber(d?.distance_data?.steps);
+          const newSteps =
+            toFiniteNumber(d?.distance_data?.steps) ??
+            toFiniteNumber(d?.distance_data?.summary?.steps);
+          const newCalories =
+            toFiniteNumber(d?.calories_data?.total_burned_calories) ??
+            toFiniteNumber(d?.calories_data?.net_activity_calories);
+          const newDistanceMetres =
+            toFiniteNumber(d?.distance_data?.distance_metres) ??
+            toFiniteNumber(d?.distance_data?.summary?.distance_metres);
+          const newActiveSeconds =
+            toFiniteNumber(d?.active_durations_data?.activity_seconds) ??
+            toFiniteNumber(d?.active_durations_data?.active_seconds);
           const vo2SamplesArr = Array.isArray(d?.oxygen_data?.vo2_samples) ? d.oxygen_data.vo2_samples : [];
           const lastVo2 = vo2SamplesArr.length > 0
             ? toFiniteNumber(vo2SamplesArr[vo2SamplesArr.length - 1]?.vo2max_ml_per_min_per_kg)
@@ -902,7 +913,7 @@ async function processWebhook(
           // Re-read existing row including current numeric stats so we don't blow them away with nulls.
           const { data: existingFull } = await supa
             .from("terra_daily_health")
-            .select("resting_hr, steps, vo2max, hrv")
+            .select("resting_hr, steps, vo2max, hrv, calories, distance_metres, active_seconds")
             .eq("user_id", appUserId)
             .eq("provider", provider)
             .eq("date", date)
@@ -915,6 +926,9 @@ async function processWebhook(
             // Only overwrite if the new payload actually has a value; otherwise keep existing.
             resting_hr: newRestingHr ?? existingFull?.resting_hr ?? null,
             steps: newSteps ?? existingFull?.steps ?? null,
+            calories: newCalories != null ? Math.round(newCalories) : existingFull?.calories ?? null,
+            distance_metres: newDistanceMetres ?? existingFull?.distance_metres ?? null,
+            active_seconds: newActiveSeconds != null ? Math.round(newActiveSeconds) : existingFull?.active_seconds ?? null,
             vo2max: newVo2max ?? existingFull?.vo2max ?? null,
             hrv: newHrv ?? existingFull?.hrv ?? null,
             sleep_seconds: existing?.sleep_seconds ?? null,

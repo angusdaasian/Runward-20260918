@@ -122,20 +122,24 @@ interface Props {
 // activity lists would silently blank out older maps, so keep a small pool of
 // live preview maps and release the least-recently-used ones.
 const MAX_LIVE_PREVIEWS = 6;
-const livePreviews: Array<() => void> = [];
+type Release = () => boolean;
+const livePreviews: Release[] = [];
 
-function registerPreview(release: () => void) {
+function registerPreview(release: Release) {
   livePreviews.push(release);
   while (livePreviews.length > MAX_LIVE_PREVIEWS) {
-    const oldest = livePreviews.shift();
-    oldest?.();
+    // Free the oldest map that is currently off-screen; never drop a visible one.
+    const index = livePreviews.findIndex((candidate) => candidate());
+    if (index < 0) break;
+    livePreviews.splice(index, 1);
   }
 }
 
-function unregisterPreview(release: () => void) {
+function unregisterPreview(release: Release) {
   const index = livePreviews.indexOf(release);
   if (index >= 0) livePreviews.splice(index, 1);
 }
+
 
 const ActivityMap = ({ polyline, className, lang }: Props) => {
   const previewRef = useRef<HTMLDivElement>(null);

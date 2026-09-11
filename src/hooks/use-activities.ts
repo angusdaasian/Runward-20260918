@@ -537,10 +537,10 @@ export function useActivities(options?: { limit?: number; enabled?: boolean }) {
     staleTime: 5 * 60 * 1000,
   });
 
-  // Every source runs in parallel now, so "ready" simply means all of them
-  // have settled at least once.
+  // "Ready" only waits for the light Terra query — the heavy full fetch keeps
+  // hydrating in the background without holding back the first paint.
   const allSourcesSettled =
-    terraQuery.isFetched && !terraQuery.isFetching &&
+    terraLightQuery.isFetched && !terraLightQuery.isFetching &&
     activitiesQuery.isFetched && !activitiesQuery.isFetching &&
     appleHealthQuery.isFetched && !appleHealthQuery.isFetching &&
     garminQuery.isFetched && !garminQuery.isFetching &&
@@ -556,7 +556,11 @@ export function useActivities(options?: { limit?: number; enabled?: boolean }) {
   const mergedActivities = useMemo(() => {
     if (!allSourcesSettled) return lastMergedRef.current;
 
-    const tr = terraQuery.data || [];
+    // Prefer the full rows once they land (they carry sample streams + laps);
+    // until then the light summaries are enough for every list/chart view.
+    const full = terraQuery.data;
+    const light = terraLightQuery.data || [];
+    const tr = full && full.length >= light.length ? full : light;
     const terraOnlyLatestView = !!limit && tr.length > 0;
     const strava = terraOnlyLatestView ? [] : (activitiesQuery.data || []);
     const ah = terraOnlyLatestView ? [] : (appleHealthQuery.data || []);
@@ -580,9 +584,11 @@ export function useActivities(options?: { limit?: number; enabled?: boolean }) {
     appleHealthQuery.data,
     garminQuery.data,
     terraQuery.data,
+    terraLightQuery.data,
     suuntoQuery.data,
     limit,
   ]);
+
 
   // Auto-link races to activities: when an activity exists on a race day and
   // the race has no finish time yet, fill it from the activity's elapsed_time.

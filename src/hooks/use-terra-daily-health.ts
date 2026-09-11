@@ -146,15 +146,22 @@ export function useTerraTodayStats(): TerraTodayStats | null {
     // Sleep for "today" is last night's sleep, which may be stored on today's row.
     const sleepSeconds = best("sleep_seconds");
 
-    if (steps == null && calories == null && distance == null) return null;
+    if (steps == null && calories == null && distance == null) {
+      // Steps/cal/distance missing — keep any cached same-day value rather than
+      // blanking the card; sleep-only rows shouldn't clear it either.
+      return _cachedTodayStats;
+    }
 
-    return {
+    const stats: TerraTodayStats = {
       steps: steps ?? 0,
       caloriesBurned: calories != null ? Math.round(calories) : 0,
       walkRunDistanceKm: distance != null ? Math.round((distance / 1000) * 100) / 100 : 0,
       sleepMinutes: sleepSeconds != null ? Math.round(sleepSeconds / 60) : 0,
     };
-  }, [rows]);
+    _cachedTodayStats = stats;
+    writeCachedTodayStats(stats);
+    return stats;
+  }, [rows, isLoading]);
 }
 
 

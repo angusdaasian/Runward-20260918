@@ -14,6 +14,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { updateHeaderCache } from "@/components/AppHeader";
 import { useActivities } from "@/hooks/use-activities";
 import HeartRateZonesCard from "@/components/HeartRateZonesCard";
+import CommunityPrivacy from "@/components/community/CommunityPrivacy";
 import { ZONE_LABELS, zoneBoundaries, estimateMaxHr, estimateRestingHr } from "@/lib/hrZones";
 
 const ZONE_INFO: Array<{ key: string; name: string; nameZh: string; desc: string; descZh: string }> = [
@@ -864,6 +865,8 @@ const ProfileSection = ({ lang, subpage = "main", onNavigate }: ProfileSectionPr
         </div>
         <ChevronRight size={18} className="text-muted-foreground" />
       </button>
+
+      <CommunityPrivacy lang={lang} />
     </div>
   );
 };

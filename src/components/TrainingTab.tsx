@@ -23,7 +23,9 @@ import {
 } from "lucide-react";
 import { shareTrainingWeek } from "@/lib/sharePlanWeek";
 import { estimateMaxHr, estimateRestingHr, zoneBoundaries, isValidCustomZones } from "@/lib/hrZones";
-import { predictRaceFromActivities, typeLabel, type RunType } from "@/lib/racePredictionHr";
+import { typeLabel, type RunType, DISTANCE_METERS } from "@/lib/racePredictionHr";
+import { buildRaceForecast } from "@/lib/raceForecast";
+import type { PB } from "@/lib/racePrediction";
 import { targetTimeFromPlan, type SuggestProfile, type SuggestActivity } from "@/lib/paceSuggest";
 import { genSessionId, sessionDistanceKm, sessionPace, summarizeDay, type WorkoutSession } from "@/lib/planTypes";
 import { splitIntervalsInPlan } from "@/lib/splitIntervalSessions";
@@ -1853,20 +1855,34 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
 
   const aiTargetTime = useMemo(() => targetTimeFromPlan(existingPlan?.distance ?? null, existingPlan?.target_time ?? null), [existingPlan?.distance, existingPlan?.target_time]);
 
-  // Deterministic HR + VDOT race prediction over last 30 days.
+  // Unified race forecast (PBs + recent efforts + current training).
+  const [predictorPbs, setPredictorPbs] = useState<PB[]>([]);
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    supabase
+      .from("personal_bests")
+      .select("distance,hours,minutes,seconds,race_date")
+      .eq("user_id", user.id)
+      .then(({ data }) => { if (!cancelled) setPredictorPbs((data ?? []) as PB[]); });
+    return () => { cancelled = true; };
+  }, [user]);
+
   const racePrediction = useMemo(() => {
     if (!canPredictRaceTime || !existingPlan) return null;
     if (!allActivities || allActivities.length === 0) return null;
+    const meters = DISTANCE_METERS[String(existingPlan.distance)];
+    if (!meters) return null;
     const hrZones = hrBounds
       ? { z1: hrBounds.z1, z2: hrBounds.z2, z3: hrBounds.z3, z4: hrBounds.z4, z5: hrBounds.z5 }
       : null;
-    return predictRaceFromActivities(
-      allActivities as any,
-      hrZones,
-      String(existingPlan.distance),
-      30,
-    );
-  }, [canPredictRaceTime, existingPlan, allActivities, hrBounds]);
+    return buildRaceForecast({
+      activities: allActivities as any,
+      targetMeters: meters,
+      pbs: predictorPbs,
+      hrBounds: hrZones,
+    });
+  }, [canPredictRaceTime, existingPlan, allActivities, hrBounds, predictorPbs]);
 
 
 
@@ -3529,7 +3545,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                                       <div className="text-xs text-muted-foreground mt-0.5">
                                         <span className="font-semibold text-primary">{predictedLabel}</span>
                                         <span className="mx-1">·</span>
-                                        <span>{lang === "zh" ? "根據過去 30 天跑步估算" : "Based on your last 30 days of running"}</span>
+                                        <span>{lang === "zh" ? "綜合個人最佳、近期成績與目前訓練估算" : "From your PBs, recent efforts and current training"}</span>
                                       </div>
                                     </div>
                                     <ChevronDown size={18} className="text-muted-foreground transition-transform group-open:rotate-180 flex-shrink-0" />
@@ -3547,8 +3563,8 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                                       <div className="text-[11px] text-muted-foreground">
                                         {racePrediction
                                           ? (lang === "zh"
-                                              ? `${racePrediction.totalRuns} 次跑步`
-                                              : `${racePrediction.totalRuns} runs`)
+                                              ? `${racePrediction.trainingRuns} 次跑步`
+                                              : `${racePrediction.trainingRuns} runs`)
                                           : (lang === "zh" ? "需要更多跑步資料" : "Not enough run data yet")}
                                       </div>
                                     </div>
@@ -3557,7 +3573,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
                                   {racePrediction && (
                                     <div className="mt-3 rounded-lg border border-border bg-background p-3">
                                       <div className="text-[11px] font-medium uppercase text-muted-foreground mb-2">
-                                        {lang === "zh" ? "跑步類型分佈（30 天）" : "Run types (30d)"}
+                                        {lang === "zh" ? "跑步類型分佈（42 天）" : "Run types (42d)"}
                                       </div>
                                       <div className="flex flex-wrap gap-2">
                                         {typeOrder.map((t) => {

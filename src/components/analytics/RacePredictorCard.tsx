@@ -8,17 +8,12 @@ import { usePremium } from "@/contexts/PremiumContext";
 import PlanComparisonDialog from "@/components/PlanComparisonDialog";
 import { formatTime, formatPace } from "@/lib/vdot";
 import {
-  bestAnchorPb,
-  bestRecentEffortAt,
-  effectiveVdot,
   freshnessAdj,
-  predictRace,
-  predictionConfidence,
-  recentVdot,
-  volumeStats,
   weatherSlowdown,
   type PB,
 } from "@/lib/racePrediction";
+import { buildRaceForecast } from "@/lib/raceForecast";
+import { estimateMaxHr, estimateRestingHr, isValidCustomZones, zoneBoundaries } from "@/lib/hrZones";
 import { buildWeeklyLoadSeries } from "@/lib/trainingLoad";
 
 interface Props {
@@ -90,14 +85,15 @@ const RacePredictorCard = ({ lang }: Props) => {
     return () => { cancelled = true; };
   }, [city]);
 
-  const anchor = useMemo(() => bestAnchorPb(pbs), [pbs]);
-  const pbScore = anchor?.decayedScore ?? null;
-  const recentScore = useMemo(() => recentVdot(activities as any, 30), [activities]);
-  const vdot = useMemo(
-    () => effectiveVdot(recentScore, pbScore),
-    [recentScore, pbScore]
-  );
-  const vol = useMemo(() => volumeStats(activities as any), [activities]);
+  // HR zone bounds so training runs can be classified by effort.
+  const hrBounds = useMemo(() => {
+    const p: any = profile || {};
+    const max = estimateMaxHr(p.age, p.max_heartrate);
+    const rest = estimateRestingHr(p.resting_heartrate);
+    const custom = isValidCustomZones(p.custom_hr_zones) ? (p.custom_hr_zones as number[]) : null;
+    return zoneBoundaries(max, rest, custom);
+  }, [profile]);
+
 
   // Freshness from weekly training-load series (last week's TSB / "form").
   const freshness = useMemo(() => {
@@ -122,19 +118,19 @@ const RacePredictorCard = ({ lang }: Props) => {
     }
   }, [activities, profile]);
 
-  const confidence = useMemo(
+  // Headline fitness score + confidence (half marathon reference).
+  const headline = useMemo(
     () =>
-      predictionConfidence({
-        hasPb: !!anchor,
-        pbAgeDays: anchor?.ageDays ?? null,
-        hasRecent: recentScore !== null,
-        sessions4wk: vol.sessions4wk,
-        weeklyKm4wk: vol.weeklyKm4wk,
+      buildRaceForecast({
+        activities: activities as any,
         targetMeters: 21097.5,
-        longestRunKm90d: vol.longestRunKm90d,
+        pbs,
+        hrBounds,
       }),
-    [anchor, recentScore, vol],
+    [activities, pbs, hrBounds],
   );
+  const vdot = headline?.vdot ?? null;
+  const confidence = headline?.confidence ?? "low";
 
   const tt = (en: string, zh: string) => (lang === "zh" ? zh : en);
 
@@ -237,16 +233,18 @@ const RacePredictorCard = ({ lang }: Props) => {
               weather?.humidity ?? null,
               d.meters,
             );
-            const directEffort = bestRecentEffortAt(activities as any, d.meters, 90);
-            const result = predictRace({
-              vdot,
-              meters: d.meters,
-              anchor,
-              directEffort,
-              vol,
+            const forecast = buildRaceForecast({
+              activities: activities as any,
+              targetMeters: d.meters,
+              pbs,
+              hrBounds,
               slowdown,
               freshness,
             });
+            const result = {
+              adjustedTime: forecast?.predictedSec ?? 0,
+              delta: forecast?.delta ?? 0,
+            };
             const pacePerKm = result.adjustedTime / (d.meters / 1000);
             return (
               <div

@@ -233,16 +233,18 @@ const RacePredictorCard = ({ lang }: Props) => {
               weather?.humidity ?? null,
               d.meters,
             );
-            const directEffort = bestRecentEffortAt(activities as any, d.meters, 90);
-            const result = predictRace({
-              vdot,
-              meters: d.meters,
-              anchor,
-              directEffort,
-              vol,
+            const forecast = buildRaceForecast({
+              activities: activities as any,
+              targetMeters: d.meters,
+              pbs,
+              hrBounds,
               slowdown,
               freshness,
             });
+            const result = {
+              adjustedTime: forecast?.predictedSec ?? 0,
+              delta: forecast?.delta ?? 0,
+            };
             const pacePerKm = result.adjustedTime / (d.meters / 1000);
             return (
               <div

@@ -13,6 +13,9 @@ import EditWorkoutDialog from "@/components/training/EditWorkoutDialog";
 import AutoAdjustCard from "@/components/training/AutoAdjustCard";
 import PlanComparisonDialog from "@/components/PlanComparisonDialog";
 import { useActivities } from "@/hooks/use-activities";
+import { buildRaceForecast } from "@/lib/raceForecast";
+import { DISTANCE_METERS } from "@/lib/racePredictionHr";
+import { estimateMaxHr, estimateRestingHr, isValidCustomZones, zoneBoundaries } from "@/lib/hrZones";
 
 type Goal = "race" | "distance" | "first5k" | "parkrun" | "general" | "postnatal" | "fitness" | "injury" | "postrace";
 type Distance = "5K" | "10K" | "HM" | "FM";
@@ -341,43 +344,46 @@ const ProgramsTab = ({ lang, onLoginRequest }: Props) => {
     setTrackResult(null);
     setTrackChecking(true);
     try {
-      const { data, error } = await supabase.functions.invoke("predict-race-time", {
-        body: {
-          distance: existingPlan.distance,
-          raceDate: existingPlan.race_date || null,
-          lang,
-          activities: (activities || []).slice(0, 30).map((a: any) => ({
-            start_date: a.start_date,
-            sport_type: a.sport_type,
-            distance: a.distance,
-            moving_time: a.moving_time,
-            elapsed_time: a.elapsed_time,
-            average_heartrate: a.average_heartrate,
-            total_elevation_gain: a.total_elevation_gain,
-          })),
-        },
+      const meters = DISTANCE_METERS[String(existingPlan.distance)];
+      if (!meters) throw new Error(lang === "zh" ? "不支援此距離" : "Unsupported distance");
+
+      const [{ data: pbRows }, { data: prof }] = await Promise.all([
+        supabase.from("personal_bests").select("distance,hours,minutes,seconds,race_date").eq("user_id", user!.id),
+        supabase.from("profiles" as any).select("age, max_heartrate, resting_heartrate, custom_hr_zones").eq("id", user!.id).maybeSingle(),
+      ]);
+      const p: any = prof || {};
+      const hz = zoneBoundaries(
+        estimateMaxHr(p.age, p.max_heartrate),
+        estimateRestingHr(p.resting_heartrate),
+        isValidCustomZones(p.custom_hr_zones) ? (p.custom_hr_zones as number[]) : null,
+      );
+
+      const forecast = buildRaceForecast({
+        activities: (activities || []) as any,
+        targetMeters: meters,
+        pbs: (pbRows ?? []) as any,
+        hrBounds: hz,
       });
-      if (error) throw error;
-      if ((data as any)?.error === "no_recent_runs") {
-        setTrackError(lang === "zh" ? "沒有最近的跑步紀錄，請先同步活動。" : "No recent runs found. Sync activities first.");
+      if (!forecast) {
+        setTrackError(lang === "zh" ? "沒有足夠的跑步紀錄，請先同步活動。" : "Not enough run data. Sync activities first.");
         if (showToast) {
           toast({
-            title: lang === "zh" ? "沒有最近的跑步紀錄" : "No recent runs found",
+            title: lang === "zh" ? "沒有足夠的跑步紀錄" : "Not enough run data",
             description: lang === "zh" ? "同步跑步活動後再試。" : "Sync some running activities and try again.",
             variant: "destructive",
           });
         }
         return;
       }
-      if ((data as any)?.error) throw new Error((data as any).error);
-      const h = parseInt((data as any).hours ?? 0, 10) || 0;
-      const m = parseInt((data as any).minutes ?? 0, 10) || 0;
-      const s = parseInt((data as any).seconds ?? 0, 10) || 0;
-      const predictedSec = h * 3600 + m * 60 + s;
+      const predictedSec = forecast.predictedSec;
+      const pbCount = forecast.evidence.filter((e) => e.kind === "pb").length;
+      const rationale = lang === "zh"
+        ? `綜合 ${pbCount} 項個人最佳、近期成績與過去 42 天 ${forecast.trainingRuns} 次跑步（週均 ${forecast.volume.weeklyKm4wk.toFixed(0)} 公里，最長 ${forecast.volume.longestRunKm90d.toFixed(0)} 公里）估算。`
+        : `Based on ${pbCount} personal best(s), recent race-quality efforts and ${forecast.trainingRuns} runs in the last 42 days (${forecast.volume.weeklyKm4wk.toFixed(0)} km/week avg, longest ${forecast.volume.longestRunKm90d.toFixed(0)} km).`;
       setTrackResult({
         predictedSec,
         targetSec,
-        rationale: (data as any).rationale || "",
+        rationale,
         predictedLabel: fmtSec(predictedSec),
       });
     } catch (e: any) {
@@ -951,7 +957,7 @@ const ProgramsTab = ({ lang, onLoginRequest }: Props) => {
                 {trackChecking || activitiesLoading ? "…" : trackResult?.predictedLabel || "--:--"}
               </div>
               <div className="text-[11px] text-muted-foreground">
-                {trackResult ? (lang === "zh" ? "Gemini 預測" : "Gemini prediction") : (lang === "zh" ? "等待分析" : "Waiting for analysis")}
+                {trackResult ? (lang === "zh" ? "綜合成績與訓練估算" : "From PBs + training") : (lang === "zh" ? "等待分析" : "Waiting for analysis")}
               </div>
             </div>
           </div>

@@ -118,16 +118,62 @@ interface Props {
   lang: Lang;
 }
 
+// Browsers allow only a limited number of live WebGL contexts (~8-16). Long
+// activity lists would silently blank out older maps, so keep a small pool of
+// live preview maps and release the least-recently-used ones.
+const MAX_LIVE_PREVIEWS = 6;
+type Release = () => boolean;
+const livePreviews: Release[] = [];
+
+function registerPreview(release: Release) {
+  livePreviews.push(release);
+  while (livePreviews.length > MAX_LIVE_PREVIEWS) {
+    // Free the oldest map that is currently off-screen; never drop a visible one.
+    const index = livePreviews.findIndex((candidate) => candidate());
+    if (index < 0) break;
+    livePreviews.splice(index, 1);
+  }
+}
+
+function unregisterPreview(release: Release) {
+  const index = livePreviews.indexOf(release);
+  if (index >= 0) livePreviews.splice(index, 1);
+}
+
+
 const ActivityMap = ({ polyline, className, lang }: Props) => {
   const previewRef = useRef<HTMLDivElement>(null);
   const previewMapRef = useRef<mapboxgl.Map | null>(null);
   const fullRef = useRef<HTMLDivElement>(null);
   const fullMapRef = useRef<mapboxgl.Map | null>(null);
   const [open, setOpen] = useState(false);
+  const [visible, setVisible] = useState(false);
+  const visibleRef = useRef(false);
+
+  // Only build the preview map while it's near the viewport
+  useEffect(() => {
+    const container = previewRef.current;
+    if (!container) return;
+    if (typeof IntersectionObserver === "undefined") {
+      visibleRef.current = true;
+      setVisible(true);
+      return;
+    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const isVisible = entries.some((entry) => entry.isIntersecting);
+        visibleRef.current = isVisible;
+        setVisible(isVisible);
+      },
+      { rootMargin: "300px 0px" },
+    );
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, []);
 
   // Preview map
   useEffect(() => {
-    if (!previewRef.current || !polyline) return;
+    if (!previewRef.current || !polyline || !visible) return;
 
     if (previewMapRef.current) {
       previewMapRef.current.remove();
@@ -139,21 +185,37 @@ const ActivityMap = ({ polyline, className, lang }: Props) => {
 
     let cancelled = false;
     const container = previewRef.current;
+    const release = () => {
+      if (visibleRef.current) return false;
+      if (previewMapRef.current) {
+        previewMapRef.current.remove();
+        previewMapRef.current = null;
+      }
+      setVisible(false);
+      return true;
+    };
+
+
     void createRouteMap(container, coords, lang, false, 14)
       .then((map) => {
-        if (cancelled) map.remove();
-        else previewMapRef.current = map;
+        if (cancelled) {
+          map.remove();
+          return;
+        }
+        previewMapRef.current = map;
+        registerPreview(release);
       })
       .catch((error) => console.error("Activity map failed to load", error));
 
     return () => {
       cancelled = true;
+      unregisterPreview(release);
       if (previewMapRef.current) {
         previewMapRef.current.remove();
         previewMapRef.current = null;
       }
     };
-  }, [polyline, lang]);
+  }, [polyline, lang, visible]);
 
   // Fullscreen map (mounted only when overlay opens)
   useEffect(() => {

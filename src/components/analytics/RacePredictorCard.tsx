@@ -118,19 +118,19 @@ const RacePredictorCard = ({ lang }: Props) => {
     }
   }, [activities, profile]);
 
-  const confidence = useMemo(
+  // Headline fitness score + confidence (half marathon reference).
+  const headline = useMemo(
     () =>
-      predictionConfidence({
-        hasPb: !!anchor,
-        pbAgeDays: anchor?.ageDays ?? null,
-        hasRecent: recentScore !== null,
-        sessions4wk: vol.sessions4wk,
-        weeklyKm4wk: vol.weeklyKm4wk,
+      buildRaceForecast({
+        activities: activities as any,
         targetMeters: 21097.5,
-        longestRunKm90d: vol.longestRunKm90d,
+        pbs,
+        hrBounds,
       }),
-    [anchor, recentScore, vol],
+    [activities, pbs, hrBounds],
   );
+  const vdot = headline?.vdot ?? null;
+  const confidence = headline?.confidence ?? "low";
 
   const tt = (en: string, zh: string) => (lang === "zh" ? zh : en);
 

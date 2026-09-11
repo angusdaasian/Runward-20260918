@@ -76,11 +76,56 @@ export interface TerraTodayStats {
  * sleep). Returns null when nothing usable has arrived for today, so callers can
  * fall back to Apple Health.
  */
+// ---------- Today-stats cache (prevents cold-start flicker) ----------
+const TODAY_CACHE_KEY = "terra-today-stats-cache";
+
+function todayStr(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+}
+
+function readCachedTodayStats(): TerraTodayStats | null {
+  try {
+    const raw = localStorage.getItem(TODAY_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (parsed?.date !== todayStr() || !parsed?.stats) return null;
+    return parsed.stats as TerraTodayStats;
+  } catch {
+    return null;
+  }
+}
+
+function writeCachedTodayStats(stats: TerraTodayStats | null) {
+  try {
+    if (stats) {
+      localStorage.setItem(TODAY_CACHE_KEY, JSON.stringify({ date: todayStr(), stats }));
+    } else {
+      localStorage.removeItem(TODAY_CACHE_KEY);
+    }
+  } catch { /* ignore */ }
+}
+
+let _cachedTodayStats: TerraTodayStats | null = null;
+
 export function useTerraTodayStats(): TerraTodayStats | null {
-  const { data: rows } = useTerraDailyHealth();
+  const { data: rows, isLoading } = useTerraDailyHealth();
 
   return useMemo(() => {
-    if (!rows || rows.length === 0) return null;
+    // While the first fetch is in flight, serve the same-day cached stats so the
+    // Today card renders instantly instead of popping in late.
+    if (!rows) {
+      if (isLoading) {
+        if (!_cachedTodayStats) _cachedTodayStats = readCachedTodayStats();
+        return _cachedTodayStats;
+      }
+      return null;
+    }
+    if (rows.length === 0) {
+      writeCachedTodayStats(null);
+      _cachedTodayStats = null;
+      return null;
+    }
     const now = new Date();
     const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
     const todays = rows.filter((r) => (r.date ?? "").slice(0, 10) === today);
@@ -101,15 +146,22 @@ export function useTerraTodayStats(): TerraTodayStats | null {
     // Sleep for "today" is last night's sleep, which may be stored on today's row.
     const sleepSeconds = best("sleep_seconds");
 
-    if (steps == null && calories == null && distance == null) return null;
+    if (steps == null && calories == null && distance == null) {
+      // Steps/cal/distance missing — keep any cached same-day value rather than
+      // blanking the card; sleep-only rows shouldn't clear it either.
+      return _cachedTodayStats;
+    }
 
-    return {
+    const stats: TerraTodayStats = {
       steps: steps ?? 0,
       caloriesBurned: calories != null ? Math.round(calories) : 0,
       walkRunDistanceKm: distance != null ? Math.round((distance / 1000) * 100) / 100 : 0,
       sleepMinutes: sleepSeconds != null ? Math.round(sleepSeconds / 60) : 0,
     };
-  }, [rows]);
+    _cachedTodayStats = stats;
+    writeCachedTodayStats(stats);
+    return stats;
+  }, [rows, isLoading]);
 }
 
 

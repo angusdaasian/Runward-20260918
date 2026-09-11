@@ -667,7 +667,10 @@ const ActivitiesTab = ({ lang, resetSignal }: Props) => {
 
   const appleHealth = useAppleHealth(lang);
   const terraToday = useTerraTodayStats();
-  const [ahConnected, setAhConnected] = useState(false);
+  // Seed from cache so the Today card doesn't pop in late on cold start.
+  const [ahConnected, setAhConnected] = useState<boolean>(() => {
+    try { return localStorage.getItem("ah-connected") === "1"; } catch { return false; }
+  });
 
   useEffect(() => {
     if (!user) return;
@@ -677,6 +680,8 @@ const ActivitiesTab = ({ lang, resetSignal }: Props) => {
       .eq("user_id", user.id)
       .maybeSingle()
       .then(({ data }) => {
+        try { localStorage.setItem("ah-connected", data ? "1" : "0"); } catch { /* ignore */ }
+        if (!data) setAhConnected(false);
         if (data) {
           setAhConnected(true);
           if (!appleHealth.syncing) {

@@ -53,7 +53,7 @@ export function useTerraDailyHealth() {
     queryFn: async (): Promise<TerraDailyHealthRow[]> => {
       const { data, error } = await supabase
         .from("terra_daily_health")
-        .select("provider, date, vo2max, resting_hr, sleep_seconds, sleep_score, steps, hrv, fetched_at")
+        .select("provider, date, vo2max, resting_hr, sleep_seconds, sleep_score, steps, hrv, calories, distance_metres, active_seconds, fetched_at")
         .eq("user_id", user!.id)
         .order("date", { ascending: false })
         .limit(60);
@@ -63,6 +63,55 @@ export function useTerraDailyHealth() {
     staleTime: 60 * 1000,
   });
 }
+
+export interface TerraTodayStats {
+  steps: number;
+  caloriesBurned: number;
+  walkRunDistanceKm: number;
+  sleepMinutes: number;
+}
+
+/**
+ * Today's daily stats from Terra wearable webhooks (steps / calories / distance /
+ * sleep). Returns null when nothing usable has arrived for today, so callers can
+ * fall back to Apple Health.
+ */
+export function useTerraTodayStats(): TerraTodayStats | null {
+  const { data: rows } = useTerraDailyHealth();
+
+  return useMemo(() => {
+    if (!rows || rows.length === 0) return null;
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    const todays = rows.filter((r) => (r.date ?? "").slice(0, 10) === today);
+    if (todays.length === 0) return null;
+
+    const best = <K extends keyof TerraDailyHealthRow>(key: K): number | null => {
+      let max: number | null = null;
+      for (const r of todays) {
+        const v = r[key];
+        if (typeof v === "number" && isFinite(v) && (max == null || v > max)) max = v;
+      }
+      return max;
+    };
+
+    const steps = best("steps");
+    const calories = best("calories");
+    const distance = best("distance_metres");
+    // Sleep for "today" is last night's sleep, which may be stored on today's row.
+    const sleepSeconds = best("sleep_seconds");
+
+    if (steps == null && calories == null && distance == null) return null;
+
+    return {
+      steps: steps ?? 0,
+      caloriesBurned: calories != null ? Math.round(calories) : 0,
+      walkRunDistanceKm: distance != null ? Math.round((distance / 1000) * 100) / 100 : 0,
+      sleepMinutes: sleepSeconds != null ? Math.round(sleepSeconds / 60) : 0,
+    };
+  }, [rows]);
+}
+
 
 export function useRefreshTerraDailyHealth(lang: Lang) {
   const queryClient = useQueryClient();

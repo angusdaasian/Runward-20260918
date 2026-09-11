@@ -242,6 +242,63 @@ function mapTerraProviderLabel(provider: string): string {
   return provider.charAt(0).toUpperCase() + provider.slice(1).toLowerCase();
 }
 
+function mapTerraRow(a: any): StravaActivity {
+  const sourceLabel = mapTerraProviderLabel(a.provider);
+  const sportType = mapTerraSportType(a.activity_type);
+  const durationSeconds = a.duration_seconds && a.duration_seconds > 0
+    ? a.duration_seconds
+    : a.distance_meters && a.average_speed && a.average_speed > 0
+      ? Math.round(a.distance_meters / a.average_speed)
+      : 0;
+  return {
+    id: a.id,
+    strava_id: 0,
+    name: a.activity_name || `${sourceLabel} Activity`,
+    sport_type: sportType,
+    distance: a.distance_meters || 0,
+    moving_time: durationSeconds,
+    elapsed_time: durationSeconds,
+    total_elevation_gain: a.elevation_gain || 0,
+    start_date: a.start_time,
+    average_speed: (a.average_speed && a.average_speed > 0)
+      ? a.average_speed
+      : (a.distance_meters && durationSeconds > 0)
+        ? a.distance_meters / durationSeconds
+        : 0,
+    max_speed: 0,
+    average_heartrate: a.average_hr || null,
+    max_heartrate: a.max_hr || null,
+    summary_polyline: a.summary_polyline ?? null,
+    source: sourceLabel,
+    calories: a.calories ?? null,
+    laps: a.laps || [],
+    hr_samples: a.hr_samples || null,
+    distance_samples: a.distance_samples || null,
+    elevation_samples: (a as any).elevation_samples || null,
+    cadence_samples: (a as any).cadence_samples || null,
+    avg_cadence: a.avg_cadence ?? null,
+    garmin_training_load: a.training_load ?? null,
+    provenance: "terra" as const,
+  } as StravaActivity;
+}
+
+// Summary-only columns. Terra rows average ~48 kB each, of which ~46 kB is
+// per-second sample streams + laps that no list view reads. Fetching just the
+// summary makes the first paint after a cold start ~20x lighter.
+const TERRA_LIGHT_COLUMNS =
+  "id,provider,activity_name,activity_type,distance_meters,duration_seconds,elevation_gain,start_time,average_speed,average_hr,max_hr,summary_polyline,calories,avg_cadence,training_load";
+
+async function fetchTerraActivitiesLight(userId: string, limit?: number): Promise<StravaActivity[]> {
+  let q = supabase
+    .from("terra_activities")
+    .select(TERRA_LIGHT_COLUMNS)
+    .eq("user_id", userId)
+    .order("start_time", { ascending: false });
+  if (limit) q = q.limit(limit);
+  const { data } = await q;
+  return ((data as any[]) || []).map(mapTerraRow);
+}
+
 async function fetchTerraActivities(userId: string, limit?: number): Promise<StravaActivity[]> {
   let q = supabase
     .from("terra_activities")
@@ -250,45 +307,7 @@ async function fetchTerraActivities(userId: string, limit?: number): Promise<Str
     .order("start_time", { ascending: false });
   if (limit) q = q.limit(limit);
   const { data } = await q;
-  return ((data as any[]) || []).map((a) => {
-    const sourceLabel = mapTerraProviderLabel(a.provider);
-    const sportType = mapTerraSportType(a.activity_type);
-    const durationSeconds = a.duration_seconds && a.duration_seconds > 0
-      ? a.duration_seconds
-      : a.distance_meters && a.average_speed && a.average_speed > 0
-        ? Math.round(a.distance_meters / a.average_speed)
-        : 0;
-    return {
-      id: a.id,
-      strava_id: 0,
-      name: a.activity_name || `${sourceLabel} Activity`,
-      sport_type: sportType,
-      distance: a.distance_meters || 0,
-      moving_time: durationSeconds,
-      elapsed_time: durationSeconds,
-      total_elevation_gain: a.elevation_gain || 0,
-      start_date: a.start_time,
-      average_speed: (a.average_speed && a.average_speed > 0)
-        ? a.average_speed
-        : (a.distance_meters && durationSeconds > 0)
-          ? a.distance_meters / durationSeconds
-          : 0,
-      max_speed: 0,
-      average_heartrate: a.average_hr || null,
-      max_heartrate: a.max_hr || null,
-      summary_polyline: a.summary_polyline ?? null,
-      source: sourceLabel,
-      calories: a.calories ?? null,
-      laps: a.laps || [],
-      hr_samples: a.hr_samples || null,
-      distance_samples: a.distance_samples || null,
-      elevation_samples: (a as any).elevation_samples || null,
-      cadence_samples: (a as any).cadence_samples || null,
-      avg_cadence: a.avg_cadence ?? null,
-      garmin_training_load: a.training_load ?? null,
-      provenance: "terra" as const,
-    } as StravaActivity;
-  });
+  return ((data as any[]) || []).map(mapTerraRow);
 }
 
 async function fetchSuuntoActivities(userId: string, limit?: number): Promise<StravaActivity[]> {

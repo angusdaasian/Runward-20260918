@@ -2235,7 +2235,10 @@ export type Database = {
       }
       terra_daily_health: {
         Row: {
+          active_seconds: number | null
+          calories: number | null
           date: string
+          distance_metres: number | null
           fetched_at: string
           hrv: number | null
           id: string
@@ -2248,7 +2251,10 @@ export type Database = {
           vo2max: number | null
         }
         Insert: {
+          active_seconds?: number | null
+          calories?: number | null
           date: string
+          distance_metres?: number | null
           fetched_at?: string
           hrv?: number | null
           id?: string
@@ -2261,7 +2267,10 @@ export type Database = {
           vo2max?: number | null
         }
         Update: {
+          active_seconds?: number | null
+          calories?: number | null
           date?: string
+          distance_metres?: number | null
           fetched_at?: string
           hrv?: number | null
           id?: string

@@ -618,6 +618,7 @@ const ActivitiesTab = ({ lang, resetSignal }: Props) => {
 
   const profile = homepage.profile;
   const connected = homepage.connected;
+  const connectionLoading = homepage.connectionLoading;
   const fitnessAppConnected = homepage.fitnessAppConnected;
   const plannedWorkouts = homepage.plannedWorkouts;
   const userRaces = homepage.userRaces;

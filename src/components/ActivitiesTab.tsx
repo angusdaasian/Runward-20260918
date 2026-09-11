@@ -1234,8 +1234,25 @@ const ActivitiesTab = ({ lang, resetSignal }: Props) => {
   return (
     <FadeIn className="px-5 pt-6 max-w-lg mx-auto">
 
-      {/* Today Stats from Apple HealthKit */}
-      <TodayStats lang={lang} healthStats={ahConnected ? appleHealth.healthStats : null} />
+      {/* Today Stats: wearable (Terra) daily data wins, Apple Health as fallback */}
+      <TodayStats
+        lang={lang}
+        healthStats={
+          terraToday
+            ? {
+                steps: terraToday.steps,
+                caloriesBurned: terraToday.caloriesBurned,
+                walkRunDistanceKm: terraToday.walkRunDistanceKm,
+                sleepMinutes:
+                  terraToday.sleepMinutes > 0
+                    ? terraToday.sleepMinutes
+                    : (ahConnected ? appleHealth.healthStats?.sleepMinutes ?? 0 : 0),
+              }
+            : ahConnected
+              ? appleHealth.healthStats
+              : null
+        }
+      />
 
 
 

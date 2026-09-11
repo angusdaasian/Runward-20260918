@@ -41,6 +41,7 @@ import { useActivities, type StravaActivity } from "@/hooks/use-activities";
 import FadeIn from "@/components/ui/FadeIn";
 import { ActivityListSkeleton } from "@/components/ui/PageSkeleton";
 import { useAppleHealth, type HealthStats } from "@/hooks/use-apple-health";
+import { useTerraTodayStats } from "@/hooks/use-terra-daily-health";
 import { useSimpleMode } from "@/hooks/use-simple-mode";
 
 

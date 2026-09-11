@@ -8,17 +8,12 @@ import { usePremium } from "@/contexts/PremiumContext";
 import PlanComparisonDialog from "@/components/PlanComparisonDialog";
 import { formatTime, formatPace } from "@/lib/vdot";
 import {
-  bestAnchorPb,
-  bestRecentEffortAt,
-  effectiveVdot,
   freshnessAdj,
-  predictRace,
-  predictionConfidence,
-  recentVdot,
-  volumeStats,
   weatherSlowdown,
   type PB,
 } from "@/lib/racePrediction";
+import { buildRaceForecast } from "@/lib/raceForecast";
+import { estimateMaxHr, estimateRestingHr, isValidCustomZones, zoneBoundaries } from "@/lib/hrZones";
 import { buildWeeklyLoadSeries } from "@/lib/trainingLoad";
 
 interface Props {

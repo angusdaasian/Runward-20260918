@@ -18,6 +18,9 @@ export interface TerraDailyHealthRow {
   sleep_score: number | null;
   steps: number | null;
   hrv: number | null;
+  calories: number | null;
+  distance_metres: number | null;
+  active_seconds: number | null;
   fetched_at: string;
 }
 

@@ -242,6 +242,63 @@ function mapTerraProviderLabel(provider: string): string {
   return provider.charAt(0).toUpperCase() + provider.slice(1).toLowerCase();
 }
 
+function mapTerraRow(a: any): StravaActivity {
+  const sourceLabel = mapTerraProviderLabel(a.provider);
+  const sportType = mapTerraSportType(a.activity_type);
+  const durationSeconds = a.duration_seconds && a.duration_seconds > 0
+    ? a.duration_seconds
+    : a.distance_meters && a.average_speed && a.average_speed > 0
+      ? Math.round(a.distance_meters / a.average_speed)
+      : 0;
+  return {
+    id: a.id,
+    strava_id: 0,
+    name: a.activity_name || `${sourceLabel} Activity`,
+    sport_type: sportType,
+    distance: a.distance_meters || 0,
+    moving_time: durationSeconds,
+    elapsed_time: durationSeconds,
+    total_elevation_gain: a.elevation_gain || 0,
+    start_date: a.start_time,
+    average_speed: (a.average_speed && a.average_speed > 0)
+      ? a.average_speed
+      : (a.distance_meters && durationSeconds > 0)
+        ? a.distance_meters / durationSeconds
+        : 0,
+    max_speed: 0,
+    average_heartrate: a.average_hr || null,
+    max_heartrate: a.max_hr || null,
+    summary_polyline: a.summary_polyline ?? null,
+    source: sourceLabel,
+    calories: a.calories ?? null,
+    laps: a.laps || [],
+    hr_samples: a.hr_samples || null,
+    distance_samples: a.distance_samples || null,
+    elevation_samples: (a as any).elevation_samples || null,
+    cadence_samples: (a as any).cadence_samples || null,
+    avg_cadence: a.avg_cadence ?? null,
+    garmin_training_load: a.training_load ?? null,
+    provenance: "terra" as const,
+  } as StravaActivity;
+}
+
+// Summary-only columns. Terra rows average ~48 kB each, of which ~46 kB is
+// per-second sample streams + laps that no list view reads. Fetching just the
+// summary makes the first paint after a cold start ~20x lighter.
+const TERRA_LIGHT_COLUMNS =
+  "id,provider,activity_name,activity_type,distance_meters,duration_seconds,elevation_gain,start_time,average_speed,average_hr,max_hr,summary_polyline,calories,avg_cadence,training_load";
+
+async function fetchTerraActivitiesLight(userId: string, limit?: number): Promise<StravaActivity[]> {
+  let q = supabase
+    .from("terra_activities")
+    .select(TERRA_LIGHT_COLUMNS)
+    .eq("user_id", userId)
+    .order("start_time", { ascending: false });
+  if (limit) q = q.limit(limit);
+  const { data } = await q;
+  return ((data as any[]) || []).map(mapTerraRow);
+}
+
 async function fetchTerraActivities(userId: string, limit?: number): Promise<StravaActivity[]> {
   let q = supabase
     .from("terra_activities")
@@ -250,45 +307,7 @@ async function fetchTerraActivities(userId: string, limit?: number): Promise<Str
     .order("start_time", { ascending: false });
   if (limit) q = q.limit(limit);
   const { data } = await q;
-  return ((data as any[]) || []).map((a) => {
-    const sourceLabel = mapTerraProviderLabel(a.provider);
-    const sportType = mapTerraSportType(a.activity_type);
-    const durationSeconds = a.duration_seconds && a.duration_seconds > 0
-      ? a.duration_seconds
-      : a.distance_meters && a.average_speed && a.average_speed > 0
-        ? Math.round(a.distance_meters / a.average_speed)
-        : 0;
-    return {
-      id: a.id,
-      strava_id: 0,
-      name: a.activity_name || `${sourceLabel} Activity`,
-      sport_type: sportType,
-      distance: a.distance_meters || 0,
-      moving_time: durationSeconds,
-      elapsed_time: durationSeconds,
-      total_elevation_gain: a.elevation_gain || 0,
-      start_date: a.start_time,
-      average_speed: (a.average_speed && a.average_speed > 0)
-        ? a.average_speed
-        : (a.distance_meters && durationSeconds > 0)
-          ? a.distance_meters / durationSeconds
-          : 0,
-      max_speed: 0,
-      average_heartrate: a.average_hr || null,
-      max_heartrate: a.max_hr || null,
-      summary_polyline: a.summary_polyline ?? null,
-      source: sourceLabel,
-      calories: a.calories ?? null,
-      laps: a.laps || [],
-      hr_samples: a.hr_samples || null,
-      distance_samples: a.distance_samples || null,
-      elevation_samples: (a as any).elevation_samples || null,
-      cadence_samples: (a as any).cadence_samples || null,
-      avg_cadence: a.avg_cadence ?? null,
-      garmin_training_load: a.training_load ?? null,
-      provenance: "terra" as const,
-    } as StravaActivity;
-  });
+  return ((data as any[]) || []).map(mapTerraRow);
 }
 
 async function fetchSuuntoActivities(userId: string, limit?: number): Promise<StravaActivity[]> {
@@ -424,6 +443,17 @@ export function useActivities(options?: { limit?: number; enabled?: boolean }) {
   // waterfall and made rows pop in one wave at a time. Dedup still happens
   // once on the merged set (see mergedActivities below), and the list is only
   // painted once every source has settled — so no more staggered pop-in.
+  // Terra is fetched in two phases: a light summary query that paints the UI
+  // almost immediately, then the full query (with sample streams) hydrating in
+  // the background for the detail view / exports.
+  const terraLightQuery = useQuery({
+    queryKey: ["terra-activities-light", user?.id, limit ?? "all"],
+    queryFn: () => fetchTerraActivitiesLight(user!.id, limit),
+    enabled: activityQueriesEnabled,
+    staleTime: 30 * 1000,
+    gcTime: 10 * 60 * 1000,
+  });
+
   const terraQuery = useQuery({
     queryKey: ["terra-activities", user?.id, limit ?? "all"],
     queryFn: () => fetchTerraActivities(user!.id, limit),
@@ -432,7 +462,8 @@ export function useActivities(options?: { limit?: number; enabled?: boolean }) {
     gcTime: 10 * 60 * 1000,
   });
 
-  const hasTerraForLatestView = !!limit && (terraQuery.data?.length ?? 0) > 0;
+  const hasTerraForLatestView = !!limit && ((terraLightQuery.data?.length ?? terraQuery.data?.length ?? 0) > 0);
+
   const secondaryEnabled = activityQueriesEnabled;
 
   const activitiesQuery = useQuery({
@@ -506,10 +537,10 @@ export function useActivities(options?: { limit?: number; enabled?: boolean }) {
     staleTime: 5 * 60 * 1000,
   });
 
-  // Every source runs in parallel now, so "ready" simply means all of them
-  // have settled at least once.
+  // "Ready" only waits for the light Terra query — the heavy full fetch keeps
+  // hydrating in the background without holding back the first paint.
   const allSourcesSettled =
-    terraQuery.isFetched && !terraQuery.isFetching &&
+    terraLightQuery.isFetched && !terraLightQuery.isFetching &&
     activitiesQuery.isFetched && !activitiesQuery.isFetching &&
     appleHealthQuery.isFetched && !appleHealthQuery.isFetching &&
     garminQuery.isFetched && !garminQuery.isFetching &&
@@ -525,7 +556,11 @@ export function useActivities(options?: { limit?: number; enabled?: boolean }) {
   const mergedActivities = useMemo(() => {
     if (!allSourcesSettled) return lastMergedRef.current;
 
-    const tr = terraQuery.data || [];
+    // Prefer the full rows once they land (they carry sample streams + laps);
+    // until then the light summaries are enough for every list/chart view.
+    const full = terraQuery.data;
+    const light = terraLightQuery.data || [];
+    const tr = full && full.length >= light.length ? full : light;
     const terraOnlyLatestView = !!limit && tr.length > 0;
     const strava = terraOnlyLatestView ? [] : (activitiesQuery.data || []);
     const ah = terraOnlyLatestView ? [] : (appleHealthQuery.data || []);
@@ -549,9 +584,11 @@ export function useActivities(options?: { limit?: number; enabled?: boolean }) {
     appleHealthQuery.data,
     garminQuery.data,
     terraQuery.data,
+    terraLightQuery.data,
     suuntoQuery.data,
     limit,
   ]);
+
 
   // Auto-link races to activities: when an activity exists on a race day and
   // the race has no finish time yet, fill it from the activity's elapsed_time.
@@ -607,6 +644,7 @@ export function useActivities(options?: { limit?: number; enabled?: boolean }) {
     queryClient.invalidateQueries({ queryKey: ["apple-health-activities", user?.id] });
     queryClient.invalidateQueries({ queryKey: ["garmin-activities", user?.id] });
     queryClient.invalidateQueries({ queryKey: ["terra-activities", user?.id] });
+    queryClient.invalidateQueries({ queryKey: ["terra-activities-light", user?.id] });
     queryClient.invalidateQueries({ queryKey: ["suunto-activities", user?.id] });
     queryClient.invalidateQueries({ queryKey: ["user-profile", user?.id] });
     queryClient.invalidateQueries({ queryKey: ["planned-workouts", user?.id] });
@@ -630,7 +668,7 @@ export function useActivities(options?: { limit?: number; enabled?: boolean }) {
       mergedActivities.length === 0 &&
       !profileQuery.data,
     isRefreshing:
-      terraQuery.isFetching ||
+      terraLightQuery.isFetching ||
       activitiesQuery.isFetching ||
       appleHealthQuery.isFetching ||
       garminQuery.isFetching ||

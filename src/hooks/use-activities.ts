@@ -665,9 +665,8 @@ export function useActivities(options?: { limit?: number; enabled?: boolean }) {
     // and nothing merged yet). Background refreshes surface via isRefreshing
     // so content is never replaced by a skeleton again.
     loading:
-      (!activitiesReady || profileQuery.isLoading || connectionQuery.isLoading) &&
       mergedActivities.length === 0 &&
-      !profileQuery.data,
+      (!activitiesReady || profileQuery.isLoading || connectionQuery.isLoading),
     isRefreshing:
       terraLightQuery.isFetching ||
       activitiesQuery.isFetching ||

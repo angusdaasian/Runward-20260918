@@ -65,10 +65,10 @@ export function useTerraDailyHealth() {
 }
 
 export interface TerraTodayStats {
-  steps: number;
-  caloriesBurned: number;
-  walkRunDistanceKm: number;
-  sleepMinutes: number;
+  steps: number | null;
+  caloriesBurned: number | null;
+  walkRunDistanceKm: number | null;
+  sleepMinutes: number | null;
 }
 
 /**
@@ -77,7 +77,7 @@ export interface TerraTodayStats {
  * fall back to Apple Health.
  */
 // ---------- Today-stats cache (prevents cold-start flicker) ----------
-const TODAY_CACHE_KEY = "terra-today-stats-cache";
+const TODAY_CACHE_KEY = "terra-today-stats-cache-v2";
 
 function todayStr(): string {
   const now = new Date();
@@ -147,17 +147,17 @@ export function useTerraTodayStats(): { stats: TerraTodayStats | null; ready: bo
     // Sleep for "today" is last night's sleep, which may be stored on today's row.
     const sleepSeconds = best("sleep_seconds");
 
-    if (steps == null && calories == null && distance == null) {
+    if (steps == null && calories == null && distance == null && sleepSeconds == null) {
       // Steps/cal/distance missing — keep any cached same-day value rather than
       // blanking the card; sleep-only rows shouldn't clear it either.
       return _cachedTodayStats;
     }
 
     const stats: TerraTodayStats = {
-      steps: steps ?? 0,
-      caloriesBurned: calories != null ? Math.round(calories) : 0,
-      walkRunDistanceKm: distance != null ? Math.round((distance / 1000) * 100) / 100 : 0,
-      sleepMinutes: sleepSeconds != null ? Math.round(sleepSeconds / 60) : 0,
+      steps,
+      caloriesBurned: calories != null ? Math.round(calories) : null,
+      walkRunDistanceKm: distance != null ? Math.round((distance / 1000) * 100) / 100 : null,
+      sleepMinutes: sleepSeconds != null ? Math.round(sleepSeconds / 60) : null,
     };
     _cachedTodayStats = stats;
     writeCachedTodayStats(stats);

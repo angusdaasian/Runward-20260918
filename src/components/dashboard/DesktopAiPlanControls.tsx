@@ -13,7 +13,8 @@ import { useActivities } from "@/hooks/use-activities";
 import { Lang } from "@/lib/i18n";
 import { toast } from "sonner";
 import { notifyPlanChanged } from "@/lib/planEvents";
-import { predictRaceFromActivities, typeLabel, RunType } from "@/lib/racePredictionHr";
+import { typeLabel, RunType, DISTANCE_METERS } from "@/lib/racePredictionHr";
+import { buildRaceForecast } from "@/lib/raceForecast";
 import { estimateMaxHr, estimateRestingHr, isValidCustomZones, zoneBoundaries } from "@/lib/hrZones";
 import WeeklyReviewModal from "@/components/training/WeeklyReviewModal";
 
@@ -270,7 +271,9 @@ export default function DesktopAiPlanControls({ lang, plan, weekIdx, isPremium, 
   const racePrediction = useMemo(() => {
     if (!canPredict || !allActivities || allActivities.length === 0) return null;
     const hz = hrBounds ? { z1: hrBounds.z1, z2: hrBounds.z2, z3: hrBounds.z3, z4: hrBounds.z4, z5: hrBounds.z5 } : null;
-    return predictRaceFromActivities(allActivities as any, hz, String(plan.distance), 30);
+    const meters = DISTANCE_METERS[String(plan.distance)];
+    if (!meters) return null;
+    return buildRaceForecast({ activities: allActivities as any, targetMeters: meters, hrBounds: hz });
   }, [canPredict, allActivities, hrBounds, plan?.distance]);
 
   // ── HRV finetune ──
@@ -528,7 +531,7 @@ export default function DesktopAiPlanControls({ lang, plan, weekIdx, isPremium, 
               <div className="text-[11px] uppercase font-medium text-muted-foreground">{L("Current estimate", "目前預測")}</div>
               <div className="mt-1 text-xl font-bold text-primary">{racePrediction ? fmtSec(racePrediction.predictedSec) : "--:--"}</div>
               <div className="text-[11px] text-muted-foreground">
-                {racePrediction ? `${racePrediction.totalRuns} ${L("runs", "次跑步")}` : L("Not enough data", "資料不足")}
+                {racePrediction ? `${racePrediction.trainingRuns} ${L("runs", "次跑步")}` : L("Not enough data", "資料不足")}
               </div>
             </div>
           </div>

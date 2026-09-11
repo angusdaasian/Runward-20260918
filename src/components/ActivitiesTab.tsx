@@ -41,7 +41,7 @@ import { useActivities, type StravaActivity } from "@/hooks/use-activities";
 import FadeIn from "@/components/ui/FadeIn";
 import { ActivityListSkeleton } from "@/components/ui/PageSkeleton";
 import { useAppleHealth, type HealthStats } from "@/hooks/use-apple-health";
-import { useTerraTodayStats } from "@/hooks/use-terra-daily-health";
+import { useTerraDailyHealth, useTerraTodayStats } from "@/hooks/use-terra-daily-health";
 import { useGarminDailyHealth } from "@/hooks/use-garmin-daily-health";
 import { useSimpleMode } from "@/hooks/use-simple-mode";
 
@@ -668,11 +668,17 @@ const ActivitiesTab = ({ lang, resetSignal }: Props) => {
 
   const appleHealth = useAppleHealth(lang);
   const { stats: terraToday, ready: terraTodayReady } = useTerraTodayStats();
+  const { data: terraHealth } = useTerraDailyHealth();
   const { data: garminHealth, isFetched: garminHealthReady } = useGarminDailyHealth();
   const garminSleepMinutes = useMemo(() => {
-    const sleepSeconds = garminHealth?.find((row) => row.sleep_seconds != null)?.sleep_seconds;
+    // Match the Analysis card: current Terra/Garmin daily health is authoritative.
+    // The direct Garmin table is retained only as a fallback for older connections.
+    const sleepSeconds = terraHealth
+      ?.filter((row) => row.provider?.toUpperCase() === "GARMIN")
+      .find((row) => row.sleep_seconds != null)?.sleep_seconds
+      ?? garminHealth?.find((row) => row.sleep_seconds != null)?.sleep_seconds;
     return sleepSeconds != null ? Math.round(sleepSeconds / 60) : 0;
-  }, [garminHealth]);
+  }, [terraHealth, garminHealth]);
   // Seed from cache so the Today card doesn't pop in late on cold start.
   const [ahConnected, setAhConnected] = useState<boolean>(() => {
     try { return localStorage.getItem("ah-connected") === "1"; } catch { return false; }

@@ -3417,6 +3417,11 @@ export type Database = {
           user_id: string
         }[]
       }
+      community_is_run: { Args: { p_type: string }; Returns: boolean }
+      community_sport_label: {
+        Args: { p_raw: string; p_source: string }
+        Returns: string
+      }
       consume_rate_limit: {
         Args: { p_app_id: string }
         Returns: {

@@ -3474,6 +3474,16 @@ export type Database = {
           user_id: string
         }[]
       }
+      get_leaderboard_group_members: {
+        Args: { p_group_id: string }
+        Returns: {
+          avatar_url: string
+          display_name: string
+          joined_at: string
+          role: string
+          user_id: string
+        }[]
+      }
       get_my_leaderboard_groups: {
         Args: never
         Returns: {
@@ -3553,6 +3563,10 @@ export type Database = {
           id: string
           name: string
         }[]
+      }
+      remove_leaderboard_group_member: {
+        Args: { p_group_id: string; p_user_id: string }
+        Returns: undefined
       }
       rotate_group_code: { Args: { p_group_id: string }; Returns: string }
       set_strava_app_secret: {

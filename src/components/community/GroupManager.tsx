@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import QRCode from "qrcode";
-import { Copy, Link2, Loader2, Plus, RefreshCw, Users } from "lucide-react";
+import { Copy, Link2, Loader2, LogOut, Plus, RefreshCw, Trash2, UserMinus, Users } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import type { Lang } from "@/lib/i18n";
 
 export interface LeaderboardGroup { id: string; name: string; emoji: string | null; invite_code: string | null; owner_user_id: string; member_count: number }
+interface GroupMember { user_id: string; display_name: string | null; avatar_url: string | null; role: string }
 interface Props { lang: Lang; groups: LeaderboardGroup[]; onChanged: () => void }
 
 export default function GroupManager({ lang, groups, onChanged }: Props) {
@@ -19,6 +20,7 @@ export default function GroupManager({ lang, groups, onChanged }: Props) {
   const [joinCode, setJoinCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [qr, setQr] = useState<Record<string, string>>({});
+  const [members, setMembers] = useState<Record<string, GroupMember[]>>({});
 
   useEffect(() => {
     groups.forEach((group) => {
@@ -42,6 +44,18 @@ export default function GroupManager({ lang, groups, onChanged }: Props) {
   };
   const copyInvite = async (code: string) => navigator.clipboard.writeText(`${window.location.origin}/join/${code}`);
   const rotate = async (id: string) => { setBusy(true); await supabase.rpc("rotate_group_code", { p_group_id: id }); setBusy(false); onChanged(); };
+  const loadMembers = async (id: string) => {
+    const { data } = await supabase.rpc("get_leaderboard_group_members", { p_group_id: id });
+    setMembers((current) => ({ ...current, [id]: (data || []) as GroupMember[] }));
+  };
+  const removeMember = async (groupId: string, userId: string) => {
+    setBusy(true);
+    await supabase.rpc("remove_leaderboard_group_member", { p_group_id: groupId, p_user_id: userId });
+    await loadMembers(groupId); setBusy(false); onChanged();
+  };
+  const deleteGroup = async (id: string) => {
+    setBusy(true); await supabase.from("leaderboard_groups").delete().eq("id", id); setBusy(false); onChanged();
+  };
 
   if (!user) return null;
   return (
@@ -61,8 +75,10 @@ export default function GroupManager({ lang, groups, onChanged }: Props) {
           </div>
           {groups.map((group) => (
             <div key={group.id} className="rounded-lg border border-border p-3">
-              <div className="flex items-center justify-between"><strong>{group.emoji} {group.name}</strong><span className="text-xs text-muted-foreground">{group.member_count} {zh ? "人" : "members"}</span></div>
+              <div className="flex items-center justify-between gap-2"><strong>{group.emoji} {group.name}</strong><Button variant="ghost" size="sm" onClick={() => loadMembers(group.id)}>{group.member_count} {zh ? "人" : "members"}</Button></div>
               {group.invite_code && group.owner_user_id === user.id && <div className="mt-3 flex flex-col items-center gap-3"><img src={qr[group.id]} alt={`${group.name} invitation QR code`} className="h-36 w-36 rounded-md" /><div className="flex gap-2"><Button size="sm" variant="outline" onClick={() => copyInvite(group.invite_code || "")}><Copy />{zh ? "複製連結" : "Copy link"}</Button><Button size="icon" variant="ghost" onClick={() => rotate(group.id)} aria-label={zh ? "更新邀請碼" : "Rotate invite code"}><RefreshCw /></Button></div></div>}
+              {members[group.id] && <div className="mt-3 divide-y divide-border border-t border-border">{members[group.id].map((member) => <div key={member.user_id} className="flex items-center justify-between py-2 text-sm"><span>{member.display_name || (zh ? "跑者" : "Runner")}{member.role === "owner" ? ` · ${zh ? "群主" : "owner"}` : ""}</span>{group.owner_user_id === user.id && member.role !== "owner" && <Button size="icon" variant="ghost" onClick={() => removeMember(group.id, member.user_id)} aria-label={zh ? "移除成員" : "Remove member"}><UserMinus /></Button>}</div>)}</div>}
+              <div className="mt-2 flex justify-end">{group.owner_user_id === user.id ? <Button variant="ghost" size="sm" className="text-destructive" onClick={() => deleteGroup(group.id)} disabled={busy}><Trash2 />{zh ? "刪除群組" : "Delete group"}</Button> : <Button variant="ghost" size="sm" onClick={() => removeMember(group.id, user.id)} disabled={busy}><LogOut />{zh ? "離開" : "Leave"}</Button>}</div>
             </div>
           ))}
         </div>

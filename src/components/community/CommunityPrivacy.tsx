@@ -16,8 +16,18 @@ export default function CommunityPrivacy({ lang, compact = false }: Props) {
 
   useEffect(() => {
     if (!user) { setLoading(false); return; }
+    const cacheKey = `social_prefs:${user.id}`;
+    try {
+      const cached = sessionStorage.getItem(cacheKey);
+      if (cached) { setPrefs(JSON.parse(cached)); setLoading(false); }
+    } catch { /* ignore cache errors */ }
     supabase.from("social_prefs").select("leaderboard_opt_in, social_opt_in").eq("user_id", user.id).maybeSingle()
-      .then(({ data }) => { if (data) setPrefs(data); setLoading(false); });
+      .then(({ data }) => {
+        const next = data ?? { leaderboard_opt_in: false, social_opt_in: false };
+        setPrefs(next);
+        try { sessionStorage.setItem(cacheKey, JSON.stringify(next)); } catch { /* ignore cache errors */ }
+        setLoading(false);
+      });
   }, [user]);
 
   const toggle = async (key: keyof typeof prefs, value: boolean) => {

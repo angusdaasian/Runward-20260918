@@ -3357,6 +3357,21 @@ export type Database = {
       }
     }
     Views: {
+      community_activities_v: {
+        Row: {
+          activity_name: string | null
+          activity_type: string | null
+          distance_m: number | null
+          duration_s: number | null
+          elevation_m: number | null
+          source: string | null
+          source_id: string | null
+          started_at: string | null
+          summary_polyline: string | null
+          user_id: string | null
+        }
+        Relationships: []
+      }
       leaderboard_view: {
         Row: {
           avatar_url: string | null

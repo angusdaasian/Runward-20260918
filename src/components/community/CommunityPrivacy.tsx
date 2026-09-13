@@ -35,8 +35,10 @@ export default function CommunityPrivacy({ lang, compact = false }: Props) {
     const previous = prefs;
     setPrefs((current) => ({ ...current, [key]: value }));
     setSaving(key);
-    const { error } = await supabase.from("social_prefs").upsert({ user_id: user.id, ...prefs, [key]: value });
+    const next = { ...prefs, [key]: value };
+    const { error } = await supabase.from("social_prefs").upsert({ user_id: user.id, ...next });
     if (error) setPrefs(previous);
+    else try { sessionStorage.setItem(`social_prefs:${user.id}`, JSON.stringify(next)); } catch { /* ignore cache errors */ }
     setSaving(null);
   };
 

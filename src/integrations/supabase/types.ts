@@ -3470,6 +3470,7 @@ export type Database = {
           name: string
         }[]
       }
+      gen_group_invite_code: { Args: never; Returns: string }
       get_group_by_code: {
         Args: { p_code: string }
         Returns: {

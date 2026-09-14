@@ -1,11 +1,11 @@
-import { useEffect, useState } from "react";
-import QRCode from "qrcode";
-import { Copy, Link2, Loader2, LogOut, Plus, RefreshCw, Trash2, UserMinus, Users } from "lucide-react";
+import { useState } from "react";
+import { Copy, Link2, Loader2, LogOut, Plus, RefreshCw, Share2, Trash2, UserMinus, Users } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { useToast } from "@/hooks/use-toast";
 import type { Lang } from "@/lib/i18n";
 
 export interface LeaderboardGroup { id: string; name: string; emoji: string | null; invite_code: string | null; owner_user_id: string; member_count: number }
@@ -14,21 +14,13 @@ interface Props { lang: Lang; groups: LeaderboardGroup[]; onChanged: () => void 
 
 export default function GroupManager({ lang, groups, onChanged }: Props) {
   const { user } = useAuth();
+  const { toast } = useToast();
   const zh = lang === "zh";
   const [name, setName] = useState("");
   const [emoji, setEmoji] = useState("🏃");
   const [joinCode, setJoinCode] = useState("");
   const [busy, setBusy] = useState(false);
-  const [qr, setQr] = useState<Record<string, string>>({});
   const [members, setMembers] = useState<Record<string, GroupMember[]>>({});
-
-  useEffect(() => {
-    groups.forEach((group) => {
-      if (!group.invite_code || qr[group.id]) return;
-      const url = `${window.location.origin}/join/${group.invite_code}`;
-      QRCode.toDataURL(url, { width: 240, margin: 1 }).then((data) => setQr((current) => ({ ...current, [group.id]: data })));
-    });
-  }, [groups, qr]);
 
   const create = async () => {
     if (!name.trim()) return;
@@ -39,10 +31,25 @@ export default function GroupManager({ lang, groups, onChanged }: Props) {
   const join = async () => {
     if (!joinCode.trim()) return;
     setBusy(true);
-    await supabase.rpc("join_group_by_code", { p_code: joinCode.trim() });
-    setJoinCode(""); setBusy(false); onChanged();
+    const { error } = await supabase.rpc("join_group_by_code", { p_code: joinCode.trim().toUpperCase() });
+    setBusy(false);
+    if (error) { toast({ title: zh ? "邀請碼無效" : "Invalid invite code", variant: "destructive" }); return; }
+    setJoinCode(""); onChanged();
   };
-  const copyInvite = async (code: string) => navigator.clipboard.writeText(`${window.location.origin}/join/${code}`);
+  const inviteText = (group: LeaderboardGroup) =>
+    zh
+      ? `加入我的 Runward 排行榜「${group.name}」，邀請碼：${group.invite_code}`
+      : `Join my Runward leaderboard "${group.name}" with invite code ${group.invite_code}`;
+  const copyCode = async (group: LeaderboardGroup) => {
+    await navigator.clipboard.writeText(group.invite_code || "");
+    toast({ title: zh ? "已複製邀請碼" : "Invite code copied" });
+  };
+  const shareCode = async (group: LeaderboardGroup) => {
+    const text = inviteText(group);
+    if (navigator.share) { try { await navigator.share({ text }); return; } catch { /* dismissed */ } }
+    await navigator.clipboard.writeText(text);
+    toast({ title: zh ? "已複製邀請訊息" : "Invitation copied" });
+  };
   const rotate = async (id: string) => { setBusy(true); await supabase.rpc("rotate_group_code", { p_group_id: id }); setBusy(false); onChanged(); };
   const loadMembers = async (id: string) => {
     const { data } = await supabase.rpc("get_leaderboard_group_members", { p_group_id: id });
@@ -62,7 +69,7 @@ export default function GroupManager({ lang, groups, onChanged }: Props) {
     <Dialog>
       <DialogTrigger asChild><Button variant="outline" size="sm"><Users />{zh ? "私人排行榜" : "Private groups"}</Button></DialogTrigger>
       <DialogContent className="max-h-[85vh] overflow-y-auto">
-        <DialogHeader><DialogTitle>{zh ? "私人排行榜" : "Private leaderboards"}</DialogTitle><DialogDescription>{zh ? "用同一邀請連結或 QR Code 邀請跑友。" : "Invite runners with one link or its QR code."}</DialogDescription></DialogHeader>
+        <DialogHeader><DialogTitle>{zh ? "私人排行榜" : "Private leaderboards"}</DialogTitle><DialogDescription>{zh ? "用 5 位邀請碼邀請跑友，可複製或分享到 WhatsApp。" : "Invite runners with a 5-character code you can copy or share to WhatsApp."}</DialogDescription></DialogHeader>
         <div className="space-y-3">
           <div className="grid grid-cols-[64px_1fr_auto] gap-2">
             <Input value={emoji} onChange={(e) => setEmoji(e.target.value)} maxLength={4} aria-label="Emoji" />
@@ -70,13 +77,23 @@ export default function GroupManager({ lang, groups, onChanged }: Props) {
             <Button size="icon" onClick={create} disabled={busy || !name.trim()} aria-label={zh ? "建立群組" : "Create group"}>{busy ? <Loader2 className="animate-spin" /> : <Plus />}</Button>
           </div>
           <div className="flex gap-2">
-            <Input value={joinCode} onChange={(e) => setJoinCode(e.target.value)} placeholder={zh ? "輸入邀請碼" : "Enter invite code"} />
-            <Button variant="secondary" onClick={join} disabled={busy || !joinCode.trim()}><Link2 />{zh ? "加入" : "Join"}</Button>
+            <Input value={joinCode} onChange={(e) => setJoinCode(e.target.value.toUpperCase())} maxLength={5} placeholder={zh ? "輸入 5 位邀請碼" : "Enter 5-character code"} className="uppercase tracking-widest" />
+            <Button variant="secondary" onClick={join} disabled={busy || joinCode.trim().length < 5}><Link2 />{zh ? "加入" : "Join"}</Button>
           </div>
           {groups.map((group) => (
             <div key={group.id} className="rounded-lg border border-border p-3">
               <div className="flex items-center justify-between gap-2"><strong>{group.emoji} {group.name}</strong><Button variant="ghost" size="sm" onClick={() => loadMembers(group.id)}>{group.member_count} {zh ? "人" : "members"}</Button></div>
-              {group.invite_code && group.owner_user_id === user.id && <div className="mt-3 flex flex-col items-center gap-3"><img src={qr[group.id]} alt={`${group.name} invitation QR code`} className="h-36 w-36 rounded-md" /><div className="flex gap-2"><Button size="sm" variant="outline" onClick={() => copyInvite(group.invite_code || "")}><Copy />{zh ? "複製連結" : "Copy link"}</Button><Button size="icon" variant="ghost" onClick={() => rotate(group.id)} aria-label={zh ? "更新邀請碼" : "Rotate invite code"}><RefreshCw /></Button></div></div>}
+              {group.invite_code && (
+                <div className="mt-3 space-y-2">
+                  <p className="text-xs text-muted-foreground">{zh ? "邀請碼" : "Invite code"}</p>
+                  <p className="rounded-md bg-muted px-3 py-2 text-center text-2xl font-bold tracking-[0.3em]">{group.invite_code}</p>
+                  <div className="flex flex-wrap justify-center gap-2">
+                    <Button size="sm" variant="outline" onClick={() => copyCode(group)}><Copy />{zh ? "複製邀請碼" : "Copy code"}</Button>
+                    <Button size="sm" variant="secondary" onClick={() => shareCode(group)}><Share2 />{zh ? "分享" : "Share"}</Button>
+                    {group.owner_user_id === user.id && <Button size="icon" variant="ghost" onClick={() => rotate(group.id)} aria-label={zh ? "更新邀請碼" : "Rotate invite code"}><RefreshCw /></Button>}
+                  </div>
+                </div>
+              )}
               {members[group.id] && <div className="mt-3 divide-y divide-border border-t border-border">{members[group.id].map((member) => <div key={member.user_id} className="flex items-center justify-between py-2 text-sm"><span>{member.display_name || (zh ? "跑者" : "Runner")}{member.role === "owner" ? ` · ${zh ? "群主" : "owner"}` : ""}</span>{group.owner_user_id === user.id && member.role !== "owner" && <Button size="icon" variant="ghost" onClick={() => removeMember(group.id, member.user_id)} aria-label={zh ? "移除成員" : "Remove member"}><UserMinus /></Button>}</div>)}</div>}
               <div className="mt-2 flex justify-end">{group.owner_user_id === user.id ? <Button variant="ghost" size="sm" className="text-destructive" onClick={() => deleteGroup(group.id)} disabled={busy}><Trash2 />{zh ? "刪除群組" : "Delete group"}</Button> : <Button variant="ghost" size="sm" onClick={() => removeMember(group.id, user.id)} disabled={busy}><LogOut />{zh ? "離開" : "Leave"}</Button>}</div>
             </div>

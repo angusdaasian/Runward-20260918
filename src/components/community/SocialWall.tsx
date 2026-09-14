@@ -15,6 +15,13 @@ export default function SocialWall({ lang }: { lang: Lang }) {
   const cacheKey = user ? `social_feed:${user.id}` : "";
   const [runs, setRuns] = useState<FeedRun[]>([]);
   const [loading, setLoading] = useState(true);
+  const [reloadKey, setReloadKey] = useState(0);
+
+  useEffect(() => {
+    const onChanged = () => setReloadKey((k) => k + 1);
+    window.addEventListener("social-prefs-changed", onChanged);
+    return () => window.removeEventListener("social-prefs-changed", onChanged);
+  }, []);
 
   useEffect(() => {
     if (!user) { setLoading(false); return; }
@@ -30,7 +37,8 @@ export default function SocialWall({ lang }: { lang: Lang }) {
       }
       setLoading(false);
     });
-  }, [user, cacheKey]);
+  }, [user, cacheKey, reloadKey]);
+
 
   if (!user) return <div className="py-12 text-center text-sm text-muted-foreground">{zh ? "請登入以查看跑步動態" : "Sign in to view the running feed"}</div>;
 

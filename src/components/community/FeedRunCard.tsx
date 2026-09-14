@@ -1,4 +1,4 @@
-import { Clock, Heart, MessageCircle, Mountain, Route } from "lucide-react";
+import { Heart, HeartPulse, MessageCircle, Route, Timer } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import type { Lang } from "@/lib/i18n";
 
@@ -14,13 +14,14 @@ export interface FeedRun {
   distance_km: number;
   duration_s: number | null;
   elevation_m: number | null;
+  avg_hr: number | null;
 }
 
-const duration = (seconds: number | null) => {
-  const s = Math.max(0, Number(seconds || 0));
-  const h = Math.floor(s / 3600);
-  const m = Math.floor((s % 3600) / 60);
-  return h ? `${h}h ${m}m` : `${m}m`;
+const pace = (km: number, seconds: number | null) => {
+  const s = Number(seconds || 0);
+  if (!km || km <= 0 || s <= 0) return "--";
+  const perKm = s / km;
+  return `${Math.floor(perKm / 60)}:${String(Math.round(perKm % 60)).padStart(2, "0")}/km`;
 };
 
 export interface FeedRunSocial { like_count?: number; comment_count?: number; liked_by_me?: boolean }

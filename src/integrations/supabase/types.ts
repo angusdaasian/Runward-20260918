@@ -3480,6 +3480,23 @@ export type Database = {
           name: string
         }[]
       }
+      get_group_feed: {
+        Args: { p_limit?: number; p_offset?: number }
+        Returns: {
+          activity_name: string
+          activity_type: string
+          avatar_url: string
+          display_name: string
+          distance_km: number
+          duration_s: number
+          elevation_m: number
+          group_names: string
+          source: string
+          source_id: string
+          started_at: string
+          user_id: string
+        }[]
+      }
       get_group_leaderboard: {
         Args: { p_group_id: string; p_month?: string }
         Returns: {
@@ -3550,6 +3567,23 @@ export type Database = {
           total_count: number
         }[]
       }
+      get_social_activity_detail: {
+        Args: { p_source: string; p_source_id: string }
+        Returns: {
+          activity_name: string
+          activity_type: string
+          avatar_url: string
+          display_name: string
+          distance_km: number
+          duration_s: number
+          elevation_m: number
+          source: string
+          source_id: string
+          started_at: string
+          summary_polyline: string
+          user_id: string
+        }[]
+      }
       get_social_feed: {
         Args: { p_limit?: number; p_offset?: number }
         Returns: {
@@ -3609,6 +3643,10 @@ export type Database = {
       set_strava_app_secret: {
         Args: { p_app_id: string; p_kind: string; p_value: string }
         Returns: undefined
+      }
+      shares_group_with: {
+        Args: { p_a: string; p_b: string }
+        Returns: boolean
       }
       unschedule_cron_job: { Args: { job_name: string }; Returns: undefined }
       unschedule_terra_today_oneoff: { Args: never; Returns: undefined }

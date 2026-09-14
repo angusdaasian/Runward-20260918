@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import FeedRunCard, { type FeedRun } from "./FeedRunCard";
 import FeedActivityDetail, { type FeedActivityRef } from "./FeedActivityDetail";
+import { useFeedSocial } from "@/hooks/use-feed-social";
 import type { Lang } from "@/lib/i18n";
 
 export default function FriendsFeed({ lang }: { lang: Lang }) {

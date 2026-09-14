@@ -1,4 +1,4 @@
-import { Clock, Heart, MessageCircle, Mountain, Route } from "lucide-react";
+import { Heart, HeartPulse, MessageCircle, Route, Timer } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import type { Lang } from "@/lib/i18n";
 
@@ -14,13 +14,14 @@ export interface FeedRun {
   distance_km: number;
   duration_s: number | null;
   elevation_m: number | null;
+  avg_hr: number | null;
 }
 
-const duration = (seconds: number | null) => {
-  const s = Math.max(0, Number(seconds || 0));
-  const h = Math.floor(s / 3600);
-  const m = Math.floor((s % 3600) / 60);
-  return h ? `${h}h ${m}m` : `${m}m`;
+const pace = (km: number, seconds: number | null) => {
+  const s = Number(seconds || 0);
+  if (!km || km <= 0 || s <= 0) return "--";
+  const perKm = s / km;
+  return `${Math.floor(perKm / 60)}:${String(Math.round(perKm % 60)).padStart(2, "0")}/km`;
 };
 
 export interface FeedRunSocial { like_count?: number; comment_count?: number; liked_by_me?: boolean }
@@ -44,8 +45,8 @@ export default function FeedRunCard({ run, lang, isSelf, footer, social, onOpen 
         <h3 className="mt-4 font-semibold">{run.activity_name || run.activity_type || (zh ? "跑步" : "Run")}</h3>
         <div className="mt-3 grid grid-cols-3 gap-2 text-sm">
           <span className="flex items-center gap-1.5"><Route size={14} className="text-primary" />{Number(run.distance_km).toFixed(2)} km</span>
-          <span className="flex items-center gap-1.5"><Clock size={14} className="text-primary" />{duration(run.duration_s)}</span>
-          <span className="flex items-center gap-1.5"><Mountain size={14} className="text-primary" />{Math.round(Number(run.elevation_m || 0))} m</span>
+          <span className="flex items-center gap-1.5"><Timer size={14} className="text-primary" />{pace(run.distance_km, run.duration_s)}</span>
+          <span className="flex items-center gap-1.5"><HeartPulse size={14} className="text-primary" />{run.avg_hr ? `${Math.round(run.avg_hr)}` : "--"}</span>
         </div>
         <div className="mt-3 flex items-center gap-4 text-[11px] text-muted-foreground">
           <span className="flex items-center gap-1">

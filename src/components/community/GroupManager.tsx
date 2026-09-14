@@ -80,13 +80,17 @@ export default function GroupManager({ lang, groups, onChanged }: Props) {
       return;
     }
     setBusy(true);
-    const { error } = await supabase
-      .from("leaderboard_groups")
-      .update({ name: nextName })
-      .eq("id", group.id);
+    const { error } = await (supabase.rpc as any)("rename_leaderboard_group", {
+      p_group_id: group.id,
+      p_name: nextName,
+    });
     setBusy(false);
     if (error) {
-      toast({ title: zh ? "未能更新群組名稱" : "Could not update group name", variant: "destructive" });
+      toast({
+        title: zh ? "未能更新群組名稱" : "Could not update group name",
+        description: error.message,
+        variant: "destructive",
+      });
       return;
     }
     cancelEditingName();

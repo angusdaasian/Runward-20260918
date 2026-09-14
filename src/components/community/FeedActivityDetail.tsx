@@ -5,7 +5,6 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import ActivityMap from "@/components/activities/ActivityMap";
 import HrZoneBars from "@/components/activities/HrZoneBars";
 import ActivitySocial from "./ActivitySocial";
-import GroupInviteMenu from "./GroupInviteMenu";
 import { computeZonePct, type ZonePct } from "@/lib/hrZones";
 import type { Lang } from "@/lib/i18n";
 

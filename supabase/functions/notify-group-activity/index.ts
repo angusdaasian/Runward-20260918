@@ -100,7 +100,7 @@ Deno.serve(async (req) => {
     };
 
     const sent =
-      (await send(zhIds, "群組跑步動態", `${runnerName} 剛完成了 ${km} 公里跑步！去為 TA 打氣一下吧！🎉`)) +
+      (await send(zhIds, "群組跑步動態", `${runnerName} 剛完成了 ${km} 公里跑步！去為他/她打氣一下吧！🎉`)) +
       (await send(enIds, "Group activity", `${runnerName} just did a ${km} km run! Congratulate them! 🎉`));
 
     return json({ sent, recipients: list.length });

@@ -5,10 +5,12 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import type { Lang } from "@/lib/i18n";
 
-export interface LeaderboardGroup { id: string; name: string; emoji: string | null; invite_code: string | null; owner_user_id: string; member_count: number }
+export interface LeaderboardGroup { id: string; name: string; emoji: string | null; invite_code: string | null; owner_user_id: string; member_count: number; push_enabled?: boolean }
 interface GroupMember { user_id: string; display_name: string | null; avatar_url: string | null; role: string }
 interface Props { lang: Lang; groups: LeaderboardGroup[]; onChanged: () => void }
 
@@ -51,6 +53,10 @@ export default function GroupManager({ lang, groups, onChanged }: Props) {
     toast({ title: zh ? "已複製邀請訊息" : "Invitation copied" });
   };
   const rotate = async (id: string) => { setBusy(true); await supabase.rpc("rotate_group_code", { p_group_id: id }); setBusy(false); onChanged(); };
+  const setPush = async (id: string, enabled: boolean) => {
+    await (supabase.rpc as any)("set_group_push", { p_group_id: id, p_enabled: enabled });
+    onChanged();
+  };
   const loadMembers = async (id: string) => {
     const { data } = await supabase.rpc("get_leaderboard_group_members", { p_group_id: id });
     setMembers((current) => ({ ...current, [id]: (data || []) as GroupMember[] }));
@@ -94,7 +100,17 @@ export default function GroupManager({ lang, groups, onChanged }: Props) {
                   </div>
                 </div>
               )}
-              {members[group.id] && <div className="mt-3 divide-y divide-border border-t border-border">{members[group.id].map((member) => <div key={member.user_id} className="flex items-center justify-between py-2 text-sm"><span>{member.display_name || (zh ? "跑者" : "Runner")}{member.role === "owner" ? ` · ${zh ? "群主" : "owner"}` : ""}</span>{group.owner_user_id === user.id && member.role !== "owner" && <Button size="icon" variant="ghost" onClick={() => removeMember(group.id, member.user_id)} aria-label={zh ? "移除成員" : "Remove member"}><UserMinus /></Button>}</div>)}</div>}
+              <div className="mt-3 flex items-center justify-between gap-3 rounded-md border border-border p-2">
+                <Label htmlFor={`push-${group.id}`} className="text-xs font-normal text-muted-foreground">
+                  {zh ? "當群組成員完成跑步時通知我" : "Notify me when a group member finishes a run"}
+                </Label>
+                <Switch
+                  id={`push-${group.id}`}
+                  checked={group.push_enabled !== false}
+                  onCheckedChange={(checked) => setPush(group.id, checked)}
+                />
+              </div>
+              {members[group.id] &&  <div className="mt-3 divide-y divide-border border-t border-border">{members[group.id].map((member) => <div key={member.user_id} className="flex items-center justify-between py-2 text-sm"><span>{member.display_name || (zh ? "跑者" : "Runner")}{member.role === "owner" ? ` · ${zh ? "群主" : "owner"}` : ""}</span>{group.owner_user_id === user.id && member.role !== "owner" && <Button size="icon" variant="ghost" onClick={() => removeMember(group.id, member.user_id)} aria-label={zh ? "移除成員" : "Remove member"}><UserMinus /></Button>}</div>)}</div>}
               <div className="mt-2 flex justify-end">{group.owner_user_id === user.id ? <Button variant="ghost" size="sm" className="text-destructive" onClick={() => deleteGroup(group.id)} disabled={busy}><Trash2 />{zh ? "刪除群組" : "Delete group"}</Button> : <Button variant="ghost" size="sm" onClick={() => removeMember(group.id, user.id)} disabled={busy}><LogOut />{zh ? "離開" : "Leave"}</Button>}</div>
             </div>
           ))}

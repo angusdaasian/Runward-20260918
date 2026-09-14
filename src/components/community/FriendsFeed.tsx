@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import FeedRunCard, { type FeedRun } from "./FeedRunCard";
 import FeedActivityDetail, { type FeedActivityRef } from "./FeedActivityDetail";
+import { useFeedSocial } from "@/hooks/use-feed-social";
 import type { Lang } from "@/lib/i18n";
 
 export default function FriendsFeed({ lang }: { lang: Lang }) {
@@ -12,6 +13,7 @@ export default function FriendsFeed({ lang }: { lang: Lang }) {
   const [runs, setRuns] = useState<FeedRun[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState<FeedActivityRef | null>(null);
+  const { social, refreshSocial } = useFeedSocial(runs);
 
   useEffect(() => {
     if (!user) { setLoading(false); return; }
@@ -51,12 +53,13 @@ export default function FriendsFeed({ lang }: { lang: Lang }) {
             run={run}
             lang={lang}
             isSelf={run.user_id === user.id}
-            footer={zh ? "群組動態 · 點擊查看詳細數據" : "Group run · tap to see full stats"}
+            footer={zh ? "群組動態" : "Group run"}
+            social={social[`${run.source}-${run.source_id}`]}
             onOpen={() => setOpen({ source: run.source, source_id: run.source_id })}
           />
         ))
       )}
-      {open && <FeedActivityDetail activity={open} lang={lang} onClose={() => setOpen(null)} />}
+      {open && <FeedActivityDetail activity={open} lang={lang} onClose={() => { setOpen(null); refreshSocial(); }} />}
     </div>
   );
 }

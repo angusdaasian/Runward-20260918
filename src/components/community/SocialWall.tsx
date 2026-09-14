@@ -4,6 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import CommunityPrivacy from "./CommunityPrivacy";
 import FeedRunCard, { type FeedRun } from "./FeedRunCard";
 import FeedActivityDetail, { type FeedActivityRef } from "./FeedActivityDetail";
+import { useFeedSocial } from "@/hooks/use-feed-social";
 import type { Lang } from "@/lib/i18n";
 
 export default function SocialWall({ lang }: { lang: Lang }) {
@@ -14,6 +15,7 @@ export default function SocialWall({ lang }: { lang: Lang }) {
   const [loading, setLoading] = useState(true);
   const [reloadKey, setReloadKey] = useState(0);
   const [open, setOpen] = useState<FeedActivityRef | null>(null);
+  const { social, refreshSocial } = useFeedSocial(runs);
 
   useEffect(() => {
     const onChanged = () => setReloadKey((k) => k + 1);
@@ -55,11 +57,12 @@ export default function SocialWall({ lang }: { lang: Lang }) {
             run={run}
             lang={lang}
             isSelf={run.user_id === user.id}
+            social={social[`${run.source}-${run.source_id}`]}
             onOpen={() => setOpen({ source: run.source, source_id: run.source_id })}
           />
         ))
       )}
-      {open && <FeedActivityDetail activity={open} lang={lang} onClose={() => setOpen(null)} />}
+      {open && <FeedActivityDetail activity={open} lang={lang} onClose={() => { setOpen(null); refreshSocial(); }} />}
     </div>
   );
 }

@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import ActivityMap from "@/components/activities/ActivityMap";
 import HrZoneBars from "@/components/activities/HrZoneBars";
+import ActivitySocial from "./ActivitySocial";
 import { computeZonePct, type ZonePct } from "@/lib/hrZones";
 import type { Lang } from "@/lib/i18n";
 
@@ -257,6 +258,8 @@ export default function FeedActivityDetail({ activity, lang, onClose }: { activi
             )}
 
             {zones && <HrZoneBars zones={zones} lang={lang} />}
+
+            <ActivitySocial source={row.source} sourceId={row.source_id} lang={lang} />
           </div>
         )}
       </div>

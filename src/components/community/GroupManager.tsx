@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { useToast } from "@/hooks/use-toast";
 import type { Lang } from "@/lib/i18n";
 
-export interface LeaderboardGroup { id: string; name: string; emoji: string | null; invite_code: string | null; owner_user_id: string; member_count: number }
+export interface LeaderboardGroup { id: string; name: string; emoji: string | null; invite_code: string | null; owner_user_id: string; member_count: number; push_enabled?: boolean }
 interface GroupMember { user_id: string; display_name: string | null; avatar_url: string | null; role: string }
 interface Props { lang: Lang; groups: LeaderboardGroup[]; onChanged: () => void }
 

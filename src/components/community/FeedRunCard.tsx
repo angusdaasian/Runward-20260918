@@ -45,8 +45,8 @@ export default function FeedRunCard({ run, lang, isSelf, footer, social, onOpen 
         <h3 className="mt-4 font-semibold">{run.activity_name || run.activity_type || (zh ? "跑步" : "Run")}</h3>
         <div className="mt-3 grid grid-cols-3 gap-2 text-sm">
           <span className="flex items-center gap-1.5"><Route size={14} className="text-primary" />{Number(run.distance_km).toFixed(2)} km</span>
-          <span className="flex items-center gap-1.5"><Clock size={14} className="text-primary" />{duration(run.duration_s)}</span>
-          <span className="flex items-center gap-1.5"><Mountain size={14} className="text-primary" />{Math.round(Number(run.elevation_m || 0))} m</span>
+          <span className="flex items-center gap-1.5"><Timer size={14} className="text-primary" />{pace(run.distance_km, run.duration_s)}</span>
+          <span className="flex items-center gap-1.5"><HeartPulse size={14} className="text-primary" />{run.avg_hr ? `${Math.round(run.avg_hr)}` : "--"}</span>
         </div>
         <div className="mt-3 flex items-center gap-4 text-[11px] text-muted-foreground">
           <span className="flex items-center gap-1">

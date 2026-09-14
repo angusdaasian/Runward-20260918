@@ -1,5 +1,6 @@
 import { Heart, HeartPulse, MessageCircle, Route, Timer } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import GroupInviteMenu from "./GroupInviteMenu";
 import type { Lang } from "@/lib/i18n";
 
 export interface FeedRun {

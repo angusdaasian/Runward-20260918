@@ -196,15 +196,6 @@ export default function FeedActivityDetail({ activity, lang, onClose }: { activi
           <X size={20} />
         </button>
         <p className="truncate text-sm font-semibold">{zh ? "跑步詳情" : "Run details"}</p>
-        {row ? (
-          <div className="ml-auto">
-            <GroupInviteMenu
-              targetUserId={row.user_id}
-              targetName={row.display_name || (zh ? "跑者" : "Runner")}
-              lang={lang}
-            />
-          </div>
-        ) : null}
       </header>
 
       <div className="flex-1 overflow-y-auto p-4 pb-24">

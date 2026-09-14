@@ -257,6 +257,8 @@ export default function FeedActivityDetail({ activity, lang, onClose }: { activi
             )}
 
             {zones && <HrZoneBars zones={zones} lang={lang} />}
+
+            <ActivitySocial source={row.source} sourceId={row.source_id} lang={lang} />
           </div>
         )}
       </div>

@@ -3826,6 +3826,10 @@ export type Database = {
         Args: { p_group_id: string; p_user_id: string }
         Returns: undefined
       }
+      rename_leaderboard_group: {
+        Args: { p_group_id: string; p_name: string }
+        Returns: undefined
+      }
       respond_group_invitation: {
         Args: { p_accept: boolean; p_invitation_id: string }
         Returns: undefined

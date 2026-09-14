@@ -3759,6 +3759,7 @@ export type Database = {
         Returns: {
           avg_hr: number
           distance_samples: Json
+          elevation_samples: Json
           hr_samples: Json
           laps: Json
           max_hr: number

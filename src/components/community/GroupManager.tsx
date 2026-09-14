@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import type { Lang } from "@/lib/i18n";
 
-export interface LeaderboardGroup { id: string; name: string; emoji: string | null; invite_code: string | null; owner_user_id: string; member_count: number; push_enabled?: boolean }
+export interface LeaderboardGroup { id: string; name: string; emoji: string | null; invite_code: string | null; owner_user_id: string; member_count: number; push_enabled?: boolean; member_invite_enabled?: boolean }
 interface GroupMember { user_id: string; display_name: string | null; avatar_url: string | null; role: string }
 interface Props { lang: Lang; groups: LeaderboardGroup[]; onChanged: () => void }
 
@@ -55,6 +55,11 @@ export default function GroupManager({ lang, groups, onChanged }: Props) {
   const rotate = async (id: string) => { setBusy(true); await supabase.rpc("rotate_group_code", { p_group_id: id }); setBusy(false); onChanged(); };
   const setPush = async (id: string, enabled: boolean) => {
     await (supabase.rpc as any)("set_group_push", { p_group_id: id, p_enabled: enabled });
+    onChanged();
+  };
+  const setOpenInvites = async (id: string, enabled: boolean) => {
+    const { error } = await (supabase.rpc as any)("set_group_member_invite", { p_group_id: id, p_enabled: enabled });
+    if (error) { toast({ title: zh ? "只有群主可以更改" : "Only the group leader can change this", variant: "destructive" }); return; }
     onChanged();
   };
   const loadMembers = async (id: string) => {

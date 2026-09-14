@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/card";
 import DesktopPageHeader from "./DesktopPageHeader";
 import TerritoryTab from "@/components/rewards/TerritoryTab";
 import KmLeaderboard from "@/components/community/KmLeaderboard";
-import SocialWall from "@/components/community/SocialWall";
+import SocialFeedTab from "@/components/community/SocialFeedTab";
 
 interface Props {
   lang: Lang;
@@ -55,7 +55,7 @@ export default function DashboardCommunity({ lang }: Props) {
               <KmLeaderboard lang={lang} />
             </Card>
           )}
-          {sub === "social" && <SocialWall lang={lang} />}
+          {sub === "social" && <SocialFeedTab lang={lang} />}
 
           {sub === "territory" && (
             <Card className="p-2 md:p-6">

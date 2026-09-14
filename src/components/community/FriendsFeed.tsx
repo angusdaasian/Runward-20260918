@@ -13,6 +13,7 @@ export default function FriendsFeed({ lang }: { lang: Lang }) {
   const [runs, setRuns] = useState<FeedRun[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState<FeedActivityRef | null>(null);
+  const { social, refreshSocial } = useFeedSocial(runs);
 
   useEffect(() => {
     if (!user) { setLoading(false); return; }

@@ -1,0 +1,14 @@
+REVOKE ALL ON FUNCTION public.can_invite_to_group(uuid, uuid) FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.set_group_member_invite(uuid, boolean) FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.get_invitable_groups(uuid) FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.invite_user_to_group(uuid, uuid) FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.get_my_group_invitations() FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.respond_group_invitation(uuid, boolean) FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.get_my_leaderboard_groups() FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.can_invite_to_group(uuid, uuid) TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.set_group_member_invite(uuid, boolean) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.get_invitable_groups(uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.invite_user_to_group(uuid, uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.get_my_group_invitations() TO authenticated;
+GRANT EXECUTE ON FUNCTION public.respond_group_invitation(uuid, boolean) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.get_my_leaderboard_groups() TO authenticated;

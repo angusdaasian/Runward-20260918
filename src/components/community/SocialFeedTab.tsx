@@ -5,6 +5,7 @@ import type { Lang } from "@/lib/i18n";
 import SocialWall from "./SocialWall";
 import FriendsFeed from "./FriendsFeed";
 import GroupManager, { type LeaderboardGroup } from "./GroupManager";
+import GroupInvitations from "./GroupInvitations";
 
 export default function SocialFeedTab({ lang }: { lang: Lang }) {
   const { user } = useAuth();
@@ -25,6 +26,7 @@ export default function SocialFeedTab({ lang }: { lang: Lang }) {
 
   return (
     <div className="space-y-4">
+      <GroupInvitations lang={lang} onJoined={loadGroups} />
       <div className="grid grid-cols-2 gap-2">
         <button
           onClick={() => setView("public")}

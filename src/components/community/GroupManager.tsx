@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import type { Lang } from "@/lib/i18n";
 
-export interface LeaderboardGroup { id: string; name: string; emoji: string | null; invite_code: string | null; owner_user_id: string; member_count: number; push_enabled?: boolean }
+export interface LeaderboardGroup { id: string; name: string; emoji: string | null; invite_code: string | null; owner_user_id: string; member_count: number; push_enabled?: boolean; member_invite_enabled?: boolean }
 interface GroupMember { user_id: string; display_name: string | null; avatar_url: string | null; role: string }
 interface Props { lang: Lang; groups: LeaderboardGroup[]; onChanged: () => void }
 
@@ -55,6 +55,11 @@ export default function GroupManager({ lang, groups, onChanged }: Props) {
   const rotate = async (id: string) => { setBusy(true); await supabase.rpc("rotate_group_code", { p_group_id: id }); setBusy(false); onChanged(); };
   const setPush = async (id: string, enabled: boolean) => {
     await (supabase.rpc as any)("set_group_push", { p_group_id: id, p_enabled: enabled });
+    onChanged();
+  };
+  const setOpenInvites = async (id: string, enabled: boolean) => {
+    const { error } = await (supabase.rpc as any)("set_group_member_invite", { p_group_id: id, p_enabled: enabled });
+    if (error) { toast({ title: zh ? "只有群主可以更改" : "Only the group leader can change this", variant: "destructive" }); return; }
     onChanged();
   };
   const loadMembers = async (id: string) => {
@@ -108,6 +113,17 @@ export default function GroupManager({ lang, groups, onChanged }: Props) {
                   id={`push-${group.id}`}
                   checked={group.push_enabled !== false}
                   onCheckedChange={(checked) => setPush(group.id, checked)}
+                />
+              </div>
+              <div className="mt-2 flex items-center justify-between gap-3 rounded-md border border-border p-2">
+                <Label htmlFor={`openinv-${group.id}`} className="text-xs font-normal text-muted-foreground">
+                  {zh ? "開放邀請：所有成員都可邀請新跑友（關閉時只有群主可邀請）" : "Open invites: any member can invite new runners (off = leader only)"}
+                </Label>
+                <Switch
+                  id={`openinv-${group.id}`}
+                  checked={group.member_invite_enabled === true}
+                  disabled={group.owner_user_id !== user.id}
+                  onCheckedChange={(checked) => setOpenInvites(group.id, checked)}
                 />
               </div>
               {members[group.id] &&  <div className="mt-3 divide-y divide-border border-t border-border">{members[group.id].map((member) => <div key={member.user_id} className="flex items-center justify-between py-2 text-sm"><span>{member.display_name || (zh ? "跑者" : "Runner")}{member.role === "owner" ? ` · ${zh ? "群主" : "owner"}` : ""}</span>{group.owner_user_id === user.id && member.role !== "owner" && <Button size="icon" variant="ghost" onClick={() => removeMember(group.id, member.user_id)} aria-label={zh ? "移除成員" : "Remove member"}><UserMinus /></Button>}</div>)}</div>}

@@ -23,10 +23,12 @@ export default function GroupInviteMenu({ targetUserId, targetName, lang }: { ta
   const [groups, setGroups] = useState<InvitableGroup[] | null>(null);
   const [busy, setBusy] = useState(false);
 
-  if (!user || user.id === targetUserId) return null;
+  const isSelf = !!user && user.id === targetUserId;
+
+  if (!user) return null;
 
   const load = async (open: boolean) => {
-    if (!open) return;
+    if (!open || isSelf) return;
     setGroups(null);
     const { data } = await (supabase.rpc as any)("get_invitable_groups", { p_target_user_id: targetUserId });
     setGroups((data || []) as InvitableGroup[]);
@@ -57,7 +59,9 @@ export default function GroupInviteMenu({ targetUserId, targetName, lang }: { ta
           {zh ? `邀請 ${targetName} 加入群組` : `Invite ${targetName} to a group`}
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        {groups === null ? (
+        {isSelf ? (
+          <p className="px-2 py-3 text-xs text-muted-foreground">{zh ? "你不能邀請自己" : "You cannot invite yourself"}</p>
+        ) : groups === null ? (
           <div className="flex items-center gap-2 px-2 py-3 text-sm text-muted-foreground"><Loader2 className="animate-spin" size={14} />{zh ? "載入中…" : "Loading…"}</div>
         ) : groups.length === 0 ? (
           <p className="px-2 py-3 text-xs text-muted-foreground">{zh ? "你還未加入任何私人群組" : "You haven't joined any private group yet"}</p>

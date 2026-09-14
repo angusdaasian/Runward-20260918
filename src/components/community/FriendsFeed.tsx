@@ -53,7 +53,9 @@ export default function FriendsFeed({ lang }: { lang: Lang }) {
             run={run}
             lang={lang}
             isSelf={run.user_id === user.id}
-            footer={zh ? "群組動態" : "Group run"}
+            footer={run.group_names
+              ? `${zh ? "群組" : "Groups"}: ${run.group_names}`
+              : (zh ? "群組動態" : "Group run")}
             social={social[`${run.source}-${run.source_id}`]}
             onOpen={() => setOpen({ source: run.source, source_id: run.source_id })}
           />

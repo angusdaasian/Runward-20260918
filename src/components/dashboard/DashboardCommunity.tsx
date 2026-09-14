@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/card";
 import DesktopPageHeader from "./DesktopPageHeader";
 import TerritoryTab from "@/components/rewards/TerritoryTab";
 import KmLeaderboard from "@/components/community/KmLeaderboard";
-import SocialWall from "@/components/community/SocialWall";
+import SocialFeedTab from "@/components/community/SocialFeedTab";
 
 interface Props {
   lang: Lang;

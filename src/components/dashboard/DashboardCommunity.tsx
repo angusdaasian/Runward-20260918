@@ -55,7 +55,7 @@ export default function DashboardCommunity({ lang }: Props) {
               <KmLeaderboard lang={lang} />
             </Card>
           )}
-          {sub === "social" && <SocialWall lang={lang} />}
+          {sub === "social" && <SocialFeedTab lang={lang} />}
 
           {sub === "territory" && (
             <Card className="p-2 md:p-6">

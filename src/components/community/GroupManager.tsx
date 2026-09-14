@@ -53,6 +53,10 @@ export default function GroupManager({ lang, groups, onChanged }: Props) {
     toast({ title: zh ? "已複製邀請訊息" : "Invitation copied" });
   };
   const rotate = async (id: string) => { setBusy(true); await supabase.rpc("rotate_group_code", { p_group_id: id }); setBusy(false); onChanged(); };
+  const setPush = async (id: string, enabled: boolean) => {
+    await (supabase.rpc as any)("set_group_push", { p_group_id: id, p_enabled: enabled });
+    onChanged();
+  };
   const loadMembers = async (id: string) => {
     const { data } = await supabase.rpc("get_leaderboard_group_members", { p_group_id: id });
     setMembers((current) => ({ ...current, [id]: (data || []) as GroupMember[] }));

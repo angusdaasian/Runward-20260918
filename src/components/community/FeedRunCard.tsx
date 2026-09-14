@@ -1,4 +1,4 @@
-import { Clock, Mountain, Route } from "lucide-react";
+import { Clock, Heart, MessageCircle, Mountain, Route } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import type { Lang } from "@/lib/i18n";
 

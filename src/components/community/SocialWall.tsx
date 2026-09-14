@@ -4,6 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import CommunityPrivacy from "./CommunityPrivacy";
 import FeedRunCard, { type FeedRun } from "./FeedRunCard";
 import FeedActivityDetail, { type FeedActivityRef } from "./FeedActivityDetail";
+import { useFeedSocial } from "@/hooks/use-feed-social";
 import type { Lang } from "@/lib/i18n";
 
 export default function SocialWall({ lang }: { lang: Lang }) {

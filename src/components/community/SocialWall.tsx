@@ -57,11 +57,12 @@ export default function SocialWall({ lang }: { lang: Lang }) {
             run={run}
             lang={lang}
             isSelf={run.user_id === user.id}
+            social={social[`${run.source}-${run.source_id}`]}
             onOpen={() => setOpen({ source: run.source, source_id: run.source_id })}
           />
         ))
       )}
-      {open && <FeedActivityDetail activity={open} lang={lang} onClose={() => setOpen(null)} />}
+      {open && <FeedActivityDetail activity={open} lang={lang} onClose={() => { setOpen(null); refreshSocial(); }} />}
     </div>
   );
 }

@@ -96,7 +96,17 @@ export default function GroupManager({ lang, groups, onChanged }: Props) {
                   </div>
                 </div>
               )}
-              {members[group.id] && <div className="mt-3 divide-y divide-border border-t border-border">{members[group.id].map((member) => <div key={member.user_id} className="flex items-center justify-between py-2 text-sm"><span>{member.display_name || (zh ? "跑者" : "Runner")}{member.role === "owner" ? ` · ${zh ? "群主" : "owner"}` : ""}</span>{group.owner_user_id === user.id && member.role !== "owner" && <Button size="icon" variant="ghost" onClick={() => removeMember(group.id, member.user_id)} aria-label={zh ? "移除成員" : "Remove member"}><UserMinus /></Button>}</div>)}</div>}
+              <div className="mt-3 flex items-center justify-between gap-3 rounded-md border border-border p-2">
+                <Label htmlFor={`push-${group.id}`} className="text-xs font-normal text-muted-foreground">
+                  {zh ? "當群組成員完成跑步時通知我" : "Notify me when a group member finishes a run"}
+                </Label>
+                <Switch
+                  id={`push-${group.id}`}
+                  checked={group.push_enabled !== false}
+                  onCheckedChange={(checked) => setPush(group.id, checked)}
+                />
+              </div>
+              {members[group.id] &&  <div className="mt-3 divide-y divide-border border-t border-border">{members[group.id].map((member) => <div key={member.user_id} className="flex items-center justify-between py-2 text-sm"><span>{member.display_name || (zh ? "跑者" : "Runner")}{member.role === "owner" ? ` · ${zh ? "群主" : "owner"}` : ""}</span>{group.owner_user_id === user.id && member.role !== "owner" && <Button size="icon" variant="ghost" onClick={() => removeMember(group.id, member.user_id)} aria-label={zh ? "移除成員" : "Remove member"}><UserMinus /></Button>}</div>)}</div>}
               <div className="mt-2 flex justify-end">{group.owner_user_id === user.id ? <Button variant="ghost" size="sm" className="text-destructive" onClick={() => deleteGroup(group.id)} disabled={busy}><Trash2 />{zh ? "刪除群組" : "Delete group"}</Button> : <Button variant="ghost" size="sm" onClick={() => removeMember(group.id, user.id)} disabled={busy}><LogOut />{zh ? "離開" : "Leave"}</Button>}</div>
             </div>
           ))}

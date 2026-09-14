@@ -38,8 +38,15 @@ export default function CommunityPrivacy({ lang, compact = false }: Props) {
     const next = { ...prefs, [key]: value };
     const { error } = await supabase.from("social_prefs").upsert({ user_id: user.id, ...next });
     if (error) setPrefs(previous);
-    else try { sessionStorage.setItem(`social_prefs:${user.id}`, JSON.stringify(next)); } catch { /* ignore cache errors */ }
+    else {
+      try {
+        sessionStorage.setItem(`social_prefs:${user.id}`, JSON.stringify(next));
+        sessionStorage.removeItem(`social_feed:${user.id}`);
+      } catch { /* ignore cache errors */ }
+      if (key === "social_opt_in") window.dispatchEvent(new CustomEvent("social-prefs-changed"));
+    }
     setSaving(null);
+
   };
 
   if (!user) return null;

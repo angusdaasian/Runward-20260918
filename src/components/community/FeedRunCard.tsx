@@ -1,5 +1,6 @@
 import { Heart, HeartPulse, MessageCircle, Route, Timer } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import GroupInviteMenu from "./GroupInviteMenu";
 import type { Lang } from "@/lib/i18n";
 
 export interface FeedRun {
@@ -29,9 +30,16 @@ export interface FeedRunSocial { like_count?: number; comment_count?: number; li
 export default function FeedRunCard({ run, lang, isSelf, footer, social, onOpen }: { run: FeedRun; lang: Lang; isSelf: boolean; footer?: string; social?: FeedRunSocial; onOpen: () => void }) {
   const zh = lang === "zh";
   return (
-    <article className={`overflow-hidden rounded-lg border bg-card ${isSelf ? "border-primary/60" : "border-border"}`}>
+    <article className={`relative overflow-hidden rounded-lg border bg-card ${isSelf ? "border-primary/60" : "border-border"}`}>
+      <div className="absolute right-2 top-2 z-10" onClick={(e) => e.stopPropagation()}>
+        <GroupInviteMenu
+          targetUserId={run.user_id}
+          targetName={isSelf ? (zh ? "你" : "You") : run.display_name || (zh ? "跑者" : "Runner")}
+          lang={lang}
+        />
+      </div>
       <button onClick={onOpen} className="w-full p-4 text-left transition-colors hover:bg-muted/40">
-        <header className="flex items-center gap-3">
+        <header className="flex items-center gap-3 pr-8">
           <Avatar><AvatarImage src={run.avatar_url || undefined} /><AvatarFallback>{(run.display_name || "R")[0]}</AvatarFallback></Avatar>
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold">

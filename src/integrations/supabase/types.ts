@@ -789,6 +789,44 @@ export type Database = {
         }
         Relationships: []
       }
+      group_invitations: {
+        Row: {
+          created_at: string
+          group_id: string
+          id: string
+          invitee_user_id: string
+          inviter_user_id: string
+          responded_at: string | null
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          group_id: string
+          id?: string
+          invitee_user_id: string
+          inviter_user_id: string
+          responded_at?: string | null
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          group_id?: string
+          id?: string
+          invitee_user_id?: string
+          inviter_user_id?: string
+          responded_at?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_invitations_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "leaderboard_groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       intervals_activities: {
         Row: {
           average_heartrate: number | null
@@ -940,6 +978,7 @@ export type Database = {
           emoji: string | null
           id: string
           invite_code: string
+          member_invite_enabled: boolean
           name: string
           owner_user_id: string
           updated_at: string
@@ -949,6 +988,7 @@ export type Database = {
           emoji?: string | null
           id?: string
           invite_code?: string
+          member_invite_enabled?: boolean
           name: string
           owner_user_id: string
           updated_at?: string
@@ -958,6 +998,7 @@ export type Database = {
           emoji?: string | null
           id?: string
           invite_code?: string
+          member_invite_enabled?: boolean
           name?: string
           owner_user_id?: string
           updated_at?: string
@@ -3464,6 +3505,10 @@ export type Database = {
       }
     }
     Functions: {
+      can_invite_to_group: {
+        Args: { p_group_id: string; p_user_id: string }
+        Returns: boolean
+      }
       can_view_social_activity: {
         Args: { p_source: string; p_source_id: string }
         Returns: boolean
@@ -3605,6 +3650,17 @@ export type Database = {
           user_id: string
         }[]
       }
+      get_invitable_groups: {
+        Args: { p_target_user_id: string }
+        Returns: {
+          already_invited: boolean
+          already_member: boolean
+          can_invite: boolean
+          emoji: string
+          id: string
+          name: string
+        }[]
+      }
       get_km_leaderboard: {
         Args: { p_limit?: number; p_month?: string }
         Returns: {
@@ -3635,6 +3691,17 @@ export type Database = {
           user_id: string
         }[]
       }
+      get_my_group_invitations: {
+        Args: never
+        Returns: {
+          created_at: string
+          emoji: string
+          group_id: string
+          group_name: string
+          id: string
+          inviter_name: string
+        }[]
+      }
       get_my_leaderboard_groups: {
         Args: never
         Returns: {
@@ -3642,6 +3709,7 @@ export type Database = {
           id: string
           invite_code: string
           member_count: number
+          member_invite_enabled: boolean
           name: string
           owner_user_id: string
           push_enabled: boolean
@@ -3727,6 +3795,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      invite_user_to_group: {
+        Args: { p_group_id: string; p_user_id: string }
+        Returns: undefined
+      }
       invoke_plan_auto_adjust: {
         Args: { p_dry_run?: boolean; p_limit?: number }
         Returns: number
@@ -3749,7 +3821,15 @@ export type Database = {
         Args: { p_group_id: string; p_user_id: string }
         Returns: undefined
       }
+      respond_group_invitation: {
+        Args: { p_accept: boolean; p_invitation_id: string }
+        Returns: undefined
+      }
       rotate_group_code: { Args: { p_group_id: string }; Returns: string }
+      set_group_member_invite: {
+        Args: { p_enabled: boolean; p_group_id: string }
+        Returns: undefined
+      }
       set_group_push: {
         Args: { p_enabled: boolean; p_group_id: string }
         Returns: undefined

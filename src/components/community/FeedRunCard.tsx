@@ -16,6 +16,7 @@ export interface FeedRun {
   duration_s: number | null;
   elevation_m: number | null;
   avg_hr: number | null;
+  group_names?: string | null;
 }
 
 const pace = (km: number, seconds: number | null) => {
@@ -46,7 +47,12 @@ export default function FeedRunCard({ run, lang, isSelf, footer, social, onOpen 
               {isSelf ? (zh ? "你" : "You") : run.display_name || (zh ? "跑者" : "Runner")}
             </p>
             <p className="text-xs text-muted-foreground">
-              {new Date(run.started_at).toLocaleDateString(zh ? "zh-HK" : "en-GB", { month: "short", day: "numeric" })}
+              {new Date(run.started_at).toLocaleString(zh ? "zh-HK" : "en-GB", {
+                month: "short",
+                day: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
             </p>
           </div>
         </header>

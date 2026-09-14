@@ -23,10 +23,12 @@ export default function GroupInviteMenu({ targetUserId, targetName, lang }: { ta
   const [groups, setGroups] = useState<InvitableGroup[] | null>(null);
   const [busy, setBusy] = useState(false);
 
-  if (!user || user.id === targetUserId) return null;
+  const isSelf = !!user && user.id === targetUserId;
+
+  if (!user) return null;
 
   const load = async (open: boolean) => {
-    if (!open) return;
+    if (!open || isSelf) return;
     setGroups(null);
     const { data } = await (supabase.rpc as any)("get_invitable_groups", { p_target_user_id: targetUserId });
     setGroups((data || []) as InvitableGroup[]);

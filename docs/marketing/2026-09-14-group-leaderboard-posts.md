@@ -5,9 +5,9 @@ Focus: private kilometre leaderboards, invite-only groups, and a social feed wit
 
 ## Push notification
 
-> 🏃 跑友圈來了！免費建立你的私人跑班排行榜
+> 🏃 跑友圈來了！免費建立你的私人跑班排行榜（Beta）
 > 完全免費！建立私人跑步群組，用 5 字邀請碼一鍵分享到 WhatsApp，好友加入後就能一起比拚每月跑量。群組成員同步新跑步時，其他人會收到推送：「阿傑剛跑完 10.5 公里！去恭喜他！」
-> 還有公開跑步動態牆，可以給跑友按讚、留言。所有功能免費使用，立即更新，跟跑班一起進步 →
+> 還有公開跑步動態牆，可以給跑友按讚、留言。社群功能現為 Beta 版，如有任何問題歡迎在 App 內回報。所有功能免費使用，立即更新，跟跑班一起進步 →
 
 ## Threads post
 
@@ -35,7 +35,7 @@ Focus: private kilometre leaderboards, invite-only groups, and a social feed wit
 >
 > 隱私優先：所有分享都是預設關閉，要你自己打開才會公開。關閉後跑步紀錄立刻從動態牆移除。
 >
-> 所有社群功能完全免費。在「社群」分頁即可建立群組、開啟分享。找回一起跑步的感覺。
+> 所有社群功能完全免費，現為 Beta 版本，如有任何問題歡迎在 App 內回報。在「社群」分頁即可建立群組、開啟分享。找回一起跑步的感覺。
 >
 > #Runward #跑步 #跑班 #跑步社群 #Runward更新 #跑步訓練
 
@@ -66,7 +66,7 @@ Focus: private kilometre leaderboards, invite-only groups, and a social feed wit
 >
 > 🔒 隱私優先：所有分享預設關閉，你自己打開才公開；關閉後紀錄立刻下架。
 >
-> 所有社群功能完全免費。在「社群」分頁即可建立群組、開啟分享。
+> 所有社群功能完全免費，現為 Beta 版本，如有任何問題歡迎在 App 內回報。在「社群」分頁即可建立群組、開啟分享。
 > 找回一起跑步的感覺。👇
 >
 > #Runward #跑步 #跑班 #跑步社群 #跑步訓練 #馬拉松訓練 #跑步動態 #跑友 #Runward更新

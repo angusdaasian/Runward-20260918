@@ -59,6 +59,60 @@ export type Database = {
         }
         Relationships: []
       }
+      activity_comments: {
+        Row: {
+          body: string
+          created_at: string
+          id: string
+          source: string
+          source_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          id?: string
+          source: string
+          source_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          id?: string
+          source?: string
+          source_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      activity_likes: {
+        Row: {
+          created_at: string
+          id: string
+          source: string
+          source_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          source: string
+          source_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          source?: string
+          source_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       activity_push_log: {
         Row: {
           activity_key: string
@@ -838,18 +892,21 @@ export type Database = {
         Row: {
           group_id: string
           joined_at: string
+          push_enabled: boolean
           role: string
           user_id: string
         }
         Insert: {
           group_id: string
           joined_at?: string
+          push_enabled?: boolean
           role?: string
           user_id: string
         }
         Update: {
           group_id?: string
           joined_at?: string
+          push_enabled?: boolean
           role?: string
           user_id?: string
         }
@@ -3407,6 +3464,10 @@ export type Database = {
       }
     }
     Functions: {
+      can_view_social_activity: {
+        Args: { p_source: string; p_source_id: string }
+        Returns: boolean
+      }
       claim_terra_webhook_queue: {
         Args: { batch_size: number }
         Returns: {
@@ -3471,6 +3532,36 @@ export type Database = {
         }[]
       }
       gen_group_invite_code: { Args: never; Returns: string }
+      get_activity_comments: {
+        Args: { p_source: string; p_source_id: string }
+        Returns: {
+          avatar_url: string
+          body: string
+          created_at: string
+          display_name: string
+          id: string
+          is_mine: boolean
+          user_id: string
+        }[]
+      }
+      get_activity_likes: {
+        Args: { p_source: string; p_source_id: string }
+        Returns: {
+          like_count: number
+          liked_by_me: boolean
+          likers: string
+        }[]
+      }
+      get_activity_social_counts: {
+        Args: { p_source_ids: string[]; p_sources: string[] }
+        Returns: {
+          comment_count: number
+          like_count: number
+          liked_by_me: boolean
+          source: string
+          source_id: string
+        }[]
+      }
       get_group_by_code: {
         Args: { p_code: string }
         Returns: {
@@ -3504,6 +3595,13 @@ export type Database = {
           display_name: string
           distance_km: number
           run_count: number
+          user_id: string
+        }[]
+      }
+      get_group_push_recipients: {
+        Args: { p_user_id: string }
+        Returns: {
+          lang: string
           user_id: string
         }[]
       }
@@ -3546,6 +3644,7 @@ export type Database = {
           member_count: number
           name: string
           owner_user_id: string
+          push_enabled: boolean
         }[]
       }
       get_my_month_km: {
@@ -3651,6 +3750,10 @@ export type Database = {
         Returns: undefined
       }
       rotate_group_code: { Args: { p_group_id: string }; Returns: string }
+      set_group_push: {
+        Args: { p_enabled: boolean; p_group_id: string }
+        Returns: undefined
+      }
       set_strava_app_secret: {
         Args: { p_app_id: string; p_kind: string; p_value: string }
         Returns: undefined
@@ -3658,6 +3761,10 @@ export type Database = {
       shares_group_with: {
         Args: { p_a: string; p_b: string }
         Returns: boolean
+      }
+      social_activity_owner: {
+        Args: { p_source: string; p_source_id: string }
+        Returns: string
       }
       unschedule_cron_job: { Args: { job_name: string }; Returns: undefined }
       unschedule_terra_today_oneoff: { Args: never; Returns: undefined }

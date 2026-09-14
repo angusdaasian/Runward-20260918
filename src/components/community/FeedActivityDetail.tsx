@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import ActivityMap from "@/components/activities/ActivityMap";
 import HrZoneBars from "@/components/activities/HrZoneBars";
+import FeedActivityCharts from "./FeedActivityCharts";
 import ActivitySocial from "./ActivitySocial";
 import { computeZonePct, type ZonePct } from "@/lib/hrZones";
 import type { Lang } from "@/lib/i18n";
@@ -31,6 +32,7 @@ interface StreamRow {
   laps: any[] | null;
   hr_samples: Array<{ t?: number; bpm?: number | null }> | null;
   distance_samples: Array<{ t?: number; d?: number | null }> | null;
+  elevation_samples: Array<{ t?: number; e?: number | null }> | null;
   zone_lowers: number[] | null;
 }
 
@@ -234,6 +236,13 @@ export default function FeedActivityDetail({ activity, lang, onClose }: { activi
               <Stat icon={<Mountain size={15} className="text-primary" />} label={zh ? "爬升" : "Elevation gain"} value={`${Math.round(Number(row.elevation_m || 0))} m`} />
               <Stat icon={<HeartPulse size={15} className="text-primary" />} label={zh ? "平均心率" : "Avg HR"} value={avgHr ? `${avgHr} bpm` : "--"} />
             </div>
+
+            <FeedActivityCharts
+              hrSamples={extra?.hr_samples || null}
+              distanceSamples={extra?.distance_samples || null}
+              elevationSamples={extra?.elevation_samples || null}
+              lang={lang}
+            />
 
             {splits.length > 0 && (
               <div className="rounded-lg border border-border bg-card">

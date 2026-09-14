@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import ActivityMap from "@/components/activities/ActivityMap";
 import HrZoneBars from "@/components/activities/HrZoneBars";
+import FeedActivityCharts from "./FeedActivityCharts";
 import ActivitySocial from "./ActivitySocial";
 import { computeZonePct, type ZonePct } from "@/lib/hrZones";
 import type { Lang } from "@/lib/i18n";
@@ -31,6 +32,7 @@ interface StreamRow {
   laps: any[] | null;
   hr_samples: Array<{ t?: number; bpm?: number | null }> | null;
   distance_samples: Array<{ t?: number; d?: number | null }> | null;
+  elevation_samples: Array<{ t?: number; e?: number | null }> | null;
   zone_lowers: number[] | null;
 }
 

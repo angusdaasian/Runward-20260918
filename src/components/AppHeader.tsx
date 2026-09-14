@@ -13,8 +13,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Skeleton } from "@/components/ui/skeleton";
 import { WeatherInline } from "@/components/WeatherWidget";
 
-import { getRankFromXP, formatRank, getTierColor, type RankTier } from "@/lib/ranks";
-import { RANK_EMBLEMS } from "@/lib/rankEmblems";
+
+
 import { Progress } from "@/components/ui/progress";
 
 // Module-level cache — survives across remounts/tab switches.

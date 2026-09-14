@@ -168,3 +168,6 @@ verify_jwt = false
 
 
 
+
+[functions.notify-group-activity]
+verify_jwt = false

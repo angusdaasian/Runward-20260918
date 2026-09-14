@@ -23,7 +23,9 @@ const duration = (seconds: number | null) => {
   return h ? `${h}h ${m}m` : `${m}m`;
 };
 
-export default function FeedRunCard({ run, lang, isSelf, footer, onOpen }: { run: FeedRun; lang: Lang; isSelf: boolean; footer?: string; onOpen: () => void }) {
+export interface FeedRunSocial { like_count?: number; comment_count?: number; liked_by_me?: boolean }
+
+export default function FeedRunCard({ run, lang, isSelf, footer, social, onOpen }: { run: FeedRun; lang: Lang; isSelf: boolean; footer?: string; social?: FeedRunSocial; onOpen: () => void }) {
   const zh = lang === "zh";
   return (
     <article className={`overflow-hidden rounded-lg border bg-card ${isSelf ? "border-primary/60" : "border-border"}`}>

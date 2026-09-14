@@ -3543,6 +3543,7 @@ export type Database = {
         Returns: {
           activity_name: string
           activity_type: string
+          avg_hr: number
           distance_m: number
           duration_s: number
           elevation_m: number
@@ -3622,6 +3623,7 @@ export type Database = {
           activity_name: string
           activity_type: string
           avatar_url: string
+          avg_hr: number
           display_name: string
           distance_km: number
           duration_s: number
@@ -3768,6 +3770,7 @@ export type Database = {
           activity_name: string
           activity_type: string
           avatar_url: string
+          avg_hr: number
           display_name: string
           distance_km: number
           duration_s: number

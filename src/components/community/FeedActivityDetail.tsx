@@ -131,6 +131,7 @@ function samplesToSplits(
 export default function FeedActivityDetail({ activity, lang, onClose }: { activity: FeedActivityRef; lang: Lang; onClose: () => void }) {
   const zh = lang === "zh";
   const [row, setRow] = useState<DetailRow | null>(null);
+  const [extra, setExtra] = useState<StreamRow | null>(null);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
 
@@ -138,6 +139,7 @@ export default function FeedActivityDetail({ activity, lang, onClose }: { activi
     let cancelled = false;
     setLoading(true);
     setFailed(false);
+    setExtra(null);
     (supabase.rpc as any)("get_social_activity_detail", { p_source: activity.source, p_source_id: activity.source_id })
       .then(({ data, error }: { data: DetailRow[] | null; error: unknown }) => {
         if (cancelled) return;
@@ -145,6 +147,11 @@ export default function FeedActivityDetail({ activity, lang, onClose }: { activi
         if (error || !first) setFailed(true);
         setRow(first);
         setLoading(false);
+      });
+    (supabase.rpc as any)("get_social_activity_streams", { p_source: activity.source, p_source_id: activity.source_id })
+      .then(({ data }: { data: StreamRow[] | null }) => {
+        if (cancelled) return;
+        setExtra((data || [])[0] || null);
       });
     return () => { cancelled = true; };
   }, [activity.source, activity.source_id]);
@@ -156,6 +163,28 @@ export default function FeedActivityDetail({ activity, lang, onClose }: { activi
   }, [onClose]);
 
   const km = Number(row?.distance_km || 0);
+
+  const splits = useMemo<SplitRow[]>(() => {
+    if (!extra) return [];
+    if (Array.isArray(extra.laps) && extra.laps.length > 0) {
+      const fromLaps = lapsToSplits(extra.laps);
+      if (fromLaps.length > 0) return fromLaps;
+    }
+    if (Array.isArray(extra.distance_samples) && Array.isArray(extra.hr_samples)) {
+      return samplesToSplits(extra.distance_samples, extra.hr_samples);
+    }
+    return [];
+  }, [extra]);
+
+  const zones = useMemo<ZonePct | null>(() => {
+    const samples = extra?.hr_samples;
+    if (!Array.isArray(samples) || samples.length === 0) return null;
+    const bpm = samples.map((s) => (typeof s?.bpm === "number" ? s.bpm : null));
+    const lowers = Array.isArray(extra?.zone_lowers) ? extra!.zone_lowers!.map(Number) : null;
+    return computeZonePct(bpm, 190, 60, lowers);
+  }, [extra]);
+
+  const avgHr = typeof extra?.avg_hr === "number" ? Math.round(extra.avg_hr) : null;
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-background">
@@ -202,18 +231,39 @@ export default function FeedActivityDetail({ activity, lang, onClose }: { activi
               <Stat icon={<Timer size={15} className="text-primary" />} label={zh ? "平均配速" : "Avg pace"} value={paceLabel(km, row.duration_s)} />
               <Stat icon={<Gauge size={15} className="text-primary" />} label={zh ? "平均速度" : "Avg speed"} value={speedLabel(km, row.duration_s)} />
               <Stat icon={<Mountain size={15} className="text-primary" />} label={zh ? "爬升" : "Elevation gain"} value={`${Math.round(Number(row.elevation_m || 0))} m`} />
-              <Stat icon={<Route size={15} className="text-primary" />} label={zh ? "運動類型" : "Sport"} value={row.activity_type || (zh ? "跑步" : "Run")} />
+              <Stat icon={<HeartPulse size={15} className="text-primary" />} label={zh ? "平均心率" : "Avg HR"} value={avgHr ? `${avgHr} bpm` : "--"} />
             </div>
 
-            <p className="text-[11px] text-muted-foreground">
-              {zh ? "為保護隱私，社群動態不顯示心率或健康數據。" : "For privacy, community runs never show heart rate or health data."}
-            </p>
+            {splits.length > 0 && (
+              <div className="rounded-lg border border-border bg-card">
+                <p className="border-b border-border px-3 py-2 text-sm font-semibold">{zh ? "分段" : "Splits"}</p>
+                <div className="divide-y divide-border">
+                  <div className="grid grid-cols-4 px-3 py-1.5 text-[11px] text-muted-foreground">
+                    <span>{zh ? "段" : "Split"}</span>
+                    <span className="text-right">{zh ? "距離" : "Dist"}</span>
+                    <span className="text-right">{zh ? "配速" : "Pace"}</span>
+                    <span className="text-right">{zh ? "心率" : "HR"}</span>
+                  </div>
+                  {splits.map((s, i) => (
+                    <div key={`${s.label}-${i}`} className="grid grid-cols-4 px-3 py-2 text-sm tabular-nums">
+                      <span className="font-medium">{s.label}</span>
+                      <span className="text-right">{s.km.toFixed(2)} km</span>
+                      <span className="text-right">{paceLabel(s.km, s.seconds)}</span>
+                      <span className="text-right">{s.hr ? `${s.hr}` : "--"}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {zones && <HrZoneBars zones={zones} lang={lang} />}
           </div>
         )}
       </div>
     </div>
   );
 }
+
 
 function Stat({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
   return (

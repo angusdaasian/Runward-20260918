@@ -3459,6 +3459,7 @@ export type Database = {
         Row: {
           activity_name: string | null
           activity_type: string | null
+          avg_hr: number | null
           distance_m: number | null
           duration_s: number | null
           elevation_m: number | null

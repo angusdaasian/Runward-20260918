@@ -47,7 +47,14 @@ export default function FeedRunCard({ run, lang, isSelf, footer, social, onOpen 
           <span className="flex items-center gap-1.5"><Clock size={14} className="text-primary" />{duration(run.duration_s)}</span>
           <span className="flex items-center gap-1.5"><Mountain size={14} className="text-primary" />{Math.round(Number(run.elevation_m || 0))} m</span>
         </div>
-        <p className="mt-3 text-[11px] text-muted-foreground">{footer ?? (zh ? "點擊查看詳細數據" : "Tap to see full stats")}</p>
+        <div className="mt-3 flex items-center gap-4 text-[11px] text-muted-foreground">
+          <span className="flex items-center gap-1">
+            <Heart size={13} className={social?.liked_by_me ? "fill-primary text-primary" : ""} />
+            {Number(social?.like_count || 0)}
+          </span>
+          <span className="flex items-center gap-1"><MessageCircle size={13} />{Number(social?.comment_count || 0)}</span>
+          <span className="truncate">{footer ?? (zh ? "點擊查看詳細數據" : "Tap to see full stats")}</span>
+        </div>
       </button>
     </article>
   );

@@ -15,6 +15,7 @@ export default function SocialWall({ lang }: { lang: Lang }) {
   const [loading, setLoading] = useState(true);
   const [reloadKey, setReloadKey] = useState(0);
   const [open, setOpen] = useState<FeedActivityRef | null>(null);
+  const { social, refreshSocial } = useFeedSocial(runs);
 
   useEffect(() => {
     const onChanged = () => setReloadKey((k) => k + 1);

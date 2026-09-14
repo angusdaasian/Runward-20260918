@@ -237,6 +237,13 @@ export default function FeedActivityDetail({ activity, lang, onClose }: { activi
               <Stat icon={<HeartPulse size={15} className="text-primary" />} label={zh ? "平均心率" : "Avg HR"} value={avgHr ? `${avgHr} bpm` : "--"} />
             </div>
 
+            <FeedActivityCharts
+              hrSamples={extra?.hr_samples || null}
+              distanceSamples={extra?.distance_samples || null}
+              elevationSamples={extra?.elevation_samples || null}
+              lang={lang}
+            />
+
             {splits.length > 0 && (
               <div className="rounded-lg border border-border bg-card">
                 <p className="border-b border-border px-3 py-2 text-sm font-semibold">{zh ? "分段" : "Splits"}</p>

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Copy, Link2, Loader2, LogOut, Plus, RefreshCw, Share2, Trash2, UserMinus, Users } from "lucide-react";
+import { Check, Copy, Link2, Loader2, LogOut, Pencil, Plus, RefreshCw, Share2, Trash2, UserMinus, Users, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -23,6 +23,8 @@ export default function GroupManager({ lang, groups, onChanged }: Props) {
   const [joinCode, setJoinCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [members, setMembers] = useState<Record<string, GroupMember[]>>({});
+  const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
+  const [editingGroupName, setEditingGroupName] = useState("");
 
   const create = async () => {
     if (!name.trim()) return;
@@ -62,6 +64,35 @@ export default function GroupManager({ lang, groups, onChanged }: Props) {
     if (error) { toast({ title: zh ? "只有群主可以更改" : "Only the group leader can change this", variant: "destructive" }); return; }
     onChanged();
   };
+  const startEditingName = (group: LeaderboardGroup) => {
+    setEditingGroupId(group.id);
+    setEditingGroupName(group.name);
+  };
+  const cancelEditingName = () => {
+    setEditingGroupId(null);
+    setEditingGroupName("");
+  };
+  const saveGroupName = async (group: LeaderboardGroup) => {
+    const nextName = editingGroupName.trim();
+    if (!nextName) return;
+    if (nextName === group.name) {
+      cancelEditingName();
+      return;
+    }
+    setBusy(true);
+    const { error } = await supabase
+      .from("leaderboard_groups")
+      .update({ name: nextName })
+      .eq("id", group.id);
+    setBusy(false);
+    if (error) {
+      toast({ title: zh ? "未能更新群組名稱" : "Could not update group name", variant: "destructive" });
+      return;
+    }
+    cancelEditingName();
+    toast({ title: zh ? "群組名稱已更新" : "Group name updated" });
+    onChanged();
+  };
   const loadMembers = async (id: string) => {
     const { data } = await supabase.rpc("get_leaderboard_group_members", { p_group_id: id });
     setMembers((current) => ({ ...current, [id]: (data || []) as GroupMember[] }));
@@ -93,7 +124,35 @@ export default function GroupManager({ lang, groups, onChanged }: Props) {
           </div>
           {groups.map((group) => (
             <div key={group.id} className="rounded-lg border border-border p-3">
-              <div className="flex items-center justify-between gap-2"><strong>{group.emoji} {group.name}</strong><Button variant="ghost" size="sm" onClick={() => loadMembers(group.id)}>{group.member_count} {zh ? "人" : "members"}</Button></div>
+              <div className="flex items-center justify-between gap-2">
+                {editingGroupId === group.id ? (
+                  <div className="flex min-w-0 flex-1 items-center gap-1">
+                    <span aria-hidden="true">{group.emoji}</span>
+                    <Input
+                      value={editingGroupName}
+                      onChange={(event) => setEditingGroupName(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") void saveGroupName(group);
+                        if (event.key === "Escape") cancelEditingName();
+                      }}
+                      autoFocus
+                      aria-label={zh ? "群組名稱" : "Group name"}
+                    />
+                    <Button size="icon" variant="ghost" onClick={() => saveGroupName(group)} disabled={busy || !editingGroupName.trim()} aria-label={zh ? "儲存群組名稱" : "Save group name"}>
+                      {busy ? <Loader2 className="animate-spin" /> : <Check />}
+                    </Button>
+                    <Button size="icon" variant="ghost" onClick={cancelEditingName} disabled={busy} aria-label={zh ? "取消編輯" : "Cancel editing"}><X /></Button>
+                  </div>
+                ) : (
+                  <div className="flex min-w-0 items-center gap-1">
+                    <strong className="truncate">{group.emoji} {group.name}</strong>
+                    {group.owner_user_id === user.id && (
+                      <Button size="icon" variant="ghost" onClick={() => startEditingName(group)} aria-label={zh ? "編輯群組名稱" : "Edit group name"}><Pencil /></Button>
+                    )}
+                  </div>
+                )}
+                <Button variant="ghost" size="sm" className="shrink-0" onClick={() => loadMembers(group.id)}>{group.member_count} {zh ? "人" : "members"}</Button>
+              </div>
               {group.invite_code && (
                 <div className="mt-3 space-y-2">
                   <p className="text-xs text-muted-foreground">{zh ? "邀請碼" : "Invite code"}</p>

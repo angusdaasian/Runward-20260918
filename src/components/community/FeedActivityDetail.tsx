@@ -1,8 +1,10 @@
-import { useEffect, useState } from "react";
-import { Clock, Gauge, Mountain, Route, Timer, X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Clock, Gauge, HeartPulse, Mountain, Route, Timer, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import ActivityMap from "@/components/activities/ActivityMap";
+import HrZoneBars from "@/components/activities/HrZoneBars";
+import { computeZonePct, type ZonePct } from "@/lib/hrZones";
 import type { Lang } from "@/lib/i18n";
 
 export interface FeedActivityRef { source: string; source_id: string }
@@ -20,6 +22,22 @@ interface DetailRow {
   duration_s: number | null;
   elevation_m: number | null;
   summary_polyline: string | null;
+}
+
+interface StreamRow {
+  avg_hr: number | null;
+  max_hr: number | null;
+  laps: any[] | null;
+  hr_samples: Array<{ t?: number; bpm?: number | null }> | null;
+  distance_samples: Array<{ t?: number; d?: number | null }> | null;
+  zone_lowers: number[] | null;
+}
+
+interface SplitRow {
+  label: string;
+  km: number;
+  seconds: number;
+  hr: number | null;
 }
 
 const durationLabel = (seconds: number | null) => {
@@ -43,9 +61,77 @@ const speedLabel = (km: number, seconds: number | null) => {
   return `${(km / (s / 3600)).toFixed(1)} km/h`;
 };
 
+/** Laps stored by Garmin/Terra → split rows. */
+function lapsToSplits(laps: any[]): SplitRow[] {
+  return laps
+    .map((lap, i) => {
+      const meters = Number(lap.distance_meters ?? lap.distance ?? 0);
+      const seconds = Number(lap.duration_seconds ?? lap.moving_time ?? lap.elapsed_time ?? 0);
+      const hr = lap.avg_hr ?? lap.average_hr ?? lap.average_heartrate ?? null;
+      return {
+        label: String(lap.lap_index ?? i + 1),
+        km: meters / 1000,
+        seconds,
+        hr: typeof hr === "number" ? Math.round(hr) : null,
+      };
+    })
+    .filter((s) => s.km > 0.05 && s.seconds > 0);
+}
+
+/** Derive 1 km splits (with average HR) from per-second distance + HR samples. */
+function samplesToSplits(
+  distance: Array<{ t?: number; d?: number | null }>,
+  hr: Array<{ t?: number; bpm?: number | null }>,
+): SplitRow[] {
+  const hrAt = new Map<number, number>();
+  for (const s of hr) {
+    if (typeof s?.t === "number" && typeof s?.bpm === "number") hrAt.set(s.t, s.bpm);
+  }
+  const pts = distance
+    .filter((s) => typeof s?.t === "number" && typeof s?.d === "number")
+    .map((s) => ({ t: Number(s.t), d: Number(s.d) }))
+    .sort((a, b) => a.t - b.t);
+  if (pts.length < 10) return [];
+
+  const out: SplitRow[] = [];
+  let startT = pts[0].t;
+  let nextKm = 1;
+  let hrSum = 0;
+  let hrCount = 0;
+  for (const p of pts) {
+    const bpm = hrAt.get(p.t);
+    if (typeof bpm === "number") { hrSum += bpm; hrCount++; }
+    if (p.d / 1000 >= nextKm) {
+      out.push({
+        label: String(nextKm),
+        km: 1,
+        seconds: p.t - startT,
+        hr: hrCount ? Math.round(hrSum / hrCount) : null,
+      });
+      startT = p.t;
+      nextKm += 1;
+      hrSum = 0;
+      hrCount = 0;
+    }
+  }
+  const last = pts[pts.length - 1];
+  const leftover = last.d / 1000 - (nextKm - 1);
+  if (leftover > 0.05) {
+    out.push({
+      label: `${(nextKm - 1 + leftover).toFixed(2)}`,
+      km: leftover,
+      seconds: last.t - startT,
+      hr: hrCount ? Math.round(hrSum / hrCount) : null,
+    });
+  }
+  return out.filter((s) => s.seconds > 0);
+}
+
+
 export default function FeedActivityDetail({ activity, lang, onClose }: { activity: FeedActivityRef; lang: Lang; onClose: () => void }) {
   const zh = lang === "zh";
   const [row, setRow] = useState<DetailRow | null>(null);
+  const [extra, setExtra] = useState<StreamRow | null>(null);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
 
@@ -53,6 +139,7 @@ export default function FeedActivityDetail({ activity, lang, onClose }: { activi
     let cancelled = false;
     setLoading(true);
     setFailed(false);
+    setExtra(null);
     (supabase.rpc as any)("get_social_activity_detail", { p_source: activity.source, p_source_id: activity.source_id })
       .then(({ data, error }: { data: DetailRow[] | null; error: unknown }) => {
         if (cancelled) return;
@@ -60,6 +147,11 @@ export default function FeedActivityDetail({ activity, lang, onClose }: { activi
         if (error || !first) setFailed(true);
         setRow(first);
         setLoading(false);
+      });
+    (supabase.rpc as any)("get_social_activity_streams", { p_source: activity.source, p_source_id: activity.source_id })
+      .then(({ data }: { data: StreamRow[] | null }) => {
+        if (cancelled) return;
+        setExtra((data || [])[0] || null);
       });
     return () => { cancelled = true; };
   }, [activity.source, activity.source_id]);
@@ -71,6 +163,28 @@ export default function FeedActivityDetail({ activity, lang, onClose }: { activi
   }, [onClose]);
 
   const km = Number(row?.distance_km || 0);
+
+  const splits = useMemo<SplitRow[]>(() => {
+    if (!extra) return [];
+    if (Array.isArray(extra.laps) && extra.laps.length > 0) {
+      const fromLaps = lapsToSplits(extra.laps);
+      if (fromLaps.length > 0) return fromLaps;
+    }
+    if (Array.isArray(extra.distance_samples) && Array.isArray(extra.hr_samples)) {
+      return samplesToSplits(extra.distance_samples, extra.hr_samples);
+    }
+    return [];
+  }, [extra]);
+
+  const zones = useMemo<ZonePct | null>(() => {
+    const samples = extra?.hr_samples;
+    if (!Array.isArray(samples) || samples.length === 0) return null;
+    const bpm = samples.map((s) => (typeof s?.bpm === "number" ? s.bpm : null));
+    const lowers = Array.isArray(extra?.zone_lowers) ? extra!.zone_lowers!.map(Number) : null;
+    return computeZonePct(bpm, 190, 60, lowers);
+  }, [extra]);
+
+  const avgHr = typeof extra?.avg_hr === "number" ? Math.round(extra.avg_hr) : null;
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-background">
@@ -117,18 +231,39 @@ export default function FeedActivityDetail({ activity, lang, onClose }: { activi
               <Stat icon={<Timer size={15} className="text-primary" />} label={zh ? "平均配速" : "Avg pace"} value={paceLabel(km, row.duration_s)} />
               <Stat icon={<Gauge size={15} className="text-primary" />} label={zh ? "平均速度" : "Avg speed"} value={speedLabel(km, row.duration_s)} />
               <Stat icon={<Mountain size={15} className="text-primary" />} label={zh ? "爬升" : "Elevation gain"} value={`${Math.round(Number(row.elevation_m || 0))} m`} />
-              <Stat icon={<Route size={15} className="text-primary" />} label={zh ? "運動類型" : "Sport"} value={row.activity_type || (zh ? "跑步" : "Run")} />
+              <Stat icon={<HeartPulse size={15} className="text-primary" />} label={zh ? "平均心率" : "Avg HR"} value={avgHr ? `${avgHr} bpm` : "--"} />
             </div>
 
-            <p className="text-[11px] text-muted-foreground">
-              {zh ? "為保護隱私，社群動態不顯示心率或健康數據。" : "For privacy, community runs never show heart rate or health data."}
-            </p>
+            {splits.length > 0 && (
+              <div className="rounded-lg border border-border bg-card">
+                <p className="border-b border-border px-3 py-2 text-sm font-semibold">{zh ? "分段" : "Splits"}</p>
+                <div className="divide-y divide-border">
+                  <div className="grid grid-cols-4 px-3 py-1.5 text-[11px] text-muted-foreground">
+                    <span>{zh ? "段" : "Split"}</span>
+                    <span className="text-right">{zh ? "距離" : "Dist"}</span>
+                    <span className="text-right">{zh ? "配速" : "Pace"}</span>
+                    <span className="text-right">{zh ? "心率" : "HR"}</span>
+                  </div>
+                  {splits.map((s, i) => (
+                    <div key={`${s.label}-${i}`} className="grid grid-cols-4 px-3 py-2 text-sm tabular-nums">
+                      <span className="font-medium">{s.label}</span>
+                      <span className="text-right">{s.km.toFixed(2)} km</span>
+                      <span className="text-right">{paceLabel(s.km, s.seconds)}</span>
+                      <span className="text-right">{s.hr ? `${s.hr}` : "--"}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {zones && <HrZoneBars zones={zones} lang={lang} />}
           </div>
         )}
       </div>
     </div>
   );
 }
+
 
 function Stat({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
   return (

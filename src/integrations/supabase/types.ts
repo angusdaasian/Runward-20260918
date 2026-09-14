@@ -3584,6 +3584,17 @@ export type Database = {
           user_id: string
         }[]
       }
+      get_social_activity_streams: {
+        Args: { p_source: string; p_source_id: string }
+        Returns: {
+          avg_hr: number
+          distance_samples: Json
+          hr_samples: Json
+          laps: Json
+          max_hr: number
+          zone_lowers: number[]
+        }[]
+      }
       get_social_feed: {
         Args: { p_limit?: number; p_offset?: number }
         Returns: {

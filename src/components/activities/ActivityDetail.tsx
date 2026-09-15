@@ -41,6 +41,7 @@ import RpeSlider from "./RpeSlider";
 import PlanNextWorkoutCard from "./PlanNextWorkoutCard";
 import PlanComparisonDialog from "@/components/PlanComparisonDialog";
 import ActivityShoePicker from "./ActivityShoePicker";
+import { detectIntervals, formatRepDistance } from "@/lib/detectIntervals";
 
 
 interface StravaActivity {
@@ -187,7 +188,8 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
   const [streams, setStreams] = useState<any[]>([]);
   const [showPlanCompare, setShowPlanCompare] = useState(false);
   const [splits, setSplits] = useState<Split[] | null>(null);
-  const [showKmSplits, setShowKmSplits] = useState(false);
+  const [splitView, setSplitView] = useState<"laps" | "km" | "reps">("laps");
+  const showKmSplits = splitView === "km";
   const [loading, setLoading] = useState(true);
   const [activeChart, setActiveChart] = useState<"pace" | "heartrate" | "altitude" | "cadence">("pace");
   const [deleting, setDeleting] = useState(false);
@@ -841,6 +843,19 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
     return out.length >= 2 ? out : null;
   }, [activity.distance_samples, activity.hr_samples, splits]);
 
+  // Smart interval detection: finds irregular reps (e.g. 5k-4k-3k-2k-1k) from
+  // per-second distance samples, independent of the watch's auto-laps.
+  const smartReps = useMemo(() => {
+    if (!isRunningActivity) return null;
+    return detectIntervals(activity.distance_samples, activity.hr_samples);
+  }, [activity.distance_samples, activity.hr_samples, isRunningActivity]);
+
+  useEffect(() => {
+    if (splitView === "reps" && !smartReps) setSplitView("laps");
+  }, [splitView, smartReps]);
+
+
+
 
 
   const chartTabs = useMemo(() => {
@@ -1064,54 +1079,71 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
                  const lapDists = (splits || []).map((s) => s.distance || 0).filter((d) => d > 50);
                  const isTrackLaps = lapDists.length >= 2
                    && (lapDists.reduce((a, b) => a + b, 0) / lapDists.length) < 900;
-                 const doShare = (useKm: boolean) => {
-                   if (!isPremium) {
-                     toast.error(lang === "zh" ? "升級 Premium 以解鎖" : "Upgrade to Premium to unlock");
-                     return;
-                   }
-                   const src = useKm && exactKmSplits ? exactKmSplits : splits;
-                   if (!src || src.length === 0) return;
-                   shareSplits({
-                     name: activityName,
-                     startDate: activity.start_date,
-                     splits: src.map((s) => ({
-                       distance: s.distance,
-                       elapsed_time: s.elapsed_time,
-                       average_speed: s.average_speed,
-                       average_heartrate: s.average_heartrate ?? null,
-                     })),
-                     lang,
-                   });
-                 };
-                 if (isTrackLaps && exactKmSplits) {
-                   return (
-                     <>
-                       <DropdownMenuItem disabled={!splits || splits.length === 0} onClick={() => doShare(false)}>
-                         <span className="flex items-center gap-2 w-full">
-                           <LayoutList size={12} className="text-primary" />
-                           {lang === "zh" ? "分享分段（每圈 400m）" : "Share splits (laps)"}
-                           {!isPremium && <Lock size={12} className="ml-auto text-muted-foreground" />}
-                         </span>
-                       </DropdownMenuItem>
-                       <DropdownMenuItem onClick={() => doShare(true)}>
-                         <span className="flex items-center gap-2 w-full">
-                           <LayoutList size={12} className="text-primary" />
-                           {lang === "zh" ? "分享分段（每 1 公里）" : "Share splits (1 km)"}
-                           {!isPremium && <Lock size={12} className="ml-auto text-muted-foreground" />}
-                         </span>
-                       </DropdownMenuItem>
-                     </>
-                   );
-                 }
-                 return (
-                   <DropdownMenuItem disabled={!splits || splits.length === 0} onClick={() => doShare(false)}>
-                     <span className="flex items-center gap-2 w-full">
-                       <LayoutList size={12} className="text-primary" />
-                       {lang === "zh" ? "分享分段" : "Share splits"}
-                       {!isPremium && <Lock size={12} className="ml-auto text-muted-foreground" />}
-                     </span>
-                   </DropdownMenuItem>
-                 );
+                  const doShare = (mode: "laps" | "km" | "reps") => {
+                    if (!isPremium) {
+                      toast.error(lang === "zh" ? "升級 Premium 以解鎖" : "Upgrade to Premium to unlock");
+                      return;
+                    }
+                    const src: any[] | null | undefined = mode === "reps"
+                      ? smartReps?.segments
+                      : mode === "km" && exactKmSplits
+                        ? exactKmSplits
+                        : splits;
+                    if (!src || src.length === 0) return;
+                    shareSplits({
+                      name: activityName,
+                      startDate: activity.start_date,
+                      splits: src.map((s) => ({
+                        distance: s.distance,
+                        elapsed_time: s.elapsed_time,
+                        average_speed: s.average_speed,
+                        average_heartrate: s.average_heartrate ?? null,
+                      })),
+                      lang,
+                    });
+                  };
+                  const repsItem = smartReps ? (
+                    <DropdownMenuItem onClick={() => doShare("reps")}>
+                      <span className="flex items-center gap-2 w-full">
+                        <LayoutList size={12} className="text-primary" />
+                        {lang === "zh" ? "分享分段（智能分段）" : "Share splits (reps)"}
+                        {!isPremium && <Lock size={12} className="ml-auto text-muted-foreground" />}
+                      </span>
+                    </DropdownMenuItem>
+                  ) : null;
+                  if (isTrackLaps && exactKmSplits) {
+                    return (
+                      <>
+                        <DropdownMenuItem disabled={!splits || splits.length === 0} onClick={() => doShare("laps")}>
+                          <span className="flex items-center gap-2 w-full">
+                            <LayoutList size={12} className="text-primary" />
+                            {lang === "zh" ? "分享分段（每圈 400m）" : "Share splits (laps)"}
+                            {!isPremium && <Lock size={12} className="ml-auto text-muted-foreground" />}
+                          </span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => doShare("km")}>
+                          <span className="flex items-center gap-2 w-full">
+                            <LayoutList size={12} className="text-primary" />
+                            {lang === "zh" ? "分享分段（每 1 公里）" : "Share splits (1 km)"}
+                            {!isPremium && <Lock size={12} className="ml-auto text-muted-foreground" />}
+                          </span>
+                        </DropdownMenuItem>
+                        {repsItem}
+                      </>
+                    );
+                  }
+                  return (
+                    <>
+                      <DropdownMenuItem disabled={!splits || splits.length === 0} onClick={() => doShare("laps")}>
+                        <span className="flex items-center gap-2 w-full">
+                          <LayoutList size={12} className="text-primary" />
+                          {lang === "zh" ? "分享分段" : "Share splits"}
+                          {!isPremium && <Lock size={12} className="ml-auto text-muted-foreground" />}
+                        </span>
+                      </DropdownMenuItem>
+                      {repsItem}
+                    </>
+                  );
                })()}
               <DropdownMenuItem
                 disabled={!chartData || chartData.length < 2}
@@ -1533,26 +1565,32 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
             </h3>
             {(() => {
               // Detect track-style laps (e.g. 400 m auto-laps) and offer a
-              // toggle to view them regrouped as 1 km splits.
+              // toggle to view them regrouped as 1 km splits. When an interval
+              // workout is detected from stream data, also offer the reps view.
               const lapDists = splits.map((s) => s.distance || 0).filter((d) => d > 50);
               const meanLapDist = lapDists.length >= 2
                 ? lapDists.reduce((a, b) => a + b, 0) / lapDists.length
                 : 0;
-              if (!(meanLapDist > 0 && meanLapDist < 900)) return null;
+              const showKmOption = meanLapDist > 0 && meanLapDist < 900;
+              const showRepsOption = !!smartReps;
+              if (!showKmOption && !showRepsOption) return null;
+              const btn = (active: boolean) =>
+                `px-2.5 py-1 rounded-md transition-colors ${active ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`;
               return (
                 <div className="flex rounded-lg bg-slate-100 p-0.5 text-[11px] font-semibold">
-                  <button
-                    onClick={() => setShowKmSplits(false)}
-                    className={`px-2.5 py-1 rounded-md transition-colors ${!showKmSplits ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}
-                  >
+                  <button onClick={() => setSplitView("laps")} className={btn(splitView === "laps")}>
                     {lang === "zh" ? "每圈" : "Laps"}
                   </button>
-                  <button
-                    onClick={() => setShowKmSplits(true)}
-                    className={`px-2.5 py-1 rounded-md transition-colors ${showKmSplits ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}
-                  >
-                    1 km
-                  </button>
+                  {showKmOption && (
+                    <button onClick={() => setSplitView("km")} className={btn(splitView === "km")}>
+                      1 km
+                    </button>
+                  )}
+                  {showRepsOption && (
+                    <button onClick={() => setSplitView("reps")} className={btn(splitView === "reps")}>
+                      {lang === "zh" ? "智能分段" : "Reps"}
+                    </button>
+                  )}
                 </div>
               );
             })()}
@@ -1585,8 +1623,10 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
             // When "1 km" view is selected, prefer exact 1000 m splits derived
             // from Terra distance/time samples (interpolated at each km mark).
             // Fall back to regrouping whole laps when stream data is missing.
-            let visibleSplits = rawVisible;
-            if (showKmSplits && exactKmSplits) {
+            let visibleSplits: any[] = rawVisible;
+            if (splitView === "reps" && smartReps) {
+              visibleSplits = smartReps.segments;
+            } else if (showKmSplits && exactKmSplits) {
               visibleSplits = exactKmSplits;
             } else if (showKmSplits) {
               const grouped: Split[] = [];
@@ -1649,6 +1689,17 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
               const pace = formatPace(split.average_speed);
               const hr = split.average_heartrate ? Math.round(split.average_heartrate) : null;
               if (!isRest) runNum++;
+              const kind = (split as any).kind as string | undefined;
+              const rounded = (split as any).roundedDistance as number | undefined;
+              const typeLabel = kind === "warmup"
+                ? (lang === "zh" ? "熱身" : "Warm up")
+                : kind === "cooldown"
+                  ? (lang === "zh" ? "緩和" : "Cool down")
+                  : kind === "rep"
+                    ? `${lang === "zh" ? "間歇" : "Rep"} ${formatRepDistance(rounded ?? Math.round(distMeters))}`
+                    : isRest
+                      ? (lang === "zh" ? "休息" : "Rest")
+                      : (lang === "zh" ? "跑步" : "Run");
               return (
                 <div
                   key={idx}
@@ -1660,7 +1711,7 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
                     {isRest ? "" : runNum}
                   </span>
                   <span className={`${isRest ? "text-slate-400 font-normal" : "text-slate-900 font-semibold"}`}>
-                    {isRest ? (lang === "zh" ? "休息" : "Rest") : (lang === "zh" ? "跑步" : "Run")}
+                    {typeLabel}
                   </span>
                   <span className={`text-right tabular-nums ${isRest ? "text-slate-400" : "text-slate-900 font-semibold"}`}>
                     {formatDuration(split.elapsed_time)}

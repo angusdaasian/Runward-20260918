@@ -3683,6 +3683,13 @@ export type Database = {
           name: string
         }[]
       }
+      get_group_chat_push_recipients: {
+        Args: { p_exclude_user: string; p_group_id: string }
+        Returns: {
+          lang: string
+          user_id: string
+        }[]
+      }
       get_group_feed: {
         Args: { p_limit?: number; p_offset?: number }
         Returns: {

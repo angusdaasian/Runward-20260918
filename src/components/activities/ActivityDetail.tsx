@@ -1672,6 +1672,17 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
               const pace = formatPace(split.average_speed);
               const hr = split.average_heartrate ? Math.round(split.average_heartrate) : null;
               if (!isRest) runNum++;
+              const kind = (split as any).kind as string | undefined;
+              const rounded = (split as any).roundedDistance as number | undefined;
+              const typeLabel = kind === "warmup"
+                ? (lang === "zh" ? "熱身" : "Warm up")
+                : kind === "cooldown"
+                  ? (lang === "zh" ? "緩和" : "Cool down")
+                  : kind === "rep"
+                    ? `${lang === "zh" ? "間歇" : "Rep"} ${formatRepDistance(rounded ?? Math.round(distMeters))}`
+                    : isRest
+                      ? (lang === "zh" ? "休息" : "Rest")
+                      : (lang === "zh" ? "跑步" : "Run");
               return (
                 <div
                   key={idx}
@@ -1683,7 +1694,7 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
                     {isRest ? "" : runNum}
                   </span>
                   <span className={`${isRest ? "text-slate-400 font-normal" : "text-slate-900 font-semibold"}`}>
-                    {isRest ? (lang === "zh" ? "休息" : "Rest") : (lang === "zh" ? "跑步" : "Run")}
+                    {typeLabel}
                   </span>
                   <span className={`text-right tabular-nums ${isRest ? "text-slate-400" : "text-slate-900 font-semibold"}`}>
                     {formatDuration(split.elapsed_time)}

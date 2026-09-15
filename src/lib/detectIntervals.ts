@@ -31,7 +31,7 @@ export interface DetectedSegment {
 const SMOOTH_WINDOW_S = 15;
 const MIN_REP_M = 200;
 const MIN_REP_S = 45;
-const MIN_REST_S = 15;
+const MIN_REST_S = 20;
 const WARMCOOL_MIN_M = 600;
 const MIN_SPREAD = 1.18;
 const MIN_REPS = 2;

@@ -11,3 +11,4 @@
 - [x] Likes and comments on runs in the public and friends feeds
 - [x] Per-group push notification toggle ("friend just ran" alert, EN/ZH)
 - [x] Show run start times and shared group names in social feeds
+- [x] Private group chat inside each running group (realtime, unread badges, push notifications)

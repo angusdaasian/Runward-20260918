@@ -1205,6 +1205,67 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+        <AlertDialog open={shareSplitsOpen} onOpenChange={setShareSplitsOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>{lang === "zh" ? "分享哪一種分段？" : "Which splits do you want to share?"}</AlertDialogTitle>
+              <AlertDialogDescription>
+                {lang === "zh" ? "選擇要生成的分段圖。" : "Pick the split view to put on the share card."}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            {(() => {
+              const lapDists = (splits || []).map((s) => s.distance || 0).filter((d) => d > 50);
+              const avgLap = lapDists.length ? lapDists.reduce((a, b) => a + b, 0) / lapDists.length : 0;
+              const lapLabel = avgLap > 0 && avgLap < 900
+                ? (lang === "zh" ? "每圈 400 公尺" : "Laps (400 m)")
+                : (lang === "zh" ? "手錶分段" : "Watch laps");
+              const doShare = (mode: "laps" | "km" | "reps") => {
+                const src: any[] | null | undefined = mode === "reps"
+                  ? smartReps?.segments
+                  : mode === "km" && exactKmSplits
+                    ? exactKmSplits
+                    : splits;
+                setShareSplitsOpen(false);
+                if (!src || src.length === 0) return;
+                shareSplits({
+                  name: activityName,
+                  startDate: activity.start_date,
+                  splits: src.map((s) => ({
+                    distance: s.distance,
+                    elapsed_time: s.elapsed_time,
+                    average_speed: s.average_speed,
+                    average_heartrate: s.average_heartrate ?? null,
+                  })),
+                  lang,
+                });
+              };
+              const optionCls = "w-full flex items-center gap-2 px-4 py-3 rounded-xl border border-border text-sm font-medium hover:bg-muted transition-colors text-left";
+              return (
+                <div className="space-y-2">
+                  <button className={optionCls} disabled={!splits || splits.length === 0} onClick={() => doShare("laps")}>
+                    <LayoutList size={14} className="text-primary" />
+                    {lapLabel}
+                  </button>
+                  {exactKmSplits && exactKmSplits.length > 0 && (
+                    <button className={optionCls} onClick={() => doShare("km")}>
+                      <LayoutList size={14} className="text-primary" />
+                      {lang === "zh" ? "每 1 公里" : "1 km splits"}
+                    </button>
+                  )}
+                  {smartReps && (
+                    <button className={optionCls} onClick={() => doShare("reps")}>
+                      <LayoutList size={14} className="text-primary" />
+                      {lang === "zh" ? "智能分段" : "Intervals"}
+                    </button>
+                  )}
+                </div>
+              );
+            })()}
+            <AlertDialogFooter>
+              <AlertDialogCancel>{lang === "zh" ? "取消" : "Cancel"}</AlertDialogCancel>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
         <AlertDialog>
           <AlertDialogTrigger asChild>
             <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-destructive hover:bg-destructive/10 transition-colors">

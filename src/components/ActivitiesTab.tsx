@@ -38,6 +38,7 @@ import SuggestedNextWorkout from "@/components/activities/SuggestedNextWorkout";
 import { calculateRunningScore } from "@/lib/vdot";
 import { loadForActivity, isRunning } from "@/lib/trainingLoad";
 import { useActivities, type StravaActivity } from "@/hooks/use-activities";
+import { trackReviewRunCount } from "@/lib/reviewPrompt";
 import FadeIn from "@/components/ui/FadeIn";
 import { ActivityListSkeleton } from "@/components/ui/PageSkeleton";
 import { useAppleHealth, type HealthStats } from "@/hooks/use-apple-health";
@@ -632,6 +633,16 @@ const ActivitiesTab = ({ lang, resetSignal }: Props) => {
   // homepage's latest-only list. The latest activity is identical in both,
   // so the homepage card never swaps mid-render.
   const activities = full.activities.length > 0 ? full.activities : homepage.activities;
+
+  // Feed the run-count signal to the native review prompt and, once the user
+  // has shown real engagement (enough sessions + runs), spend one rating request.
+  useEffect(() => {
+    if (!user?.id) return;
+    trackReviewRunCount(activities.length);
+    if (!fullLoading && activities.length > 0) {
+      import("@/lib/reviewPrompt").then((m) => m.maybeRequestReview());
+    }
+  }, [user?.id, activities.length, fullLoading]);
   const [selectedActivity, setSelectedActivity] = useState<StravaActivity | null>(null);
   const [dateSheet, setDateSheet] = useState<{
     dateLabel: string;

@@ -105,6 +105,12 @@ const Index = () => {
       if (timeoutId) clearTimeout(timeoutId);
     };
   }, []);
+  // Track one session per day for the native review prompt.
+  useEffect(() => {
+    if (!user?.id) return;
+    import("@/lib/reviewPrompt").then((m) => m.trackReviewSession());
+  }, [user?.id]);
+
   useEffect(() => {
     const sync = () => setAiChatDisabled(localStorage.getItem("ai_chat_disabled") === "true");
     window.addEventListener("ai-chat-toggle", sync);

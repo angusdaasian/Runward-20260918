@@ -1,74 +1,72 @@
-# Runner Classes — RPG layer integrated with CityHunter
+# Group chat inside running groups
 
-## Goal
-Turn Runward's existing data (activities + CityHunter territory) into an RPG-style **Runner Class** progression system. Runners pick one of four classes, earn class XP from real running + territory capture, level up, and see a "character sheet" with a radar chart of their four affinities. CityHunter becomes the **exploration pillar** of the RPG — the Pathfinder class levels almost entirely from territory capture, and every class earns bonus XP for capturing new hexes.
+Private text chat for each running group. Only members of a group can read or post; there are no public chats and no direct one-to-one chats.
 
-## The four classes (bilingual)
+## UI approach — keep it clean
 
-| Class | Emoji | EN | ZH | XP source (real data) |
-|---|---|---|---|---|
-| Sprintblade | ⚡ | Sprintblade | 速刃 | Speed — pace PRs, interval runs, sub-6/sub-5/speedster badges, negative splits |
-| Wayfarer | 🛡️ | Wayfarer | 遠行者 | Distance — lifetime km, long-run distance, weekly/monthly volume |
-| Highlander | ⛰️ | Highlander | 高地戰士 | Elevation — total ascent, steepest run, Everest challenge |
-| Pathfinder | 🧭 | Pathfinder | 探路者 | **Territory** — unique hexes captured, landmarks, city badges, capture contributions |
+Today groups live inside a popup (invite code, members, toggles), which is the wrong place for a conversation. Chat becomes its own space:
 
-- User picks **one active class** at a time (stored in `profiles.runner_class`). Switching is free and never loses XP — each class keeps its own cumulative XP.
-- A **suggested class** is computed from the radar chart (highest affinity); the user can accept it or pick any class.
+1. A new **Groups / 群組** section in the Community tab (beside Leaderboards, Social, CityHunter).
+2. That section lists your groups as rows: emoji, name, member count, last message preview, time, and an unread dot with count.
+3. Tapping a row opens a **full-height chat screen**: back arrow + group name in a sticky header, messages below, message box pinned at the bottom, and a small menu in the header for the existing group settings (invite code, members, notification and invite toggles, rename, leave/delete) so nothing is duplicated.
+4. If you are in no group yet, the section shows a single friendly empty state with the existing create/join controls.
 
-## How CityHunter integrates (the RPG "world")
-- **Pathfinder XP is the CityHunter engine**: every unique hex captured = 10 XP, every landmark captured = 100 XP, every city badge earned (Bronze 500 / Silver 1,000 / Gold 2,000 / Platinum 4,000 / Diamond 8,000 / Conqueror 16,000) = XP.
-- **All classes** earn a small territory bonus: each *new-to-you* hex captured = +5 class XP, so exploring the map rewards every class, not just Pathfinder.
-- **Highlander** additionally weights runs that captured hexes with high total elevation; **Sprintblade** weights fast runs that captured hexes; **Wayfarer** weights long runs (more hexes traversed). These are derived from run stats already linked to territory captures, not new per-hex data.
-- CityHunter tab gains a **Pathfinder level badge** beside the city progress, so the territory tab visibly reflects RPG progression.
+Chat bubbles: your own messages right-aligned in the app's primary colour, others left-aligned on the card surface with avatar + name above the first message of a run of messages. Day separators. Messages grouped by sender. Auto-scroll to newest, "jump to latest" button when scrolled up. Bilingual (EN / 繁中) throughout.
 
-## Level system
-- 50 levels per class. Threshold curve: `level = min(50, floor(√(xp / 50)) + 1)` (tunable). Each level shows an emblem tier tint and an XP bar to the next level.
-- Class level is **cosmetic/progression only** in this phase — no gameplay gating. (Phase 2 can add class-exclusive milestone badges.)
+## Behaviour
 
-## Data & computation (no XP stored in DB)
-- Class XP is **computed client-side**, mirroring `computeBadgeProgress` in `src/lib/badges.ts`:
-  - Sprintblade / Wayfarer / Highlander XP derived from the `activities` array already loaded by `useActivities` (same inputs badges use: distance, pace, elevation, splits).
-  - Pathfinder XP derived from territory aggregates fetched with existing queries: `territory_captures` count (unique hexes), `territory_landmark_captures` count, and per-city % (already computed in `CityProgressList`) mapped to city badges.
-- Module-level cache (like `cachedBadgeUserId` / `cachedBadgeProgress` in BadgesPage) keeps the highest-ever XP to avoid flicker on refetch.
+- Messages are text only, 1–1000 characters, trimmed; empty messages rejected.
+- New messages appear live for everyone in the group (realtime subscription, cleaned up on unmount).
+- Long press / tap-and-hold on your own message lets you delete it; group leader can delete any message in their group.
+- Unread count per group = messages newer than your last-read marker for that group. Opening the chat marks it read.
+- Optional: reuse the existing per-group notification switch so a new chat message also pushes to members who have that group's notifications on. (Included — same toggle, same wording, no new setting.)
 
-## Storage change (small migration)
-- Add one column to `profiles`:
-  ```sql
-  alter table public.profiles add column runner_class text;
-  ```
-  Default null. Existing RLS on profiles (user owns their row) already covers read/update, so no new policy needed. No XP columns — XP is computed.
+## Database (migration)
 
-## Files to add / change
+New tables, both with grants + RLS:
+
+- `group_messages` — `id`, `group_id` (FK `leaderboard_groups`, cascade), `user_id`, `body text`, `created_at`, `deleted_at`. Indexed on `(group_id, created_at desc)`.
+  - Read: only members (`is_leaderboard_group_member(group_id, auth.uid())`).
+  - Insert: only members, and `user_id = auth.uid()`.
+  - Update/delete (soft delete): own message, or group owner.
+- `group_message_reads` — `group_id`, `user_id`, `last_read_at`; primary key `(group_id, user_id)`. Own-row read/write only.
+
+New SECURITY DEFINER helpers (EXECUTE to `authenticated` + `service_role`, revoked from `PUBLIC`/`anon`), matching the existing group RPC style:
+
+- `get_group_messages(p_group_id uuid, p_before timestamptz, p_limit int)` → message rows joined to `profiles` for `display_name` / `avatar_url`, newest-first paging.
+- `send_group_message(p_group_id uuid, p_body text)` → validates membership + length, inserts, returns the row.
+- `delete_group_message(p_message_id uuid)` → soft delete, own message or group owner.
+- `get_my_group_chat_summaries()` → per group: last message body, last message time, last sender name, unread count. Powers the group list rows.
+- `mark_group_chat_read(p_group_id uuid)` → upsert `last_read_at = now()`.
+
+`group_messages` added to the realtime publication so the live subscription works with RLS intact.
+
+## Files
 
 **New**
-- `src/lib/runnerClasses.ts` — class definitions, `computeClassXp({ activities, territoryStats })` returning per-class XP + level + affinity radar data, level curve, suggested-class helper. Mirrors `badges.ts` patterns.
-- `src/components/rewards/RunnerClassCard.tsx` — the character sheet card: active class emblem + level + XP bar to next level, a radar chart of the four affinities (reuse the radar-chart pattern from `PostureRadarChart`), and a class-switch UI (4 selectable class chips + "Suggested: X").
-- `src/assets/classes/{sprintblade,wayfarer,highlander,pathfinder}.png` — four class emblems, generated with imagegen (transparent PNG, consistent style with `src/assets/ranks/*.png`).
+- `src/components/community/GroupChatList.tsx` — the group rows with last message + unread badge, plus empty state wrapping the existing create/join controls.
+- `src/components/community/GroupChatRoom.tsx` — full-height chat screen: header (back, name, settings menu), message list, composer.
+- `src/components/community/GroupChatMessage.tsx` — one bubble (grouping, day separator, delete action).
+- `src/hooks/use-group-chat.ts` — loads messages, paginates older on scroll-up, realtime subscribe/cleanup, send, delete, mark-read.
+- `src/hooks/use-group-chat-summaries.ts` — group list summaries + total unread count.
 
 **Changed**
-- `src/components/RewardsTab.tsx` — render `RunnerClassCard` at the top of the Rewards tab (above Leaderboards/Social/CityHunter), so the RPG sheet is the entry point.
-- `src/components/rewards/TerritoryTab.tsx` — show the user's Pathfinder level badge + active-class emblem beside city progress; surface the territory→XP connection ("+10 XP per new hex").
-- `src/components/community/FeedRunCard.tsx` — show a small class emblem next to the runner's name on each feed card (territory-as-world social signal). Emblem only; no extra data fetched (class comes from the profile already loaded with the feed row, or a tiny per-user cache).
-- `supabase/migrations/NNNN_runner_class.sql` — the `alter table` above + the standard `GRANT`/comment. (profiles already has grants; this is additive.)
+- `src/components/RewardsTab.tsx` — add the Groups tab (mobile).
+- `src/components/dashboard/DashboardCommunity.tsx` — add the same Groups sub-tab (desktop).
+- `src/components/community/GroupManager.tsx` — expose it as the chat header's settings menu content in addition to its current button, so settings are reachable from inside a chat.
+- `supabase/functions/notify-group-activity/index.ts` — reuse its push helper for new-message notifications (or a small sibling function `notify-group-message`, registered in `supabase/config.toml` with `verify_jwt = false` and the same `x-webhook-key` check + trigger pattern already used for activity pushes).
 
-## Technical details
-- **Radar chart**: reuse the SVG radar approach from `src/components/posture/PostureRadarChart.tsx` — four axes (Speed / Distance / Elevation / Exploration), each normalised 0–100 from that class's XP percentile.
-- **Affinity normalisation**: each class's XP mapped to 0–100 via a soft curve so the radar shows shape even at low levels; tuned so a specialist (one axis dominant) is visually distinct from an all-rounder.
-- **Pathfinder territory fetch**: a single `territory_captures` count + `territory_landmark_captures` count + the city-badge percentages already computed in `CityProgressList`; batched in `RunnerClassCard`'s effect. Cache result for the session.
-- **Privacy**: class emblem on feed cards is derived from the runner's own `profiles.runner_class` (already visible to feed viewers via the existing profile join in `get_social_feed`/`get_group_feed` — if not currently returned, add `runner_class` to the SELECT). No new opt-in; class choice is public like display_name.
-- **i18n**: all labels bilingual via `Lang` (en/zh), matching `badges.ts` `en`/`zh` pattern.
-- **No edge-function change** in this phase — XP is computed from existing data, so `process-territory` is untouched.
+## Technical notes
 
-## Out of scope (phase 2, not built now)
-- Class-exclusive milestone badges / perks.
-- "Every run earns XP" push notification on level-up.
-- Per-hex elevation/pace metadata for richer class bonuses.
-- Group raid boss battles (separate feature).
+- Message send is optimistic: the bubble appears immediately with a sending state, replaced by the server row (or marked failed with a retry tap).
+- Paging: 40 messages initially, 40 more when scrolled to the top.
+- Realtime: one channel per open chat (`group-chat:<group_id>`), subscribed in `useEffect`, `supabase.removeChannel` in cleanup.
+- Unread badge also shows on the Community tab's Groups label so users notice new messages without opening it.
+- No new privacy toggle: group chat visibility follows group membership, which is already invite-only.
 
 ## Verification
-- Build passes (`tsgo` + Vite).
-- `RunnerClassCard` renders on Rewards tab with radar + level + switch.
-- Switching class persists to `profiles.runner_class` and reloads correctly.
-- Pathfinder level on CityHunter tab matches captured-hex count.
-- Feed cards show the runner's class emblem.
-- Linter no new errors.
+- Build passes; no new lint errors.
+- Two members in one group: message sent by one appears live for the other.
+- Non-member cannot read or insert (RLS check via a direct query).
+- Unread count increments, then clears on open.
+- Own message deletes; leader can delete another member's message; a normal member cannot.

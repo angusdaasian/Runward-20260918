@@ -842,6 +842,19 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
     return out.length >= 2 ? out : null;
   }, [activity.distance_samples, activity.hr_samples, splits]);
 
+  // Smart interval detection: finds irregular reps (e.g. 5k-4k-3k-2k-1k) from
+  // per-second distance samples, independent of the watch's auto-laps.
+  const smartReps = useMemo(() => {
+    if (!isRunningActivity) return null;
+    return detectIntervals(activity.distance_samples, activity.hr_samples);
+  }, [activity.distance_samples, activity.hr_samples, isRunningActivity]);
+
+  useEffect(() => {
+    if (splitView === "reps" && !smartReps) setSplitView("laps");
+  }, [splitView, smartReps]);
+
+
+
 
 
   const chartTabs = useMemo(() => {

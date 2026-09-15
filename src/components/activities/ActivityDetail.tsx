@@ -1606,8 +1606,10 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
             // When "1 km" view is selected, prefer exact 1000 m splits derived
             // from Terra distance/time samples (interpolated at each km mark).
             // Fall back to regrouping whole laps when stream data is missing.
-            let visibleSplits = rawVisible;
-            if (showKmSplits && exactKmSplits) {
+            let visibleSplits: any[] = rawVisible;
+            if (splitView === "reps" && smartReps) {
+              visibleSplits = smartReps.segments;
+            } else if (showKmSplits && exactKmSplits) {
               visibleSplits = exactKmSplits;
             } else if (showKmSplits) {
               const grouped: Split[] = [];

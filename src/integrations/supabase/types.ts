@@ -827,6 +827,67 @@ export type Database = {
           },
         ]
       }
+      group_message_reads: {
+        Row: {
+          group_id: string
+          last_read_at: string
+          user_id: string
+        }
+        Insert: {
+          group_id: string
+          last_read_at?: string
+          user_id: string
+        }
+        Update: {
+          group_id?: string
+          last_read_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_message_reads_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "leaderboard_groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      group_messages: {
+        Row: {
+          body: string
+          created_at: string
+          deleted_at: string | null
+          group_id: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          deleted_at?: string | null
+          group_id: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          deleted_at?: string | null
+          group_id?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_messages_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "leaderboard_groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       intervals_activities: {
         Row: {
           average_heartrate: number | null
@@ -3578,6 +3639,10 @@ export type Database = {
           name: string
         }[]
       }
+      delete_group_message: {
+        Args: { p_message_id: string }
+        Returns: undefined
+      }
       gen_group_invite_code: { Args: never; Returns: string }
       get_activity_comments: {
         Args: { p_source: string; p_source_id: string }
@@ -3646,6 +3711,20 @@ export type Database = {
           user_id: string
         }[]
       }
+      get_group_messages: {
+        Args: { p_before?: string; p_group_id: string; p_limit?: number }
+        Returns: {
+          avatar_url: string
+          body: string
+          can_delete: boolean
+          created_at: string
+          display_name: string
+          group_id: string
+          id: string
+          is_mine: boolean
+          user_id: string
+        }[]
+      }
       get_group_push_recipients: {
         Args: { p_user_id: string }
         Returns: {
@@ -3692,6 +3771,19 @@ export type Database = {
           joined_at: string
           role: string
           user_id: string
+        }[]
+      }
+      get_my_group_chat_summaries: {
+        Args: never
+        Returns: {
+          emoji: string
+          group_id: string
+          last_at: string
+          last_body: string
+          last_sender: string
+          member_count: number
+          name: string
+          unread_count: number
         }[]
       }
       get_my_group_invitations: {
@@ -3821,6 +3913,7 @@ export type Database = {
           name: string
         }[]
       }
+      mark_group_chat_read: { Args: { p_group_id: string }; Returns: undefined }
       polyline_first_point: { Args: { p_encoded: string }; Returns: number[] }
       remove_leaderboard_group_member: {
         Args: { p_group_id: string; p_user_id: string }
@@ -3835,6 +3928,20 @@ export type Database = {
         Returns: undefined
       }
       rotate_group_code: { Args: { p_group_id: string }; Returns: string }
+      send_group_message: {
+        Args: { p_body: string; p_group_id: string }
+        Returns: {
+          avatar_url: string
+          body: string
+          can_delete: boolean
+          created_at: string
+          display_name: string
+          group_id: string
+          id: string
+          is_mine: boolean
+          user_id: string
+        }[]
+      }
       set_group_member_invite: {
         Args: { p_enabled: boolean; p_group_id: string }
         Returns: undefined

@@ -1696,7 +1696,7 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
                 : kind === "cooldown"
                   ? (lang === "zh" ? "緩和" : "Cool down")
                   : kind === "rep"
-                    ? `${lang === "zh" ? "間歇" : "Rep"} ${formatRepDistance(rounded ?? Math.round(distMeters))}`
+                    ? formatRepDistance(rounded ?? Math.round(distMeters))
                     : isRest
                       ? (lang === "zh" ? "休息" : "Rest")
                       : (lang === "zh" ? "跑步" : "Run");

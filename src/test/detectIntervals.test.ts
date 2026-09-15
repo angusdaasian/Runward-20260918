@@ -80,7 +80,7 @@ describe("detectIntervals", () => {
   it("rounds rep distances", () => {
     expect(roundRepDistance(4987)).toBe(5000);
     expect(roundRepDistance(806)).toBe(800);
-    expect(roundRepDistance(1234)).toBeUndefined();
+    expect(roundRepDistance(1350)).toBeUndefined();
     expect(formatRepDistance(5000)).toBe("5 km");
     expect(formatRepDistance(400)).toBe("400 m");
   });

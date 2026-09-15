@@ -36,8 +36,9 @@ const RateAppReward = ({ lang, userId, currentXp, onXpGain }: Props) => {
     if (busy || claimed) return;
     setBusy(true);
 
-    // Open App Store review page in user gesture
-    window.open(APP_STORE_URL, "_blank", "noopener,noreferrer");
+    // Open the store review composer (native in-app sheet in the Despia shell,
+    // App Store web URL in a browser) while we still have the user gesture.
+    openReviewComposer();
 
     const { error: insertErr } = await supabase
       .from("social_rewards_claimed")

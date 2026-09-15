@@ -41,6 +41,7 @@ import RpeSlider from "./RpeSlider";
 import PlanNextWorkoutCard from "./PlanNextWorkoutCard";
 import PlanComparisonDialog from "@/components/PlanComparisonDialog";
 import ActivityShoePicker from "./ActivityShoePicker";
+import { detectIntervals, formatRepDistance } from "@/lib/detectIntervals";
 
 
 interface StravaActivity {

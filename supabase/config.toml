@@ -171,3 +171,6 @@ verify_jwt = false
 
 [functions.notify-group-activity]
 verify_jwt = false
+
+[functions.notify-group-message]
+verify_jwt = false

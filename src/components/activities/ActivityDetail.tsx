@@ -189,6 +189,7 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
   const [showPlanCompare, setShowPlanCompare] = useState(false);
   const [splits, setSplits] = useState<Split[] | null>(null);
   const [splitView, setSplitView] = useState<"laps" | "km" | "reps">("laps");
+  const [shareSplitsOpen, setShareSplitsOpen] = useState(false);
   const showKmSplits = splitView === "km";
   const [loading, setLoading] = useState(true);
   const [activeChart, setActiveChart] = useState<"pace" | "heartrate" | "altitude" | "cadence">("pace");

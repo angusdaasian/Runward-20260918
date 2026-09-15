@@ -14,8 +14,7 @@ interface Props {
 
 const REWARD_KEY = "rate_app";
 const REWARD_XP = 5000;
-const APP_STORE_URL =
-  "https://apps.apple.com/us/app/runward/id6761060757?action=write-review";
+import { openReviewComposer } from "@/lib/reviewPrompt";
 
 const RateAppReward = ({ lang, userId, currentXp, onXpGain }: Props) => {
   const [claimed, setClaimed] = useState<boolean | null>(null);

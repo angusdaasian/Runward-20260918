@@ -38,6 +38,7 @@ import SuggestedNextWorkout from "@/components/activities/SuggestedNextWorkout";
 import { calculateRunningScore } from "@/lib/vdot";
 import { loadForActivity, isRunning } from "@/lib/trainingLoad";
 import { useActivities, type StravaActivity } from "@/hooks/use-activities";
+import { trackReviewRunCount } from "@/lib/reviewPrompt";
 import FadeIn from "@/components/ui/FadeIn";
 import { ActivityListSkeleton } from "@/components/ui/PageSkeleton";
 import { useAppleHealth, type HealthStats } from "@/hooks/use-apple-health";

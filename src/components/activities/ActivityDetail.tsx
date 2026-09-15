@@ -189,6 +189,7 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
   const [showPlanCompare, setShowPlanCompare] = useState(false);
   const [splits, setSplits] = useState<Split[] | null>(null);
   const [splitView, setSplitView] = useState<"laps" | "km" | "reps">("laps");
+  const [shareSplitsOpen, setShareSplitsOpen] = useState(false);
   const showKmSplits = splitView === "km";
   const [loading, setLoading] = useState(true);
   const [activeChart, setActiveChart] = useState<"pace" | "heartrate" | "altitude" | "cadence">("pace");
@@ -1073,78 +1074,22 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
                   {lang === "zh" ? "分享活動卡片" : "Share activity card"}
                 </span>
               </DropdownMenuItem>
-               {(() => {
-                 // Track-style activities (400 m auto-laps) get a choice:
-                 // share raw laps or exact 1 km splits derived from stream data.
-                 const lapDists = (splits || []).map((s) => s.distance || 0).filter((d) => d > 50);
-                 const isTrackLaps = lapDists.length >= 2
-                   && (lapDists.reduce((a, b) => a + b, 0) / lapDists.length) < 900;
-                  const doShare = (mode: "laps" | "km" | "reps") => {
-                    if (!isPremium) {
-                      toast.error(lang === "zh" ? "升級 Premium 以解鎖" : "Upgrade to Premium to unlock");
-                      return;
-                    }
-                    const src: any[] | null | undefined = mode === "reps"
-                      ? smartReps?.segments
-                      : mode === "km" && exactKmSplits
-                        ? exactKmSplits
-                        : splits;
-                    if (!src || src.length === 0) return;
-                    shareSplits({
-                      name: activityName,
-                      startDate: activity.start_date,
-                      splits: src.map((s) => ({
-                        distance: s.distance,
-                        elapsed_time: s.elapsed_time,
-                        average_speed: s.average_speed,
-                        average_heartrate: s.average_heartrate ?? null,
-                      })),
-                      lang,
-                    });
-                  };
-                  const repsItem = smartReps ? (
-                    <DropdownMenuItem onClick={() => doShare("reps")}>
-                      <span className="flex items-center gap-2 w-full">
-                        <LayoutList size={12} className="text-primary" />
-                        {lang === "zh" ? "分享分段（智能分段）" : "Share splits (reps)"}
-                        {!isPremium && <Lock size={12} className="ml-auto text-muted-foreground" />}
-                      </span>
-                    </DropdownMenuItem>
-                  ) : null;
-                  if (isTrackLaps && exactKmSplits) {
-                    return (
-                      <>
-                        <DropdownMenuItem disabled={!splits || splits.length === 0} onClick={() => doShare("laps")}>
-                          <span className="flex items-center gap-2 w-full">
-                            <LayoutList size={12} className="text-primary" />
-                            {lang === "zh" ? "分享分段（每圈 400m）" : "Share splits (laps)"}
-                            {!isPremium && <Lock size={12} className="ml-auto text-muted-foreground" />}
-                          </span>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => doShare("km")}>
-                          <span className="flex items-center gap-2 w-full">
-                            <LayoutList size={12} className="text-primary" />
-                            {lang === "zh" ? "分享分段（每 1 公里）" : "Share splits (1 km)"}
-                            {!isPremium && <Lock size={12} className="ml-auto text-muted-foreground" />}
-                          </span>
-                        </DropdownMenuItem>
-                        {repsItem}
-                      </>
-                    );
+              <DropdownMenuItem
+                disabled={!splits || splits.length === 0}
+                onClick={() => {
+                  if (!isPremium) {
+                    toast.error(lang === "zh" ? "升級 Premium 以解鎖" : "Upgrade to Premium to unlock");
+                    return;
                   }
-                  return (
-                    <>
-                      <DropdownMenuItem disabled={!splits || splits.length === 0} onClick={() => doShare("laps")}>
-                        <span className="flex items-center gap-2 w-full">
-                          <LayoutList size={12} className="text-primary" />
-                          {lang === "zh" ? "分享分段" : "Share splits"}
-                          {!isPremium && <Lock size={12} className="ml-auto text-muted-foreground" />}
-                        </span>
-                      </DropdownMenuItem>
-                      {repsItem}
-                    </>
-                  );
-               })()}
+                  setShareSplitsOpen(true);
+                }}
+              >
+                <span className="flex items-center gap-2 w-full">
+                  <LayoutList size={12} className="text-primary" />
+                  {lang === "zh" ? "分享分段" : "Share splits"}
+                  {!isPremium && <Lock size={12} className="ml-auto text-muted-foreground" />}
+                </span>
+              </DropdownMenuItem>
               <DropdownMenuItem
                 disabled={!chartData || chartData.length < 2}
                 onClick={() => {
@@ -1260,6 +1205,67 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+        <AlertDialog open={shareSplitsOpen} onOpenChange={setShareSplitsOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>{lang === "zh" ? "分享哪一種分段？" : "Which splits do you want to share?"}</AlertDialogTitle>
+              <AlertDialogDescription>
+                {lang === "zh" ? "選擇要生成的分段圖。" : "Pick the split view to put on the share card."}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            {(() => {
+              const lapDists = (splits || []).map((s) => s.distance || 0).filter((d) => d > 50);
+              const avgLap = lapDists.length ? lapDists.reduce((a, b) => a + b, 0) / lapDists.length : 0;
+              const lapLabel = avgLap > 0 && avgLap < 900
+                ? (lang === "zh" ? "每圈 400 公尺" : "Laps (400 m)")
+                : (lang === "zh" ? "手錶分段" : "Watch laps");
+              const doShare = (mode: "laps" | "km" | "reps") => {
+                const src: any[] | null | undefined = mode === "reps"
+                  ? smartReps?.segments
+                  : mode === "km" && exactKmSplits
+                    ? exactKmSplits
+                    : splits;
+                setShareSplitsOpen(false);
+                if (!src || src.length === 0) return;
+                shareSplits({
+                  name: activityName,
+                  startDate: activity.start_date,
+                  splits: src.map((s) => ({
+                    distance: s.distance,
+                    elapsed_time: s.elapsed_time,
+                    average_speed: s.average_speed,
+                    average_heartrate: s.average_heartrate ?? null,
+                  })),
+                  lang,
+                });
+              };
+              const optionCls = "w-full flex items-center gap-2 px-4 py-3 rounded-xl border border-border text-sm font-medium hover:bg-muted transition-colors text-left";
+              return (
+                <div className="space-y-2">
+                  <button className={optionCls} disabled={!splits || splits.length === 0} onClick={() => doShare("laps")}>
+                    <LayoutList size={14} className="text-primary" />
+                    {lapLabel}
+                  </button>
+                  {exactKmSplits && exactKmSplits.length > 0 && (
+                    <button className={optionCls} onClick={() => doShare("km")}>
+                      <LayoutList size={14} className="text-primary" />
+                      {lang === "zh" ? "每 1 公里" : "1 km splits"}
+                    </button>
+                  )}
+                  {smartReps && (
+                    <button className={optionCls} onClick={() => doShare("reps")}>
+                      <LayoutList size={14} className="text-primary" />
+                      {lang === "zh" ? "智能分段" : "Intervals"}
+                    </button>
+                  )}
+                </div>
+              );
+            })()}
+            <AlertDialogFooter>
+              <AlertDialogCancel>{lang === "zh" ? "取消" : "Cancel"}</AlertDialogCancel>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
         <AlertDialog>
           <AlertDialogTrigger asChild>
             <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-destructive hover:bg-destructive/10 transition-colors">
@@ -1696,7 +1702,7 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
                 : kind === "cooldown"
                   ? (lang === "zh" ? "緩和" : "Cool down")
                   : kind === "rep"
-                    ? `${lang === "zh" ? "間歇" : "Rep"} ${formatRepDistance(rounded ?? Math.round(distMeters))}`
+                    ? formatRepDistance(rounded ?? Math.round(distMeters))
                     : isRest
                       ? (lang === "zh" ? "休息" : "Rest")
                       : (lang === "zh" ? "跑步" : "Run");

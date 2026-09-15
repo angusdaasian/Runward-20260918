@@ -632,6 +632,16 @@ const ActivitiesTab = ({ lang, resetSignal }: Props) => {
   // homepage's latest-only list. The latest activity is identical in both,
   // so the homepage card never swaps mid-render.
   const activities = full.activities.length > 0 ? full.activities : homepage.activities;
+
+  // Feed the run-count signal to the native review prompt and, once the user
+  // has shown real engagement (enough sessions + runs), spend one rating request.
+  useEffect(() => {
+    if (!user?.id) return;
+    trackReviewRunCount(activities.length);
+    if (!fullLoading && activities.length > 0) {
+      import("@/lib/reviewPrompt").then((m) => m.maybeRequestReview());
+    }
+  }, [user?.id, activities.length, fullLoading]);
   const [selectedActivity, setSelectedActivity] = useState<StravaActivity | null>(null);
   const [dateSheet, setDateSheet] = useState<{
     dateLabel: string;

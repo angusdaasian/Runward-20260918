@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -9,9 +9,11 @@ import {
 } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
+import { Slider } from "@/components/ui/slider";
 import { Lang } from "@/lib/i18n";
 import { shareCustom, CustomShareSelections, CustomShareInput } from "@/lib/shareActivity";
-import { Sparkles } from "lucide-react";
+import { AlignCenter, AlignStartVertical, AlignEndVertical, RotateCcw, Sparkles } from "lucide-react";
+import appIcon from "@/assets/app-icon.png";
 
 interface Props {
   open: boolean;
@@ -43,6 +45,7 @@ const CustomShareDialog = ({ open, onOpenChange, lang, data, available, photos =
 
   const [sel, setSel] = useState<CustomShareSelections>({
     photoOverlay: false,
+    overlayTransform: { x: 0.5, y: 0.76, scale: 1 },
     route: available.route,
     splits: available.splits,
     hrZones: available.hrZones,
@@ -63,6 +66,34 @@ const CustomShareDialog = ({ open, onOpenChange, lang, data, available, photos =
   });
 
   const [submitting, setSubmitting] = useState(false);
+  const previewRef = useRef<HTMLDivElement>(null);
+  const dragPointerRef = useRef<number | null>(null);
+
+  const overlay = sel.overlayTransform ?? { x: 0.5, y: 0.76, scale: 1 };
+  const setOverlay = (next: Partial<NonNullable<CustomShareSelections["overlayTransform"]>>) =>
+    setSel((s) => ({
+      ...s,
+      overlayTransform: { ...(s.overlayTransform ?? { x: 0.5, y: 0.76, scale: 1 }), ...next },
+    }));
+
+  const moveOverlay = (clientX: number, clientY: number) => {
+    const rect = previewRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const minX = 0.36 * overlay.scale + 0.025;
+    const halfY = 0.14 * overlay.scale;
+    const x = Math.max(minX, Math.min(1 - minX, (clientX - rect.left) / rect.width));
+    const y = Math.max(0.16 + halfY, Math.min(0.97 - halfY, (clientY - rect.top) / rect.height));
+    setOverlay({ x, y });
+  };
+
+  const previewStats = [
+    sel.stats.totalTime ? { label: t("Time", "時間"), value: formatPreviewTime(data.movingTimeSeconds) } : null,
+    sel.stats.pace && data.averageSpeed > 0 ? { label: t("Pace", "配速"), value: formatPreviewPace(data.averageSpeed) } : null,
+    sel.stats.avgHr && data.averageHeartrate ? { label: t("Avg HR", "平均心率"), value: `${Math.round(data.averageHeartrate)}` } : null,
+    sel.stats.maxHr && data.maxHeartrate ? { label: t("Max HR", "最大心率"), value: `${Math.round(data.maxHeartrate)}` } : null,
+    sel.stats.elevation && data.elevationGainMeters ? { label: t("Elev", "爬升"), value: `${Math.round(data.elevationGainMeters)} m` } : null,
+    sel.stats.calories && data.calories ? { label: t("Calories", "卡路里"), value: `${Math.round(data.calories)}` } : null,
+  ].filter((stat): stat is { label: string; value: string } => stat !== null).slice(0, 6);
 
   const toggleStat = (k: keyof CustomShareSelections["stats"]) =>
     setSel((s) => ({ ...s, stats: { ...s.stats, [k]: !s.stats[k] } }));
@@ -153,6 +184,101 @@ const CustomShareDialog = ({ open, onOpenChange, lang, data, available, photos =
                       "數據與 Runward 標誌會疊在照片上，分段、圖表與心率區間不會顯示。",
                     )}
                   </p>
+                  {photoUrl && (
+                    <div className="mt-3 space-y-3">
+                      <div
+                        ref={previewRef}
+                        className="relative mx-auto aspect-[4/5] w-full max-w-[300px] overflow-hidden rounded-lg bg-muted select-none"
+                      >
+                        <img src={photoUrl} alt={t("Share card preview", "分享卡片預覽")} className="absolute inset-0 h-full w-full object-cover" />
+                        <div className="absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-foreground/60 to-transparent" />
+                        <div className="absolute right-3 top-3 flex items-center gap-1.5 text-background drop-shadow-md">
+                          <span className="font-display text-xs font-bold">Runward</span>
+                          <img src={appIcon} alt="" className="h-6 w-6 rounded-md" />
+                        </div>
+                        <div
+                          role="button"
+                          tabIndex={0}
+                          aria-label={t("Drag to move stats", "拖曳以移動數據")}
+                          className="absolute left-1/2 top-1/2 w-[70%] touch-none cursor-move rounded-lg bg-foreground/55 p-3 text-background shadow-lg ring-1 ring-background/30 backdrop-blur-[2px]"
+                          style={{
+                            left: `${overlay.x * 100}%`,
+                            top: `${overlay.y * 100}%`,
+                            transform: `translate(-50%, -50%) scale(${overlay.scale})`,
+                          }}
+                          onPointerDown={(event) => {
+                            dragPointerRef.current = event.pointerId;
+                            event.currentTarget.setPointerCapture(event.pointerId);
+                            moveOverlay(event.clientX, event.clientY);
+                          }}
+                          onPointerMove={(event) => {
+                            if (dragPointerRef.current === event.pointerId) moveOverlay(event.clientX, event.clientY);
+                          }}
+                          onPointerUp={(event) => {
+                            if (dragPointerRef.current === event.pointerId) dragPointerRef.current = null;
+                          }}
+                          onPointerCancel={() => { dragPointerRef.current = null; }}
+                          onKeyDown={(event) => {
+                            const step = event.shiftKey ? 0.05 : 0.02;
+                            if (event.key === "ArrowLeft") setOverlay({ x: Math.max(0.3, overlay.x - step) });
+                            else if (event.key === "ArrowRight") setOverlay({ x: Math.min(0.7, overlay.x + step) });
+                            else if (event.key === "ArrowUp") setOverlay({ y: Math.max(0.28, overlay.y - step) });
+                            else if (event.key === "ArrowDown") setOverlay({ y: Math.min(0.86, overlay.y + step) });
+                            else return;
+                            event.preventDefault();
+                          }}
+                        >
+                          <div className="truncate text-[10px] font-semibold opacity-85">{data.name}</div>
+                          {sel.stats.distance && (
+                            <div className="mt-1 flex items-baseline gap-1 font-display">
+                              <span className="text-4xl font-bold leading-none">{(data.distanceMeters / 1000).toFixed(2)}</span>
+                              <span className="text-sm font-semibold opacity-80">km</span>
+                            </div>
+                          )}
+                          {previewStats.length > 0 && (
+                            <div className="mt-2 grid grid-cols-3 gap-x-2 gap-y-1.5">
+                              {previewStats.map((stat) => (
+                                <div key={stat.label} className="min-w-0">
+                                  <div className="truncate text-[7px] font-semibold uppercase opacity-65">{stat.label}</div>
+                                  <div className="truncate text-xs font-bold">{stat.value}</div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="font-medium">{t("Size", "大小")}</span>
+                          <span className="tabular-nums text-muted-foreground">{Math.round(overlay.scale * 100)}%</span>
+                        </div>
+                        <Slider
+                          aria-label={t("Stats size", "數據大小")}
+                          min={65}
+                          max={115}
+                          step={5}
+                          value={[Math.round(overlay.scale * 100)]}
+                          onValueChange={([value]) => setOverlay({ scale: value / 100 })}
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-4 gap-1.5">
+                        <Button type="button" variant="outline" size="sm" className="px-2" onClick={() => setOverlay({ x: 0.5, y: 0.3 })}>
+                          <AlignStartVertical /> {t("Top", "頂部")}
+                        </Button>
+                        <Button type="button" variant="outline" size="sm" className="px-2" onClick={() => setOverlay({ x: 0.5, y: 0.55 })}>
+                          <AlignCenter /> {t("Middle", "中間")}
+                        </Button>
+                        <Button type="button" variant="outline" size="sm" className="px-2" onClick={() => setOverlay({ x: 0.5, y: 0.78 })}>
+                          <AlignEndVertical /> {t("Bottom", "底部")}
+                        </Button>
+                        <Button type="button" variant="ghost" size="sm" className="px-2" onClick={() => setOverlay({ x: 0.5, y: 0.76, scale: 1 })}>
+                          <RotateCcw /> {t("Reset", "重設")}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </>
               )}
             </div>
@@ -267,3 +393,17 @@ const CustomShareDialog = ({ open, onOpenChange, lang, data, available, photos =
 };
 
 export default CustomShareDialog;
+
+function formatPreviewTime(seconds: number) {
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = Math.floor(seconds % 60);
+  return hours > 0
+    ? `${hours}:${String(minutes).padStart(2, "0")}:${String(secs).padStart(2, "0")}`
+    : `${minutes}:${String(secs).padStart(2, "0")}`;
+}
+
+function formatPreviewPace(speed: number) {
+  const seconds = 1000 / speed;
+  return `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, "0")}`;
+}

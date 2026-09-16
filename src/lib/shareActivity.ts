@@ -1592,6 +1592,12 @@ export type ZonePctLite = { z1: number; z2: number; z3: number; z4: number; z5: 
 export interface CustomShareSelections {
   /** Use an uploaded run photo as the card background with the stats overlaid. */
   photoOverlay?: boolean;
+  /** Normalized center position and proportional size of the photo stats block. */
+  overlayTransform?: {
+    x: number;
+    y: number;
+    scale: number;
+  };
   route: boolean;
   splits: boolean;
   hrZones: boolean;
@@ -2185,19 +2191,12 @@ async function renderPhotoCard(input: CustomShareInput): Promise<Blob> {
     console.warn("[PhotoShare] photo load failed:", err);
   }
 
-  // Top scrim (for the logo) + bottom scrim (for the stats)
+  // Top scrim keeps the fixed brand readable.
   const topGrad = ctx.createLinearGradient(0, 0, 0, 300);
   topGrad.addColorStop(0, "rgba(0,0,0,0.55)");
   topGrad.addColorStop(1, "rgba(0,0,0,0)");
   ctx.fillStyle = topGrad;
   ctx.fillRect(0, 0, W, 300);
-
-  const botGrad = ctx.createLinearGradient(0, H - 700, 0, H);
-  botGrad.addColorStop(0, "rgba(0,0,0,0)");
-  botGrad.addColorStop(0.45, "rgba(0,0,0,0.55)");
-  botGrad.addColorStop(1, "rgba(0,0,0,0.9)");
-  ctx.fillStyle = botGrad;
-  ctx.fillRect(0, H - 700, W, 700);
 
   const padX = 64;
 
@@ -2249,33 +2248,61 @@ async function renderPhotoCard(input: CustomShareInput): Promise<Blob> {
   const rowH = 132;
   const heroH = sel.stats.distance ? 190 : 0;
   const blockH = heroH + rows * rowH;
-  let y = H - 96 - blockH;
+  const contentH = 56 + blockH;
+  const transform = sel.overlayTransform ?? { x: 0.5, y: 0.76, scale: 1 };
+  const scale = Math.max(0.65, Math.min(1.15, transform.scale));
+  const blockW = 760;
+  const blockX = (W - blockW) / 2;
+  const contentX = blockX + 24;
+  const contentW = blockW - 48;
+  const halfW = (blockW * scale) / 2;
+  const halfH = (contentH * scale) / 2;
+  const centerX = Math.max(halfW + 28, Math.min(W - halfW - 28, transform.x * W));
+  const centerY = Math.max(halfH + 180, Math.min(H - halfH - 44, transform.y * H));
+
+  ctx.save();
+  ctx.translate(centerX, centerY);
+  ctx.scale(scale, scale);
+  ctx.translate(-W / 2, -contentH / 2);
+
+  // A local scrim moves with the stats, preserving contrast anywhere on the photo.
+  const scrimY = -44;
+  const scrimH = contentH + 88;
+  const scrim = ctx.createLinearGradient(0, scrimY, 0, scrimY + scrimH);
+  scrim.addColorStop(0, "rgba(0,0,0,0.08)");
+  scrim.addColorStop(0.35, "rgba(0,0,0,0.42)");
+  scrim.addColorStop(1, "rgba(0,0,0,0.68)");
+  ctx.fillStyle = scrim;
+  roundedRect(ctx, blockX, scrimY, blockW, scrimH, 32);
+  ctx.fill();
+
+  let y = 56;
 
   // Activity name above the numbers
   ctx.textBaseline = "top";
   ctx.fillStyle = "rgba(255,255,255,0.85)";
   ctx.font = `600 30px ${FONT_TEXT}`;
-  const nameY = y - 56;
-  wrapText(ctx, input.name, padX, nameY, W - padX * 2, 38, 1);
+  const nameY = 0;
+  wrapText(ctx, input.name, contentX, nameY, contentW, 38, 1);
 
   if (sel.stats.distance) {
     ctx.fillStyle = "#FFFFFF";
     ctx.font = `800 148px ${FONT_DISPLAY}`;
     ctx.textBaseline = "top";
     const distTxt = fmtDistance(input.distanceMeters);
-    ctx.fillText(distTxt, padX, y);
+    ctx.fillText(distTxt, contentX, y);
     const distW = ctx.measureText(distTxt).width;
     ctx.fillStyle = "rgba(255,255,255,0.75)";
     ctx.font = `700 40px ${FONT_DISPLAY}`;
-    ctx.fillText(isZh ? "公里" : "km", padX + distW + 16, y + 92);
+    ctx.fillText(isZh ? "公里" : "km", contentX + distW + 16, y + 92);
     y += heroH;
   }
 
-  const colW = (W - padX * 2) / 3;
+  const colW = contentW / 3;
   shown.forEach((s, i) => {
     const col = i % 3;
     const row = Math.floor(i / 3);
-    const sx = padX + col * colW;
+    const sx = contentX + col * colW;
     const sy = y + row * rowH;
     ctx.fillStyle = "rgba(255,255,255,0.65)";
     ctx.font = `600 20px ${FONT_TEXT}`;
@@ -2286,6 +2313,8 @@ async function renderPhotoCard(input: CustomShareInput): Promise<Blob> {
     ctx.fillText(s.value, sx, sy + 30);
   });
 
+  ctx.restore();
+
   // Route line overlay (optional, bottom-right corner)
   if (sel.route && input.summaryPolyline) {
     try {
@@ -2294,7 +2323,7 @@ async function renderPhotoCard(input: CustomShareInput): Promise<Blob> {
         const boxW = 300;
         const boxH = 200;
         const bx = W - padX - boxW;
-        const by = H - 96 - blockH - 56 - boxH - 24;
+        const by = H - 96 - boxH;
         const lats = coords.map((c) => c[0]);
         const lngs = coords.map((c) => c[1]);
         const minLat = Math.min(...lats), maxLat = Math.max(...lats);

@@ -66,7 +66,7 @@ function formatCountdown(expiresAt: Date): string {
   return `${hours}h ${mins}m`;
 }
 
-const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps, onNavigateMessaging, onNavigateShoes }: Props) => {
+const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps, onNavigateMessaging }: Props) => {
   // Mandatory skeleton on every mount
   const [skeletonDone, setSkeletonDone] = useState(false);
   useEffect(() => {
@@ -79,7 +79,7 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps, onNavig
   const [showDefs, setShowDefs] = useState(false);
   const [showStartGuide, setShowStartGuide] = useState(false);
   const [showFuelGuide, setShowFuelGuide] = useState(false);
-  const { isPremium, expiresAt, plan, rcEntitlement } = usePremium();
+  const { isPremium, expiresAt } = usePremium();
   const { user, signOut } = useAuth();
   const { isAdmin, loading: adminLoading } = useAdmin();
   const { toast } = useToast();
@@ -151,7 +151,6 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps, onNavig
   const [countdown, setCountdown] = useState("");
   const [activityNotifications, setActivityNotifications] = useState(true);
   const [notifLoading, setNotifLoading] = useState(false);
-  const { refreshSubscription } = usePremium();
   const currentRoute = `${location.pathname}${location.search}`;
   const [darkMode, setDarkMode] = useState(() => {
     return localStorage.getItem("app_theme") === "dark" || document.documentElement.classList.contains("dark");

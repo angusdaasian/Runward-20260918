@@ -269,7 +269,7 @@ export function drawIgHandle(
 }
 
 // Decode Google encoded polyline → [lat, lng] pairs
-function decodePolyline(encoded: string): [number, number][] {
+export function decodePolyline(encoded: string): [number, number][] {
   const points: [number, number][] = [];
   let index = 0, lat = 0, lng = 0;
   while (index < encoded.length) {

@@ -1604,6 +1604,10 @@ export interface CustomShareSelections {
   overlayTransform?: OverlayTransform;
   /** Normalized placement of the splits block on the photo card. */
   splitsTransform?: OverlayTransform;
+  /** Normalized placement of the HR-zones block on the photo card. */
+  zonesTransform?: OverlayTransform;
+  /** Normalized placement of the route outline on the photo card. */
+  routeTransform?: OverlayTransform;
   /** Normalized placement of each chart block on the photo card. */
   chartTransforms?: Partial<Record<PhotoChartKind, OverlayTransform>>;
   route: boolean;

@@ -92,6 +92,45 @@ const CustomShareDialog = ({ open, onOpenChange, lang, data, available, photos =
   const isZh = lang === "zh";
   const t = (en: string, zh: string) => (isZh ? zh : en);
 
+  /**
+   * Route, splits, zones and chart data come from streams that can briefly be
+   * empty while they refetch (e.g. right after sharing). Remember the last
+   * non-empty value so selected blocks never vanish from the card.
+   */
+  const stickyPolyline = useSticky(data.summaryPolyline ?? null);
+  const stickyZones = useSticky(data.hrZones ?? null);
+  const stickyChart = useSticky(data.chartData && data.chartData.length ? data.chartData : null);
+  const stickySplits = useSticky(data.splits && data.splits.length ? data.splits : null);
+  const ss = useSticky(
+    splitSets && (splitSets.laps?.length || splitSets.km?.length || splitSets.reps?.length)
+      ? splitSets
+      : null,
+  );
+
+  const d = useMemo(
+    () => ({
+      ...data,
+      summaryPolyline: data.summaryPolyline ?? stickyPolyline,
+      hrZones: data.hrZones ?? stickyZones,
+      chartData: data.chartData?.length ? data.chartData : stickyChart ?? [],
+      splits: data.splits?.length ? data.splits : stickySplits ?? [],
+    }),
+    [data, stickyPolyline, stickyZones, stickyChart, stickySplits],
+  );
+
+  const hasChart = (key: "pace" | "heartrate" | "altitude") =>
+    (d.chartData || []).some((r) => typeof r[key] === "number" && (key === "altitude" || (r[key] as number) > 0));
+
+  const av = {
+    ...available,
+    route: available.route || !!d.summaryPolyline,
+    splits: available.splits || (d.splits?.length ?? 0) > 0,
+    hrZones: available.hrZones || !!d.hrZones,
+    chartPace: available.chartPace || hasChart("pace"),
+    chartHr: available.chartHr || hasChart("heartrate"),
+    chartAlt: available.chartAlt || hasChart("altitude"),
+  };
+
   const [photoId, setPhotoId] = useState<string | null>(null);
   const photoUrl = photos.find((p) => p.id === photoId)?.url || null;
 

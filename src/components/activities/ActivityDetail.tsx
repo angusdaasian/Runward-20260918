@@ -175,6 +175,7 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
   const needsRpe = isAppleHealth || isGarmin || isTerraActivity || isCoros;
   const dbTable = isTerraActivity ? "terra_activities" : isAppleHealth ? "apple_health_activities" : isGarmin || isCoros ? "garmin_activities" : "strava_activities";
   const isRunningActivity = isRunning(activity.sport_type);
+  const activityPhotos = useActivityPhotos(String(activity.id), activity.source || "strava");
 
   // Per-activity training score (VDOT) — computed from this activity's distance & time
   const activityScore = useMemo(() => {

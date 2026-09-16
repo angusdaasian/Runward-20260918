@@ -78,9 +78,10 @@ interface ProfileSectionProps {
   lang: Lang;
   subpage?: ProfileSubpage;
   onNavigate?: (sub: ProfileSubpage) => void;
+  compact?: boolean;
 }
 
-const ProfileSection = ({ lang, subpage = "main", onNavigate }: ProfileSectionProps) => {
+const ProfileSection = ({ lang, subpage = "main", onNavigate, compact = false }: ProfileSectionProps) => {
   const { user, signOut } = useAuth();
   const { toast } = useToast();
   const { activities } = useActivities();
@@ -786,6 +787,40 @@ const ProfileSection = ({ lang, subpage = "main", onNavigate }: ProfileSectionPr
             </SelectContent>
           </Select>
         </div>
+      </div>
+    );
+  }
+
+  if (compact) {
+    return (
+      <div className="flex items-center gap-4 py-2">
+        <Avatar className="h-16 w-16 rounded-2xl ring-2 ring-primary/20">
+          <AvatarImage src={profile?.avatar_url || undefined} className="rounded-2xl" />
+          <AvatarFallback className="rounded-2xl text-xl font-display font-bold bg-primary text-primary-foreground">
+            {(profile?.display_name || "U")[0].toUpperCase()}
+          </AvatarFallback>
+        </Avatar>
+        <div className="min-w-0 flex-1">
+          <h1 className="truncate font-display text-xl font-bold text-foreground">
+            {profile?.display_name || (lang === "zh" ? "使用者" : "User")}
+          </h1>
+          <p className="mt-0.5 text-sm text-muted-foreground">
+            {user?.created_at
+              ? (lang === "zh"
+                ? `加入於 ${new Date(user.created_at).toLocaleDateString("zh-TW", { year: "numeric", month: "long" })}`
+                : `Joined ${new Date(user.created_at).toLocaleDateString("en-US", { year: "numeric", month: "short" })}`)
+              : (lang === "zh" ? "Runward 跑者" : "Runward runner")}
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          size="icon"
+          className="h-10 w-10 shrink-0 rounded-xl"
+          onClick={() => onNavigate?.("edit-profile")}
+          aria-label={lang === "zh" ? "編輯個人資料" : "Edit profile"}
+        >
+          <Pencil size={17} />
+        </Button>
       </div>
     );
   }

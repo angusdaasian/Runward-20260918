@@ -12,8 +12,8 @@ export default {
     },
     extend: {
       fontFamily: {
-        display: ["Space Grotesk", "sans-serif"],
-        body: ["Inter", "sans-serif"],
+        display: ["Outfit", "Avenir Next", "sans-serif"],
+        body: ["Figtree", "Avenir Next", "sans-serif"],
       },
       colors: {
         border: "hsl(var(--border))",

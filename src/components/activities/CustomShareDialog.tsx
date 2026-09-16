@@ -214,6 +214,8 @@ const CustomShareDialog = ({ open, onOpenChange, lang, data, available, photos =
   const overlayKeys: OverlayKey[] = [
     "stats",
     ...(splitsOnPhoto ? (["splits"] as OverlayKey[]) : []),
+    ...(zonesOnPhoto ? (["zones"] as OverlayKey[]) : []),
+    ...(routeOnPhoto ? (["route"] as OverlayKey[]) : []),
     ...chartsOnPhoto.map((c) => `chart:${c.kind}` as OverlayKey),
   ];
 
@@ -224,12 +226,18 @@ const CustomShareDialog = ({ open, onOpenChange, lang, data, available, photos =
   const transformOf = (key: OverlayKey): OverlayTransform => {
     const kind = chartKindOf(key);
     if (kind) return chartTransform(kind);
-    return key === "splits" ? splitsOverlay : statsOverlay;
+    if (key === "splits") return splitsOverlay;
+    if (key === "zones") return zonesOverlay;
+    if (key === "route") return routeOverlay;
+    return statsOverlay;
   };
   const defaultOf = (key: OverlayKey): OverlayTransform => {
     const kind = chartKindOf(key);
     if (kind) return DEFAULT_CHART_TRANSFORMS[kind];
-    return key === "splits" ? DEFAULT_SPLITS_TRANSFORM : DEFAULT_STATS_TRANSFORM;
+    if (key === "splits") return DEFAULT_SPLITS_TRANSFORM;
+    if (key === "zones") return DEFAULT_ZONES_TRANSFORM;
+    if (key === "route") return DEFAULT_ROUTE_TRANSFORM;
+    return DEFAULT_STATS_TRANSFORM;
   };
   const activeTransform = transformOf(activeOverlay);
 
@@ -242,6 +250,12 @@ const CustomShareDialog = ({ open, onOpenChange, lang, data, available, photos =
       }
       if (key === "splits") {
         return { ...s, splitsTransform: { ...(s.splitsTransform ?? DEFAULT_SPLITS_TRANSFORM), ...next } };
+      }
+      if (key === "zones") {
+        return { ...s, zonesTransform: { ...(s.zonesTransform ?? DEFAULT_ZONES_TRANSFORM), ...next } };
+      }
+      if (key === "route") {
+        return { ...s, routeTransform: { ...(s.routeTransform ?? DEFAULT_ROUTE_TRANSFORM), ...next } };
       }
       return { ...s, overlayTransform: { ...(s.overlayTransform ?? DEFAULT_STATS_TRANSFORM), ...next } };
     });
@@ -260,6 +274,12 @@ const CustomShareDialog = ({ open, onOpenChange, lang, data, available, photos =
         hx: ((splitsLayout.blockW * s) / PHOTO_CARD_W) / 2,
         hy: ((splitsLayout.blockH * s) / 1350) / 2,
       };
+    }
+    if (key === "zones") {
+      return { hx: ((PHOTO_ZONES_W * scale) / PHOTO_CARD_W) / 2, hy: ((PHOTO_ZONES_H * scale) / 1350) / 2 };
+    }
+    if (key === "route") {
+      return { hx: ((PHOTO_ROUTE_W * scale) / PHOTO_CARD_W) / 2, hy: ((PHOTO_ROUTE_H * scale) / 1350) / 2 };
     }
     return { hx: 0.36 * scale, hy: 0.14 * scale };
   };

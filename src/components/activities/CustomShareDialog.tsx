@@ -26,6 +26,10 @@ import {
   PHOTO_ZONES_ROW_H,
   PHOTO_ROUTE_W,
   PHOTO_ROUTE_H,
+  PHOTO_STATS_W,
+  PHOTO_STATS_TOP,
+  PHOTO_STATS_HERO_H,
+  PHOTO_STATS_ROW_H,
   photoRoutePoints,
   decodePolyline,
   photoSplitsLayout,
@@ -92,32 +96,71 @@ const CustomShareDialog = ({ open, onOpenChange, lang, data, available, photos =
   const isZh = lang === "zh";
   const t = (en: string, zh: string) => (isZh ? zh : en);
 
+  /**
+   * Route, splits, zones and chart data come from streams that can briefly be
+   * empty while they refetch (e.g. right after sharing). Remember the last
+   * non-empty value so selected blocks never vanish from the card.
+   */
+  const stickyPolyline = useSticky(data.summaryPolyline ?? null);
+  const stickyZones = useSticky(data.hrZones ?? null);
+  const stickyChart = useSticky(data.chartData && data.chartData.length ? data.chartData : null);
+  const stickySplits = useSticky(data.splits && data.splits.length ? data.splits : null);
+  const ss = useSticky(
+    splitSets && (splitSets.laps?.length || splitSets.km?.length || splitSets.reps?.length)
+      ? splitSets
+      : null,
+  );
+
+  const d = useMemo(
+    () => ({
+      ...data,
+      summaryPolyline: data.summaryPolyline ?? stickyPolyline,
+      hrZones: data.hrZones ?? stickyZones,
+      chartData: data.chartData?.length ? data.chartData : stickyChart ?? [],
+      splits: data.splits?.length ? data.splits : stickySplits ?? [],
+    }),
+    [data, stickyPolyline, stickyZones, stickyChart, stickySplits],
+  );
+
+  const hasChart = (key: "pace" | "heartrate" | "altitude") =>
+    (d.chartData || []).some((r) => typeof r[key] === "number" && (key === "altitude" || (r[key] as number) > 0));
+
+  const av = {
+    ...available,
+    route: available.route || !!d.summaryPolyline,
+    splits: available.splits || (d.splits?.length ?? 0) > 0,
+    hrZones: available.hrZones || !!d.hrZones,
+    chartPace: available.chartPace || hasChart("pace"),
+    chartHr: available.chartHr || hasChart("heartrate"),
+    chartAlt: available.chartAlt || hasChart("altitude"),
+  };
+
   const [photoId, setPhotoId] = useState<string | null>(null);
   const photoUrl = photos.find((p) => p.id === photoId)?.url || null;
 
   const splitOptions = useMemo(() => {
     const opts: Array<{ mode: SplitsMode; label: string; splits: ShareSplit[] }> = [];
-    if (splitSets?.laps?.length) {
+    if (ss?.laps?.length) {
       opts.push({
         mode: "laps",
         label: splitSets.lapsLabel || t("Watch laps", "手錶分段"),
         splits: splitSets.laps,
       });
     }
-    if (splitSets?.km?.length) {
+    if (ss?.km?.length) {
       opts.push({ mode: "km", label: t("1 km splits", "每 1 公里"), splits: splitSets.km });
     }
-    if (splitSets?.reps?.length) {
+    if (ss?.reps?.length) {
       opts.push({ mode: "reps", label: t("Intervals", "智能分段"), splits: splitSets.reps });
     }
     return opts;
-  }, [splitSets, isZh]);
+  }, [ss, isZh]);
 
   const [splitsMode, setSplitsMode] = useState<SplitsMode>("laps");
   const activeSplits = useMemo(() => {
     const chosen = splitOptions.find((o) => o.mode === splitsMode) || splitOptions[0];
-    return chosen?.splits ?? data.splits ?? [];
-  }, [splitOptions, splitsMode, data.splits]);
+    return chosen?.splits ?? d.splits ?? [];
+  }, [splitOptions, splitsMode, d.splits]);
 
   const [sel, setSel] = useState<CustomShareSelections>({
     photoOverlay: false,
@@ -126,17 +169,17 @@ const CustomShareDialog = ({ open, onOpenChange, lang, data, available, photos =
     zonesTransform: DEFAULT_ZONES_TRANSFORM,
     routeTransform: DEFAULT_ROUTE_TRANSFORM,
     chartTransforms: { ...DEFAULT_CHART_TRANSFORMS },
-    route: available.route,
-    splits: available.splits,
-    hrZones: available.hrZones,
+    route: av.route,
+    splits: av.splits,
+    hrZones: av.hrZones,
     stats: {
       distance: true,
       totalTime: true,
-      pace: available.pace,
-      avgHr: available.avgHr,
+      pace: av.pace,
+      avgHr: av.avgHr,
       maxHr: false,
-      elevation: available.elevation,
-      calories: available.calories,
+      elevation: av.elevation,
+      calories: av.calories,
     },
     charts: {
       pace: false,
@@ -170,11 +213,11 @@ const CustomShareDialog = ({ open, onOpenChange, lang, data, available, photos =
   const chartTransform = (kind: PhotoChartKind) =>
     sel.chartTransforms?.[kind] ?? DEFAULT_CHART_TRANSFORMS[kind];
 
-  const zonesOnPhoto = !!sel.hrZones && !!data.hrZones;
+  const zonesOnPhoto = !!sel.hrZones && !!d.hrZones;
   const routePoints = useMemo(() => {
-    if (!data.summaryPolyline) return null;
+    if (!d.summaryPolyline) return null;
     try {
-      const coords = decodePolyline(data.summaryPolyline);
+      const coords = decodePolyline(d.summaryPolyline);
       if (coords.length < 2) return null;
       return photoRoutePoints(coords, PHOTO_ROUTE_W, PHOTO_ROUTE_H)
         .map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`)
@@ -182,7 +225,7 @@ const CustomShareDialog = ({ open, onOpenChange, lang, data, available, photos =
     } catch {
       return null;
     }
-  }, [data.summaryPolyline]);
+  }, [d.summaryPolyline]);
   const routeOnPhoto = !!sel.route && !!routePoints;
 
 
@@ -191,7 +234,7 @@ const CustomShareDialog = ({ open, onOpenChange, lang, data, available, photos =
   const splitsLayout = photoSplitsLayout(previewSplits.length);
 
   const chartSeries = useMemo(() => {
-    const rows = data.chartData || [];
+    const rows = d.chartData || [];
     const pick = (get: (d: typeof rows[number]) => number | undefined) =>
       rows.map(get).filter((v): v is number => typeof v === "number" && Number.isFinite(v) && v !== 0);
     return {
@@ -201,7 +244,7 @@ const CustomShareDialog = ({ open, onOpenChange, lang, data, available, photos =
         .map((d) => d.altitude)
         .filter((v): v is number => typeof v === "number" && Number.isFinite(v)),
     };
-  }, [data.chartData]);
+  }, [d.chartData]);
 
   const chartsOnPhoto = ([
     { kind: "pace", label: t("PACE", "配速"), values: chartSeries.pace, invert: true },
@@ -261,6 +304,23 @@ const CustomShareDialog = ({ open, onOpenChange, lang, data, available, photos =
     });
   const setActive = (next: Partial<OverlayTransform>) => setOverlay(activeOverlay, next);
 
+  const previewStats = [
+    sel.stats.totalTime ? { label: t("Time", "時間"), value: formatPreviewTime(d.movingTimeSeconds) } : null,
+    sel.stats.pace && d.averageSpeed > 0 ? { label: t("Pace", "配速"), value: formatPreviewPace(d.averageSpeed) } : null,
+    sel.stats.avgHr && d.averageHeartrate ? { label: t("Avg HR", "平均心率"), value: `${Math.round(d.averageHeartrate)}` } : null,
+    sel.stats.maxHr && d.maxHeartrate ? { label: t("Max HR", "最大心率"), value: `${Math.round(d.maxHeartrate)}` } : null,
+    sel.stats.elevation && d.elevationGainMeters ? { label: t("Elev", "爬升"), value: `${Math.round(d.elevationGainMeters)} m` } : null,
+    sel.stats.calories && d.calories ? { label: t("Calories", "卡路里"), value: `${Math.round(d.calories)}` } : null,
+  ].filter((stat): stat is { label: string; value: string } => stat !== null).slice(0, 6);
+
+  /** Stats block geometry in canvas px — identical to the exported card. */
+  const statsRows = Math.ceil(previewStats.length / 3);
+  const statsHeroH = sel.stats.distance ? PHOTO_STATS_HERO_H : 0;
+  const statsBlockH = PHOTO_STATS_TOP + statsHeroH + statsRows * PHOTO_STATS_ROW_H;
+  const statsInnerX = 24;
+  const statsInnerW = PHOTO_STATS_W - 48;
+  const statsColW = statsInnerW / 3;
+
   /** Half size of an overlay as a fraction of the card, used for clamping. */
   const halfFractions = (key: OverlayKey) => {
     const tf = transformOf(key);
@@ -281,7 +341,7 @@ const CustomShareDialog = ({ open, onOpenChange, lang, data, available, photos =
     if (key === "route") {
       return { hx: ((PHOTO_ROUTE_W * scale) / PHOTO_CARD_W) / 2, hy: ((PHOTO_ROUTE_H * scale) / 1350) / 2 };
     }
-    return { hx: 0.36 * scale, hy: 0.14 * scale };
+    return { hx: ((PHOTO_STATS_W * scale) / PHOTO_CARD_W) / 2, hy: ((statsBlockH * scale) / 1350) / 2 };
   };
 
   const moveOverlay = (key: OverlayKey, clientX: number, clientY: number) => {
@@ -296,15 +356,6 @@ const CustomShareDialog = ({ open, onOpenChange, lang, data, available, photos =
     setOverlay(key, { x, y });
   };
 
-  const previewStats = [
-    sel.stats.totalTime ? { label: t("Time", "時間"), value: formatPreviewTime(data.movingTimeSeconds) } : null,
-    sel.stats.pace && data.averageSpeed > 0 ? { label: t("Pace", "配速"), value: formatPreviewPace(data.averageSpeed) } : null,
-    sel.stats.avgHr && data.averageHeartrate ? { label: t("Avg HR", "平均心率"), value: `${Math.round(data.averageHeartrate)}` } : null,
-    sel.stats.maxHr && data.maxHeartrate ? { label: t("Max HR", "最大心率"), value: `${Math.round(data.maxHeartrate)}` } : null,
-    sel.stats.elevation && data.elevationGainMeters ? { label: t("Elev", "爬升"), value: `${Math.round(data.elevationGainMeters)} m` } : null,
-    sel.stats.calories && data.calories ? { label: t("Calories", "卡路里"), value: `${Math.round(data.calories)}` } : null,
-  ].filter((stat): stat is { label: string; value: string } => stat !== null).slice(0, 6);
-
   const toggleStat = (k: keyof CustomShareSelections["stats"]) =>
     setSel((s) => ({ ...s, stats: { ...s.stats, [k]: !s.stats[k] } }));
   const toggleChart = (k: keyof CustomShareSelections["charts"]) =>
@@ -313,8 +364,9 @@ const CustomShareDialog = ({ open, onOpenChange, lang, data, available, photos =
   const handleGenerate = async () => {
     setSubmitting(true);
     try {
-      await shareCustom({ ...data, splits: activeSplits, photoUrl, selections: sel });
-      onOpenChange(false);
+      await shareCustom({ ...d, splits: activeSplits, photoUrl, selections: sel });
+      // Photo cards stay open so the layout survives a second share/regenerate.
+      if (!sel.photoOverlay || !photoUrl) onOpenChange(false);
     } finally {
       setSubmitting(false);
     }
@@ -454,31 +506,59 @@ const CustomShareDialog = ({ open, onOpenChange, lang, data, available, photos =
                           role="button"
                           tabIndex={0}
                           aria-label={t("Drag to move stats", "拖曳以移動數據")}
-                          className={`${blockClass("stats")} w-[70%] p-1`}
+                          className={blockClass("stats")}
                           style={{
                             left: `${statsOverlay.x * 100}%`,
                             top: `${statsOverlay.y * 100}%`,
-                            transform: `translate(-50%, -50%) scale(${statsOverlay.scale})`,
+                            width: PHOTO_STATS_W,
+                            height: statsBlockH,
+                            transform: `translate(-50%, -50%) scale(${f * statsOverlay.scale})`,
                           }}
                           {...dragHandlers("stats")}
                         >
-                          <div className="truncate text-[10px] font-semibold opacity-90">{data.name}</div>
+                          <div
+                            className="absolute overflow-hidden whitespace-nowrap font-semibold opacity-85"
+                            style={{ left: statsInnerX, top: 0, width: statsInnerW, fontSize: 30, lineHeight: "38px" }}
+                          >
+                            {d.name}
+                          </div>
                           {sel.stats.distance && (
-                            <div className="mt-1 flex items-baseline gap-1 font-display">
-                              <span className="text-4xl font-bold leading-none">{(data.distanceMeters / 1000).toFixed(2)}</span>
-                              <span className="text-sm font-semibold opacity-85">km</span>
+                            <div
+                              className="absolute flex items-baseline font-display"
+                              style={{ left: statsInnerX, top: PHOTO_STATS_TOP, gap: 16 }}
+                            >
+                              <span style={{ fontSize: 148, fontWeight: 800, lineHeight: "148px" }}>
+                                {(d.distanceMeters / 1000).toFixed(2)}
+                              </span>
+                              <span className="opacity-75" style={{ fontSize: 40, fontWeight: 700 }}>
+                                {isZh ? "公里" : "km"}
+                              </span>
                             </div>
                           )}
-                          {previewStats.length > 0 && (
-                            <div className="mt-2 grid grid-cols-3 gap-x-2 gap-y-1.5">
-                              {previewStats.map((stat) => (
-                                <div key={stat.label} className="min-w-0">
-                                  <div className="truncate text-[7px] font-semibold uppercase opacity-80">{stat.label}</div>
-                                  <div className="truncate text-xs font-bold">{stat.value}</div>
-                                </div>
-                              ))}
+                          {previewStats.map((stat, i) => (
+                            <div
+                              key={stat.label}
+                              className="absolute"
+                              style={{
+                                left: statsInnerX + (i % 3) * statsColW,
+                                top: PHOTO_STATS_TOP + statsHeroH + Math.floor(i / 3) * PHOTO_STATS_ROW_H,
+                                width: statsColW,
+                              }}
+                            >
+                              <div
+                                className="overflow-hidden whitespace-nowrap font-semibold uppercase opacity-65"
+                                style={{ fontSize: 20, lineHeight: "26px" }}
+                              >
+                                {stat.label}
+                              </div>
+                              <div
+                                className="overflow-hidden whitespace-nowrap font-display"
+                                style={{ fontSize: 56, fontWeight: 800, lineHeight: "62px" }}
+                              >
+                                {stat.value}
+                              </div>
                             </div>
-                          )}
+                          ))}
                         </div>
 
                         {splitsOnPhoto && (
@@ -524,7 +604,7 @@ const CustomShareDialog = ({ open, onOpenChange, lang, data, available, photos =
                           </div>
                         )}
 
-                        {zonesOnPhoto && data.hrZones && (
+                        {zonesOnPhoto && d.hrZones && (
                           <div
                             role="button"
                             tabIndex={0}
@@ -546,7 +626,7 @@ const CustomShareDialog = ({ open, onOpenChange, lang, data, available, photos =
                               {t("HR zones", "心率區間")}
                             </div>
                             {ZONE_ROWS.map((z) => {
-                              const pct = Math.max(0, Math.min(100, Number(data.hrZones![z.key] || 0)));
+                              const pct = Math.max(0, Math.min(100, Number(d.hrZones![z.key] || 0)));
                               return (
                                 <div
                                   key={z.key}
@@ -731,13 +811,13 @@ const CustomShareDialog = ({ open, onOpenChange, lang, data, available, photos =
               label={t("Route map", "路線圖")}
               checked={sel.route}
               onChange={() => setSel((s) => ({ ...s, route: !s.route }))}
-              disabled={!available.route}
+              disabled={!av.route}
             />
             <Row
               label={t("Splits", "分段")}
               checked={sel.splits}
               onChange={() => setSel((s) => ({ ...s, splits: !s.splits }))}
-              disabled={!available.splits}
+              disabled={!av.splits}
             />
             {sel.splits && splitOptions.length > 1 && (
               <div className="ml-6 mb-1 flex flex-wrap gap-1.5">
@@ -758,7 +838,7 @@ const CustomShareDialog = ({ open, onOpenChange, lang, data, available, photos =
               label={t("HR zones chart", "心率區間")}
               checked={sel.hrZones}
               onChange={() => setSel((s) => ({ ...s, hrZones: !s.hrZones }))}
-              disabled={!available.hrZones}
+              disabled={!av.hrZones}
             />
           </div>
 
@@ -780,31 +860,31 @@ const CustomShareDialog = ({ open, onOpenChange, lang, data, available, photos =
               label={t("Pace", "配速")}
               checked={sel.stats.pace}
               onChange={() => toggleStat("pace")}
-              disabled={!available.pace}
+              disabled={!av.pace}
             />
             <Row
               label={t("Average HR", "平均心率")}
               checked={sel.stats.avgHr}
               onChange={() => toggleStat("avgHr")}
-              disabled={!available.avgHr}
+              disabled={!av.avgHr}
             />
             <Row
               label={t("Max HR", "最大心率")}
               checked={sel.stats.maxHr}
               onChange={() => toggleStat("maxHr")}
-              disabled={!available.maxHr}
+              disabled={!av.maxHr}
             />
             <Row
               label={t("Elevation", "爬升")}
               checked={sel.stats.elevation}
               onChange={() => toggleStat("elevation")}
-              disabled={!available.elevation}
+              disabled={!av.elevation}
             />
             <Row
               label={t("Calories", "卡路里")}
               checked={sel.stats.calories}
               onChange={() => toggleStat("calories")}
-              disabled={!available.calories}
+              disabled={!av.calories}
             />
           </div>
 
@@ -816,19 +896,19 @@ const CustomShareDialog = ({ open, onOpenChange, lang, data, available, photos =
               label={t("Pace chart", "配速圖")}
               checked={sel.charts.pace}
               onChange={() => toggleChart("pace")}
-              disabled={!available.chartPace}
+              disabled={!av.chartPace}
             />
             <Row
               label={t("Heart rate chart", "心率圖")}
               checked={sel.charts.hr}
               onChange={() => toggleChart("hr")}
-              disabled={!available.chartHr}
+              disabled={!av.chartHr}
             />
             <Row
               label={t("Elevation chart", "海拔圖")}
               checked={sel.charts.altitude}
               onChange={() => toggleChart("altitude")}
-              disabled={!available.chartAlt}
+              disabled={!av.chartAlt}
             />
           </div>
         </div>
@@ -863,4 +943,11 @@ function formatPreviewPace(speedMps: number) {
   const minutes = Math.floor(secPerKm / 60);
   const secs = Math.round(secPerKm % 60);
   return `${minutes}:${String(secs).padStart(2, "0")}`;
+}
+
+/** Remembers the last non-empty value, so refetching streams never blanks a block. */
+function useSticky<T>(value: T): T {
+  const ref = useRef<T>(value);
+  if (value !== null && value !== undefined) ref.current = value;
+  return ref.current;
 }

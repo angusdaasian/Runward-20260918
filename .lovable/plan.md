@@ -27,7 +27,16 @@ Cost: unknown; a yes saves you the whole native shell, a no costs you only the e
 The watch (via a companion app) uploads to the maker's server, and your server pulls from it. Your app stays a Despia web app. This only exists if the factory offers a data API — many CRP factories do not, and users would still need a second app installed, which defeats the point of selling branded watches.
 Cost: low app-side effort, but depends entirely on the supplier and gives a worse user experience.
 
-Recommendation: send the supplier questions below and the Despia question in parallel, then choose A or B. Treat C as a fallback only.
+**D. Your own "Runward Watch" companion app — recommended.**
+Exactly what you proposed, and it is the cleanest fit. A second, small app of your own (built with Capacitor, released from Xcode and Android Studio) does one job: pair with the watch over Bluetooth and pull activities. It then sends those activities to your existing Runward account over your own API, and your main Despia app keeps working untouched.
+
+Why it is better than A: your main app never has to leave Despia, and the watch code lives in a small app you can update independently. Trade-off: customers install two apps, so the pairing screen and onboarding must make that feel deliberate — the watch box QR points at Runward Watch, and Runward Watch tells them to install Runward for training.
+
+How the link-up works: the companion app signs in with the same Runward account, or the user pastes a short pairing code shown in the main app. From then on the companion uploads in the background to a new endpoint on your server, and the runs appear in Runward like any other provider.
+Cost: the native Bluetooth work is the same as path A, but confined to a tiny app; plus two store listings to maintain and one new server endpoint. No risk to the main app.
+
+Recommendation: path D, and send the supplier questions below in parallel. Only fall back to B or C if the supplier blocks the kit licence.
+
 
 ## The "DaFit" message on the watch
 

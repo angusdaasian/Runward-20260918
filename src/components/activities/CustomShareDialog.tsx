@@ -136,21 +136,21 @@ const CustomShareDialog = ({ open, onOpenChange, lang, data, available, photos =
 
   const splitOptions = useMemo(() => {
     const opts: Array<{ mode: SplitsMode; label: string; splits: ShareSplit[] }> = [];
-    if (splitSets?.laps?.length) {
+    if (ss?.laps?.length) {
       opts.push({
         mode: "laps",
         label: splitSets.lapsLabel || t("Watch laps", "手錶分段"),
         splits: splitSets.laps,
       });
     }
-    if (splitSets?.km?.length) {
+    if (ss?.km?.length) {
       opts.push({ mode: "km", label: t("1 km splits", "每 1 公里"), splits: splitSets.km });
     }
-    if (splitSets?.reps?.length) {
+    if (ss?.reps?.length) {
       opts.push({ mode: "reps", label: t("Intervals", "智能分段"), splits: splitSets.reps });
     }
     return opts;
-  }, [splitSets, isZh]);
+  }, [ss, isZh]);
 
   const [splitsMode, setSplitsMode] = useState<SplitsMode>("laps");
   const activeSplits = useMemo(() => {

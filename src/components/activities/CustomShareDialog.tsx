@@ -358,7 +358,10 @@ const CustomShareDialog = ({ open, onOpenChange, lang, data, available, photos =
     if (kind === "pace") return t("Pace chart", "配速圖");
     if (kind === "hr") return t("HR chart", "心率圖");
     if (kind === "altitude") return t("Elev chart", "海拔圖");
-    return key === "splits" ? t("Splits", "分段") : t("Stats", "數據");
+    if (key === "splits") return t("Splits", "分段");
+    if (key === "zones") return t("HR zones", "心率區間");
+    if (key === "route") return t("Route", "路線");
+    return t("Stats", "數據");
   };
 
   const Row = ({

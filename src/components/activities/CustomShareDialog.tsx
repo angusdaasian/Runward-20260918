@@ -172,13 +172,13 @@ const CustomShareDialog = ({ open, onOpenChange, lang, data, available, photos =
               label={t("Splits", "分段")}
               checked={sel.splits}
               onChange={() => setSel((s) => ({ ...s, splits: !s.splits }))}
-              disabled={!available.splits}
+              disabled={!available.splits || !!sel.photoOverlay}
             />
             <Row
               label={t("HR zones chart", "心率區間")}
               checked={sel.hrZones}
               onChange={() => setSel((s) => ({ ...s, hrZones: !s.hrZones }))}
-              disabled={!available.hrZones}
+              disabled={!available.hrZones || !!sel.photoOverlay}
             />
           </div>
 
@@ -236,19 +236,19 @@ const CustomShareDialog = ({ open, onOpenChange, lang, data, available, photos =
               label={t("Pace chart", "配速圖")}
               checked={sel.charts.pace}
               onChange={() => toggleChart("pace")}
-              disabled={!available.chartPace}
+              disabled={!available.chartPace || !!sel.photoOverlay}
             />
             <Row
               label={t("Heart rate chart", "心率圖")}
               checked={sel.charts.hr}
               onChange={() => toggleChart("hr")}
-              disabled={!available.chartHr}
+              disabled={!available.chartHr || !!sel.photoOverlay}
             />
             <Row
               label={t("Elevation chart", "海拔圖")}
               checked={sel.charts.altitude}
               onChange={() => toggleChart("altitude")}
-              disabled={!available.chartAlt}
+              disabled={!available.chartAlt || !!sel.photoOverlay}
             />
           </div>
         </div>

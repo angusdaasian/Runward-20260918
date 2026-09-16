@@ -2293,12 +2293,29 @@ async function renderPhotoCard(input: CustomShareInput): Promise<Blob> {
   ctx.textAlign = "left";
 
   // ---------- Stats block (bottom) ----------
+  // Keep photo-overlay values compact, matching the editor preview. The
+  // regular share-card format includes localized units, which are too wide
+  // for the three-column transparent overlay.
+  const compactTime = (seconds: number) => {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = Math.floor(seconds % 60);
+    return hours > 0
+      ? `${hours}:${String(minutes).padStart(2, "0")}:${String(secs).padStart(2, "0")}`
+      : `${minutes}:${String(secs).padStart(2, "0")}`;
+  };
+  const compactPace = (speedMps: number) => {
+    const secPerKm = 1000 / speedMps;
+    const minutes = Math.floor(secPerKm / 60);
+    const secs = Math.round(secPerKm % 60);
+    return `${minutes}:${String(secs).padStart(2, "0")}`;
+  };
   const stats: Array<{ label: string; value: string }> = [];
   if (sel.stats.totalTime) {
-    stats.push({ label: isZh ? "時間" : "Time", value: fmtTimeShort(input.movingTimeSeconds, isZh) });
+    stats.push({ label: isZh ? "時間" : "Time", value: compactTime(input.movingTimeSeconds) });
   }
   if (sel.stats.pace && input.averageSpeed > 0) {
-    stats.push({ label: isZh ? "配速" : "Pace", value: fmtPace(input.averageSpeed, isZh) });
+    stats.push({ label: isZh ? "配速" : "Pace", value: compactPace(input.averageSpeed) });
   }
   if (sel.stats.avgHr && input.averageHeartrate) {
     stats.push({ label: isZh ? "平均心率" : "Avg HR", value: `${Math.round(input.averageHeartrate)}` });
@@ -2372,7 +2389,12 @@ async function renderPhotoCard(input: CustomShareInput): Promise<Blob> {
     ctx.textBaseline = "top";
     ctx.fillText(s.label.toUpperCase(), sx, sy);
     ctx.fillStyle = "#FFFFFF";
-    ctx.font = `800 56px ${FONT_DISPLAY}`;
+    let valueSize = 56;
+    ctx.font = `800 ${valueSize}px ${FONT_DISPLAY}`;
+    while (valueSize > 36 && ctx.measureText(s.value).width > colW - 20) {
+      valueSize -= 2;
+      ctx.font = `800 ${valueSize}px ${FONT_DISPLAY}`;
+    }
     ctx.fillText(s.value, sx, sy + 30);
   });
 

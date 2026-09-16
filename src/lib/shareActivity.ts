@@ -2339,7 +2339,9 @@ export async function shareCustom(input: CustomShareInput): Promise<void> {
   const loadingId = toast.loading(isZh ? "正在生成分享圖片..." : "Generating share image...");
   let blob: Blob;
   try {
-    blob = await renderCustomCard(input);
+    blob = input.selections.photoOverlay && input.photoUrl
+      ? await renderPhotoCard(input)
+      : await renderCustomCard(input);
   } catch (err) {
     console.error("[ShareCustom] Render failed:", err);
     toast.dismiss(loadingId);

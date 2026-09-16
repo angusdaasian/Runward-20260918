@@ -1589,15 +1589,19 @@ export async function distributeImageBlob(
 
 export type ZonePctLite = { z1: number; z2: number; z3: number; z4: number; z5: number };
 
+export interface OverlayTransform {
+  x: number;
+  y: number;
+  scale: number;
+}
+
 export interface CustomShareSelections {
   /** Use an uploaded run photo as the card background with the stats overlaid. */
   photoOverlay?: boolean;
   /** Normalized center position and proportional size of the photo stats block. */
-  overlayTransform?: {
-    x: number;
-    y: number;
-    scale: number;
-  };
+  overlayTransform?: OverlayTransform;
+  /** Normalized placement of the splits block on the photo card. */
+  splitsTransform?: OverlayTransform;
   route: boolean;
   splits: boolean;
   hrZones: boolean;

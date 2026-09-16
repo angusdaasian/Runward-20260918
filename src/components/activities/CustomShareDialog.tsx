@@ -165,8 +165,26 @@ const CustomShareDialog = ({ open, onOpenChange, lang, data, available, photos =
 
   const statsOverlay = sel.overlayTransform ?? DEFAULT_STATS_TRANSFORM;
   const splitsOverlay = sel.splitsTransform ?? DEFAULT_SPLITS_TRANSFORM;
+  const zonesOverlay = sel.zonesTransform ?? DEFAULT_ZONES_TRANSFORM;
+  const routeOverlay = sel.routeTransform ?? DEFAULT_ROUTE_TRANSFORM;
   const chartTransform = (kind: PhotoChartKind) =>
     sel.chartTransforms?.[kind] ?? DEFAULT_CHART_TRANSFORMS[kind];
+
+  const zonesOnPhoto = !!sel.hrZones && !!data.hrZones;
+  const routePoints = useMemo(() => {
+    if (!data.summaryPolyline) return null;
+    try {
+      const coords = decodePolyline(data.summaryPolyline);
+      if (coords.length < 2) return null;
+      return photoRoutePoints(coords, PHOTO_ROUTE_W, PHOTO_ROUTE_H)
+        .map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`)
+        .join(" ");
+    } catch {
+      return null;
+    }
+  }, [data.summaryPolyline]);
+  const routeOnPhoto = !!sel.route && !!routePoints;
+
 
   const previewSplits = useMemo(() => filterVisibleSplits(activeSplits), [activeSplits]);
   const splitsOnPhoto = sel.splits && previewSplits.length > 0;

@@ -7,6 +7,23 @@ if (localStorage.getItem("app_theme") === "dark") {
   document.documentElement.classList.add("dark");
 }
 
+// Keep duplicate hostnames (preview/test domains) out of the search index so
+// crawl budget and ranking signals concentrate on runward.site.
+{
+  const host = window.location.hostname;
+  const indexable =
+    host === "runward.site" ||
+    host === "www.runward.site" ||
+    host === "localhost" ||
+    host.endsWith(".lovable.app"); // lovable.app 302s to the canonical host anyway
+  if (!indexable && !document.querySelector('meta[name="robots"]')) {
+    const meta = document.createElement("meta");
+    meta.name = "robots";
+    meta.content = "noindex, follow";
+    document.head.appendChild(meta);
+  }
+}
+
 createRoot(document.getElementById("root")!).render(<App />);
 
 // Defer non-critical image preloading until the browser is idle so it doesn't

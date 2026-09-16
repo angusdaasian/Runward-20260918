@@ -7,7 +7,7 @@
  * Sources: markdown files in src/content/blog plus published rows in the
  * blog_posts table (fetched over the public REST API with the anon key).
  */
-import { readFileSync, readdirSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { readFileSync, readdirSync, existsSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { resolve, join } from "node:path";
 import { marked } from "marked";
 
@@ -261,6 +261,11 @@ async function prerender() {
   const template = readFileSync(distIndex, "utf8");
   const posts = await allPosts();
 
+  // Write flat files (blog.html, blog/<slug>.html) instead of folder index
+  // files, so /blog/<slug> answers 200 directly instead of redirecting to the
+  // trailing-slash folder form. Remove any previously generated folder form.
+  rmSync(resolve("dist/blog"), { recursive: true, force: true });
+
   // /blog index
   const indexBody = `<main><h1>Runward Blog</h1><p>Training guides, pacing strategy and posture notes for runners.</p><ul>${posts
     .map(
@@ -283,10 +288,7 @@ async function prerender() {
     },
   });
   mkdirSync(resolve("dist/blog"), { recursive: true });
-  writeFileSync(
-    resolve("dist/blog/index.html"),
-    renderShell(template, indexHead, indexBody),
-  );
+  writeFileSync(resolve("dist/blog.html"), renderShell(template, indexHead, indexBody));
 
   for (const post of posts) {
     const canonical = `${BASE_URL}/blog/${post.slug}`;
@@ -328,9 +330,7 @@ async function prerender() {
         ? `<img src="${escapeHtml(post.coverImage)}" alt="${escapeHtml(post.title)}" width="1600" height="900" loading="lazy" />`
         : ""
     }${marked.parse(post.content)}</article></main>`;
-    const dir = resolve(`dist/blog/${post.slug}`);
-    mkdirSync(dir, { recursive: true });
-    writeFileSync(join(dir, "index.html"), renderShell(template, head, body));
+    writeFileSync(resolve(`dist/blog/${post.slug}.html`), renderShell(template, head, body));
   }
   console.log(`prerendered /blog and ${posts.length} post page(s)`);
 }

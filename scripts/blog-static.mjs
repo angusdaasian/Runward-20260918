@@ -7,7 +7,7 @@
  * Sources: markdown files in src/content/blog plus published rows in the
  * blog_posts table (fetched over the public REST API with the anon key).
  */
-import { readFileSync, readdirSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { readFileSync, readdirSync, existsSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { resolve, join } from "node:path";
 import { marked } from "marked";
 
@@ -260,6 +260,11 @@ async function prerender() {
   }
   const template = readFileSync(distIndex, "utf8");
   const posts = await allPosts();
+
+  // Write flat files (blog.html, blog/<slug>.html) instead of folder index
+  // files, so /blog/<slug> answers 200 directly instead of redirecting to the
+  // trailing-slash folder form. Remove any previously generated folder form.
+  rmSync(resolve("dist/blog"), { recursive: true, force: true });
 
   // /blog index
   const indexBody = `<main><h1>Runward Blog</h1><p>Training guides, pacing strategy and posture notes for runners.</p><ul>${posts

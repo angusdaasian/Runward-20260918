@@ -79,8 +79,10 @@ const CustomShareDialog = ({ open, onOpenChange, lang, data, available, photos =
   const moveOverlay = (clientX: number, clientY: number) => {
     const rect = previewRef.current?.getBoundingClientRect();
     if (!rect) return;
-    const x = Math.max(0.12, Math.min(0.88, (clientX - rect.left) / rect.width));
-    const y = Math.max(0.24, Math.min(0.88, (clientY - rect.top) / rect.height));
+    const minX = 0.36 * overlay.scale + 0.025;
+    const halfY = 0.14 * overlay.scale;
+    const x = Math.max(minX, Math.min(1 - minX, (clientX - rect.left) / rect.width));
+    const y = Math.max(0.16 + halfY, Math.min(0.97 - halfY, (clientY - rect.top) / rect.height));
     setOverlay({ x, y });
   };
 
@@ -198,7 +200,7 @@ const CustomShareDialog = ({ open, onOpenChange, lang, data, available, photos =
                           role="button"
                           tabIndex={0}
                           aria-label={t("Drag to move stats", "拖曳以移動數據")}
-                          className="absolute left-1/2 top-1/2 w-[88%] touch-none cursor-move rounded-lg bg-foreground/55 p-3 text-background shadow-lg ring-1 ring-background/30 backdrop-blur-[2px]"
+                          className="absolute left-1/2 top-1/2 w-[70%] touch-none cursor-move rounded-lg bg-foreground/55 p-3 text-background shadow-lg ring-1 ring-background/30 backdrop-blur-[2px]"
                           style={{
                             left: `${overlay.x * 100}%`,
                             top: `${overlay.y * 100}%`,
@@ -216,6 +218,15 @@ const CustomShareDialog = ({ open, onOpenChange, lang, data, available, photos =
                             if (dragPointerRef.current === event.pointerId) dragPointerRef.current = null;
                           }}
                           onPointerCancel={() => { dragPointerRef.current = null; }}
+                          onKeyDown={(event) => {
+                            const step = event.shiftKey ? 0.05 : 0.02;
+                            if (event.key === "ArrowLeft") setOverlay({ x: Math.max(0.3, overlay.x - step) });
+                            else if (event.key === "ArrowRight") setOverlay({ x: Math.min(0.7, overlay.x + step) });
+                            else if (event.key === "ArrowUp") setOverlay({ y: Math.max(0.28, overlay.y - step) });
+                            else if (event.key === "ArrowDown") setOverlay({ y: Math.min(0.86, overlay.y + step) });
+                            else return;
+                            event.preventDefault();
+                          }}
                         >
                           <div className="truncate text-[10px] font-semibold opacity-85">{data.name}</div>
                           {sel.stats.distance && (
@@ -245,7 +256,7 @@ const CustomShareDialog = ({ open, onOpenChange, lang, data, available, photos =
                         <Slider
                           aria-label={t("Stats size", "數據大小")}
                           min={65}
-                          max={125}
+                          max={115}
                           step={5}
                           value={[Math.round(overlay.scale * 100)]}
                           onValueChange={([value]) => setOverlay({ scale: value / 100 })}

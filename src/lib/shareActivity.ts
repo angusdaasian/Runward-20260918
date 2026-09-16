@@ -2250,8 +2250,12 @@ async function renderPhotoCard(input: CustomShareInput): Promise<Blob> {
   const blockH = heroH + rows * rowH;
   const contentH = 56 + blockH;
   const transform = sel.overlayTransform ?? { x: 0.5, y: 0.76, scale: 1 };
-  const scale = Math.max(0.65, Math.min(1.25, transform.scale));
-  const halfW = ((W - padX * 2) * scale) / 2;
+  const scale = Math.max(0.65, Math.min(1.15, transform.scale));
+  const blockW = 760;
+  const blockX = (W - blockW) / 2;
+  const contentX = blockX + 24;
+  const contentW = blockW - 48;
+  const halfW = (blockW * scale) / 2;
   const halfH = (contentH * scale) / 2;
   const centerX = Math.max(halfW + 28, Math.min(W - halfW - 28, transform.x * W));
   const centerY = Math.max(halfH + 180, Math.min(H - halfH - 44, transform.y * H));
@@ -2269,7 +2273,7 @@ async function renderPhotoCard(input: CustomShareInput): Promise<Blob> {
   scrim.addColorStop(0.35, "rgba(0,0,0,0.42)");
   scrim.addColorStop(1, "rgba(0,0,0,0.68)");
   ctx.fillStyle = scrim;
-  roundedRect(ctx, 28, scrimY, W - 56, scrimH, 32);
+  roundedRect(ctx, blockX, scrimY, blockW, scrimH, 32);
   ctx.fill();
 
   let y = 56;
@@ -2279,26 +2283,26 @@ async function renderPhotoCard(input: CustomShareInput): Promise<Blob> {
   ctx.fillStyle = "rgba(255,255,255,0.85)";
   ctx.font = `600 30px ${FONT_TEXT}`;
   const nameY = 0;
-  wrapText(ctx, input.name, padX, nameY, W - padX * 2, 38, 1);
+  wrapText(ctx, input.name, contentX, nameY, contentW, 38, 1);
 
   if (sel.stats.distance) {
     ctx.fillStyle = "#FFFFFF";
     ctx.font = `800 148px ${FONT_DISPLAY}`;
     ctx.textBaseline = "top";
     const distTxt = fmtDistance(input.distanceMeters);
-    ctx.fillText(distTxt, padX, y);
+    ctx.fillText(distTxt, contentX, y);
     const distW = ctx.measureText(distTxt).width;
     ctx.fillStyle = "rgba(255,255,255,0.75)";
     ctx.font = `700 40px ${FONT_DISPLAY}`;
-    ctx.fillText(isZh ? "公里" : "km", padX + distW + 16, y + 92);
+    ctx.fillText(isZh ? "公里" : "km", contentX + distW + 16, y + 92);
     y += heroH;
   }
 
-  const colW = (W - padX * 2) / 3;
+  const colW = contentW / 3;
   shown.forEach((s, i) => {
     const col = i % 3;
     const row = Math.floor(i / 3);
-    const sx = padX + col * colW;
+    const sx = contentX + col * colW;
     const sy = y + row * rowH;
     ctx.fillStyle = "rgba(255,255,255,0.65)";
     ctx.font = `600 20px ${FONT_TEXT}`;

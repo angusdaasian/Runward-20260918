@@ -1590,6 +1590,8 @@ export async function distributeImageBlob(
 export type ZonePctLite = { z1: number; z2: number; z3: number; z4: number; z5: number };
 
 export interface CustomShareSelections {
+  /** Use an uploaded run photo as the card background with the stats overlaid. */
+  photoOverlay?: boolean;
   route: boolean;
   splits: boolean;
   hrZones: boolean;
@@ -1631,6 +1633,8 @@ export interface CustomShareInput {
   splits?: ShareSplit[];
   chartData?: CustomShareChartPoint[];
   hrZones?: ZonePctLite | null;
+  /** Local object URL of the chosen run photo (blob URL — keeps the canvas untainted). */
+  photoUrl?: string | null;
   selections: CustomShareSelections;
 }
 

@@ -1658,6 +1658,12 @@ export const PHOTO_ZONES_H = PHOTO_ZONES_HEAD_H + 5 * PHOTO_ZONES_ROW_H;
 export const PHOTO_ROUTE_W = 460;
 export const PHOTO_ROUTE_H = 380;
 
+/** Shared stats-overlay geometry (canvas px) so preview and export match exactly. */
+export const PHOTO_STATS_W = 760;
+export const PHOTO_STATS_TOP = 56;
+export const PHOTO_STATS_HERO_H = 190;
+export const PHOTO_STATS_ROW_H = 132;
+
 /** Fit a decoded polyline into a w×h box (canvas px), shared by preview and export. */
 export function photoRoutePoints(
   coords: [number, number][],

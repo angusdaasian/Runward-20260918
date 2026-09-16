@@ -360,8 +360,9 @@ const CustomShareDialog = ({ open, onOpenChange, lang, data, available, photos =
   const handleGenerate = async () => {
     setSubmitting(true);
     try {
-      await shareCustom({ ...data, splits: activeSplits, photoUrl, selections: sel });
-      onOpenChange(false);
+      await shareCustom({ ...d, splits: activeSplits, photoUrl, selections: sel });
+      // Photo cards stay open so the layout survives a second share/regenerate.
+      if (!sel.photoOverlay || !photoUrl) onOpenChange(false);
     } finally {
       setSubmitting(false);
     }

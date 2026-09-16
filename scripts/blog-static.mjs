@@ -288,10 +288,7 @@ async function prerender() {
     },
   });
   mkdirSync(resolve("dist/blog"), { recursive: true });
-  writeFileSync(
-    resolve("dist/blog/index.html"),
-    renderShell(template, indexHead, indexBody),
-  );
+  writeFileSync(resolve("dist/blog.html"), renderShell(template, indexHead, indexBody));
 
   for (const post of posts) {
     const canonical = `${BASE_URL}/blog/${post.slug}`;
@@ -333,9 +330,7 @@ async function prerender() {
         ? `<img src="${escapeHtml(post.coverImage)}" alt="${escapeHtml(post.title)}" width="1600" height="900" loading="lazy" />`
         : ""
     }${marked.parse(post.content)}</article></main>`;
-    const dir = resolve(`dist/blog/${post.slug}`);
-    mkdirSync(dir, { recursive: true });
-    writeFileSync(join(dir, "index.html"), renderShell(template, head, body));
+    writeFileSync(resolve(`dist/blog/${post.slug}.html`), renderShell(template, head, body));
   }
   console.log(`prerendered /blog and ${posts.length} post page(s)`);
 }

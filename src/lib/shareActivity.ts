@@ -2340,19 +2340,16 @@ async function renderPhotoCard(input: CustomShareInput): Promise<Blob> {
 
   ctx.restore();
 
-  // ---------- Splits block (transparent, independently placed) ----------
-  const photoSplits = sel.splits && input.splits
-    ? input.splits
-        .filter((s) => !((s.distance || 0) < 50 && (s.elapsed_time || 0) < 10))
-        .slice(0, 8)
-    : [];
+  // ---------- Splits block (transparent, independently placed, full list) ----------
+  const photoSplits = sel.splits && input.splits ? filterVisibleSplits(input.splits) : [];
   if (photoSplits.length > 0) {
     const sTransform = sel.splitsTransform ?? { x: 0.5, y: 0.34, scale: 1 };
-    const sScale = Math.max(0.65, Math.min(1.15, sTransform.scale));
-    const sBlockW = 560;
-    const headH = 44;
-    const sRowH = 56;
-    const sBlockH = headH + photoSplits.length * sRowH;
+    const layout = photoSplitsLayout(photoSplits.length);
+    const sScale = Math.max(0.65, Math.min(1.15, sTransform.scale)) * layout.fit;
+    const sBlockW = layout.blockW;
+    const headH = layout.headH;
+    const sRowH = layout.rowH;
+    const sBlockH = layout.blockH;
     const sHalfW = (sBlockW * sScale) / 2;
     const sHalfH = (sBlockH * sScale) / 2;
     const sCenterX = Math.max(sHalfW + 28, Math.min(W - sHalfW - 28, sTransform.x * W));
@@ -2397,6 +2394,92 @@ async function renderPhotoCard(input: CustomShareInput): Promise<Blob> {
     ctx.textAlign = "left";
     ctx.restore();
   }
+
+  // ---------- Chart overlays (transparent, independently placed) ----------
+  const cData = input.chartData || [];
+  const chartDefs: Array<{ kind: PhotoChartKind; on: boolean; label: string; values: number[]; invert: boolean }> = [
+    {
+      kind: "pace",
+      on: !!sel.charts.pace,
+      label: isZh ? "配速" : "PACE",
+      values: cData.map((d) => (typeof d.pace === "number" && d.pace > 0 ? d.pace : NaN)),
+      invert: true,
+    },
+    {
+      kind: "hr",
+      on: !!sel.charts.hr,
+      label: isZh ? "心率" : "HEART RATE",
+      values: cData.map((d) => (typeof d.heartrate === "number" && d.heartrate > 0 ? d.heartrate : NaN)),
+      invert: false,
+    },
+    {
+      kind: "altitude",
+      on: !!sel.charts.altitude,
+      label: isZh ? "海拔" : "ELEVATION",
+      values: cData.map((d) => (typeof d.altitude === "number" ? d.altitude : NaN)),
+      invert: false,
+    },
+  ];
+
+  for (const def of chartDefs) {
+    if (!def.on) continue;
+    const pts = def.values.filter((v) => Number.isFinite(v));
+    if (pts.length < 2) continue;
+    const tf = sel.chartTransforms?.[def.kind] ?? { x: 0.5, y: 0.5, scale: 1 };
+    const cScale = Math.max(0.65, Math.min(1.15, tf.scale));
+    const cw = PHOTO_CHART_W;
+    const ch = PHOTO_CHART_H;
+    const halfW = (cw * cScale) / 2;
+    const halfH = (ch * cScale) / 2;
+    const cx = Math.max(halfW + 28, Math.min(W - halfW - 28, tf.x * W));
+    const cy = Math.max(halfH + 180, Math.min(H - halfH - 44, tf.y * H));
+
+    const min = Math.min(...pts);
+    const max = Math.max(...pts);
+    const span = Math.max(max - min, 1e-6);
+
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.scale(cScale, cScale);
+    ctx.translate(-cw / 2, -ch / 2);
+    ctx.shadowColor = "rgba(0,0,0,0.55)";
+    ctx.shadowBlur = 16;
+    ctx.shadowOffsetY = 2;
+
+    ctx.textBaseline = "top";
+    ctx.textAlign = "left";
+    ctx.fillStyle = "rgba(255,255,255,0.8)";
+    ctx.font = `700 24px ${FONT_TEXT}`;
+    ctx.fillText(def.label, 0, 0);
+
+    const plotY = 46;
+    const plotH = ch - plotY - 10;
+    const xAt = (i: number) => (i / (pts.length - 1)) * cw;
+    const yAt = (v: number) => {
+      const norm = (v - min) / span;
+      const up = def.invert ? norm : 1 - norm;
+      return plotY + up * plotH;
+    };
+
+    ctx.beginPath();
+    pts.forEach((v, i) => (i === 0 ? ctx.moveTo(xAt(i), yAt(v)) : ctx.lineTo(xAt(i), yAt(v))));
+    ctx.strokeStyle = "rgba(255,255,255,0.95)";
+    ctx.lineWidth = 5;
+    ctx.lineJoin = "round";
+    ctx.lineCap = "round";
+    ctx.stroke();
+
+    ctx.shadowColor = "transparent";
+    ctx.lineTo(cw, plotY + plotH);
+    ctx.lineTo(0, plotY + plotH);
+    ctx.closePath();
+    ctx.fillStyle = "rgba(255,255,255,0.18)";
+    ctx.fill();
+
+    ctx.restore();
+  }
+
+
 
 
 

@@ -2269,16 +2269,10 @@ async function renderPhotoCard(input: CustomShareInput): Promise<Blob> {
   ctx.scale(scale, scale);
   ctx.translate(-W / 2, -contentH / 2);
 
-  // A local scrim moves with the stats, preserving contrast anywhere on the photo.
-  const scrimY = -44;
-  const scrimH = contentH + 88;
-  const scrim = ctx.createLinearGradient(0, scrimY, 0, scrimY + scrimH);
-  scrim.addColorStop(0, "rgba(0,0,0,0.08)");
-  scrim.addColorStop(0.35, "rgba(0,0,0,0.42)");
-  scrim.addColorStop(1, "rgba(0,0,0,0.68)");
-  ctx.fillStyle = scrim;
-  roundedRect(ctx, blockX, scrimY, blockW, scrimH, 32);
-  ctx.fill();
+  // Fully transparent block — a soft text shadow keeps it readable on any photo.
+  ctx.shadowColor = "rgba(0,0,0,0.55)";
+  ctx.shadowBlur = 18;
+  ctx.shadowOffsetY = 2;
 
   let y = 56;
 

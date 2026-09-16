@@ -1,4 +1,4 @@
-import { ChevronRight, Crown, Globe, BookOpen, Check, ScanEye, Lock, KeyRound, Clock, Shield, Info, LifeBuoy, Mail, ShieldCheck, Smartphone, Moon, Sun, LogOut, Gift, Ticket, Bell, Footprints, Flame, Trash2 } from "lucide-react";
+import { ChevronRight, ChevronLeft, Crown, Globe, BookOpen, Check, Lock, KeyRound, Clock, Shield, LifeBuoy, ShieldCheck, Smartphone, Moon, Sun, LogOut, Ticket, Bell, Footprints, Flame, Trash2, UserRound, HeartPulse, Cable, Settings2, MessageSquare } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -34,7 +34,6 @@ import PlanComparisonDialog from "@/components/PlanComparisonDialog";
 import StartRunningGuide from "@/components/StartRunningGuide";
 import FuelingGuide from "@/components/FuelingGuide";
 import HomeWidgetDialog from "@/components/HomeWidgetDialog";
-import { MessageSquare } from "lucide-react";
 
 interface Props {
   lang: Lang;
@@ -97,6 +96,7 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps, onNavig
   const [showWidgetDialog, setShowWidgetDialog] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [textScale, setTextScale] = useTextScale();
+  const [hubSection, setHubSection] = useState<"main" | "profile" | "connections" | "guides" | "settings">("main");
 
   const handleDeleteAccount = async () => {
     if (!user || deleting) return;

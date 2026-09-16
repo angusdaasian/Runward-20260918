@@ -14,3 +14,4 @@
 - [x] Private group chat inside each running group (realtime, unread badges, push notifications)
 - [x] Redesign the personal page as a compact category hub
 - [x] Let users drag and resize the stats overlay on activity photo share cards
+- [ ] After publish: resubmit sitemap in Search Console + verify /blog returns 200 (no redirect)

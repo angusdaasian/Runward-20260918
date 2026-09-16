@@ -758,7 +758,7 @@ const CustomShareDialog = ({ open, onOpenChange, lang, data, available, photos =
               label={t("HR zones chart", "心率區間")}
               checked={sel.hrZones}
               onChange={() => setSel((s) => ({ ...s, hrZones: !s.hrZones }))}
-              disabled={!available.hrZones || !!sel.photoOverlay}
+              disabled={!available.hrZones}
             />
           </div>
 

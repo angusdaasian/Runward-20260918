@@ -72,7 +72,7 @@ const CustomShareDialog = ({ open, onOpenChange, lang, data, available, photos =
   const handleGenerate = async () => {
     setSubmitting(true);
     try {
-      await shareCustom({ ...data, selections: sel });
+      await shareCustom({ ...data, photoUrl, selections: sel });
       onOpenChange(false);
     } finally {
       setSubmitting(false);
@@ -115,6 +115,49 @@ const CustomShareDialog = ({ open, onOpenChange, lang, data, available, photos =
         </DialogHeader>
 
         <div className="space-y-4">
+          {photos.length > 0 && (
+            <div>
+              <div className="text-xs font-semibold text-muted-foreground mb-1 uppercase">
+                {t("Photo background", "照片背景")}
+              </div>
+              <Row
+                label={t("Put stats on my photo", "把數據疊在我的照片上")}
+                checked={!!sel.photoOverlay}
+                onChange={() =>
+                  setSel((s) => {
+                    const next = !s.photoOverlay;
+                    if (next && !photoId) setPhotoId(photos[0].id);
+                    return { ...s, photoOverlay: next };
+                  })
+                }
+              />
+              {sel.photoOverlay && (
+                <>
+                  <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
+                    {photos.map((p) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => setPhotoId(p.id)}
+                        className={`h-16 w-16 shrink-0 overflow-hidden rounded-lg border-2 ${
+                          photoId === p.id ? "border-primary" : "border-transparent"
+                        }`}
+                      >
+                        <img src={p.url} alt="" className="h-full w-full object-cover" />
+                      </button>
+                    ))}
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {t(
+                      "Your stats and the Runward logo are laid over the photo. Splits, charts and HR zones are skipped.",
+                      "數據與 Runward 標誌會疊在照片上，分段、圖表與心率區間不會顯示。",
+                    )}
+                  </p>
+                </>
+              )}
+            </div>
+          )}
+
           <div>
             <div className="text-xs font-semibold text-muted-foreground mb-1 uppercase">
               {t("Sections", "區塊")}

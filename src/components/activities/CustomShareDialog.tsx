@@ -75,13 +75,15 @@ interface Props {
 
 const DEFAULT_STATS_TRANSFORM: OverlayTransform = { x: 0.5, y: 0.76, scale: 1 };
 const DEFAULT_SPLITS_TRANSFORM: OverlayTransform = { x: 0.5, y: 0.34, scale: 1 };
+const DEFAULT_ZONES_TRANSFORM: OverlayTransform = { x: 0.5, y: 0.3, scale: 1 };
+const DEFAULT_ROUTE_TRANSFORM: OverlayTransform = { x: 0.5, y: 0.5, scale: 1 };
 const DEFAULT_CHART_TRANSFORMS: Record<PhotoChartKind, OverlayTransform> = {
   pace: { x: 0.5, y: 0.42, scale: 1 },
   hr: { x: 0.5, y: 0.55, scale: 1 },
   altitude: { x: 0.5, y: 0.68, scale: 1 },
 };
 
-type OverlayKey = "stats" | "splits" | "chart:pace" | "chart:hr" | "chart:altitude";
+type OverlayKey = "stats" | "splits" | "zones" | "route" | "chart:pace" | "chart:hr" | "chart:altitude";
 
 const chartKindOf = (key: OverlayKey): PhotoChartKind | null =>
   key.startsWith("chart:") ? (key.slice(6) as PhotoChartKind) : null;

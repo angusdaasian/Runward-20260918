@@ -123,6 +123,8 @@ const CustomShareDialog = ({ open, onOpenChange, lang, data, available, photos =
     photoOverlay: false,
     overlayTransform: DEFAULT_STATS_TRANSFORM,
     splitsTransform: DEFAULT_SPLITS_TRANSFORM,
+    zonesTransform: DEFAULT_ZONES_TRANSFORM,
+    routeTransform: DEFAULT_ROUTE_TRANSFORM,
     chartTransforms: { ...DEFAULT_CHART_TRANSFORMS },
     route: available.route,
     splits: available.splits,

@@ -116,8 +116,8 @@ const CustomShareDialog = ({ open, onOpenChange, lang, data, available, photos =
   const [splitsMode, setSplitsMode] = useState<SplitsMode>("laps");
   const activeSplits = useMemo(() => {
     const chosen = splitOptions.find((o) => o.mode === splitsMode) || splitOptions[0];
-    return chosen?.splits ?? data.splits ?? [];
-  }, [splitOptions, splitsMode, data.splits]);
+    return chosen?.splits ?? d.splits ?? [];
+  }, [splitOptions, splitsMode, d.splits]);
 
   const [sel, setSel] = useState<CustomShareSelections>({
     photoOverlay: false,
@@ -126,17 +126,17 @@ const CustomShareDialog = ({ open, onOpenChange, lang, data, available, photos =
     zonesTransform: DEFAULT_ZONES_TRANSFORM,
     routeTransform: DEFAULT_ROUTE_TRANSFORM,
     chartTransforms: { ...DEFAULT_CHART_TRANSFORMS },
-    route: available.route,
-    splits: available.splits,
-    hrZones: available.hrZones,
+    route: av.route,
+    splits: av.splits,
+    hrZones: av.hrZones,
     stats: {
       distance: true,
       totalTime: true,
-      pace: available.pace,
-      avgHr: available.avgHr,
+      pace: av.pace,
+      avgHr: av.avgHr,
       maxHr: false,
-      elevation: available.elevation,
-      calories: available.calories,
+      elevation: av.elevation,
+      calories: av.calories,
     },
     charts: {
       pace: false,
@@ -170,11 +170,11 @@ const CustomShareDialog = ({ open, onOpenChange, lang, data, available, photos =
   const chartTransform = (kind: PhotoChartKind) =>
     sel.chartTransforms?.[kind] ?? DEFAULT_CHART_TRANSFORMS[kind];
 
-  const zonesOnPhoto = !!sel.hrZones && !!data.hrZones;
+  const zonesOnPhoto = !!sel.hrZones && !!d.hrZones;
   const routePoints = useMemo(() => {
-    if (!data.summaryPolyline) return null;
+    if (!d.summaryPolyline) return null;
     try {
-      const coords = decodePolyline(data.summaryPolyline);
+      const coords = decodePolyline(d.summaryPolyline);
       if (coords.length < 2) return null;
       return photoRoutePoints(coords, PHOTO_ROUTE_W, PHOTO_ROUTE_H)
         .map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`)
@@ -182,7 +182,7 @@ const CustomShareDialog = ({ open, onOpenChange, lang, data, available, photos =
     } catch {
       return null;
     }
-  }, [data.summaryPolyline]);
+  }, [d.summaryPolyline]);
   const routeOnPhoto = !!sel.route && !!routePoints;
 
 
@@ -191,7 +191,7 @@ const CustomShareDialog = ({ open, onOpenChange, lang, data, available, photos =
   const splitsLayout = photoSplitsLayout(previewSplits.length);
 
   const chartSeries = useMemo(() => {
-    const rows = data.chartData || [];
+    const rows = d.chartData || [];
     const pick = (get: (d: typeof rows[number]) => number | undefined) =>
       rows.map(get).filter((v): v is number => typeof v === "number" && Number.isFinite(v) && v !== 0);
     return {
@@ -201,7 +201,7 @@ const CustomShareDialog = ({ open, onOpenChange, lang, data, available, photos =
         .map((d) => d.altitude)
         .filter((v): v is number => typeof v === "number" && Number.isFinite(v)),
     };
-  }, [data.chartData]);
+  }, [d.chartData]);
 
   const chartsOnPhoto = ([
     { kind: "pace", label: t("PACE", "配速"), values: chartSeries.pace, invert: true },
@@ -297,12 +297,12 @@ const CustomShareDialog = ({ open, onOpenChange, lang, data, available, photos =
   };
 
   const previewStats = [
-    sel.stats.totalTime ? { label: t("Time", "時間"), value: formatPreviewTime(data.movingTimeSeconds) } : null,
-    sel.stats.pace && data.averageSpeed > 0 ? { label: t("Pace", "配速"), value: formatPreviewPace(data.averageSpeed) } : null,
-    sel.stats.avgHr && data.averageHeartrate ? { label: t("Avg HR", "平均心率"), value: `${Math.round(data.averageHeartrate)}` } : null,
-    sel.stats.maxHr && data.maxHeartrate ? { label: t("Max HR", "最大心率"), value: `${Math.round(data.maxHeartrate)}` } : null,
-    sel.stats.elevation && data.elevationGainMeters ? { label: t("Elev", "爬升"), value: `${Math.round(data.elevationGainMeters)} m` } : null,
-    sel.stats.calories && data.calories ? { label: t("Calories", "卡路里"), value: `${Math.round(data.calories)}` } : null,
+    sel.stats.totalTime ? { label: t("Time", "時間"), value: formatPreviewTime(d.movingTimeSeconds) } : null,
+    sel.stats.pace && d.averageSpeed > 0 ? { label: t("Pace", "配速"), value: formatPreviewPace(d.averageSpeed) } : null,
+    sel.stats.avgHr && d.averageHeartrate ? { label: t("Avg HR", "平均心率"), value: `${Math.round(d.averageHeartrate)}` } : null,
+    sel.stats.maxHr && d.maxHeartrate ? { label: t("Max HR", "最大心率"), value: `${Math.round(d.maxHeartrate)}` } : null,
+    sel.stats.elevation && d.elevationGainMeters ? { label: t("Elev", "爬升"), value: `${Math.round(d.elevationGainMeters)} m` } : null,
+    sel.stats.calories && d.calories ? { label: t("Calories", "卡路里"), value: `${Math.round(d.calories)}` } : null,
   ].filter((stat): stat is { label: string; value: string } => stat !== null).slice(0, 6);
 
   const toggleStat = (k: keyof CustomShareSelections["stats"]) =>
@@ -462,10 +462,10 @@ const CustomShareDialog = ({ open, onOpenChange, lang, data, available, photos =
                           }}
                           {...dragHandlers("stats")}
                         >
-                          <div className="truncate text-[10px] font-semibold opacity-90">{data.name}</div>
+                          <div className="truncate text-[10px] font-semibold opacity-90">{d.name}</div>
                           {sel.stats.distance && (
                             <div className="mt-1 flex items-baseline gap-1 font-display">
-                              <span className="text-4xl font-bold leading-none">{(data.distanceMeters / 1000).toFixed(2)}</span>
+                              <span className="text-4xl font-bold leading-none">{(d.distanceMeters / 1000).toFixed(2)}</span>
                               <span className="text-sm font-semibold opacity-85">km</span>
                             </div>
                           )}
@@ -524,7 +524,7 @@ const CustomShareDialog = ({ open, onOpenChange, lang, data, available, photos =
                           </div>
                         )}
 
-                        {zonesOnPhoto && data.hrZones && (
+                        {zonesOnPhoto && d.hrZones && (
                           <div
                             role="button"
                             tabIndex={0}
@@ -546,7 +546,7 @@ const CustomShareDialog = ({ open, onOpenChange, lang, data, available, photos =
                               {t("HR zones", "心率區間")}
                             </div>
                             {ZONE_ROWS.map((z) => {
-                              const pct = Math.max(0, Math.min(100, Number(data.hrZones![z.key] || 0)));
+                              const pct = Math.max(0, Math.min(100, Number(d.hrZones![z.key] || 0)));
                               return (
                                 <div
                                   key={z.key}
@@ -731,13 +731,13 @@ const CustomShareDialog = ({ open, onOpenChange, lang, data, available, photos =
               label={t("Route map", "路線圖")}
               checked={sel.route}
               onChange={() => setSel((s) => ({ ...s, route: !s.route }))}
-              disabled={!available.route}
+              disabled={!av.route}
             />
             <Row
               label={t("Splits", "分段")}
               checked={sel.splits}
               onChange={() => setSel((s) => ({ ...s, splits: !s.splits }))}
-              disabled={!available.splits}
+              disabled={!av.splits}
             />
             {sel.splits && splitOptions.length > 1 && (
               <div className="ml-6 mb-1 flex flex-wrap gap-1.5">
@@ -758,7 +758,7 @@ const CustomShareDialog = ({ open, onOpenChange, lang, data, available, photos =
               label={t("HR zones chart", "心率區間")}
               checked={sel.hrZones}
               onChange={() => setSel((s) => ({ ...s, hrZones: !s.hrZones }))}
-              disabled={!available.hrZones}
+              disabled={!av.hrZones}
             />
           </div>
 
@@ -780,31 +780,31 @@ const CustomShareDialog = ({ open, onOpenChange, lang, data, available, photos =
               label={t("Pace", "配速")}
               checked={sel.stats.pace}
               onChange={() => toggleStat("pace")}
-              disabled={!available.pace}
+              disabled={!av.pace}
             />
             <Row
               label={t("Average HR", "平均心率")}
               checked={sel.stats.avgHr}
               onChange={() => toggleStat("avgHr")}
-              disabled={!available.avgHr}
+              disabled={!av.avgHr}
             />
             <Row
               label={t("Max HR", "最大心率")}
               checked={sel.stats.maxHr}
               onChange={() => toggleStat("maxHr")}
-              disabled={!available.maxHr}
+              disabled={!av.maxHr}
             />
             <Row
               label={t("Elevation", "爬升")}
               checked={sel.stats.elevation}
               onChange={() => toggleStat("elevation")}
-              disabled={!available.elevation}
+              disabled={!av.elevation}
             />
             <Row
               label={t("Calories", "卡路里")}
               checked={sel.stats.calories}
               onChange={() => toggleStat("calories")}
-              disabled={!available.calories}
+              disabled={!av.calories}
             />
           </div>
 
@@ -816,19 +816,19 @@ const CustomShareDialog = ({ open, onOpenChange, lang, data, available, photos =
               label={t("Pace chart", "配速圖")}
               checked={sel.charts.pace}
               onChange={() => toggleChart("pace")}
-              disabled={!available.chartPace}
+              disabled={!av.chartPace}
             />
             <Row
               label={t("Heart rate chart", "心率圖")}
               checked={sel.charts.hr}
               onChange={() => toggleChart("hr")}
-              disabled={!available.chartHr}
+              disabled={!av.chartHr}
             />
             <Row
               label={t("Elevation chart", "海拔圖")}
               checked={sel.charts.altitude}
               onChange={() => toggleChart("altitude")}
-              disabled={!available.chartAlt}
+              disabled={!av.chartAlt}
             />
           </div>
         </div>

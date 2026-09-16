@@ -113,6 +113,39 @@ export type Database = {
         }
         Relationships: []
       }
+      activity_photos: {
+        Row: {
+          activity_id: string
+          created_at: string
+          id: string
+          sort_order: number
+          source: string
+          storage_path: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          activity_id: string
+          created_at?: string
+          id?: string
+          sort_order?: number
+          source?: string
+          storage_path: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          activity_id?: string
+          created_at?: string
+          id?: string
+          sort_order?: number
+          source?: string
+          storage_path?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       activity_push_log: {
         Row: {
           activity_key: string

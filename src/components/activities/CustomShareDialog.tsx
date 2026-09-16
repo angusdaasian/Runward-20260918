@@ -31,13 +31,18 @@ interface Props {
     chartHr: boolean;
     chartAlt: boolean;
   };
+  photos?: Array<{ id: string; url: string }>;
 }
 
-const CustomShareDialog = ({ open, onOpenChange, lang, data, available }: Props) => {
+const CustomShareDialog = ({ open, onOpenChange, lang, data, available, photos = [] }: Props) => {
   const isZh = lang === "zh";
   const t = (en: string, zh: string) => (isZh ? zh : en);
 
+  const [photoId, setPhotoId] = useState<string | null>(null);
+  const photoUrl = photos.find((p) => p.id === photoId)?.url || null;
+
   const [sel, setSel] = useState<CustomShareSelections>({
+    photoOverlay: false,
     route: available.route,
     splits: available.splits,
     hrZones: available.hrZones,
@@ -67,7 +72,7 @@ const CustomShareDialog = ({ open, onOpenChange, lang, data, available }: Props)
   const handleGenerate = async () => {
     setSubmitting(true);
     try {
-      await shareCustom({ ...data, selections: sel });
+      await shareCustom({ ...data, photoUrl, selections: sel });
       onOpenChange(false);
     } finally {
       setSubmitting(false);
@@ -110,6 +115,49 @@ const CustomShareDialog = ({ open, onOpenChange, lang, data, available }: Props)
         </DialogHeader>
 
         <div className="space-y-4">
+          {photos.length > 0 && (
+            <div>
+              <div className="text-xs font-semibold text-muted-foreground mb-1 uppercase">
+                {t("Photo background", "照片背景")}
+              </div>
+              <Row
+                label={t("Put stats on my photo", "把數據疊在我的照片上")}
+                checked={!!sel.photoOverlay}
+                onChange={() =>
+                  setSel((s) => {
+                    const next = !s.photoOverlay;
+                    if (next && !photoId) setPhotoId(photos[0].id);
+                    return { ...s, photoOverlay: next };
+                  })
+                }
+              />
+              {sel.photoOverlay && (
+                <>
+                  <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
+                    {photos.map((p) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => setPhotoId(p.id)}
+                        className={`h-16 w-16 shrink-0 overflow-hidden rounded-lg border-2 ${
+                          photoId === p.id ? "border-primary" : "border-transparent"
+                        }`}
+                      >
+                        <img src={p.url} alt="" className="h-full w-full object-cover" />
+                      </button>
+                    ))}
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {t(
+                      "Your stats and the Runward logo are laid over the photo. Splits, charts and HR zones are skipped.",
+                      "數據與 Runward 標誌會疊在照片上，分段、圖表與心率區間不會顯示。",
+                    )}
+                  </p>
+                </>
+              )}
+            </div>
+          )}
+
           <div>
             <div className="text-xs font-semibold text-muted-foreground mb-1 uppercase">
               {t("Sections", "區塊")}
@@ -124,13 +172,13 @@ const CustomShareDialog = ({ open, onOpenChange, lang, data, available }: Props)
               label={t("Splits", "分段")}
               checked={sel.splits}
               onChange={() => setSel((s) => ({ ...s, splits: !s.splits }))}
-              disabled={!available.splits}
+              disabled={!available.splits || !!sel.photoOverlay}
             />
             <Row
               label={t("HR zones chart", "心率區間")}
               checked={sel.hrZones}
               onChange={() => setSel((s) => ({ ...s, hrZones: !s.hrZones }))}
-              disabled={!available.hrZones}
+              disabled={!available.hrZones || !!sel.photoOverlay}
             />
           </div>
 
@@ -188,19 +236,19 @@ const CustomShareDialog = ({ open, onOpenChange, lang, data, available }: Props)
               label={t("Pace chart", "配速圖")}
               checked={sel.charts.pace}
               onChange={() => toggleChart("pace")}
-              disabled={!available.chartPace}
+              disabled={!available.chartPace || !!sel.photoOverlay}
             />
             <Row
               label={t("Heart rate chart", "心率圖")}
               checked={sel.charts.hr}
               onChange={() => toggleChart("hr")}
-              disabled={!available.chartHr}
+              disabled={!available.chartHr || !!sel.photoOverlay}
             />
             <Row
               label={t("Elevation chart", "海拔圖")}
               checked={sel.charts.altitude}
               onChange={() => toggleChart("altitude")}
-              disabled={!available.chartAlt}
+              disabled={!available.chartAlt || !!sel.photoOverlay}
             />
           </div>
         </div>

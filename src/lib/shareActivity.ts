@@ -1590,6 +1590,8 @@ export async function distributeImageBlob(
 export type ZonePctLite = { z1: number; z2: number; z3: number; z4: number; z5: number };
 
 export interface CustomShareSelections {
+  /** Use an uploaded run photo as the card background with the stats overlaid. */
+  photoOverlay?: boolean;
   route: boolean;
   splits: boolean;
   hrZones: boolean;
@@ -1631,6 +1633,8 @@ export interface CustomShareInput {
   splits?: ShareSplit[];
   chartData?: CustomShareChartPoint[];
   hrZones?: ZonePctLite | null;
+  /** Local object URL of the chosen run photo (blob URL — keeps the canvas untainted). */
+  photoUrl?: string | null;
   selections: CustomShareSelections;
 }
 
@@ -2156,12 +2160,188 @@ async function renderCustomCard(input: CustomShareInput): Promise<Blob> {
   });
 }
 
+/**
+ * Garmin-style photo card: the runner's own photo full-bleed, stats overlaid at
+ * the bottom, Runward logo in the top-right corner.
+ */
+async function renderPhotoCard(input: CustomShareInput): Promise<Blob> {
+  const isZh = input.lang === "zh";
+  const sel = input.selections;
+  const W = 1080;
+  const H = 1350;
+
+  const canvas = document.createElement("canvas");
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext("2d")!;
+
+  ctx.fillStyle = "#0F172A";
+  ctx.fillRect(0, 0, W, H);
+
+  try {
+    const photo = await loadImage(input.photoUrl!);
+    drawCover(ctx, photo, 0, 0, W, H);
+  } catch (err) {
+    console.warn("[PhotoShare] photo load failed:", err);
+  }
+
+  // Top scrim (for the logo) + bottom scrim (for the stats)
+  const topGrad = ctx.createLinearGradient(0, 0, 0, 300);
+  topGrad.addColorStop(0, "rgba(0,0,0,0.55)");
+  topGrad.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = topGrad;
+  ctx.fillRect(0, 0, W, 300);
+
+  const botGrad = ctx.createLinearGradient(0, H - 700, 0, H);
+  botGrad.addColorStop(0, "rgba(0,0,0,0)");
+  botGrad.addColorStop(0.45, "rgba(0,0,0,0.55)");
+  botGrad.addColorStop(1, "rgba(0,0,0,0.9)");
+  ctx.fillStyle = botGrad;
+  ctx.fillRect(0, H - 700, W, 700);
+
+  const padX = 64;
+
+  // ---------- Logo (top right) ----------
+  const logoSize = 64;
+  const logoX = W - padX - logoSize;
+  const logoY = 56;
+  try {
+    const icon = await loadImage(appIcon);
+    ctx.save();
+    roundedRect(ctx, logoX, logoY, logoSize, logoSize, 16);
+    ctx.clip();
+    ctx.drawImage(icon, logoX, logoY, logoSize, logoSize);
+    ctx.restore();
+  } catch { /* ignore */ }
+  ctx.textAlign = "right";
+  ctx.textBaseline = "top";
+  ctx.fillStyle = "#FFFFFF";
+  ctx.font = `800 30px ${FONT_DISPLAY}`;
+  ctx.fillText(APP_NAME, logoX - 16, logoY + 6);
+  ctx.fillStyle = "rgba(255,255,255,0.7)";
+  ctx.font = `500 19px ${FONT_TEXT}`;
+  ctx.fillText(fmtDate(input.startDate, input.lang), logoX - 16, logoY + 40);
+  ctx.textAlign = "left";
+
+  // ---------- Stats block (bottom) ----------
+  const stats: Array<{ label: string; value: string }> = [];
+  if (sel.stats.totalTime) {
+    stats.push({ label: isZh ? "時間" : "Time", value: fmtTimeShort(input.movingTimeSeconds, isZh) });
+  }
+  if (sel.stats.pace && input.averageSpeed > 0) {
+    stats.push({ label: isZh ? "配速" : "Pace", value: fmtPace(input.averageSpeed, isZh) });
+  }
+  if (sel.stats.avgHr && input.averageHeartrate) {
+    stats.push({ label: isZh ? "平均心率" : "Avg HR", value: `${Math.round(input.averageHeartrate)}` });
+  }
+  if (sel.stats.maxHr && input.maxHeartrate) {
+    stats.push({ label: isZh ? "最大心率" : "Max HR", value: `${Math.round(input.maxHeartrate)}` });
+  }
+  if (sel.stats.elevation && input.elevationGainMeters) {
+    stats.push({ label: isZh ? "爬升" : "Elev", value: `${Math.round(input.elevationGainMeters)} m` });
+  }
+  if (sel.stats.calories && input.calories) {
+    stats.push({ label: isZh ? "卡路里" : "Calories", value: `${Math.round(input.calories)}` });
+  }
+  const shown = stats.slice(0, 6);
+
+  const rows = Math.ceil(shown.length / 3) || 0;
+  const rowH = 132;
+  const heroH = sel.stats.distance ? 190 : 0;
+  const blockH = heroH + rows * rowH;
+  let y = H - 96 - blockH;
+
+  // Activity name above the numbers
+  ctx.textBaseline = "top";
+  ctx.fillStyle = "rgba(255,255,255,0.85)";
+  ctx.font = `600 30px ${FONT_TEXT}`;
+  const nameY = y - 56;
+  wrapText(ctx, input.name, padX, nameY, W - padX * 2, 38, 1);
+
+  if (sel.stats.distance) {
+    ctx.fillStyle = "#FFFFFF";
+    ctx.font = `800 148px ${FONT_DISPLAY}`;
+    ctx.textBaseline = "top";
+    const distTxt = fmtDistance(input.distanceMeters);
+    ctx.fillText(distTxt, padX, y);
+    const distW = ctx.measureText(distTxt).width;
+    ctx.fillStyle = "rgba(255,255,255,0.75)";
+    ctx.font = `700 40px ${FONT_DISPLAY}`;
+    ctx.fillText(isZh ? "公里" : "km", padX + distW + 16, y + 92);
+    y += heroH;
+  }
+
+  const colW = (W - padX * 2) / 3;
+  shown.forEach((s, i) => {
+    const col = i % 3;
+    const row = Math.floor(i / 3);
+    const sx = padX + col * colW;
+    const sy = y + row * rowH;
+    ctx.fillStyle = "rgba(255,255,255,0.65)";
+    ctx.font = `600 20px ${FONT_TEXT}`;
+    ctx.textBaseline = "top";
+    ctx.fillText(s.label.toUpperCase(), sx, sy);
+    ctx.fillStyle = "#FFFFFF";
+    ctx.font = `800 56px ${FONT_DISPLAY}`;
+    ctx.fillText(s.value, sx, sy + 30);
+  });
+
+  // Route line overlay (optional, bottom-right corner)
+  if (sel.route && input.summaryPolyline) {
+    try {
+      const coords = decodePolyline(input.summaryPolyline);
+      if (coords.length >= 2) {
+        const boxW = 300;
+        const boxH = 200;
+        const bx = W - padX - boxW;
+        const by = H - 96 - blockH - 56 - boxH - 24;
+        const lats = coords.map((c) => c[0]);
+        const lngs = coords.map((c) => c[1]);
+        const minLat = Math.min(...lats), maxLat = Math.max(...lats);
+        const minLng = Math.min(...lngs), maxLng = Math.max(...lngs);
+        const spanLat = Math.max(maxLat - minLat, 1e-6);
+        const spanLng = Math.max(maxLng - minLng, 1e-6);
+        const scale = Math.min(boxW / spanLng, boxH / spanLat) * 0.9;
+        const offX = bx + boxW / 2 - (spanLng * scale) / 2;
+        const offY = by + boxH / 2 - (spanLat * scale) / 2;
+        ctx.save();
+        ctx.strokeStyle = "rgba(255,255,255,0.95)";
+        ctx.lineWidth = 6;
+        ctx.lineJoin = "round";
+        ctx.lineCap = "round";
+        ctx.shadowColor = "rgba(0,0,0,0.5)";
+        ctx.shadowBlur = 10;
+        ctx.beginPath();
+        coords.forEach(([lat, lng], i) => {
+          const px = offX + (lng - minLng) * scale;
+          const py = offY + (maxLat - lat) * scale;
+          if (i === 0) ctx.moveTo(px, py);
+          else ctx.lineTo(px, py);
+        });
+        ctx.stroke();
+        ctx.restore();
+      }
+    } catch { /* ignore */ }
+  }
+
+  ctx.textAlign = "left";
+  return await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob(
+      (b) => (b ? resolve(b) : reject(new Error("Canvas toBlob failed"))),
+      "image/jpeg",
+      0.92,
+    );
+  });
+}
+
 export async function shareCustom(input: CustomShareInput): Promise<void> {
   const isZh = input.lang === "zh";
   const loadingId = toast.loading(isZh ? "正在生成分享圖片..." : "Generating share image...");
   let blob: Blob;
   try {
-    blob = await renderCustomCard(input);
+    blob = input.selections.photoOverlay && input.photoUrl
+      ? await renderPhotoCard(input)
+      : await renderCustomCard(input);
   } catch (err) {
     console.error("[ShareCustom] Render failed:", err);
     toast.dismiss(loadingId);

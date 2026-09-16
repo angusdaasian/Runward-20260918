@@ -41,6 +41,8 @@ import RpeSlider from "./RpeSlider";
 import PlanNextWorkoutCard from "./PlanNextWorkoutCard";
 import PlanComparisonDialog from "@/components/PlanComparisonDialog";
 import ActivityShoePicker from "./ActivityShoePicker";
+import ActivityPhotos from "./ActivityPhotos";
+import { useActivityPhotos } from "@/hooks/use-activity-photos";
 import { detectIntervals, formatRepDistance } from "@/lib/detectIntervals";
 
 
@@ -173,6 +175,7 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
   const needsRpe = isAppleHealth || isGarmin || isTerraActivity || isCoros;
   const dbTable = isTerraActivity ? "terra_activities" : isAppleHealth ? "apple_health_activities" : isGarmin || isCoros ? "garmin_activities" : "strava_activities";
   const isRunningActivity = isRunning(activity.sport_type);
+  const activityPhotos = useActivityPhotos(String(activity.id), activity.source || "strava");
 
   // Per-activity training score (VDOT) — computed from this activity's distance & time
   const activityScore = useMemo(() => {
@@ -1020,6 +1023,7 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
           chartHr: chartData.some((d: any) => typeof d.heartrate === "number" && d.heartrate > 0),
           chartAlt: chartData.some((d: any) => typeof d.altitude === "number"),
         }}
+        photos={activityPhotos.photos.map((p) => ({ id: p.id, url: p.url }))}
       />
       <RouteVideoDialog
         open={routeVideoOpen}
@@ -1420,6 +1424,18 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
           ) : null}
         </>
       )}
+
+      {/* Run photos */}
+      <div className="mb-4">
+        <ActivityPhotos
+          lang={lang}
+          photos={activityPhotos.photos}
+          loading={activityPhotos.loading}
+          uploading={activityPhotos.uploading}
+          onUpload={activityPhotos.upload}
+          onRemove={activityPhotos.remove}
+        />
+      </div>
 
       {/* Charts */}
       {loading ? (

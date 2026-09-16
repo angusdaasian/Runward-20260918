@@ -501,31 +501,59 @@ const CustomShareDialog = ({ open, onOpenChange, lang, data, available, photos =
                           role="button"
                           tabIndex={0}
                           aria-label={t("Drag to move stats", "拖曳以移動數據")}
-                          className={`${blockClass("stats")} w-[70%] p-1`}
+                          className={blockClass("stats")}
                           style={{
                             left: `${statsOverlay.x * 100}%`,
                             top: `${statsOverlay.y * 100}%`,
-                            transform: `translate(-50%, -50%) scale(${statsOverlay.scale})`,
+                            width: PHOTO_STATS_W,
+                            height: statsBlockH,
+                            transform: `translate(-50%, -50%) scale(${f * statsOverlay.scale})`,
                           }}
                           {...dragHandlers("stats")}
                         >
-                          <div className="truncate text-[10px] font-semibold opacity-90">{d.name}</div>
+                          <div
+                            className="absolute overflow-hidden whitespace-nowrap font-semibold opacity-85"
+                            style={{ left: statsInnerX, top: 0, width: statsInnerW, fontSize: 30, lineHeight: "38px" }}
+                          >
+                            {d.name}
+                          </div>
                           {sel.stats.distance && (
-                            <div className="mt-1 flex items-baseline gap-1 font-display">
-                              <span className="text-4xl font-bold leading-none">{(d.distanceMeters / 1000).toFixed(2)}</span>
-                              <span className="text-sm font-semibold opacity-85">km</span>
+                            <div
+                              className="absolute flex items-baseline font-display"
+                              style={{ left: statsInnerX, top: PHOTO_STATS_TOP, gap: 16 }}
+                            >
+                              <span style={{ fontSize: 148, fontWeight: 800, lineHeight: "148px" }}>
+                                {(d.distanceMeters / 1000).toFixed(2)}
+                              </span>
+                              <span className="opacity-75" style={{ fontSize: 40, fontWeight: 700 }}>
+                                {isZh ? "公里" : "km"}
+                              </span>
                             </div>
                           )}
-                          {previewStats.length > 0 && (
-                            <div className="mt-2 grid grid-cols-3 gap-x-2 gap-y-1.5">
-                              {previewStats.map((stat) => (
-                                <div key={stat.label} className="min-w-0">
-                                  <div className="truncate text-[7px] font-semibold uppercase opacity-80">{stat.label}</div>
-                                  <div className="truncate text-xs font-bold">{stat.value}</div>
-                                </div>
-                              ))}
+                          {previewStats.map((stat, i) => (
+                            <div
+                              key={stat.label}
+                              className="absolute"
+                              style={{
+                                left: statsInnerX + (i % 3) * statsColW,
+                                top: PHOTO_STATS_TOP + statsHeroH + Math.floor(i / 3) * PHOTO_STATS_ROW_H,
+                                width: statsColW,
+                              }}
+                            >
+                              <div
+                                className="overflow-hidden whitespace-nowrap font-semibold uppercase opacity-65"
+                                style={{ fontSize: 20, lineHeight: "26px" }}
+                              >
+                                {stat.label}
+                              </div>
+                              <div
+                                className="overflow-hidden whitespace-nowrap font-display"
+                                style={{ fontSize: 56, fontWeight: 800, lineHeight: "62px" }}
+                              >
+                                {stat.value}
+                              </div>
                             </div>
-                          )}
+                          ))}
                         </div>
 
                         {splitsOnPhoto && (

@@ -55,12 +55,15 @@ Ask Despia one thing: "Can you compile a third-party closed Bluetooth SDK (iOS f
 
 ## Technical notes
 
-- Path A means adding Capacitor to this project (`@capacitor/core`, `cli`, `ios`, `android`), then a custom plugin per platform wrapping `CRPSmartBand` and `crpblelib`. The web side would get a `use-crp-watch` hook and a provider card in Connect apps, alongside the existing Strava/Terra/Garmin cards.
-- Watch activities would land in the same activities tables the current providers write to, so charts, splits, leaderboards and share cards keep working untouched.
-- Your one-fitness-provider-at-a-time rule would need the watch added as another option in that group.
+- Path D (companion app): a separate Capacitor project, not this repo. Two native plugin wrappers — `CRPSmartBand.framework` on iOS, `crpblelib-2.0.4.aar` on Android — behind one JS interface (scan, bond, fetch activities, fetch daily health, firmware update). UI is deliberately thin: sign in, pair, sync status, last-sync time.
+- New provider in this project, mirroring the existing Strava/Terra shape: a `watch_connections` + `watch_activities` pair (or reuse of the existing activity tables), a `watch-ingest` edge function authenticated with the user's Supabase session, and a card in Connect apps / DashboardConnect showing pair status and last sync. Idempotent ingest keyed on device id + activity start time so re-syncs don't duplicate.
+- Because ingest lands in the same activity tables the current providers write to, charts, splits, interval detection, leaderboards and share cards keep working untouched.
+- Your one-fitness-provider-at-a-time rule needs the watch added as another option in that mutually exclusive group.
+- Path A (kit inside the main app) would instead mean adding Capacitor to this repo directly — kept as the fallback if you later want a single app.
 - iOS needs Bluetooth usage strings and background BLE entitlement; Android needs the newer Bluetooth scan/connect permissions and, on older versions, location permission.
-- Sandbox limits: iOS and Android builds cannot be produced here — that work happens on your own Mac / Android Studio after exporting the project.
+- Sandbox limits: iOS and Android builds cannot be produced here — that work happens on your own Mac / Android Studio after exporting the companion project.
 
 ## Next step
 
-Tell me which path you want after hearing back from the supplier and Despia, and I will write the build plan for it.
+Confirm path D and I will write the build plan: the companion app skeleton, the ingest endpoint, and the Connect apps card. Supplier answers on the kit licence can arrive in parallel.
+

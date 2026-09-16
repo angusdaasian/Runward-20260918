@@ -200,7 +200,9 @@ const CustomShareDialog = ({ open, onOpenChange, lang, data, available, photos =
                           aria-label={t("Drag to move stats", "拖曳以移動數據")}
                           className="absolute left-1/2 top-1/2 w-[88%] touch-none cursor-move rounded-lg bg-foreground/55 p-3 text-background shadow-lg ring-1 ring-background/30 backdrop-blur-[2px]"
                           style={{
-                            transform: `translate(-50%, -50%) translate(${(overlay.x - 0.5) * 113.64}%, ${(overlay.y - 0.5) * 142.05}%) scale(${overlay.scale})`,
+                            left: `${overlay.x * 100}%`,
+                            top: `${overlay.y * 100}%`,
+                            transform: `translate(-50%, -50%) scale(${overlay.scale})`,
                           }}
                           onPointerDown={(event) => {
                             dragPointerRef.current = event.pointerId;

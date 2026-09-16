@@ -1,0 +1,57 @@
+# Custom watch sync — options, costs, and what to ask your supplier
+
+No code changes in this plan. This is the decision write-up you asked for.
+
+## What the two kits actually are
+
+- iOS kit: `CRPSmartBand` framework (plus Realtek/JieLi firmware-update helpers) + an iOS Development Guide PDF, with Objective-C and Swift demo apps.
+- Android kit: a single `crpblelib-2.0.4` library + an Android Development Guide PDF.
+
+These are the CRP / Moyoung Bluetooth kits — the same family the DaFit app is built on. They are closed, compiled native libraries. They speak directly to the watch over Bluetooth Low Energy, and they only run inside a real iPhone/Android app binary.
+
+## Can this work with Despia?
+
+Not as it stands. Despia loads your web app inside a wrapper and exposes a fixed set of phone features. Bluetooth talk to this watch is not one of them, and cannot be added from your side — the watch libraries have to be compiled into the app itself.
+
+Three realistic paths:
+
+**A. Real native app (Capacitor) — the reliable path.**
+Your app screens stay exactly as they are today; only the shell changes. The watch libraries go into the native shell, plus a thin bridge so your screens can say "scan", "connect", "pull today's activity". Needs a Mac with Xcode and Android Studio to build and release, and you take over App Store / Play submissions.
+Cost: highest effort of the three; realistically several weeks of native work for pairing, sync, background reconnect, firmware updates. Ongoing: every watch firmware change may need a kit update and a new app release.
+
+**B. Ask Despia to compile the kit in.**
+Cheapest if they agree. This is a non-standard request — they would need to accept a third-party closed library and expose functions to your web layer. Ask them directly before planning around it.
+Cost: unknown; a yes saves you the whole native shell, a no costs you only the email.
+
+**C. Cloud sync, no Bluetooth in your app.**
+The watch (via a companion app) uploads to the maker's server, and your server pulls from it. Your app stays a Despia web app. This only exists if the factory offers a data API — many CRP factories do not, and users would still need a second app installed, which defeats the point of selling branded watches.
+Cost: low app-side effort, but depends entirely on the supplier and gives a worse user experience.
+
+Recommendation: send the supplier questions below and the Despia question in parallel, then choose A or B. Treat C as a fallback only.
+
+## The "DaFit" message on the watch
+
+That text and the download code are baked into the watch firmware — nothing in your app can change it. It is a factory (OEM) job, and it is routine for these makers. What you need from them:
+
+1. White-label firmware for your order: your app name shown on first power-on, and the pairing QR pointing at your own App Store / Play listing (or a link page you control).
+2. Your own logo/animation on the boot screen and watch faces, if you want it.
+3. Written licence to use the iOS and Android kits in **your** app, published under your developer account — including whether they require a per-app key or bind the kit to a bundle ID.
+4. Confirmation your app can pair with the watch without DaFit ever being installed, and that the watch will not keep prompting for DaFit.
+5. Exact watch model / chipset / firmware version, and which kit version matches it.
+6. Minimum order quantity and unit-cost difference for custom firmware, plus lead time.
+7. Whether they run a cloud/data API (for path C), and firmware-update files served from your own app.
+8. Support terms: who fixes it when a phone OS update breaks pairing, and how kit updates are delivered.
+
+Ask Despia one thing: "Can you compile a third-party closed Bluetooth SDK (iOS framework + Android AAR) into my wrapped app and expose a few JavaScript functions for it?"
+
+## Technical notes
+
+- Path A means adding Capacitor to this project (`@capacitor/core`, `cli`, `ios`, `android`), then a custom plugin per platform wrapping `CRPSmartBand` and `crpblelib`. The web side would get a `use-crp-watch` hook and a provider card in Connect apps, alongside the existing Strava/Terra/Garmin cards.
+- Watch activities would land in the same activities tables the current providers write to, so charts, splits, leaderboards and share cards keep working untouched.
+- Your one-fitness-provider-at-a-time rule would need the watch added as another option in that group.
+- iOS needs Bluetooth usage strings and background BLE entitlement; Android needs the newer Bluetooth scan/connect permissions and, on older versions, location permission.
+- Sandbox limits: iOS and Android builds cannot be produced here — that work happens on your own Mac / Android Studio after exporting the project.
+
+## Next step
+
+Tell me which path you want after hearing back from the supplier and Despia, and I will write the build plan for it.

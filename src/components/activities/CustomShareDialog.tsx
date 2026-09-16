@@ -300,6 +300,23 @@ const CustomShareDialog = ({ open, onOpenChange, lang, data, available, photos =
     });
   const setActive = (next: Partial<OverlayTransform>) => setOverlay(activeOverlay, next);
 
+  const previewStats = [
+    sel.stats.totalTime ? { label: t("Time", "時間"), value: formatPreviewTime(d.movingTimeSeconds) } : null,
+    sel.stats.pace && d.averageSpeed > 0 ? { label: t("Pace", "配速"), value: formatPreviewPace(d.averageSpeed) } : null,
+    sel.stats.avgHr && d.averageHeartrate ? { label: t("Avg HR", "平均心率"), value: `${Math.round(d.averageHeartrate)}` } : null,
+    sel.stats.maxHr && d.maxHeartrate ? { label: t("Max HR", "最大心率"), value: `${Math.round(d.maxHeartrate)}` } : null,
+    sel.stats.elevation && d.elevationGainMeters ? { label: t("Elev", "爬升"), value: `${Math.round(d.elevationGainMeters)} m` } : null,
+    sel.stats.calories && d.calories ? { label: t("Calories", "卡路里"), value: `${Math.round(d.calories)}` } : null,
+  ].filter((stat): stat is { label: string; value: string } => stat !== null).slice(0, 6);
+
+  /** Stats block geometry in canvas px — identical to the exported card. */
+  const statsRows = Math.ceil(previewStats.length / 3);
+  const statsHeroH = sel.stats.distance ? PHOTO_STATS_HERO_H : 0;
+  const statsBlockH = PHOTO_STATS_TOP + statsHeroH + statsRows * PHOTO_STATS_ROW_H;
+  const statsInnerX = 24;
+  const statsInnerW = PHOTO_STATS_W - 48;
+  const statsColW = statsInnerW / 3;
+
   /** Half size of an overlay as a fraction of the card, used for clamping. */
   const halfFractions = (key: OverlayKey) => {
     const tf = transformOf(key);
@@ -320,7 +337,7 @@ const CustomShareDialog = ({ open, onOpenChange, lang, data, available, photos =
     if (key === "route") {
       return { hx: ((PHOTO_ROUTE_W * scale) / PHOTO_CARD_W) / 2, hy: ((PHOTO_ROUTE_H * scale) / 1350) / 2 };
     }
-    return { hx: 0.36 * scale, hy: 0.14 * scale };
+    return { hx: ((PHOTO_STATS_W * scale) / PHOTO_CARD_W) / 2, hy: ((statsBlockH * scale) / 1350) / 2 };
   };
 
   const moveOverlay = (key: OverlayKey, clientX: number, clientY: number) => {
@@ -334,15 +351,6 @@ const CustomShareDialog = ({ open, onOpenChange, lang, data, available, photos =
     const y = Math.max(minY, Math.min(maxY, (clientY - rect.top) / rect.height));
     setOverlay(key, { x, y });
   };
-
-  const previewStats = [
-    sel.stats.totalTime ? { label: t("Time", "時間"), value: formatPreviewTime(d.movingTimeSeconds) } : null,
-    sel.stats.pace && d.averageSpeed > 0 ? { label: t("Pace", "配速"), value: formatPreviewPace(d.averageSpeed) } : null,
-    sel.stats.avgHr && d.averageHeartrate ? { label: t("Avg HR", "平均心率"), value: `${Math.round(d.averageHeartrate)}` } : null,
-    sel.stats.maxHr && d.maxHeartrate ? { label: t("Max HR", "最大心率"), value: `${Math.round(d.maxHeartrate)}` } : null,
-    sel.stats.elevation && d.elevationGainMeters ? { label: t("Elev", "爬升"), value: `${Math.round(d.elevationGainMeters)} m` } : null,
-    sel.stats.calories && d.calories ? { label: t("Calories", "卡路里"), value: `${Math.round(d.calories)}` } : null,
-  ].filter((stat): stat is { label: string; value: string } => stat !== null).slice(0, 6);
 
   const toggleStat = (k: keyof CustomShareSelections["stats"]) =>
     setSel((s) => ({ ...s, stats: { ...s.stats, [k]: !s.stats[k] } }));

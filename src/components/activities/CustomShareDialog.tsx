@@ -165,11 +165,13 @@ const CustomShareDialog = ({ open, onOpenChange, lang, data, available, photos =
     };
   }, [data.chartData]);
 
-  const chartsOnPhoto: Array<{ kind: PhotoChartKind; label: string; values: number[]; invert: boolean }> = [
+  const chartsOnPhoto = ([
     { kind: "pace", label: t("PACE", "配速"), values: chartSeries.pace, invert: true },
     { kind: "hr", label: t("HEART RATE", "心率"), values: chartSeries.hr, invert: false },
     { kind: "altitude", label: t("ELEVATION", "海拔"), values: chartSeries.altitude, invert: false },
-  ].filter((c) => sel.charts[c.kind === "altitude" ? "altitude" : c.kind] && c.values.length >= 2);
+  ] as Array<{ kind: PhotoChartKind; label: string; values: number[]; invert: boolean }>).filter(
+    (c) => sel.charts[c.kind] && c.values.length >= 2,
+  );
 
   const overlayKeys: OverlayKey[] = [
     "stats",

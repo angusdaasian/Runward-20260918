@@ -2513,46 +2513,89 @@ async function renderPhotoCard(input: CustomShareInput): Promise<Blob> {
   }
 
 
+  // ---------- HR zones overlay (transparent, independently placed) ----------
+  if (sel.hrZones && input.hrZones) {
+    const zTf = sel.zonesTransform ?? { x: 0.5, y: 0.3, scale: 1 };
+    const zScale = Math.max(0.65, Math.min(1.15, zTf.scale));
+    const zw = PHOTO_ZONES_W;
+    const zh = PHOTO_ZONES_H;
+    const zHalfW = (zw * zScale) / 2;
+    const zHalfH = (zh * zScale) / 2;
+    const zx = Math.max(zHalfW + 28, Math.min(W - zHalfW - 28, zTf.x * W));
+    const zy = Math.max(zHalfH + 180, Math.min(H - zHalfH - 44, zTf.y * H));
 
+    ctx.save();
+    ctx.translate(zx, zy);
+    ctx.scale(zScale, zScale);
+    ctx.translate(-zw / 2, -zh / 2);
+    ctx.shadowColor = "rgba(0,0,0,0.55)";
+    ctx.shadowBlur = 16;
+    ctx.shadowOffsetY = 2;
+    ctx.textBaseline = "top";
+    ctx.textAlign = "left";
+    ctx.fillStyle = "rgba(255,255,255,0.8)";
+    ctx.font = `700 24px ${FONT_TEXT}`;
+    ctx.fillText(isZh ? "心率區間" : "HR ZONES", 0, 0);
 
+    ZONE_META.forEach((z, i) => {
+      const ry = PHOTO_ZONES_HEAD_H + i * PHOTO_ZONES_ROW_H;
+      const pct = Math.max(0, Math.min(100, Number(input.hrZones![z.key] || 0)));
+      ctx.fillStyle = "rgba(255,255,255,0.9)";
+      ctx.font = `700 26px ${FONT_TEXT}`;
+      ctx.textAlign = "left";
+      ctx.fillText(isZh ? z.labelZh : z.label, 0, ry + 4);
+      const barX = 190;
+      const barW = zw - barX - 90;
+      ctx.fillStyle = "rgba(255,255,255,0.25)";
+      roundedRect(ctx, barX, ry + 6, barW, 26, 13);
+      ctx.fill();
+      if (pct > 0) {
+        ctx.fillStyle = z.color;
+        roundedRect(ctx, barX, ry + 6, Math.max(6, (barW * pct) / 100), 26, 13);
+        ctx.fill();
+      }
+      ctx.fillStyle = "#FFFFFF";
+      ctx.font = `800 26px ${FONT_DISPLAY}`;
+      ctx.textAlign = "right";
+      ctx.fillText(`${pct.toFixed(0)}%`, zw, ry + 4);
+    });
+    ctx.textAlign = "left";
+    ctx.restore();
+  }
 
-  // Route line overlay (optional, bottom-right corner)
+  // ---------- Route outline overlay (transparent, independently placed) ----------
   if (sel.route && input.summaryPolyline) {
     try {
       const coords = decodePolyline(input.summaryPolyline);
       if (coords.length >= 2) {
-        const boxW = 300;
-        const boxH = 200;
-        const bx = W - padX - boxW;
-        const by = H - 96 - boxH;
-        const lats = coords.map((c) => c[0]);
-        const lngs = coords.map((c) => c[1]);
-        const minLat = Math.min(...lats), maxLat = Math.max(...lats);
-        const minLng = Math.min(...lngs), maxLng = Math.max(...lngs);
-        const spanLat = Math.max(maxLat - minLat, 1e-6);
-        const spanLng = Math.max(maxLng - minLng, 1e-6);
-        const scale = Math.min(boxW / spanLng, boxH / spanLat) * 0.9;
-        const offX = bx + boxW / 2 - (spanLng * scale) / 2;
-        const offY = by + boxH / 2 - (spanLat * scale) / 2;
+        const rTf = sel.routeTransform ?? { x: 0.5, y: 0.5, scale: 1 };
+        const rScale = Math.max(0.65, Math.min(1.15, rTf.scale));
+        const rw = PHOTO_ROUTE_W;
+        const rh = PHOTO_ROUTE_H;
+        const rHalfW = (rw * rScale) / 2;
+        const rHalfH = (rh * rScale) / 2;
+        const rx = Math.max(rHalfW + 28, Math.min(W - rHalfW - 28, rTf.x * W));
+        const ry = Math.max(rHalfH + 180, Math.min(H - rHalfH - 44, rTf.y * H));
+        const pts = photoRoutePoints(coords, rw, rh);
+
         ctx.save();
+        ctx.translate(rx, ry);
+        ctx.scale(rScale, rScale);
+        ctx.translate(-rw / 2, -rh / 2);
         ctx.strokeStyle = "rgba(255,255,255,0.95)";
-        ctx.lineWidth = 6;
+        ctx.lineWidth = 7;
         ctx.lineJoin = "round";
         ctx.lineCap = "round";
         ctx.shadowColor = "rgba(0,0,0,0.5)";
-        ctx.shadowBlur = 10;
+        ctx.shadowBlur = 12;
         ctx.beginPath();
-        coords.forEach(([lat, lng], i) => {
-          const px = offX + (lng - minLng) * scale;
-          const py = offY + (maxLat - lat) * scale;
-          if (i === 0) ctx.moveTo(px, py);
-          else ctx.lineTo(px, py);
-        });
+        pts.forEach(([px, py], i) => (i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py)));
         ctx.stroke();
         ctx.restore();
       }
     } catch { /* ignore */ }
   }
+
 
   ctx.textAlign = "left";
   return await new Promise<Blob>((resolve, reject) => {

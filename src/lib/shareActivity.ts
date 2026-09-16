@@ -2315,15 +2315,14 @@ async function renderPhotoCard(input: CustomShareInput): Promise<Blob> {
   const shown = stats.slice(0, 6);
 
   const rows = Math.ceil(shown.length / 3) || 0;
-  const rowH = 132;
-  const heroH = sel.stats.distance ? 190 : 0;
+  const rowH = PHOTO_STATS_ROW_H;
+  const heroH = sel.stats.distance ? PHOTO_STATS_HERO_H : 0;
   const blockH = heroH + rows * rowH;
-  const contentH = 56 + blockH;
+  const contentH = PHOTO_STATS_TOP + blockH;
   const transform = sel.overlayTransform ?? { x: 0.5, y: 0.76, scale: 1 };
   const scale = Math.max(0.65, Math.min(1.15, transform.scale));
-  const blockW = 760;
-  const blockX = (W - blockW) / 2;
-  const contentX = blockX + 24;
+  const blockW = PHOTO_STATS_W;
+  const contentX = 24;
   const contentW = blockW - 48;
   const halfW = (blockW * scale) / 2;
   const halfH = (contentH * scale) / 2;
@@ -2333,7 +2332,7 @@ async function renderPhotoCard(input: CustomShareInput): Promise<Blob> {
   ctx.save();
   ctx.translate(centerX, centerY);
   ctx.scale(scale, scale);
-  ctx.translate(-W / 2, -contentH / 2);
+  ctx.translate(-blockW / 2, -contentH / 2);
 
   // Fully transparent block — a soft text shadow keeps it readable on any photo.
   ctx.shadowColor = "rgba(0,0,0,0.55)";

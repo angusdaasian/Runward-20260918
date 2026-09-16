@@ -257,9 +257,9 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps, onNavig
       <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
         <Icon size={21} />
       </span>
-      <span className="min-w-0 whitespace-normal">
-        <span className="block font-display text-[15px] font-semibold leading-tight text-foreground">{title}</span>
-        <span className="mt-1 block text-xs font-normal leading-snug text-muted-foreground">{description}</span>
+      <span className="w-full min-w-0 whitespace-normal">
+        <span className="flex h-5 items-end font-display text-[15px] font-semibold leading-tight text-foreground">{title}</span>
+        <span className="mt-1 block h-8 text-xs font-normal leading-snug text-muted-foreground">{description}</span>
       </span>
     </Button>
   );

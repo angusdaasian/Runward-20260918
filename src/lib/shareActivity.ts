@@ -1648,6 +1648,35 @@ export function photoSplitsLayout(count: number) {
 export const PHOTO_CHART_W = 620;
 export const PHOTO_CHART_H = 280;
 
+/** Shared HR-zones-overlay geometry (canvas px). */
+export const PHOTO_ZONES_W = 560;
+export const PHOTO_ZONES_ROW_H = 56;
+export const PHOTO_ZONES_HEAD_H = 44;
+export const PHOTO_ZONES_H = PHOTO_ZONES_HEAD_H + 5 * PHOTO_ZONES_ROW_H;
+
+/** Shared route-overlay geometry (canvas px). */
+export const PHOTO_ROUTE_W = 460;
+export const PHOTO_ROUTE_H = 380;
+
+/** Fit a decoded polyline into a w×h box (canvas px), shared by preview and export. */
+export function photoRoutePoints(
+  coords: [number, number][],
+  w: number,
+  h: number,
+): Array<[number, number]> {
+  const lats = coords.map((c) => c[0]);
+  const lngs = coords.map((c) => c[1]);
+  const minLat = Math.min(...lats), maxLat = Math.max(...lats);
+  const minLng = Math.min(...lngs), maxLng = Math.max(...lngs);
+  const spanLat = Math.max(maxLat - minLat, 1e-6);
+  const spanLng = Math.max(maxLng - minLng, 1e-6);
+  const s = Math.min(w / spanLng, h / spanLat) * 0.9;
+  const offX = w / 2 - (spanLng * s) / 2;
+  const offY = h / 2 - (spanLat * s) / 2;
+  return coords.map(([lat, lng]) => [offX + (lng - minLng) * s, offY + (maxLat - lat) * s]);
+}
+
+
 export function filterVisibleSplits(splits: ShareSplit[]): ShareSplit[] {
   return splits.filter((s) => !((s.distance || 0) < 50 && (s.elapsed_time || 0) < 10));
 }

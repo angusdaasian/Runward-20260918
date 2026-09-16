@@ -1,32 +1,29 @@
-# Make the blog properly indexable
+# Get the blog crawled and indexed by Google
 
-Your blog is already served as real HTML for search engines — the app itself stays client-side. So the fix isn't "add server rendering", it's repairing what search engines actually see today.
+## What Google actually says (Search Console, checked live)
 
-## What I checked on the live site
+- Homepage: **indexed**, crawled 13 Sep 2026, one known backlink (pacecalculator.fun).
+- `/blog`: **"Discovered – currently not indexed"** — known but never crawled.
+- Blog post pages: **"URL is unknown to Google"**.
+- Sitemap: processed with 0 errors, but **0 of 18 addresses indexed**.
+- Live HTML check: `/blog/<slug>` 301-redirects to `/blog/<slug>/` (trailing slash), so the address the sitemap and canonical tag declare is never the one that answers.
 
-- `https://runward.site/blog/race-fueling-guide` returns the full article text and a unique title. Good.
-- **But every blog address in your sitemap redirects.** Requesting `/blog/race-fueling-guide` returns a 301 to `/blog/race-fueling-guide/` (with a trailing slash). The address you tell Google is the official one is not the address that answers — Google reports these as "Page with redirect" / "Alternate page with canonical tag" and often leaves them out of the index. Same for `/blog` itself.
-- The same page is also reachable on two other addresses (`angustest.site`, `welcome-ward-start.lovable.app`). Both correctly point back to runward.site, so this is secondary, but it does dilute crawling.
-- New posts written in the admin only get their HTML page when the site is rebuilt, so a fresh post can be invisible to Google for a while.
-- Robots rules and the sitemap are otherwise fine (20 addresses, all readable).
+Diagnosis: not an HTML/SSR problem (blog pages already serve full article HTML). It's a crawl-priority problem: young domain, one backlink, and a canonical URL that redirects. This plan removes the technical friction and raises crawl priority.
 
-## What I'll do
+## Work items
 
-1. **Remove the redirect.** Generate each blog page as a single file (`/blog/<slug>.html`) instead of a folder, so `/blog/race-fueling-guide` answers directly with 200 and matches the sitemap and the canonical tag exactly. Same for the blog index.
-2. **Keep old folder addresses working** so nothing that's already linked or indexed breaks.
-3. **Publish new posts to Google faster.** Rebuild the sitemap and page HTML whenever a post is published from the admin, instead of only on the next site build, and include a real last-modified date per post.
-4. **Reduce duplicate copies.** Tell crawlers not to index the preview/alternate hostnames, so only runward.site competes for the ranking.
-5. **Verify.** Fetch each blog address after deploying and confirm 200 with no redirect, correct title, correct canonical, and full article text present.
+1. **Fix the canonical/redirect mismatch (core fix).** In `scripts/blog-static.mjs`, write posts as flat files (`dist/blog/<slug>.html`, index as `dist/blog.html`) so `/blog/<slug>` returns 200 directly — matching the sitemap and canonical tag. Add `_redirects` entries so the old `/blog/<slug>/` folder form 301s to the canonical form.
+2. **Add `<lastmod>` to the sitemap** from each post's `published_at`/`updated_at` (omit when unknown), so crawlers can tell new/updated posts apart.
+3. **Strengthen internal links.** Add a visible "Guides & articles" link to the landing page footer (and nav where natural) pointing to `/blog`, plus each blog post already links to translations — ensure the blog index links every post with descriptive anchor text (it does; verify after change).
+4. **Deindex duplicate hosts.** Serve `X-Robots-Tag: noindex` on non-runward hostnames (angustest.site, welcome-ward-start.lovable.app) so crawl budget and authority concentrate on runward.site.
+5. **Regenerate sitemap + prerendered pages on each build** (already wired via prebuild/postbuild); confirm the same output also lands on the Netlify-deployed runward.site build.
+6. **Resubmit the sitemap** to Search Console after publishing, then verify with URL Inspection that a blog post and `/blog` return 200 directly.
 
-## Optional, and worth it
+## What only you can do (no code can)
 
-Connect Google Search Console to this project so I can read the real reasons Google gives for each blog address (indexed / redirect / crawled-not-indexed) instead of inferring them, and submit the sitemap after the fix. Say the word and I'll open the connection step.
+- In Search Console, open each key blog URL in **URL Inspection → Request indexing** (this API can't submit indexing requests). ~10 min for the main posts.
+- Build backlinks (share posts on Threads/IG bio, running forums, the pacecalculator.fun cross-link both ways) — with one backlink, discovery is slow no matter what we ship.
 
-## Technical notes
+## Expected result
 
-- `scripts/blog-static.mjs` (`prerender` mode) currently writes `dist/blog/<slug>/index.html`; Netlify's pretty-URL handling then 301s the extension-less path to the folder form. Switching output to `dist/blog/<slug>.html` (plus the blog index as `dist/blog.html`) makes the extension-less path resolve with 200.
-- Add folder-form → flat-form entries in `public/_redirects` ahead of the SPA fallback so previously crawled `/blog/<slug>/` URLs 301 to the canonical form.
-- Add `<lastmod>` in `writeSitemap` from each post's `published_at`/`updated_at`, omitted when unknown.
-- Trigger the static regeneration from the admin publish action (build hook) so a new post's HTML and sitemap entry exist without a manual rebuild.
-- Serve `X-Robots-Tag: noindex` for non-runward hostnames (Netlify header rule / edge condition), keeping runward.site fully indexable.
-- No change to app rendering: everything outside `/blog` stays client-side.
+All `/blog` addresses answer 200 with no redirect and match the sitemap exactly; Google re-crawls (helped by the resubmitted sitemap, lastmod, internal links and your indexing requests) and blog pages move from "unknown/discovered" to indexed over the following days-to-weeks. The app stays fully client-side; only the blog output is pre-rendered, as today.

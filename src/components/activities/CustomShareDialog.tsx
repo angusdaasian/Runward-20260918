@@ -20,12 +20,28 @@ import {
   PHOTO_CARD_W,
   PHOTO_CHART_W,
   PHOTO_CHART_H,
+  PHOTO_ZONES_W,
+  PHOTO_ZONES_H,
+  PHOTO_ZONES_HEAD_H,
+  PHOTO_ZONES_ROW_H,
+  PHOTO_ROUTE_W,
+  PHOTO_ROUTE_H,
+  photoRoutePoints,
+  decodePolyline,
   photoSplitsLayout,
   filterVisibleSplits,
   ShareSplit,
 } from "@/lib/shareActivity";
 import { AlignCenter, AlignStartVertical, AlignEndVertical, RotateCcw, Sparkles } from "lucide-react";
 import appIcon from "@/assets/app-icon.png";
+
+const ZONE_ROWS: Array<{ key: "z1" | "z2" | "z3" | "z4" | "z5"; label: string; labelZh: string; color: string }> = [
+  { key: "z1", label: "Z1 Recovery", labelZh: "Z1 恢復", color: "#94A3B8" },
+  { key: "z2", label: "Z2 Easy", labelZh: "Z2 輕鬆", color: "#3B82F6" },
+  { key: "z3", label: "Z3 Aerobic", labelZh: "Z3 有氧", color: "#10B981" },
+  { key: "z4", label: "Z4 Threshold", labelZh: "Z4 乳酸閾", color: "#F59E0B" },
+  { key: "z5", label: "Z5 Max", labelZh: "Z5 極限", color: "#EF4444" },
+];
 
 type SplitsMode = "laps" | "km" | "reps";
 

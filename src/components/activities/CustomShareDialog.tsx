@@ -20,12 +20,28 @@ import {
   PHOTO_CARD_W,
   PHOTO_CHART_W,
   PHOTO_CHART_H,
+  PHOTO_ZONES_W,
+  PHOTO_ZONES_H,
+  PHOTO_ZONES_HEAD_H,
+  PHOTO_ZONES_ROW_H,
+  PHOTO_ROUTE_W,
+  PHOTO_ROUTE_H,
+  photoRoutePoints,
+  decodePolyline,
   photoSplitsLayout,
   filterVisibleSplits,
   ShareSplit,
 } from "@/lib/shareActivity";
 import { AlignCenter, AlignStartVertical, AlignEndVertical, RotateCcw, Sparkles } from "lucide-react";
 import appIcon from "@/assets/app-icon.png";
+
+const ZONE_ROWS: Array<{ key: "z1" | "z2" | "z3" | "z4" | "z5"; label: string; labelZh: string; color: string }> = [
+  { key: "z1", label: "Z1 Recovery", labelZh: "Z1 恢復", color: "#94A3B8" },
+  { key: "z2", label: "Z2 Easy", labelZh: "Z2 輕鬆", color: "#3B82F6" },
+  { key: "z3", label: "Z3 Aerobic", labelZh: "Z3 有氧", color: "#10B981" },
+  { key: "z4", label: "Z4 Threshold", labelZh: "Z4 乳酸閾", color: "#F59E0B" },
+  { key: "z5", label: "Z5 Max", labelZh: "Z5 極限", color: "#EF4444" },
+];
 
 type SplitsMode = "laps" | "km" | "reps";
 
@@ -59,13 +75,15 @@ interface Props {
 
 const DEFAULT_STATS_TRANSFORM: OverlayTransform = { x: 0.5, y: 0.76, scale: 1 };
 const DEFAULT_SPLITS_TRANSFORM: OverlayTransform = { x: 0.5, y: 0.34, scale: 1 };
+const DEFAULT_ZONES_TRANSFORM: OverlayTransform = { x: 0.5, y: 0.3, scale: 1 };
+const DEFAULT_ROUTE_TRANSFORM: OverlayTransform = { x: 0.5, y: 0.5, scale: 1 };
 const DEFAULT_CHART_TRANSFORMS: Record<PhotoChartKind, OverlayTransform> = {
   pace: { x: 0.5, y: 0.42, scale: 1 },
   hr: { x: 0.5, y: 0.55, scale: 1 },
   altitude: { x: 0.5, y: 0.68, scale: 1 },
 };
 
-type OverlayKey = "stats" | "splits" | "chart:pace" | "chart:hr" | "chart:altitude";
+type OverlayKey = "stats" | "splits" | "zones" | "route" | "chart:pace" | "chart:hr" | "chart:altitude";
 
 const chartKindOf = (key: OverlayKey): PhotoChartKind | null =>
   key.startsWith("chart:") ? (key.slice(6) as PhotoChartKind) : null;
@@ -105,6 +123,8 @@ const CustomShareDialog = ({ open, onOpenChange, lang, data, available, photos =
     photoOverlay: false,
     overlayTransform: DEFAULT_STATS_TRANSFORM,
     splitsTransform: DEFAULT_SPLITS_TRANSFORM,
+    zonesTransform: DEFAULT_ZONES_TRANSFORM,
+    routeTransform: DEFAULT_ROUTE_TRANSFORM,
     chartTransforms: { ...DEFAULT_CHART_TRANSFORMS },
     route: available.route,
     splits: available.splits,
@@ -145,8 +165,26 @@ const CustomShareDialog = ({ open, onOpenChange, lang, data, available, photos =
 
   const statsOverlay = sel.overlayTransform ?? DEFAULT_STATS_TRANSFORM;
   const splitsOverlay = sel.splitsTransform ?? DEFAULT_SPLITS_TRANSFORM;
+  const zonesOverlay = sel.zonesTransform ?? DEFAULT_ZONES_TRANSFORM;
+  const routeOverlay = sel.routeTransform ?? DEFAULT_ROUTE_TRANSFORM;
   const chartTransform = (kind: PhotoChartKind) =>
     sel.chartTransforms?.[kind] ?? DEFAULT_CHART_TRANSFORMS[kind];
+
+  const zonesOnPhoto = !!sel.hrZones && !!data.hrZones;
+  const routePoints = useMemo(() => {
+    if (!data.summaryPolyline) return null;
+    try {
+      const coords = decodePolyline(data.summaryPolyline);
+      if (coords.length < 2) return null;
+      return photoRoutePoints(coords, PHOTO_ROUTE_W, PHOTO_ROUTE_H)
+        .map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`)
+        .join(" ");
+    } catch {
+      return null;
+    }
+  }, [data.summaryPolyline]);
+  const routeOnPhoto = !!sel.route && !!routePoints;
+
 
   const previewSplits = useMemo(() => filterVisibleSplits(activeSplits), [activeSplits]);
   const splitsOnPhoto = sel.splits && previewSplits.length > 0;
@@ -176,6 +214,8 @@ const CustomShareDialog = ({ open, onOpenChange, lang, data, available, photos =
   const overlayKeys: OverlayKey[] = [
     "stats",
     ...(splitsOnPhoto ? (["splits"] as OverlayKey[]) : []),
+    ...(zonesOnPhoto ? (["zones"] as OverlayKey[]) : []),
+    ...(routeOnPhoto ? (["route"] as OverlayKey[]) : []),
     ...chartsOnPhoto.map((c) => `chart:${c.kind}` as OverlayKey),
   ];
 
@@ -186,12 +226,18 @@ const CustomShareDialog = ({ open, onOpenChange, lang, data, available, photos =
   const transformOf = (key: OverlayKey): OverlayTransform => {
     const kind = chartKindOf(key);
     if (kind) return chartTransform(kind);
-    return key === "splits" ? splitsOverlay : statsOverlay;
+    if (key === "splits") return splitsOverlay;
+    if (key === "zones") return zonesOverlay;
+    if (key === "route") return routeOverlay;
+    return statsOverlay;
   };
   const defaultOf = (key: OverlayKey): OverlayTransform => {
     const kind = chartKindOf(key);
     if (kind) return DEFAULT_CHART_TRANSFORMS[kind];
-    return key === "splits" ? DEFAULT_SPLITS_TRANSFORM : DEFAULT_STATS_TRANSFORM;
+    if (key === "splits") return DEFAULT_SPLITS_TRANSFORM;
+    if (key === "zones") return DEFAULT_ZONES_TRANSFORM;
+    if (key === "route") return DEFAULT_ROUTE_TRANSFORM;
+    return DEFAULT_STATS_TRANSFORM;
   };
   const activeTransform = transformOf(activeOverlay);
 
@@ -204,6 +250,12 @@ const CustomShareDialog = ({ open, onOpenChange, lang, data, available, photos =
       }
       if (key === "splits") {
         return { ...s, splitsTransform: { ...(s.splitsTransform ?? DEFAULT_SPLITS_TRANSFORM), ...next } };
+      }
+      if (key === "zones") {
+        return { ...s, zonesTransform: { ...(s.zonesTransform ?? DEFAULT_ZONES_TRANSFORM), ...next } };
+      }
+      if (key === "route") {
+        return { ...s, routeTransform: { ...(s.routeTransform ?? DEFAULT_ROUTE_TRANSFORM), ...next } };
       }
       return { ...s, overlayTransform: { ...(s.overlayTransform ?? DEFAULT_STATS_TRANSFORM), ...next } };
     });
@@ -222,6 +274,12 @@ const CustomShareDialog = ({ open, onOpenChange, lang, data, available, photos =
         hx: ((splitsLayout.blockW * s) / PHOTO_CARD_W) / 2,
         hy: ((splitsLayout.blockH * s) / 1350) / 2,
       };
+    }
+    if (key === "zones") {
+      return { hx: ((PHOTO_ZONES_W * scale) / PHOTO_CARD_W) / 2, hy: ((PHOTO_ZONES_H * scale) / 1350) / 2 };
+    }
+    if (key === "route") {
+      return { hx: ((PHOTO_ROUTE_W * scale) / PHOTO_CARD_W) / 2, hy: ((PHOTO_ROUTE_H * scale) / 1350) / 2 };
     }
     return { hx: 0.36 * scale, hy: 0.14 * scale };
   };
@@ -300,7 +358,10 @@ const CustomShareDialog = ({ open, onOpenChange, lang, data, available, photos =
     if (kind === "pace") return t("Pace chart", "配速圖");
     if (kind === "hr") return t("HR chart", "心率圖");
     if (kind === "altitude") return t("Elev chart", "海拔圖");
-    return key === "splits" ? t("Splits", "分段") : t("Stats", "數據");
+    if (key === "splits") return t("Splits", "分段");
+    if (key === "zones") return t("HR zones", "心率區間");
+    if (key === "route") return t("Route", "路線");
+    return t("Stats", "數據");
   };
 
   const Row = ({
@@ -463,6 +524,94 @@ const CustomShareDialog = ({ open, onOpenChange, lang, data, available, photos =
                           </div>
                         )}
 
+                        {zonesOnPhoto && data.hrZones && (
+                          <div
+                            role="button"
+                            tabIndex={0}
+                            aria-label={t("Drag to move HR zones", "拖曳以移動心率區間")}
+                            className={blockClass("zones")}
+                            style={{
+                              left: `${zonesOverlay.x * 100}%`,
+                              top: `${zonesOverlay.y * 100}%`,
+                              width: PHOTO_ZONES_W,
+                              height: PHOTO_ZONES_H,
+                              transform: `translate(-50%, -50%) scale(${f * zonesOverlay.scale})`,
+                            }}
+                            {...dragHandlers("zones")}
+                          >
+                            <div
+                              className="font-semibold uppercase opacity-80"
+                              style={{ fontSize: 24, lineHeight: `${PHOTO_ZONES_HEAD_H}px` }}
+                            >
+                              {t("HR zones", "心率區間")}
+                            </div>
+                            {ZONE_ROWS.map((z) => {
+                              const pct = Math.max(0, Math.min(100, Number(data.hrZones![z.key] || 0)));
+                              return (
+                                <div
+                                  key={z.key}
+                                  className="flex items-center"
+                                  style={{ height: PHOTO_ZONES_ROW_H, gap: 12 }}
+                                >
+                                  <span className="font-bold" style={{ fontSize: 26, width: 180 }}>
+                                    {isZh ? z.labelZh : z.label}
+                                  </span>
+                                  <span
+                                    className="relative flex-1 overflow-hidden"
+                                    style={{ height: 26, borderRadius: 13, background: "rgba(255,255,255,0.25)" }}
+                                  >
+                                    <span
+                                      className="absolute inset-y-0 left-0"
+                                      style={{ width: `${pct}%`, background: z.color, borderRadius: 13 }}
+                                    />
+                                  </span>
+                                  <span
+                                    className="font-display font-bold tabular-nums"
+                                    style={{ fontSize: 26, width: 80, textAlign: "right" }}
+                                  >
+                                    {pct.toFixed(0)}%
+                                  </span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+
+                        {routeOnPhoto && routePoints && (
+                          <div
+                            role="button"
+                            tabIndex={0}
+                            aria-label={t("Drag to move route", "拖曳以移動路線")}
+                            className={blockClass("route")}
+                            style={{
+                              left: `${routeOverlay.x * 100}%`,
+                              top: `${routeOverlay.y * 100}%`,
+                              width: PHOTO_ROUTE_W,
+                              height: PHOTO_ROUTE_H,
+                              transform: `translate(-50%, -50%) scale(${f * routeOverlay.scale})`,
+                            }}
+                            {...dragHandlers("route")}
+                          >
+                            <svg
+                              width={PHOTO_ROUTE_W}
+                              height={PHOTO_ROUTE_H}
+                              viewBox={`0 0 ${PHOTO_ROUTE_W} ${PHOTO_ROUTE_H}`}
+                              className="absolute inset-0"
+                            >
+                              <polyline
+                                points={routePoints}
+                                fill="none"
+                                stroke="rgba(255,255,255,0.95)"
+                                strokeWidth={7}
+                                strokeLinejoin="round"
+                                strokeLinecap="round"
+                              />
+                            </svg>
+                          </div>
+                        )}
+
+
+
                         {chartsOnPhoto.map((c) => {
                           const tf = chartTransform(c.kind);
                           const min = Math.min(...c.values);
@@ -609,7 +758,7 @@ const CustomShareDialog = ({ open, onOpenChange, lang, data, available, photos =
               label={t("HR zones chart", "心率區間")}
               checked={sel.hrZones}
               onChange={() => setSel((s) => ({ ...s, hrZones: !s.hrZones }))}
-              disabled={!available.hrZones || !!sel.photoOverlay}
+              disabled={!available.hrZones}
             />
           </div>
 

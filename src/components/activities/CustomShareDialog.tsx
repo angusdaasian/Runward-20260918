@@ -944,3 +944,10 @@ function formatPreviewPace(speedMps: number) {
   const secs = Math.round(secPerKm % 60);
   return `${minutes}:${String(secs).padStart(2, "0")}`;
 }
+
+/** Remembers the last non-empty value, so refetching streams never blanks a block. */
+function useSticky<T>(value: T): T {
+  const ref = useRef<T>(value);
+  if (value !== null && value !== undefined) ref.current = value;
+  return ref.current;
+}

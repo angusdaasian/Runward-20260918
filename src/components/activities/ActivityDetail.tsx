@@ -1024,6 +1024,27 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
           chartAlt: chartData.some((d: any) => typeof d.altitude === "number"),
         }}
         photos={activityPhotos.photos.map((p) => ({ id: p.id, url: p.url }))}
+        splitSets={(() => {
+          const map = (arr: any[] | null | undefined) =>
+            arr && arr.length
+              ? arr.map((s: any) => ({
+                  distance: s.distance,
+                  elapsed_time: s.elapsed_time,
+                  average_speed: s.average_speed,
+                  average_heartrate: s.average_heartrate ?? null,
+                }))
+              : null;
+          const lapDists = (splits || []).map((s) => s.distance || 0).filter((d) => d > 50);
+          const avgLap = lapDists.length ? lapDists.reduce((a, b) => a + b, 0) / lapDists.length : 0;
+          return {
+            laps: map(splits),
+            km: map(exactKmSplits),
+            reps: map(smartReps?.segments),
+            lapsLabel: avgLap > 0 && avgLap < 900
+              ? (lang === "zh" ? "每圈 400 公尺" : "Laps (400 m)")
+              : (lang === "zh" ? "手錶分段" : "Watch laps"),
+          };
+        })()}
       />
       <RouteVideoDialog
         open={routeVideoOpen}

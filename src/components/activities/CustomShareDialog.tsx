@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -11,9 +11,23 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Lang } from "@/lib/i18n";
-import { shareCustom, CustomShareSelections, CustomShareInput, OverlayTransform } from "@/lib/shareActivity";
+import {
+  shareCustom,
+  CustomShareSelections,
+  CustomShareInput,
+  OverlayTransform,
+  PhotoChartKind,
+  PHOTO_CARD_W,
+  PHOTO_CHART_W,
+  PHOTO_CHART_H,
+  photoSplitsLayout,
+  filterVisibleSplits,
+  ShareSplit,
+} from "@/lib/shareActivity";
 import { AlignCenter, AlignStartVertical, AlignEndVertical, RotateCcw, Sparkles } from "lucide-react";
 import appIcon from "@/assets/app-icon.png";
+
+type SplitsMode = "laps" | "km" | "reps";
 
 interface Props {
   open: boolean;
@@ -34,24 +48,64 @@ interface Props {
     chartAlt: boolean;
   };
   photos?: Array<{ id: string; url: string }>;
+  /** Alternative split sources the user can choose between. */
+  splitSets?: {
+    laps?: ShareSplit[] | null;
+    km?: ShareSplit[] | null;
+    reps?: ShareSplit[] | null;
+    lapsLabel?: string;
+  };
 }
 
 const DEFAULT_STATS_TRANSFORM: OverlayTransform = { x: 0.5, y: 0.76, scale: 1 };
 const DEFAULT_SPLITS_TRANSFORM: OverlayTransform = { x: 0.5, y: 0.34, scale: 1 };
+const DEFAULT_CHART_TRANSFORMS: Record<PhotoChartKind, OverlayTransform> = {
+  pace: { x: 0.5, y: 0.42, scale: 1 },
+  hr: { x: 0.5, y: 0.55, scale: 1 },
+  altitude: { x: 0.5, y: 0.68, scale: 1 },
+};
 
-type OverlayKey = "stats" | "splits";
+type OverlayKey = "stats" | "splits" | "chart:pace" | "chart:hr" | "chart:altitude";
 
-const CustomShareDialog = ({ open, onOpenChange, lang, data, available, photos = [] }: Props) => {
+const chartKindOf = (key: OverlayKey): PhotoChartKind | null =>
+  key.startsWith("chart:") ? (key.slice(6) as PhotoChartKind) : null;
+
+const CustomShareDialog = ({ open, onOpenChange, lang, data, available, photos = [], splitSets }: Props) => {
   const isZh = lang === "zh";
   const t = (en: string, zh: string) => (isZh ? zh : en);
 
   const [photoId, setPhotoId] = useState<string | null>(null);
   const photoUrl = photos.find((p) => p.id === photoId)?.url || null;
 
+  const splitOptions = useMemo(() => {
+    const opts: Array<{ mode: SplitsMode; label: string; splits: ShareSplit[] }> = [];
+    if (splitSets?.laps?.length) {
+      opts.push({
+        mode: "laps",
+        label: splitSets.lapsLabel || t("Watch laps", "手錶分段"),
+        splits: splitSets.laps,
+      });
+    }
+    if (splitSets?.km?.length) {
+      opts.push({ mode: "km", label: t("1 km splits", "每 1 公里"), splits: splitSets.km });
+    }
+    if (splitSets?.reps?.length) {
+      opts.push({ mode: "reps", label: t("Intervals", "智能分段"), splits: splitSets.reps });
+    }
+    return opts;
+  }, [splitSets, isZh]);
+
+  const [splitsMode, setSplitsMode] = useState<SplitsMode>("laps");
+  const activeSplits = useMemo(() => {
+    const chosen = splitOptions.find((o) => o.mode === splitsMode) || splitOptions[0];
+    return chosen?.splits ?? data.splits ?? [];
+  }, [splitOptions, splitsMode, data.splits]);
+
   const [sel, setSel] = useState<CustomShareSelections>({
     photoOverlay: false,
     overlayTransform: DEFAULT_STATS_TRANSFORM,
     splitsTransform: DEFAULT_SPLITS_TRANSFORM,
+    chartTransforms: { ...DEFAULT_CHART_TRANSFORMS },
     route: available.route,
     splits: available.splits,
     hrZones: available.hrZones,
@@ -75,28 +129,112 @@ const CustomShareDialog = ({ open, onOpenChange, lang, data, available, photos =
   const [activeOverlay, setActiveOverlay] = useState<OverlayKey>("stats");
   const previewRef = useRef<HTMLDivElement>(null);
   const dragPointerRef = useRef<number | null>(null);
+  const [previewW, setPreviewW] = useState(300);
+
+  useEffect(() => {
+    const el = previewRef.current;
+    if (!el) return;
+    setPreviewW(el.clientWidth);
+    const ro = new ResizeObserver(() => setPreviewW(el.clientWidth));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [open, photoUrl, sel.photoOverlay]);
+
+  /** preview px per canvas px — keeps the preview a true WYSIWYG of the export. */
+  const f = previewW / PHOTO_CARD_W;
 
   const statsOverlay = sel.overlayTransform ?? DEFAULT_STATS_TRANSFORM;
   const splitsOverlay = sel.splitsTransform ?? DEFAULT_SPLITS_TRANSFORM;
-  const splitsOnPhoto = sel.splits && (data.splits?.length ?? 0) > 0;
-  const activeTransform = activeOverlay === "splits" ? splitsOverlay : statsOverlay;
+  const chartTransform = (kind: PhotoChartKind) =>
+    sel.chartTransforms?.[kind] ?? DEFAULT_CHART_TRANSFORMS[kind];
+
+  const previewSplits = useMemo(() => filterVisibleSplits(activeSplits), [activeSplits]);
+  const splitsOnPhoto = sel.splits && previewSplits.length > 0;
+  const splitsLayout = photoSplitsLayout(previewSplits.length);
+
+  const chartSeries = useMemo(() => {
+    const rows = data.chartData || [];
+    const pick = (get: (d: typeof rows[number]) => number | undefined) =>
+      rows.map(get).filter((v): v is number => typeof v === "number" && Number.isFinite(v) && v !== 0);
+    return {
+      pace: pick((d) => d.pace),
+      hr: pick((d) => d.heartrate),
+      altitude: rows
+        .map((d) => d.altitude)
+        .filter((v): v is number => typeof v === "number" && Number.isFinite(v)),
+    };
+  }, [data.chartData]);
+
+  const chartsOnPhoto = ([
+    { kind: "pace", label: t("PACE", "配速"), values: chartSeries.pace, invert: true },
+    { kind: "hr", label: t("HEART RATE", "心率"), values: chartSeries.hr, invert: false },
+    { kind: "altitude", label: t("ELEVATION", "海拔"), values: chartSeries.altitude, invert: false },
+  ] as Array<{ kind: PhotoChartKind; label: string; values: number[]; invert: boolean }>).filter(
+    (c) => sel.charts[c.kind] && c.values.length >= 2,
+  );
+
+  const overlayKeys: OverlayKey[] = [
+    "stats",
+    ...(splitsOnPhoto ? (["splits"] as OverlayKey[]) : []),
+    ...chartsOnPhoto.map((c) => `chart:${c.kind}` as OverlayKey),
+  ];
+
+  useEffect(() => {
+    if (!overlayKeys.includes(activeOverlay)) setActiveOverlay("stats");
+  }, [overlayKeys.join(","), activeOverlay]);
+
+  const transformOf = (key: OverlayKey): OverlayTransform => {
+    const kind = chartKindOf(key);
+    if (kind) return chartTransform(kind);
+    return key === "splits" ? splitsOverlay : statsOverlay;
+  };
+  const defaultOf = (key: OverlayKey): OverlayTransform => {
+    const kind = chartKindOf(key);
+    if (kind) return DEFAULT_CHART_TRANSFORMS[kind];
+    return key === "splits" ? DEFAULT_SPLITS_TRANSFORM : DEFAULT_STATS_TRANSFORM;
+  };
+  const activeTransform = transformOf(activeOverlay);
 
   const setOverlay = (key: OverlayKey, next: Partial<OverlayTransform>) =>
-    setSel((s) =>
-      key === "splits"
-        ? { ...s, splitsTransform: { ...(s.splitsTransform ?? DEFAULT_SPLITS_TRANSFORM), ...next } }
-        : { ...s, overlayTransform: { ...(s.overlayTransform ?? DEFAULT_STATS_TRANSFORM), ...next } },
-    );
+    setSel((s) => {
+      const kind = chartKindOf(key);
+      if (kind) {
+        const prev = s.chartTransforms?.[kind] ?? DEFAULT_CHART_TRANSFORMS[kind];
+        return { ...s, chartTransforms: { ...s.chartTransforms, [kind]: { ...prev, ...next } } };
+      }
+      if (key === "splits") {
+        return { ...s, splitsTransform: { ...(s.splitsTransform ?? DEFAULT_SPLITS_TRANSFORM), ...next } };
+      }
+      return { ...s, overlayTransform: { ...(s.overlayTransform ?? DEFAULT_STATS_TRANSFORM), ...next } };
+    });
   const setActive = (next: Partial<OverlayTransform>) => setOverlay(activeOverlay, next);
+
+  /** Half size of an overlay as a fraction of the card, used for clamping. */
+  const halfFractions = (key: OverlayKey) => {
+    const tf = transformOf(key);
+    const scale = Math.max(0.65, Math.min(1.15, tf.scale));
+    if (chartKindOf(key)) {
+      return { hx: ((PHOTO_CHART_W * scale) / PHOTO_CARD_W) / 2, hy: ((PHOTO_CHART_H * scale) / 1350) / 2 };
+    }
+    if (key === "splits") {
+      const s = scale * splitsLayout.fit;
+      return {
+        hx: ((splitsLayout.blockW * s) / PHOTO_CARD_W) / 2,
+        hy: ((splitsLayout.blockH * s) / 1350) / 2,
+      };
+    }
+    return { hx: 0.36 * scale, hy: 0.14 * scale };
+  };
 
   const moveOverlay = (key: OverlayKey, clientX: number, clientY: number) => {
     const rect = previewRef.current?.getBoundingClientRect();
     if (!rect) return;
-    const scale = key === "splits" ? splitsOverlay.scale : statsOverlay.scale;
-    const minX = 0.36 * scale + 0.025;
-    const halfY = 0.14 * scale;
+    const { hx, hy } = halfFractions(key);
+    const minX = Math.min(0.5, hx + 0.025);
+    const minY = Math.min(0.5, 0.14 + hy);
+    const maxY = Math.max(0.5, 0.98 - hy);
     const x = Math.max(minX, Math.min(1 - minX, (clientX - rect.left) / rect.width));
-    const y = Math.max(0.16 + halfY, Math.min(0.97 - halfY, (clientY - rect.top) / rect.height));
+    const y = Math.max(minY, Math.min(maxY, (clientY - rect.top) / rect.height));
     setOverlay(key, { x, y });
   };
 
@@ -109,10 +247,6 @@ const CustomShareDialog = ({ open, onOpenChange, lang, data, available, photos =
     sel.stats.calories && data.calories ? { label: t("Calories", "卡路里"), value: `${Math.round(data.calories)}` } : null,
   ].filter((stat): stat is { label: string; value: string } => stat !== null).slice(0, 6);
 
-  const previewSplits = (data.splits ?? [])
-    .filter((s) => !((s.distance || 0) < 50 && (s.elapsed_time || 0) < 10))
-    .slice(0, 8);
-
   const toggleStat = (k: keyof CustomShareSelections["stats"]) =>
     setSel((s) => ({ ...s, stats: { ...s.stats, [k]: !s.stats[k] } }));
   const toggleChart = (k: keyof CustomShareSelections["charts"]) =>
@@ -121,7 +255,7 @@ const CustomShareDialog = ({ open, onOpenChange, lang, data, available, photos =
   const handleGenerate = async () => {
     setSubmitting(true);
     try {
-      await shareCustom({ ...data, photoUrl, selections: sel });
+      await shareCustom({ ...data, splits: activeSplits, photoUrl, selections: sel });
       onOpenChange(false);
     } finally {
       setSubmitting(false);
@@ -145,21 +279,29 @@ const CustomShareDialog = ({ open, onOpenChange, lang, data, available, photos =
       dragPointerRef.current = null;
     },
     onKeyDown: (event: React.KeyboardEvent<HTMLDivElement>) => {
-      const current = key === "splits" ? splitsOverlay : statsOverlay;
+      const current = transformOf(key);
       const step = event.shiftKey ? 0.05 : 0.02;
-      if (event.key === "ArrowLeft") setOverlay(key, { x: Math.max(0.3, current.x - step) });
-      else if (event.key === "ArrowRight") setOverlay(key, { x: Math.min(0.7, current.x + step) });
-      else if (event.key === "ArrowUp") setOverlay(key, { y: Math.max(0.2, current.y - step) });
-      else if (event.key === "ArrowDown") setOverlay(key, { y: Math.min(0.9, current.y + step) });
+      if (event.key === "ArrowLeft") setOverlay(key, { x: Math.max(0.1, current.x - step) });
+      else if (event.key === "ArrowRight") setOverlay(key, { x: Math.min(0.9, current.x + step) });
+      else if (event.key === "ArrowUp") setOverlay(key, { y: Math.max(0.14, current.y - step) });
+      else if (event.key === "ArrowDown") setOverlay(key, { y: Math.min(0.96, current.y + step) });
       else return;
       event.preventDefault();
     },
   });
 
   const blockClass = (key: OverlayKey) =>
-    `absolute touch-none cursor-move rounded-md p-1 text-background [text-shadow:0_1px_6px_rgba(0,0,0,0.75)] ${
+    `absolute touch-none cursor-move rounded-md text-background [text-shadow:0_1px_6px_rgba(0,0,0,0.75)] ${
       activeOverlay === key ? "ring-1 ring-background/70" : "ring-0"
     }`;
+
+  const overlayLabel = (key: OverlayKey) => {
+    const kind = chartKindOf(key);
+    if (kind === "pace") return t("Pace chart", "配速圖");
+    if (kind === "hr") return t("HR chart", "心率圖");
+    if (kind === "altitude") return t("Elev chart", "海拔圖");
+    return key === "splits" ? t("Splits", "分段") : t("Stats", "數據");
+  };
 
   const Row = ({
     label,
@@ -231,8 +373,8 @@ const CustomShareDialog = ({ open, onOpenChange, lang, data, available, photos =
                   </div>
                   <p className="mt-1 text-xs text-muted-foreground">
                     {t(
-                      "Tap a block to select it, drag to move it, and use the slider to resize. Text sits directly on the photo.",
-                      "點選一個區塊即可選取，拖曳可移動，滑桿可調整大小。文字會直接疊在照片上。",
+                      "Tap a block to select it, drag to move it, and use the slider to resize. Long split lists shrink automatically to fit.",
+                      "點選一個區塊即可選取，拖曳可移動，滑桿可調整大小。分段太長時會自動縮小以完整顯示。",
                     )}
                   </p>
                   {photoUrl && (
@@ -251,7 +393,7 @@ const CustomShareDialog = ({ open, onOpenChange, lang, data, available, photos =
                           role="button"
                           tabIndex={0}
                           aria-label={t("Drag to move stats", "拖曳以移動數據")}
-                          className={`${blockClass("stats")} w-[70%]`}
+                          className={`${blockClass("stats")} w-[70%] p-1`}
                           style={{
                             left: `${statsOverlay.x * 100}%`,
                             top: `${statsOverlay.y * 100}%`,
@@ -278,66 +420,120 @@ const CustomShareDialog = ({ open, onOpenChange, lang, data, available, photos =
                           )}
                         </div>
 
-                        {splitsOnPhoto && previewSplits.length > 0 && (
+                        {splitsOnPhoto && (
                           <div
                             role="button"
                             tabIndex={0}
                             aria-label={t("Drag to move splits", "拖曳以移動分段")}
-                            className={`${blockClass("splits")} w-[55%]`}
+                            className={blockClass("splits")}
                             style={{
                               left: `${splitsOverlay.x * 100}%`,
                               top: `${splitsOverlay.y * 100}%`,
-                              transform: `translate(-50%, -50%) scale(${splitsOverlay.scale})`,
+                              width: splitsLayout.blockW,
+                              height: splitsLayout.blockH,
+                              transform: `translate(-50%, -50%) scale(${f * splitsLayout.fit * splitsOverlay.scale})`,
                             }}
                             {...dragHandlers("splits")}
                           >
-                            <div className="flex text-[6px] font-semibold uppercase opacity-80">
+                            <div
+                              className="flex font-semibold uppercase opacity-75"
+                              style={{ fontSize: 22, lineHeight: `${splitsLayout.headH}px` }}
+                            >
                               <span className="flex-1">{t("Split", "分段")}</span>
-                              <span className="w-9 text-right">{t("Pace", "配速")}</span>
-                              <span className="w-6 text-right">HR</span>
+                              <span style={{ width: 120, textAlign: "right" }}>{t("Pace", "配速")}</span>
+                              <span style={{ width: 100, textAlign: "right" }}>HR</span>
                             </div>
                             {previewSplits.map((s, i) => (
-                              <div key={i} className="flex items-baseline text-[8px] font-bold">
+                              <div
+                                key={i}
+                                className="flex items-baseline font-bold"
+                                style={{ fontSize: 32, height: splitsLayout.rowH, lineHeight: `${splitsLayout.rowH}px` }}
+                              >
                                 <span className="flex-1">
                                   {((s.distance || 0) / 1000).toFixed((s.distance || 0) % 1000 === 0 ? 0 : 2)} km
                                 </span>
-                                <span className="w-9 text-right font-display">
+                                <span className="font-display" style={{ width: 120, textAlign: "right" }}>
                                   {s.average_speed > 0 ? formatPreviewPace(s.average_speed) : "--"}
                                 </span>
-                                <span className="w-6 text-right opacity-90">
+                                <span className="opacity-90" style={{ width: 100, textAlign: "right" }}>
                                   {s.average_heartrate ? Math.round(s.average_heartrate) : "--"}
                                 </span>
                               </div>
                             ))}
                           </div>
                         )}
+
+                        {chartsOnPhoto.map((c) => {
+                          const tf = chartTransform(c.kind);
+                          const min = Math.min(...c.values);
+                          const max = Math.max(...c.values);
+                          const span = Math.max(max - min, 1e-6);
+                          const plotY = 46;
+                          const plotH = PHOTO_CHART_H - plotY - 10;
+                          const pts = c.values
+                            .map((v, i) => {
+                              const x = (i / (c.values.length - 1)) * PHOTO_CHART_W;
+                              const norm = (v - min) / span;
+                              const y = plotY + (c.invert ? norm : 1 - norm) * plotH;
+                              return `${x.toFixed(1)},${y.toFixed(1)}`;
+                            })
+                            .join(" ");
+                          return (
+                            <div
+                              key={c.kind}
+                              role="button"
+                              tabIndex={0}
+                              aria-label={t("Drag to move chart", "拖曳以移動圖表")}
+                              className={blockClass(`chart:${c.kind}` as OverlayKey)}
+                              style={{
+                                left: `${tf.x * 100}%`,
+                                top: `${tf.y * 100}%`,
+                                width: PHOTO_CHART_W,
+                                height: PHOTO_CHART_H,
+                                transform: `translate(-50%, -50%) scale(${f * tf.scale})`,
+                              }}
+                              {...dragHandlers(`chart:${c.kind}` as OverlayKey)}
+                            >
+                              <div className="font-semibold uppercase opacity-80" style={{ fontSize: 24, lineHeight: "34px" }}>
+                                {c.label}
+                              </div>
+                              <svg
+                                width={PHOTO_CHART_W}
+                                height={PHOTO_CHART_H}
+                                viewBox={`0 0 ${PHOTO_CHART_W} ${PHOTO_CHART_H}`}
+                                className="absolute inset-0"
+                              >
+                                <polygon
+                                  points={`0,${plotY + plotH} ${pts} ${PHOTO_CHART_W},${plotY + plotH}`}
+                                  fill="rgba(255,255,255,0.18)"
+                                />
+                                <polyline points={pts} fill="none" stroke="rgba(255,255,255,0.95)" strokeWidth={5} strokeLinejoin="round" />
+                              </svg>
+                            </div>
+                          );
+                        })}
                       </div>
 
-                      {splitsOnPhoto && previewSplits.length > 0 && (
-                        <div className="grid grid-cols-2 gap-1.5">
-                          <Button
-                            type="button"
-                            variant={activeOverlay === "stats" ? "default" : "outline"}
-                            size="sm"
-                            onClick={() => setActiveOverlay("stats")}
-                          >
-                            {t("Stats", "數據")}
-                          </Button>
-                          <Button
-                            type="button"
-                            variant={activeOverlay === "splits" ? "default" : "outline"}
-                            size="sm"
-                            onClick={() => setActiveOverlay("splits")}
-                          >
-                            {t("Splits", "分段")}
-                          </Button>
+                      {overlayKeys.length > 1 && (
+                        <div className="flex flex-wrap gap-1.5">
+                          {overlayKeys.map((key) => (
+                            <Button
+                              key={key}
+                              type="button"
+                              variant={activeOverlay === key ? "default" : "outline"}
+                              size="sm"
+                              onClick={() => setActiveOverlay(key)}
+                            >
+                              {overlayLabel(key)}
+                            </Button>
+                          ))}
                         </div>
                       )}
 
                       <div className="space-y-2">
                         <div className="flex items-center justify-between text-xs">
                           <span className="font-medium">
-                            {activeOverlay === "splits" ? t("Splits size", "分段大小") : t("Stats size", "數據大小")}
+                            {overlayLabel(activeOverlay)} · {t("size", "大小")}
                           </span>
                           <span className="tabular-nums text-muted-foreground">{Math.round(activeTransform.scale * 100)}%</span>
                         </div>
@@ -366,9 +562,7 @@ const CustomShareDialog = ({ open, onOpenChange, lang, data, available, photos =
                           variant="ghost"
                           size="sm"
                           className="px-2"
-                          onClick={() =>
-                            setActive(activeOverlay === "splits" ? DEFAULT_SPLITS_TRANSFORM : DEFAULT_STATS_TRANSFORM)
-                          }
+                          onClick={() => setActive(defaultOf(activeOverlay))}
                         >
                           <RotateCcw /> {t("Reset", "重設")}
                         </Button>
@@ -396,6 +590,21 @@ const CustomShareDialog = ({ open, onOpenChange, lang, data, available, photos =
               onChange={() => setSel((s) => ({ ...s, splits: !s.splits }))}
               disabled={!available.splits}
             />
+            {sel.splits && splitOptions.length > 1 && (
+              <div className="ml-6 mb-1 flex flex-wrap gap-1.5">
+                {splitOptions.map((o) => (
+                  <Button
+                    key={o.mode}
+                    type="button"
+                    size="sm"
+                    variant={splitsMode === o.mode ? "default" : "outline"}
+                    onClick={() => setSplitsMode(o.mode)}
+                  >
+                    {o.label}
+                  </Button>
+                ))}
+              </div>
+            )}
             <Row
               label={t("HR zones chart", "心率區間")}
               checked={sel.hrZones}
@@ -458,19 +667,19 @@ const CustomShareDialog = ({ open, onOpenChange, lang, data, available, photos =
               label={t("Pace chart", "配速圖")}
               checked={sel.charts.pace}
               onChange={() => toggleChart("pace")}
-              disabled={!available.chartPace || !!sel.photoOverlay}
+              disabled={!available.chartPace}
             />
             <Row
               label={t("Heart rate chart", "心率圖")}
               checked={sel.charts.hr}
               onChange={() => toggleChart("hr")}
-              disabled={!available.chartHr || !!sel.photoOverlay}
+              disabled={!available.chartHr}
             />
             <Row
               label={t("Elevation chart", "海拔圖")}
               checked={sel.charts.altitude}
               onChange={() => toggleChart("altitude")}
-              disabled={!available.chartAlt || !!sel.photoOverlay}
+              disabled={!available.chartAlt}
             />
           </div>
         </div>
@@ -499,7 +708,10 @@ function formatPreviewTime(seconds: number) {
     : `${minutes}:${String(secs).padStart(2, "0")}`;
 }
 
-function formatPreviewPace(speed: number) {
-  const seconds = 1000 / speed;
-  return `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, "0")}`;
+function formatPreviewPace(speedMps: number) {
+  if (!speedMps || speedMps <= 0) return "--";
+  const secPerKm = 1000 / speedMps;
+  const minutes = Math.floor(secPerKm / 60);
+  const secs = Math.round(secPerKm % 60);
+  return `${minutes}:${String(secs).padStart(2, "0")}`;
 }

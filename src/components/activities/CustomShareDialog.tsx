@@ -31,13 +31,18 @@ interface Props {
     chartHr: boolean;
     chartAlt: boolean;
   };
+  photos?: Array<{ id: string; url: string }>;
 }
 
-const CustomShareDialog = ({ open, onOpenChange, lang, data, available }: Props) => {
+const CustomShareDialog = ({ open, onOpenChange, lang, data, available, photos = [] }: Props) => {
   const isZh = lang === "zh";
   const t = (en: string, zh: string) => (isZh ? zh : en);
 
+  const [photoId, setPhotoId] = useState<string | null>(null);
+  const photoUrl = photos.find((p) => p.id === photoId)?.url || null;
+
   const [sel, setSel] = useState<CustomShareSelections>({
+    photoOverlay: false,
     route: available.route,
     splits: available.splits,
     hrZones: available.hrZones,

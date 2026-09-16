@@ -2313,6 +2313,66 @@ async function renderPhotoCard(input: CustomShareInput): Promise<Blob> {
 
   ctx.restore();
 
+  // ---------- Splits block (transparent, independently placed) ----------
+  const photoSplits = sel.splits && input.splits
+    ? input.splits
+        .filter((s) => !((s.distance || 0) < 50 && (s.elapsed_time || 0) < 10))
+        .slice(0, 8)
+    : [];
+  if (photoSplits.length > 0) {
+    const sTransform = sel.splitsTransform ?? { x: 0.5, y: 0.34, scale: 1 };
+    const sScale = Math.max(0.65, Math.min(1.15, sTransform.scale));
+    const sBlockW = 560;
+    const headH = 44;
+    const sRowH = 56;
+    const sBlockH = headH + photoSplits.length * sRowH;
+    const sHalfW = (sBlockW * sScale) / 2;
+    const sHalfH = (sBlockH * sScale) / 2;
+    const sCenterX = Math.max(sHalfW + 28, Math.min(W - sHalfW - 28, sTransform.x * W));
+    const sCenterY = Math.max(sHalfH + 180, Math.min(H - sHalfH - 44, sTransform.y * H));
+
+    ctx.save();
+    ctx.translate(sCenterX, sCenterY);
+    ctx.scale(sScale, sScale);
+    ctx.translate(-sBlockW / 2, -sBlockH / 2);
+    ctx.shadowColor = "rgba(0,0,0,0.55)";
+    ctx.shadowBlur = 18;
+    ctx.shadowOffsetY = 2;
+    ctx.textBaseline = "top";
+
+    const colKm = 0;
+    const colPace = 250;
+    const colHr = 430;
+    ctx.fillStyle = "rgba(255,255,255,0.7)";
+    ctx.font = `700 22px ${FONT_TEXT}`;
+    ctx.textAlign = "left";
+    ctx.fillText(isZh ? "分段" : "SPLIT", colKm, 0);
+    ctx.textAlign = "right";
+    ctx.fillText(isZh ? "配速" : "PACE", colPace + 120, 0);
+    ctx.fillText("HR", colHr + 100, 0);
+
+    photoSplits.forEach((s, i) => {
+      const ry = headH + i * sRowH;
+      const kmLabel = `${((s.distance || 0) / 1000).toFixed((s.distance || 0) % 1000 === 0 ? 0 : 2)} km`;
+      ctx.fillStyle = "rgba(255,255,255,0.9)";
+      ctx.font = `600 32px ${FONT_TEXT}`;
+      ctx.textAlign = "left";
+      ctx.fillText(kmLabel, colKm, ry);
+      ctx.fillStyle = "#FFFFFF";
+      ctx.font = `800 34px ${FONT_DISPLAY}`;
+      ctx.textAlign = "right";
+      ctx.fillText(s.average_speed > 0 ? fmtPace(s.average_speed, isZh) : "--", colPace + 120, ry);
+      ctx.fillStyle = "rgba(255,255,255,0.85)";
+      ctx.font = `700 32px ${FONT_TEXT}`;
+      ctx.fillText(s.average_heartrate ? `${Math.round(s.average_heartrate)}` : "--", colHr + 100, ry);
+    });
+
+    ctx.textAlign = "left";
+    ctx.restore();
+  }
+
+
+
   // Route line overlay (optional, bottom-right corner)
   if (sel.route && input.summaryPolyline) {
     try {

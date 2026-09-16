@@ -524,6 +524,94 @@ const CustomShareDialog = ({ open, onOpenChange, lang, data, available, photos =
                           </div>
                         )}
 
+                        {zonesOnPhoto && data.hrZones && (
+                          <div
+                            role="button"
+                            tabIndex={0}
+                            aria-label={t("Drag to move HR zones", "拖曳以移動心率區間")}
+                            className={blockClass("zones")}
+                            style={{
+                              left: `${zonesOverlay.x * 100}%`,
+                              top: `${zonesOverlay.y * 100}%`,
+                              width: PHOTO_ZONES_W,
+                              height: PHOTO_ZONES_H,
+                              transform: `translate(-50%, -50%) scale(${f * zonesOverlay.scale})`,
+                            }}
+                            {...dragHandlers("zones")}
+                          >
+                            <div
+                              className="font-semibold uppercase opacity-80"
+                              style={{ fontSize: 24, lineHeight: `${PHOTO_ZONES_HEAD_H}px` }}
+                            >
+                              {t("HR zones", "心率區間")}
+                            </div>
+                            {ZONE_ROWS.map((z) => {
+                              const pct = Math.max(0, Math.min(100, Number(data.hrZones![z.key] || 0)));
+                              return (
+                                <div
+                                  key={z.key}
+                                  className="flex items-center"
+                                  style={{ height: PHOTO_ZONES_ROW_H, gap: 12 }}
+                                >
+                                  <span className="font-bold" style={{ fontSize: 26, width: 180 }}>
+                                    {isZh ? z.labelZh : z.label}
+                                  </span>
+                                  <span
+                                    className="relative flex-1 overflow-hidden"
+                                    style={{ height: 26, borderRadius: 13, background: "rgba(255,255,255,0.25)" }}
+                                  >
+                                    <span
+                                      className="absolute inset-y-0 left-0"
+                                      style={{ width: `${pct}%`, background: z.color, borderRadius: 13 }}
+                                    />
+                                  </span>
+                                  <span
+                                    className="font-display font-bold tabular-nums"
+                                    style={{ fontSize: 26, width: 80, textAlign: "right" }}
+                                  >
+                                    {pct.toFixed(0)}%
+                                  </span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+
+                        {routeOnPhoto && routePoints && (
+                          <div
+                            role="button"
+                            tabIndex={0}
+                            aria-label={t("Drag to move route", "拖曳以移動路線")}
+                            className={blockClass("route")}
+                            style={{
+                              left: `${routeOverlay.x * 100}%`,
+                              top: `${routeOverlay.y * 100}%`,
+                              width: PHOTO_ROUTE_W,
+                              height: PHOTO_ROUTE_H,
+                              transform: `translate(-50%, -50%) scale(${f * routeOverlay.scale})`,
+                            }}
+                            {...dragHandlers("route")}
+                          >
+                            <svg
+                              width={PHOTO_ROUTE_W}
+                              height={PHOTO_ROUTE_H}
+                              viewBox={`0 0 ${PHOTO_ROUTE_W} ${PHOTO_ROUTE_H}`}
+                              className="absolute inset-0"
+                            >
+                              <polyline
+                                points={routePoints}
+                                fill="none"
+                                stroke="rgba(255,255,255,0.95)"
+                                strokeWidth={7}
+                                strokeLinejoin="round"
+                                strokeLinecap="round"
+                              />
+                            </svg>
+                          </div>
+                        )}
+
+
+
                         {chartsOnPhoto.map((c) => {
                           const tf = chartTransform(c.kind);
                           const min = Math.min(...c.values);

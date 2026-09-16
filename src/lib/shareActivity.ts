@@ -1595,6 +1595,8 @@ export interface OverlayTransform {
   scale: number;
 }
 
+export type PhotoChartKind = "pace" | "hr" | "altitude";
+
 export interface CustomShareSelections {
   /** Use an uploaded run photo as the card background with the stats overlaid. */
   photoOverlay?: boolean;
@@ -1602,6 +1604,8 @@ export interface CustomShareSelections {
   overlayTransform?: OverlayTransform;
   /** Normalized placement of the splits block on the photo card. */
   splitsTransform?: OverlayTransform;
+  /** Normalized placement of each chart block on the photo card. */
+  chartTransforms?: Partial<Record<PhotoChartKind, OverlayTransform>>;
   route: boolean;
   splits: boolean;
   hrZones: boolean;
@@ -1619,6 +1623,29 @@ export interface CustomShareSelections {
     hr: boolean;
     altitude: boolean;
   };
+}
+
+/** Photo share card canvas size — the dialog preview mirrors these units. */
+export const PHOTO_CARD_W = 1080;
+export const PHOTO_CARD_H = 1350;
+
+/** Shared splits-overlay geometry (canvas px) so preview and export match. */
+export function photoSplitsLayout(count: number) {
+  const blockW = 560;
+  const headH = 44;
+  const rowH = 56;
+  const blockH = headH + Math.max(count, 1) * rowH;
+  // Auto-shrink so a long list always fits inside the card.
+  const fit = Math.min(1, (PHOTO_CARD_H - 300) / blockH);
+  return { blockW, headH, rowH, blockH, fit };
+}
+
+/** Shared chart-overlay geometry (canvas px). */
+export const PHOTO_CHART_W = 620;
+export const PHOTO_CHART_H = 280;
+
+export function filterVisibleSplits(splits: ShareSplit[]): ShareSplit[] {
+  return splits.filter((s) => !((s.distance || 0) < 50 && (s.elapsed_time || 0) < 10));
 }
 
 export interface CustomShareChartPoint {

@@ -533,7 +533,7 @@ const ProfileSection = ({ lang, subpage = "main", onNavigate, compact = false, d
               <div key={zone.key} className="min-w-0 text-center">
                 <div className="flex h-20 items-end justify-center">
                   <div
-                    className="animate-zone-grow w-full max-w-8 rounded-t-md"
+                    className="animate-zone-grow w-full max-w-[2rem] rounded-t-md"
                     style={{
                       height: barHeights[index],
                       backgroundColor: ZONE_LABELS[index].color,

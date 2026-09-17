@@ -16,6 +16,24 @@ import { useActivities } from "@/hooks/use-activities";
 import HeartRateZonesCard from "@/components/HeartRateZonesCard";
 import { ZONE_LABELS, zoneBoundaries, estimateMaxHr, estimateRestingHr } from "@/lib/hrZones";
 
+/** Counts a number up from 0 with an ease-out curve whenever the target changes. */
+function AnimatedScore({ value, className }: { value: number; className?: string }) {
+  const [shown, setShown] = useState(0);
+  useEffect(() => {
+    let raf = 0;
+    const start = performance.now();
+    const duration = 900;
+    const tick = (now: number) => {
+      const p = Math.min(1, (now - start) / duration);
+      setShown(Math.round(value * (1 - Math.pow(1 - p, 3)) * 10) / 10);
+      if (p < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [value]);
+  return <span className={className}>{shown % 1 === 0 ? shown : shown.toFixed(1)}</span>;
+}
+
 const ZONE_INFO: Array<{ key: string; name: string; nameZh: string; desc: string; descZh: string }> = [
   { key: "z1", name: "Recovery", nameZh: "恢復", desc: "Easy effort for warm-ups, cool-downs, and active recovery.", descZh: "輕鬆配速，適合熱身、緩和及主動恢復。" },
   { key: "z2", name: "Endurance", nameZh: "耐力", desc: "Comfortable effort that burns fat and builds endurance.", descZh: "舒適配速，燃燒脂肪並建立耐力基礎。" },
@@ -392,10 +410,17 @@ const ProfileSection = ({ lang, subpage = "main", onNavigate, compact = false, d
   if (display === "personal-bests") {
     return (
       <section className="overflow-hidden rounded-2xl border border-warning/30 bg-card shadow-sm">
-        <div className="flex items-start justify-between gap-4 bg-warning/10 p-4">
+        <div className="relative flex items-start justify-between gap-4 bg-gradient-to-br from-warning/25 via-warning/10 to-transparent p-4">
+          <div className="pointer-events-none absolute inset-0 overflow-hidden">
+            <div className="animate-shine-sweep absolute inset-y-0 w-1/3 bg-gradient-to-r from-transparent via-warning/15 to-transparent" />
+          </div>
           <div className="flex min-w-0 items-center gap-3">
-            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-warning/20 text-warning">
-              <Trophy size={23} />
+            <span className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-warning/20 text-warning shadow-[inset_0_1px_0_hsl(var(--warning)/0.3)]">
+              <Trophy size={23} className="animate-trophy-float" />
+              <span className="absolute -right-0.5 -top-0.5 flex h-3 w-3">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-warning/50" />
+                <span className="relative inline-flex h-3 w-3 rounded-full border-2 border-card bg-warning" />
+              </span>
             </span>
             <div className="min-w-0">
               <p className="font-display text-base font-bold text-foreground">{lang === "zh" ? "個人最佳" : "Personal Bests"}</p>
@@ -404,7 +429,9 @@ const ProfileSection = ({ lang, subpage = "main", onNavigate, compact = false, d
           </div>
           {runningScore && (
             <div className="shrink-0 text-right">
-              <p className="font-display text-2xl font-bold text-primary">{runningScore}</p>
+              <p className="font-display text-2xl font-bold text-primary">
+                <AnimatedScore value={runningScore} />
+              </p>
               <p className="text-[10px] font-semibold uppercase text-muted-foreground">{lang === "zh" ? "跑力" : "Score"}</p>
             </div>
           )}
@@ -413,9 +440,16 @@ const ProfileSection = ({ lang, subpage = "main", onNavigate, compact = false, d
         <div className="p-4">
           {pbs.length > 0 ? (
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-              {pbs.map((pb) => (
-                <div key={pb.id} className="rounded-xl border border-border bg-muted/40 px-3 py-2.5">
-                  <p className="text-[11px] font-semibold uppercase text-muted-foreground">{pb.distance}</p>
+              {pbs.map((pb, index) => (
+                <div
+                  key={pb.id}
+                  className="animate-pb-pop relative overflow-hidden rounded-xl border border-warning/25 bg-gradient-to-b from-warning/10 to-transparent px-3 py-2.5 shadow-sm transition-transform duration-200 hover:-translate-y-0.5 hover:shadow-md"
+                  style={{ animationDelay: `${index * 90}ms` }}
+                >
+                  <p className="flex items-center gap-1 text-[11px] font-semibold uppercase text-warning">
+                    <Trophy size={10} />
+                    {pb.distance}
+                  </p>
                   <p className="mt-1 font-display text-lg font-bold tabular-nums text-foreground">{formatTime(pb.hours, pb.minutes, pb.seconds)}</p>
                 </div>
               ))}
@@ -478,11 +512,12 @@ const ProfileSection = ({ lang, subpage = "main", onNavigate, compact = false, d
     const effectiveRest = estimateRestingHr(profile.resting_heartrate);
     const bounds = zoneBoundaries(effectiveMax, effectiveRest, profile.custom_hr_zones);
     const values = [bounds.z1, bounds.z2, bounds.z3, bounds.z4, bounds.z5];
+    const barHeights = ["38%", "54%", "70%", "86%", "100%"];
     return (
-      <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+      <section className="overflow-hidden rounded-2xl border border-border bg-card p-4 shadow-sm">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-destructive/10 text-destructive"><Heart size={20} /></span>
+            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-destructive/10 text-destructive"><Heart size={20} className="animate-heartbeat" /></span>
             <div>
               <h2 className="font-display text-base font-bold text-foreground">{lang === "zh" ? "心率區間" : "Heart Rate Zones"}</h2>
               <p className="text-xs text-muted-foreground">{lang === "zh" ? `最大 ${effectiveMax} · 靜息 ${effectiveRest} BPM` : `Max ${effectiveMax} · Resting ${effectiveRest} BPM`}</p>
@@ -493,10 +528,19 @@ const ProfileSection = ({ lang, subpage = "main", onNavigate, compact = false, d
           </Button>
         </div>
         {!hrEditMode ? (
-          <div className="mt-4 grid grid-cols-5 gap-1.5">
+          <div className="mt-4 grid grid-cols-5 items-end gap-2">
             {ZONE_INFO.map((zone, index) => (
               <div key={zone.key} className="min-w-0 text-center">
-                <div className="h-2 rounded-full" style={{ backgroundColor: ZONE_LABELS[index].color }} />
+                <div className="flex h-20 items-end justify-center">
+                  <div
+                    className="animate-zone-grow w-full max-w-[2rem] rounded-t-md"
+                    style={{
+                      height: barHeights[index],
+                      backgroundColor: ZONE_LABELS[index].color,
+                      animationDelay: `${index * 110}ms`,
+                    }}
+                  />
+                </div>
                 <p className="mt-1.5 text-[10px] font-semibold text-muted-foreground">Z{index + 1}</p>
                 <p className="text-xs font-bold tabular-nums text-foreground">{values[index]}</p>
               </div>

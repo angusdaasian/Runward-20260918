@@ -387,19 +387,8 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps, onNavig
             </div>
           </div>
 
-          {hubSection === "fitness" && (
-            <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm divide-y divide-border">
-              {user && <MenuRow icon={Smartphone} label={t("connectFitnessApps", lang)} detail={lang === "zh" ? "管理你的主要運動資料來源" : "Manage your primary fitness data source"} onClick={() => onNavigateConnectApps?.()} />}
-              {user && <MenuRow icon={KeyRound} label={lang === "zh" ? "已連結的應用程式" : "Connected apps"} detail={lang === "zh" ? "第三方應用程式存取" : "Third-party app access"} onClick={() => navigate("/settings/connected-apps", { state: { from: currentRoute } })} />}
-              {!user && <MenuRow icon={Lock} label={lang === "zh" ? "登入以連接健身應用程式" : "Sign in to connect fitness apps"} onClick={() => onLoginRequest?.()} />}
-            </div>
-          )}
 
-          {hubSection === "communication" && (
-            <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm divide-y divide-border">
-              {user ? <MenuRow icon={MessageSquare} label={lang === "zh" ? "通訊應用程式（試行）" : "Messaging Apps (BETA)"} detail="WhatsApp · Telegram" onClick={() => onNavigateMessaging?.()} /> : <MenuRow icon={Lock} label={lang === "zh" ? "登入以連接通訊應用程式" : "Sign in to connect communication apps"} onClick={() => onLoginRequest?.()} />}
-            </div>
-          )}
+
 
           {hubSection === "guides" && (
             <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm divide-y divide-border">

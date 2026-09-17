@@ -373,6 +373,7 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps, onNavig
           <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm divide-y divide-border">
             <MenuRow icon={LifeBuoy} label={lang === "zh" ? "支援與幫助" : "Support & Help"} onClick={() => navigate("/support", { state: { from: currentRoute } })} />
             {!adminLoading && isAdmin && <MenuRow icon={Shield} label={lang === "zh" ? "管理員" : "Admin Panel"} onClick={() => navigate("/admin", { state: { from: currentRoute } })} />}
+            {!adminLoading && isAdmin && user && <MenuRow icon={KeyRound} label={lang === "zh" ? "已連結的應用程式" : "Connected apps"} detail={lang === "zh" ? "第三方應用程式存取" : "Third-party app access"} onClick={() => navigate("/settings/connected-apps", { state: { from: currentRoute } })} />}
           </div>
           {user && <Button variant="ghost" className="w-full text-muted-foreground" onClick={signOut}><LogOut size={18} />{lang === "zh" ? "登出" : "Sign Out"}</Button>}
         </div>

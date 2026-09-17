@@ -1,4 +1,4 @@
-import { ChevronRight, ChevronLeft, Crown, Globe, BookOpen, Check, Lock, KeyRound, Clock, Shield, LifeBuoy, ShieldCheck, Smartphone, Moon, Sun, LogOut, Ticket, Bell, Footprints, Flame, Trash2, UserRound, HeartPulse, Cable, Settings2, MessageSquare } from "lucide-react";
+import { ChevronRight, ChevronLeft, Crown, Globe, BookOpen, Check, Lock, KeyRound, Clock, Shield, LifeBuoy, ShieldCheck, Smartphone, Moon, Sun, LogOut, Ticket, Bell, Footprints, Flame, Trash2, UserRound, Settings2, MessageSquare, Watch } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -34,6 +34,7 @@ import PlanComparisonDialog from "@/components/PlanComparisonDialog";
 import StartRunningGuide from "@/components/StartRunningGuide";
 import FuelingGuide from "@/components/FuelingGuide";
 import HomeWidgetDialog from "@/components/HomeWidgetDialog";
+import CommunityPrivacy from "@/components/community/CommunityPrivacy";
 
 interface Props {
   lang: Lang;
@@ -94,9 +95,10 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps, onNavig
   const [aiChatDisabled, setAiChatDisabled] = useState(() => localStorage.getItem("ai_chat_disabled") === "true");
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showWidgetDialog, setShowWidgetDialog] = useState(false);
+  const [openHeartRateEditor, setOpenHeartRateEditor] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [textScale, setTextScale] = useTextScale();
-  const [hubSection, setHubSection] = useState<"main" | "profile" | "connections" | "guides" | "settings">("main");
+  const [hubSection, setHubSection] = useState<"main" | "fitness" | "communication" | "guides" | "settings">("main");
 
   const handleDeleteAccount = async () => {
     if (!user || deleting) return;
@@ -131,13 +133,19 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps, onNavig
   useEffect(() => {
     const checkHash = () => {
       if (window.location.hash === "#hr-zones") {
-        setProfileSubpage("hr-zones");
+        setHubSection("main");
+        setOpenHeartRateEditor(true);
+        window.setTimeout(() => document.getElementById("more-heart-rate-zones")?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
         history.replaceState(null, "", window.location.pathname + window.location.search);
       }
     };
     checkHash();
     const onHash = () => checkHash();
-    const onCustom = () => setProfileSubpage("hr-zones");
+    const onCustom = () => {
+      setHubSection("main");
+      setOpenHeartRateEditor(true);
+      window.setTimeout(() => document.getElementById("more-heart-rate-zones")?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
+    };
     const onOpenFuel = () => setShowFuelGuide(true);
     window.addEventListener("hashchange", onHash);
     window.addEventListener("focus-hr-zones", onCustom);
@@ -237,8 +245,8 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps, onNavig
   }
 
   const sectionTitle = {
-    profile: lang === "zh" ? "個人與健康" : "Profile & Health",
-    connections: lang === "zh" ? "連接與通訊" : "Connections",
+    fitness: lang === "zh" ? "連接健身應用程式" : "Connect Fitness Apps",
+    communication: lang === "zh" ? "連接通訊應用程式" : "Connect Communication Apps",
     guides: lang === "zh" ? "跑步指南" : "Running Guides",
     settings: lang === "zh" ? "應用程式設定" : "App Settings",
   } as const;
@@ -347,11 +355,18 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps, onNavig
             </div>
           </div>
 
+          {user && <ProfileSection lang={lang} display="personal-bests" />}
+          {user && (
+            <div id="more-heart-rate-zones" className="scroll-mt-4">
+              <ProfileSection lang={lang} display="heart-rate-zones" startEditing={openHeartRateEditor} />
+            </div>
+          )}
+
           <div>
             <h2 className="mb-3 px-1 font-display text-xs font-semibold uppercase text-muted-foreground">{lang === "zh" ? "你的 Runward" : "Your Runward"}</h2>
             <div className="grid grid-cols-2 gap-3">
-              <HubTile section="profile" icon={HeartPulse} title={lang === "zh" ? "個人與健康" : "Profile & Health"} description={lang === "zh" ? "個人資料、心率、最佳成績" : "Profile, heart rate, personal bests"} />
-              <HubTile section="connections" icon={Cable} title={lang === "zh" ? "連接與通訊" : "Connections"} description={lang === "zh" ? "運動裝置、通訊應用程式" : "Fitness devices and messaging"} />
+              <HubTile section="fitness" icon={Watch} title={lang === "zh" ? "連接健身應用程式" : "Connect Fitness Apps"} description={lang === "zh" ? "手錶與主要運動資料來源" : "Watches and activity data sources"} />
+              <HubTile section="communication" icon={MessageSquare} title={lang === "zh" ? "連接通訊應用程式" : "Connect Communication Apps"} description={lang === "zh" ? "WhatsApp、Telegram 通知" : "WhatsApp and Telegram alerts"} />
               <HubTile section="guides" icon={BookOpen} title={lang === "zh" ? "跑步指南" : "Running Guides"} description={lang === "zh" ? "訓練、長跑與補給知識" : "Training, distance and fueling"} />
               <HubTile section="settings" icon={Settings2} title={lang === "zh" ? "應用程式設定" : "App Settings"} description={lang === "zh" ? "顯示、語言、通知與私隱" : "Display, language and notifications"} />
             </div>
@@ -373,21 +388,17 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps, onNavig
             </div>
           </div>
 
-          {hubSection === "profile" && user && <ProfileSection lang={lang} subpage="main" onNavigate={setProfileSubpage} />}
-          {hubSection === "profile" && !user && (
-            <div className="rounded-2xl border border-border bg-card p-5 text-center shadow-sm">
-              <UserRound className="mx-auto text-primary" size={28} />
-              <p className="mt-3 text-sm text-muted-foreground">{lang === "zh" ? "登入後即可管理個人與健康資料。" : "Sign in to manage your profile and health data."}</p>
-              <Button className="mt-4" onClick={onLoginRequest}>{lang === "zh" ? "登入 / 註冊" : "Sign In / Sign Up"}</Button>
+          {hubSection === "fitness" && (
+            <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm divide-y divide-border">
+              {user && <MenuRow icon={Smartphone} label={t("connectFitnessApps", lang)} detail={lang === "zh" ? "管理你的主要運動資料來源" : "Manage your primary fitness data source"} onClick={() => onNavigateConnectApps?.()} />}
+              {user && <MenuRow icon={KeyRound} label={lang === "zh" ? "已連結的應用程式" : "Connected apps"} detail={lang === "zh" ? "第三方應用程式存取" : "Third-party app access"} onClick={() => navigate("/settings/connected-apps", { state: { from: currentRoute } })} />}
+              {!user && <MenuRow icon={Lock} label={lang === "zh" ? "登入以連接健身應用程式" : "Sign in to connect fitness apps"} onClick={() => onLoginRequest?.()} />}
             </div>
           )}
 
-          {hubSection === "connections" && (
+          {hubSection === "communication" && (
             <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm divide-y divide-border">
-              {user && <MenuRow icon={Smartphone} label={t("connectFitnessApps", lang)} detail={lang === "zh" ? "管理你的主要運動資料來源" : "Manage your primary fitness data source"} onClick={() => onNavigateConnectApps?.()} />}
-              {user && <MenuRow icon={MessageSquare} label={lang === "zh" ? "通訊應用程式（試行）" : "Messaging Apps (BETA)"} detail="WhatsApp · Telegram" onClick={() => onNavigateMessaging?.()} />}
-              {user && <MenuRow icon={KeyRound} label={lang === "zh" ? "已連結的應用程式" : "Connected apps"} detail={lang === "zh" ? "第三方應用程式存取" : "Third-party app access"} onClick={() => navigate("/settings/connected-apps", { state: { from: currentRoute } })} />}
-              <MenuRow icon={Smartphone} label={lang === "zh" ? "主螢幕小工具" : "Home Screen Widget"} detail={user?.id?.startsWith("c7a7") ? undefined : (lang === "zh" ? "即將推出" : "Coming soon")} onClick={() => user?.id?.startsWith("c7a7") && setShowWidgetDialog(true)} />
+              {user ? <MenuRow icon={MessageSquare} label={lang === "zh" ? "通訊應用程式（試行）" : "Messaging Apps (BETA)"} detail="WhatsApp · Telegram" onClick={() => onNavigateMessaging?.()} /> : <MenuRow icon={Lock} label={lang === "zh" ? "登入以連接通訊應用程式" : "Sign in to connect communication apps"} onClick={() => onLoginRequest?.()} />}
             </div>
           )}
 
@@ -408,6 +419,13 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps, onNavig
                 {user && <ToggleRow icon={Bell} label={lang === "zh" ? "活動推送通知" : "Activity Notifications"} detail={lang === "zh" ? "跑步同步後接收通知" : "Get notified after a run syncs"} checked={activityNotifications} onToggle={toggleActivityNotifications} disabled={notifLoading} />}
               </div>
 
+              {user && (
+                <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+                  <h2 className="mb-3 font-display text-sm font-semibold text-foreground">{lang === "zh" ? "社群私隱" : "Community Privacy"}</h2>
+                  <CommunityPrivacy lang={lang} compact />
+                </div>
+              )}
+
               <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
                 <div className="mb-3 flex items-center gap-2"><Globe size={18} className="text-primary" /><p className="text-sm font-medium">{t("language", lang)}</p></div>
                 <div className="grid grid-cols-2 gap-2">
@@ -422,6 +440,7 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps, onNavig
               </div>
 
               <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm divide-y divide-border">
+                <MenuRow icon={Smartphone} label={lang === "zh" ? "主螢幕小工具" : "Home Screen Widget"} detail={user?.id?.startsWith("c7a7") ? undefined : (lang === "zh" ? "即將推出" : "Coming soon")} onClick={() => user?.id?.startsWith("c7a7") && setShowWidgetDialog(true)} />
                 {user && !isPremium && <MenuRow icon={Ticket} label={lang === "zh" ? "兌換優惠代碼" : "Redeem Offer Code"} onClick={() => setShowRedeemDialog(true)} />}
                 <MenuRow icon={ShieldCheck} label={lang === "zh" ? "隱私權政策" : "Privacy Policy"} onClick={() => navigate("/privacy", { state: { from: currentRoute } })} />
                 {user && <MenuRow icon={Trash2} label={lang === "zh" ? "刪除帳號" : "Delete Account"} onClick={() => setShowDeleteDialog(true)} destructive />}

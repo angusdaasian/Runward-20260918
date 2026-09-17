@@ -14,7 +14,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { updateHeaderCache } from "@/components/AppHeader";
 import { useActivities } from "@/hooks/use-activities";
 import HeartRateZonesCard from "@/components/HeartRateZonesCard";
-import CommunityPrivacy from "@/components/community/CommunityPrivacy";
 import { ZONE_LABELS, zoneBoundaries, estimateMaxHr, estimateRestingHr } from "@/lib/hrZones";
 
 const ZONE_INFO: Array<{ key: string; name: string; nameZh: string; desc: string; descZh: string }> = [
@@ -79,9 +78,11 @@ interface ProfileSectionProps {
   subpage?: ProfileSubpage;
   onNavigate?: (sub: ProfileSubpage) => void;
   compact?: boolean;
+  display?: "default" | "personal-bests" | "heart-rate-zones";
+  startEditing?: boolean;
 }
 
-const ProfileSection = ({ lang, subpage = "main", onNavigate, compact = false }: ProfileSectionProps) => {
+const ProfileSection = ({ lang, subpage = "main", onNavigate, compact = false, display = "default", startEditing = false }: ProfileSectionProps) => {
   const { user, signOut } = useAuth();
   const { toast } = useToast();
   const { activities } = useActivities();
@@ -114,6 +115,11 @@ const ProfileSection = ({ lang, subpage = "main", onNavigate, compact = false }:
   const [newM, setNewM] = useState("");
   const [newS, setNewS] = useState("");
   const [hrEditMode, setHrEditMode] = useState(false);
+  const [pbEditMode, setPbEditMode] = useState(false);
+
+  useEffect(() => {
+    if (display === "heart-rate-zones" && startEditing) setHrEditMode(true);
+  }, [display, startEditing]);
 
   useEffect(() => {
     if (!user) return;
@@ -382,6 +388,135 @@ const ProfileSection = ({ lang, subpage = "main", onNavigate, compact = false }:
     }
     return best > 0 ? Math.round(best * 10) / 10 : null;
   }, [pbs]);
+
+  if (display === "personal-bests") {
+    return (
+      <section className="overflow-hidden rounded-2xl border border-warning/30 bg-card shadow-sm">
+        <div className="flex items-start justify-between gap-4 bg-warning/10 p-4">
+          <div className="flex min-w-0 items-center gap-3">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-warning/20 text-warning">
+              <Trophy size={23} />
+            </span>
+            <div className="min-w-0">
+              <p className="font-display text-base font-bold text-foreground">{lang === "zh" ? "個人最佳" : "Personal Bests"}</p>
+              <p className="text-xs text-muted-foreground">{lang === "zh" ? "你的最佳比賽成績" : "Your best race performances"}</p>
+            </div>
+          </div>
+          {runningScore && (
+            <div className="shrink-0 text-right">
+              <p className="font-display text-2xl font-bold text-primary">{runningScore}</p>
+              <p className="text-[10px] font-semibold uppercase text-muted-foreground">{lang === "zh" ? "跑力" : "Score"}</p>
+            </div>
+          )}
+        </div>
+
+        <div className="p-4">
+          {pbs.length > 0 ? (
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              {pbs.map((pb) => (
+                <div key={pb.id} className="rounded-xl border border-border bg-muted/40 px-3 py-2.5">
+                  <p className="text-[11px] font-semibold uppercase text-muted-foreground">{pb.distance}</p>
+                  <p className="mt-1 font-display text-lg font-bold tabular-nums text-foreground">{formatTime(pb.hours, pb.minutes, pb.seconds)}</p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="py-2 text-center">
+              <p className="text-sm font-medium text-foreground">{lang === "zh" ? "你的下一個紀錄由此開始" : "Your next record starts here"}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{lang === "zh" ? "從活動偵測或手動新增最佳成績" : "Detect a result from activities or add one manually"}</p>
+            </div>
+          )}
+
+          <div className="mt-3 flex gap-2 border-t border-border pt-3">
+            <Button size="sm" variant="outline" className="flex-1" onClick={handleDetectPBs} disabled={detecting}>
+              {detecting ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+              {lang === "zh" ? "從活動偵測" : "Detect"}
+            </Button>
+            <Button size="sm" variant={pbEditMode ? "secondary" : "outline"} className="flex-1" onClick={() => setPbEditMode((value) => !value)}>
+              <Pencil size={14} />
+              {pbEditMode ? (lang === "zh" ? "完成" : "Done") : (lang === "zh" ? "管理紀錄" : "Manage")}
+            </Button>
+          </div>
+
+          {pbEditMode && (
+            <div className="mt-4 space-y-3 border-t border-border pt-4">
+              {pbs.map((pb) => (
+                <div key={pb.id} className="flex items-center justify-between rounded-lg bg-muted/50 px-3 py-2">
+                  <span className="text-sm font-medium">{pb.distance}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm tabular-nums text-muted-foreground">{formatTime(pb.hours, pb.minutes, pb.seconds)}</span>
+                    <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => handleDeletePB(pb.id)} aria-label={lang === "zh" ? "刪除紀錄" : "Delete record"}><Trash2 size={14} /></Button>
+                  </div>
+                </div>
+              ))}
+              <div className="flex flex-wrap gap-1.5">
+                {DISTANCES.map((distance) => (
+                  <Button key={distance} type="button" size="sm" variant={newDist === distance ? "default" : "secondary"} className="h-7 px-2.5 text-xs" onClick={() => setNewDist(distance)}>{distance}</Button>
+                ))}
+              </div>
+              {newDist && (
+                <div className="space-y-2">
+                  <div className="grid grid-cols-[1fr_1fr_1fr_auto] gap-2">
+                    <Input aria-label="Hours" placeholder="H" type="number" min={0} value={newH} onChange={(e) => setNewH(e.target.value)} className="h-9 text-center" />
+                    <Input aria-label="Minutes" placeholder="M" type="number" min={0} max={59} value={newM} onChange={(e) => setNewM(e.target.value)} className="h-9 text-center" />
+                    <Input aria-label="Seconds" placeholder="S" type="number" min={0} max={59} value={newS} onChange={(e) => setNewS(e.target.value)} className="h-9 text-center" />
+                    <Button size="sm" className="h-9" onClick={handleAddPB} disabled={isPBFasterThanWR()}>{lang === "zh" ? "新增" : "Add"}</Button>
+                  </div>
+                  {isPBFasterThanWR() && <p className="text-xs font-medium text-warning">{lang === "zh" ? "這個時間快於目前的世界紀錄。" : "This time is faster than the current world record."}</p>}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </section>
+    );
+  }
+
+  if (display === "heart-rate-zones") {
+    if (!profile) return <Skeleton className="h-36 w-full rounded-2xl" />;
+    const effectiveMax = estimateMaxHr(profile.age, profile.max_heartrate);
+    const effectiveRest = estimateRestingHr(profile.resting_heartrate);
+    const bounds = zoneBoundaries(effectiveMax, effectiveRest, profile.custom_hr_zones);
+    const values = [bounds.z1, bounds.z2, bounds.z3, bounds.z4, bounds.z5];
+    return (
+      <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-destructive/10 text-destructive"><Heart size={20} /></span>
+            <div>
+              <h2 className="font-display text-base font-bold text-foreground">{lang === "zh" ? "心率區間" : "Heart Rate Zones"}</h2>
+              <p className="text-xs text-muted-foreground">{lang === "zh" ? `最大 ${effectiveMax} · 靜息 ${effectiveRest} BPM` : `Max ${effectiveMax} · Resting ${effectiveRest} BPM`}</p>
+            </div>
+          </div>
+          <Button size="sm" variant={hrEditMode ? "secondary" : "outline"} onClick={() => setHrEditMode((value) => !value)}>
+            <Pencil size={14} />{hrEditMode ? (lang === "zh" ? "完成" : "Done") : (lang === "zh" ? "編輯" : "Edit")}
+          </Button>
+        </div>
+        {!hrEditMode ? (
+          <div className="mt-4 grid grid-cols-5 gap-1.5">
+            {ZONE_INFO.map((zone, index) => (
+              <div key={zone.key} className="min-w-0 text-center">
+                <div className="h-2 rounded-full" style={{ backgroundColor: ZONE_LABELS[index].color }} />
+                <p className="mt-1.5 text-[10px] font-semibold text-muted-foreground">Z{index + 1}</p>
+                <p className="text-xs font-bold tabular-nums text-foreground">{values[index]}</p>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="mt-4 border-t border-border pt-4">
+            <HeartRateZonesCard lang={lang} initialAge={profile.age} initialMaxHr={profile.max_heartrate} initialRestingHr={profile.resting_heartrate} initialCustomZones={profile.custom_hr_zones} onSaved={(maxHr, restingHr, customZones) => {
+              setProfile((current) => {
+                const updated = current ? { ...current, max_heartrate: maxHr, resting_heartrate: restingHr, custom_hr_zones: customZones } : current;
+                _cachedProfile = updated;
+                return updated;
+              });
+              setHrEditMode(false);
+            }} />
+          </div>
+        )}
+      </section>
+    );
+  }
 
   if (!profile && subpage !== "main") {
     return (
@@ -901,7 +1036,6 @@ const ProfileSection = ({ lang, subpage = "main", onNavigate, compact = false }:
         <ChevronRight size={18} className="text-muted-foreground" />
       </button>
 
-      <CommunityPrivacy lang={lang} />
     </div>
   );
 };

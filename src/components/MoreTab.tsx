@@ -95,6 +95,7 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps, onNavig
   const [aiChatDisabled, setAiChatDisabled] = useState(() => localStorage.getItem("ai_chat_disabled") === "true");
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showWidgetDialog, setShowWidgetDialog] = useState(false);
+  const [openHeartRateEditor, setOpenHeartRateEditor] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [textScale, setTextScale] = useTextScale();
   const [hubSection, setHubSection] = useState<"main" | "fitness" | "communication" | "guides" | "settings">("main");
@@ -133,6 +134,7 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps, onNavig
     const checkHash = () => {
       if (window.location.hash === "#hr-zones") {
         setHubSection("main");
+        setOpenHeartRateEditor(true);
         window.setTimeout(() => document.getElementById("more-heart-rate-zones")?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
         history.replaceState(null, "", window.location.pathname + window.location.search);
       }
@@ -141,6 +143,7 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps, onNavig
     const onHash = () => checkHash();
     const onCustom = () => {
       setHubSection("main");
+      setOpenHeartRateEditor(true);
       window.setTimeout(() => document.getElementById("more-heart-rate-zones")?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
     };
     const onOpenFuel = () => setShowFuelGuide(true);
@@ -351,6 +354,13 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps, onNavig
               </Button>
             </div>
           </div>
+
+          {user && <ProfileSection lang={lang} display="personal-bests" />}
+          {user && (
+            <div id="more-heart-rate-zones" className="scroll-mt-4">
+              <ProfileSection lang={lang} display="heart-rate-zones" startEditing={openHeartRateEditor} />
+            </div>
+          )}
 
           <div>
             <h2 className="mb-3 px-1 font-display text-xs font-semibold uppercase text-muted-foreground">{lang === "zh" ? "你的 Runward" : "Your Runward"}</h2>

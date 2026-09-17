@@ -79,9 +79,10 @@ interface ProfileSectionProps {
   onNavigate?: (sub: ProfileSubpage) => void;
   compact?: boolean;
   display?: "default" | "personal-bests" | "heart-rate-zones";
+  startEditing?: boolean;
 }
 
-const ProfileSection = ({ lang, subpage = "main", onNavigate, compact = false, display = "default" }: ProfileSectionProps) => {
+const ProfileSection = ({ lang, subpage = "main", onNavigate, compact = false, display = "default", startEditing = false }: ProfileSectionProps) => {
   const { user, signOut } = useAuth();
   const { toast } = useToast();
   const { activities } = useActivities();
@@ -115,6 +116,10 @@ const ProfileSection = ({ lang, subpage = "main", onNavigate, compact = false, d
   const [newS, setNewS] = useState("");
   const [hrEditMode, setHrEditMode] = useState(false);
   const [pbEditMode, setPbEditMode] = useState(false);
+
+  useEffect(() => {
+    if (display === "heart-rate-zones" && startEditing) setHrEditMode(true);
+  }, [display, startEditing]);
 
   useEffect(() => {
     if (!user) return;

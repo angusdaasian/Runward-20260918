@@ -410,10 +410,17 @@ const ProfileSection = ({ lang, subpage = "main", onNavigate, compact = false, d
   if (display === "personal-bests") {
     return (
       <section className="overflow-hidden rounded-2xl border border-warning/30 bg-card shadow-sm">
-        <div className="flex items-start justify-between gap-4 bg-warning/10 p-4">
+        <div className="relative flex items-start justify-between gap-4 bg-gradient-to-br from-warning/25 via-warning/10 to-transparent p-4">
+          <div className="pointer-events-none absolute inset-0 overflow-hidden">
+            <div className="animate-shine-sweep absolute inset-y-0 w-1/3 bg-gradient-to-r from-transparent via-warning/15 to-transparent" />
+          </div>
           <div className="flex min-w-0 items-center gap-3">
-            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-warning/20 text-warning">
-              <Trophy size={23} />
+            <span className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-warning/20 text-warning shadow-[inset_0_1px_0_hsl(var(--warning)/0.3)]">
+              <Trophy size={23} className="animate-trophy-float" />
+              <span className="absolute -right-0.5 -top-0.5 flex h-3 w-3">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-warning/50" />
+                <span className="relative inline-flex h-3 w-3 rounded-full border-2 border-card bg-warning" />
+              </span>
             </span>
             <div className="min-w-0">
               <p className="font-display text-base font-bold text-foreground">{lang === "zh" ? "個人最佳" : "Personal Bests"}</p>
@@ -422,7 +429,9 @@ const ProfileSection = ({ lang, subpage = "main", onNavigate, compact = false, d
           </div>
           {runningScore && (
             <div className="shrink-0 text-right">
-              <p className="font-display text-2xl font-bold text-primary">{runningScore}</p>
+              <p className="font-display text-2xl font-bold text-primary">
+                <AnimatedScore value={runningScore} />
+              </p>
               <p className="text-[10px] font-semibold uppercase text-muted-foreground">{lang === "zh" ? "跑力" : "Score"}</p>
             </div>
           )}
@@ -431,9 +440,16 @@ const ProfileSection = ({ lang, subpage = "main", onNavigate, compact = false, d
         <div className="p-4">
           {pbs.length > 0 ? (
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-              {pbs.map((pb) => (
-                <div key={pb.id} className="rounded-xl border border-border bg-muted/40 px-3 py-2.5">
-                  <p className="text-[11px] font-semibold uppercase text-muted-foreground">{pb.distance}</p>
+              {pbs.map((pb, index) => (
+                <div
+                  key={pb.id}
+                  className="animate-pb-pop relative overflow-hidden rounded-xl border border-warning/25 bg-gradient-to-b from-warning/10 to-transparent px-3 py-2.5 shadow-sm transition-transform duration-200 hover:-translate-y-0.5 hover:shadow-md"
+                  style={{ animationDelay: `${index * 90}ms` }}
+                >
+                  <p className="flex items-center gap-1 text-[11px] font-semibold uppercase text-warning">
+                    <Trophy size={10} />
+                    {pb.distance}
+                  </p>
                   <p className="mt-1 font-display text-lg font-bold tabular-nums text-foreground">{formatTime(pb.hours, pb.minutes, pb.seconds)}</p>
                 </div>
               ))}

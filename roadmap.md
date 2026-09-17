@@ -13,5 +13,6 @@
 - [x] Show run start times and shared group names in social feeds
 - [x] Private group chat inside each running group (realtime, unread badges, push notifications)
 - [x] Redesign the personal page as a compact category hub
+- [x] Surface Personal Bests and Heart Rate Zones on More, split its connection categories, and move social privacy into App Settings
 - [x] Let users drag and resize the stats overlay on activity photo share cards
 - [ ] After publish: resubmit sitemap in Search Console + verify /blog returns 200 (no redirect)

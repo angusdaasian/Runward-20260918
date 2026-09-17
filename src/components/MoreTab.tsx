@@ -98,7 +98,7 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps, onNavig
   const [openHeartRateEditor, setOpenHeartRateEditor] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [textScale, setTextScale] = useTextScale();
-  const [hubSection, setHubSection] = useState<"main" | "fitness" | "communication" | "guides" | "settings">("main");
+  const [hubSection, setHubSection] = useState<"main" | "guides" | "settings">("main");
 
   const handleDeleteAccount = async () => {
     if (!user || deleting) return;

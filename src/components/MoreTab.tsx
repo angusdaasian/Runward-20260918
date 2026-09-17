@@ -245,21 +245,19 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps, onNavig
   }
 
   const sectionTitle = {
-    fitness: lang === "zh" ? "健身應用程式" : "Fitness Apps",
-    communication: lang === "zh" ? "通訊應用程式" : "Communication Apps",
     guides: lang === "zh" ? "跑步指南" : "Running Guides",
     settings: lang === "zh" ? "應用程式設定" : "App Settings",
   } as const;
 
-  const HubTile = ({ section, icon: Icon, title, description }: {
-    section: Exclude<typeof hubSection, "main">;
+  const HubTile = ({ icon: Icon, title, description, onClick }: {
     icon: typeof UserRound;
     title: string;
     description: string;
+    onClick: () => void;
   }) => (
     <Button
       variant="outline"
-      onClick={() => setHubSection(section)}
+      onClick={onClick}
       className="h-36 min-w-0 flex-col items-start justify-between rounded-2xl border-border bg-card p-4 text-left shadow-sm transition-transform active:scale-[0.98]"
     >
       <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">

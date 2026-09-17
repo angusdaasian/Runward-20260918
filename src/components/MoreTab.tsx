@@ -98,7 +98,7 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps, onNavig
   const [openHeartRateEditor, setOpenHeartRateEditor] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [textScale, setTextScale] = useTextScale();
-  const [hubSection, setHubSection] = useState<"main" | "fitness" | "communication" | "guides" | "settings">("main");
+  const [hubSection, setHubSection] = useState<"main" | "guides" | "settings">("main");
 
   const handleDeleteAccount = async () => {
     if (!user || deleting) return;
@@ -245,21 +245,19 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps, onNavig
   }
 
   const sectionTitle = {
-    fitness: lang === "zh" ? "健身應用程式" : "Fitness Apps",
-    communication: lang === "zh" ? "通訊應用程式" : "Communication Apps",
     guides: lang === "zh" ? "跑步指南" : "Running Guides",
     settings: lang === "zh" ? "應用程式設定" : "App Settings",
   } as const;
 
-  const HubTile = ({ section, icon: Icon, title, description }: {
-    section: Exclude<typeof hubSection, "main">;
+  const HubTile = ({ icon: Icon, title, description, onClick }: {
     icon: typeof UserRound;
     title: string;
     description: string;
+    onClick: () => void;
   }) => (
     <Button
       variant="outline"
-      onClick={() => setHubSection(section)}
+      onClick={onClick}
       className="h-36 min-w-0 flex-col items-start justify-between rounded-2xl border-border bg-card p-4 text-left shadow-sm transition-transform active:scale-[0.98]"
     >
       <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
@@ -365,16 +363,17 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps, onNavig
           <div>
             <h2 className="mb-3 px-1 font-display text-xs font-semibold uppercase text-muted-foreground">{lang === "zh" ? "你的 Runward" : "Your Runward"}</h2>
             <div className="grid grid-cols-2 gap-3">
-              <HubTile section="fitness" icon={Watch} title={lang === "zh" ? "健身應用程式" : "Fitness Apps"} description={lang === "zh" ? "手錶與主要運動資料來源" : "Watches and activity data sources"} />
-              <HubTile section="communication" icon={MessageSquare} title={lang === "zh" ? "通訊應用程式" : "Communication Apps"} description={lang === "zh" ? "WhatsApp、Telegram 通知" : "WhatsApp and Telegram alerts"} />
-              <HubTile section="guides" icon={BookOpen} title={lang === "zh" ? "跑步指南" : "Running Guides"} description={lang === "zh" ? "訓練、長跑與補給知識" : "Training, distance and fueling"} />
-              <HubTile section="settings" icon={Settings2} title={lang === "zh" ? "應用程式設定" : "App Settings"} description={lang === "zh" ? "顯示、語言、通知與私隱" : "Display, language and notifications"} />
+              <HubTile icon={Watch} title={lang === "zh" ? "健身應用程式" : "Fitness Apps"} description={lang === "zh" ? "手錶與主要運動資料來源" : "Watches and activity data sources"} onClick={() => (user ? onNavigateConnectApps?.() : onLoginRequest?.())} />
+              <HubTile icon={MessageSquare} title={lang === "zh" ? "通訊應用程式" : "Communication Apps"} description={lang === "zh" ? "WhatsApp、Telegram 通知" : "WhatsApp and Telegram alerts"} onClick={() => (user ? onNavigateMessaging?.() : onLoginRequest?.())} />
+              <HubTile icon={BookOpen} title={lang === "zh" ? "跑步指南" : "Running Guides"} description={lang === "zh" ? "訓練、長跑與補給知識" : "Training, distance and fueling"} onClick={() => setHubSection("guides")} />
+              <HubTile icon={Settings2} title={lang === "zh" ? "應用程式設定" : "App Settings"} description={lang === "zh" ? "顯示、語言、通知與私隱" : "Display, language and notifications"} onClick={() => setHubSection("settings")} />
             </div>
           </div>
 
           <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm divide-y divide-border">
             <MenuRow icon={LifeBuoy} label={lang === "zh" ? "支援與幫助" : "Support & Help"} onClick={() => navigate("/support", { state: { from: currentRoute } })} />
             {!adminLoading && isAdmin && <MenuRow icon={Shield} label={lang === "zh" ? "管理員" : "Admin Panel"} onClick={() => navigate("/admin", { state: { from: currentRoute } })} />}
+            {!adminLoading && isAdmin && user && <MenuRow icon={KeyRound} label={lang === "zh" ? "已連結的應用程式" : "Connected apps"} detail={lang === "zh" ? "第三方應用程式存取" : "Third-party app access"} onClick={() => navigate("/settings/connected-apps", { state: { from: currentRoute } })} />}
           </div>
           {user && <Button variant="ghost" className="w-full text-muted-foreground" onClick={signOut}><LogOut size={18} />{lang === "zh" ? "登出" : "Sign Out"}</Button>}
         </div>
@@ -388,19 +387,8 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps, onNavig
             </div>
           </div>
 
-          {hubSection === "fitness" && (
-            <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm divide-y divide-border">
-              {user && <MenuRow icon={Smartphone} label={t("connectFitnessApps", lang)} detail={lang === "zh" ? "管理你的主要運動資料來源" : "Manage your primary fitness data source"} onClick={() => onNavigateConnectApps?.()} />}
-              {user && <MenuRow icon={KeyRound} label={lang === "zh" ? "已連結的應用程式" : "Connected apps"} detail={lang === "zh" ? "第三方應用程式存取" : "Third-party app access"} onClick={() => navigate("/settings/connected-apps", { state: { from: currentRoute } })} />}
-              {!user && <MenuRow icon={Lock} label={lang === "zh" ? "登入以連接健身應用程式" : "Sign in to connect fitness apps"} onClick={() => onLoginRequest?.()} />}
-            </div>
-          )}
 
-          {hubSection === "communication" && (
-            <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm divide-y divide-border">
-              {user ? <MenuRow icon={MessageSquare} label={lang === "zh" ? "通訊應用程式（試行）" : "Messaging Apps (BETA)"} detail="WhatsApp · Telegram" onClick={() => onNavigateMessaging?.()} /> : <MenuRow icon={Lock} label={lang === "zh" ? "登入以連接通訊應用程式" : "Sign in to connect communication apps"} onClick={() => onLoginRequest?.()} />}
-            </div>
-          )}
+
 
           {hubSection === "guides" && (
             <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm divide-y divide-border">

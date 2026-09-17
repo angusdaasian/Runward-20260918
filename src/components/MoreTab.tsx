@@ -245,8 +245,8 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps, onNavig
   }
 
   const sectionTitle = {
-    fitness: lang === "zh" ? "連接健身應用程式" : "Connect Fitness Apps",
-    communication: lang === "zh" ? "連接通訊應用程式" : "Connect Communication Apps",
+    fitness: lang === "zh" ? "健身應用程式" : "Fitness Apps",
+    communication: lang === "zh" ? "通訊應用程式" : "Communication Apps",
     guides: lang === "zh" ? "跑步指南" : "Running Guides",
     settings: lang === "zh" ? "應用程式設定" : "App Settings",
   } as const;

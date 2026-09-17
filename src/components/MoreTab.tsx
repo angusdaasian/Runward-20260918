@@ -245,8 +245,8 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps, onNavig
   }
 
   const sectionTitle = {
-    fitness: lang === "zh" ? "連接健身應用程式" : "Connect Fitness Apps",
-    communication: lang === "zh" ? "連接通訊應用程式" : "Connect Communication Apps",
+    fitness: lang === "zh" ? "健身應用程式" : "Fitness Apps",
+    communication: lang === "zh" ? "通訊應用程式" : "Communication Apps",
     guides: lang === "zh" ? "跑步指南" : "Running Guides",
     settings: lang === "zh" ? "應用程式設定" : "App Settings",
   } as const;
@@ -365,8 +365,8 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps, onNavig
           <div>
             <h2 className="mb-3 px-1 font-display text-xs font-semibold uppercase text-muted-foreground">{lang === "zh" ? "你的 Runward" : "Your Runward"}</h2>
             <div className="grid grid-cols-2 gap-3">
-              <HubTile section="fitness" icon={Watch} title={lang === "zh" ? "連接健身應用程式" : "Connect Fitness Apps"} description={lang === "zh" ? "手錶與主要運動資料來源" : "Watches and activity data sources"} />
-              <HubTile section="communication" icon={MessageSquare} title={lang === "zh" ? "連接通訊應用程式" : "Connect Communication Apps"} description={lang === "zh" ? "WhatsApp、Telegram 通知" : "WhatsApp and Telegram alerts"} />
+              <HubTile section="fitness" icon={Watch} title={lang === "zh" ? "健身應用程式" : "Fitness Apps"} description={lang === "zh" ? "手錶與主要運動資料來源" : "Watches and activity data sources"} />
+              <HubTile section="communication" icon={MessageSquare} title={lang === "zh" ? "通訊應用程式" : "Communication Apps"} description={lang === "zh" ? "WhatsApp、Telegram 通知" : "WhatsApp and Telegram alerts"} />
               <HubTile section="guides" icon={BookOpen} title={lang === "zh" ? "跑步指南" : "Running Guides"} description={lang === "zh" ? "訓練、長跑與補給知識" : "Training, distance and fueling"} />
               <HubTile section="settings" icon={Settings2} title={lang === "zh" ? "應用程式設定" : "App Settings"} description={lang === "zh" ? "顯示、語言、通知與私隱" : "Display, language and notifications"} />
             </div>

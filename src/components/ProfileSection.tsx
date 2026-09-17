@@ -16,6 +16,24 @@ import { useActivities } from "@/hooks/use-activities";
 import HeartRateZonesCard from "@/components/HeartRateZonesCard";
 import { ZONE_LABELS, zoneBoundaries, estimateMaxHr, estimateRestingHr } from "@/lib/hrZones";
 
+/** Counts a number up from 0 with an ease-out curve whenever the target changes. */
+function AnimatedScore({ value, className }: { value: number; className?: string }) {
+  const [shown, setShown] = useState(0);
+  useEffect(() => {
+    let raf = 0;
+    const start = performance.now();
+    const duration = 900;
+    const tick = (now: number) => {
+      const p = Math.min(1, (now - start) / duration);
+      setShown(Math.round(value * (1 - Math.pow(1 - p, 3)) * 10) / 10);
+      if (p < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [value]);
+  return <span className={className}>{shown % 1 === 0 ? shown : shown.toFixed(1)}</span>;
+}
+
 const ZONE_INFO: Array<{ key: string; name: string; nameZh: string; desc: string; descZh: string }> = [
   { key: "z1", name: "Recovery", nameZh: "恢復", desc: "Easy effort for warm-ups, cool-downs, and active recovery.", descZh: "輕鬆配速，適合熱身、緩和及主動恢復。" },
   { key: "z2", name: "Endurance", nameZh: "耐力", desc: "Comfortable effort that burns fat and builds endurance.", descZh: "舒適配速，燃燒脂肪並建立耐力基礎。" },

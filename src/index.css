@@ -178,6 +178,55 @@ html.runward-share-unlock body {
     animation: runner-bob 1.6s ease-in-out infinite;
     transform-origin: center bottom;
   }
+
+  /* Achievement entrance: tiles pop in with a stagger (delay via inline style) */
+  @keyframes pb-pop {
+    0% { opacity: 0; transform: translateY(10px) scale(0.92); }
+    60% { opacity: 1; transform: translateY(-2px) scale(1.03); }
+    100% { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  .animate-pb-pop {
+    animation: pb-pop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  }
+
+  /* Gold shine sweep across a surface once */
+  @keyframes shine-sweep {
+    0% { transform: translateX(-120%) skewX(-18deg); }
+    100% { transform: translateX(240%) skewX(-18deg); }
+  }
+  .animate-shine-sweep {
+    animation: shine-sweep 1.1s ease-out both;
+  }
+
+  /* Gentle trophy float */
+  @keyframes trophy-float {
+    0%, 100% { transform: translateY(0) rotate(-3deg); }
+    50% { transform: translateY(-4px) rotate(3deg); }
+  }
+  .animate-trophy-float {
+    animation: trophy-float 2.6s ease-in-out infinite;
+  }
+
+  /* Heartbeat pulse for the zones icon */
+  @keyframes heartbeat {
+    0%, 40%, 100% { transform: scale(1); }
+    12% { transform: scale(1.18); }
+    24% { transform: scale(1.05); }
+    32% { transform: scale(1.22); }
+  }
+  .animate-heartbeat {
+    animation: heartbeat 1.8s ease-in-out infinite;
+  }
+
+  /* Zone bars grow from zero to their set height (height via inline style) */
+  @keyframes zone-grow {
+    0% { transform: scaleY(0); opacity: 0.4; }
+    100% { transform: scaleY(1); opacity: 1; }
+  }
+  .animate-zone-grow {
+    animation: zone-grow 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+    transform-origin: center bottom;
+  }
 }
 
 /* Text-size scaling: the html root font-size scales content, footer, and

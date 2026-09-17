@@ -512,11 +512,12 @@ const ProfileSection = ({ lang, subpage = "main", onNavigate, compact = false, d
     const effectiveRest = estimateRestingHr(profile.resting_heartrate);
     const bounds = zoneBoundaries(effectiveMax, effectiveRest, profile.custom_hr_zones);
     const values = [bounds.z1, bounds.z2, bounds.z3, bounds.z4, bounds.z5];
+    const barHeights = ["38%", "54%", "70%", "86%", "100%"];
     return (
-      <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+      <section className="overflow-hidden rounded-2xl border border-border bg-card p-4 shadow-sm">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-destructive/10 text-destructive"><Heart size={20} /></span>
+            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-destructive/10 text-destructive"><Heart size={20} className="animate-heartbeat" /></span>
             <div>
               <h2 className="font-display text-base font-bold text-foreground">{lang === "zh" ? "心率區間" : "Heart Rate Zones"}</h2>
               <p className="text-xs text-muted-foreground">{lang === "zh" ? `最大 ${effectiveMax} · 靜息 ${effectiveRest} BPM` : `Max ${effectiveMax} · Resting ${effectiveRest} BPM`}</p>
@@ -527,10 +528,19 @@ const ProfileSection = ({ lang, subpage = "main", onNavigate, compact = false, d
           </Button>
         </div>
         {!hrEditMode ? (
-          <div className="mt-4 grid grid-cols-5 gap-1.5">
+          <div className="mt-4 grid grid-cols-5 items-end gap-2">
             {ZONE_INFO.map((zone, index) => (
               <div key={zone.key} className="min-w-0 text-center">
-                <div className="h-2 rounded-full" style={{ backgroundColor: ZONE_LABELS[index].color }} />
+                <div className="flex h-20 items-end justify-center">
+                  <div
+                    className="animate-zone-grow w-full max-w-8 rounded-t-md"
+                    style={{
+                      height: barHeights[index],
+                      backgroundColor: ZONE_LABELS[index].color,
+                      animationDelay: `${index * 110}ms`,
+                    }}
+                  />
+                </div>
                 <p className="mt-1.5 text-[10px] font-semibold text-muted-foreground">Z{index + 1}</p>
                 <p className="text-xs font-bold tabular-nums text-foreground">{values[index]}</p>
               </div>

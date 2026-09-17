@@ -5,13 +5,14 @@ Make the first More screen the place for personal information and achievements, 
 
 ## Main More screen
 - Keep the compact profile header and its Edit Profile action at the top.
-- Keep Premium directly visible.
+- Keep Premium directly visible in its current position.
+- Place the Personal Bests panel immediately below Premium.
 - Add a polished Personal Bests achievement panel directly on this screen:
   - prominent trophy/medal treatment and Running Score;
   - show the runner’s recorded distances and times without entering a category;
   - retain Detect from activities, manual record entry, and delete controls in an expandable editor so the main screen stays concise;
   - show a purposeful empty state for runners without records.
-- Add Heart Rate Zones directly beneath the achievements:
+- Place Heart Rate Zones immediately below Personal Bests, before the four-category grid:
   - show the five coloured zones and current max/resting heart-rate summary on the main screen;
   - provide an Edit action that opens the existing zone editor without passing through a category;
   - preserve links from activity details that currently open heart-rate settings.

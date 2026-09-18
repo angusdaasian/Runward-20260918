@@ -1,8 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Settings, Bell, Megaphone, Menu, Cloud, HelpCircle, Headset, Rocket, Users, Sparkles } from "lucide-react";
+import { Settings, Bell, Megaphone, Menu, Cloud, Headset, Rocket, Users, Sparkles } from "lucide-react";
 import { useSimpleMode } from "@/hooks/use-simple-mode";
-import AppGuideDialog from "@/components/AppGuideDialog";
 import RoadmapDialog from "@/components/RoadmapDialog";
 import WhatsNewWalkthrough from "@/components/WhatsNewWalkthrough";
 import { Lang } from "@/lib/i18n";
@@ -166,7 +165,6 @@ const AppHeader = ({ lang, onNavigateSettings, onOpenPromoBanner, isGuest }: App
   const [profile, setProfile] = useState(() =>
     _headerUserId === user?.id ? _headerProfile : null
   );
-  const [guideOpen, setGuideOpen] = useState(false);
   const [roadmapOpen, setRoadmapOpen] = useState(false);
   const [whatsNewOpen, setWhatsNewOpen] = useState(false);
   const [simpleMode, setSimpleMode] = useSimpleMode();
@@ -436,7 +434,6 @@ const AppHeader = ({ lang, onNavigateSettings, onOpenPromoBanner, isGuest }: App
             </div>
           </PopoverContent>
         </Popover>
-        <AppGuideDialog open={guideOpen} onOpenChange={setGuideOpen} lang={lang} />
         <RoadmapDialog open={roadmapOpen} onOpenChange={setRoadmapOpen} lang={lang} />
         <WhatsNewWalkthrough
           lang={lang}

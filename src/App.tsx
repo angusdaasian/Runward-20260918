@@ -24,6 +24,7 @@ const NotFound = lazy(() => import("./pages/NotFound.tsx"));
 const AdminPanel = lazy(() => import("./pages/AdminPanel.tsx"));
 const AppleCallback = lazy(() => import("./pages/AppleCallback.tsx"));
 const Support = lazy(() => import("./pages/Support.tsx"));
+const AppGuide = lazy(() => import("./pages/AppGuide.tsx"));
 const Privacy = lazy(() => import("./pages/Privacy.tsx"));
 const DeleteAccount = lazy(() => import("./pages/DeleteAccount.tsx"));
 const TerraReturn = lazy(() => import("./pages/TerraReturn.tsx"));
@@ -111,6 +112,7 @@ const App = () => (
                 <Route path="/callback/apple" element={<AppleCallback />} />
                 <Route path="/admin" element={<AdminPanel />} />
                 <Route path="/support" element={<Support />} />
+                <Route path="/app-guide" element={<AppGuide />} />
                 <Route path="/privacy" element={<Privacy />} />
                 <Route path="/delete-account" element={<DeleteAccount />} />
                 <Route path="/terra-return" element={<TerraReturn />} />

@@ -1,4 +1,4 @@
-import { ChevronRight, ChevronLeft, Crown, Globe, BookOpen, Check, Lock, KeyRound, Clock, Shield, LifeBuoy, ShieldCheck, Smartphone, Moon, Sun, LogOut, Ticket, Bell, Footprints, Flame, Trash2, UserRound, Settings2, MessageSquare, Watch } from "lucide-react";
+import { ChevronRight, ChevronLeft, Crown, Globe, BookOpen, Check, Lock, KeyRound, Clock, Shield, LifeBuoy, ShieldCheck, Smartphone, Moon, Sun, LogOut, Ticket, Bell, Footprints, Flame, Trash2, UserRound, Settings2, MessageSquare, Watch, BookMarked } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -372,6 +372,7 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps, onNavig
 
           <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm divide-y divide-border">
             <MenuRow icon={LifeBuoy} label={lang === "zh" ? "支援與幫助" : "Support & Help"} onClick={() => navigate("/support", { state: { from: currentRoute } })} />
+            <MenuRow icon={BookMarked} label={lang === "zh" ? "使用教學" : "App Guide"} onClick={() => navigate("/app-guide", { state: { from: currentRoute } })} />
             {!adminLoading && isAdmin && <MenuRow icon={Shield} label={lang === "zh" ? "管理員" : "Admin Panel"} onClick={() => navigate("/admin", { state: { from: currentRoute } })} />}
             {!adminLoading && isAdmin && user && <MenuRow icon={KeyRound} label={lang === "zh" ? "已連結的應用程式" : "Connected apps"} detail={lang === "zh" ? "第三方應用程式存取" : "Third-party app access"} onClick={() => navigate("/settings/connected-apps", { state: { from: currentRoute } })} />}
           </div>

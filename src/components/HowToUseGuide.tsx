@@ -32,15 +32,15 @@ const HowToUseGuide = ({ lang }: HowToUseGuideProps) => {
   const quickStart: string[] = zh
     ? [
         "建立帳戶並登入（訪客模式可試用，但紀錄不會儲存）。",
-        "前往「更多」→「健身應用程式」，連接 Garmin、Coros、Suunto、Strava、Pacer 或 Apple Health，跑步紀錄會自動同步。",
-        "在「更多」設定個人最佳成績與心率區間，分析結果會更準確。",
+        "點擊左上角頭像，再選擇「健身應用程式」，連接 Garmin、Coros、Suunto、Strava、Polar 或 Apple Health，跑步紀錄會自動同步。",
+        "點擊左上角頭像，設定個人最佳成績與心率區間，分析結果會更準確。",
         "在「賽事」加入你的目標比賽，然後到「訓練」建立訓練計劃。",
         "在「社群」建立或加入跑班排行榜，與隊友比拚每月跑量。",
       ]
     : [
         "Create an account and sign in (guest mode works for a look around, but nothing is saved).",
-        "Go to More → Fitness Apps and connect Garmin, Coros, Suunto, Strava, Pacer or Apple Health so your runs sync automatically.",
-        "Set your personal bests and heart rate zones in More so the analysis fits you.",
+        "Click the avatar image on the top left, then choose Fitness Apps and connect Garmin, Coros, Suunto, Strava, Polar or Apple Health so your runs sync automatically.",
+        "Click the avatar image on the top left to set your personal bests and heart rate zones so the analysis fits you.",
         "Add your goal race in Races, then build a plan in Training.",
         "Create or join a group leaderboard in Community to compare monthly distance with friends.",
       ];
@@ -58,7 +58,7 @@ const HowToUseGuide = ({ lang }: HowToUseGuideProps) => {
             "手錶或手機錄到的跑步會自動出現在這裡，包含距離、配速、時間與心率。"
           ),
           steps: [
-            tx("Connect your device once in More → Fitness Apps.", "先在「更多」→「健身應用程式」連接一次裝置。"),
+            tx("Click the avatar image on the top left, then choose Fitness Apps to connect your device once.", "點擊左上角頭像，再選擇「健身應用程式」連接一次裝置。"),
             tx("Finish a run and let your watch app upload it as usual.", "跑完步後，讓手錶的原生 App 照常上傳紀錄。"),
             tx("Pull down on the Activities list to refresh if a run has not shown up yet.", "如果紀錄未出現，在活動列表下拉刷新即可。"),
           ],
@@ -197,7 +197,7 @@ const HowToUseGuide = ({ lang }: HowToUseGuideProps) => {
           where: tx("Training tab → plan calendar", "「訓練」分頁 → 計劃日曆"),
           what: tx("Push a planned workout to your connected watch so you can run it as a guided session.", "把計劃中的課表推送到已連接的手錶，直接照著跑。"),
           steps: [
-            tx("Connect a supported watch in More → Fitness Apps.", "先在「更多」→「健身應用程式」連接支援的手錶。"),
+            tx("Click the avatar image on the top left, then choose Fitness Apps to connect a supported watch.", "點擊左上角頭像，再選擇「健身應用程式」連接支援的手錶。"),
             tx("Open a workout day and tap the watch push button.", "打開課表日期，點擊推送到手錶的按鈕。"),
           ],
           premium: true,
@@ -282,7 +282,7 @@ const HowToUseGuide = ({ lang }: HowToUseGuideProps) => {
           steps: [
             tx("Switch between Public and Friends at the top.", "在上方切換「公開」與「好友」。"),
             tx("Tap a run to see its full detail.", "點擊跑步紀錄查看完整詳情。"),
-            tx("Sharing is off by default — turn it on in More → App Settings → Community Privacy.", "分享預設關閉——可在「更多」→「應用程式設定」→「社群私隱」開啟。"),
+            tx("Sharing is off by default — click the avatar image on the top left, then open App Settings → Community Privacy to turn it on.", "分享預設關閉——點擊左上角頭像，再到「應用程式設定」→「社群私隱」開啟。"),
           ],
         },
         {
@@ -302,7 +302,7 @@ const HowToUseGuide = ({ lang }: HowToUseGuideProps) => {
         },
         {
           title: tx("Privacy controls", "私隱設定"),
-          where: tx("More → App Settings → Community Privacy", "「更多」→「應用程式設定」→「社群私隱」"),
+          where: tx("Click the avatar image on the top left → App Settings → Community Privacy", "點擊左上角頭像 →「應用程式設定」→「社群私隱」"),
           what: tx(
             "Both the leaderboard and the public feed are opt-in and off by default. Turning public sharing off removes your runs from the public feed straight away.",
             "排行榜與公開動態都需自行選擇開啟，預設為關閉。關閉公開分享後，你的跑步紀錄會立即從公開動態移除。"
@@ -359,12 +359,12 @@ const HowToUseGuide = ({ lang }: HowToUseGuideProps) => {
     },
     {
       icon: Settings2,
-      title: tx("More & settings", "更多與設定"),
+      title: tx("Profile & settings", "個人頁面與設定"),
       items: [
         {
           title: tx("Connect fitness apps", "連接健身應用程式"),
-          where: tx("More → Fitness Apps", "「更多」→「健身應用程式」"),
-          what: tx("Link Garmin, Coros, Suunto, Strava, Pacer or Apple Health to sync runs, sleep, heart rate variability and daily readiness.", "連接 Garmin、Coros、Suunto、Strava、Pacer 或 Apple Health，同步跑步、睡眠、心率變異與每日準備度。"),
+          where: tx("Click the avatar image on the top left → Fitness Apps", "點擊左上角頭像 →「健身應用程式」"),
+          what: tx("Link Garmin, Coros, Suunto, Strava, Polar or Apple Health to sync runs, sleep, heart rate variability and daily readiness.", "連接 Garmin、Coros、Suunto、Strava、Polar 或 Apple Health，同步跑步、睡眠、心率變異與每日準備度。"),
           steps: [
             tx("Tap Fitness Apps and pick your brand.", "點擊「健身應用程式」，選擇你的品牌。"),
             tx("Sign in to that service and approve access.", "登入該服務並允許授權。"),
@@ -373,7 +373,7 @@ const HowToUseGuide = ({ lang }: HowToUseGuideProps) => {
         },
         {
           title: tx("Communication apps", "通訊應用程式"),
-          where: tx("More → Communication Apps", "「更多」→「通訊應用程式」"),
+          where: tx("Click the avatar image on the top left → Communication Apps", "點擊左上角頭像 →「通訊應用程式」"),
           what: tx("Get your training reminders and summaries on WhatsApp or Telegram.", "透過 WhatsApp 或 Telegram 接收訓練提醒與總結。"),
           steps: [
             tx("Tap Communication Apps and choose WhatsApp or Telegram.", "點擊「通訊應用程式」，選擇 WhatsApp 或 Telegram。"),
@@ -382,7 +382,7 @@ const HowToUseGuide = ({ lang }: HowToUseGuideProps) => {
         },
         {
           title: tx("Personal bests", "個人最佳成績"),
-          where: tx("More (below Premium)", "「更多」（付費版下方）"),
+          where: tx("Click the avatar image on the top left (below Premium)", "點擊左上角頭像（付費版下方）"),
           what: tx("Your best times per distance, used across predictions and pace suggestions.", "各距離的最佳成績，用於預測與配速建議。"),
           steps: [
             tx("Tap the edit icon on the personal bests card.", "點擊個人最佳成績卡上的編輯圖示。"),
@@ -391,7 +391,7 @@ const HowToUseGuide = ({ lang }: HowToUseGuideProps) => {
         },
         {
           title: tx("Heart rate zones", "心率區間"),
-          where: tx("More (below personal bests)", "「更多」（個人最佳成績下方）"),
+          where: tx("Click the avatar image on the top left (below personal bests)", "點擊左上角頭像（個人最佳成績下方）"),
           what: tx("Your five training zones, used in activity detail and weekly zone charts.", "五個訓練區間，用於活動詳情與每週區間圖表。"),
           steps: [
             tx("Tap edit on the heart rate zones card.", "點擊心率區間卡上的編輯。"),
@@ -400,7 +400,7 @@ const HowToUseGuide = ({ lang }: HowToUseGuideProps) => {
         },
         {
           title: tx("Running guides", "跑步指南"),
-          where: tx("More → Running Guides", "「更多」→「跑步指南」"),
+          where: tx("Click the avatar image on the top left → Running Guides", "點擊左上角頭像 →「跑步指南」"),
           what: tx("Plain-language explanations of training terms, how to start long distance running, and a fuelling guide.", "以淺白文字解釋訓練術語、如何開始長距離跑步，以及補給指南。"),
           steps: [tx("Open Running Guides and tap any topic to expand it.", "打開「跑步指南」，點擊任何主題展開閱讀。")],
         },
@@ -410,13 +410,13 @@ const HowToUseGuide = ({ lang }: HowToUseGuideProps) => {
           what: tx("Ask any running question and get answers based on your own training history.", "詢問任何跑步問題，並根據你的訓練紀錄獲得解答。"),
           steps: [
             tx("Tap the chat button and type your question.", "點擊聊天按鈕並輸入問題。"),
-            tx("You can hide the button in More → App Settings.", "可在「更多」→「應用程式設定」隱藏此按鈕。"),
+            tx("Click the avatar image on the top left, then open App Settings to hide the button.", "點擊左上角頭像，再到「應用程式設定」隱藏此按鈕。"),
           ],
           premium: true,
         },
         {
           title: tx("App settings", "應用程式設定"),
-          where: tx("More → App Settings", "「更多」→「應用程式設定」"),
+          where: tx("Click the avatar image on the top left → App Settings", "點擊左上角頭像 →「應用程式設定」"),
           what: tx(
             "Dark mode, language (English / 中文), text size, activity notifications, community privacy, privacy policy and account deletion.",
             "深色模式、語言（English／中文）、文字大小、活動推送通知、社群私隱、隱私政策與刪除帳號。"
@@ -425,7 +425,7 @@ const HowToUseGuide = ({ lang }: HowToUseGuideProps) => {
         },
         {
           title: tx("Premium and offer codes", "付費版與優惠代碼"),
-          where: tx("More → Runward Premium", "「更多」→ Runward Premium"),
+          where: tx("Click the avatar image on the top left → Runward Premium", "點擊左上角頭像 → Runward Premium"),
           what: tx(
             "See your subscription status, upgrade, or redeem an offer code from a race or partner.",
             "查看訂閱狀態、升級，或兌換比賽及合作夥伴提供的優惠代碼。"

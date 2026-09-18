@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
-import HowToUseGuide from "@/components/HowToUseGuide";
 
 interface Ticket {
   id: string;
@@ -99,9 +98,6 @@ const Support = () => {
       </div>
 
       <div className="space-y-6 md:space-y-8">
-        {/* How to use the app */}
-        <HowToUseGuide lang={lang} />
-
         {/* My Tickets */}
         {user && (
           <div className="bg-card border border-border rounded-xl p-5 space-y-3">

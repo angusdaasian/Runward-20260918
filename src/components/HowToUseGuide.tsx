@@ -104,16 +104,19 @@ const HowToUseGuide = ({ lang }: HowToUseGuideProps) => {
           ],
         },
         {
-          title: tx("Effort rating and shoes", "體感強度與跑鞋"),
-          where: tx("Activity detail", "活動詳情"),
+          title: tx("AI workout analysis (RPE & feelings)", "AI 訓練分析（RPE 與感受）"),
+          where: tx("Activity detail → AI Workout Analysis", "活動詳情 →「AI 訓練分析」"),
           what: tx(
-            "Record how hard a run felt and which shoes you wore, so training load and shoe mileage stay accurate.",
-            "記錄該次跑步的體感強度與所穿跑鞋，讓訓練負荷與跑鞋里程更準確。"
+            "A premium AI breakdown of one run. For Apple Health, Garmin, Coros or Terra runs you first set an RPE (how hard it felt, 1-10); you can also tag a race and add a written comment about how the run felt, then run the analysis.",
+            "付費版的 AI 單次跑步分析。Apple Health、Garmin、Coros 或 Terra 的紀錄需先填寫 RPE（體感強度 1-10）；亦可標記比賽並用文字寫下這次跑步的感受，然後執行分析。"
           ),
           steps: [
-            tx("Slide the effort bar right after a run.", "跑完後拉動體感強度滑桿。"),
-            tx("Pick a shoe from the shoe selector; add new shoes in the shoes page.", "在跑鞋選擇器選擇跑鞋；可在跑鞋頁面新增鞋款。"),
+            tx("Open a running activity and scroll to the AI Workout Analysis card.", "打開一次跑步活動，向下滑到「AI 訓練分析」卡片。"),
+            tx("If asked, set your RPE on the 1-10 slider or tap a quick option (Easy / A bit hard / Hard / Very hard).", "如出現提示，在 1-10 滑桿設定 RPE，或點擊快速選項（輕鬆／有點吃力／吃力／非常吃力）。"),
+            tx("Optionally tag a race with 'Was this a race?' and type how the run felt in the comment box.", "可在「這是比賽嗎？」標記比賽，並在感受欄寫下這次跑步的感覺。"),
+            tx("Tap Analyze to generate the analysis; tap Copy or Share to save or post it.", "點擊「分析」產生結果，再用「複製」或「分享」儲存或發佈。"),
           ],
+          premium: true,
         },
         {
           title: tx("Monthly stats and Road Quest", "每月數據與每月挑戰"),

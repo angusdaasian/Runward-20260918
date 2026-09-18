@@ -72,6 +72,12 @@ const Landing = () => {
             >
               {zh ? "跑步文章" : "Blog"}
             </Link>
+            <Link
+              to="/guide"
+              className="hidden sm:inline-block text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              {zh ? "使用教學" : "App Guide"}
+            </Link>
 
             <button
               onClick={toggleLang}

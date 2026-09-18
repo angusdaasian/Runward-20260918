@@ -7,6 +7,8 @@ import { Lang } from "@/lib/i18n";
 
 interface HowToUseGuideProps {
   lang: Lang;
+  /** "app" = compact in-app accordions; "web" = expanded website layout */
+  variant?: "app" | "web";
 }
 
 type Item = {
@@ -23,7 +25,7 @@ type Group = {
   items: Item[];
 };
 
-const HowToUseGuide = ({ lang }: HowToUseGuideProps) => {
+const HowToUseGuide = ({ lang, variant = "app" }: HowToUseGuideProps) => {
   const zh = lang === "zh";
   const tx = (en: string, z: string) => (zh ? z : en);
   const [openGroup, setOpenGroup] = useState<string | null>(null);

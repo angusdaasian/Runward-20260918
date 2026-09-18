@@ -18,4 +18,4 @@
 - [ ] After publish: resubmit sitemap in Search Console + verify /blog returns 200 (no redirect)
 
 ## New workspace setup
-- [ ] Connect Google Search Console (previous workspace connections no longer apply)
+- [x] Connect Google Search Console (previous workspace connections no longer apply)

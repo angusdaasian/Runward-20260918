@@ -1,4 +1,3 @@
 /__l5e/*  https://welcome-ward-start.lovable.app/__l5e/:splat  200
-/blog/        /blog          301!
-/blog/:slug/  /blog/:slug    301!
+
 /*        /index.html                                          200

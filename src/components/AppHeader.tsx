@@ -1,8 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Settings, Bell, Megaphone, Menu, Cloud, HelpCircle, Headset, Rocket, Users, Sparkles } from "lucide-react";
+import { Settings, Bell, Megaphone, Menu, Cloud, Headset, Rocket, Users, Sparkles } from "lucide-react";
 import { useSimpleMode } from "@/hooks/use-simple-mode";
-import AppGuideDialog from "@/components/AppGuideDialog";
 import RoadmapDialog from "@/components/RoadmapDialog";
 import WhatsNewWalkthrough from "@/components/WhatsNewWalkthrough";
 import { Lang } from "@/lib/i18n";
@@ -166,7 +165,6 @@ const AppHeader = ({ lang, onNavigateSettings, onOpenPromoBanner, isGuest }: App
   const [profile, setProfile] = useState(() =>
     _headerUserId === user?.id ? _headerProfile : null
   );
-  const [guideOpen, setGuideOpen] = useState(false);
   const [roadmapOpen, setRoadmapOpen] = useState(false);
   const [whatsNewOpen, setWhatsNewOpen] = useState(false);
   const [simpleMode, setSimpleMode] = useSimpleMode();
@@ -396,23 +394,6 @@ const AppHeader = ({ lang, onNavigateSettings, onOpenPromoBanner, isGuest }: App
 
 
 
-              {/* App Guide */}
-              <button
-                onClick={() => setGuideOpen(true)}
-                className="flex items-center gap-3 px-2 py-1.5 rounded-md hover:bg-muted/60 transition-colors text-left active:scale-[0.98] w-full"
-              >
-                <span className="w-10 h-10 rounded-full bg-muted flex items-center justify-center shrink-0">
-                  <HelpCircle size={18} className="text-foreground" />
-                </span>
-                <div className="flex flex-col">
-                  <span className="text-sm font-medium text-foreground leading-tight">
-                    {lang === "zh" ? "應用程式指南" : "App Guide"}
-                  </span>
-                  <span className="text-[11px] text-muted-foreground leading-tight">
-                    {lang === "zh" ? "了解所有功能" : "Learn about all features"}
-                  </span>
-                </div>
-              </button>
 
               {/* What's New — opens the walkthrough */}
               <button
@@ -453,7 +434,6 @@ const AppHeader = ({ lang, onNavigateSettings, onOpenPromoBanner, isGuest }: App
             </div>
           </PopoverContent>
         </Popover>
-        <AppGuideDialog open={guideOpen} onOpenChange={setGuideOpen} lang={lang} />
         <RoadmapDialog open={roadmapOpen} onOpenChange={setRoadmapOpen} lang={lang} />
         <WhatsNewWalkthrough
           lang={lang}

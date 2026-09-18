@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, ChevronDown, Loader2, MessageCircle, Send } from "lucide-react";
+import { ArrowLeft, ChevronDown, Loader2, MessageCircle, MoreVertical, Send, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useGroupChat } from "@/hooks/use-group-chat";
 import GroupChatMessage from "./GroupChatMessage";
-import GroupManager, { type LeaderboardGroup } from "./GroupManager";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { type LeaderboardGroup } from "./GroupManager";
+import GroupMembersDialog from "./GroupMembersDialog";
 import type { Lang } from "@/lib/i18n";
 
 interface Props {
@@ -24,6 +26,7 @@ export default function GroupChatRoom({ lang, group, managerGroups, onBack, onGr
   const { messages, loading, loadingOlder, hasMore, sending, send, remove, retry, loadOlder } = useGroupChat(group.id);
   const [draft, setDraft] = useState("");
   const [atBottom, setAtBottom] = useState(true);
+  const [manageOpen, setManageOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -73,7 +76,28 @@ export default function GroupChatRoom({ lang, group, managerGroups, onBack, onGr
             {group.member_count} {zh ? "位成員" : "members"}
           </p>
         </div>
-        <GroupManager lang={lang} groups={managerGroups} onChanged={onGroupsChanged} />
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" aria-label={zh ? "群組選項" : "Group options"}>
+              <MoreVertical />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => setManageOpen(true)}>
+              <Users />
+              {zh ? "管理群組" : "Manage group"}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+        <GroupMembersDialog
+          lang={lang}
+          open={manageOpen}
+          onOpenChange={setManageOpen}
+          group={group}
+          managerGroup={managerGroups.find((g) => g.id === group.id)}
+          onChanged={onGroupsChanged}
+          onLeft={onBack}
+        />
       </header>
 
       <div ref={scrollRef} onScroll={onScroll} className="relative flex-1 space-y-2 overflow-y-auto px-3 py-3">

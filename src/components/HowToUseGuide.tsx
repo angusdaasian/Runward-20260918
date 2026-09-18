@@ -444,6 +444,83 @@ const HowToUseGuide = ({ lang, variant = "app" }: HowToUseGuideProps) => {
     },
   ];
 
+  if (variant === "web") {
+    return (
+      <div className="space-y-16">
+        {/* Quick start */}
+        <section className="rounded-2xl border border-primary/25 bg-primary/5 p-6 sm:p-8">
+          <h2 className="font-display text-xl sm:text-2xl font-bold text-foreground flex items-center gap-2.5">
+            <Rocket size={20} className="text-primary" />
+            {tx("Quick start (5 steps)", "快速開始（5 步）")}
+          </h2>
+          <ol className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+            {quickStart.map((s, i) => (
+              <li key={i} className="rounded-xl bg-card border border-border/60 p-4">
+                <span className="w-7 h-7 rounded-full bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center">
+                  {i + 1}
+                </span>
+                <p className="mt-3 text-sm text-muted-foreground leading-relaxed">{s}</p>
+              </li>
+            ))}
+          </ol>
+        </section>
+
+        {/* Feature groups — fully expanded for the web */}
+        {groups.map(({ icon: Icon, title, items }) => (
+          <section key={title} id={`guide-${title}`} className="scroll-mt-24">
+            <div className="flex items-center gap-3.5">
+              <span className="w-11 h-11 rounded-2xl bg-primary/10 flex items-center justify-center shrink-0">
+                <Icon size={20} className="text-primary" />
+              </span>
+              <div>
+                <h2 className="font-display text-xl sm:text-2xl font-bold text-foreground">{title}</h2>
+                <p className="text-sm text-muted-foreground">
+                  {items.length} {tx("features", "項功能")}
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-6 grid gap-5 md:grid-cols-2">
+              {items.map((item) => (
+                <article
+                  key={`${title}-${item.title}`}
+                  className="rounded-2xl bg-card border border-border/60 p-5 sm:p-6 flex flex-col hover:border-primary/30 transition-colors"
+                >
+                  <h3 className="text-base sm:text-lg font-semibold text-foreground flex items-center gap-2 flex-wrap">
+                    {item.title}
+                    {item.premium && (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-medium text-amber-600 dark:text-amber-400 bg-amber-500/10 rounded-full px-2 py-0.5">
+                        <Crown size={10} />
+                        {tx("Premium", "付費版")}
+                      </span>
+                    )}
+                  </h3>
+                  <p className="text-xs text-primary/80 font-medium mt-1">{item.where}</p>
+                  <p className="text-sm text-muted-foreground leading-relaxed mt-3">{item.what}</p>
+                  <div className="mt-4 pt-4 border-t border-border/50">
+                    <p className="text-[11px] uppercase tracking-wide text-primary font-semibold mb-2">
+                      {tx("How to use", "使用步驟")}
+                    </p>
+                    <ol className="space-y-1.5">
+                      {item.steps.map((s, i) => (
+                        <li key={i} className="flex gap-2.5 text-sm text-muted-foreground leading-relaxed">
+                          <span className="shrink-0 w-5 h-5 mt-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-semibold flex items-center justify-center">
+                            {i + 1}
+                          </span>
+                          <span>{s}</span>
+                        </li>
+                      ))}
+                    </ol>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </section>
+        ))}
+      </div>
+    );
+  }
+
   return (
     <div className="bg-card border border-border rounded-xl p-5 space-y-4">
       <div>

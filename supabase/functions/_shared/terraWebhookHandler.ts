@@ -786,7 +786,7 @@ async function processWebhook(
           // Read existing row so we don't overwrite good polyline/laps/hr_samples with empty
           const { data: existing } = await supa
             .from("terra_activities")
-            .select("summary_polyline, laps, has_gps, hr_samples, distance_samples, elevation_samples, cadence_samples")
+            .select("summary_polyline, laps, has_gps, hr_samples, distance_samples, elevation_samples, cadence_samples, device_model")
             .eq("user_id", appUserId)
             .eq("terra_activity_id", aid)
             .maybeSingle();
@@ -814,6 +814,7 @@ async function processWebhook(
             provider,
             terra_activity_id: aid,
             activity_name: meta?.name ?? null,
+            device_model: deviceModel ?? (existing as any)?.device_model ?? null,
             activity_type: meta?.type ?? meta?.activity_type ?? null,
             start_time: meta?.start_time ?? null,
             duration_seconds: durationSeconds,

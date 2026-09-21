@@ -767,6 +767,14 @@ async function processWebhook(
           const durationSeconds = extractDurationSeconds(a, distanceMeters);
           const aid = String(meta?.upload_type ?? "") + ":" + String(meta?.summary_id ?? meta?.id ?? meta?.start_time ?? crypto.randomUUID());
           const polyline = extractPolyline(a);
+          // Garmin branding requirement: keep the device model with the data.
+          const deviceModel: string | null = (() => {
+            const dd = a?.device_data ?? {};
+            const raw = dd?.name ?? dd?.model ?? dd?.hardware_version ?? meta?.device_name ?? null;
+            const s = raw == null ? "" : String(raw).trim();
+            if (!s || s.toLowerCase() === "unknown") return null;
+            return s.slice(0, 80);
+          })();
           const rawLaps = extractLaps(a);
           const hrSamples = extractHrSamples(a);
           const distanceSamples = extractDistanceSamples(a);

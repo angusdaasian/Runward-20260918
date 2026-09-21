@@ -2429,6 +2429,7 @@ export type Database = {
           cadence_samples: Json | null
           calories: number | null
           created_at: string
+          device_model: string | null
           distance_meters: number | null
           distance_samples: Json | null
           duration_seconds: number | null
@@ -2459,6 +2460,7 @@ export type Database = {
           cadence_samples?: Json | null
           calories?: number | null
           created_at?: string
+          device_model?: string | null
           distance_meters?: number | null
           distance_samples?: Json | null
           duration_seconds?: number | null
@@ -2489,6 +2491,7 @@ export type Database = {
           cadence_samples?: Json | null
           calories?: number | null
           created_at?: string
+          device_model?: string | null
           distance_meters?: number | null
           distance_samples?: Json | null
           duration_seconds?: number | null

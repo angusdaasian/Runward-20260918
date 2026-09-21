@@ -767,6 +767,14 @@ async function processWebhook(
           const durationSeconds = extractDurationSeconds(a, distanceMeters);
           const aid = String(meta?.upload_type ?? "") + ":" + String(meta?.summary_id ?? meta?.id ?? meta?.start_time ?? crypto.randomUUID());
           const polyline = extractPolyline(a);
+          // Garmin branding requirement: keep the device model with the data.
+          const deviceModel: string | null = (() => {
+            const dd = a?.device_data ?? {};
+            const raw = dd?.name ?? dd?.model ?? dd?.hardware_version ?? meta?.device_name ?? null;
+            const s = raw == null ? "" : String(raw).trim();
+            if (!s || s.toLowerCase() === "unknown") return null;
+            return s.slice(0, 80);
+          })();
           const rawLaps = extractLaps(a);
           const hrSamples = extractHrSamples(a);
           const distanceSamples = extractDistanceSamples(a);
@@ -778,7 +786,7 @@ async function processWebhook(
           // Read existing row so we don't overwrite good polyline/laps/hr_samples with empty
           const { data: existing } = await supa
             .from("terra_activities")
-            .select("summary_polyline, laps, has_gps, hr_samples, distance_samples, elevation_samples, cadence_samples")
+            .select("summary_polyline, laps, has_gps, hr_samples, distance_samples, elevation_samples, cadence_samples, device_model")
             .eq("user_id", appUserId)
             .eq("terra_activity_id", aid)
             .maybeSingle();
@@ -806,6 +814,7 @@ async function processWebhook(
             provider,
             terra_activity_id: aid,
             activity_name: meta?.name ?? null,
+            device_model: deviceModel ?? (existing as any)?.device_model ?? null,
             activity_type: meta?.type ?? meta?.activity_type ?? null,
             start_time: meta?.start_time ?? null,
             duration_seconds: durationSeconds,

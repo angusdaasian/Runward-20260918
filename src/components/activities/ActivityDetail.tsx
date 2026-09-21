@@ -71,6 +71,7 @@ interface StravaActivity {
   avg_cadence?: number | null;
   map_screenshot_url?: string | null;
   provenance?: "strava" | "apple_health" | "garmin" | "terra";
+  device_model?: string | null;
 }
 
 interface Split {
@@ -1341,6 +1342,9 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
           <span className="text-[10px] text-white bg-red-500 px-2 py-0.5 rounded-full mt-1 inline-block">
             ❤️ {activity.source}
           </span>
+        )}
+        {isTerraGarmin && (
+          <GarminAttribution deviceModel={activity.device_model} size="md" className="mt-1.5" />
         )}
       </div>
 

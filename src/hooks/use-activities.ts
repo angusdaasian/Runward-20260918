@@ -42,6 +42,8 @@ export interface StravaActivity {
   cadence_samples?: Array<{ t: number; rpm: number }> | null;
   avg_cadence?: number | null;
   provenance?: "strava" | "apple_health" | "garmin" | "terra";
+  /** Device model reported by Terra (e.g. "Forerunner 265"). Required for Garmin attribution. */
+  device_model?: string | null;
 }
 
 export interface PlannedWorkout {
@@ -278,6 +280,7 @@ function mapTerraRow(a: any): StravaActivity {
     cadence_samples: (a as any).cadence_samples || null,
     avg_cadence: a.avg_cadence ?? null,
     garmin_training_load: a.training_load ?? null,
+    device_model: a.device_model ?? null,
     provenance: "terra" as const,
   } as StravaActivity;
 }
@@ -286,7 +289,7 @@ function mapTerraRow(a: any): StravaActivity {
 // per-second sample streams + laps that no list view reads. Fetching just the
 // summary makes the first paint after a cold start ~20x lighter.
 const TERRA_LIGHT_COLUMNS =
-  "id,provider,activity_name,activity_type,distance_meters,duration_seconds,elevation_gain,start_time,average_speed,average_hr,max_hr,summary_polyline,calories,avg_cadence,training_load";
+  "id,provider,activity_name,activity_type,distance_meters,duration_seconds,elevation_gain,start_time,average_speed,average_hr,max_hr,summary_polyline,calories,avg_cadence,training_load,device_model";
 
 async function fetchTerraActivitiesLight(userId: string, limit?: number): Promise<StravaActivity[]> {
   let q = supabase

@@ -608,9 +608,6 @@ async function renderShareCard(input: ShareActivityInput): Promise<Blob> {
   // Accent underline
   ctx.fillStyle = "#FC4C02";
   ctx.fillRect(cardX + 44, titleEnd + 8, 64, 5);
-  if (input.garminDeviceModel) {
-    await drawGarminTag(ctx, { x: cardX + 44 + 88, y: titleEnd - 4, deviceModel: input.garminDeviceModel, tagH: 28 });
-  }
 
   // ---------- Map area ----------
   const mapY = titleEnd + 44;
@@ -649,7 +646,16 @@ async function renderShareCard(input: ShareActivityInput): Promise<Blob> {
   ctx.restore();
 
   // ---------- Stats grid (Distance / Pace / Time + optional row) ----------
-  const statsY = mapY + mapH + 40;
+  const garminY = mapY + mapH + 34;
+  if (input.garminDeviceModel) {
+    await drawGarminTag(ctx, {
+      x: cardX + 44,
+      y: garminY,
+      deviceModel: input.garminDeviceModel,
+      tagH: 28,
+    });
+  }
+  const statsY = garminY + (input.garminDeviceModel ? 52 : 6);
   const stats: { label: string; value: string }[] = [
     { label: isZh ? "距離" : "Distance", value: `${fmtDistance(input.distanceMeters)} ${isZh ? "公里" : "km"}` },
     { label: isZh ? "配速" : "Pace", value: fmtPace(input.averageSpeed, isZh) },
@@ -2000,7 +2006,7 @@ async function renderCustomCard(input: CustomShareInput): Promise<Blob> {
   const innerW = W - padX * 2 - innerPad * 2;
 
   // ---- Compute section heights ----
-  const HEADER_H = 100;
+  const HEADER_H = input.garminDeviceModel ? 140 : 100;
   const TITLE_H = 80;
   const MAP_H = 560;
   const STATS_ROW_H = 110;
@@ -2123,6 +2129,14 @@ async function renderCustomCard(input: CustomShareInput): Promise<Blob> {
   ctx.fillStyle = "#64748B";
   ctx.font = `500 18px ${FONT_TEXT}`;
   ctx.fillText(isZh ? "AI 跑步教練" : "AI Running Coach", innerX + 72, headerY + 34);
+  if (input.garminDeviceModel) {
+    await drawGarminTag(ctx, {
+      x: innerX + 72,
+      y: headerY + 66,
+      deviceModel: input.garminDeviceModel,
+      tagH: 24,
+    });
+  }
 
   ctx.textAlign = "right";
   ctx.fillStyle = "#64748B";
@@ -2131,15 +2145,12 @@ async function renderCustomCard(input: CustomShareInput): Promise<Blob> {
   ctx.textAlign = "left";
 
   // Title
-  const titleY = headerY + 96;
+  const titleY = headerY + (input.garminDeviceModel ? 136 : 96);
   ctx.fillStyle = "#0F172A";
   ctx.font = `800 44px ${FONT_DISPLAY}`;
   const titleEnd = wrapText(ctx, input.name, innerX, titleY, innerW, 50, 1);
   ctx.fillStyle = "#FC4C02";
   ctx.fillRect(innerX, titleEnd + 8, 56, 4);
-  if (input.garminDeviceModel) {
-    await drawGarminTag(ctx, { x: innerX + 80, y: titleEnd - 3, deviceModel: input.garminDeviceModel });
-  }
 
   // Sections
   let cy = cardY + HEADER_H + TITLE_H;

@@ -1522,7 +1522,10 @@ const ActivitiesTab = ({ lang, resetSignal }: Props) => {
                                 minute: "2-digit",
                               })}
                               {" · "}
-                              {act.source && act.source !== "strava" ? act.source : "Strava"}
+                              {isTerraGarminActivity(act) ? "" : (act.source && act.source !== "strava" ? act.source : "Strava")}
+                            </span>
+                            {isTerraGarminActivity(act) && (
+                              <GarminAttribution deviceModel={act.device_model} className="ml-0.5" />
                             </span>
                           </div>
                         </div>

@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import { getMapboxToken, mapboxTileUrl } from "@/lib/mapTiles";
 
 import appIcon from "@/assets/app-icon.png";
+import garminTagBlack from "@/assets/brands/garmin-tag-black.png.asset.json";
 import bg1 from "@/assets/share-bg-1.jpg";
 import bg2 from "@/assets/share-bg-2.jpg";
 import bg3 from "@/assets/share-bg-3.jpg";
@@ -37,6 +38,8 @@ export interface ShareActivityInput {
   analysis?: string | null; // unused (kept for backwards compat)
   nextWorkout?: string | null; // unused
   lang: Lang;
+  /** Garmin device model (Terra/Garmin activities only) — required brand attribution. */
+  garminDeviceModel?: string | null;
 }
 
 export interface ShareSplit {
@@ -51,6 +54,7 @@ export interface ShareSplitsInput {
   startDate: string;
   splits: ShareSplit[];
   lang: Lang;
+  garminDeviceModel?: string | null;
 }
 
 export interface ShareChartPoint {
@@ -64,6 +68,7 @@ export interface ShareChartsInput {
   startDate: string;
   data: ShareChartPoint[];
   lang: Lang;
+  garminDeviceModel?: string | null;
 }
 
 // ---------------- formatting helpers ----------------

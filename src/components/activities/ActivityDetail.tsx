@@ -173,6 +173,8 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
   const isTerraActivity = activity.provenance === "terra" || (activity.source?.startsWith("Terra") ?? false);
   const isGarmin = activity.provenance === "garmin" && activity.source === "Garmin";
   const isCoros = activity.provenance === "garmin" && activity.source === "COROS";
+  // Terra/Garmin data requires Garmin brand + device model attribution.
+  const isTerraGarmin = isTerraActivity && (activity.source ?? "").toUpperCase().includes("GARMIN");
   const needsRpe = isAppleHealth || isGarmin || isTerraActivity || isCoros;
   const dbTable = isTerraActivity ? "terra_activities" : isAppleHealth ? "apple_health_activities" : isGarmin || isCoros ? "garmin_activities" : "strava_activities";
   const isRunningActivity = isRunning(activity.sport_type);

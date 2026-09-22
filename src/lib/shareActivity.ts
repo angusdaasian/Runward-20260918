@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import { getMapboxToken, mapboxTileUrl } from "@/lib/mapTiles";
 
 import appIcon from "@/assets/app-icon.png";
+import garminTagBlack from "@/assets/brands/garmin-tag-black.png.asset.json";
 import bg1 from "@/assets/share-bg-1.jpg";
 import bg2 from "@/assets/share-bg-2.jpg";
 import bg3 from "@/assets/share-bg-3.jpg";
@@ -37,6 +38,8 @@ export interface ShareActivityInput {
   analysis?: string | null; // unused (kept for backwards compat)
   nextWorkout?: string | null; // unused
   lang: Lang;
+  /** Garmin device model (Terra/Garmin activities only) — required brand attribution. */
+  garminDeviceModel?: string | null;
 }
 
 export interface ShareSplit {
@@ -51,6 +54,7 @@ export interface ShareSplitsInput {
   startDate: string;
   splits: ShareSplit[];
   lang: Lang;
+  garminDeviceModel?: string | null;
 }
 
 export interface ShareChartPoint {
@@ -64,6 +68,7 @@ export interface ShareChartsInput {
   startDate: string;
   data: ShareChartPoint[];
   lang: Lang;
+  garminDeviceModel?: string | null;
 }
 
 // ---------------- formatting helpers ----------------
@@ -129,6 +134,44 @@ function loadImage(src: string): Promise<HTMLImageElement> {
     img.onerror = reject;
     img.src = src;
   });
+}
+
+/**
+ * Garmin brand attribution required on any view built from Garmin data:
+ * the unaltered Garmin tag logo followed by "Garmin [device model]".
+ */
+async function drawGarminTag(
+  ctx: CanvasRenderingContext2D,
+  opts: {
+    x: number;
+    y: number;
+    deviceModel?: string | null;
+    tagH?: number;
+    textColor?: string;
+    align?: "left" | "right";
+  },
+): Promise<void> {
+  const tagH = opts.tagH ?? 26;
+  const gap = 12;
+  const label = (opts.deviceModel || "").trim() || "Garmin device";
+  const fontSize = Math.round(tagH * 0.72);
+  let img: HTMLImageElement | null = null;
+  try {
+    img = await loadImage(garminTagBlack.url);
+  } catch { /* ignore */ }
+  const tagW = img ? tagH * (img.width / img.height) : 0;
+
+  ctx.save();
+  ctx.textAlign = "left";
+  ctx.textBaseline = "middle";
+  ctx.font = `600 ${fontSize}px ${FONT_TEXT}`;
+  const textW = ctx.measureText(label).width;
+  const total = tagW + (tagW ? gap : 0) + textW;
+  const startX = opts.align === "right" ? opts.x - total : opts.x;
+  if (img) ctx.drawImage(img, startX, opts.y, tagW, tagH);
+  ctx.fillStyle = opts.textColor ?? "#0F172A";
+  ctx.fillText(label, startX + tagW + (tagW ? gap : 0), opts.y + tagH / 2 + 1);
+  ctx.restore();
 }
 
 function pickHero(seed: string): string {
@@ -565,6 +608,9 @@ async function renderShareCard(input: ShareActivityInput): Promise<Blob> {
   // Accent underline
   ctx.fillStyle = "#FC4C02";
   ctx.fillRect(cardX + 44, titleEnd + 8, 64, 5);
+  if (input.garminDeviceModel) {
+    await drawGarminTag(ctx, { x: cardX + 44 + 88, y: titleEnd - 4, deviceModel: input.garminDeviceModel, tagH: 28 });
+  }
 
   // ---------- Map area ----------
   const mapY = titleEnd + 44;
@@ -878,6 +924,9 @@ async function renderSplitsCard(input: ShareSplitsInput): Promise<Blob> {
   const titleEnd = wrapText(ctx, isZh ? "分段" : "Intervals", innerX, titleY, innerW, 50, 1);
   ctx.fillStyle = "#FC4C02";
   ctx.fillRect(innerX, titleEnd + 8, 56, 4);
+  if (input.garminDeviceModel) {
+    await drawGarminTag(ctx, { x: innerX + 80, y: titleEnd - 3, deviceModel: input.garminDeviceModel });
+  }
 
   // Table header
   const tableY = headerH;
@@ -1441,6 +1490,9 @@ async function renderChartsCard(input: ShareChartsInput): Promise<Blob> {
   const titleEnd = wrapText(ctx, input.name, innerX, titleY, innerW, 50, 1);
   ctx.fillStyle = "#FC4C02";
   ctx.fillRect(innerX, titleEnd + 8, 56, 4);
+  if (input.garminDeviceModel) {
+    await drawGarminTag(ctx, { x: innerX + 80, y: titleEnd - 3, deviceModel: input.garminDeviceModel });
+  }
 
   // Build series
   const pacePts = input.data
@@ -1712,6 +1764,7 @@ export interface CustomShareInput {
   /** Local object URL of the chosen run photo (blob URL — keeps the canvas untainted). */
   photoUrl?: string | null;
   selections: CustomShareSelections;
+  garminDeviceModel?: string | null;
 }
 
 const ZONE_META: Array<{ key: keyof ZonePctLite; label: string; labelZh: string; color: string }> = [
@@ -2084,6 +2137,9 @@ async function renderCustomCard(input: CustomShareInput): Promise<Blob> {
   const titleEnd = wrapText(ctx, input.name, innerX, titleY, innerW, 50, 1);
   ctx.fillStyle = "#FC4C02";
   ctx.fillRect(innerX, titleEnd + 8, 56, 4);
+  if (input.garminDeviceModel) {
+    await drawGarminTag(ctx, { x: innerX + 80, y: titleEnd - 3, deviceModel: input.garminDeviceModel });
+  }
 
   // Sections
   let cy = cardY + HEADER_H + TITLE_H;
@@ -2291,6 +2347,16 @@ async function renderPhotoCard(input: CustomShareInput): Promise<Blob> {
   ctx.font = `500 19px ${FONT_TEXT}`;
   ctx.fillText(fmtDate(input.startDate, input.lang), logoX - 16, logoY + 40);
   ctx.textAlign = "left";
+  if (input.garminDeviceModel) {
+    await drawGarminTag(ctx, {
+      x: logoX + logoSize,
+      y: logoY + logoSize + 16,
+      deviceModel: input.garminDeviceModel,
+      tagH: 28,
+      textColor: "#FFFFFF",
+      align: "right",
+    });
+  }
 
   // ---------- Stats block (bottom) ----------
   // Keep photo-overlay values compact, matching the editor preview. The

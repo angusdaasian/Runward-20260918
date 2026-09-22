@@ -45,6 +45,7 @@ import { useAppleHealth, type HealthStats } from "@/hooks/use-apple-health";
 import { useTerraDailyHealth, useTerraTodayStats } from "@/hooks/use-terra-daily-health";
 import { useGarminDailyHealth } from "@/hooks/use-garmin-daily-health";
 import { useSimpleMode } from "@/hooks/use-simple-mode";
+import GarminAttribution from "@/components/brand/GarminAttribution";
 
 
 
@@ -183,6 +184,10 @@ const TodayStats = ({ lang, healthStats }: { lang: Lang; healthStats: HealthStat
   );
 };
 
+/** Terra-sourced Garmin activity → requires Garmin brand + device model attribution. */
+const isTerraGarminActivity = (act: StravaActivity) =>
+  act.provenance === "terra" && (act.source ?? "").toUpperCase().includes("GARMIN");
+
 // ---------- Activity Card ----------
 const ActivityCard = ({
   act,
@@ -223,11 +228,13 @@ const ActivityCard = ({
         </div>
       </div>
       <div className="flex items-center gap-1">
-        {act.source && act.source !== "strava" && (
+        {isTerraGarminActivity(act) ? (
+          <GarminAttribution deviceModel={act.device_model} />
+        ) : act.source && act.source !== "strava" ? (
           <span className="text-[10px] text-white bg-red-500 px-2 py-0.5 rounded-full">
             {act.source === "Apple Health" ? "❤️ Health" : act.source}
           </span>
-        )}
+        ) : null}
         <span className="text-[10px] text-muted-foreground bg-muted px-2 py-0.5 rounded-full">{act.sport_type}</span>
       </div>
     </div>
@@ -1519,9 +1526,18 @@ const ActivitiesTab = ({ lang, resetSignal }: Props) => {
                                 hour: "2-digit",
                                 minute: "2-digit",
                               })}
-                              {" · "}
-                              {act.source && act.source !== "strava" ? act.source : "Strava"}
+                              {!isTerraGarminActivity(act) && (
+                                <>
+                                  {" · "}
+                                  {act.source && act.source !== "strava" ? act.source : "Strava"}
+                                </>
+                              )}
                             </span>
+                            {isTerraGarminActivity(act) && (
+                              <div className="mt-0.5">
+                                <GarminAttribution deviceModel={act.device_model} />
+                              </div>
+                            )}
                           </div>
                         </div>
 

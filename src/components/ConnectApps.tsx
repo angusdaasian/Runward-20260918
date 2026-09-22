@@ -652,7 +652,7 @@ const ConnectApps = ({ lang, onBack }: Props) => {
                       {lang === "zh" ? "中斷" : "Disconnect"}
                     </button>
                   </div>
-                ) : (
+                ) : p.id !== "GARMIN" ? (
                   <button
                     onClick={() => handleTerraConnect(p.id)}
                     disabled={busy || disabledByOther}
@@ -660,8 +660,31 @@ const ConnectApps = ({ lang, onBack }: Props) => {
                   >
                     {busy ? (lang === "zh" ? "..." : "...") : (lang === "zh" ? "連結" : "Connect")}
                   </button>
-                )}
+                ) : null}
               </div>
+
+              {/* Garmin uses the official Garmin Connect™ badge instead of a plain button. */}
+              {!conn && p.id === "GARMIN" && (
+                <button
+                  onClick={() => handleTerraConnect(p.id)}
+                  disabled={busy || disabledByOther}
+                  aria-label={lang === "zh" ? "連結 Garmin Connect" : "Connect Garmin Connect"}
+                  className={`mt-3 w-full rounded-lg overflow-hidden transition-opacity ${disabledByOther ? "cursor-not-allowed opacity-60" : "hover:opacity-90"} disabled:opacity-50`}
+                >
+                  <img
+                    src={garminConnectBadge.url}
+                    alt="Garmin Connect"
+                    className="w-full max-w-[280px] mx-auto h-auto"
+                  />
+                </button>
+              )}
+              {!conn && p.id === "GARMIN" && (
+                <p className="mt-2 text-[11px] text-center text-muted-foreground">
+                  {lang === "zh"
+                    ? "需要 Garmin Connect™ 帳戶授權"
+                    : "Requires authorization with your Garmin Connect™ account"}
+                </p>
+              )}
             </div>
           );
         })}

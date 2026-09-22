@@ -44,6 +44,7 @@ import ActivityShoePicker from "./ActivityShoePicker";
 import ActivityPhotos from "./ActivityPhotos";
 import { useActivityPhotos } from "@/hooks/use-activity-photos";
 import { detectIntervals, formatRepDistance } from "@/lib/detectIntervals";
+import GarminAttribution from "@/components/brand/GarminAttribution";
 
 
 interface StravaActivity {
@@ -173,6 +174,9 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
   const isTerraActivity = activity.provenance === "terra" || (activity.source?.startsWith("Terra") ?? false);
   const isGarmin = activity.provenance === "garmin" && activity.source === "Garmin";
   const isCoros = activity.provenance === "garmin" && activity.source === "COROS";
+  // Terra/Garmin data requires Garmin brand + device model attribution.
+  const isTerraGarmin = isTerraActivity && (activity.source ?? "").toUpperCase().includes("GARMIN");
+  const garminDeviceModel = isTerraGarmin ? (activity.device_model || "Garmin device") : undefined;
   const needsRpe = isAppleHealth || isGarmin || isTerraActivity || isCoros;
   const dbTable = isTerraActivity ? "terra_activities" : isAppleHealth ? "apple_health_activities" : isGarmin || isCoros ? "garmin_activities" : "strava_activities";
   const isRunningActivity = isRunning(activity.sport_type);
@@ -997,6 +1001,7 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
           elevationGainMeters: activity.total_elevation_gain ?? null,
           calories: (activity as any).calories ?? null,
           summaryPolyline: activity.summary_polyline ?? null,
+          garminDeviceModel,
           splits: splits ? splits.map((s) => ({
             distance: s.distance,
             elapsed_time: s.elapsed_time,
@@ -1092,6 +1097,7 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
                     elevationGainMeters: activity.total_elevation_gain ?? null,
                     summaryPolyline: activity.summary_polyline ?? null,
                     lang,
+                    garminDeviceModel,
                   })
                 }
               >
@@ -1133,6 +1139,7 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
                       heartrate: typeof d.heartrate === "number" ? d.heartrate : undefined,
                     })),
                     lang,
+                    garminDeviceModel,
                   });
                 }}
               >
@@ -1263,6 +1270,7 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
                     average_heartrate: s.average_heartrate ?? null,
                   })),
                   lang,
+                  garminDeviceModel,
                 });
               };
               const optionCls = "w-full flex items-center gap-2 px-4 py-3 rounded-xl border border-border text-sm font-medium hover:bg-muted transition-colors text-left";

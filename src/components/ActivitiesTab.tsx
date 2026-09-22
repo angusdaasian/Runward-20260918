@@ -183,6 +183,10 @@ const TodayStats = ({ lang, healthStats }: { lang: Lang; healthStats: HealthStat
   );
 };
 
+/** Terra-sourced Garmin activity → requires Garmin brand + device model attribution. */
+const isTerraGarminActivity = (act: StravaActivity) =>
+  act.provenance === "terra" && (act.source ?? "").toUpperCase().includes("GARMIN");
+
 // ---------- Activity Card ----------
 const ActivityCard = ({
   act,

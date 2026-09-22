@@ -1269,6 +1269,7 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
                     average_heartrate: s.average_heartrate ?? null,
                   })),
                   lang,
+                  garminDeviceModel,
                 });
               };
               const optionCls = "w-full flex items-center gap-2 px-4 py-3 rounded-xl border border-border text-sm font-medium hover:bg-muted transition-colors text-left";

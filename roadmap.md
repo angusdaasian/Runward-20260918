@@ -16,6 +16,7 @@
 - [x] Surface Personal Bests and Heart Rate Zones on More, split its connection categories, and move social privacy into App Settings
 - [x] Let users drag and resize the stats overlay on activity photo share cards
 - [ ] After publish: resubmit sitemap in Search Console + verify /blog returns 200 (no redirect)
+- [ ] Reposition Garmin attribution on sharing cards and resync c7a7
 
 ## New workspace setup
 - [x] Connect Google Search Console (previous workspace connections no longer apply)

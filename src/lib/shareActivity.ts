@@ -1717,6 +1717,7 @@ export interface CustomShareInput {
   /** Local object URL of the chosen run photo (blob URL — keeps the canvas untainted). */
   photoUrl?: string | null;
   selections: CustomShareSelections;
+  garminDeviceModel?: string | null;
 }
 
 const ZONE_META: Array<{ key: keyof ZonePctLite; label: string; labelZh: string; color: string }> = [

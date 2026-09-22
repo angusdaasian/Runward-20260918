@@ -1001,6 +1001,7 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
           elevationGainMeters: activity.total_elevation_gain ?? null,
           calories: (activity as any).calories ?? null,
           summaryPolyline: activity.summary_polyline ?? null,
+          garminDeviceModel,
           splits: splits ? splits.map((s) => ({
             distance: s.distance,
             elapsed_time: s.elapsed_time,

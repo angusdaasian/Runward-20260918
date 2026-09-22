@@ -2347,6 +2347,16 @@ async function renderPhotoCard(input: CustomShareInput): Promise<Blob> {
   ctx.font = `500 19px ${FONT_TEXT}`;
   ctx.fillText(fmtDate(input.startDate, input.lang), logoX - 16, logoY + 40);
   ctx.textAlign = "left";
+  if (input.garminDeviceModel) {
+    await drawGarminTag(ctx, {
+      x: logoX + logoSize,
+      y: logoY + logoSize + 16,
+      deviceModel: input.garminDeviceModel,
+      tagH: 28,
+      textColor: "#FFFFFF",
+      align: "right",
+    });
+  }
 
   // ---------- Stats block (bottom) ----------
   // Keep photo-overlay values compact, matching the editor preview. The

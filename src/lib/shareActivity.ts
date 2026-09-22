@@ -136,6 +136,44 @@ function loadImage(src: string): Promise<HTMLImageElement> {
   });
 }
 
+/**
+ * Garmin brand attribution required on any view built from Garmin data:
+ * the unaltered Garmin tag logo followed by "Garmin [device model]".
+ */
+async function drawGarminTag(
+  ctx: CanvasRenderingContext2D,
+  opts: {
+    x: number;
+    y: number;
+    deviceModel?: string | null;
+    tagH?: number;
+    textColor?: string;
+    align?: "left" | "right";
+  },
+): Promise<void> {
+  const tagH = opts.tagH ?? 26;
+  const gap = 12;
+  const label = (opts.deviceModel || "").trim() || "Garmin device";
+  const fontSize = Math.round(tagH * 0.72);
+  let img: HTMLImageElement | null = null;
+  try {
+    img = await loadImage(garminTagBlack.url);
+  } catch { /* ignore */ }
+  const tagW = img ? tagH * (img.width / img.height) : 0;
+
+  ctx.save();
+  ctx.textAlign = "left";
+  ctx.textBaseline = "middle";
+  ctx.font = `600 ${fontSize}px ${FONT_TEXT}`;
+  const textW = ctx.measureText(label).width;
+  const total = tagW + (tagW ? gap : 0) + textW;
+  const startX = opts.align === "right" ? opts.x - total : opts.x;
+  if (img) ctx.drawImage(img, startX, opts.y, tagW, tagH);
+  ctx.fillStyle = opts.textColor ?? "#0F172A";
+  ctx.fillText(label, startX + tagW + (tagW ? gap : 0), opts.y + tagH / 2 + 1);
+  ctx.restore();
+}
+
 function pickHero(seed: string): string {
   let h = 0;
   for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;

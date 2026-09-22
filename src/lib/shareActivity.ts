@@ -608,6 +608,9 @@ async function renderShareCard(input: ShareActivityInput): Promise<Blob> {
   // Accent underline
   ctx.fillStyle = "#FC4C02";
   ctx.fillRect(cardX + 44, titleEnd + 8, 64, 5);
+  if (input.garminDeviceModel) {
+    await drawGarminTag(ctx, { x: cardX + 44 + 88, y: titleEnd - 4, deviceModel: input.garminDeviceModel, tagH: 28 });
+  }
 
   // ---------- Map area ----------
   const mapY = titleEnd + 44;
@@ -921,6 +924,9 @@ async function renderSplitsCard(input: ShareSplitsInput): Promise<Blob> {
   const titleEnd = wrapText(ctx, isZh ? "分段" : "Intervals", innerX, titleY, innerW, 50, 1);
   ctx.fillStyle = "#FC4C02";
   ctx.fillRect(innerX, titleEnd + 8, 56, 4);
+  if (input.garminDeviceModel) {
+    await drawGarminTag(ctx, { x: innerX + 80, y: titleEnd - 3, deviceModel: input.garminDeviceModel });
+  }
 
   // Table header
   const tableY = headerH;
@@ -1484,6 +1490,9 @@ async function renderChartsCard(input: ShareChartsInput): Promise<Blob> {
   const titleEnd = wrapText(ctx, input.name, innerX, titleY, innerW, 50, 1);
   ctx.fillStyle = "#FC4C02";
   ctx.fillRect(innerX, titleEnd + 8, 56, 4);
+  if (input.garminDeviceModel) {
+    await drawGarminTag(ctx, { x: innerX + 80, y: titleEnd - 3, deviceModel: input.garminDeviceModel });
+  }
 
   // Build series
   const pacePts = input.data
@@ -2128,6 +2137,9 @@ async function renderCustomCard(input: CustomShareInput): Promise<Blob> {
   const titleEnd = wrapText(ctx, input.name, innerX, titleY, innerW, 50, 1);
   ctx.fillStyle = "#FC4C02";
   ctx.fillRect(innerX, titleEnd + 8, 56, 4);
+  if (input.garminDeviceModel) {
+    await drawGarminTag(ctx, { x: innerX + 80, y: titleEnd - 3, deviceModel: input.garminDeviceModel });
+  }
 
   // Sections
   let cy = cardY + HEADER_H + TITLE_H;

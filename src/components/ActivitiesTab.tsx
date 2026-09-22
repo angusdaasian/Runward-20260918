@@ -45,6 +45,7 @@ import { useAppleHealth, type HealthStats } from "@/hooks/use-apple-health";
 import { useTerraDailyHealth, useTerraTodayStats } from "@/hooks/use-terra-daily-health";
 import { useGarminDailyHealth } from "@/hooks/use-garmin-daily-health";
 import { useSimpleMode } from "@/hooks/use-simple-mode";
+import GarminAttribution from "@/components/brand/GarminAttribution";
 
 
 

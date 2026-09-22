@@ -223,11 +223,13 @@ const ActivityCard = ({
         </div>
       </div>
       <div className="flex items-center gap-1">
-        {act.source && act.source !== "strava" && (
+        {isTerraGarminActivity(act) ? (
+          <GarminAttribution deviceModel={act.device_model} />
+        ) : act.source && act.source !== "strava" ? (
           <span className="text-[10px] text-white bg-red-500 px-2 py-0.5 rounded-full">
             {act.source === "Apple Health" ? "❤️ Health" : act.source}
           </span>
-        )}
+        ) : null}
         <span className="text-[10px] text-muted-foreground bg-muted px-2 py-0.5 rounded-full">{act.sport_type}</span>
       </div>
     </div>

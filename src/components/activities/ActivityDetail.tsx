@@ -44,6 +44,7 @@ import ActivityShoePicker from "./ActivityShoePicker";
 import ActivityPhotos from "./ActivityPhotos";
 import { useActivityPhotos } from "@/hooks/use-activity-photos";
 import { detectIntervals, formatRepDistance } from "@/lib/detectIntervals";
+import GarminAttribution from "@/components/brand/GarminAttribution";
 
 
 interface StravaActivity {

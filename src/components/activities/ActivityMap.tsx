@@ -144,6 +144,7 @@ function unregisterPreview(release: Release) {
 const ActivityMap = ({ polyline, className, lang }: Props) => {
   const previewRef = useRef<HTMLDivElement>(null);
   const previewMapRef = useRef<mapboxgl.Map | null>(null);
+  const releaseRef = useRef<Release | null>(null);
   const fullRef = useRef<HTMLDivElement>(null);
   const fullMapRef = useRef<mapboxgl.Map | null>(null);
   const [open, setOpen] = useState(false);

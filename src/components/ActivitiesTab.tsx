@@ -1117,7 +1117,7 @@ const ActivitiesTab = ({ lang, resetSignal }: Props) => {
     }
     setFetchingToday(false);
 
-  }, [user, fetchingToday, invalidateAll, lang, invokeStravaSync, invokeSuuntoSync, detectProviders]);
+  }, [user, fetchingToday, invalidateAll, lang, invokeStravaSync, invokeSuuntoSync, invokeGarminRailwaySync, detectProviders]);
 
   const handleFetchWeekOnly = useCallback(async () => {
     if (!user || fetchingToday) return;
@@ -1171,7 +1171,7 @@ const ActivitiesTab = ({ lang, resetSignal }: Props) => {
       toast.error(lang === "zh" ? "同步失敗" : "Sync failed");
     }
     setFetchingToday(false);
-  }, [user, fetchingToday, invalidateAll, lang, invokeStravaSync, invokeSuuntoSync, detectProviders]);
+  }, [user, fetchingToday, invalidateAll, lang, invokeStravaSync, invokeSuuntoSync, invokeGarminRailwaySync, detectProviders]);
 
 
   const handleFetchStrava30Days = useCallback(async () => {

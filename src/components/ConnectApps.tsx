@@ -686,6 +686,45 @@ const ConnectApps = ({ lang, onBack }: Props) => {
                     : "Requires authorization with your Garmin Connect™ account"}
                 </p>
               )}
+
+              {/* Temporary fallback: Garmin Connect™ is not delivering activities
+                  through Terra right now, so Garmin users can sign in directly
+                  and we poll Garmin every minute until Terra resumes. */}
+              {p.id === "GARMIN" && conn && (
+                <div className="mt-3 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3">
+                  <p className="text-[11px] leading-relaxed text-foreground">
+                    {lang === "zh"
+                      ? "Garmin 活動同步暫時中斷。加入 Garmin Connect™ 帳戶登入，我們會每分鐘自動抓取你的新跑步紀錄；服務恢復後會自動切回。"
+                      : "Garmin activity sync is temporarily interrupted. Sign in with your Garmin Connect™ account and we'll fetch new runs every minute; it switches back automatically once the service recovers."}
+                  </p>
+                  {garminConnected ? (
+                    <div className="mt-2 flex items-center gap-3">
+                      <Check size={14} className="text-green-500" />
+                      <span className="text-[11px] text-muted-foreground">
+                        {lang === "zh" ? "備用同步已啟用" : "Backup sync active"}
+                      </span>
+                      <button
+                        onClick={handleSyncGarmin}
+                        disabled={garmin.syncing}
+                        className="text-[11px] text-primary hover:underline disabled:opacity-50"
+                      >
+                        {garmin.syncing ? (lang === "zh" ? "同步中…" : "Syncing…") : (lang === "zh" ? "立即同步" : "Sync now")}
+                      </button>
+                      <button onClick={handleDisconnectGarmin} className="text-[11px] text-destructive hover:underline">
+                        {lang === "zh" ? "停用" : "Turn off"}
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setGarminDialogOpen(true)}
+                      className="mt-2 text-xs font-medium px-3 py-1 rounded-full text-primary-foreground bg-primary"
+                    >
+                      {lang === "zh" ? "啟用備用同步" : "Enable backup sync"}
+                    </button>
+                  )}
+                </div>
+              )}
+
             </div>
           );
         })}

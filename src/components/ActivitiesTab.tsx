@@ -210,11 +210,11 @@ const ActivityCard = ({
     className="bg-card border border-border rounded-xl p-4 cursor-pointer hover:border-primary/50 transition-colors"
     onClick={onClick}
   >
-    <div className="flex items-start justify-between mb-2">
-      <div className="flex items-center gap-2">
-        <span className="text-lg">{sportTypeIcon[act.sport_type] || "🏃"}</span>
-        <div>
-          <h3 className="font-medium text-foreground text-sm">{act.name}</h3>
+    <div className="flex items-start justify-between mb-2 gap-2">
+      <div className="flex items-center gap-2 min-w-0">
+        <span className="text-lg shrink-0">{sportTypeIcon[act.sport_type] || "🏃"}</span>
+        <div className="min-w-0">
+          <h3 className="font-medium text-foreground text-sm truncate">{act.name}</h3>
           <span className="text-xs text-muted-foreground">
             {new Date(act.start_date).toLocaleDateString(lang === "zh" ? "zh-TW" : "en-US", {
               year: "numeric",
@@ -227,12 +227,15 @@ const ActivityCard = ({
               minute: "2-digit",
             })}
           </span>
+          {isTerraGarminActivity(act) && (
+            <div className="mt-1">
+              <GarminAttribution deviceModel={act.device_model} />
+            </div>
+          )}
         </div>
       </div>
-      <div className="flex items-center gap-1">
-        {isTerraGarminActivity(act) ? (
-          <GarminAttribution deviceModel={act.device_model} />
-        ) : act.source && act.source !== "strava" ? (
+      <div className="flex items-center gap-1 shrink-0">
+        {act.source && act.source !== "strava" && !isTerraGarminActivity(act) ? (
           <span className="text-[10px] text-white bg-red-500 px-2 py-0.5 rounded-full">
             {act.source === "Apple Health" ? "❤️ Health" : act.source}
           </span>

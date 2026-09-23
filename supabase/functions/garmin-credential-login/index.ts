@@ -155,6 +155,20 @@ serve(async (req) => {
     const oauth1Encrypted = await encryptString(oauth1);
     const oauth2Encrypted = await encryptString(oauth2);
 
+    // Temporary Garmin/Terra outage: if the user is NOT connected via Terra,
+    // this backup sign-in is their primary source — record it so the poller
+    // and manual sync pull their last 3 months. Existing Terra/Garmin users
+    // keep backup_signup_at null → only activities on/after the Terra cutoff
+    // (2026-09-21 14:40 HKT) are touched.
+    const { data: terraConn } = await supabase
+      .from("terra_connections")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("provider", "GARMIN")
+      .eq("active", true)
+      .maybeSingle();
+    const backupSignupAt = terraConn ? null : new Date().toISOString();
+
     console.log("garmin-credential-login: upserting garmin connection");
     const { error: upsertError } = await supabase
       .from("garmin_connections")
@@ -165,6 +179,7 @@ serve(async (req) => {
         oauth1_token_encrypted: oauth1Encrypted,
         oauth2_token_encrypted: oauth2Encrypted,
         needs_reauth: false,
+        backup_signup_at: backupSignupAt,
         
       }, { onConflict: "user_id" });
 

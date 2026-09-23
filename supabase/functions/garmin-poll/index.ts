@@ -211,7 +211,7 @@ serve(async (req) => {
       let detailsFetched = 0;
       const { data: candidates } = await supabase
         .from("garmin_activities")
-        .select("id, garmin_activity_id, laps, has_details")
+        .select("id, garmin_activity_id, has_details")
         .eq("user_id", userId)
         .gte("start_time", floor.toISOString())
         .order("start_time", { ascending: false })

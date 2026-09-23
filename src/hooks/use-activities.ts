@@ -520,8 +520,8 @@ export function useActivities(options?: { limit?: number; enabled?: boolean }) {
     staleTime: 5 * 60 * 1000,
   });
 
-  // "Ready" only waits for the light Terra query — the heavy full fetch keeps
-  // hydrating in the background without holding back the first paint.
+  // "Ready" waits for the lightweight Terra summary query. Detailed sample
+  // streams are requested only after one activity is opened.
   const allSourcesSettled =
     terraLightQuery.isFetched && !terraLightQuery.isFetching &&
     activitiesQuery.isFetched && !activitiesQuery.isFetching &&

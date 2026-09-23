@@ -22,3 +22,4 @@
 ## New workspace setup
 - [x] Connect Google Search Console (previous workspace connections no longer apply)
 - [ ] Temporary Garmin/Railway fallback while Terra Garmin is down: direct Garmin connect for Garmin users + 1-minute polling from 2026-09-21T10:40Z (Terra data overwrites later)
+- [x] Stop the Garmin poller during database recovery and remove full-history Terra sample downloads from list views

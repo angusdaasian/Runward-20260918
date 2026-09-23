@@ -1,0 +1,2 @@
+ALTER TABLE public.garmin_connections ADD COLUMN IF NOT EXISTS last_polled_at timestamptz;
+CREATE INDEX IF NOT EXISTS garmin_connections_last_polled_at_idx ON public.garmin_connections (last_polled_at NULLS FIRST);

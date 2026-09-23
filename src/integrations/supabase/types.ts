@@ -754,6 +754,7 @@ export type Database = {
           garmin_display_name: string | null
           garmin_email_encrypted: string | null
           id: string
+          last_polled_at: string | null
           last_refreshed_at: string | null
           needs_reauth: boolean
           oauth1_token_encrypted: string | null
@@ -767,6 +768,7 @@ export type Database = {
           garmin_display_name?: string | null
           garmin_email_encrypted?: string | null
           id?: string
+          last_polled_at?: string | null
           last_refreshed_at?: string | null
           needs_reauth?: boolean
           oauth1_token_encrypted?: string | null
@@ -780,6 +782,7 @@ export type Database = {
           garmin_display_name?: string | null
           garmin_email_encrypted?: string | null
           id?: string
+          last_polled_at?: string | null
           last_refreshed_at?: string | null
           needs_reauth?: boolean
           oauth1_token_encrypted?: string | null

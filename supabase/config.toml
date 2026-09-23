@@ -174,3 +174,6 @@ verify_jwt = false
 
 [functions.notify-group-message]
 verify_jwt = false
+
+[functions.garmin-poll]
+verify_jwt = false

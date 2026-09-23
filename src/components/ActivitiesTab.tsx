@@ -1023,17 +1023,43 @@ const ActivitiesTab = ({ lang, resetSignal }: Props) => {
     }
   }, []);
 
-  const detectProviders = useCallback(async (): Promise<{ terra: boolean; strava: boolean; suunto: boolean }> => {
-    if (!user) return { terra: false, strava: false, suunto: false };
-    const [terraRes, stravaRes, suuntoRes] = await Promise.all([
+  const invokeGarminRailwaySync = useCallback(async (days: number): Promise<number> => {
+    try {
+      const { data, error } = await supabase.functions.invoke("garmin-sync", {
+        body: { action: "sync", days },
+      });
+      if (error || !(data as any)?.success) {
+        console.warn("Garmin/Railway sync failed:", error ?? data);
+        return 0;
+      }
+      return typeof (data as any)?.synced === "number" ? (data as any).synced : 0;
+    } catch (e) {
+      console.warn("Garmin/Railway sync error:", e);
+      return 0;
+    }
+  }, []);
+
+  const detectProviders = useCallback(async (): Promise<{ terra: boolean; strava: boolean; suunto: boolean; garmin: boolean }> => {
+    if (!user) return { terra: false, strava: false, suunto: false, garmin: false };
+    const [terraRes, stravaRes, suuntoRes, garminRes] = await Promise.all([
       supabase.from("terra_connections").select("user_id").eq("user_id", user.id).eq("active", true).limit(1).maybeSingle(),
       supabase.from("strava_connections").select("user_id").eq("user_id", user.id).limit(1).maybeSingle(),
       supabase.from("suunto_connections").select("user_id").eq("user_id", user.id).limit(1).maybeSingle(),
+      supabase
+        .from("garmin_connections")
+        .select("user_id")
+        .eq("user_id", user.id)
+        .not("oauth1_token_encrypted", "is", null)
+        .not("oauth2_token_encrypted", "is", null)
+        .or("needs_reauth.is.null,needs_reauth.eq.false")
+        .limit(1)
+        .maybeSingle(),
     ]);
     return {
       terra: !!terraRes.data,
       strava: !!stravaRes.data,
       suunto: !!suuntoRes.data,
+      garmin: !!garminRes.data,
     };
   }, [user]);
 
@@ -1067,15 +1093,16 @@ const ActivitiesTab = ({ lang, resetSignal }: Props) => {
         ? invokeStravaSync(accessToken, { after: afterSec, perPage: 30, environment: getAppEnvironment() })
         : Promise.resolve(0);
       const suuntoPromise = providers.suunto ? invokeSuuntoSync(1) : Promise.resolve(0);
+      const garminPromise = providers.garmin ? invokeGarminRailwaySync(1) : Promise.resolve(0);
 
-      const [terraRes, stravaCount, suuntoCount] = await Promise.all([terraPromise, stravaPromise, suuntoPromise]);
+      const [terraRes, stravaCount, suuntoCount, garminCount] = await Promise.all([terraPromise, stravaPromise, suuntoPromise, garminPromise]);
       const result = terraRes ? await terraRes.json().catch(() => null) : null;
       if (terraRes && !terraRes.ok && terraRes.status !== 404) {
         throw new Error(result?.error ?? `Sync failed (${terraRes.status})`);
       }
       invalidateAll();
       const terraCount = result?.activities ?? 0;
-      const count = terraCount + stravaCount + suuntoCount;
+      const count = terraCount + stravaCount + suuntoCount + garminCount;
       const msg = lang === "zh" ? result?.message_zh : result?.message_en;
       if (result?.rateLimited && stravaCount === 0 && suuntoCount === 0) {
         toast.info(msg ?? (lang === "zh" ? "請稍後再試" : "Please try again later"));
@@ -1090,7 +1117,7 @@ const ActivitiesTab = ({ lang, resetSignal }: Props) => {
     }
     setFetchingToday(false);
 
-  }, [user, fetchingToday, invalidateAll, lang, invokeStravaSync, invokeSuuntoSync, detectProviders]);
+  }, [user, fetchingToday, invalidateAll, lang, invokeStravaSync, invokeSuuntoSync, invokeGarminRailwaySync, detectProviders]);
 
   const handleFetchWeekOnly = useCallback(async () => {
     if (!user || fetchingToday) return;
@@ -1119,8 +1146,9 @@ const ActivitiesTab = ({ lang, resetSignal }: Props) => {
         ? invokeStravaSync(accessToken, { after: afterSec, perPage: 100, environment: getAppEnvironment() })
         : Promise.resolve(0);
       const suuntoPromise = providers.suunto ? invokeSuuntoSync(7) : Promise.resolve(0);
+      const garminPromise = providers.garmin ? invokeGarminRailwaySync(7) : Promise.resolve(0);
 
-      const [terraRes, stravaCount, suuntoCount] = await Promise.all([terraPromise, stravaPromise, suuntoPromise]);
+      const [terraRes, stravaCount, suuntoCount, garminCount] = await Promise.all([terraPromise, stravaPromise, suuntoPromise, garminPromise]);
       const result = terraRes ? await terraRes.json().catch(() => null) : null;
       if (terraRes && !terraRes.ok && terraRes.status !== 404) {
         throw new Error(result?.error ?? `Sync failed (${terraRes.status})`);
@@ -1128,7 +1156,7 @@ const ActivitiesTab = ({ lang, resetSignal }: Props) => {
       invalidateAll();
       const providersResult = Array.isArray(result?.providers) ? result.providers : [];
       const terraIngested = providersResult.reduce((s: number, p: any) => s + (p?.ingested ?? 0), 0);
-      const ingested = terraIngested + stravaCount + suuntoCount;
+      const ingested = terraIngested + stravaCount + suuntoCount + garminCount;
       const msg = lang === "zh" ? result?.message_zh : result?.message_en;
       if (result?.rateLimited && stravaCount === 0 && suuntoCount === 0) {
         toast.info(msg ?? (lang === "zh" ? "請稍後再試" : "Please try again later"));
@@ -1143,7 +1171,7 @@ const ActivitiesTab = ({ lang, resetSignal }: Props) => {
       toast.error(lang === "zh" ? "同步失敗" : "Sync failed");
     }
     setFetchingToday(false);
-  }, [user, fetchingToday, invalidateAll, lang, invokeStravaSync, invokeSuuntoSync, detectProviders]);
+  }, [user, fetchingToday, invalidateAll, lang, invokeStravaSync, invokeSuuntoSync, invokeGarminRailwaySync, detectProviders]);
 
 
   const handleFetchStrava30Days = useCallback(async () => {

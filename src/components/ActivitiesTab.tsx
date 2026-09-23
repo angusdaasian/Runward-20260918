@@ -652,6 +652,34 @@ const ActivitiesTab = ({ lang, resetSignal }: Props) => {
     }
   }, [user?.id, activities.length, fullLoading]);
   const [selectedActivity, setSelectedActivity] = useState<StravaActivity | null>(null);
+  const openActivity = useCallback(async (activity: StravaActivity) => {
+    if (activity.provenance !== "terra" || !user) {
+      setSelectedActivity(activity);
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("terra_activities")
+      .select("*")
+      .eq("id", activity.id)
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (error || !data) {
+      console.warn("Failed to load Terra activity details:", error);
+      setSelectedActivity(activity);
+      return;
+    }
+
+    setSelectedActivity({
+      ...activity,
+      laps: data.laps || [],
+      hr_samples: data.hr_samples || null,
+      distance_samples: data.distance_samples || null,
+      elevation_samples: data.elevation_samples || null,
+      cadence_samples: data.cadence_samples || null,
+    });
+  }, [user]);
   const [dateSheet, setDateSheet] = useState<{
     dateLabel: string;
     activities: StravaActivity[];
@@ -1413,7 +1441,7 @@ const ActivitiesTab = ({ lang, resetSignal }: Props) => {
               score={activityScores[latestActivity.id]}
               load={activityLoads[latestActivity.id]}
               isPremium={isPremium}
-              onClick={() => setSelectedActivity(latestActivity)}
+              onClick={() => void openActivity(latestActivity)}
             />
           </div>
         ) : (
@@ -1630,7 +1658,7 @@ const ActivitiesTab = ({ lang, resetSignal }: Props) => {
                         <button
                           onClick={() => {
                             setDateSheet(null);
-                            setSelectedActivity(act);
+                            void openActivity(act);
                           }}
                           className="w-full px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors"
                         >

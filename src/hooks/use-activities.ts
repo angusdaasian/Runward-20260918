@@ -302,17 +302,6 @@ async function fetchTerraActivitiesLight(userId: string, limit?: number): Promis
   return ((data as any[]) || []).map(mapTerraRow);
 }
 
-async function fetchTerraActivities(userId: string, limit?: number): Promise<StravaActivity[]> {
-  let q = supabase
-    .from("terra_activities")
-    .select("*")
-    .eq("user_id", userId)
-    .order("start_time", { ascending: false });
-  if (limit) q = q.limit(limit);
-  const { data } = await q;
-  return ((data as any[]) || []).map(mapTerraRow);
-}
-
 async function fetchSuuntoActivities(userId: string, limit?: number): Promise<StravaActivity[]> {
   let q = supabase
     .from("suunto_activities")
@@ -446,9 +435,8 @@ export function useActivities(options?: { limit?: number; enabled?: boolean }) {
   // waterfall and made rows pop in one wave at a time. Dedup still happens
   // once on the merged set (see mergedActivities below), and the list is only
   // painted once every source has settled — so no more staggered pop-in.
-  // Terra is fetched in two phases: a light summary query that paints the UI
-  // almost immediately, then the full query (with sample streams) hydrating in
-  // the background for the detail view / exports.
+  // Terra list views only fetch summary columns. Per-second samples and laps
+  // are loaded for one activity after it is opened, never for the full history.
   const terraLightQuery = useQuery({
     queryKey: ["terra-activities-light", user?.id, limit ?? "all"],
     queryFn: () => fetchTerraActivitiesLight(user!.id, limit),
@@ -457,15 +445,7 @@ export function useActivities(options?: { limit?: number; enabled?: boolean }) {
     gcTime: 10 * 60 * 1000,
   });
 
-  const terraQuery = useQuery({
-    queryKey: ["terra-activities", user?.id, limit ?? "all"],
-    queryFn: () => fetchTerraActivities(user!.id, limit),
-    enabled: activityQueriesEnabled,
-    staleTime: 30 * 1000,
-    gcTime: 10 * 60 * 1000,
-  });
-
-  const hasTerraForLatestView = !!limit && ((terraLightQuery.data?.length ?? terraQuery.data?.length ?? 0) > 0);
+  const hasTerraForLatestView = !!limit && ((terraLightQuery.data?.length ?? 0) > 0);
 
   const secondaryEnabled = activityQueriesEnabled;
 
@@ -559,11 +539,8 @@ export function useActivities(options?: { limit?: number; enabled?: boolean }) {
   const mergedActivities = useMemo(() => {
     if (!allSourcesSettled) return lastMergedRef.current;
 
-    // Prefer the full rows once they land (they carry sample streams + laps);
-    // until then the light summaries are enough for every list/chart view.
-    const full = terraQuery.data;
     const light = terraLightQuery.data || [];
-    const tr = full && full.length >= light.length ? full : light;
+    const tr = light;
     const terraOnlyLatestView = !!limit && tr.length > 0;
     const strava = terraOnlyLatestView ? [] : (activitiesQuery.data || []);
     const ah = terraOnlyLatestView ? [] : (appleHealthQuery.data || []);
@@ -586,7 +563,6 @@ export function useActivities(options?: { limit?: number; enabled?: boolean }) {
     activitiesQuery.data,
     appleHealthQuery.data,
     garminQuery.data,
-    terraQuery.data,
     terraLightQuery.data,
     suuntoQuery.data,
     limit,

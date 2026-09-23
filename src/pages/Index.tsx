@@ -280,9 +280,11 @@ const Index = () => {
           <span>{lang === "zh" ? "離線中 — 顯示已儲存的資料" : "You're offline — showing saved data"}</span>
         </div>
       )}
+      <div className="relative min-h-0 flex-1">
       <div
-        className="flex-1 overflow-y-auto relative"
-        style={{ paddingBottom: 'calc(5rem + var(--safe-area-bottom, 0px))', display: activeTab === "activities" ? "none" : "block" }}
+        className={`absolute inset-0 overflow-y-auto ${activeTab === "activities" ? "invisible pointer-events-none" : "visible"}`}
+        style={{ paddingBottom: 'calc(5rem + var(--safe-area-bottom, 0px))' }}
+        aria-hidden={activeTab === "activities"}
       >
         {activeTab === "training" && (
           <Suspense fallback={<TrainingSkeleton />}>
@@ -342,13 +344,14 @@ const Index = () => {
         )}
       </div>
       <div
-        className="flex-1 overflow-y-auto relative"
+        className={`absolute inset-0 overflow-y-auto ${activeTab === "activities" ? "visible" : "invisible pointer-events-none"}`}
         style={{
           paddingBottom: 'calc(5rem + var(--safe-area-bottom, 0px))',
-          display: activeTab === "activities" ? "block" : "none",
         }}
+        aria-hidden={activeTab !== "activities"}
       >
         <ActivitiesTab lang={lang} resetSignal={activityResetSignal} />
+      </div>
       </div>
 
       <div className="bottom-nav fixed bottom-0 left-0 right-0 bg-card border-t border-border" style={{ paddingBottom: 'var(--safe-area-bottom, 0px)' }}>

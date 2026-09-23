@@ -210,7 +210,7 @@ serve(async (req) => {
         .from("garmin_activities")
         .select("id, garmin_activity_id, laps, has_details")
         .eq("user_id", userId)
-        .gte("start_time", windowStart.toISOString())
+        .gte("start_time", floor.toISOString())
         .order("start_time", { ascending: false })
         .limit(30);
 
@@ -257,7 +257,7 @@ serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ success: true, window: { start: startDate, end: endDate }, processed: results.length, results }),
+      JSON.stringify({ success: true, window_end: fmtDate(now), processed: results.length, results }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (e) {

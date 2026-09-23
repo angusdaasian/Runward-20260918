@@ -35,7 +35,7 @@ import ActivityMap from "./ActivityMap";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from "recharts";
 import { loadForActivity, isRunning } from "@/lib/trainingLoad";
 import { calculateRunningScore } from "@/lib/vdot";
-import { computeZonePct, estimateMaxHr, estimateRestingHr, zoneBoundaries, ZONE_LABELS, isValidCustomZones } from "@/lib/hrZones";
+import { computeZonePct, computeZonePctWeighted, estimateMaxHr, estimateRestingHr, zoneBoundaries, ZONE_LABELS, isValidCustomZones } from "@/lib/hrZones";
 import HrZoneBars from "./HrZoneBars";
 import RpeSlider from "./RpeSlider";
 import PlanNextWorkoutCard from "./PlanNextWorkoutCard";
@@ -44,6 +44,7 @@ import ActivityShoePicker from "./ActivityShoePicker";
 import ActivityPhotos from "./ActivityPhotos";
 import { useActivityPhotos } from "@/hooks/use-activity-photos";
 import { detectIntervals, formatRepDistance } from "@/lib/detectIntervals";
+import GarminAttribution from "@/components/brand/GarminAttribution";
 
 
 interface StravaActivity {
@@ -71,6 +72,7 @@ interface StravaActivity {
   avg_cadence?: number | null;
   map_screenshot_url?: string | null;
   provenance?: "strava" | "apple_health" | "garmin" | "terra";
+  device_model?: string | null;
 }
 
 interface Split {
@@ -97,9 +99,10 @@ interface Props {
 }
 
 function formatDuration(seconds: number): string {
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  const s = seconds % 60;
+  const total = Math.round(Number(seconds) || 0);
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
   if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
   return `${m}:${String(s).padStart(2, '0')}`;
 }
@@ -172,6 +175,11 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
   const isTerraActivity = activity.provenance === "terra" || (activity.source?.startsWith("Terra") ?? false);
   const isGarmin = activity.provenance === "garmin" && activity.source === "Garmin";
   const isCoros = activity.provenance === "garmin" && activity.source === "COROS";
+  // Terra/Garmin data requires Garmin brand + device model attribution.
+  const isTerraGarmin =
+    (isTerraActivity || activity.provenance === "garmin") &&
+    (activity.source ?? "").toUpperCase().includes("GARMIN");
+  const garminDeviceModel = isTerraGarmin ? (activity.device_model || "Garmin device") : undefined;
   const needsRpe = isAppleHealth || isGarmin || isTerraActivity || isCoros;
   const dbTable = isTerraActivity ? "terra_activities" : isAppleHealth ? "apple_health_activities" : isGarmin || isCoros ? "garmin_activities" : "strava_activities";
   const isRunningActivity = isRunning(activity.sport_type);
@@ -891,8 +899,24 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
     if (hrStream && Array.isArray(hrStream.data) && hrStream.data.length > 10) {
       return computeZonePct(hrStream.data, maxHr, restHr, custom);
     }
+    // 3. Backup Garmin (Railway) and other lap-only sources: weight each lap's
+    // average HR by its duration so zones still show without a HR stream.
+    if (Array.isArray(activity.laps) && activity.laps.length > 0) {
+      const entries = activity.laps.map((lap: any) => ({
+        bpm: Number(lap.avg_hr ?? lap.average_hr ?? lap.average_heartrate ?? lap.averageHR) || null,
+        seconds: Number(lap.elapsed_time ?? lap.moving_time ?? lap.duration_seconds) || null,
+      }));
+      const lapZones = computeZonePctWeighted(entries, maxHr, restHr, custom);
+      if (lapZones) return lapZones;
+    }
+    // 4. Last resort: activity-level average HR over the whole duration.
+    const avgHr = Number(activity.average_heartrate) || 0;
+    const secs = Number(activity.moving_time || activity.elapsed_time) || 0;
+    if (avgHr > 30 && secs > 0) {
+      return computeZonePctWeighted([{ bpm: avgHr, seconds: secs }], maxHr, restHr, custom);
+    }
     return null;
-  }, [activity.hr_samples, profileMaxHr, profileAge, profileRestingHr, profileCustomZones, streams]);
+  }, [activity.hr_samples, activity.laps, activity.average_heartrate, activity.moving_time, activity.elapsed_time, profileMaxHr, profileAge, profileRestingHr, profileCustomZones, streams]);
 
   // Per-point HR zone color stops for the HR chart gradient, so the curve
   // visually matches the zone distribution (Z1 grey, Z2 blue, Z3 green, ...).
@@ -996,6 +1020,7 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
           elevationGainMeters: activity.total_elevation_gain ?? null,
           calories: (activity as any).calories ?? null,
           summaryPolyline: activity.summary_polyline ?? null,
+          garminDeviceModel,
           splits: splits ? splits.map((s) => ({
             distance: s.distance,
             elapsed_time: s.elapsed_time,
@@ -1091,6 +1116,7 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
                     elevationGainMeters: activity.total_elevation_gain ?? null,
                     summaryPolyline: activity.summary_polyline ?? null,
                     lang,
+                    garminDeviceModel,
                   })
                 }
               >
@@ -1132,6 +1158,7 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
                       heartrate: typeof d.heartrate === "number" ? d.heartrate : undefined,
                     })),
                     lang,
+                    garminDeviceModel,
                   });
                 }}
               >
@@ -1262,6 +1289,7 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
                     average_heartrate: s.average_heartrate ?? null,
                   })),
                   lang,
+                  garminDeviceModel,
                 });
               };
               const optionCls = "w-full flex items-center gap-2 px-4 py-3 rounded-xl border border-border text-sm font-medium hover:bg-muted transition-colors text-left";
@@ -1341,6 +1369,9 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
           <span className="text-[10px] text-white bg-red-500 px-2 py-0.5 rounded-full mt-1 inline-block">
             ❤️ {activity.source}
           </span>
+        )}
+        {isTerraGarmin && (
+          <GarminAttribution deviceModel={activity.device_model} size="md" className="mt-1.5" />
         )}
       </div>
 

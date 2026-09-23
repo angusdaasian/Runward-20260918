@@ -45,6 +45,8 @@ import { useAppleHealth, type HealthStats } from "@/hooks/use-apple-health";
 import { useTerraDailyHealth, useTerraTodayStats } from "@/hooks/use-terra-daily-health";
 import { useGarminDailyHealth } from "@/hooks/use-garmin-daily-health";
 import { useSimpleMode } from "@/hooks/use-simple-mode";
+import GarminAttribution from "@/components/brand/GarminAttribution";
+import ServiceStatusBanner from "@/components/ServiceStatusBanner";
 
 
 
@@ -54,9 +56,10 @@ interface Props {
 }
 
 function formatDuration(seconds: number): string {
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  const s = seconds % 60;
+  const total = Math.round(Number(seconds) || 0);
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
   if (h > 0) return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
   return `${m}:${String(s).padStart(2, "0")}`;
 }
@@ -183,6 +186,11 @@ const TodayStats = ({ lang, healthStats }: { lang: Lang; healthStats: HealthStat
   );
 };
 
+/** Terra-sourced Garmin activity → requires Garmin brand + device model attribution. */
+const isTerraGarminActivity = (act: StravaActivity) =>
+  (act.provenance === "terra" || act.provenance === "garmin") &&
+  (act.source ?? "").toUpperCase().includes("GARMIN");
+
 // ---------- Activity Card ----------
 const ActivityCard = ({
   act,
@@ -203,11 +211,11 @@ const ActivityCard = ({
     className="bg-card border border-border rounded-xl p-4 cursor-pointer hover:border-primary/50 transition-colors"
     onClick={onClick}
   >
-    <div className="flex items-start justify-between mb-2">
-      <div className="flex items-center gap-2">
-        <span className="text-lg">{sportTypeIcon[act.sport_type] || "🏃"}</span>
-        <div>
-          <h3 className="font-medium text-foreground text-sm">{act.name}</h3>
+    <div className="flex items-start justify-between mb-2 gap-2">
+      <div className="flex items-center gap-2 min-w-0">
+        <span className="text-lg shrink-0">{sportTypeIcon[act.sport_type] || "🏃"}</span>
+        <div className="min-w-0">
+          <h3 className="font-medium text-foreground text-sm truncate">{act.name}</h3>
           <span className="text-xs text-muted-foreground">
             {new Date(act.start_date).toLocaleDateString(lang === "zh" ? "zh-TW" : "en-US", {
               year: "numeric",
@@ -220,14 +228,19 @@ const ActivityCard = ({
               minute: "2-digit",
             })}
           </span>
+          {isTerraGarminActivity(act) && (
+            <div className="mt-1">
+              <GarminAttribution deviceModel={act.device_model} />
+            </div>
+          )}
         </div>
       </div>
-      <div className="flex items-center gap-1">
-        {act.source && act.source !== "strava" && (
+      <div className="flex items-center gap-1 shrink-0">
+        {act.source && act.source !== "strava" && !isTerraGarminActivity(act) ? (
           <span className="text-[10px] text-white bg-red-500 px-2 py-0.5 rounded-full">
             {act.source === "Apple Health" ? "❤️ Health" : act.source}
           </span>
-        )}
+        ) : null}
         <span className="text-[10px] text-muted-foreground bg-muted px-2 py-0.5 rounded-full">{act.sport_type}</span>
       </div>
     </div>
@@ -644,6 +657,60 @@ const ActivitiesTab = ({ lang, resetSignal }: Props) => {
     }
   }, [user?.id, activities.length, fullLoading]);
   const [selectedActivity, setSelectedActivity] = useState<StravaActivity | null>(null);
+  const openActivity = useCallback(async (activity: StravaActivity) => {
+    if (!user || (activity.provenance !== "terra" && activity.provenance !== "garmin")) {
+      setSelectedActivity(activity);
+      return;
+    }
+
+    // Backup Garmin (Railway) rows keep their per-second samples in
+    // garmin_activities; load them only for the activity being opened.
+    if (activity.provenance === "garmin") {
+      const { data: g, error: gErr } = await supabase
+        .from("garmin_activities")
+        .select("laps, hr_samples, distance_samples, elevation_samples, cadence_samples")
+        .eq("id", activity.id)
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (gErr || !g) {
+        setSelectedActivity(activity);
+        return;
+      }
+
+      setSelectedActivity({
+        ...activity,
+        laps: Array.isArray(g.laps) ? g.laps : activity.laps ?? [],
+        hr_samples: Array.isArray(g.hr_samples) ? g.hr_samples as Array<{ t: number; bpm: number }> : null,
+        distance_samples: Array.isArray(g.distance_samples) ? g.distance_samples as Array<{ t: number; d: number }> : null,
+        elevation_samples: Array.isArray(g.elevation_samples) ? g.elevation_samples as Array<{ t: number; e: number }> : null,
+        cadence_samples: Array.isArray(g.cadence_samples) ? g.cadence_samples as Array<{ t: number; rpm: number }> : null,
+      });
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("terra_activities")
+      .select("*")
+      .eq("id", activity.id)
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (error || !data) {
+      console.warn("Failed to load Terra activity details:", error);
+      setSelectedActivity(activity);
+      return;
+    }
+
+    setSelectedActivity({
+      ...activity,
+      laps: Array.isArray(data.laps) ? data.laps : [],
+      hr_samples: Array.isArray(data.hr_samples) ? data.hr_samples as Array<{ t: number; bpm: number }> : null,
+      distance_samples: Array.isArray(data.distance_samples) ? data.distance_samples as Array<{ t: number; d: number }> : null,
+      elevation_samples: Array.isArray(data.elevation_samples) ? data.elevation_samples as Array<{ t: number; e: number }> : null,
+      cadence_samples: Array.isArray(data.cadence_samples) ? data.cadence_samples as Array<{ t: number; rpm: number }> : null,
+    });
+  }, [user]);
   const [dateSheet, setDateSheet] = useState<{
     dateLabel: string;
     activities: StravaActivity[];
@@ -1266,7 +1333,7 @@ const ActivitiesTab = ({ lang, resetSignal }: Props) => {
         activityLoads={activityLoads}
         isPremium={isPremium}
         onBack={() => setShowAllActivities(false)}
-        onSelect={setSelectedActivity}
+        onSelect={(a) => void openActivity(a)}
       />
     );
   }
@@ -1293,6 +1360,8 @@ const ActivitiesTab = ({ lang, resetSignal }: Props) => {
 
   return (
     <FadeIn className="px-5 pt-6 max-w-lg mx-auto">
+
+      <ServiceStatusBanner lang={lang} />
 
       {/* Today Stats: wearable (Terra) daily data wins, Apple Health as fallback */}
       <TodayStats
@@ -1405,7 +1474,7 @@ const ActivitiesTab = ({ lang, resetSignal }: Props) => {
               score={activityScores[latestActivity.id]}
               load={activityLoads[latestActivity.id]}
               isPremium={isPremium}
-              onClick={() => setSelectedActivity(latestActivity)}
+              onClick={() => void openActivity(latestActivity)}
             />
           </div>
         ) : (
@@ -1519,9 +1588,18 @@ const ActivitiesTab = ({ lang, resetSignal }: Props) => {
                                 hour: "2-digit",
                                 minute: "2-digit",
                               })}
-                              {" · "}
-                              {act.source && act.source !== "strava" ? act.source : "Strava"}
+                              {!isTerraGarminActivity(act) && (
+                                <>
+                                  {" · "}
+                                  {act.source && act.source !== "strava" ? act.source : "Strava"}
+                                </>
+                              )}
                             </span>
+                            {isTerraGarminActivity(act) && (
+                              <div className="mt-0.5">
+                                <GarminAttribution deviceModel={act.device_model} />
+                              </div>
+                            )}
                           </div>
                         </div>
 
@@ -1613,7 +1691,7 @@ const ActivitiesTab = ({ lang, resetSignal }: Props) => {
                         <button
                           onClick={() => {
                             setDateSheet(null);
-                            setSelectedActivity(act);
+                            void openActivity(act);
                           }}
                           className="w-full px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors"
                         >

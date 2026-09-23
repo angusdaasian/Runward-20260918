@@ -670,14 +670,19 @@ export type Database = {
           average_pace: number | null
           average_speed: number | null
           avg_cadence: number | null
+          cadence_samples: Json | null
           calories: number | null
           created_at: string | null
+          device_model: string | null
           distance_meters: number | null
+          distance_samples: Json | null
           duration_seconds: number | null
           elevation_gain: number | null
+          elevation_samples: Json | null
           garmin_activity_id: string
           has_details: boolean
           has_gps: boolean | null
+          hr_samples: Json | null
           id: string
           laps: Json | null
           max_hr: number | null
@@ -698,14 +703,19 @@ export type Database = {
           average_pace?: number | null
           average_speed?: number | null
           avg_cadence?: number | null
+          cadence_samples?: Json | null
           calories?: number | null
           created_at?: string | null
+          device_model?: string | null
           distance_meters?: number | null
+          distance_samples?: Json | null
           duration_seconds?: number | null
           elevation_gain?: number | null
+          elevation_samples?: Json | null
           garmin_activity_id: string
           has_details?: boolean
           has_gps?: boolean | null
+          hr_samples?: Json | null
           id?: string
           laps?: Json | null
           max_hr?: number | null
@@ -726,14 +736,19 @@ export type Database = {
           average_pace?: number | null
           average_speed?: number | null
           avg_cadence?: number | null
+          cadence_samples?: Json | null
           calories?: number | null
           created_at?: string | null
+          device_model?: string | null
           distance_meters?: number | null
+          distance_samples?: Json | null
           duration_seconds?: number | null
           elevation_gain?: number | null
+          elevation_samples?: Json | null
           garmin_activity_id?: string
           has_details?: boolean
           has_gps?: boolean | null
+          hr_samples?: Json | null
           id?: string
           laps?: Json | null
           max_hr?: number | null
@@ -749,11 +764,13 @@ export type Database = {
       }
       garmin_connections: {
         Row: {
+          backup_signup_at: string | null
           created_at: string | null
           full_resync_done: boolean
           garmin_display_name: string | null
           garmin_email_encrypted: string | null
           id: string
+          last_polled_at: string | null
           last_refreshed_at: string | null
           needs_reauth: boolean
           oauth1_token_encrypted: string | null
@@ -762,11 +779,13 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          backup_signup_at?: string | null
           created_at?: string | null
           full_resync_done?: boolean
           garmin_display_name?: string | null
           garmin_email_encrypted?: string | null
           id?: string
+          last_polled_at?: string | null
           last_refreshed_at?: string | null
           needs_reauth?: boolean
           oauth1_token_encrypted?: string | null
@@ -775,11 +794,13 @@ export type Database = {
           user_id: string
         }
         Update: {
+          backup_signup_at?: string | null
           created_at?: string | null
           full_resync_done?: boolean
           garmin_display_name?: string | null
           garmin_email_encrypted?: string | null
           id?: string
+          last_polled_at?: string | null
           last_refreshed_at?: string | null
           needs_reauth?: boolean
           oauth1_token_encrypted?: string | null
@@ -1956,6 +1977,42 @@ export type Database = {
         }
         Relationships: []
       }
+      service_statuses: {
+        Row: {
+          created_at: string
+          created_by: string
+          display_order: number
+          id: string
+          message: string | null
+          message_zh: string | null
+          service_name: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          display_order?: number
+          id?: string
+          message?: string | null
+          message_zh?: string | null
+          service_name: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          display_order?: number
+          id?: string
+          message?: string | null
+          message_zh?: string | null
+          service_name?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       shoes_catalog: {
         Row: {
           active: boolean
@@ -2429,6 +2486,7 @@ export type Database = {
           cadence_samples: Json | null
           calories: number | null
           created_at: string
+          device_model: string | null
           distance_meters: number | null
           distance_samples: Json | null
           duration_seconds: number | null
@@ -2459,6 +2517,7 @@ export type Database = {
           cadence_samples?: Json | null
           calories?: number | null
           created_at?: string
+          device_model?: string | null
           distance_meters?: number | null
           distance_samples?: Json | null
           duration_seconds?: number | null
@@ -2489,6 +2548,7 @@ export type Database = {
           cadence_samples?: Json | null
           calories?: number | null
           created_at?: string
+          device_model?: string | null
           distance_meters?: number | null
           distance_samples?: Json | null
           duration_seconds?: number | null

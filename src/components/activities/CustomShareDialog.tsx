@@ -38,6 +38,7 @@ import {
 } from "@/lib/shareActivity";
 import { AlignCenter, AlignStartVertical, AlignEndVertical, RotateCcw, Sparkles } from "lucide-react";
 import appIcon from "@/assets/app-icon.png";
+import garminTagWhite from "@/assets/brands/garmin-tag-white.png.asset.json";
 
 const ZONE_ROWS: Array<{ key: "z1" | "z2" | "z3" | "z4" | "z5"; label: string; labelZh: string; color: string }> = [
   { key: "z1", label: "Z1 Recovery", labelZh: "Z1 恢復", color: "#94A3B8" },
@@ -501,6 +502,12 @@ const CustomShareDialog = ({ open, onOpenChange, lang, data, available, photos =
                           <span className="font-display text-xs font-bold">Runward</span>
                           <img src={appIcon} alt="" className="h-6 w-6 rounded-md" />
                         </div>
+                        {d.garminDeviceModel && (
+                          <div className="absolute right-3 top-11 flex items-center gap-1.5 text-background [text-shadow:0_1px_6px_rgba(0,0,0,0.75)]">
+                            <img src={garminTagWhite.url} alt="Garmin" className="h-2.5 w-auto" />
+                            <span className="text-[8px] font-semibold">{d.garminDeviceModel}</span>
+                          </div>
+                        )}
 
                         <div
                           role="button"

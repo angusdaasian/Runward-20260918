@@ -26,6 +26,7 @@ import {
   Code2,
   Brain,
   Newspaper,
+  Activity as ActivityIcon,
 } from "lucide-react";
 import {
   Sidebar,
@@ -54,6 +55,7 @@ import PolarSyncTester from "@/components/admin/PolarSyncTester";
 import DeveloperAppsManager from "@/components/admin/DeveloperAppsManager";
 import AdminLlamaTraining from "@/components/admin/AdminLlamaTraining";
 import BlogManager from "@/components/admin/BlogManager";
+import ServiceStatusManager from "@/components/admin/ServiceStatusManager";
 
 interface UserRow {
   user_id: string;
@@ -73,6 +75,7 @@ type TabKey =
   | "users"
   | "llama"
   | "notifications"
+  | "status"
   | "announcements"
   | "promo"
   | "rewards"
@@ -90,6 +93,7 @@ const TABS: { key: TabKey; label: string; icon: React.ComponentType<{ className?
   { key: "users", label: "Users", icon: Users },
   { key: "llama", label: "Llama Training", icon: Brain },
   { key: "notifications", label: "Notifications", icon: Bell },
+  { key: "status", label: "Service Status", icon: ActivityIcon },
   { key: "announcements", label: "Announcements", icon: Megaphone },
   { key: "promo", label: "Promo Banners", icon: ImageIcon },
   { key: "rewards", label: "Reward Codes", icon: Gift },
@@ -426,6 +430,8 @@ const AdminPanel = () => {
         return <AdminLlamaTraining />;
       case "notifications":
         return <NotificationManager />;
+      case "status":
+        return <ServiceStatusManager />;
       case "announcements":
         return <AnnouncementManager />;
       case "promo":

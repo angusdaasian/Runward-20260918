@@ -122,3 +122,37 @@ export function combineZonePct(parts: Array<{ samples: Array<number | null | und
     z5: (acc.z5 / total) * 100,
   };
 }
+
+/**
+ * Bucket duration-weighted HR averages into zone shares (0..100).
+ * Used for sources that have no per-second HR stream (e.g. the backup
+ * Garmin/Railway sync), where only per-lap average HR + lap duration exist.
+ */
+export function computeZonePctWeighted(
+  entries: Array<{ bpm: number | null | undefined; seconds: number | null | undefined }>,
+  maxHr: number,
+  restHr: number,
+  custom?: number[] | null,
+): ZonePct | null {
+  if (!entries?.length) return null;
+  if (!(custom && isValidCustomZones(custom)) && maxHr <= restHr) return null;
+  const acc = { z1: 0, z2: 0, z3: 0, z4: 0, z5: 0 };
+  let total = 0;
+  for (const e of entries) {
+    const bpm = typeof e.bpm === "number" ? e.bpm : NaN;
+    const secs = typeof e.seconds === "number" && e.seconds > 0 ? e.seconds : 0;
+    if (!isFinite(bpm) || secs <= 0) continue;
+    const z = bucket(bpm, maxHr, restHr, custom);
+    if (!z) continue;
+    acc[z] += secs;
+    total += secs;
+  }
+  if (total <= 0) return null;
+  return {
+    z1: (acc.z1 / total) * 100,
+    z2: (acc.z2 / total) * 100,
+    z3: (acc.z3 / total) * 100,
+    z4: (acc.z4 / total) * 100,
+    z5: (acc.z5 / total) * 100,
+  };
+}

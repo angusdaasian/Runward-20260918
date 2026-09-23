@@ -16,6 +16,11 @@
 - [x] Surface Personal Bests and Heart Rate Zones on More, split its connection categories, and move social privacy into App Settings
 - [x] Let users drag and resize the stats overlay on activity photo share cards
 - [ ] After publish: resubmit sitemap in Search Console + verify /blog returns 200 (no redirect)
+- [x] Reposition Garmin attribution on sharing cards
+- [ ] Force a 7-day Terra/Garmin resync for c7a7 — blocked: external Supabase cannot provide an admin session
 
 ## New workspace setup
 - [x] Connect Google Search Console (previous workspace connections no longer apply)
+- [ ] Temporary Garmin/Railway fallback while Terra Garmin is down: direct Garmin connect for Garmin users + 1-minute polling from 2026-09-21T10:40Z (Terra data overwrites later)
+- [x] Stop the Garmin poller during database recovery and remove full-history Terra sample downloads from list views
+- [x] Add problems-only service status updates on Home with admin-managed bilingual messages

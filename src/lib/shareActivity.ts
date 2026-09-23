@@ -852,7 +852,7 @@ async function renderSplitsCard(input: ShareSplitsInput): Promise<Blob> {
   };
 
   const W = 1080;
-  const headerH = 220;
+  const headerH = 260;
   const rowH = 60;
   const tableHeaderH = 56;
   const totalRowH = 78;
@@ -931,7 +931,7 @@ async function renderSplitsCard(input: ShareSplitsInput): Promise<Blob> {
   ctx.fillStyle = "#FC4C02";
   ctx.fillRect(innerX, titleEnd + 8, 56, 4);
   if (input.garminDeviceModel) {
-    await drawGarminTag(ctx, { x: innerX + 80, y: titleEnd - 3, deviceModel: input.garminDeviceModel });
+    await drawGarminTag(ctx, { x: innerX, y: titleEnd + 20, deviceModel: input.garminDeviceModel });
   }
 
   // Table header
@@ -1421,7 +1421,7 @@ function drawInstagramFooter(
 async function renderChartsCard(input: ShareChartsInput): Promise<Blob> {
   const isZh = input.lang === "zh";
   const W = 1080;
-  const headerH = 240;
+  const headerH = 280;
   const chartH = 460;
   const chartGap = 28;
   const footerH = 96;
@@ -1497,7 +1497,7 @@ async function renderChartsCard(input: ShareChartsInput): Promise<Blob> {
   ctx.fillStyle = "#FC4C02";
   ctx.fillRect(innerX, titleEnd + 8, 56, 4);
   if (input.garminDeviceModel) {
-    await drawGarminTag(ctx, { x: innerX + 80, y: titleEnd - 3, deviceModel: input.garminDeviceModel });
+    await drawGarminTag(ctx, { x: innerX, y: titleEnd + 20, deviceModel: input.garminDeviceModel });
   }
 
   // Build series

@@ -21,7 +21,7 @@ const corsHeaders = {
 
 // Kill switch: flip to true to resume polling. Disabled while the database
 // recovers from overload / while all saved Garmin sign-ins are expired.
-const POLL_ENABLED = true;
+const POLL_ENABLED = false;
 
 // Last activity Terra delivered — never poll anything before this.
 const POLL_START_ISO = "2026-09-21T10:40:00Z";

@@ -35,7 +35,7 @@ import ActivityMap from "./ActivityMap";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from "recharts";
 import { loadForActivity, isRunning } from "@/lib/trainingLoad";
 import { calculateRunningScore } from "@/lib/vdot";
-import { computeZonePct, estimateMaxHr, estimateRestingHr, zoneBoundaries, ZONE_LABELS, isValidCustomZones } from "@/lib/hrZones";
+import { computeZonePct, computeZonePctWeighted, estimateMaxHr, estimateRestingHr, zoneBoundaries, ZONE_LABELS, isValidCustomZones } from "@/lib/hrZones";
 import HrZoneBars from "./HrZoneBars";
 import RpeSlider from "./RpeSlider";
 import PlanNextWorkoutCard from "./PlanNextWorkoutCard";
@@ -899,8 +899,24 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
     if (hrStream && Array.isArray(hrStream.data) && hrStream.data.length > 10) {
       return computeZonePct(hrStream.data, maxHr, restHr, custom);
     }
+    // 3. Backup Garmin (Railway) and other lap-only sources: weight each lap's
+    // average HR by its duration so zones still show without a HR stream.
+    if (Array.isArray(activity.laps) && activity.laps.length > 0) {
+      const entries = activity.laps.map((lap: any) => ({
+        bpm: Number(lap.avg_hr ?? lap.average_hr ?? lap.average_heartrate ?? lap.averageHR) || null,
+        seconds: Number(lap.elapsed_time ?? lap.moving_time ?? lap.duration_seconds) || null,
+      }));
+      const lapZones = computeZonePctWeighted(entries, maxHr, restHr, custom);
+      if (lapZones) return lapZones;
+    }
+    // 4. Last resort: activity-level average HR over the whole duration.
+    const avgHr = Number(activity.average_heartrate) || 0;
+    const secs = Number(activity.moving_time || activity.elapsed_time) || 0;
+    if (avgHr > 30 && secs > 0) {
+      return computeZonePctWeighted([{ bpm: avgHr, seconds: secs }], maxHr, restHr, custom);
+    }
     return null;
-  }, [activity.hr_samples, profileMaxHr, profileAge, profileRestingHr, profileCustomZones, streams]);
+  }, [activity.hr_samples, activity.laps, activity.average_heartrate, activity.moving_time, activity.elapsed_time, profileMaxHr, profileAge, profileRestingHr, profileCustomZones, streams]);
 
   // Per-point HR zone color stops for the HR chart gradient, so the curve
   // visually matches the zone distribution (Z1 grey, Z2 blue, Z3 green, ...).

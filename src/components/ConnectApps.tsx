@@ -17,7 +17,9 @@ import IntervalsIntroSheet from "@/components/IntervalsIntroSheet";
 import corosIcon from "@/assets/brands/coros.png";
 import polarIcon from "@/assets/brands/polar.png";
 import garminIcon from "@/assets/brands/garmin.png";
-import garminConnectBadge from "@/assets/brands/garmin-connect-badge.png.asset.json";
+// Note: the official Garmin Connect™ badge (garmin-connect-badge asset) is
+// intentionally not shown while the Terra Garmin outage fallback is active —
+// restore it in the provider row below when Terra Garmin resumes.
 import suuntoIcon from "@/assets/brands/suunto.png";
 import zeppIcon from "@/assets/brands/zepp.png";
 import fitbitIcon from "@/assets/brands/fitbit.png";

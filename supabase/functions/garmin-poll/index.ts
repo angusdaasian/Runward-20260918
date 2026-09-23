@@ -195,16 +195,19 @@ serve(async (req) => {
         else synced = rows.length;
       }
 
-      // Fill in laps / route for the newest activities that still lack details.
+      // Fill in laps / route for the newest activities that still lack them.
       let detailsFetched = 0;
-      const { data: missing } = await supabase
+      const { data: candidates } = await supabase
         .from("garmin_activities")
-        .select("id, garmin_activity_id")
+        .select("id, garmin_activity_id, laps, has_details")
         .eq("user_id", userId)
-        .eq("has_details", false)
         .gte("start_time", windowStart.toISOString())
         .order("start_time", { ascending: false })
-        .limit(DETAIL_LIMIT);
+        .limit(30);
+
+      const missing = (candidates ?? [])
+        .filter((c: any) => !c.has_details || !Array.isArray(c.laps) || c.laps.length === 0)
+        .slice(0, DETAIL_LIMIT);
 
       if (missing && missing.length > 0) {
         const detailResult = await callRailway<Record<string, any>>({
@@ -222,21 +225,24 @@ serve(async (req) => {
           const details: Record<string, any> = d?.details && typeof d.details === "object" ? d.details : d;
           for (const item of missing) {
             const detail = details?.[item.garmin_activity_id];
-            await supabase
-              .from("garmin_activities")
-              .update({
-                laps: detail && Array.isArray(detail.laps) ? detail.laps : [],
-                weather: detail?.weather ?? null,
-                summary_polyline: detail?.map_polyline ?? null,
-                has_details: true,
-              })
-              .eq("id", item.id);
-            if (detail) detailsFetched++;
+            // Nothing came back — leave has_details alone so we retry next cycle.
+            if (!detail) continue;
+            const laps = Array.isArray(detail.laps) ? detail.laps : [];
+            const patch: Record<string, unknown> = { has_details: true };
+            if (laps.length > 0) patch.laps = laps;
+            if (detail.weather) patch.weather = detail.weather;
+            if (detail.map_polyline) {
+              patch.summary_polyline = detail.map_polyline;
+              patch.has_gps = true;
+            }
+            await supabase.from("garmin_activities").update(patch).eq("id", item.id);
+            detailsFetched++;
           }
         } else {
           console.error(`[garmin-poll] details failed user=${userId}`, detailResult.errorText);
         }
       }
+
 
       results.push({ user_id: userId, synced, details_fetched: detailsFetched });
     }

@@ -118,9 +118,13 @@ async function fetchProfile(userId: string) {
 }
 
 async function fetchGarminActivities(userId: string, limit?: number): Promise<StravaActivity[]> {
+  // Summary columns only. Per-second sample arrays (hr/distance/elevation/
+  // cadence) are large and are loaded lazily when one activity is opened.
   let q = supabase
     .from("garmin_activities")
-    .select("*")
+    .select(
+      "id, garmin_activity_id, activity_name, activity_type, distance_meters, duration_seconds, elevation_gain, start_time, average_speed, average_pace, average_hr, max_hr, summary_polyline, calories, laps, weather, raw_json, training_load, avg_cadence, device_model",
+    )
     .eq("user_id", userId)
     .order("start_time", { ascending: false });
   if (limit) q = q.limit(limit);

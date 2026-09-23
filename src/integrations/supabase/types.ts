@@ -672,6 +672,7 @@ export type Database = {
           avg_cadence: number | null
           calories: number | null
           created_at: string | null
+          device_model: string | null
           distance_meters: number | null
           duration_seconds: number | null
           elevation_gain: number | null
@@ -700,6 +701,7 @@ export type Database = {
           avg_cadence?: number | null
           calories?: number | null
           created_at?: string | null
+          device_model?: string | null
           distance_meters?: number | null
           duration_seconds?: number | null
           elevation_gain?: number | null
@@ -728,6 +730,7 @@ export type Database = {
           avg_cadence?: number | null
           calories?: number | null
           created_at?: string | null
+          device_model?: string | null
           distance_meters?: number | null
           duration_seconds?: number | null
           elevation_gain?: number | null

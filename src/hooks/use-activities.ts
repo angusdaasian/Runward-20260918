@@ -154,6 +154,7 @@ async function fetchGarminActivities(userId: string, limit?: number): Promise<St
       map_screenshot_url: a.raw_json?.map_screenshot_url ?? null,
       garmin_training_load: a.training_load ?? null,
       avg_cadence: a.avg_cadence ?? null,
+      device_model: a.device_model ?? null,
       provenance: "garmin" as const,
     };
   });
@@ -544,7 +545,10 @@ export function useActivities(options?: { limit?: number; enabled?: boolean }) {
     const terraOnlyLatestView = !!limit && tr.length > 0;
     const strava = terraOnlyLatestView ? [] : (activitiesQuery.data || []);
     const ah = terraOnlyLatestView ? [] : (appleHealthQuery.data || []);
-    const gm = terraOnlyLatestView ? [] : (garminQuery.data || []);
+    // Garmin rows are always included, even in the "latest" view: while Terra's
+    // Garmin feed is down, the Railway backup poller writes here, so hiding
+    // them would hide the newest runs. Duplicates are removed just below.
+    const gm = garminQuery.data || [];
 
     const filteredGarmin = gm.filter((g) => !tr.some((t) => {
       const timeDiff = Math.abs(new Date(g.start_date).getTime() - new Date(t.start_date).getTime());

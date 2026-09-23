@@ -192,6 +192,7 @@ serve(async (req) => {
           vo2max: a.vo2max ?? null,
           training_load: a.training_load ?? null,
           has_gps: a.has_gps ?? false,
+          device_model: a.device_model ?? a.device_name ?? a.deviceName ?? null,
           raw_json: a,
         }))
         // Hard guard: never write anything before this user's floor.

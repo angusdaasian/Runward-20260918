@@ -315,7 +315,7 @@ const ConnectApps = ({ lang, onBack }: Props) => {
           : "Overlapping Apple Health activities cleared, activities will come from Garmin"
       );
     }
-    garmin.syncActivities();
+    garmin.syncActivities(90);
   };
 
   const handleDisconnectGarmin = async () => {

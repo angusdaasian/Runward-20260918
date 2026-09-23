@@ -281,8 +281,10 @@ const Index = () => {
         </div>
       )}
       <div
-        className="flex-1 overflow-y-auto relative"
-        style={{ paddingBottom: 'calc(5rem + var(--safe-area-bottom, 0px))', display: activeTab === "activities" ? "none" : "block" }}
+        className={`absolute inset-x-0 bottom-0 top-[var(--app-content-top,0px)] overflow-y-auto ${activeTab === "activities" ? "invisible pointer-events-none" : "visible"}`}
+        style={{ paddingBottom: 'calc(5rem + var(--safe-area-bottom, 0px))' }}
+        aria-hidden={activeTab === "activities"}
+        inert={activeTab === "activities" ? true : undefined}
       >
         {activeTab === "training" && (
           <Suspense fallback={<TrainingSkeleton />}>
@@ -342,11 +344,12 @@ const Index = () => {
         )}
       </div>
       <div
-        className="flex-1 overflow-y-auto relative"
+        className={`absolute inset-x-0 bottom-0 top-[var(--app-content-top,0px)] overflow-y-auto ${activeTab === "activities" ? "visible" : "invisible pointer-events-none"}`}
         style={{
           paddingBottom: 'calc(5rem + var(--safe-area-bottom, 0px))',
-          display: activeTab === "activities" ? "block" : "none",
         }}
+        aria-hidden={activeTab !== "activities"}
+        inert={activeTab !== "activities" ? true : undefined}
       >
         <ActivitiesTab lang={lang} resetSignal={activityResetSignal} />
       </div>

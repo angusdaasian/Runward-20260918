@@ -673,11 +673,11 @@ const ActivitiesTab = ({ lang, resetSignal }: Props) => {
 
     setSelectedActivity({
       ...activity,
-      laps: data.laps || [],
-      hr_samples: data.hr_samples || null,
-      distance_samples: data.distance_samples || null,
-      elevation_samples: data.elevation_samples || null,
-      cadence_samples: data.cadence_samples || null,
+      laps: Array.isArray(data.laps) ? data.laps : [],
+      hr_samples: Array.isArray(data.hr_samples) ? data.hr_samples as Array<{ t: number; bpm: number }> : null,
+      distance_samples: Array.isArray(data.distance_samples) ? data.distance_samples as Array<{ t: number; d: number }> : null,
+      elevation_samples: Array.isArray(data.elevation_samples) ? data.elevation_samples as Array<{ t: number; e: number }> : null,
+      cadence_samples: Array.isArray(data.cadence_samples) ? data.cadence_samples as Array<{ t: number; rpm: number }> : null,
     });
   }, [user]);
   const [dateSheet, setDateSheet] = useState<{

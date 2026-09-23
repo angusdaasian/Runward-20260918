@@ -340,9 +340,10 @@ const ProfileSection = ({ lang, subpage = "main", onNavigate, compact = false, d
         ? existing.hours * 3600 + existing.minutes * 60 + existing.seconds
         : Infinity;
       if (seconds < existingSec) {
-        const h = Math.floor(seconds / 3600);
-        const m = Math.floor((seconds % 3600) / 60);
-        const s = seconds % 60;
+        const total = Math.round(seconds);
+        const h = Math.floor(total / 3600);
+        const m = Math.floor((total % 3600) / 60);
+        const s = total % 60;
         updates.push({ distance: dist, h, m, s });
       }
     }

@@ -1306,7 +1306,7 @@ const ActivitiesTab = ({ lang, resetSignal }: Props) => {
         activityLoads={activityLoads}
         isPremium={isPremium}
         onBack={() => setShowAllActivities(false)}
-        onSelect={setSelectedActivity}
+        onSelect={(a) => void openActivity(a)}
       />
     );
   }

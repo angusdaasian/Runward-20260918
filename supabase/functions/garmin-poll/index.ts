@@ -106,7 +106,13 @@ serve(async (req) => {
         console.error(`[garmin-poll] decrypt failed user=${userId}`, e);
       }
       if (!email || !oauth1 || !oauth2) {
-        results.push({ user_id: userId, skipped: "missing_credentials" });
+        // No usable tokens — flag so this connection is never polled again
+        // until the user signs in again.
+        await supabase
+          .from("garmin_connections")
+          .update({ needs_reauth: true })
+          .eq("user_id", userId);
+        results.push({ user_id: userId, skipped: "missing_credentials", flagged_reauth: true });
         continue;
       }
 

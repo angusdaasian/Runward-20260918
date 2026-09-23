@@ -131,7 +131,25 @@ serve(async (req) => {
 
       if (!actResult.ok) {
         console.error(`[garmin-poll] fetch failed user=${userId}`, actResult.status, actResult.errorText);
-        results.push({ user_id: userId, error: actResult.status, reauth: !!actResult.reauthRequired });
+        // Treat any auth-shaped failure (expired/invalid/unauthorized tokens)
+        // like a 401: flag needs_reauth so we stop polling this connection.
+        const errText = (actResult.errorText ?? "").toLowerCase();
+        const looksExpired =
+          actResult.status === 401 ||
+          actResult.status === 403 ||
+          /expired|invalid|unauthori[sz]ed|reauth|login required|credentials/.test(errText);
+        if (looksExpired) {
+          await supabase
+            .from("garmin_connections")
+            .update({ needs_reauth: true })
+            .eq("user_id", userId);
+        }
+        results.push({
+          user_id: userId,
+          error: actResult.status,
+          reauth: !!actResult.reauthRequired || looksExpired,
+          flagged_reauth: looksExpired,
+        });
         continue;
       }
 

@@ -5,7 +5,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const BOT_TOKEN = Deno.env.get("TELEGRAM_BOT_TOKEN") ?? "";
 
-export type ActivitySource = "strava" | "suunto" | "terra" | "apple_health";
+export type ActivitySource = "strava" | "suunto" | "terra" | "apple_health" | "garmin";
 
 export type ActivitySummary = {
   userId: string;
@@ -95,6 +95,13 @@ async function lookupActivityDbId(
         .eq("user_id", userId)
         .eq("provider", provider)
         .eq("terra_activity_id", aid)
+        .maybeSingle();
+      return data?.id ?? null;
+    }
+    if (summary.source === "garmin") {
+      const { data } = await supabase
+        .from("garmin_activities").select("id")
+        .eq("user_id", userId).eq("garmin_activity_id", String(summary.activityKey))
         .maybeSingle();
       return data?.id ?? null;
     }

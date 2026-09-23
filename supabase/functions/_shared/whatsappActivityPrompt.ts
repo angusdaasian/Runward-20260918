@@ -6,7 +6,7 @@ const ACCESS_TOKEN = Deno.env.get("WHATSAPP_ACCESS_TOKEN") ?? "";
 const PHONE_NUMBER_ID = Deno.env.get("WHATSAPP_PHONE_NUMBER_ID") ?? "";
 const GRAPH_VERSION = "v21.0";
 
-export type ActivitySource = "strava" | "suunto" | "terra" | "apple_health";
+export type ActivitySource = "strava" | "suunto" | "terra" | "apple_health" | "garmin";
 
 export type ActivitySummary = {
   userId: string;
@@ -247,6 +247,13 @@ async function lookupActivityDbId(
       const { data } = await supabase
         .from("terra_activities").select("id")
         .eq("user_id", userId).eq("provider", provider).eq("terra_activity_id", aid)
+        .maybeSingle();
+      return data?.id ?? null;
+    }
+    if (summary.source === "garmin") {
+      const { data } = await supabase
+        .from("garmin_activities").select("id")
+        .eq("user_id", userId).eq("garmin_activity_id", String(summary.activityKey))
         .maybeSingle();
       return data?.id ?? null;
     }

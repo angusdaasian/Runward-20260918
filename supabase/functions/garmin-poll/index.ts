@@ -199,12 +199,43 @@ serve(async (req) => {
         .filter((r) => r.garmin_activity_id && r.start_time && new Date(r.start_time) >= floor);
 
       let synced = 0;
+      let notified = 0;
       if (rows.length > 0) {
+        // Which of these already exist? Anything else is new and should trigger
+        // the same notifications Terra sends.
+        const { data: existingRows } = await supabase
+          .from("garmin_activities")
+          .select("garmin_activity_id")
+          .eq("user_id", userId)
+          .in("garmin_activity_id", rows.map((r) => r.garmin_activity_id));
+        const existingIds = new Set((existingRows ?? []).map((r: any) => String(r.garmin_activity_id)));
+
         const { error: upErr } = await supabase
           .from("garmin_activities")
           .upsert(rows, { onConflict: "garmin_activity_id,user_id", ignoreDuplicates: false });
         if (upErr) console.error(`[garmin-poll] upsert failed user=${userId}`, upErr);
-        else synced = rows.length;
+        else {
+          synced = rows.length;
+          const newRows = rows.filter(
+            (r) => !existingIds.has(String(r.garmin_activity_id)) && (Number(r.distance_meters) || 0) > 0,
+          );
+          for (const r of newRows) {
+            await pushActivityUploadedNotification(supabase, userId, `garmin:${r.garmin_activity_id}`);
+            notified++;
+            if (isRunning(r.activity_type, r.activity_name)) {
+              const prompt = {
+                userId,
+                source: "garmin" as const,
+                activityKey: String(r.garmin_activity_id),
+                distanceMeters: Number(r.distance_meters) || null,
+                durationSeconds: Number(r.duration_seconds) || null,
+                sportType: "run",
+              };
+              await maybeSendTelegramActivityPrompt(prompt);
+              await maybeSendWhatsappActivityPrompt(prompt);
+            }
+          }
+        }
       }
 
       // Fill in laps / route for the newest activities that still lack them.

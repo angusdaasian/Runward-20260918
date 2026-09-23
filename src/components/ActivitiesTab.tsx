@@ -1023,17 +1023,43 @@ const ActivitiesTab = ({ lang, resetSignal }: Props) => {
     }
   }, []);
 
-  const detectProviders = useCallback(async (): Promise<{ terra: boolean; strava: boolean; suunto: boolean }> => {
-    if (!user) return { terra: false, strava: false, suunto: false };
-    const [terraRes, stravaRes, suuntoRes] = await Promise.all([
+  const invokeGarminRailwaySync = useCallback(async (days: number): Promise<number> => {
+    try {
+      const { data, error } = await supabase.functions.invoke("garmin-sync", {
+        body: { action: "sync", days },
+      });
+      if (error || !(data as any)?.success) {
+        console.warn("Garmin/Railway sync failed:", error ?? data);
+        return 0;
+      }
+      return typeof (data as any)?.synced === "number" ? (data as any).synced : 0;
+    } catch (e) {
+      console.warn("Garmin/Railway sync error:", e);
+      return 0;
+    }
+  }, []);
+
+  const detectProviders = useCallback(async (): Promise<{ terra: boolean; strava: boolean; suunto: boolean; garmin: boolean }> => {
+    if (!user) return { terra: false, strava: false, suunto: false, garmin: false };
+    const [terraRes, stravaRes, suuntoRes, garminRes] = await Promise.all([
       supabase.from("terra_connections").select("user_id").eq("user_id", user.id).eq("active", true).limit(1).maybeSingle(),
       supabase.from("strava_connections").select("user_id").eq("user_id", user.id).limit(1).maybeSingle(),
       supabase.from("suunto_connections").select("user_id").eq("user_id", user.id).limit(1).maybeSingle(),
+      supabase
+        .from("garmin_connections")
+        .select("user_id")
+        .eq("user_id", user.id)
+        .not("oauth1_token_encrypted", "is", null)
+        .not("oauth2_token_encrypted", "is", null)
+        .or("needs_reauth.is.null,needs_reauth.eq.false")
+        .limit(1)
+        .maybeSingle(),
     ]);
     return {
       terra: !!terraRes.data,
       strava: !!stravaRes.data,
       suunto: !!suuntoRes.data,
+      garmin: !!garminRes.data,
     };
   }, [user]);
 

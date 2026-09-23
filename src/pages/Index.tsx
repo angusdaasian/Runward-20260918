@@ -285,7 +285,6 @@ const Index = () => {
         className={`absolute inset-0 overflow-y-auto ${activeTab === "activities" ? "invisible pointer-events-none" : "visible"}`}
         style={{ paddingBottom: 'calc(5rem + var(--safe-area-bottom, 0px))' }}
         aria-hidden={activeTab === "activities"}
-        inert={activeTab === "activities" ? true : undefined}
       >
         {activeTab === "training" && (
           <Suspense fallback={<TrainingSkeleton />}>
@@ -350,7 +349,6 @@ const Index = () => {
           paddingBottom: 'calc(5rem + var(--safe-area-bottom, 0px))',
         }}
         aria-hidden={activeTab !== "activities"}
-        inert={activeTab !== "activities" ? true : undefined}
       >
         <ActivitiesTab lang={lang} resetSignal={activityResetSignal} />
       </div>

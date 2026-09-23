@@ -1977,6 +1977,42 @@ export type Database = {
         }
         Relationships: []
       }
+      service_statuses: {
+        Row: {
+          created_at: string
+          created_by: string
+          display_order: number
+          id: string
+          message: string | null
+          message_zh: string | null
+          service_name: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          display_order?: number
+          id?: string
+          message?: string | null
+          message_zh?: string | null
+          service_name: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          display_order?: number
+          id?: string
+          message?: string | null
+          message_zh?: string | null
+          service_name?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       shoes_catalog: {
         Row: {
           active: boolean

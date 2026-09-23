@@ -657,8 +657,34 @@ const ActivitiesTab = ({ lang, resetSignal }: Props) => {
   }, [user?.id, activities.length, fullLoading]);
   const [selectedActivity, setSelectedActivity] = useState<StravaActivity | null>(null);
   const openActivity = useCallback(async (activity: StravaActivity) => {
-    if (activity.provenance !== "terra" || !user) {
+    if (!user || (activity.provenance !== "terra" && activity.provenance !== "garmin")) {
       setSelectedActivity(activity);
+      return;
+    }
+
+    // Backup Garmin (Railway) rows keep their per-second samples in
+    // garmin_activities; load them only for the activity being opened.
+    if (activity.provenance === "garmin") {
+      const { data: g, error: gErr } = await supabase
+        .from("garmin_activities")
+        .select("laps, hr_samples, distance_samples, elevation_samples, cadence_samples")
+        .eq("id", activity.id)
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (gErr || !g) {
+        setSelectedActivity(activity);
+        return;
+      }
+
+      setSelectedActivity({
+        ...activity,
+        laps: Array.isArray(g.laps) ? g.laps : activity.laps ?? [],
+        hr_samples: Array.isArray(g.hr_samples) ? g.hr_samples as Array<{ t: number; bpm: number }> : null,
+        distance_samples: Array.isArray(g.distance_samples) ? g.distance_samples as Array<{ t: number; d: number }> : null,
+        elevation_samples: Array.isArray(g.elevation_samples) ? g.elevation_samples as Array<{ t: number; e: number }> : null,
+        cadence_samples: Array.isArray(g.cadence_samples) ? g.cadence_samples as Array<{ t: number; rpm: number }> : null,
+      });
       return;
     }
 

@@ -211,14 +211,14 @@ serve(async (req) => {
       let detailsFetched = 0;
       const { data: candidates } = await supabase
         .from("garmin_activities")
-        .select("id, garmin_activity_id, laps, has_details")
+        .select("id, garmin_activity_id, has_details")
         .eq("user_id", userId)
         .gte("start_time", floor.toISOString())
         .order("start_time", { ascending: false })
         .limit(30);
 
       const missing = (candidates ?? [])
-        .filter((c: any) => !c.has_details || !Array.isArray(c.laps) || c.laps.length === 0)
+        .filter((c: any) => !c.has_details)
         .slice(0, DETAIL_LIMIT);
 
       if (missing && missing.length > 0) {
@@ -243,6 +243,20 @@ serve(async (req) => {
             const patch: Record<string, unknown> = { has_details: true };
             if (laps.length > 0) patch.laps = laps;
             if (detail.weather) patch.weather = detail.weather;
+            // Per-second sample series (from Garmin's activity detail metrics),
+            // used for pace/HR/elevation charts, km splits and HR zones.
+            if (Array.isArray(detail.hr_samples) && detail.hr_samples.length > 0) {
+              patch.hr_samples = detail.hr_samples;
+            }
+            if (Array.isArray(detail.distance_samples) && detail.distance_samples.length > 0) {
+              patch.distance_samples = detail.distance_samples;
+            }
+            if (Array.isArray(detail.elevation_samples) && detail.elevation_samples.length > 0) {
+              patch.elevation_samples = detail.elevation_samples;
+            }
+            if (Array.isArray(detail.cadence_samples) && detail.cadence_samples.length > 0) {
+              patch.cadence_samples = detail.cadence_samples;
+            }
             if (detail.map_polyline) {
               patch.summary_polyline = detail.map_polyline;
               patch.has_gps = true;

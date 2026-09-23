@@ -1,0 +1,1 @@
+ALTER TABLE public.garmin_activities ADD COLUMN IF NOT EXISTS device_model TEXT;

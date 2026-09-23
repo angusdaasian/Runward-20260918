@@ -369,7 +369,7 @@ serve(async (req) => {
       }
 
 
-      results.push({ user_id: userId, synced, details_fetched: detailsFetched });
+      results.push({ user_id: userId, synced, details_fetched: detailsFetched, notified });
     }
 
     return new Response(

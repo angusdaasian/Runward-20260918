@@ -6,7 +6,7 @@
 // Terra/Garmin delivery) so we never touch older history. When Terra resumes,
 // its webhook data overwrites these rows in terra_activities as usual.
 //
-// Scheduled by pg_cron every minute; each run processes a small batch of users
+// Scheduled by pg_cron every 2 minutes; each run processes a small batch of users
 // (round-robin by garmin_connections.last_polled_at) to stay within limits.
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
@@ -19,9 +19,8 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Kill switch: flip to true to resume polling. Disabled while the database
-// recovers from overload / while all saved Garmin sign-ins are expired.
-const POLL_ENABLED = false;
+// Kill switch: flip to false to pause polling.
+const POLL_ENABLED = true;
 
 // Last activity Terra delivered — never poll anything before this.
 const POLL_START_ISO = "2026-09-21T10:40:00Z";
@@ -78,6 +77,9 @@ serve(async (req) => {
       .from("garmin_connections")
       .select("user_id, garmin_email_encrypted, oauth1_token_encrypted, oauth2_token_encrypted, last_polled_at, backup_signup_at")
       .or("needs_reauth.is.null,needs_reauth.eq.false")
+      .not("garmin_email_encrypted", "is", null)
+      .not("oauth1_token_encrypted", "is", null)
+      .not("oauth2_token_encrypted", "is", null)
       .order("last_polled_at", { ascending: true, nullsFirst: true })
       .limit(BATCH_SIZE);
 

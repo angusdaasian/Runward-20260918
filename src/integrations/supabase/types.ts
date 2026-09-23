@@ -749,6 +749,7 @@ export type Database = {
       }
       garmin_connections: {
         Row: {
+          backup_signup_at: string | null
           created_at: string | null
           full_resync_done: boolean
           garmin_display_name: string | null
@@ -763,6 +764,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          backup_signup_at?: string | null
           created_at?: string | null
           full_resync_done?: boolean
           garmin_display_name?: string | null
@@ -777,6 +779,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          backup_signup_at?: string | null
           created_at?: string | null
           full_resync_done?: boolean
           garmin_display_name?: string | null

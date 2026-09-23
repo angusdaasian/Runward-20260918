@@ -21,7 +21,7 @@ const corsHeaders = {
 
 // Kill switch: flip to true to resume polling. Disabled while the database
 // recovers from overload / while all saved Garmin sign-ins are expired.
-const POLL_ENABLED = false;
+const POLL_ENABLED = true;
 
 // Last activity Terra delivered — never poll anything before this.
 const POLL_START_ISO = "2026-09-21T10:40:00Z";
@@ -70,15 +70,13 @@ serve(async (req) => {
 
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-  const windowStart = new Date(POLL_START_ISO);
+  const hardCutoff = new Date(POLL_START_ISO);
   const now = new Date();
-  const startDate = fmtDate(windowStart);
-  const endDate = fmtDate(now);
 
   try {
     const { data: conns, error: connErr } = await supabase
       .from("garmin_connections")
-      .select("user_id, garmin_email_encrypted, oauth1_token_encrypted, oauth2_token_encrypted, last_polled_at")
+      .select("user_id, garmin_email_encrypted, oauth1_token_encrypted, oauth2_token_encrypted, last_polled_at, backup_signup_at")
       .or("needs_reauth.is.null,needs_reauth.eq.false")
       .order("last_polled_at", { ascending: true, nullsFirst: true })
       .limit(BATCH_SIZE);
@@ -115,6 +113,17 @@ serve(async (req) => {
         results.push({ user_id: userId, skipped: "missing_credentials", flagged_reauth: true });
         continue;
       }
+
+      // Per-user floor: existing Terra/Garmin users only fetch activities on or
+      // after the Terra cutoff; backup-primary users (no Terra connection when
+      // they signed in) get their last 3 months.
+      const floor = conn.backup_signup_at
+        ? new Date(new Date(conn.backup_signup_at).getTime() - 90 * 24 * 60 * 60 * 1000)
+        : hardCutoff;
+      const floorDate = fmtDate(floor);
+      const fetchStart = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000);
+      const startDate = fmtDate(fetchStart > floor ? fetchStart : floor);
+      const endDate = fmtDate(now);
 
       const actResult = await callRailway<any>({
         supabase,
@@ -183,8 +192,8 @@ serve(async (req) => {
           has_gps: a.has_gps ?? false,
           raw_json: a,
         }))
-        // Hard guard: never write anything before the Terra cutoff.
-        .filter((r) => r.garmin_activity_id && r.start_time && new Date(r.start_time) >= windowStart);
+        // Hard guard: never write anything before this user's floor.
+        .filter((r) => r.garmin_activity_id && r.start_time && new Date(r.start_time) >= floor);
 
       let synced = 0;
       if (rows.length > 0) {
@@ -201,7 +210,7 @@ serve(async (req) => {
         .from("garmin_activities")
         .select("id, garmin_activity_id, laps, has_details")
         .eq("user_id", userId)
-        .gte("start_time", windowStart.toISOString())
+        .gte("start_time", floor.toISOString())
         .order("start_time", { ascending: false })
         .limit(30);
 
@@ -248,7 +257,7 @@ serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ success: true, window: { start: startDate, end: endDate }, processed: results.length, results }),
+      JSON.stringify({ success: true, window_end: fmtDate(now), processed: results.length, results }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (e) {

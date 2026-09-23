@@ -109,7 +109,7 @@ serve(async (req) => {
     if (action === "sync") {
       const { data: conn } = await supabase
         .from("garmin_connections")
-        .select("garmin_email_encrypted, oauth1_token_encrypted, oauth2_token_encrypted, full_resync_done")
+        .select("garmin_email_encrypted, oauth1_token_encrypted, oauth2_token_encrypted, full_resync_done, backup_signup_at")
         .eq("user_id", user.id)
         .maybeSingle();
 
@@ -174,7 +174,15 @@ serve(async (req) => {
       }
 
       // ── Determine sync window ──
-      const firstSyncStart = new Date(`${FIRST_SYNC_START_ISO}T00:00:00Z`);
+      // Floor per user (temporary Garmin/Terra outage): existing Terra/Garmin
+      // users only touch activities on/after the last Terra delivery; users who
+      // signed in without a Terra connection get their last 3 months.
+      const TERRA_CUTOFF_MS = Date.parse("2026-09-21T14:40:00+08:00");
+      const minWindowStart = conn.backup_signup_at
+        ? new Date(Date.parse(conn.backup_signup_at) - 90 * 24 * 60 * 60 * 1000)
+        : new Date(TERRA_CUTOFF_MS);
+      const firstSyncStartRaw = new Date(`${FIRST_SYNC_START_ISO}T00:00:00Z`);
+      const firstSyncStart = firstSyncStartRaw > minWindowStart ? firstSyncStartRaw : minWindowStart;
       const today = new Date();
 
       // If user hasn't done the one-time full 2026 resync yet, normally we wipe
@@ -357,7 +365,9 @@ serve(async (req) => {
             training_load: a.training_load ?? null,
             has_gps: a.has_gps ?? false,
             raw_json: a,
-          }));
+          }))
+            // Never write anything before this user's floor date.
+            .filter((r) => r.garmin_activity_id && r.start_time && new Date(r.start_time) >= minWindowStart);
 
           const { error: upsertError } = await supabase
             .from("garmin_activities")

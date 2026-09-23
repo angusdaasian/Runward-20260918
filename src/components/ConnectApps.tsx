@@ -17,7 +17,9 @@ import IntervalsIntroSheet from "@/components/IntervalsIntroSheet";
 import corosIcon from "@/assets/brands/coros.png";
 import polarIcon from "@/assets/brands/polar.png";
 import garminIcon from "@/assets/brands/garmin.png";
-import garminConnectBadge from "@/assets/brands/garmin-connect-badge.png.asset.json";
+// Note: the official Garmin Connect™ badge (garmin-connect-badge asset) is
+// intentionally not shown while the Terra Garmin outage fallback is active —
+// restore it in the provider row below when Terra Garmin resumes.
 import suuntoIcon from "@/assets/brands/suunto.png";
 import zeppIcon from "@/assets/brands/zepp.png";
 import fitbitIcon from "@/assets/brands/fitbit.png";
@@ -315,7 +317,7 @@ const ConnectApps = ({ lang, onBack }: Props) => {
           : "Overlapping Apple Health activities cleared, activities will come from Garmin"
       );
     }
-    garmin.syncActivities();
+    garmin.syncActivities(90);
   };
 
   const handleDisconnectGarmin = async () => {
@@ -664,27 +666,42 @@ const ConnectApps = ({ lang, onBack }: Props) => {
                 ) : null}
               </div>
 
-              {/* Garmin uses the official Garmin Connect™ badge instead of a plain button. */}
+              {/* Official Garmin (via Terra) is temporarily unavailable. New
+                  users sign in with the backup sync instead; we migrate them
+                  back to the official Garmin connection once it recovers. */}
               {!conn && p.id === "GARMIN" && (
-                <button
-                  onClick={() => handleTerraConnect(p.id)}
-                  disabled={busy || disabledByOther}
-                  aria-label={lang === "zh" ? "連結 Garmin Connect" : "Connect Garmin Connect"}
-                  className={`mt-3 w-full rounded-lg overflow-hidden transition-opacity ${disabledByOther ? "cursor-not-allowed opacity-60" : "hover:opacity-90"} disabled:opacity-50`}
-                >
-                  <img
-                    src={garminConnectBadge.url}
-                    alt="Garmin Connect"
-                    className="w-full max-w-[280px] mx-auto h-auto"
-                  />
-                </button>
-              )}
-              {!conn && p.id === "GARMIN" && (
-                <p className="mt-2 text-[11px] text-center text-muted-foreground">
-                  {lang === "zh"
-                    ? "需要 Garmin Connect™ 帳戶授權"
-                    : "Requires authorization with your Garmin Connect™ account"}
-                </p>
+                <div className="mt-3 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3">
+                  <p className="text-[11px] leading-relaxed text-foreground">
+                    {lang === "zh"
+                      ? "Garmin 同步服務暫時中斷，暫時無法連接官方 Garmin。請先使用 Garmin Connect™ 帳戶登入我們的備用同步，我們會自動抓回最近 3 個月的跑步紀錄；官方服務恢復後，我們會自動為你遷移回官方 Garmin，無需重新設定。"
+                      : "Garmin sync is temporarily down, so the official Garmin connection is unavailable. Please sign in with your Garmin Connect™ account through our backup sync instead — we'll automatically fetch your last 3 months of runs, and migrate you back to the official Garmin connection once the service is back. No re-setup needed."}
+                  </p>
+                  {garminConnected ? (
+                    <div className="mt-2 flex items-center gap-3">
+                      <Check size={14} className="text-green-500" />
+                      <span className="text-[11px] text-muted-foreground">
+                        {lang === "zh" ? "備用同步已啟用" : "Backup sync active"}
+                      </span>
+                      <button
+                        onClick={handleSyncGarmin}
+                        disabled={garmin.syncing}
+                        className="text-[11px] text-primary hover:underline disabled:opacity-50"
+                      >
+                        {garmin.syncing ? (lang === "zh" ? "同步中…" : "Syncing…") : (lang === "zh" ? "立即同步" : "Sync now")}
+                      </button>
+                      <button onClick={handleDisconnectGarmin} className="text-[11px] text-destructive hover:underline">
+                        {lang === "zh" ? "停用" : "Turn off"}
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setGarminDialogOpen(true)}
+                      className="mt-2 text-xs font-medium px-3 py-1 rounded-full text-primary-foreground bg-primary"
+                    >
+                      {lang === "zh" ? "登入 Garmin（備用）" : "Sign in to Garmin (backup)"}
+                    </button>
+                  )}
+                </div>
               )}
 
               {/* Temporary fallback: Garmin Connect™ is not delivering activities
@@ -694,8 +711,8 @@ const ConnectApps = ({ lang, onBack }: Props) => {
                 <div className="mt-3 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3">
                   <p className="text-[11px] leading-relaxed text-foreground">
                     {lang === "zh"
-                      ? "Garmin 活動同步暫時中斷。加入 Garmin Connect™ 帳戶登入，我們會每分鐘自動抓取你的新跑步紀錄；服務恢復後會自動切回。"
-                      : "Garmin activity sync is temporarily interrupted. Sign in with your Garmin Connect™ account and we'll fetch new runs every minute; it switches back automatically once the service recovers."}
+                      ? "Garmin 活動同步暫時中斷。使用 Garmin Connect™ 帳戶登入備用同步，我們會自動抓取 9 月 21 日後的新跑步紀錄；較早的紀錄可在服務恢復後重新同步，屆時會自動切回官方連接。"
+                      : "Garmin activity sync is temporarily interrupted. Sign in with your Garmin Connect™ account for backup sync — we'll automatically fetch your new runs after 21 Sep. Earlier activities can be re-synced once the service recovers, and it will switch back to the official connection automatically."}
                   </p>
                   {garminConnected ? (
                     <div className="mt-2 flex items-center gap-3">

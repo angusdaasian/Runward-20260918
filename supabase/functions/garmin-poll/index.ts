@@ -114,6 +114,17 @@ serve(async (req) => {
         continue;
       }
 
+      // Per-user floor: existing Terra/Garmin users only fetch activities on or
+      // after the Terra cutoff; backup-primary users (no Terra connection when
+      // they signed in) get their last 3 months.
+      const floor = conn.backup_signup_at
+        ? new Date(new Date(conn.backup_signup_at).getTime() - 90 * 24 * 60 * 60 * 1000)
+        : hardCutoff;
+      const floorDate = fmtDate(floor);
+      const fetchStart = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000);
+      const startDate = fmtDate(fetchStart > floor ? fetchStart : floor);
+      const endDate = fmtDate(now);
+
       const actResult = await callRailway<any>({
         supabase,
         userId,
@@ -181,8 +192,8 @@ serve(async (req) => {
           has_gps: a.has_gps ?? false,
           raw_json: a,
         }))
-        // Hard guard: never write anything before the Terra cutoff.
-        .filter((r) => r.garmin_activity_id && r.start_time && new Date(r.start_time) >= windowStart);
+        // Hard guard: never write anything before this user's floor.
+        .filter((r) => r.garmin_activity_id && r.start_time && new Date(r.start_time) >= floor);
 
       let synced = 0;
       if (rows.length > 0) {

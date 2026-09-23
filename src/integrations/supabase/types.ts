@@ -670,15 +670,19 @@ export type Database = {
           average_pace: number | null
           average_speed: number | null
           avg_cadence: number | null
+          cadence_samples: Json | null
           calories: number | null
           created_at: string | null
           device_model: string | null
           distance_meters: number | null
+          distance_samples: Json | null
           duration_seconds: number | null
           elevation_gain: number | null
+          elevation_samples: Json | null
           garmin_activity_id: string
           has_details: boolean
           has_gps: boolean | null
+          hr_samples: Json | null
           id: string
           laps: Json | null
           max_hr: number | null
@@ -699,15 +703,19 @@ export type Database = {
           average_pace?: number | null
           average_speed?: number | null
           avg_cadence?: number | null
+          cadence_samples?: Json | null
           calories?: number | null
           created_at?: string | null
           device_model?: string | null
           distance_meters?: number | null
+          distance_samples?: Json | null
           duration_seconds?: number | null
           elevation_gain?: number | null
+          elevation_samples?: Json | null
           garmin_activity_id: string
           has_details?: boolean
           has_gps?: boolean | null
+          hr_samples?: Json | null
           id?: string
           laps?: Json | null
           max_hr?: number | null
@@ -728,15 +736,19 @@ export type Database = {
           average_pace?: number | null
           average_speed?: number | null
           avg_cadence?: number | null
+          cadence_samples?: Json | null
           calories?: number | null
           created_at?: string | null
           device_model?: string | null
           distance_meters?: number | null
+          distance_samples?: Json | null
           duration_seconds?: number | null
           elevation_gain?: number | null
+          elevation_samples?: Json | null
           garmin_activity_id?: string
           has_details?: boolean
           has_gps?: boolean | null
+          hr_samples?: Json | null
           id?: string
           laps?: Json | null
           max_hr?: number | null

@@ -48,7 +48,14 @@ const toInt = (v: unknown): number | null => {
 };
 
 serve(async (req) => {
+  if (!POLL_ENABLED) {
+    return new Response(JSON.stringify({ skipped: true, reason: "polling disabled" }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+
 
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
   const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;

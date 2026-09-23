@@ -280,8 +280,9 @@ const Index = () => {
           <span>{lang === "zh" ? "離線中 — 顯示已儲存的資料" : "You're offline — showing saved data"}</span>
         </div>
       )}
+      <div className="relative min-h-0 flex-1">
       <div
-        className={`absolute inset-x-0 bottom-0 top-[var(--app-content-top,0px)] overflow-y-auto ${activeTab === "activities" ? "invisible pointer-events-none" : "visible"}`}
+        className={`absolute inset-0 overflow-y-auto ${activeTab === "activities" ? "invisible pointer-events-none" : "visible"}`}
         style={{ paddingBottom: 'calc(5rem + var(--safe-area-bottom, 0px))' }}
         aria-hidden={activeTab === "activities"}
         inert={activeTab === "activities" ? true : undefined}
@@ -344,7 +345,7 @@ const Index = () => {
         )}
       </div>
       <div
-        className={`absolute inset-x-0 bottom-0 top-[var(--app-content-top,0px)] overflow-y-auto ${activeTab === "activities" ? "visible" : "invisible pointer-events-none"}`}
+        className={`absolute inset-0 overflow-y-auto ${activeTab === "activities" ? "visible" : "invisible pointer-events-none"}`}
         style={{
           paddingBottom: 'calc(5rem + var(--safe-area-bottom, 0px))',
         }}
@@ -352,6 +353,7 @@ const Index = () => {
         inert={activeTab !== "activities" ? true : undefined}
       >
         <ActivitiesTab lang={lang} resetSignal={activityResetSignal} />
+      </div>
       </div>
 
       <div className="bottom-nav fixed bottom-0 left-0 right-0 bg-card border-t border-border" style={{ paddingBottom: 'var(--safe-area-bottom, 0px)' }}>

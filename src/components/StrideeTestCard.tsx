@@ -20,6 +20,7 @@ import despia from "despia-native";
 import { isDespiaUA } from "@/lib/despiaOAuth";
 
 const GARMIN_NATIVE_RETURN_KEY = "stridee_garmin_native_return";
+const GARMIN_RESTART_DELAY_MS = 1500;
 
 // Admin-only trial of Garmin via Stridee. Hidden for everyone else.
 export default function StrideeTestCard({ lang }: { lang: string }) {
@@ -41,18 +42,20 @@ export default function StrideeTestCard({ lang }: { lang: string }) {
   useEffect(() => {
     const onReturn = () => {
       if (document.visibilityState !== "visible") return;
-      if (sessionStorage.getItem(GARMIN_NATIVE_RETURN_KEY) === "away") {
+      const armedAt = Number(sessionStorage.getItem(GARMIN_NATIVE_RETURN_KEY));
+      if (armedAt > 0 && Date.now() - armedAt >= GARMIN_RESTART_DELAY_MS) {
         sessionStorage.removeItem(GARMIN_NATIVE_RETURN_KEY);
-        window.location.replace(`${window.location.origin}/?page=connect-apps`);
+        const returnUrl = `${window.location.origin}/?page=connect-apps`;
+        window.history.replaceState(null, "", returnUrl);
+        // A page refresh cannot dismiss Garmin's native browser layer. Despia's
+        // reset command restarts the native shell, which also removes that layer.
+        void despia("reset://");
+        window.setTimeout(() => window.location.replace(returnUrl), 400);
         return;
       }
       void load();
     };
     const onVisibility = () => {
-      if (document.visibilityState === "hidden" && sessionStorage.getItem(GARMIN_NATIVE_RETURN_KEY) === "armed") {
-        sessionStorage.setItem(GARMIN_NATIVE_RETURN_KEY, "away");
-        return;
-      }
       onReturn();
     };
     document.addEventListener("visibilitychange", onVisibility);
@@ -85,7 +88,7 @@ export default function StrideeTestCard({ lang }: { lang: string }) {
       // makes Despia close the in-app browser and return to RunWard.
       const bridge = `${window.location.origin}/stridee-bridge?` +
         new URLSearchParams({ url: data.connect_url, sid: data.stridee_user_id ?? "" }).toString();
-      if (provider === "garmin") sessionStorage.setItem(GARMIN_NATIVE_RETURN_KEY, "armed");
+      if (provider === "garmin") sessionStorage.setItem(GARMIN_NATIVE_RETURN_KEY, String(Date.now()));
       despia(`oauth://?url=${encodeURIComponent(bridge)}`);
       return;
     }

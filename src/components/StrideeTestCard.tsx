@@ -44,7 +44,9 @@ export default function StrideeTestCard({ lang }: { lang: string }) {
       return;
     }
     if (!data?.connect_url) { toast.error(zh ? "Stridee 連結失敗" : "Stridee connect failed"); console.error(data); return; }
-    if (isDespiaUA()) despia(`oauth://?url=${encodeURIComponent(data.connect_url)}`);
+    // In the app, open the normal outside browser (not the in-app OAuth sheet,
+    // which cannot be closed reliably). The card polls and flips to Connected.
+    if (isDespiaUA()) despia(`openurl://?url=${encodeURIComponent(data.connect_url)}`);
     else window.location.href = data.connect_url;
   };
   const sync = async () => {

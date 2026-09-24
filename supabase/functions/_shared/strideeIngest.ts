@@ -103,6 +103,8 @@ export function mapActivity(a: any, fit: any) {
     cadence_samples: cad.length ? downsample(cad, MAX_SAMPLES) : null,
     raw_json: { source: "stridee", stridee_activity_id: a.id, provider_activity_id: a.provider_activity_id, received_at: a.received_at },
   };
+}
+
 
 // Downloads + parses the FIT and upserts one activity. Throws on FIT failure.
 export async function ingestStrideeActivity(admin: any, uid: string, a: any) {

@@ -9,8 +9,18 @@ function loadKey() {
   const keyId = Deno.env.get("STRIDEE_KEY_ID") ?? "";
   if (!raw || !keyId) throw new Error("Stridee secrets not configured");
   // Accept PEM pasted with lost newlines, or a bare base64 body / 32-byte seed.
-  const b64 = raw.replace(/\\n/g, "\n").replace(/-----[^-]+-----/g, "").replace(/\s+/g, "");
-  let der = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+  const cleaned = raw.replace(/\\n/g, "\n").replace(/-----[^-]+-----/g, "").replace(/\s+/g, "");
+  let der: Uint8Array;
+  if (/^[0-9a-f]+$/i.test(cleaned) && cleaned.length % 2 === 0) {
+    der = Uint8Array.from(cleaned.match(/../g)!.map((h) => parseInt(h, 16)));
+  } else {
+    const b64 = cleaned.replace(/-/g, "+").replace(/_/g, "/");
+    try {
+      der = Uint8Array.from(atob(b64 + "=".repeat((4 - (b64.length % 4)) % 4)), (c) => c.charCodeAt(0));
+    } catch {
+      throw new Error(`STRIDEE_PRIVATE_KEY not recognised (len ${raw.length}, starts "${raw.slice(0, 5).replace(/[A-Za-z0-9+/]/g, "x")}")`);
+    }
+  }
   if (der.length === 32) {
     const prefix = [0x30, 0x2e, 0x02, 0x01, 0x00, 0x30, 0x05, 0x06, 0x03, 0x2b, 0x65, 0x70, 0x04, 0x22, 0x04, 0x20];
     der = new Uint8Array([...prefix, ...der]);

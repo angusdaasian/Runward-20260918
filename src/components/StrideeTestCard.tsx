@@ -3,8 +3,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import garminIcon from "@/assets/brands/garmin.png";
-import despia from "despia-native";
-import { isDespiaUA } from "@/lib/despiaOAuth";
 import { Button } from "@/components/ui/button";
 
 // Admin-only trial of Garmin via Stridee. Hidden for everyone else.
@@ -36,9 +34,8 @@ export default function StrideeTestCard({ lang }: { lang: string }) {
 
   const connect = async () => {
     setBusy(true);
-    const native = isDespiaUA();
     const { data, error } = await supabase.functions.invoke("stridee-connect", {
-      body: { action: "connect", native },
+      body: { action: "connect" },
     });
     setBusy(false);
     if (error) { toast.error(zh ? "Stridee 連結失敗" : "Stridee connect failed"); console.error(error, data); return; }
@@ -48,13 +45,10 @@ export default function StrideeTestCard({ lang }: { lang: string }) {
       return;
     }
     if (!data?.connect_url) { toast.error(zh ? "Stridee 連結失敗" : "Stridee connect failed"); console.error(data); return; }
-    if (native) {
-      // Garmin blocks or loops inside an embedded WebView. Despia's OAuth bridge
-      // opens a secure browser and closes it when the callback fires runward://oauth/.
-      despia(`oauth://?url=${encodeURIComponent(data.connect_url)}`);
-    } else {
-      window.location.href = data.connect_url;
-    }
+    // Stridee launches Garmin from a second page, so wrapping its first page in
+    // Despia's oauth:// session leaves that first page open. A blank-target link
+    // lets Despia route the whole flow to the normal phone browser instead.
+    window.open(data.connect_url, "_blank");
   };
   const sync = async () => {
     setBusy(true);

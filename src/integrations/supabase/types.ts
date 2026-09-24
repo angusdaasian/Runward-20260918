@@ -624,6 +624,42 @@ export type Database = {
         }
         Relationships: []
       }
+      deduplicated_activities: {
+        Row: {
+          created_at: string
+          id: string
+          kept_id: string | null
+          kept_source: string | null
+          reason: string | null
+          row_data: Json
+          source_id: string
+          source_table: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          kept_id?: string | null
+          kept_source?: string | null
+          reason?: string | null
+          row_data: Json
+          source_id: string
+          source_table: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          kept_id?: string | null
+          kept_source?: string | null
+          reason?: string | null
+          row_data?: Json
+          source_id?: string
+          source_table?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       free_training_plans: {
         Row: {
           created_at: string

@@ -23,7 +23,7 @@ import { isDespiaUA } from "@/lib/despiaOAuth";
 export default function StrideeTestCard({ lang }: { lang: string }) {
   const { user } = useAuth();
   const [isAdmin, setIsAdmin] = useState(false);
-  const [conn, setConn] = useState<{ status: string; last_synced_at: string | null; provider?: string } | null>(null);
+  const [conn, setConn] = useState<{ status: string; last_synced_at: string | null; provider?: string; providers?: string[] } | null>(null);
   const [busy, setBusy] = useState(false);
   const zh = lang === "zh";
 
@@ -31,7 +31,7 @@ export default function StrideeTestCard({ lang }: { lang: string }) {
     if (!user) return;
     const { data: role } = await supabase.from("user_roles").select("role").eq("user_id", user.id).eq("role", "admin").maybeSingle();
     setIsAdmin(!!role);
-    const { data } = await (supabase as any).from("stridee_connections").select("status, last_synced_at, provider").eq("user_id", user.id).maybeSingle();
+    const { data } = await (supabase as any).from("stridee_connections").select("status, last_synced_at, provider, providers").eq("user_id", user.id).maybeSingle();
     setConn(data ?? null);
   };
   useEffect(() => { void load(); }, [user?.id]);
@@ -95,7 +95,7 @@ export default function StrideeTestCard({ lang }: { lang: string }) {
       <div className="flex items-center gap-3">
         <img src={conn ? cur.icon : garminIcon} alt={cur.name} className="w-9 h-9 rounded-lg" />
         <div className="flex-1 min-w-0">
-          <p className="font-semibold text-foreground text-sm">{conn ? cur.name : (zh ? "手錶" : "Watches")} (Stridee) · {zh ? "管理員測試" : "Admin trial"}</p>
+          <p className="font-semibold text-foreground text-sm">{conn?.providers?.length ? PROVIDERS.filter((p) => conn.providers!.includes(p.id)).map((p) => p.name).join(", ") : (zh ? "手錶" : "Watches")} (Stridee) · {zh ? "管理員測試" : "Admin trial"}</p>
           <p className="text-xs text-muted-foreground">
             {connected
               ? (zh ? "已連結" : "Connected") + (conn?.last_synced_at ? ` · ${new Date(conn.last_synced_at).toLocaleString()}` : "")
@@ -103,17 +103,17 @@ export default function StrideeTestCard({ lang }: { lang: string }) {
           </p>
         </div>
       </div>
-      <div className="flex gap-2 mt-3">
-        {!conn && (
+      <div className="flex flex-col gap-2 mt-3">
+        {(
           <div className="grid grid-cols-2 gap-2 flex-1">
-            {PROVIDERS.map((p) => (
+            {PROVIDERS.filter((p) => !(conn?.providers ?? []).includes(p.id)).map((p) => (
               <Button key={p.id} variant="outline" disabled={busy} onClick={() => connect(p.id)} className="justify-start gap-2">
                 <img src={p.icon} alt="" className="w-5 h-5 rounded" />{p.name}
               </Button>
             ))}
           </div>
         )}
-        {conn && !connected && <Button disabled={busy} onClick={() => connect(cur.id)} className="flex-1">{zh ? "連結" : "Connect"}</Button>}
+
         {connected && <Button disabled={busy} onClick={sync} className="flex-1">{zh ? "立即同步" : "Sync now"}</Button>}
         {conn && <Button variant="outline" disabled={busy} onClick={disconnect}>{zh ? "移除" : "Remove"}</Button>}
       </div>

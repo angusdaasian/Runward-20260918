@@ -120,6 +120,7 @@ const App = () => (
                 <Route path="/delete-account" element={<DeleteAccount />} />
                 <Route path="/terra-return" element={<TerraReturn />} />
                 <Route path="/stridee-return/*" element={<StrideeReturn />} />
+                <Route path="/stridee-bridge" element={<StrideeBridge />} />
                 <Route path="/suunto-return" element={<SuuntoReturn />} />
                 <Route path="/suunto/callback" element={<SuuntoReturn />} />
                 <Route path="/polar-return" element={<PolarReturn />} />

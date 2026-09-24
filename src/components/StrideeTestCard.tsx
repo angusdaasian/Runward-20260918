@@ -4,6 +4,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import garminIcon from "@/assets/brands/garmin.png";
 import { Button } from "@/components/ui/button";
+import despia from "despia-native";
+import { isDespiaUA } from "@/lib/despiaOAuth";
 
 // Admin-only trial of Garmin via Stridee. Hidden for everyone else.
 export default function StrideeTestCard({ lang }: { lang: string }) {
@@ -35,7 +37,7 @@ export default function StrideeTestCard({ lang }: { lang: string }) {
   const connect = async () => {
     setBusy(true);
     const { data, error } = await supabase.functions.invoke("stridee-connect", {
-      body: { action: "connect" },
+      body: { action: "connect", native: isDespiaUA() },
     });
     setBusy(false);
     if (error) { toast.error(zh ? "Stridee 連結失敗" : "Stridee connect failed"); console.error(error, data); return; }
@@ -48,6 +50,15 @@ export default function StrideeTestCard({ lang }: { lang: string }) {
     // Stridee launches Garmin from a second page, so wrapping its first page in
     // Despia's oauth:// session leaves that first page open. A blank-target link
     // lets Despia route the whole flow to the normal phone browser instead.
+    if (isDespiaUA()) {
+      // Open our own bridge page in Despia's in-app browser. It opens Stridee,
+      // watches for the connection and then fires runward://oauth/... which
+      // makes Despia close the in-app browser and return to RunWard.
+      const bridge = `${window.location.origin}/stridee-bridge?` +
+        new URLSearchParams({ url: data.connect_url, sid: data.stridee_user_id ?? "" }).toString();
+      despia(`oauth://?url=${encodeURIComponent(bridge)}`);
+      return;
+    }
     window.open(data.connect_url, "_blank");
   };
   const sync = async () => {

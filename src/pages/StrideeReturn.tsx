@@ -9,6 +9,12 @@ export default function StrideeReturn() {
 
   useEffect(() => {
     (async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        // Opened in the secure in-app browser: hand back to the app WebView.
+        window.location.href = `runward://oauth/stridee-return?${params.toString()}`;
+        return;
+      }
       if (status === "success") {
         await supabase.functions.invoke("stridee-connect", { body: { action: "confirm", stridee_user_id: strideeUserId } }).catch(() => {});
       }

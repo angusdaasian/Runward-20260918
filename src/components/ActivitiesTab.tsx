@@ -14,6 +14,7 @@ import {
   Flame,
   Timer,
   Loader2,
+  Lock,
 } from "lucide-react";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
@@ -1255,17 +1256,18 @@ const ActivitiesTab = ({ lang, resetSignal }: Props) => {
 
   const handleStrideeHistory = useCallback(async (all: boolean) => {
     if (!user || fetchingToday) return;
+    if (all && !isPremium) { setUpgradeOpen(true); return; }
     setFetchingToday(true);
     toast.info(lang === "zh" ? "正在同步 Garmin 活動，可能需要幾分鐘…" : "Syncing Garmin activities — this can take a few minutes…", { duration: 6000 });
     const n = await invokeStrideeSync(all ? 1830 : 30, all);
     invalidateAll();
     if (all) {
-      toast.success(lang === "zh" ? `已同步 ${n} 個過往活動，自動同步已開啟` : `Synced ${n} past activities. Automatic sync is now on`);
+      toast.success(lang === "zh" ? `已同步 ${n} 個過往活動` : `Synced ${n} past activities`);
     } else {
       toast.success(lang === "zh" ? `已同步 ${n} 個近 30 天活動` : `Synced ${n} activities from the past 30 days`);
     }
     setFetchingToday(false);
-  }, [user, fetchingToday, lang, invokeStrideeSync, invalidateAll]);
+  }, [user, fetchingToday, lang, invokeStrideeSync, invalidateAll, isPremium]);
 
   const handleFetchYear2026 = useCallback(async () => {
     if (!user || fetchingToday) return;
@@ -1478,9 +1480,10 @@ const ActivitiesTab = ({ lang, resetSignal }: Props) => {
                       {lang === "zh" ? "同步近 30 天活動" : "Sync past 30 days"}
                     </DropdownMenuItem>
                   )}
-                  {hasStridee && isPremium && (
+                  {hasStridee && (
                     <DropdownMenuItem onClick={() => handleStrideeHistory(true)} disabled={fetchingToday}>
-                      {lang === "zh" ? "同步全部過往活動（並開啟自動同步）" : "Sync all past data (turns on auto sync)"}
+                      <Lock className={isPremium ? "opacity-0" : ""} style={{ width: 14, height: 14, marginRight: 6 }} />
+                      {lang === "zh" ? "同步全部過往活動" : "Sync all past activities"}
                     </DropdownMenuItem>
                   )}
                   {false && isPremium && !year2026Used && (

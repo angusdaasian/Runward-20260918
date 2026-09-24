@@ -11,39 +11,19 @@ export default function StrideeBridge() {
   const sid = params.get("sid") ?? "";
   const [opened, setOpened] = useState(false);
   const done = useRef(false);
-  const strideeWindow = useRef<Window | null>(null);
 
-  const backToApp = (status = "success") => {
+  const backToApp = (status = "resume") => {
     if (done.current) return;
     done.current = true;
     const q = new URLSearchParams({ status });
     if (sid) q.set("user_id", sid);
-    const deepLink = `runward://oauth/stridee-return?${q.toString()}`;
-
-    // Stridee opens Garmin as another page. When Garmin returns to RunWard,
-    // that can expose Stridee's earlier page again. Navigate that exact child
-    // page through Despia's OAuth deeplink so the secure browser session closes.
-    const child = strideeWindow.current;
-    if (child && !child.closed) {
-      try {
-        child.location.href = deepLink;
-        window.setTimeout(() => {
-          try { child.close(); } catch { /* native browser owns the window */ }
-          window.location.href = deepLink;
-        }, 350);
-        return;
-      } catch {
-        try { child.close(); } catch { /* native browser owns the window */ }
-      }
-    }
-    window.location.href = deepLink;
+    window.location.href = `runward://oauth/stridee-return?${q.toString()}`;
   };
 
   const openGarmin = () => {
     if (!url.startsWith("https://")) return;
     setOpened(true);
     const w = window.open(url, "_blank");
-    strideeWindow.current = w;
     if (!w) window.location.href = url; // popups blocked: go in the same window
   };
 
@@ -53,20 +33,27 @@ export default function StrideeBridge() {
       const { data } = await supabase.functions.invoke("stridee-connect", {
         body: { action: "status_public", stridee_user_id: sid },
       });
-      if ((data as any)?.connected) backToApp();
+      if ((data as any)?.connected) backToApp("success");
     };
     const t = setInterval(() => void check(), 3000);
-    const onVis = () => { if (document.visibilityState === "visible") void check(); };
-    document.addEventListener("visibilitychange", onVis);
-    window.addEventListener("focus", onVis);
-    window.addEventListener("pageshow", onVis);
+    const onResume = () => {
+      if (document.visibilityState !== "visible") return;
+      // Garmin runs in a second browser page. Once RunWard becomes active again,
+      // dismiss this original Despia OAuth session immediately instead of waiting
+      // for the connection-status request to win a race with the native resume.
+      if (opened) backToApp("resume");
+      else void check();
+    };
+    document.addEventListener("visibilitychange", onResume);
+    window.addEventListener("focus", onResume);
+    window.addEventListener("pageshow", onResume);
     return () => {
       clearInterval(t);
-      document.removeEventListener("visibilitychange", onVis);
-      window.removeEventListener("focus", onVis);
-      window.removeEventListener("pageshow", onVis);
+      document.removeEventListener("visibilitychange", onResume);
+      window.removeEventListener("focus", onResume);
+      window.removeEventListener("pageshow", onResume);
     };
-  }, [sid]);
+  }, [sid, opened]);
 
   return (
     <main className="min-h-screen flex items-center justify-center bg-background p-6">

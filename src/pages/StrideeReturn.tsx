@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 export default function StrideeReturn() {
   const params = new URLSearchParams(window.location.search);
   const status = params.get("status") ?? "error";
+  const isResume = status === "resume";
   const strideeUserId = params.get("user_id") ?? "";
   const isNativeReturn = window.location.pathname.endsWith("/native");
   const [done, setDone] = useState(false);
@@ -14,6 +15,11 @@ export default function StrideeReturn() {
     (async () => {
       const { data: { session } } = await supabase.auth.getSession();
        if (!session) {
+         if (isResume) {
+           setDone(true);
+           setExternal(true);
+           return;
+         }
         if (status === "success" && strideeUserId) {
           await supabase.functions.invoke("stridee-connect", { body: { action: "confirm_public", stridee_user_id: strideeUserId } }).catch(() => {});
         }
@@ -35,9 +41,9 @@ export default function StrideeReturn() {
       setDone(true);
       setTimeout(() => window.location.replace("/?page=connect-apps"), 800);
     })();
-   }, [status, strideeUserId, isNativeReturn]);
+   }, [status, strideeUserId, isNativeReturn, isResume]);
 
-  const msg = status === "success" ? "Garmin connected ✓" : status === "denied" ? "Connection cancelled" : "Connection failed";
+  const msg = status === "success" ? "Garmin connected ✓" : isResume ? "Returning to RunWard…" : status === "denied" ? "Connection cancelled" : "Connection failed";
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-6">
       <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-6 text-center space-y-3">

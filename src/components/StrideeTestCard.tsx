@@ -19,13 +19,6 @@ import { Button } from "@/components/ui/button";
 import despia from "despia-native";
 import { isDespiaUA } from "@/lib/despiaOAuth";
 
-const GARMIN_NATIVE_RETURN_KEY = "stridee_garmin_native_return";
-const GARMIN_RESTART_DELAY_MS = 1500;
-
-type DespiaLifecycleWindow = Window & {
-  focusin?: () => void;
-};
-
 // Admin-only trial of Garmin via Stridee. Hidden for everyone else.
 export default function StrideeTestCard({ lang }: { lang: string }) {
   const { user } = useAuth();
@@ -44,52 +37,22 @@ export default function StrideeTestCard({ lang }: { lang: string }) {
   useEffect(() => { void load(); }, [user?.id]);
   // Re-check when the user comes back from the Garmin sign-in window.
   useEffect(() => {
-    const closeGarminBrowser = () => {
-      const armedAt = Number(sessionStorage.getItem(GARMIN_NATIVE_RETURN_KEY));
-      if (!(armedAt > 0) || Date.now() - armedAt < GARMIN_RESTART_DELAY_MS) return false;
-      sessionStorage.removeItem(GARMIN_NATIVE_RETURN_KEY);
-      // Despia closes an oauth:// browser only when it receives the matching
-      // app-scheme callback. reset:// refreshes the WebView underneath but does
-      // not dismiss the OAuth browser layer.
-      window.location.href = "runward://oauth/stridee-return?status=resume&page=connect-apps";
-      return true;
-    };
     const onReturn = () => {
       if (document.visibilityState !== "visible") return;
-      if (closeGarminBrowser()) return;
       void load();
     };
     const onVisibility = () => {
-      onReturn();
-    };
-    // Despia does not reliably dispatch the browser's standard focus event when
-    // an external provider app returns. Its native runtime calls window.focusin.
-    const nativeWindow = window as DespiaLifecycleWindow;
-    const previousFocusIn = nativeWindow.focusin;
-    nativeWindow.focusin = () => {
-      previousFocusIn?.();
       onReturn();
     };
     document.addEventListener("visibilitychange", onVisibility);
     window.addEventListener("focus", onReturn);
     const t = conn?.status === "pending" ? setInterval(() => void load(), 4000) : undefined;
     return () => {
-      nativeWindow.focusin = previousFocusIn;
       document.removeEventListener("visibilitychange", onVisibility);
       window.removeEventListener("focus", onReturn);
       if (t) clearInterval(t);
     };
   }, [user?.id, conn?.status]);
-
-  // If the connection completes while Despia's OAuth browser is still covering
-  // the app, send the same callback immediately instead of waiting for focus.
-  useEffect(() => {
-    if (conn?.status !== "connected") return;
-    const armedAt = Number(sessionStorage.getItem(GARMIN_NATIVE_RETURN_KEY));
-    if (!(armedAt > 0)) return;
-    sessionStorage.removeItem(GARMIN_NATIVE_RETURN_KEY);
-    window.location.href = "runward://oauth/stridee-return?status=success&page=connect-apps";
-  }, [conn?.status]);
 
   if (!isAdmin) return null;
 
@@ -115,7 +78,6 @@ export default function StrideeTestCard({ lang }: { lang: string }) {
       // makes Despia close the in-app browser and return to RunWard.
       const bridge = `${window.location.origin}/stridee-bridge?` +
         new URLSearchParams({ url: data.connect_url, sid: data.stridee_user_id ?? "" }).toString();
-      if (provider === "garmin") sessionStorage.setItem(GARMIN_NATIVE_RETURN_KEY, String(Date.now()));
       despia(`oauth://?url=${encodeURIComponent(bridge)}`);
       return;
     }

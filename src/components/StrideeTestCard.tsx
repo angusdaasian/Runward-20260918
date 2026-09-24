@@ -37,7 +37,13 @@ export default function StrideeTestCard({ lang }: { lang: string }) {
     setBusy(true);
     const { data, error } = await supabase.functions.invoke("stridee-connect", { body: { action: "connect" } });
     setBusy(false);
-    if (error || !data?.connect_url) { toast.error(zh ? "Stridee 連結失敗" : "Stridee connect failed"); console.error(error, data); return; }
+    if (error) { toast.error(zh ? "Stridee 連結失敗" : "Stridee connect failed"); console.error(error, data); return; }
+    if (data?.already_connected) {
+      await load();
+      toast.success(zh ? "Garmin 已連結，毋須再次授權" : "Garmin is already connected — no approval needed");
+      return;
+    }
+    if (!data?.connect_url) { toast.error(zh ? "Stridee 連結失敗" : "Stridee connect failed"); console.error(data); return; }
     if (isDespiaUA()) despia(`oauth://?url=${encodeURIComponent(data.connect_url)}`);
     else window.location.href = data.connect_url;
   };

@@ -46,6 +46,14 @@ Deno.serve(async (req) => {
       return json({ ok: true });
     }
 
+    const { data: existing } = await admin.from("stridee_connections")
+      .select("status")
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (existing?.status === "connected") {
+      return json({ already_connected: true });
+    }
+
     const returnUri = "https://angustest.site/stridee-return";
     const res = await strideeFetch("POST", "/v1/connect", {
       provider: "garmin",

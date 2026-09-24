@@ -19,6 +19,8 @@ import { Button } from "@/components/ui/button";
 import despia from "despia-native";
 import { isDespiaUA } from "@/lib/despiaOAuth";
 
+const GARMIN_NATIVE_RETURN_KEY = "stridee_garmin_native_return";
+
 // Admin-only trial of Garmin via Stridee. Hidden for everyone else.
 export default function StrideeTestCard({ lang }: { lang: string }) {
   const { user } = useAuth();
@@ -37,11 +39,26 @@ export default function StrideeTestCard({ lang }: { lang: string }) {
   useEffect(() => { void load(); }, [user?.id]);
   // Re-check when the user comes back from the Garmin sign-in window.
   useEffect(() => {
-    const onVis = () => { if (document.visibilityState === "visible") void load(); };
-    document.addEventListener("visibilitychange", onVis);
-    window.addEventListener("focus", onVis);
+    const onReturn = () => {
+      if (document.visibilityState !== "visible") return;
+      if (sessionStorage.getItem(GARMIN_NATIVE_RETURN_KEY) === "away") {
+        sessionStorage.removeItem(GARMIN_NATIVE_RETURN_KEY);
+        window.location.replace(`${window.location.origin}/?page=connect-apps`);
+        return;
+      }
+      void load();
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden" && sessionStorage.getItem(GARMIN_NATIVE_RETURN_KEY) === "armed") {
+        sessionStorage.setItem(GARMIN_NATIVE_RETURN_KEY, "away");
+        return;
+      }
+      onReturn();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("focus", onReturn);
     const t = conn?.status === "pending" ? setInterval(() => void load(), 4000) : undefined;
-    return () => { document.removeEventListener("visibilitychange", onVis); window.removeEventListener("focus", onVis); if (t) clearInterval(t); };
+    return () => { document.removeEventListener("visibilitychange", onVisibility); window.removeEventListener("focus", onReturn); if (t) clearInterval(t); };
   }, [user?.id, conn?.status]);
 
   if (!isAdmin) return null;
@@ -68,6 +85,7 @@ export default function StrideeTestCard({ lang }: { lang: string }) {
       // makes Despia close the in-app browser and return to RunWard.
       const bridge = `${window.location.origin}/stridee-bridge?` +
         new URLSearchParams({ url: data.connect_url, sid: data.stridee_user_id ?? "" }).toString();
+      if (provider === "garmin") sessionStorage.setItem(GARMIN_NATIVE_RETURN_KEY, "armed");
       despia(`oauth://?url=${encodeURIComponent(bridge)}`);
       return;
     }

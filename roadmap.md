@@ -27,3 +27,4 @@
 - [x] Restore the original direct-navigation Stridee connection flow
 - [x] Restore Stridee's normal browser connection flow with an explicit return-to-RunWard prompt
 - [x] Dismiss the Stridee sign-in window immediately when RunWard resumes
+- [x] Hard-refresh Fitness Apps when returning from native Garmin connection

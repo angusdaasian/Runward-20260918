@@ -2273,6 +2273,60 @@ export type Database = {
           },
         ]
       }
+      stridee_connections: {
+        Row: {
+          connected_at: string | null
+          created_at: string
+          id: string
+          last_synced_at: string | null
+          provider: string
+          status: string
+          stridee_user_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          connected_at?: string | null
+          created_at?: string
+          id?: string
+          last_synced_at?: string | null
+          provider?: string
+          status?: string
+          stridee_user_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          connected_at?: string | null
+          created_at?: string
+          id?: string
+          last_synced_at?: string | null
+          provider?: string
+          status?: string
+          stridee_user_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      stridee_sync_state: {
+        Row: {
+          id: string
+          last_received_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          id: string
+          last_received_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          last_received_at?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       support_feedback: {
         Row: {
           admin_response: string | null

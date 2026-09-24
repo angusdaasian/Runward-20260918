@@ -6,7 +6,7 @@ export default function StrideeReturn() {
   const params = new URLSearchParams(window.location.search);
   const status = params.get("status") ?? "error";
   const strideeUserId = params.get("user_id") ?? "";
-  const deeplinkScheme = params.get("deeplink_scheme") ?? "";
+  const isNativeReturn = window.location.pathname.endsWith("/native");
   const [done, setDone] = useState(false);
   const [external, setExternal] = useState(false);
 
@@ -17,11 +17,11 @@ export default function StrideeReturn() {
         if (status === "success" && strideeUserId) {
           await supabase.functions.invoke("stridee-connect", { body: { action: "confirm_public", stridee_user_id: strideeUserId } }).catch(() => {});
         }
-         if (deeplinkScheme) {
+          if (isNativeReturn) {
            const forwarded = new URLSearchParams();
            forwarded.set("status", status);
            if (strideeUserId) forwarded.set("user_id", strideeUserId);
-           window.location.href = `${deeplinkScheme}://oauth/stridee-return?${forwarded.toString()}`;
+            window.location.href = `runward://oauth/stridee-return?${forwarded.toString()}`;
            return;
          }
         // Opened in the outside browser: ask the user to go back to the app.
@@ -35,7 +35,7 @@ export default function StrideeReturn() {
       setDone(true);
       setTimeout(() => window.location.replace("/?page=connect-apps"), 800);
     })();
-   }, [status, strideeUserId, deeplinkScheme]);
+   }, [status, strideeUserId, isNativeReturn]);
 
   const msg = status === "success" ? "Garmin connected ✓" : status === "denied" ? "Connection cancelled" : "Connection failed";
   return (

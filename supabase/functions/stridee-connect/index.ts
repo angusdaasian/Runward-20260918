@@ -55,8 +55,10 @@ Deno.serve(async (req) => {
     }
 
     const native = body?.native === true;
+    // Stridee appends `?status=...&user_id=...` to this value. Keep the native
+    // marker in the path so its query string cannot corrupt the deeplink scheme.
     const returnUri = native
-      ? "https://angustest.site/stridee-return?deeplink_scheme=runward"
+      ? "https://angustest.site/stridee-return/native"
       : "https://angustest.site/stridee-return";
     const res = await strideeFetch("POST", "/v1/connect", {
       provider: "garmin",

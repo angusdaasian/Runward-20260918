@@ -1,20 +1,29 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
 
 export default function StrideeReturn() {
   const params = new URLSearchParams(window.location.search);
   const status = params.get("status") ?? "error";
   const strideeUserId = params.get("user_id") ?? "";
+  const deeplinkScheme = params.get("deeplink_scheme") ?? "";
   const [done, setDone] = useState(false);
   const [external, setExternal] = useState(false);
 
   useEffect(() => {
     (async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
+       if (!session) {
         if (status === "success" && strideeUserId) {
           await supabase.functions.invoke("stridee-connect", { body: { action: "confirm_public", stridee_user_id: strideeUserId } }).catch(() => {});
         }
+         if (deeplinkScheme) {
+           const forwarded = new URLSearchParams();
+           forwarded.set("status", status);
+           if (strideeUserId) forwarded.set("user_id", strideeUserId);
+           window.location.href = `${deeplinkScheme}://oauth/stridee-return?${forwarded.toString()}`;
+           return;
+         }
         // Opened in the outside browser: ask the user to go back to the app.
         setExternal(true);
         setDone(true);
@@ -26,7 +35,7 @@ export default function StrideeReturn() {
       setDone(true);
       setTimeout(() => window.location.replace("/?page=connect-apps"), 800);
     })();
-  }, [status, strideeUserId]);
+   }, [status, strideeUserId, deeplinkScheme]);
 
   const msg = status === "success" ? "Garmin connected ✓" : status === "denied" ? "Connection cancelled" : "Connection failed";
   return (
@@ -40,12 +49,11 @@ export default function StrideeReturn() {
                 ? "You can close this page and return to the RunWard app. 已成功連接，請返回 RunWard App。"
                 : "Please return to the RunWard app and try again. 請返回 RunWard App 再試一次。"}
             </p>
-            <a
-              href="runward://"
-              className="inline-block w-full rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground"
-            >
-              Open RunWard App 返回 App
-            </a>
+            <Button asChild className="w-full">
+              <a href={`runward://oauth/stridee-return?status=${encodeURIComponent(status)}&user_id=${encodeURIComponent(strideeUserId)}`}>
+                Open RunWard App 返回 App
+              </a>
+            </Button>
           </>
         ) : (
           <p className="text-sm text-muted-foreground">

@@ -19,6 +19,13 @@ Deno.serve(async (req) => {
         .eq("stridee_user_id", pre.stridee_user_id.slice(0, 100)).in("status", ["pending", "connected"]).select("user_id");
       return json({ ok: (rows?.length ?? 0) > 0 });
     }
+    if (pre?.action === "status_public" && typeof pre.stridee_user_id === "string" && pre.stridee_user_id) {
+      // Polled by the in-app sign-in bridge page (no session there).
+      const adminPub = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+      const { data: row } = await adminPub.from("stridee_connections").select("status")
+        .eq("stridee_user_id", pre.stridee_user_id.slice(0, 100)).maybeSingle();
+      return json({ connected: row?.status === "connected" });
+    }
     const auth = req.headers.get("Authorization") ?? "";
     const url = Deno.env.get("SUPABASE_URL")!;
     const userClient = createClient(url, Deno.env.get("SUPABASE_ANON_KEY")!, {
@@ -75,7 +82,7 @@ Deno.serve(async (req) => {
       user_id: user.id, stridee_user_id: data.user_id ?? null, status: "pending",
       updated_at: new Date().toISOString(),
     }, { onConflict: "user_id" });
-    return json({ connect_url: data.connect_url });
+    return json({ connect_url: data.connect_url, stridee_user_id: data.user_id ?? null });
   } catch (e) {
     console.error("[stridee-connect]", e);
     return json({ error: String((e as Error).message ?? e) }, 500);

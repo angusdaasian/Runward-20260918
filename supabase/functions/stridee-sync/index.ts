@@ -24,14 +24,23 @@ Deno.serve(async (req) => {
     const userClient = createClient(url, Deno.env.get("SUPABASE_ANON_KEY")!, {
       global: { headers: { Authorization: req.headers.get("Authorization") ?? "" } },
     });
-    const { data: { user } } = await userClient.auth.getUser();
-    if (!user) return json({ error: "Unauthorized" }, 401);
     const admin = createClient(url, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+    const body = await req.json().catch(() => ({}));
+    // Internal (server-to-server) mode: lets the history backfill keep running
+    // on the server even after the user closes the app.
+    const whKey = Deno.env.get("WEBHOOK_AUTH_KEY");
+    const internal = !!whKey && req.headers.get("x-webhook-key") === whKey && typeof body?.user_id === "string";
+    let user: { id: string } | null = null;
+    if (internal) user = { id: body.user_id };
+    else {
+      const { data } = await userClient.auth.getUser();
+      user = data.user;
+    }
+    if (!user) return json({ error: "Unauthorized" }, 401);
 
     const { data: conn } = await admin.from("stridee_connections").select("status").eq("user_id", user.id).maybeSingle();
     if (!conn || conn.status !== "connected") return json({ ok: true, stored: 0, remaining: 0, connected: false });
 
-    const body = await req.json().catch(() => ({}));
     const premium = await isPremium(admin, user.id);
     const wantAll = body?.all === true;
     if (wantAll && !premium) return json({ error: "premium_required" }, 402);
@@ -82,6 +91,17 @@ Deno.serve(async (req) => {
     if (wantAll && remaining === 0) patch.auto_sync_enabled = true;
     await admin.from("stridee_connections").update(patch).eq("user_id", user.id);
     if (stored > 0) triggerCrossPlatformDedup(user.id, days * 24);
+
+    // Full-history backfill continues server-side in the background.
+    if (wantAll && remaining > 0 && whKey && (stored > 0 || failed < batch.length)) {
+      const next = fetch(`${url}/functions/v1/stridee-sync`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-webhook-key": whKey },
+        body: JSON.stringify({ all: true, user_id: user.id }),
+      }).catch((e) => console.warn("[stridee-sync] chain failed", e));
+      // @ts-ignore EdgeRuntime exists on Supabase Edge
+      try { EdgeRuntime.waitUntil(next); } catch { /* detached */ }
+    }
 
     return json({ ok: true, connected: true, premium, days, stored, failed, remaining, auto_sync: !!patch.auto_sync_enabled });
   } catch (e) {

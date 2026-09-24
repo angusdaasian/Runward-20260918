@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import despia from "despia-native";
+import { isDespiaUA } from "@/lib/despiaOAuth";
 import garminIcon from "@/assets/brands/garmin.png";
 
 // Admin-only trial of Garmin via Stridee. Hidden for everyone else.
@@ -28,7 +30,8 @@ export default function StrideeTestCard({ lang }: { lang: string }) {
     const { data, error } = await supabase.functions.invoke("stridee-connect", { body: { action: "connect" } });
     setBusy(false);
     if (error || !data?.connect_url) { toast.error(zh ? "Stridee 連結失敗" : "Stridee connect failed"); console.error(error, data); return; }
-    window.location.href = data.connect_url;
+    if (isDespiaUA()) despia(`oauth://?url=${encodeURIComponent(data.connect_url)}`);
+    else window.location.href = data.connect_url;
   };
   const sync = async () => {
     setBusy(true);

@@ -14,6 +14,7 @@ import { useLocation } from "react-router-dom";
 
 import GarminCredentialDialog from "@/components/GarminCredentialDialog";
 import IntervalsIntroSheet from "@/components/IntervalsIntroSheet";
+import StrideeTestCard from "@/components/StrideeTestCard";
 import corosIcon from "@/assets/brands/coros.png";
 import polarIcon from "@/assets/brands/polar.png";
 import garminIcon from "@/assets/brands/garmin.png";
@@ -564,6 +565,8 @@ const ConnectApps = ({ lang, onBack }: Props) => {
           ? "連結你的裝置和服務以自動同步訓練數據"
           : "Connect your devices and services to automatically sync training data"}
       </p>
+
+      <StrideeTestCard lang={lang} />
 
       {/* Priority reminder */}
       <div className="flex items-start gap-2 bg-muted border border-border rounded-lg p-3 mb-3">

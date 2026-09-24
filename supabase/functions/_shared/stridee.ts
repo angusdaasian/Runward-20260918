@@ -8,10 +8,15 @@ function loadKey() {
   const raw = Deno.env.get("STRIDEE_PRIVATE_KEY") ?? "";
   const keyId = Deno.env.get("STRIDEE_KEY_ID") ?? "";
   if (!raw || !keyId) throw new Error("Stridee secrets not configured");
-  let pem = raw.replace(/\\n/g, "\n").trim();
-  if (!pem.includes("-----BEGIN")) {
-    pem = `-----BEGIN PRIVATE KEY-----\n${pem}\n-----END PRIVATE KEY-----`;
+  // Accept PEM pasted with lost newlines, or a bare base64 body / 32-byte seed.
+  const b64 = raw.replace(/\\n/g, "\n").replace(/-----[^-]+-----/g, "").replace(/\s+/g, "");
+  let der = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+  if (der.length === 32) {
+    const prefix = [0x30, 0x2e, 0x02, 0x01, 0x00, 0x30, 0x05, 0x06, 0x03, 0x2b, 0x65, 0x70, 0x04, 0x22, 0x04, 0x20];
+    der = new Uint8Array([...prefix, ...der]);
   }
+  const body = btoa(String.fromCharCode(...der)).match(/.{1,64}/g)!.join("\n");
+  const pem = `-----BEGIN PRIVATE KEY-----\n${body}\n-----END PRIVATE KEY-----`;
   return { key: createPrivateKey(pem), keyId };
 }
 

@@ -2275,6 +2275,7 @@ export type Database = {
       }
       stridee_connections: {
         Row: {
+          auto_sync_enabled: boolean
           connected_at: string | null
           created_at: string
           id: string
@@ -2286,6 +2287,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          auto_sync_enabled?: boolean
           connected_at?: string | null
           created_at?: string
           id?: string
@@ -2297,6 +2299,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          auto_sync_enabled?: boolean
           connected_at?: string | null
           created_at?: string
           id?: string

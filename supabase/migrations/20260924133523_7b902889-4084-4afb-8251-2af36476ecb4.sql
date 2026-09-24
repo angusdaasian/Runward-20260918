@@ -1,0 +1,1 @@
+ALTER TABLE public.stridee_connections ADD COLUMN IF NOT EXISTS provider text NOT NULL DEFAULT 'garmin';

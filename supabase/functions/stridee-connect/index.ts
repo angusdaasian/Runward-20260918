@@ -9,6 +9,16 @@ const json = (b: unknown, status = 200) =>
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   try {
+    const pre = await req.clone().json().catch(() => ({}));
+    if (pre?.action === "confirm_public" && typeof pre.stridee_user_id === "string" && pre.stridee_user_id) {
+      // Return page opened in an outside browser (no app session). Only flips an
+      // existing pending link that Stridee issued for this exact Stridee user id.
+      const adminPub = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+      const { data: rows } = await adminPub.from("stridee_connections")
+        .update({ status: "connected", connected_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+        .eq("stridee_user_id", pre.stridee_user_id.slice(0, 100)).in("status", ["pending", "connected"]).select("user_id");
+      return json({ ok: (rows?.length ?? 0) > 0 });
+    }
     const auth = req.headers.get("Authorization") ?? "";
     const url = Deno.env.get("SUPABASE_URL")!;
     const userClient = createClient(url, Deno.env.get("SUPABASE_ANON_KEY")!, {

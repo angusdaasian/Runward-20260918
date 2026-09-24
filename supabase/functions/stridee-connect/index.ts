@@ -36,7 +36,7 @@ Deno.serve(async (req) => {
       return json({ ok: true });
     }
 
-    const returnUri = "https://runward.site/stridee-return";
+    const returnUri = "https://angustest.site/stridee-return";
     const res = await strideeFetch("POST", "/v1/connect", {
       provider: "garmin",
       external_user_id: user.id,

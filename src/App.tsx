@@ -30,6 +30,7 @@ const Privacy = lazy(() => import("./pages/Privacy.tsx"));
 const DeleteAccount = lazy(() => import("./pages/DeleteAccount.tsx"));
 const TerraReturn = lazy(() => import("./pages/TerraReturn.tsx"));
 const StrideeReturn = lazy(() => import("./pages/StrideeReturn.tsx"));
+const StrideeBridge = lazy(() => import("./pages/StrideeBridge.tsx"));
 const SuuntoReturn = lazy(() => import("./pages/SuuntoReturn.tsx"));
 const PolarReturn = lazy(() => import("./pages/PolarReturn.tsx"));
 const Dashboard = lazy(() => import("./pages/Dashboard.tsx"));

@@ -3,7 +3,7 @@
 // show with the existing Garmin attribution. Called by cron every 5 minutes.
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { createClient } from "npm:@supabase/supabase-js@2";
-import FitParser from "npm:fit-file-parser@1.21.0";
+import FitParserModule from "npm:fit-file-parser@1.21.0";
 import { strideeFetch } from "../_shared/stridee.ts";
 
 const json = (b: unknown, status = 200) =>
@@ -11,6 +11,14 @@ const json = (b: unknown, status = 200) =>
 
 const MAX_PER_RUN = 15;
 const MAX_SAMPLES = 1200;
+
+// fit-file-parser is published as transpiled CommonJS with `exports.default`.
+// Deno's npm interop therefore returns either the constructor itself or a
+// module object containing it, depending on the edge-runtime version.
+const FitParser = ((FitParserModule as unknown as { default?: unknown }).default
+  ?? FitParserModule) as new (options: Record<string, unknown>) => {
+    parse: (content: ArrayBuffer, callback: (error: unknown, data: unknown) => void) => void;
+  };
 
 function encodePolyline(points: Array<[number, number]>): string {
   let out = "", pLat = 0, pLng = 0;
@@ -133,18 +141,26 @@ Deno.serve(async (req) => {
     let stored = 0, skipped = 0;
     let lastReceived = state?.last_received_at ?? null;
     for (const a of batch) {
-      lastReceived = a.received_at ?? lastReceived;
       const uid = a.external_user_id;
       if (!uid || !/^[0-9a-f-]{36}$/i.test(uid)) { skipped++; continue; }
       let fit: any = null;
       if (a.file?.url) {
-        try { const buf = await downloadFile(a.file.url); if (buf) fit = await parseFit(buf); }
-        catch (e) { console.error("[stridee-sync] fit parse", a.id, e); }
+        try {
+          const buf = await downloadFile(a.file.url);
+          if (!buf) throw new Error("FIT download returned no data");
+          fit = await parseFit(buf);
+        } catch (e) {
+          // Never store a hollow activity or move the bookmark past a failed
+          // FIT file. A later sync can safely retry the same activity.
+          console.error("[stridee-sync] fit parse", a.id, e);
+          return json({ error: "FIT parsing failed", activity_id: a.id, stored, skipped }, 502);
+        }
       }
       const row = { user_id: uid, ...mapActivity(a, fit) };
       const { error } = await admin.from("terra_activities").upsert(row, { onConflict: "user_id,terra_activity_id" });
       if (error) { console.error("[stridee-sync] upsert", error); skipped++; continue; }
       stored++;
+      lastReceived = a.received_at ?? lastReceived;
       await admin.from("stridee_connections").update({ last_synced_at: new Date().toISOString(), status: "connected" }).eq("user_id", uid);
     }
     // Only jump to `until` when everything in the window was processed.

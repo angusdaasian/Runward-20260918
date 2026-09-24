@@ -15,7 +15,8 @@ export default function StrideeReturn() {
           await supabase.functions.invoke("stridee-connect", { body: { action: "confirm_public", stridee_user_id: strideeUserId } }).catch(() => {});
         }
         // Opened in the secure in-app browser: hand back to the app WebView.
-        window.location.href = `runward://oauth/stridee-return?${params.toString()}`;
+        setDone(true);
+        window.location.replace(`runward://oauth/stridee-return?${params.toString()}`);
         return;
       }
       if (status === "success") {
@@ -31,7 +32,11 @@ export default function StrideeReturn() {
     <div className="min-h-screen flex items-center justify-center bg-background p-6">
       <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-6 text-center">
         <h1 className="text-lg font-semibold text-foreground">{msg}</h1>
-        <p className="text-sm text-muted-foreground mt-1">{done ? "Returning to the app…" : "…"}</p>
+        <p className="text-sm text-muted-foreground mt-1">
+          {status === "success"
+            ? (done ? "Connected. Returning to RunWard…" : "Saving your connection…")
+            : done ? "Returning to RunWard…" : "…"}
+        </p>
       </div>
     </div>
   );

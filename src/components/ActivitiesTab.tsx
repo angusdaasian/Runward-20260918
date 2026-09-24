@@ -1039,9 +1039,22 @@ const ActivitiesTab = ({ lang, resetSignal }: Props) => {
     }
   }, []);
 
-  const detectProviders = useCallback(async (): Promise<{ terra: boolean; strava: boolean; suunto: boolean; garmin: boolean }> => {
-    if (!user) return { terra: false, strava: false, suunto: false, garmin: false };
-    const [terraRes, stravaRes, suuntoRes, garminRes] = await Promise.all([
+  const invokeStrideeSync = useCallback(async (days: number, all = false): Promise<number> => {
+    let total = 0;
+    try {
+      for (let i = 0; i < 200; i++) {
+        const { data, error } = await supabase.functions.invoke("stridee-sync", { body: { days, all } });
+        if (error || !(data as any)?.ok) { console.warn("Stridee sync failed:", error ?? data); break; }
+        total += (data as any).stored ?? 0;
+        if (!((data as any).remaining > 0) || !((data as any).stored > 0)) break;
+      }
+    } catch (e) { console.warn("Stridee sync error:", e); }
+    return total;
+  }, []);
+
+  const detectProviders = useCallback(async (): Promise<{ terra: boolean; strava: boolean; suunto: boolean; garmin: boolean; stridee: boolean }> => {
+    if (!user) return { terra: false, strava: false, suunto: false, garmin: false, stridee: false };
+    const [terraRes, stravaRes, suuntoRes, garminRes, strideeRes] = await Promise.all([
       supabase.from("terra_connections").select("user_id").eq("user_id", user.id).eq("active", true).limit(1).maybeSingle(),
       supabase.from("strava_connections").select("user_id").eq("user_id", user.id).limit(1).maybeSingle(),
       supabase.from("suunto_connections").select("user_id").eq("user_id", user.id).limit(1).maybeSingle(),
@@ -1054,8 +1067,10 @@ const ActivitiesTab = ({ lang, resetSignal }: Props) => {
         .or("needs_reauth.is.null,needs_reauth.eq.false")
         .limit(1)
         .maybeSingle(),
+      supabase.from("stridee_connections").select("status").eq("user_id", user.id).eq("status", "connected").maybeSingle(),
     ]);
     return {
+      stridee: !!strideeRes.data,
       terra: !!terraRes.data,
       strava: !!stravaRes.data,
       suunto: !!suuntoRes.data,
@@ -1094,6 +1109,7 @@ const ActivitiesTab = ({ lang, resetSignal }: Props) => {
         : Promise.resolve(0);
       const suuntoPromise = providers.suunto ? invokeSuuntoSync(1) : Promise.resolve(0);
       const garminPromise = providers.garmin ? invokeGarminRailwaySync(1) : Promise.resolve(0);
+      const strideeCount = providers.stridee ? await invokeStrideeSync(1) : 0;
 
       const [terraRes, stravaCount, suuntoCount, garminCount] = await Promise.all([terraPromise, stravaPromise, suuntoPromise, garminPromise]);
       const result = terraRes ? await terraRes.json().catch(() => null) : null;
@@ -1102,7 +1118,7 @@ const ActivitiesTab = ({ lang, resetSignal }: Props) => {
       }
       invalidateAll();
       const terraCount = result?.activities ?? 0;
-      const count = terraCount + stravaCount + suuntoCount + garminCount;
+      const count = terraCount + stravaCount + suuntoCount + garminCount + strideeCount;
       const msg = lang === "zh" ? result?.message_zh : result?.message_en;
       if (result?.rateLimited && stravaCount === 0 && suuntoCount === 0) {
         toast.info(msg ?? (lang === "zh" ? "請稍後再試" : "Please try again later"));
@@ -1117,7 +1133,7 @@ const ActivitiesTab = ({ lang, resetSignal }: Props) => {
     }
     setFetchingToday(false);
 
-  }, [user, fetchingToday, invalidateAll, lang, invokeStravaSync, invokeSuuntoSync, invokeGarminRailwaySync, detectProviders]);
+  }, [user, fetchingToday, invalidateAll, lang, invokeStravaSync, invokeSuuntoSync, invokeGarminRailwaySync, invokeStrideeSync, detectProviders]);
 
   const handleFetchWeekOnly = useCallback(async () => {
     if (!user || fetchingToday) return;
@@ -1147,6 +1163,7 @@ const ActivitiesTab = ({ lang, resetSignal }: Props) => {
         : Promise.resolve(0);
       const suuntoPromise = providers.suunto ? invokeSuuntoSync(7) : Promise.resolve(0);
       const garminPromise = providers.garmin ? invokeGarminRailwaySync(7) : Promise.resolve(0);
+      const strideeCount = providers.stridee ? await invokeStrideeSync(7) : 0;
 
       const [terraRes, stravaCount, suuntoCount, garminCount] = await Promise.all([terraPromise, stravaPromise, suuntoPromise, garminPromise]);
       const result = terraRes ? await terraRes.json().catch(() => null) : null;
@@ -1156,7 +1173,7 @@ const ActivitiesTab = ({ lang, resetSignal }: Props) => {
       invalidateAll();
       const providersResult = Array.isArray(result?.providers) ? result.providers : [];
       const terraIngested = providersResult.reduce((s: number, p: any) => s + (p?.ingested ?? 0), 0);
-      const ingested = terraIngested + stravaCount + suuntoCount + garminCount;
+      const ingested = terraIngested + stravaCount + suuntoCount + garminCount + strideeCount;
       const msg = lang === "zh" ? result?.message_zh : result?.message_en;
       if (result?.rateLimited && stravaCount === 0 && suuntoCount === 0) {
         toast.info(msg ?? (lang === "zh" ? "請稍後再試" : "Please try again later"));
@@ -1171,7 +1188,7 @@ const ActivitiesTab = ({ lang, resetSignal }: Props) => {
       toast.error(lang === "zh" ? "同步失敗" : "Sync failed");
     }
     setFetchingToday(false);
-  }, [user, fetchingToday, invalidateAll, lang, invokeStravaSync, invokeSuuntoSync, invokeGarminRailwaySync, detectProviders]);
+  }, [user, fetchingToday, invalidateAll, lang, invokeStravaSync, invokeSuuntoSync, invokeGarminRailwaySync, invokeStrideeSync, detectProviders]);
 
 
   const handleFetchStrava30Days = useCallback(async () => {
@@ -1228,6 +1245,27 @@ const ActivitiesTab = ({ lang, resetSignal }: Props) => {
     }
     setFetchingToday(false);
   }, [user, fetchingToday, invalidateAll, lang, invokeStravaSync, isPremium, strava2026Key]);
+
+  const [hasStridee, setHasStridee] = useState(false);
+  useEffect(() => {
+    if (!user) return;
+    supabase.from("stridee_connections").select("status").eq("user_id", user.id).eq("status", "connected").maybeSingle()
+      .then(({ data }) => setHasStridee(!!data));
+  }, [user]);
+
+  const handleStrideeHistory = useCallback(async (all: boolean) => {
+    if (!user || fetchingToday) return;
+    setFetchingToday(true);
+    toast.info(lang === "zh" ? "正在同步 Garmin 活動，可能需要幾分鐘…" : "Syncing Garmin activities — this can take a few minutes…", { duration: 6000 });
+    const n = await invokeStrideeSync(all ? 1830 : 30, all);
+    invalidateAll();
+    if (all) {
+      toast.success(lang === "zh" ? `已同步 ${n} 個過往活動，自動同步已開啟` : `Synced ${n} past activities. Automatic sync is now on`);
+    } else {
+      toast.success(lang === "zh" ? `已同步 ${n} 個近 30 天活動` : `Synced ${n} activities from the past 30 days`);
+    }
+    setFetchingToday(false);
+  }, [user, fetchingToday, lang, invokeStrideeSync, invalidateAll]);
 
   const handleFetchYear2026 = useCallback(async () => {
     if (!user || fetchingToday) return;
@@ -1435,6 +1473,16 @@ const ActivitiesTab = ({ lang, resetSignal }: Props) => {
                   <DropdownMenuItem onClick={handleFetchWeekOnly} disabled={fetchingToday}>
                     {lang === "zh" ? "同步近 7 天活動" : "Sync past 7 days"}
                   </DropdownMenuItem>
+                  {hasStridee && (
+                    <DropdownMenuItem onClick={() => handleStrideeHistory(false)} disabled={fetchingToday}>
+                      {lang === "zh" ? "同步近 30 天活動" : "Sync past 30 days"}
+                    </DropdownMenuItem>
+                  )}
+                  {hasStridee && isPremium && (
+                    <DropdownMenuItem onClick={() => handleStrideeHistory(true)} disabled={fetchingToday}>
+                      {lang === "zh" ? "同步全部過往活動（並開啟自動同步）" : "Sync all past data (turns on auto sync)"}
+                    </DropdownMenuItem>
+                  )}
                   {false && isPremium && !year2026Used && (
                     <DropdownMenuItem onClick={handleFetchYear2026} disabled={fetchingToday}>
                       {lang === "zh" ? "同步 2026 全年活動" : "Sync all 2026 activities"}

@@ -59,7 +59,8 @@ export default function StrideeTestCard({ lang }: { lang: string }) {
   const connect = async (provider: string) => {
     setBusy(true);
     const { data, error } = await supabase.functions.invoke("stridee-connect", {
-      body: { action: "connect", native: isDespiaUA(), provider },
+      // Garmin: Safari-only flow — no in-app window, plain return page.
+      body: { action: "connect", native: isDespiaUA() && provider !== "garmin", provider },
     });
     setBusy(false);
     if (error) { toast.error(zh ? "Stridee 連結失敗" : "Stridee connect failed"); console.error(error, data); return; }
@@ -69,13 +70,14 @@ export default function StrideeTestCard({ lang }: { lang: string }) {
       return;
     }
     if (!data?.connect_url) { toast.error(zh ? "Stridee 連結失敗" : "Stridee connect failed"); console.error(data); return; }
-    // Stridee launches Garmin from a second page, so wrapping its first page in
-    // Despia's oauth:// session leaves that first page open. A blank-target link
-    // lets Despia route the whole flow to the normal phone browser instead.
+    if (isDespiaUA() && provider === "garmin") {
+      // api.stridee.com is in Despia External Links, so navigating there opens
+      // Safari. The return page in Safari then deep-links back into RunWard.
+      toast(zh ? "正在 Safari 開啟 Garmin…" : "Opening Garmin in Safari…");
+      window.location.href = data.connect_url;
+      return;
+    }
     if (isDespiaUA()) {
-      // Open our own bridge page in Despia's in-app browser. It opens Stridee,
-      // watches for the connection and then fires runward://oauth/... which
-      // makes Despia close the in-app browser and return to RunWard.
       const bridge = `${window.location.origin}/stridee-bridge?` +
         new URLSearchParams({ url: data.connect_url, sid: data.stridee_user_id ?? "" }).toString();
       despia(`oauth://?url=${encodeURIComponent(bridge)}`);

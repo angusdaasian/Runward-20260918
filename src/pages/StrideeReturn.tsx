@@ -30,9 +30,12 @@ export default function StrideeReturn() {
             window.location.href = `runward://oauth/stridee-return?${forwarded.toString()}`;
            return;
          }
-        // Opened in the outside browser: ask the user to go back to the app.
+        // Opened in Safari: show the button and also try to jump back automatically.
         setExternal(true);
         setDone(true);
+        const back = new URLSearchParams({ status });
+        if (strideeUserId) back.set("user_id", strideeUserId);
+        setTimeout(() => { window.location.href = `runward://oauth/stridee-return?${back.toString()}`; }, 600);
         return;
       }
       if (status === "success") {

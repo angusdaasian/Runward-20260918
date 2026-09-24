@@ -12,7 +12,7 @@ export default function StrideeBridge() {
   const [opened, setOpened] = useState(false);
   const done = useRef(false);
 
-  const backToApp = (status = "success") => {
+  const backToApp = (status = "resume") => {
     if (done.current) return;
     done.current = true;
     const q = new URLSearchParams({ status });
@@ -33,13 +33,23 @@ export default function StrideeBridge() {
       const { data } = await supabase.functions.invoke("stridee-connect", {
         body: { action: "status_public", stridee_user_id: sid },
       });
-      if ((data as any)?.connected) backToApp();
+      if ((data as any)?.connected) backToApp("success");
     };
     const t = setInterval(() => void check(), 3000);
-    const onVis = () => { if (document.visibilityState === "visible") void check(); };
-    document.addEventListener("visibilitychange", onVis);
-    return () => { clearInterval(t); document.removeEventListener("visibilitychange", onVis); };
-  }, [sid]);
+    const onResume = () => {
+      if (document.visibilityState !== "visible") return;
+      // Garmin runs in a second browser page. Once RunWard becomes active again,
+      // dismiss this original Despia OAuth session immediately instead of waiting
+      // for the connection-status request to win a race with the native resume.
+      if (opened) backToApp("resume");
+      else void check();
+    };
+    document.addEventListener("visibilitychange", onResume);
+    return () => {
+      clearInterval(t);
+      document.removeEventListener("visibilitychange", onResume);
+    };
+  }, [sid, opened]);
 
   return (
     <main className="min-h-screen flex items-center justify-center bg-background p-6">

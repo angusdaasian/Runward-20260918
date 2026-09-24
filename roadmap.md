@@ -26,3 +26,4 @@
 - [x] Add problems-only service status updates on Home with admin-managed bilingual messages
 - [x] Restore the original direct-navigation Stridee connection flow
 - [x] Restore Stridee's normal browser connection flow with an explicit return-to-RunWard prompt
+- [x] Dismiss the Stridee sign-in window immediately when RunWard resumes

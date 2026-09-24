@@ -5,6 +5,7 @@ import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import FitParserModule from "npm:fit-file-parser@1.21.0";
 import { strideeFetch } from "../_shared/stridee.ts";
+import { triggerCrossPlatformDedup } from "../_shared/triggerDedup.ts";
 
 const json = (b: unknown, status = 200) =>
   new Response(JSON.stringify(b), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -139,6 +140,7 @@ Deno.serve(async (req) => {
     const batch = all.slice(0, MAX_PER_RUN);
 
     let stored = 0, skipped = 0;
+    const touched = new Set<string>();
     let lastReceived = state?.last_received_at ?? null;
     for (const a of batch) {
       const uid = a.external_user_id;
@@ -160,12 +162,15 @@ Deno.serve(async (req) => {
       const { error } = await admin.from("terra_activities").upsert(row, { onConflict: "user_id,terra_activity_id" });
       if (error) { console.error("[stridee-sync] upsert", error); skipped++; continue; }
       stored++;
+      touched.add(uid);
       lastReceived = a.received_at ?? lastReceived;
       await admin.from("stridee_connections").update({ last_synced_at: new Date().toISOString(), status: "connected" }).eq("user_id", uid);
     }
     // Only jump to `until` when everything in the window was processed.
     const nextBookmark = all.length > batch.length ? lastReceived : until;
     await admin.from("stridee_sync_state").upsert({ id: "global", last_received_at: nextBookmark, updated_at: new Date().toISOString() });
+    // Same cross-platform dedup as Strava/Terra; wide window covers history replays.
+    for (const u of touched) triggerCrossPlatformDedup(u, 24 * 365 * 5);
     return json({ found: all.length, stored, skipped, remaining: all.length - batch.length });
   } catch (e) {
     console.error("[stridee-sync]", e);

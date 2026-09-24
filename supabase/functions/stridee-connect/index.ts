@@ -54,7 +54,10 @@ Deno.serve(async (req) => {
       return json({ already_connected: true });
     }
 
-    const returnUri = "https://angustest.site/stridee-return";
+    const native = body?.native === true;
+    const returnUri = native
+      ? "https://angustest.site/stridee-return?deeplink_scheme=runward"
+      : "https://angustest.site/stridee-return";
     const res = await strideeFetch("POST", "/v1/connect", {
       provider: "garmin",
       external_user_id: user.id,

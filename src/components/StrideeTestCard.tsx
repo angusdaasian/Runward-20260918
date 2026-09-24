@@ -3,6 +3,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import garminIcon from "@/assets/brands/garmin.png";
+import despia from "despia-native";
+import { isDespiaUA } from "@/lib/despiaOAuth";
+import { Button } from "@/components/ui/button";
 
 // Admin-only trial of Garmin via Stridee. Hidden for everyone else.
 export default function StrideeTestCard({ lang }: { lang: string }) {
@@ -33,7 +36,10 @@ export default function StrideeTestCard({ lang }: { lang: string }) {
 
   const connect = async () => {
     setBusy(true);
-    const { data, error } = await supabase.functions.invoke("stridee-connect", { body: { action: "connect" } });
+    const native = isDespiaUA();
+    const { data, error } = await supabase.functions.invoke("stridee-connect", {
+      body: { action: "connect", native },
+    });
     setBusy(false);
     if (error) { toast.error(zh ? "Stridee 連結失敗" : "Stridee connect failed"); console.error(error, data); return; }
     if (data?.already_connected) {
@@ -42,9 +48,13 @@ export default function StrideeTestCard({ lang }: { lang: string }) {
       return;
     }
     if (!data?.connect_url) { toast.error(zh ? "Stridee 連結失敗" : "Stridee connect failed"); console.error(data); return; }
-    // Use the original Stridee flow: navigate directly to its connection page.
-    // This works consistently in both the RunWard app and a normal browser.
-    window.location.href = data.connect_url;
+    if (native) {
+      // Garmin blocks or loops inside an embedded WebView. Despia's OAuth bridge
+      // opens a secure browser and closes it when the callback fires runward://oauth/.
+      despia(`oauth://?url=${encodeURIComponent(data.connect_url)}`);
+    } else {
+      window.location.href = data.connect_url;
+    }
   };
   const sync = async () => {
     setBusy(true);
@@ -76,9 +86,9 @@ export default function StrideeTestCard({ lang }: { lang: string }) {
         </div>
       </div>
       <div className="flex gap-2 mt-3">
-        {!connected && <button disabled={busy} onClick={connect} className="flex-1 rounded-lg bg-primary text-primary-foreground text-sm py-2 disabled:opacity-50">{zh ? "連結" : "Connect"}</button>}
-        {connected && <button disabled={busy} onClick={sync} className="flex-1 rounded-lg bg-primary text-primary-foreground text-sm py-2 disabled:opacity-50">{zh ? "立即同步" : "Sync now"}</button>}
-        {conn && <button disabled={busy} onClick={disconnect} className="rounded-lg border border-border text-sm px-3 py-2 text-foreground disabled:opacity-50">{zh ? "移除" : "Remove"}</button>}
+        {!connected && <Button disabled={busy} onClick={connect} className="flex-1">{zh ? "連結" : "Connect"}</Button>}
+        {connected && <Button disabled={busy} onClick={sync} className="flex-1">{zh ? "立即同步" : "Sync now"}</Button>}
+        {conn && <Button variant="outline" disabled={busy} onClick={disconnect}>{zh ? "移除" : "Remove"}</Button>}
       </div>
     </div>
   );

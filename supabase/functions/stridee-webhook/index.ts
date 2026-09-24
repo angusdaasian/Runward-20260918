@@ -1,5 +1,6 @@
 // Receives sealed Stridee webhook deliveries (JWS-signed, JWE X25519 encrypted).
 // Automatic sync: only Premium users whose auto_sync_enabled is on are ingested.
+import { ingestStrideeWellness } from "../_shared/strideeWellness.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import {
   base64url, compactDecrypt, createRemoteJWKSet, decodeProtectedHeader, flattenedVerify, importPKCS8,
@@ -73,6 +74,16 @@ Deno.serve(async (req) => {
       await admin.from("stridee_connections").update({ last_synced_at: new Date().toISOString() }).eq("user_id", uid);
       triggerCrossPlatformDedup(uid!, 72);
     })().catch((e) => console.error("[stridee-webhook] ingest", e));
+    // @ts-ignore EdgeRuntime exists on Supabase Edge
+    try { EdgeRuntime.waitUntil(work); } catch { /* detached */ }
+  }
+  if ((event.type === "wellness.created" || event.type === "wellness.updated") && event.data) {
+    const work = (async () => {
+      const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+      const { data: conn } = await admin.from("stridee_connections").select("user_id").eq("stridee_user_id", event.user_id).maybeSingle();
+      if (!conn) return console.warn("[stridee-webhook] wellness: no connection", event.user_id);
+      await ingestStrideeWellness(admin, conn.user_id, { ...event.data, provider: event.data.provider ?? event.provider });
+    })().catch((e) => console.error("[stridee-webhook] wellness", e));
     // @ts-ignore EdgeRuntime exists on Supabase Edge
     try { EdgeRuntime.waitUntil(work); } catch { /* detached */ }
   }

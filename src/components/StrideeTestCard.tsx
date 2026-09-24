@@ -45,11 +45,11 @@ export default function StrideeTestCard({ lang }: { lang: string }) {
       return;
     }
     if (!data?.connect_url) { toast.error(zh ? "Stridee 連結失敗" : "Stridee connect failed"); console.error(data); return; }
-    // Stridee's consent page launches Garmin outside its own page, so it cannot
-    // reliably complete Despia's oauth:// browser session. Use the wrapper's
-    // normal external-link handling instead; the return page confirms the link
-    // and gives the user an explicit button back to RunWard.
-    window.location.href = data.connect_url;
+    // Stridee launches Garmin from a second page, so wrapping its first page in
+    // Despia's oauth:// session leaves that first page open. A blank-target link
+    // lets Despia route the whole flow to the normal phone browser instead.
+    const opened = window.open(data.connect_url, "_blank", "noopener,noreferrer");
+    if (!opened) window.location.assign(data.connect_url);
   };
   const sync = async () => {
     setBusy(true);

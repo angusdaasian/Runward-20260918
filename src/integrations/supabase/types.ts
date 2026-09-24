@@ -2317,6 +2317,7 @@ export type Database = {
           id: string
           last_synced_at: string | null
           provider: string
+          providers: string[]
           status: string
           stridee_user_id: string | null
           updated_at: string
@@ -2329,6 +2330,7 @@ export type Database = {
           id?: string
           last_synced_at?: string | null
           provider?: string
+          providers?: string[]
           status?: string
           stridee_user_id?: string | null
           updated_at?: string
@@ -2341,6 +2343,7 @@ export type Database = {
           id?: string
           last_synced_at?: string | null
           provider?: string
+          providers?: string[]
           status?: string
           stridee_user_id?: string | null
           updated_at?: string

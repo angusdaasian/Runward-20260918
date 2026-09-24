@@ -48,8 +48,7 @@ export default function StrideeTestCard({ lang }: { lang: string }) {
     // Stridee launches Garmin from a second page, so wrapping its first page in
     // Despia's oauth:// session leaves that first page open. A blank-target link
     // lets Despia route the whole flow to the normal phone browser instead.
-    const opened = window.open(data.connect_url, "_blank", "noopener,noreferrer");
-    if (!opened) window.location.assign(data.connect_url);
+    window.open(data.connect_url, "_blank");
   };
   const sync = async () => {
     setBusy(true);

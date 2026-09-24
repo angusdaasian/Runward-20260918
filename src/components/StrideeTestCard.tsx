@@ -2,8 +2,6 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
-import despia from "despia-native";
-import { isDespiaUA } from "@/lib/despiaOAuth";
 import garminIcon from "@/assets/brands/garmin.png";
 
 // Admin-only trial of Garmin via Stridee. Hidden for everyone else.
@@ -44,10 +42,9 @@ export default function StrideeTestCard({ lang }: { lang: string }) {
       return;
     }
     if (!data?.connect_url) { toast.error(zh ? "Stridee 連結失敗" : "Stridee connect failed"); console.error(data); return; }
-    // In the app, open the normal outside browser (not the in-app OAuth sheet,
-    // which cannot be closed reliably). The card polls and flips to Connected.
-    if (isDespiaUA()) window.open(data.connect_url, "_blank");
-    else window.location.href = data.connect_url;
+    // Use the original Stridee flow: navigate directly to its connection page.
+    // This works consistently in both the RunWard app and a normal browser.
+    window.location.href = data.connect_url;
   };
   const sync = async () => {
     setBusy(true);

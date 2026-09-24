@@ -3,6 +3,18 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import garminIcon from "@/assets/brands/garmin.png";
+import corosIcon from "@/assets/brands/coros.png";
+import polarIcon from "@/assets/brands/polar.png";
+import fitbitIcon from "@/assets/brands/fitbit.png";
+import zeppIcon from "@/assets/brands/zepp.png";
+
+const PROVIDERS = [
+  { id: "garmin", name: "Garmin", icon: garminIcon },
+  { id: "coros", name: "COROS", icon: corosIcon },
+  { id: "polar", name: "Polar", icon: polarIcon },
+  { id: "fitbit", name: "Fitbit", icon: fitbitIcon },
+  { id: "zepp", name: "Zepp (Amazfit)", icon: zeppIcon },
+];
 import { Button } from "@/components/ui/button";
 import despia from "despia-native";
 import { isDespiaUA } from "@/lib/despiaOAuth";
@@ -11,7 +23,7 @@ import { isDespiaUA } from "@/lib/despiaOAuth";
 export default function StrideeTestCard({ lang }: { lang: string }) {
   const { user } = useAuth();
   const [isAdmin, setIsAdmin] = useState(false);
-  const [conn, setConn] = useState<{ status: string; last_synced_at: string | null } | null>(null);
+  const [conn, setConn] = useState<{ status: string; last_synced_at: string | null; provider?: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const zh = lang === "zh";
 
@@ -19,7 +31,7 @@ export default function StrideeTestCard({ lang }: { lang: string }) {
     if (!user) return;
     const { data: role } = await supabase.from("user_roles").select("role").eq("user_id", user.id).eq("role", "admin").maybeSingle();
     setIsAdmin(!!role);
-    const { data } = await (supabase as any).from("stridee_connections").select("status, last_synced_at").eq("user_id", user.id).maybeSingle();
+    const { data } = await (supabase as any).from("stridee_connections").select("status, last_synced_at, provider").eq("user_id", user.id).maybeSingle();
     setConn(data ?? null);
   };
   useEffect(() => { void load(); }, [user?.id]);
@@ -34,16 +46,16 @@ export default function StrideeTestCard({ lang }: { lang: string }) {
 
   if (!isAdmin) return null;
 
-  const connect = async () => {
+  const connect = async (provider: string) => {
     setBusy(true);
     const { data, error } = await supabase.functions.invoke("stridee-connect", {
-      body: { action: "connect", native: isDespiaUA() },
+      body: { action: "connect", native: isDespiaUA(), provider },
     });
     setBusy(false);
     if (error) { toast.error(zh ? "Stridee 連結失敗" : "Stridee connect failed"); console.error(error, data); return; }
     if (data?.already_connected) {
       await load();
-      toast.success(zh ? "Garmin 已連結，毋須再次授權" : "Garmin is already connected — no approval needed");
+      toast.success(zh ? "已連結，毋須再次授權" : "Already connected — no approval needed");
       return;
     }
     if (!data?.connect_url) { toast.error(zh ? "Stridee 連結失敗" : "Stridee connect failed"); console.error(data); return; }
@@ -77,12 +89,13 @@ export default function StrideeTestCard({ lang }: { lang: string }) {
   };
 
   const connected = conn?.status === "connected";
+  const cur = PROVIDERS.find((p) => p.id === (conn?.provider ?? "garmin")) ?? PROVIDERS[0];
   return (
     <div className="rounded-xl border border-dashed border-primary/50 bg-card p-4 mb-6">
       <div className="flex items-center gap-3">
-        <img src={garminIcon} alt="Garmin" className="w-9 h-9 rounded-lg" />
+        <img src={conn ? cur.icon : garminIcon} alt={cur.name} className="w-9 h-9 rounded-lg" />
         <div className="flex-1 min-w-0">
-          <p className="font-semibold text-foreground text-sm">Garmin (Stridee) · {zh ? "管理員測試" : "Admin trial"}</p>
+          <p className="font-semibold text-foreground text-sm">{conn ? cur.name : (zh ? "手錶" : "Watches")} (Stridee) · {zh ? "管理員測試" : "Admin trial"}</p>
           <p className="text-xs text-muted-foreground">
             {connected
               ? (zh ? "已連結" : "Connected") + (conn?.last_synced_at ? ` · ${new Date(conn.last_synced_at).toLocaleString()}` : "")
@@ -91,7 +104,16 @@ export default function StrideeTestCard({ lang }: { lang: string }) {
         </div>
       </div>
       <div className="flex gap-2 mt-3">
-        {!connected && <Button disabled={busy} onClick={connect} className="flex-1">{zh ? "連結" : "Connect"}</Button>}
+        {!conn && (
+          <div className="grid grid-cols-2 gap-2 flex-1">
+            {PROVIDERS.map((p) => (
+              <Button key={p.id} variant="outline" disabled={busy} onClick={() => connect(p.id)} className="justify-start gap-2">
+                <img src={p.icon} alt="" className="w-5 h-5 rounded" />{p.name}
+              </Button>
+            ))}
+          </div>
+        )}
+        {conn && !connected && <Button disabled={busy} onClick={() => connect(cur.id)} className="flex-1">{zh ? "連結" : "Connect"}</Button>}
         {connected && <Button disabled={busy} onClick={sync} className="flex-1">{zh ? "立即同步" : "Sync now"}</Button>}
         {conn && <Button variant="outline" disabled={busy} onClick={disconnect}>{zh ? "移除" : "Remove"}</Button>}
       </div>

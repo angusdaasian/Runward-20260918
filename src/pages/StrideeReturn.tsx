@@ -11,6 +11,9 @@ export default function StrideeReturn() {
     (async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
+        if (status === "success" && strideeUserId) {
+          await supabase.functions.invoke("stridee-connect", { body: { action: "confirm_public", stridee_user_id: strideeUserId } }).catch(() => {});
+        }
         // Opened in the secure in-app browser: hand back to the app WebView.
         window.location.href = `runward://oauth/stridee-return?${params.toString()}`;
         return;

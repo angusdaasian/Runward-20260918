@@ -22,6 +22,14 @@ export default function StrideeTestCard({ lang }: { lang: string }) {
     setConn(data ?? null);
   };
   useEffect(() => { void load(); }, [user?.id]);
+  // Re-check when the user comes back from the Garmin sign-in window.
+  useEffect(() => {
+    const onVis = () => { if (document.visibilityState === "visible") void load(); };
+    document.addEventListener("visibilitychange", onVis);
+    window.addEventListener("focus", onVis);
+    const t = conn?.status === "pending" ? setInterval(() => void load(), 4000) : undefined;
+    return () => { document.removeEventListener("visibilitychange", onVis); window.removeEventListener("focus", onVis); if (t) clearInterval(t); };
+  }, [user?.id, conn?.status]);
 
   if (!isAdmin) return null;
 

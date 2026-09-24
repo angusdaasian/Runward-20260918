@@ -11,19 +11,39 @@ export default function StrideeBridge() {
   const sid = params.get("sid") ?? "";
   const [opened, setOpened] = useState(false);
   const done = useRef(false);
+  const strideeWindow = useRef<Window | null>(null);
 
   const backToApp = (status = "success") => {
     if (done.current) return;
     done.current = true;
     const q = new URLSearchParams({ status });
     if (sid) q.set("user_id", sid);
-    window.location.href = `runward://oauth/stridee-return?${q.toString()}`;
+    const deepLink = `runward://oauth/stridee-return?${q.toString()}`;
+
+    // Stridee opens Garmin as another page. When Garmin returns to RunWard,
+    // that can expose Stridee's earlier page again. Navigate that exact child
+    // page through Despia's OAuth deeplink so the secure browser session closes.
+    const child = strideeWindow.current;
+    if (child && !child.closed) {
+      try {
+        child.location.href = deepLink;
+        window.setTimeout(() => {
+          try { child.close(); } catch { /* native browser owns the window */ }
+          window.location.href = deepLink;
+        }, 350);
+        return;
+      } catch {
+        try { child.close(); } catch { /* native browser owns the window */ }
+      }
+    }
+    window.location.href = deepLink;
   };
 
   const openGarmin = () => {
     if (!url.startsWith("https://")) return;
     setOpened(true);
     const w = window.open(url, "_blank");
+    strideeWindow.current = w;
     if (!w) window.location.href = url; // popups blocked: go in the same window
   };
 
@@ -38,7 +58,14 @@ export default function StrideeBridge() {
     const t = setInterval(() => void check(), 3000);
     const onVis = () => { if (document.visibilityState === "visible") void check(); };
     document.addEventListener("visibilitychange", onVis);
-    return () => { clearInterval(t); document.removeEventListener("visibilitychange", onVis); };
+    window.addEventListener("focus", onVis);
+    window.addEventListener("pageshow", onVis);
+    return () => {
+      clearInterval(t);
+      document.removeEventListener("visibilitychange", onVis);
+      window.removeEventListener("focus", onVis);
+      window.removeEventListener("pageshow", onVis);
+    };
   }, [sid]);
 
   return (

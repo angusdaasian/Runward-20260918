@@ -8,6 +8,7 @@ import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { strideeFetch } from "../_shared/stridee.ts";
 import { ingestStrideeActivity, isPremium } from "../_shared/strideeIngest.ts";
+import { syncStrideeWellness } from "../_shared/strideeWellness.ts";
 import { triggerCrossPlatformDedup } from "../_shared/triggerDedup.ts";
 
 const json = (b: unknown, status = 200) =>
@@ -38,7 +39,7 @@ Deno.serve(async (req) => {
     }
     if (!user) return json({ error: "Unauthorized" }, 401);
 
-    const { data: conn } = await admin.from("stridee_connections").select("status").eq("user_id", user.id).maybeSingle();
+    const { data: conn } = await admin.from("stridee_connections").select("status, stridee_user_id").eq("user_id", user.id).maybeSingle();
     if (!conn || conn.status !== "connected") return json({ ok: true, stored: 0, remaining: 0, connected: false });
 
     const premium = await isPremium(admin, user.id);
@@ -86,6 +87,8 @@ Deno.serve(async (req) => {
       try { await ingestStrideeActivity(admin, user.id, a); stored++; }
       catch (e) { console.error("[stridee-sync] ingest", a.id, e); failed++; }
     }
+    let wellness = 0;
+    if (!internal) { try { wellness = await syncStrideeWellness(admin, user.id, (conn as any).stridee_user_id ?? null, Math.min(days, 60)); } catch (e) { console.error("[stridee-sync] wellness", e); } }
     const remaining = Math.max(0, todo.length - batch.length);
     const patch: Record<string, unknown> = { last_synced_at: new Date().toISOString() };
     if (wantAll && remaining === 0) patch.auto_sync_enabled = true;
@@ -103,7 +106,7 @@ Deno.serve(async (req) => {
       try { EdgeRuntime.waitUntil(next); } catch { /* detached */ }
     }
 
-    return json({ ok: true, connected: true, premium, days, stored, failed, remaining, auto_sync: !!patch.auto_sync_enabled });
+    return json({ ok: true, connected: true, premium, days, stored, failed, remaining, wellness, auto_sync: !!patch.auto_sync_enabled });
   } catch (e) {
     console.error("[stridee-sync]", e);
     return json({ error: String((e as Error).message ?? e) }, 500);

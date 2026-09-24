@@ -25,4 +25,4 @@
 - [x] Stop the Garmin poller during database recovery and remove full-history Terra sample downloads from list views
 - [x] Add problems-only service status updates on Home with admin-managed bilingual messages
 - [x] Restore the original direct-navigation Stridee connection flow
-- [x] Fix Stridee mobile Garmin consent loop with a query-safe secure-browser return to RunWard
+- [x] Restore Stridee's normal browser connection flow with an explicit return-to-RunWard prompt

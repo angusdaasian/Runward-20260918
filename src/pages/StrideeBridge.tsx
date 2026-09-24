@@ -23,8 +23,10 @@ export default function StrideeBridge() {
   const openGarmin = () => {
     if (!url.startsWith("https://")) return;
     setOpened(true);
-    const w = window.open(url, "_blank");
-    if (!w) window.location.href = url; // popups blocked: go in the same window
+    // Stay in this in-app browser window (same as COROS, which works): Stridee
+    // then returns to /stridee-return/native here, which fires the deeplink
+    // that closes the in-app browser.
+    window.location.href = url;
   };
 
   useEffect(() => {

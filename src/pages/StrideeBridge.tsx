@@ -45,13 +45,9 @@ export default function StrideeBridge() {
       else void check();
     };
     document.addEventListener("visibilitychange", onResume);
-    window.addEventListener("focus", onResume);
-    window.addEventListener("pageshow", onResume);
     return () => {
       clearInterval(t);
       document.removeEventListener("visibilitychange", onResume);
-      window.removeEventListener("focus", onResume);
-      window.removeEventListener("pageshow", onResume);
     };
   }, [sid, opened]);
 

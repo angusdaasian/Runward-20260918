@@ -57,6 +57,10 @@ export function mapActivity(a: any, fit: any) {
   const session = fit?.sessions?.[0] ?? {};
   const records: any[] = fit?.records ?? [];
   const t0 = records[0]?.timestamp ? new Date(records[0].timestamp).getTime() : 0;
+  const sportRaw = String(a.sport ?? session.sport ?? "running").toLowerCase();
+  // FIT running cadence is per-leg (strides/min); double to steps/min like Garmin Connect.
+  const cadMul = /run|walk|hik/.test(sportRaw) ? 2 : 1;
+  const cadOf = (c: any, frac?: any) => typeof c === "number" ? Math.round((c + (typeof frac === "number" ? frac : 0)) * cadMul) : null;
   const rel = (r: any) => Math.round((new Date(r.timestamp).getTime() - t0) / 1000);
   const hr: any[] = [], dist: any[] = [], elev: any[] = [], cad: any[] = [], pts: Array<[number, number]> = [];
   for (const r of records) {
@@ -66,7 +70,7 @@ export function mapActivity(a: any, fit: any) {
     if (typeof r.distance === "number") dist.push({ t, d: Math.round(r.distance * 10) / 10 });
     const alt = r.enhanced_altitude ?? r.altitude;
     if (typeof alt === "number") elev.push({ t, e: Math.round(alt * 10) / 10 });
-    if (typeof r.cadence === "number") cad.push({ t, rpm: r.cadence });
+    if (typeof r.cadence === "number") cad.push({ t, rpm: cadOf(r.cadence, r.fractional_cadence) });
     if (typeof r.position_lat === "number" && typeof r.position_long === "number") pts.push([r.position_lat, r.position_long]);
   }
   const laps = (fit?.laps ?? []).map((l: any, i: number) => ({
@@ -76,7 +80,7 @@ export function mapActivity(a: any, fit: any) {
     moving_time: l.total_timer_time != null ? Math.round(l.total_timer_time) : null,
     average_heartrate: l.avg_heart_rate ?? null,
     max_heartrate: l.max_heart_rate ?? null,
-    average_cadence: l.avg_cadence ?? null,
+    average_cadence: cadOf(l.avg_cadence, l.avg_fractional_cadence),
   }));
   const sport = String(a.sport ?? session.sport ?? "running").toLowerCase();
   return {
@@ -91,7 +95,7 @@ export function mapActivity(a: any, fit: any) {
     average_hr: session.avg_heart_rate ?? null,
     max_hr: session.max_heart_rate ?? null,
     average_speed: session.enhanced_avg_speed ?? session.avg_speed ?? null,
-    avg_cadence: session.avg_cadence ?? null,
+    avg_cadence: cadOf(session.avg_cadence, session.avg_fractional_cadence),
     elevation_gain: session.total_ascent ?? null,
     calories: session.total_calories ?? null,
     has_gps: pts.length > 0,
@@ -101,7 +105,7 @@ export function mapActivity(a: any, fit: any) {
     distance_samples: dist.length ? downsample(dist, MAX_SAMPLES) : null,
     elevation_samples: elev.length ? downsample(elev, MAX_SAMPLES) : null,
     cadence_samples: cad.length ? downsample(cad, MAX_SAMPLES) : null,
-    raw_json: { source: "stridee", stridee_activity_id: a.id, provider_activity_id: a.provider_activity_id, received_at: a.received_at },
+    raw_json: { cadence_spm: true, source: "stridee", stridee_activity_id: a.id, provider_activity_id: a.provider_activity_id, received_at: a.received_at },
   };
 }
 

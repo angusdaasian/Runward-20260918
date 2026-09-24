@@ -252,6 +252,18 @@ async function dedupUser(supabase: any, userId: string, sinceIso: string, dryRun
       const table = TABLE_FOR[src];
       for (let k = 0; k < ids.length; k += 100) {
         const chunk = ids.slice(k, k + 100);
+        // Archive the full original row before removing it from the visible list,
+        // so no source data is ever lost.
+        const { data: full } = await supabase.from(table).select("*").eq("user_id", userId).in("id", chunk);
+        const archive = (full || []).map((r: any) => {
+          const d = details.find((x) => x.drop === `${src}:${r.id}`);
+          const [ks, ki] = (d?.keep || ":").split(":");
+          return { user_id: userId, source_table: table, source_id: String(r.id), kept_source: ks || null, kept_id: ki || null, reason: d?.reason ?? null, row_data: r };
+        });
+        if (archive.length) {
+          const { error: aErr } = await supabase.from("deduplicated_activities").upsert(archive, { onConflict: "source_table,source_id" });
+          if (aErr) { console.error(`[dedup] archive failed table=${table}`, aErr); continue; }
+        }
         const { error } = await supabase.from(table).delete().eq("user_id", userId).in("id", chunk);
         if (error) {
           console.error(`[dedup] delete failed table=${table} user=${userId}`, error);

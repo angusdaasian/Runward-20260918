@@ -504,7 +504,7 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
               elapsed_time: elapsed,
               moving_time: Number(lap.moving_time ?? lap.duration_seconds) || elapsed,
               average_speed: avgSpeed,
-              average_heartrate: lap.avg_hr ?? lap.average_hr ?? undefined,
+              average_heartrate: lap.avg_hr ?? lap.average_hr ?? lap.average_heartrate ?? undefined,
               elevation_difference:
                 Number(lap.elevation_gain ?? lap.total_ascent_meters ?? lap.total_ascent) || 0,
               split: lap.split_number ?? lap.lap_index ?? idx + 1,

@@ -54,13 +54,15 @@ Deno.serve(async (req) => {
     }
 
     const { data: existing } = await admin.from("stridee_connections")
-      .select("status")
+      .select("status, provider")
       .eq("user_id", user.id)
       .maybeSingle();
-    if (existing?.status === "connected") {
+    if (existing?.status === "connected" && (existing.provider ?? "garmin") === (body?.provider ?? "garmin")) {
       return json({ already_connected: true });
     }
 
+    const ALLOWED = ["garmin", "coros", "polar", "fitbit", "zepp"];
+    const provider = ALLOWED.includes(body?.provider) ? body.provider : "garmin";
     const native = body?.native === true;
     // Stridee appends `?status=...&user_id=...` to this value. Keep the native
     // marker in the path so its query string cannot corrupt the deeplink scheme.
@@ -68,7 +70,7 @@ Deno.serve(async (req) => {
       ? "https://angustest.site/stridee-return/native"
       : "https://angustest.site/stridee-return";
     const res = await strideeFetch("POST", "/v1/connect", {
-      provider: "garmin",
+      provider,
       external_user_id: user.id,
       return_uri: returnUri,
     });
@@ -79,7 +81,7 @@ Deno.serve(async (req) => {
     }
     const data = JSON.parse(text);
     await admin.from("stridee_connections").upsert({
-      user_id: user.id, stridee_user_id: data.user_id ?? null, status: "pending",
+      user_id: user.id, stridee_user_id: data.user_id ?? null, status: "pending", provider,
       updated_at: new Date().toISOString(),
     }, { onConflict: "user_id" });
     return json({ connect_url: data.connect_url, stridee_user_id: data.user_id ?? null });

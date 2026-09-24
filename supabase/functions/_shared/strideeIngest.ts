@@ -85,7 +85,7 @@ export function mapActivity(a: any, fit: any) {
   const sport = String(a.sport ?? session.sport ?? "running").toLowerCase();
   return {
     terra_activity_id: `stridee_${a.id}`,
-    provider: "GARMIN",
+    provider: String(a.provider ?? "garmin").toUpperCase(),
     activity_name: a.name ?? null,
     activity_type: sport === "run" ? "running" : sport,
     start_time: a.start_time ?? session.start_time ?? null,

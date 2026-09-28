@@ -1,5 +1,5 @@
 // Receives sealed Stridee webhook deliveries (JWS-signed, JWE X25519 encrypted).
-// Automatic sync: only Premium users whose auto_sync_enabled is on are ingested.
+// Automatic sync: all connected users with auto_sync_enabled on are ingested (default on).
 import { ingestStrideeWellness } from "../_shared/strideeWellness.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import {
@@ -67,8 +67,8 @@ Deno.serve(async (req) => {
         : await q.eq("stridee_user_id", event.user_id).maybeSingle();
       if (!conn) return console.warn("[stridee-webhook] no connection for", event.user_id);
       uid = conn.user_id;
-      if (!conn.auto_sync_enabled || !(await isPremium(admin, uid!))) {
-        return console.log("[stridee-webhook] auto sync off / not premium, skipped", uid);
+      if (!conn.auto_sync_enabled) {
+        return console.log("[stridee-webhook] auto sync off, skipped", uid);
       }
       await ingestStrideeActivity(admin, uid!, { ...event.data, received_at: event.created });
       await admin.from("stridee_connections").update({ last_synced_at: new Date().toISOString() }).eq("user_id", uid);

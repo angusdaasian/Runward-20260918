@@ -48,7 +48,7 @@ Deno.serve(async (req) => {
       const { data: cur } = await admin.from("stridee_connections").select("provider, providers").eq("user_id", user.id).maybeSingle();
       const list = Array.from(new Set([...(cur?.providers ?? []), cur?.provider ?? "garmin"]));
       await admin.from("stridee_connections").upsert({
-        user_id: user.id, stridee_user_id: sid, status: "connected", providers: list,
+        user_id: user.id, stridee_user_id: sid, status: "connected", providers: list, auto_sync_enabled: true,
         connected_at: new Date().toISOString(), updated_at: new Date().toISOString(),
       }, { onConflict: "user_id" });
       return json({ ok: true });
@@ -100,7 +100,7 @@ Deno.serve(async (req) => {
     const data = JSON.parse(text);
     await admin.from("stridee_connections").upsert({
       user_id: user.id, stridee_user_id: data.user_id ?? existing?.stridee_user_id ?? null,
-      status: linked.length ? "connected" : "pending", provider, providers: linked,
+      status: linked.length ? "connected" : "pending", provider, providers: linked, auto_sync_enabled: true,
       updated_at: new Date().toISOString(),
     }, { onConflict: "user_id" });
     return json({ connect_url: data.connect_url, stridee_user_id: data.user_id ?? null });

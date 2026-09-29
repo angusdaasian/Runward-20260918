@@ -7,6 +7,8 @@ import {
 } from "npm:jose@5.9.6";
 import { ingestStrideeActivity } from "../_shared/strideeIngest.ts";
 import { triggerCrossPlatformDedup } from "../_shared/triggerDedup.ts";
+import { maybeSendTelegramActivityPrompt } from "../_shared/telegramActivityPrompt.ts";
+import { maybeSendWhatsappActivityPrompt } from "../_shared/whatsappActivityPrompt.ts";
 
 const JWKS = createRemoteJWKSet(new URL("https://api.stridee.com/.well-known/jwks.json"));
 let privKey: CryptoKey | null = null;
@@ -18,6 +20,46 @@ async function getKey() {
   return privKey;
 }
 const seen = new Set<string>();
+
+// New-run alerts: one push + Telegram/WhatsApp RPE prompt per activity (only recent ones).
+async function notifyNewActivity(admin: any, uid: string, strideeId: string) {
+  try {
+    const { data: act } = await admin.from("terra_activities")
+      .select("activity_type, activity_name, distance_meters, duration_seconds, start_time")
+      .eq("user_id", uid).eq("terra_activity_id", `stridee_${strideeId}`).maybeSingle();
+    if (!act || !(Number(act.distance_meters) > 0)) return;
+    if (act.start_time && Date.now() - new Date(act.start_time).getTime() > 48 * 3600e3) return;
+    const { data: claim } = await admin.from("activity_push_log")
+      .insert({ user_id: uid, activity_key: `stridee:${strideeId}` }).select("id").maybeSingle();
+    if (!claim) return;
+    const { data: profile } = await admin.from("profiles")
+      .select("activity_notifications, lang").eq("user_id", uid).maybeSingle();
+    const appId = Deno.env.get("ONESIGNAL_APP_ID"), apiKey = Deno.env.get("ONESIGNAL_REST_API_KEY");
+    if (profile?.activity_notifications && appId && apiKey) {
+      const zh = String(profile.lang ?? "").toLowerCase().startsWith("zh");
+      const res = await fetch("https://onesignal.com/api/v1/notifications", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Basic ${apiKey}` },
+        body: JSON.stringify({
+          app_id: appId, include_external_user_ids: [uid],
+          headings: { en: zh ? "新活動已同步" : "New activity synced" },
+          contents: { en: zh ? "你的最新活動已上傳。" : "Your latest activity has been uploaded." },
+        }),
+      });
+      console.log(`[stridee-webhook] push ${res.status}`);
+    }
+    const t = `${act.activity_type ?? ""} ${act.activity_name ?? ""}`.toLowerCase();
+    if (/run|jog|trail|treadmill|跑/.test(t)) {
+      const prompt = {
+        userId: uid, source: "terra" as const, activityKey: `stridee_${strideeId}`,
+        distanceMeters: Number(act.distance_meters) || null,
+        durationSeconds: Number(act.duration_seconds) || null, sportType: "run",
+      };
+      await maybeSendTelegramActivityPrompt(prompt);
+      await maybeSendWhatsappActivityPrompt(prompt);
+    }
+  } catch (e) { console.error("[stridee-webhook] notify", e); }
+}
 const reply = (b: unknown, status = 200) =>
   new Response(JSON.stringify(b), { status, headers: { "Content-Type": "application/json" } });
 
@@ -73,6 +115,7 @@ Deno.serve(async (req) => {
       await ingestStrideeActivity(admin, uid!, { ...event.data, received_at: event.created });
       await admin.from("stridee_connections").update({ last_synced_at: new Date().toISOString() }).eq("user_id", uid);
       triggerCrossPlatformDedup(uid!, 72);
+      await notifyNewActivity(admin, uid!, String(event.data.id));
     })().catch((e) => console.error("[stridee-webhook] ingest", e));
     // @ts-ignore EdgeRuntime exists on Supabase Edge
     try { EdgeRuntime.waitUntil(work); } catch { /* detached */ }

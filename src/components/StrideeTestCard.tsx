@@ -115,7 +115,9 @@ export default function StrideeTestCard({ lang, blockedByOther = false, onBefore
         const isPending = conn?.status === "pending" && connectedProviders.includes(p.id);
         // Non-admins: one watch only — disable the other brands once connected,
         // and disable all when another fitness app (Strava/Suunto/intervals) is linked.
-        const disabled = !isConn && !isAdmin && ((conn != null) || blockedByOther);
+        // A pending brand stays tappable so users who quit the approval window
+        // can simply try again.
+        const disabled = !isConn && !isPending && !isAdmin && ((conn != null) || blockedByOther);
         return (
           <div key={p.id} className={`bg-card border border-border rounded-xl p-4 ${disabled ? "opacity-50" : ""}`}>
             <div className="flex items-center justify-between">
@@ -151,6 +153,24 @@ export default function StrideeTestCard({ lang, blockedByOther = false, onBefore
                     className="text-xs text-destructive hover:underline disabled:opacity-50"
                   >
                     {zh ? "中斷" : "Disconnect"}
+                  </button>
+                </div>
+              ) : isPending ? (
+                <div className="flex items-center gap-2">
+                  {busy === p.id && <RefreshCw size={14} className="animate-spin text-muted-foreground" />}
+                  <button
+                    onClick={() => connect(p.id)}
+                    disabled={!!busy}
+                    className="text-xs font-medium px-3 py-1 rounded-full bg-primary text-primary-foreground disabled:opacity-50"
+                  >
+                    {busy === p.id ? "..." : (zh ? "重試" : "Try again")}
+                  </button>
+                  <button
+                    onClick={() => disconnect(p.id)}
+                    disabled={!!busy}
+                    className="text-xs text-muted-foreground hover:underline disabled:opacity-50"
+                  >
+                    {zh ? "取消" : "Cancel"}
                   </button>
                 </div>
               ) : (

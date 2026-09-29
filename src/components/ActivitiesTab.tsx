@@ -609,6 +609,7 @@ const AllActivitiesView = ({
 const ActivitiesTab = ({ lang, resetSignal }: Props) => {
   const { user } = useAuth();
   const { isPremium, loading: premiumLoading } = usePremium();
+  const navigate = useNavigate();
   const [simpleMode] = useSimpleMode();
   // Homepage shows ONLY the latest activity → tiny, fast query.
   // The full history is loaded in the background and used by the calendar,

@@ -1419,10 +1419,13 @@ const ActivitiesTab = ({ lang, resetSignal }: Props) => {
         steps: terraToday?.steps ?? appleToday?.steps ?? 0,
         caloriesBurned: terraToday?.caloriesBurned ?? appleToday?.caloriesBurned ?? 0,
         walkRunDistanceKm: terraToday?.walkRunDistanceKm ?? appleToday?.walkRunDistanceKm ?? 0,
+        // Sleep: Apple Health first (Stridee sends no sleep), then wearable rows.
         sleepMinutes:
-          garminSleepMinutes > 0
-            ? garminSleepMinutes
-            : terraToday?.sleepMinutes ?? appleToday?.sleepMinutes ?? 0,
+          appleToday?.sleepMinutes && appleToday.sleepMinutes > 0
+            ? appleToday.sleepMinutes
+            : garminSleepMinutes > 0
+              ? garminSleepMinutes
+              : terraToday?.sleepMinutes ?? 0,
       }
     : null;
 

@@ -12,7 +12,7 @@ const num = (...vals: unknown[]): number | null => {
 /** Upsert one Stridee wellness record; only fills fields the record carries. */
 export async function ingestStrideeWellness(admin: any, userId: string, w: any): Promise<boolean> {
   const kind = w?.kind;
-  if (kind !== "daily" && kind !== "hrv") return false;
+  if (kind !== "daily" && kind !== "hrv" && kind !== "sleep") return false;
   const date = String(w.calendar_date ?? "").slice(0, 10);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return false;
   const provider = String(w.provider ?? "garmin").toUpperCase();
@@ -28,16 +28,28 @@ export async function ingestStrideeWellness(admin: any, userId: string, w: any):
     if (rhr != null) patch.resting_hr = Math.round(rhr);
     if (cal != null) patch.calories = Math.round(cal);
     if (dist != null) patch.distance_metres = Math.round(dist);
-  } else {
+  } else if (kind === "hrv") {
     const hrv = num(m.hrv_avg, m.last_night_avg, m.hrv, s.lastNightAvg, s.hrvAvg);
     if (hrv != null) patch.hrv = Math.round(hrv);
+  } else {
+    // sleep: several records per day are possible (naps) and Garmin revises a
+    // night after first sending it, so keep the longest record seen per day.
+    const sleep = num(m.total_sleep_seconds, w.duration_seconds, s.durationInSeconds);
+    if (sleep != null) patch.sleep_seconds = Math.round(sleep);
+    const score = num(m.sleep_score, s.overallScore?.value, s.sleepScore);
+    if (score != null) patch.sleep_score = Math.round(score);
   }
   if (!Object.keys(patch).length) return false;
   const { data: existing } = await admin.from("terra_daily_health").select("id")
     .eq("user_id", userId).eq("provider", provider).eq("date", date).maybeSingle();
   const now = new Date().toISOString();
   if (existing) {
-    await admin.from("terra_daily_health").update({ ...patch, fetched_at: now }).eq("id", existing.id);
+    if (kind === "sleep" && patch.sleep_seconds != null) {
+      // Keep the longest sleep record for the day (revisions re-send the same night).
+      const { data: cur } = await admin.from("terra_daily_health").select("sleep_seconds").eq("id", existing.id).single();
+      if (cur?.sleep_seconds != null && cur.sleep_seconds >= (patch.sleep_seconds as number)) delete patch.sleep_seconds;
+    }
+    if (Object.keys(patch).length) await admin.from("terra_daily_health").update({ ...patch, fetched_at: now }).eq("id", existing.id);
   } else {
     await admin.from("terra_daily_health").insert({ user_id: userId, provider, date, ...patch, fetched_at: now });
   }
@@ -49,7 +61,7 @@ export async function syncStrideeWellness(admin: any, userId: string, stridreeUs
   const from = new Date(Date.now() - Math.min(days, 400) * 86400_000).toISOString().slice(0, 10);
   const to = new Date(Date.now() + 86400_000).toISOString().slice(0, 10);
   let stored = 0;
-  for (const kind of ["daily", "hrv"]) {
+  for (const kind of ["daily", "hrv", "sleep"]) {
     let cursor: string | undefined;
     for (let page = 0; page < 10; page++) {
       const qs = new URLSearchParams({ kind, from_date: from, to_date: to, limit: "200" });

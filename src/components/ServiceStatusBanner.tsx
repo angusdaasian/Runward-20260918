@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, ChevronDown, Clock3, RefreshCw, Wrench } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Lang } from "@/lib/i18n";
 import { Button } from "@/components/ui/button";
@@ -33,6 +34,8 @@ const stateLabel = (status: ServiceState, lang: Lang) => {
 
 const ServiceStatusBanner = ({ lang, onReconnect }: { lang: Lang; onReconnect?: () => void }) => {
   const { user } = useAuth();
+  const navigate = useNavigate();
+  const goReconnect = onReconnect ?? (() => navigate("/?page=connect-apps"));
   const [items, setItems] = useState<ServiceStatus[]>([]);
   const [open, setOpen] = useState(false);
   const [needsReconnect, setNeedsReconnect] = useState(false);
@@ -93,11 +96,9 @@ const ServiceStatusBanner = ({ lang, onReconnect }: { lang: Lang; onReconnect?: 
             : "We've upgraded watch sync. Reconnect Garmin / COROS / Polar / Fitbit / Zepp to restore automatic sync."}
         </p>
       </div>
-      {onReconnect && (
-        <Button size="sm" onClick={onReconnect} className="shrink-0">
-          {lang === "zh" ? "重新連結" : "Reconnect"}
-        </Button>
-      )}
+      <Button size="sm" onClick={goReconnect} className="shrink-0">
+        {lang === "zh" ? "重新連結" : "Reconnect"}
+      </Button>
     </div>
   ) : null;
 

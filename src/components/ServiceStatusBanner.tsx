@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, ChevronDown, Clock3, Wrench } from "lucide-react";
+import { AlertTriangle, ChevronDown, Clock3, RefreshCw, Wrench } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Lang } from "@/lib/i18n";
 import { Button } from "@/components/ui/button";
@@ -30,9 +32,30 @@ const stateLabel = (status: ServiceState, lang: Lang) => {
   return status === "outage" ? "Service outage" : status === "degraded" ? "Degraded service" : "Maintenance";
 };
 
-const ServiceStatusBanner = ({ lang }: { lang: Lang }) => {
+const ServiceStatusBanner = ({ lang, onReconnect }: { lang: Lang; onReconnect?: () => void }) => {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const goReconnect = onReconnect ?? (() => navigate({ search: "?page=connect-apps" }));
   const [items, setItems] = useState<ServiceStatus[]>([]);
   const [open, setOpen] = useState(false);
+  const [needsReconnect, setNeedsReconnect] = useState(false);
+
+  // Watch sync moved to Stridee: nudge users still on the old Terra / backup
+  // Garmin connection to reconnect so automatic sync resumes.
+  useEffect(() => {
+    if (!user) return;
+    let active = true;
+    (async () => {
+      const [{ data: sc }, { data: tc }, { data: gc }] = await Promise.all([
+        (supabase as any).from("stridee_connections").select("status").eq("user_id", user.id).maybeSingle(),
+        supabase.from("terra_connections").select("id").eq("user_id", user.id).eq("active", true).limit(1),
+        supabase.from("garmin_connections").select("id").eq("user_id", user.id).limit(1),
+      ]);
+      if (!active) return;
+      setNeedsReconnect(sc?.status !== "connected" && ((tc?.length ?? 0) > 0 || (gc?.length ?? 0) > 0));
+    })();
+    return () => { active = false; };
+  }, [user?.id]);
 
   useEffect(() => {
     let active = true;
@@ -44,7 +67,8 @@ const ServiceStatusBanner = ({ lang }: { lang: Lang }) => {
       .order("updated_at", { ascending: false })
       .then(({ data, error }) => {
         if (!active || error) return;
-        setItems((data as ServiceStatus[] | null) ?? []);
+        // Garmin outage notices are retired now that watches sync via Stridee.
+        setItems(((data as ServiceStatus[] | null) ?? []).filter((i) => !/garmin/i.test(i.service_name)));
       });
     return () => {
       active = false;
@@ -57,7 +81,28 @@ const ServiceStatusBanner = ({ lang }: { lang: Lang }) => {
     "maintenance");
   }, [items]);
 
-  if (items.length === 0) return null;
+  const reconnectCard = needsReconnect ? (
+    <div className="mb-5 flex items-center gap-3 rounded-lg border border-primary/35 bg-primary/10 px-3.5 py-3">
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
+        <RefreshCw className="h-4 w-4" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-semibold text-foreground">
+          {lang === "zh" ? "請重新連結你的手錶" : "Please reconnect your watch"}
+        </p>
+        <p className="text-xs text-muted-foreground">
+          {lang === "zh"
+            ? "我們已升級手錶同步服務。重新連結 Garmin / COROS / Polar / Fitbit / Zepp，即可恢復自動同步。"
+            : "We've upgraded watch sync. Reconnect Garmin / COROS / Polar / Fitbit / Zepp to restore automatic sync."}
+        </p>
+      </div>
+      <Button size="sm" onClick={goReconnect} className="shrink-0">
+        {lang === "zh" ? "重新連結" : "Reconnect"}
+      </Button>
+    </div>
+  ) : null;
+
+  if (items.length === 0) return reconnectCard;
 
   const latest = items.reduce((current, item) =>
     new Date(item.updated_at) > new Date(current.updated_at) ? item : current,
@@ -65,6 +110,8 @@ const ServiceStatusBanner = ({ lang }: { lang: Lang }) => {
   const Icon = highestState === "maintenance" ? Wrench : AlertTriangle;
 
   return (
+    <>
+    {reconnectCard}
     <Collapsible open={open} onOpenChange={setOpen} className="mb-5 overflow-hidden rounded-lg border border-warning/35 bg-warning/10">
       <div className="flex items-center gap-3 px-3.5 py-3">
         <div className={cn(
@@ -133,6 +180,7 @@ const ServiceStatusBanner = ({ lang }: { lang: Lang }) => {
         </div>
       </CollapsibleContent>
     </Collapsible>
+    </>
   );
 };
 

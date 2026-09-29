@@ -12,7 +12,7 @@ const num = (...vals: unknown[]): number | null => {
 /** Upsert one Stridee wellness record; only fills fields the record carries. */
 export async function ingestStrideeWellness(admin: any, userId: string, w: any): Promise<boolean> {
   const kind = w?.kind;
-  if (kind !== "daily" && kind !== "hrv") return false;
+  if (kind !== "daily" && kind !== "hrv" && kind !== "sleep") return false;
   const date = String(w.calendar_date ?? "").slice(0, 10);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return false;
   const provider = String(w.provider ?? "garmin").toUpperCase();

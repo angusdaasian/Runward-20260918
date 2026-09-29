@@ -122,7 +122,7 @@ export default function StrideeTestCard({ lang, blockedByOther = false, onBefore
           <div key={p.id} className={`bg-card border border-border rounded-xl p-4 ${disabled ? "opacity-50" : ""}`}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center overflow-hidden">
+                <div className="w-10 h-10 shrink-0 rounded-lg bg-muted flex items-center justify-center overflow-hidden">
                   <img src={p.icon} alt={p.name} className="w-full h-full object-cover" />
                 </div>
                 <div>

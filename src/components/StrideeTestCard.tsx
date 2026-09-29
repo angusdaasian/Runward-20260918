@@ -19,8 +19,8 @@ import { Button } from "@/components/ui/button";
 import despia from "despia-native";
 import { isDespiaUA } from "@/lib/despiaOAuth";
 
-// Admin-only trial of Garmin via Stridee. Hidden for everyone else.
-export default function StrideeTestCard({ lang }: { lang: string }) {
+// Watch connections via Stridee. Non-admins may link one brand; admins can link several for testing.
+export default function StrideeTestCard({ lang, blockedByOther = false, onBeforeConnect }: { lang: string; blockedByOther?: boolean; onBeforeConnect?: () => Promise<void> }) {
   const { user } = useAuth();
   const [isAdmin, setIsAdmin] = useState(false);
   const [conn, setConn] = useState<{ status: string; last_synced_at: string | null; provider?: string; providers?: string[] } | null>(null);
@@ -54,10 +54,13 @@ export default function StrideeTestCard({ lang }: { lang: string }) {
     };
   }, [user?.id, conn?.status]);
 
-  if (!isAdmin) return null;
-
   const connect = async (provider: string) => {
+    if (!isAdmin && blockedByOther) {
+      toast.error(zh ? "請先中斷現有的健身應用連結" : "Disconnect your current fitness app first");
+      return;
+    }
     setBusy(true);
+    if (!isAdmin && onBeforeConnect) await onBeforeConnect();
     const { data, error } = await supabase.functions.invoke("stridee-connect", {
       // Garmin: Safari-only flow — no in-app window, plain return page.
       body: { action: "connect", native: isDespiaUA() && provider !== "garmin", provider },
@@ -103,11 +106,11 @@ export default function StrideeTestCard({ lang }: { lang: string }) {
   const connected = conn?.status === "connected";
   const cur = PROVIDERS.find((p) => p.id === (conn?.provider ?? "garmin")) ?? PROVIDERS[0];
   return (
-    <div className="rounded-xl border border-dashed border-primary/50 bg-card p-4 mb-6">
+    <div className="rounded-xl border border-border bg-card p-4">
       <div className="flex items-center gap-3">
         <img src={conn ? cur.icon : garminIcon} alt={cur.name} className="w-9 h-9 rounded-lg" />
         <div className="flex-1 min-w-0">
-          <p className="font-semibold text-foreground text-sm">{conn?.providers?.length ? PROVIDERS.filter((p) => conn.providers!.includes(p.id)).map((p) => p.name).join(", ") : (zh ? "手錶" : "Watches")} (Stridee) · {zh ? "管理員測試" : "Admin trial"}</p>
+          <p className="font-semibold text-foreground text-sm">{conn?.providers?.length ? PROVIDERS.filter((p) => conn.providers!.includes(p.id)).map((p) => p.name).join(", ") : (zh ? "手錶" : "Watches")}{isAdmin ? ` · ${zh ? "管理員測試" : "Admin trial"}` : ""}</p>
           <p className="text-xs text-muted-foreground">
             {connected
               ? (zh ? "已連結" : "Connected") + (conn?.last_synced_at ? ` · ${new Date(conn.last_synced_at).toLocaleString()}` : "")
@@ -116,10 +119,10 @@ export default function StrideeTestCard({ lang }: { lang: string }) {
         </div>
       </div>
       <div className="flex flex-col gap-2 mt-3">
-        {(
+        {(isAdmin || !conn) && (
           <div className="grid grid-cols-2 gap-2 flex-1">
             {PROVIDERS.filter((p) => !(conn?.providers ?? []).includes(p.id)).map((p) => (
-              <Button key={p.id} variant="outline" disabled={busy} onClick={() => connect(p.id)} className="justify-start gap-2">
+              <Button key={p.id} variant="outline" disabled={busy || (!isAdmin && blockedByOther)} onClick={() => connect(p.id)} className="justify-start gap-2">
                 <img src={p.icon} alt="" className="w-5 h-5 rounded" />{p.name}
               </Button>
             ))}
@@ -127,7 +130,7 @@ export default function StrideeTestCard({ lang }: { lang: string }) {
         )}
 
         {connected && <Button disabled={busy} onClick={sync} className="flex-1">{zh ? "立即同步" : "Sync now"}</Button>}
-        {conn && <Button variant="outline" disabled={busy} onClick={disconnect}>{zh ? "移除" : "Remove"}</Button>}
+        {conn && <Button variant="outline" disabled={busy} onClick={disconnect}>{zh ? "中斷" : "Disconnect"}</Button>}
       </div>
     </div>
   );

@@ -566,7 +566,6 @@ const ConnectApps = ({ lang, onBack }: Props) => {
           : "Connect your devices and services to automatically sync training data"}
       </p>
 
-      <StrideeTestCard lang={lang} />
 
       {/* Priority reminder */}
       <div className="flex items-start gap-2 bg-muted border border-border rounded-lg p-3 mb-3">
@@ -627,127 +626,28 @@ const ConnectApps = ({ lang, onBack }: Props) => {
           </div>
         </div>
 
-        {/* Terra device connections (Garmin / Polar / COROS / Suunto) */}
-        {TERRA_PROVIDERS.map((p) => {
-          const conn = terraConns[p.id];
-          const busy = terraBusy === p.id;
-          const disabledByOther = (hasTerraConn || hasFitnessApp) && !conn;
-          return (
-            <div key={p.id} className={`bg-card border border-border rounded-xl p-4 ${disabledByOther ? "opacity-50" : ""}`}>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center overflow-hidden">
-                    <img src={p.icon} alt={p.label} className="w-full h-full object-cover" />
-                  </div>
-                  <div>
-                    <span className="font-medium text-foreground block">{p.label}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {conn?.last_synced_at
-                        ? `${lang === "zh" ? "上次同步: " : "Last synced: "}${new Date(conn.last_synced_at).toLocaleString()}`
-                        : (lang === "zh"
-                            ? "同步跑步活動數據、配速、心率、海拔及訓練負荷"
-                            : "Sync running activity data, pace, heart rate, elevation & training load")}
-                    </span>
-                  </div>
-                </div>
-                {conn ? (
-                  <div className="flex items-center gap-2">
-                    {busy && <RefreshCw size={14} className="animate-spin text-muted-foreground" />}
-                    <Check size={16} className="text-green-500" />
-                    <button onClick={() => handleTerraDisconnect(p.id)} disabled={busy} className="text-xs text-destructive hover:underline disabled:opacity-50">
-                      {lang === "zh" ? "中斷" : "Disconnect"}
-                    </button>
-                  </div>
-                ) : p.id !== "GARMIN" ? (
-                  <button
-                    onClick={() => handleTerraConnect(p.id)}
-                    disabled={busy || disabledByOther}
-                    className={`text-xs font-medium px-3 py-1 rounded-full ${disabledByOther ? "bg-muted text-muted-foreground cursor-not-allowed" : "text-primary-foreground bg-primary"} disabled:opacity-50`}
-                  >
-                    {busy ? (lang === "zh" ? "..." : "...") : (lang === "zh" ? "連結" : "Connect")}
-                  </button>
-                ) : null}
-              </div>
-
-              {/* Official Garmin (via Terra) is temporarily unavailable. New
-                  users sign in with the backup sync instead; we migrate them
-                  back to the official Garmin connection once it recovers. */}
-              {!conn && p.id === "GARMIN" && (
-                <div className="mt-3 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3">
-                  <p className="text-[11px] leading-relaxed text-foreground">
-                    {lang === "zh"
-                      ? "Garmin 同步服務暫時中斷，暫時無法連接官方 Garmin。請先使用 Garmin Connect™ 帳戶登入我們的備用同步，我們會自動抓回最近 3 個月的跑步紀錄；官方服務恢復後，我們會自動為你遷移回官方 Garmin，無需重新設定。"
-                      : "Garmin sync is temporarily down, so the official Garmin connection is unavailable. Please sign in with your Garmin Connect™ account through our backup sync instead — we'll automatically fetch your last 3 months of runs, and migrate you back to the official Garmin connection once the service is back. No re-setup needed."}
-                  </p>
-                  {garminConnected ? (
-                    <div className="mt-2 flex items-center gap-3">
-                      <Check size={14} className="text-green-500" />
-                      <span className="text-[11px] text-muted-foreground">
-                        {lang === "zh" ? "備用同步已啟用" : "Backup sync active"}
-                      </span>
-                      <button
-                        onClick={handleSyncGarmin}
-                        disabled={garmin.syncing}
-                        className="text-[11px] text-primary hover:underline disabled:opacity-50"
-                      >
-                        {garmin.syncing ? (lang === "zh" ? "同步中…" : "Syncing…") : (lang === "zh" ? "立即同步" : "Sync now")}
-                      </button>
-                      <button onClick={handleDisconnectGarmin} className="text-[11px] text-destructive hover:underline">
-                        {lang === "zh" ? "停用" : "Turn off"}
-                      </button>
-                    </div>
-                  ) : (
-                    <button
-                      onClick={() => setGarminDialogOpen(true)}
-                      className="mt-2 text-xs font-medium px-3 py-1 rounded-full text-primary-foreground bg-primary"
-                    >
-                      {lang === "zh" ? "登入 Garmin（備用）" : "Sign in to Garmin (backup)"}
-                    </button>
-                  )}
-                </div>
-              )}
-
-              {/* Temporary fallback: Garmin Connect™ is not delivering activities
-                  through Terra right now, so Garmin users can sign in directly
-                  and we poll Garmin every minute until Terra resumes. */}
-              {p.id === "GARMIN" && conn && (
-                <div className="mt-3 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3">
-                  <p className="text-[11px] leading-relaxed text-foreground">
-                    {lang === "zh"
-                      ? "Garmin 活動同步暫時中斷。使用 Garmin Connect™ 帳戶登入備用同步，我們會自動抓取 9 月 21 日後的新跑步紀錄；較早的紀錄可在服務恢復後重新同步，屆時會自動切回官方連接。"
-                      : "Garmin activity sync is temporarily interrupted. Sign in with your Garmin Connect™ account for backup sync — we'll automatically fetch your new runs after 21 Sep. Earlier activities can be re-synced once the service recovers, and it will switch back to the official connection automatically."}
-                  </p>
-                  {garminConnected ? (
-                    <div className="mt-2 flex items-center gap-3">
-                      <Check size={14} className="text-green-500" />
-                      <span className="text-[11px] text-muted-foreground">
-                        {lang === "zh" ? "備用同步已啟用" : "Backup sync active"}
-                      </span>
-                      <button
-                        onClick={handleSyncGarmin}
-                        disabled={garmin.syncing}
-                        className="text-[11px] text-primary hover:underline disabled:opacity-50"
-                      >
-                        {garmin.syncing ? (lang === "zh" ? "同步中…" : "Syncing…") : (lang === "zh" ? "立即同步" : "Sync now")}
-                      </button>
-                      <button onClick={handleDisconnectGarmin} className="text-[11px] text-destructive hover:underline">
-                        {lang === "zh" ? "停用" : "Turn off"}
-                      </button>
-                    </div>
-                  ) : (
-                    <button
-                      onClick={() => setGarminDialogOpen(true)}
-                      className="mt-2 text-xs font-medium px-3 py-1 rounded-full text-primary-foreground bg-primary"
-                    >
-                      {lang === "zh" ? "啟用備用同步" : "Enable backup sync"}
-                    </button>
-                  )}
-                </div>
-              )}
-
-            </div>
-          );
-        })}
+        {/* Watches via Stridee (replaces Terra for Garmin / COROS / Polar / Fitbit / Zepp) */}
+        {hasTerraConn && (
+          <div className="flex items-start gap-2 rounded-lg border border-primary/40 bg-primary/10 p-3">
+            <AlertTriangle size={16} className="text-primary mt-0.5 flex-shrink-0" />
+            <p className="text-xs text-foreground">
+              {lang === "zh"
+                ? "我們已更換手錶同步服務。請在下方重新連結你的手錶（Garmin / COROS / Polar / Fitbit / Zepp），以恢復自動同步。"
+                : "We've upgraded our watch sync. Please reconnect your watch below (Garmin / COROS / Polar / Fitbit / Zepp) to restore automatic sync."}
+            </p>
+          </div>
+        )}
+        <StrideeTestCard
+          lang={lang}
+          blockedByOther={stravaConnected || suuntoConnected || intervalsConnected}
+          onBeforeConnect={async () => {
+            for (const prov of Object.keys(terraConns)) {
+              await supabase.functions.invoke("terra-disconnect", { body: { provider: prov } }).catch(() => undefined);
+            }
+            if (garminConnected) await handleDisconnectGarmin();
+            await loadTerraConns();
+          }}
+        />
 
         {/* Suunto (official Suunto Cloud API) */}
         {(() => {

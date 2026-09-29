@@ -21,6 +21,7 @@ import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuIte
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Lang, t } from "@/lib/i18n";
 import { useAuth } from "@/contexts/AuthContext";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { getAppEnvironment } from "@/lib/environment";
 import { toast } from "sonner";
@@ -608,6 +609,7 @@ const AllActivitiesView = ({
 const ActivitiesTab = ({ lang, resetSignal }: Props) => {
   const { user } = useAuth();
   const { isPremium, loading: premiumLoading } = usePremium();
+  const navigate = useNavigate();
   const [simpleMode] = useSimpleMode();
   // Homepage shows ONLY the latest activity → tiny, fast query.
   // The full history is loaded in the background and used by the calendar,
@@ -1531,11 +1533,17 @@ const ActivitiesTab = ({ lang, resetSignal }: Props) => {
               <h3 className="text-base font-semibold text-foreground mb-1">
                 {lang === "zh" ? "連結健身應用以同步活動" : "Connect a Fitness App to Sync Activities"}
               </h3>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm text-muted-foreground mb-4">
                 {lang === "zh"
-                  ? "前往設定 → 連結應用來連結 Strava 或其他健身平台。"
-                  : "Go to Settings → Connect Apps to link Strava or other fitness platforms."}
+                  ? "連結 Strava 或其他健身平台即可開始同步。"
+                  : "Link Strava or another fitness platform to start syncing."}
               </p>
+              <button
+                onClick={() => navigate({ search: "?page=connect-apps" })}
+                className="inline-flex items-center gap-2 h-10 px-5 rounded-full bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors"
+              >
+                {lang === "zh" ? "前往連結應用" : "Connect Apps"}
+              </button>
             </div>
           ) : (
             <div className="text-center py-8">

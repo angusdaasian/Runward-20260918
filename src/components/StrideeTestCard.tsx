@@ -115,7 +115,9 @@ export default function StrideeTestCard({ lang, blockedByOther = false, onBefore
         const isPending = conn?.status === "pending" && connectedProviders.includes(p.id);
         // Non-admins: one watch only — disable the other brands once connected,
         // and disable all when another fitness app (Strava/Suunto/intervals) is linked.
-        const disabled = !isConn && !isAdmin && ((conn != null) || blockedByOther);
+        // A pending brand stays tappable so users who quit the approval window
+        // can simply try again.
+        const disabled = !isConn && !isPending && !isAdmin && ((conn != null) || blockedByOther);
         return (
           <div key={p.id} className={`bg-card border border-border rounded-xl p-4 ${disabled ? "opacity-50" : ""}`}>
             <div className="flex items-center justify-between">

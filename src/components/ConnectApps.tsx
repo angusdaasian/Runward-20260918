@@ -590,8 +590,8 @@ const ConnectApps = ({ lang, onBack }: Props) => {
         {/* Apple Health */}
         <div className="bg-card border border-border rounded-xl p-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-red-500/10 flex items-center justify-center">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-10 h-10 shrink-0 rounded-lg bg-red-500/10 flex items-center justify-center">
                 <span className="text-xl">❤️</span>
               </div>
               <div>
@@ -655,8 +655,8 @@ const ConnectApps = ({ lang, onBack }: Props) => {
           return (
             <div className={`bg-card border border-border rounded-xl p-4 ${suuntoDisabledByOther ? "opacity-50" : ""}`}>
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center overflow-hidden">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-10 h-10 shrink-0 rounded-lg bg-muted flex items-center justify-center overflow-hidden">
                     <img src={suuntoIcon} alt="Suunto" className="w-full h-full object-cover" />
                   </div>
                   <div>
@@ -700,8 +700,8 @@ const ConnectApps = ({ lang, onBack }: Props) => {
           return (
             <div className={`bg-card border border-border rounded-xl p-4 ${stravaDisabledByOther ? "opacity-50" : ""}`}>
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-[#FC4C02]/10 flex items-center justify-center">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-10 h-10 shrink-0 rounded-lg bg-[#FC4C02]/10 flex items-center justify-center">
                     <svg viewBox="0 0 24 24" className="w-6 h-6" fill="#FC4C02">
                       <path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7 13.828h4.169" />
                     </svg>
@@ -763,8 +763,8 @@ const ConnectApps = ({ lang, onBack }: Props) => {
         <>
         <div className={`bg-card border border-border rounded-xl p-4 ${intervalsDisabledByOther ? "opacity-50" : ""}`}>
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg overflow-hidden flex items-center justify-center bg-background">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-10 h-10 shrink-0 rounded-lg overflow-hidden flex items-center justify-center bg-background">
                 <img src={intervalsLogo.url} alt="intervals.icu" className="w-10 h-10 object-contain" />
               </div>
               <div>

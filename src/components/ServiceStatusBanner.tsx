@@ -35,7 +35,7 @@ const stateLabel = (status: ServiceState, lang: Lang) => {
 const ServiceStatusBanner = ({ lang, onReconnect }: { lang: Lang; onReconnect?: () => void }) => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const goReconnect = onReconnect ?? (() => navigate("/?page=connect-apps"));
+  const goReconnect = onReconnect ?? (() => navigate({ search: "?page=connect-apps" }));
   const [items, setItems] = useState<ServiceStatus[]>([]);
   const [open, setOpen] = useState(false);
   const [needsReconnect, setNeedsReconnect] = useState(false);

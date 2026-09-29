@@ -28,9 +28,16 @@ export async function ingestStrideeWellness(admin: any, userId: string, w: any):
     if (rhr != null) patch.resting_hr = Math.round(rhr);
     if (cal != null) patch.calories = Math.round(cal);
     if (dist != null) patch.distance_metres = Math.round(dist);
-  } else {
+  } else if (kind === "hrv") {
     const hrv = num(m.hrv_avg, m.last_night_avg, m.hrv, s.lastNightAvg, s.hrvAvg);
     if (hrv != null) patch.hrv = Math.round(hrv);
+  } else {
+    // sleep: several records per day are possible (naps) and Garmin revises a
+    // night after first sending it, so keep the longest record seen per day.
+    const sleep = num(m.total_sleep_seconds, w.duration_seconds, s.durationInSeconds);
+    if (sleep != null) patch.sleep_seconds = Math.round(sleep);
+    const score = num(m.sleep_score, s.overallScore?.value, s.sleepScore);
+    if (score != null) patch.sleep_score = Math.round(score);
   }
   if (!Object.keys(patch).length) return false;
   const { data: existing } = await admin.from("terra_daily_health").select("id")

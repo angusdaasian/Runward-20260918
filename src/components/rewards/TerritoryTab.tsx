@@ -78,8 +78,10 @@ const TerritoryTab = ({ lang }: Props) => {
     try {
       const { data, error } = await supabase.functions.invoke("process-territory");
       if (error) throw error;
-      const d = data as { processedActivities: number; newZones: number; stolenZones: number };
-      if (d.processedActivities > 0) {
+      const d = data as { processedActivities: number; newZones: number; stolenZones: number; remaining?: number; busy?: boolean };
+      if (d.busy || (d.remaining ?? 0) > 0) {
+        toast.message(lang === "zh" ? "正在背景更新城市地圖…" : "Updating your map in the background…");
+      } else if (d.processedActivities > 0) {
         toast.success(
           lang === "zh"
             ? `處理 ${d.processedActivities} 次跑步 · 新區域 ${d.newZones} · 搶占 ${d.stolenZones}`

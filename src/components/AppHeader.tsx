@@ -217,11 +217,11 @@ const AppHeader = ({ lang, onNavigateSettings, onOpenPromoBanner, isGuest }: App
   const initials = name[0].toUpperCase();
 
   return (
-    <div className="app-header-fixed flex items-center justify-between px-5 pt-4 pb-2 w-full max-w-lg mx-auto">
+    <div className="app-header-fixed flex min-h-16 w-full max-w-lg items-center justify-between px-4 py-2 mx-auto">
       <button
         onClick={onNavigateSettings}
         aria-label={lang === "zh" ? "個人檔案" : "Profile"}
-        className="flex items-center gap-3 active:scale-[0.98] transition-transform"
+        className="flex min-h-11 min-w-0 items-center gap-3 rounded-[10px] pr-2 transition-transform active:scale-[0.98]"
       >
         {!isGuest && !profile ? (
           <>
@@ -230,32 +230,25 @@ const AppHeader = ({ lang, onNavigateSettings, onOpenPromoBanner, isGuest }: App
           </>
         ) : (
           <>
-            <Avatar className="h-12 w-12">
+            <Avatar className="h-11 w-11 ring-1 ring-border">
               <AvatarImage src={isGuest ? undefined : (profile?.avatar_url || undefined)} />
               <AvatarFallback className="text-lg font-display bg-primary/10 text-primary">{initials}</AvatarFallback>
             </Avatar>
             <div className="flex flex-col items-start">
-              <h1 className="font-display text-lg font-bold text-foreground leading-tight">{name}</h1>
+              <h1 className="truncate font-display text-base font-bold leading-tight text-foreground">{name}</h1>
             </div>
 
           </>
         )}
       </button>
-      <div className="flex items-center gap-2">
-        <button
-          aria-label={lang === "zh" ? "產品路線圖" : "Roadmap"}
-          onClick={() => setRoadmapOpen(true)}
-          className="relative w-10 h-10 rounded-full bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center hover:from-primary/30 hover:to-primary/10 active:scale-90 transition-all duration-150 group"
-        >
-          <Rocket size={18} className="text-primary group-hover:-translate-y-0.5 group-hover:translate-x-0.5 transition-transform" />
-        </button>
+      <div className="flex items-center gap-1">
         <Popover>
           <PopoverTrigger asChild>
             <button
               aria-label="Social"
-              className="w-10 h-10 rounded-full bg-gradient-to-br from-pink-500/20 to-purple-500/5 flex items-center justify-center hover:from-pink-500/30 hover:to-purple-500/10 active:scale-90 transition-all duration-150 group"
+               className="native-icon-button"
             >
-              <Users size={18} className="text-pink-500 group-hover:scale-110 transition-transform" />
+               <Users size={18} className="text-primary" />
             </button>
           </PopoverTrigger>
           <PopoverContent align="end" className="w-56 p-2">
@@ -297,13 +290,29 @@ const AppHeader = ({ lang, onNavigateSettings, onOpenPromoBanner, isGuest }: App
           <PopoverTrigger asChild>
             <button
               aria-label={lang === "zh" ? "選單" : "Menu"}
-              className="w-10 h-10 rounded-full bg-muted flex items-center justify-center hover:bg-muted/80 active:scale-90 active:bg-muted/60 transition-all duration-150"
+              className="native-icon-button"
             >
               <Menu size={18} className="text-foreground" />
             </button>
           </PopoverTrigger>
           <PopoverContent align="end" className="w-64 p-2">
             <div className="flex flex-col">
+              <button
+                onClick={() => setRoadmapOpen(true)}
+                className="flex min-h-11 w-full items-center gap-3 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-muted/60 active:scale-[0.98]"
+              >
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] bg-secondary text-primary">
+                  <Rocket size={18} />
+                </span>
+                <div className="flex flex-col">
+                  <span className="text-sm font-medium leading-tight text-foreground">
+                    {lang === "zh" ? "產品路線圖" : "Roadmap"}
+                  </span>
+                  <span className="text-[11px] leading-tight text-muted-foreground">
+                    {lang === "zh" ? "查看接下來的功能" : "See what is coming next"}
+                  </span>
+                </div>
+              </button>
               {/* Simple Mode toggle — first item */}
               <button
                 onClick={() => setSimpleMode(!simpleMode)}

@@ -19,7 +19,7 @@ const RewardsTab = ({ lang }: Props) => {
 
   return (
     <>
-      <FadeIn className="px-5 pt-4 max-w-lg mx-auto pb-24 space-y-5">
+      <FadeIn className="px-4 pt-5 max-w-lg mx-auto pb-24 space-y-5">
         <Tabs value={tab} onValueChange={setTab} className="w-full">
           <TabsList className={underlineTabsListClass}>
             <TabsTrigger value="leaderboards" className={underlineTabsTriggerClass}>

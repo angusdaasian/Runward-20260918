@@ -258,9 +258,9 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps, onNavig
     <Button
       variant="outline"
       onClick={onClick}
-      className="h-36 min-w-0 flex-col items-start justify-between rounded-2xl border-border bg-card p-4 text-left shadow-sm transition-transform active:scale-[0.98]"
+      className="native-card h-32 min-w-0 flex-col items-start justify-between p-4 text-left shadow-none transition-transform active:scale-[0.98]"
     >
-      <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+        <span className="flex h-10 w-10 items-center justify-center rounded-[10px] bg-secondary text-primary">
         <Icon size={21} />
       </span>
       <span className="w-full min-w-0 whitespace-normal">
@@ -280,7 +280,7 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps, onNavig
     <Button
       variant="ghost"
       onClick={onClick}
-      className={`h-auto w-full justify-start rounded-none px-4 py-3.5 ${destructive ? "text-destructive hover:text-destructive" : "text-foreground"}`}
+      className={`min-h-14 h-auto w-full justify-start rounded-none px-4 py-3.5 ${destructive ? "text-destructive hover:text-destructive" : "text-foreground"}`}
     >
       <Icon size={19} className={destructive ? "text-destructive" : "text-primary"} />
       <span className="min-w-0 flex-1 whitespace-normal text-left">
@@ -299,7 +299,7 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps, onNavig
     onToggle: () => void;
     disabled?: boolean;
   }) => (
-    <div className="flex items-center gap-3 px-4 py-3.5">
+    <div className="flex min-h-14 items-center gap-3 px-4 py-3.5">
       <Icon size={19} className="shrink-0 text-primary" />
       <div className="min-w-0 flex-1">
         <p className="text-sm font-medium text-foreground">{label}</p>
@@ -320,7 +320,7 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps, onNavig
   );
 
   return (
-    <div className="mx-auto max-w-lg px-5 pt-3 pb-6">
+    <div className="mx-auto max-w-lg px-4 pt-3 pb-6">
       {hubSection === "main" ? (
         <div className="space-y-5">
           {user ? (
@@ -338,7 +338,7 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps, onNavig
             </div>
           )}
 
-          <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+            <div className="native-card bg-secondary/40 p-4">
             <div className="flex items-center justify-between gap-3">
               <div className="flex min-w-0 items-center gap-3">
                 <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-warning/15 text-warning"><Crown size={21} /></span>
@@ -370,7 +370,7 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps, onNavig
             </div>
           </div>
 
-          <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm divide-y divide-border">
+          <div className="native-card overflow-hidden divide-y divide-border">
             <MenuRow icon={LifeBuoy} label={lang === "zh" ? "支援與幫助" : "Support & Help"} onClick={() => navigate("/support", { state: { from: currentRoute } })} />
             <MenuRow icon={BookMarked} label={lang === "zh" ? "使用教學" : "App Guide"} onClick={() => navigate("/app-guide", { state: { from: currentRoute } })} />
             {!adminLoading && isAdmin && <MenuRow icon={Shield} label={lang === "zh" ? "管理員" : "Admin Panel"} onClick={() => navigate("/admin", { state: { from: currentRoute } })} />}
@@ -392,7 +392,7 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps, onNavig
 
 
           {hubSection === "guides" && (
-            <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm divide-y divide-border">
+            <div className="native-card overflow-hidden divide-y divide-border">
               <MenuRow icon={BookOpen} label={t("trainingDefinitions", lang)} detail={lang === "zh" ? "了解各種訓練強度" : "Understand each training intensity"} onClick={() => setShowDefs(!showDefs)} />
               {showDefs && <div className="space-y-2 bg-muted/40 p-4">{definitions.map((def) => <div key={def.nameKey}><p className="text-sm font-semibold">{lang === "zh" ? def.nameZhKey : def.nameKey}</p><p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">{t(def.defKey, lang)}</p></div>)}</div>}
               <MenuRow icon={Footprints} label={lang === "zh" ? "如何開始長距離跑步" : "How to Start Long Distance Running"} onClick={() => setShowStartGuide(true)} />
@@ -402,7 +402,7 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps, onNavig
 
           {hubSection === "settings" && (
             <div className="space-y-4">
-              <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm divide-y divide-border">
+            <div className="native-card overflow-hidden divide-y divide-border">
                 <ToggleRow icon={darkMode ? Moon : Sun} label={lang === "zh" ? "深色模式" : "Dark Mode"} checked={darkMode} onToggle={() => setDarkMode(!darkMode)} />
                 <ToggleRow icon={Bell} label={lang === "zh" ? "停用 AI 聊天" : "Disable AI Chat"} detail={lang === "zh" ? "隱藏浮動聊天按鈕" : "Hide the floating chat button"} checked={aiChatDisabled} onToggle={() => { const next = !aiChatDisabled; setAiChatDisabled(next); if (next) localStorage.setItem("ai_chat_disabled", "true"); else localStorage.removeItem("ai_chat_disabled"); window.dispatchEvent(new Event("ai-chat-toggle")); }} />
                 {user && <ToggleRow icon={Bell} label={lang === "zh" ? "活動推送通知" : "Activity Notifications"} detail={lang === "zh" ? "跑步同步後接收通知" : "Get notified after a run syncs"} checked={activityNotifications} onToggle={toggleActivityNotifications} disabled={notifLoading} />}
@@ -428,7 +428,7 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps, onNavig
                 <div className="grid grid-cols-3 gap-2">{([ { v: "default" as TextScale, label: lang === "zh" ? "預設" : "Default" }, { v: "lg" as TextScale, label: lang === "zh" ? "大" : "Large" }, { v: "xl" as TextScale, label: lang === "zh" ? "特大" : "X-Large" } ]).map((opt) => <Button key={opt.v} variant={textScale === opt.v ? "default" : "secondary"} className="h-12 flex-col gap-0 text-xs" onClick={() => setTextScale(opt.v)}><span className={opt.v === "xl" ? "text-lg" : opt.v === "lg" ? "text-base" : "text-sm"}>A</span><span>{opt.label}</span></Button>)}</div>
               </div>
 
-              <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm divide-y divide-border">
+              <div className="native-card overflow-hidden divide-y divide-border">
                 <MenuRow icon={Smartphone} label={lang === "zh" ? "主螢幕小工具" : "Home Screen Widget"} detail={user?.id?.startsWith("c7a7") ? undefined : (lang === "zh" ? "即將推出" : "Coming soon")} onClick={() => user?.id?.startsWith("c7a7") && setShowWidgetDialog(true)} />
                 {user && !isPremium && <MenuRow icon={Ticket} label={lang === "zh" ? "兌換優惠代碼" : "Redeem Offer Code"} onClick={() => setShowRedeemDialog(true)} />}
                 <MenuRow icon={ShieldCheck} label={lang === "zh" ? "隱私權政策" : "Privacy Policy"} onClick={() => navigate("/privacy", { state: { from: currentRoute } })} />

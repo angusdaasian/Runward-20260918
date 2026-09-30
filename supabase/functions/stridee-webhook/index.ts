@@ -33,10 +33,16 @@ async function notifyNewActivity(admin: any, uid: string, strideeId: string) {
       .insert({ user_id: uid, activity_key: `stridee:${strideeId}` }).select("id").maybeSingle();
     if (!claim) return;
     const { data: profile } = await admin.from("profiles")
-      .select("activity_notifications, lang").eq("user_id", uid).maybeSingle();
+      .select("activity_notifications").eq("user_id", uid).maybeSingle();
     const appId = Deno.env.get("ONESIGNAL_APP_ID"), apiKey = Deno.env.get("ONESIGNAL_REST_API_KEY");
     if (profile?.activity_notifications && appId && apiKey) {
-      const zh = String(profile.lang ?? "").toLowerCase().startsWith("zh");
+      let zh = false;
+      try {
+        const { data } = await admin.auth.admin.getUserById(uid);
+        const meta = data?.user?.user_metadata ?? {};
+        const raw = String(meta.lang ?? meta.language ?? meta.locale ?? "").toLowerCase();
+        zh = raw.startsWith("zh");
+      } catch { /* default en */ }
       const res = await fetch("https://onesignal.com/api/v1/notifications", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Basic ${apiKey}` },

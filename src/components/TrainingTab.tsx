@@ -35,6 +35,7 @@ import {
 } from "@dnd-kit/core";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
 import WeeklyReviewModal from "@/components/training/WeeklyReviewModal";
+import ProgramCompletion from "@/components/training/ProgramCompletion";
 import AutoAdjustCard from "@/components/training/AutoAdjustCard";
 import EditWorkoutDialog from "@/components/training/EditWorkoutDialog";
 import { useSimpleMode } from "@/hooks/use-simple-mode";

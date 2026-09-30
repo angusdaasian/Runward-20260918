@@ -34,10 +34,6 @@ export function hasVertexServiceAccount(envVarName?: string): boolean {
 
 export async function getVertexAccessToken(envVarName?: string): Promise<string> {
   const key = envVarName || "GOOGLE_VERTEX_SERVICE_ACCOUNT_JSON";
-  const cached = cache.get(key);
-  if (cached && cached.expiresAtMs > Date.now() + 60_000) {
-    return cached.token;
-  }
   const json = Deno.env.get(key);
   if (!json) throw new Error(`${key} is not configured`);
   const sa = JSON.parse(json);
@@ -45,6 +41,12 @@ export async function getVertexAccessToken(envVarName?: string): Promise<string>
   const privateKey = sa.private_key;
   const tokenUri = sa.token_uri || "https://oauth2.googleapis.com/token";
   if (!clientEmail || !privateKey) throw new Error(`Invalid Vertex service account JSON in ${key}`);
+  // Cache per service account identity so a rotated account is used immediately.
+  const cacheKey = `${key}:${clientEmail}:${sa.private_key_id || ""}`;
+  const cached = cache.get(cacheKey);
+  if (cached && cached.expiresAtMs > Date.now() + 60_000) {
+    return cached.token;
+  }
 
   const now = Math.floor(Date.now() / 1000);
   const header = { alg: "RS256", typ: "JWT" };

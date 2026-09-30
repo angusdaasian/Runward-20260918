@@ -127,26 +127,26 @@ const TodayStats = ({ lang, healthStats }: { lang: Lang; healthStats: HealthStat
 
   const statCards = [
     {
-      emoji: "👟",
+      emoji: "Steps",
       label: lang === "zh" ? "每日步數" : "Daily Steps",
       value: stats.steps > 0 ? stats.steps.toLocaleString() : "--",
       unit: lang === "zh" ? "步" : "Steps",
     },
     {
-      emoji: "🔥",
+      emoji: "Energy",
       label: lang === "zh" ? "卡路里" : "Calories",
       value: stats.caloriesBurned > 0 ? stats.caloriesBurned.toLocaleString() : "--",
       unit: "kcal",
     },
     {
-      emoji: "🚶",
+      emoji: "Distance",
       label: lang === "zh" ? "距離" : "Distance",
       value: stats.walkRunDistanceKm > 0 ? `${stats.walkRunDistanceKm}` : "--",
       unit: "km",
       tooltip: lang === "zh" ? "今日跑步與步行的總距離" : "Today's Running and Walking Distance",
     },
     {
-      emoji: "🛏️",
+      emoji: "Sleep",
       label: lang === "zh" ? "睡眠" : "Sleep",
       value: formatSleep(stats.sleepMinutes),
       unit: "",
@@ -155,19 +155,19 @@ const TodayStats = ({ lang, healthStats }: { lang: Lang; healthStats: HealthStat
 
   return (
     <div className="mb-5">
-      <div className="flex items-center justify-between mb-3">
-        <h2 className="font-display text-lg font-bold text-foreground">{lang === "zh" ? "今日統計" : "Today Stats"}</h2>
+      <div className="mb-3 flex items-center justify-between">
+        <h2 className="native-section-title">{lang === "zh" ? "今日狀態" : "Today"}</h2>
       </div>
-      <div className="flex gap-3 overflow-x-auto pb-1 -mx-1 px-1">
+      <div className="grid grid-cols-2 gap-2.5">
         {statCards.map((card, i) => (
-          <div key={i} className="min-w-[140px] flex-1 bg-card border border-border rounded-2xl p-3.5 relative">
-            <div className="flex items-center gap-1.5 mb-2">
-              <span className="text-base">{card.emoji}</span>
-              <span className="text-xs font-medium text-muted-foreground">{card.label}</span>
+          <div key={i} className={`native-card min-h-[104px] p-3.5 ${i === 0 ? "bg-secondary" : ""}`}>
+            <div className="mb-3 flex items-center gap-1.5">
+              <span className="text-[10px] font-semibold uppercase text-muted-foreground">{card.emoji}</span>
+              <span className="sr-only">{card.label}</span>
               {card.tooltip && (
                 <Popover>
                   <PopoverTrigger asChild>
-                    <button className="text-muted-foreground hover:text-foreground transition-colors">
+                      <button aria-label={card.tooltip} className="flex h-7 w-7 items-center justify-center text-muted-foreground transition-colors hover:text-foreground">
                       <HelpCircle size={12} />
                     </button>
                   </PopoverTrigger>
@@ -178,7 +178,7 @@ const TodayStats = ({ lang, healthStats }: { lang: Lang; healthStats: HealthStat
               )}
             </div>
             <div className="flex items-baseline gap-1">
-              <span className="text-2xl font-bold text-foreground">{card.value}</span>
+              <span className="font-display text-2xl font-bold text-foreground">{card.value}</span>
               {card.unit && <span className="text-xs text-muted-foreground">{card.unit}</span>}
             </div>
           </div>
@@ -210,7 +210,7 @@ const ActivityCard = ({
   onClick?: () => void;
 }) => (
   <div
-    className="bg-card border border-border rounded-xl p-4 cursor-pointer hover:border-primary/50 transition-colors"
+    className="native-card cursor-pointer p-4 transition-[border-color,transform] active:scale-[0.99] hover:border-primary/40"
     onClick={onClick}
   >
     <div className="flex items-start justify-between mb-2 gap-2">
@@ -1432,7 +1432,7 @@ const ActivitiesTab = ({ lang, resetSignal }: Props) => {
     : null;
 
   return (
-    <FadeIn className="px-5 pt-6 max-w-lg mx-auto">
+    <FadeIn className="mx-auto max-w-lg px-4 pt-5">
 
       <ServiceStatusBanner lang={lang} />
 
@@ -1447,7 +1447,7 @@ const ActivitiesTab = ({ lang, resetSignal }: Props) => {
       {/* Recent Activity */}
       <div className="mb-4">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="font-display text-lg font-bold text-foreground">
+          <h2 className="native-section-title">
             {lang === "zh" ? "最近活動" : "Recent Activity"}
           </h2>
           <div className="flex items-center gap-2">
@@ -1456,7 +1456,7 @@ const ActivitiesTab = ({ lang, resetSignal }: Props) => {
                 <DropdownMenuTrigger asChild>
                   <button
                     disabled={fetchingToday}
-                    className="flex items-center gap-1.5 text-xs font-medium text-primary bg-primary/10 px-2.5 py-1.5 rounded-full hover:bg-primary/20 transition-colors disabled:opacity-50"
+                    className="flex min-h-11 items-center gap-1.5 rounded-[10px] bg-secondary px-3 text-xs font-semibold text-primary transition-colors hover:bg-secondary/80 disabled:opacity-50"
                     aria-label={lang === "zh" ? "同步" : "Sync"}
                   >
                     {fetchingToday ? (
@@ -1502,7 +1502,7 @@ const ActivitiesTab = ({ lang, resetSignal }: Props) => {
             {(latestActivity || activities.length > 0) && (
               <button
                 onClick={() => { setWarmupReady(true); setShowAllActivities(true); }}
-                className="flex items-center gap-1 text-xs font-medium text-primary hover:text-primary/80 transition-colors"
+                className="flex min-h-11 items-center gap-1 rounded-[10px] px-2 text-xs font-semibold text-primary transition-colors hover:bg-secondary"
               >
                 {lang === "zh" ? "查看全部" : "See all"}
                 <ChevronRight size={14} />
@@ -1517,7 +1517,7 @@ const ActivitiesTab = ({ lang, resetSignal }: Props) => {
           connectionLoading ? (
             // Connection status still resolving — don't flash the connect
             // prompt for users who are already linked to a fitness app.
-            <div className="bg-accent/30 border border-border rounded-xl p-5 text-center">
+            <div className="native-card bg-secondary/40 p-6 text-center">
               <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mx-auto mb-3">
                 <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
               </div>
@@ -1526,7 +1526,7 @@ const ActivitiesTab = ({ lang, resetSignal }: Props) => {
               </p>
             </div>
           ) : !connected ? (
-            <div className="bg-accent/50 border border-border rounded-xl p-5 text-center">
+            <div className="native-card bg-secondary/60 p-6 text-center">
               <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mx-auto mb-3">
                 <Activity size={24} className="text-muted-foreground" />
               </div>
@@ -1540,7 +1540,7 @@ const ActivitiesTab = ({ lang, resetSignal }: Props) => {
               </p>
               <button
                 onClick={() => navigate({ search: "?page=connect-apps" })}
-                className="inline-flex items-center gap-2 h-10 px-5 rounded-full bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors"
+                className="inline-flex min-h-11 items-center gap-2 rounded-[10px] bg-primary px-5 text-sm font-semibold text-primary-foreground transition-transform active:scale-[0.98]"
               >
                 {lang === "zh" ? "前往連結應用" : "Connect Apps"}
               </button>

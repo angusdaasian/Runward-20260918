@@ -586,26 +586,41 @@ export function useActivities(options?: { limit?: number; enabled?: boolean }) {
     if (!races.length || !mergedActivities.length) return;
 
     const toLink: Array<{ raceId: string; seconds: number; activityId: string }> = [];
+    const catMeters = (cat: string): number | null => {
+      const c = (cat || "").toLowerCase();
+      if (c.includes("half") || c.includes("半")) return 21097.5;
+      if (c.includes("marathon") || c.includes("全")) return 42195;
+      const m = c.match(/(\d+(?:\.\d+)?)\s*k/);
+      if (m) return parseFloat(m[1]) * 1000;
+      return null;
+    };
     for (const race of races) {
-      if (race.finish_time_seconds && race.finish_time_seconds > 0) continue;
+      const isAuto = race.finish_time_source === "auto";
+      if (race.finish_time_seconds && race.finish_time_seconds > 0 && !isAuto) continue;
       if (autoLinkedRef.current.has(race.id)) continue;
-      // Find an activity (Run-ish) on this race date
-      const match = mergedActivities.find((a) => {
+      const sameDay = mergedActivities.filter((a) => {
         const sport = (a.sport_type || "").toLowerCase();
         if (!sport.includes("run")) return false;
         const d = new Date(a.start_date);
         const localDate = new Date(d.getTime() - d.getTimezoneOffset() * 60000)
           .toISOString()
           .slice(0, 10);
-        return localDate === race.race_date;
+        return localDate === race.race_date && (a.distance || 0) > 0;
       });
-      if (match) {
-        const secs = match.elapsed_time || match.moving_time || 0;
-        if (secs > 0) {
-          toLink.push({ raceId: race.id, seconds: Math.round(secs), activityId: match.id });
-          autoLinkedRef.current.add(race.id);
-        }
-      }
+      if (!sameDay.length) continue;
+      // Pick the run closest to the race distance (warm-ups are far shorter);
+      // without a known distance, pick the longest run of the day.
+      const target = catMeters(race.category);
+      const match = [...sameDay].sort((a, b) =>
+        target
+          ? Math.abs(Math.log((a.distance || 1) / target)) - Math.abs(Math.log((b.distance || 1) / target))
+          : (b.distance || 0) - (a.distance || 0),
+      )[0];
+      autoLinkedRef.current.add(race.id);
+      const secs = Math.round(match.elapsed_time || match.moving_time || 0);
+      if (secs <= 0) continue;
+      if (isAuto && race.finish_activity_id === match.id && race.finish_time_seconds === secs) continue;
+      toLink.push({ raceId: race.id, seconds: secs, activityId: match.id });
     }
 
     if (toLink.length) {

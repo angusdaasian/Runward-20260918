@@ -31,3 +31,6 @@
 - [x] Dismiss the Stridee sign-in window immediately when RunWard resumes
 - [x] Hard-refresh Fitness Apps when returning from native Garmin connection
 - [ ] Close Garmin's Stridee OAuth browser automatically — blocked until Stridee redirects the visible consent page to the registered return URI after Garmin app authorization
+
+- [ ] City Hunter auto-sync on every new/backfilled activity
+- [ ] Pace zone chart (90-day HR-zone paces) in Analytics + per-activity pace zone time

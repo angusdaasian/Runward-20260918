@@ -370,7 +370,7 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps, onNavig
             </div>
           </div>
 
-          <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm divide-y divide-border">
+          <div className="native-card overflow-hidden divide-y divide-border">
             <MenuRow icon={LifeBuoy} label={lang === "zh" ? "支援與幫助" : "Support & Help"} onClick={() => navigate("/support", { state: { from: currentRoute } })} />
             <MenuRow icon={BookMarked} label={lang === "zh" ? "使用教學" : "App Guide"} onClick={() => navigate("/app-guide", { state: { from: currentRoute } })} />
             {!adminLoading && isAdmin && <MenuRow icon={Shield} label={lang === "zh" ? "管理員" : "Admin Panel"} onClick={() => navigate("/admin", { state: { from: currentRoute } })} />}
@@ -428,7 +428,7 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps, onNavig
                 <div className="grid grid-cols-3 gap-2">{([ { v: "default" as TextScale, label: lang === "zh" ? "預設" : "Default" }, { v: "lg" as TextScale, label: lang === "zh" ? "大" : "Large" }, { v: "xl" as TextScale, label: lang === "zh" ? "特大" : "X-Large" } ]).map((opt) => <Button key={opt.v} variant={textScale === opt.v ? "default" : "secondary"} className="h-12 flex-col gap-0 text-xs" onClick={() => setTextScale(opt.v)}><span className={opt.v === "xl" ? "text-lg" : opt.v === "lg" ? "text-base" : "text-sm"}>A</span><span>{opt.label}</span></Button>)}</div>
               </div>
 
-              <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm divide-y divide-border">
+              <div className="native-card overflow-hidden divide-y divide-border">
                 <MenuRow icon={Smartphone} label={lang === "zh" ? "主螢幕小工具" : "Home Screen Widget"} detail={user?.id?.startsWith("c7a7") ? undefined : (lang === "zh" ? "即將推出" : "Coming soon")} onClick={() => user?.id?.startsWith("c7a7") && setShowWidgetDialog(true)} />
                 {user && !isPremium && <MenuRow icon={Ticket} label={lang === "zh" ? "兌換優惠代碼" : "Redeem Offer Code"} onClick={() => setShowRedeemDialog(true)} />}
                 <MenuRow icon={ShieldCheck} label={lang === "zh" ? "隱私權政策" : "Privacy Policy"} onClick={() => navigate("/privacy", { state: { from: currentRoute } })} />

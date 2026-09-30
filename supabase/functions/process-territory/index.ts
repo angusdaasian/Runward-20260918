@@ -160,6 +160,8 @@ Deno.serve(async (req) => {
     }
 
     for (const act of activities) {
+      if (Date.now() - startedAt > TIME_BUDGET_MS) break;
+      processedCount++;
       const coords = decodePolyline(act.polyline);
       if (coords.length === 0) continue;
       const hexSet = new Set<string>();
@@ -318,9 +320,25 @@ Deno.serve(async (req) => {
       .select("hex_id", { count: "exact", head: true })
       .eq("user_id", user.id);
 
+    const remaining = activities.length - processedCount;
+    await admin.rpc("unlock_territory", { _uid: user.id });
+
+    // Keep going in the background until the whole backlog is done.
+    const depth = Number(body?.depth ?? 0);
+    if (remaining > 0 && webhookKey && depth < 100) {
+      const next = fetch(`${supabaseUrl}/functions/v1/process-territory`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-webhook-key": webhookKey, apikey: anonKey },
+        body: JSON.stringify({ userId: user.id, depth: depth + 1 }),
+      }).catch((e) => console.error("chain failed", e));
+      // @ts-ignore EdgeRuntime is available in Supabase
+      try { EdgeRuntime.waitUntil(next); } catch { /* detached */ }
+    }
+
     return new Response(
       JSON.stringify({
-        processedActivities: activities.length,
+        processedActivities: processedCount,
+        remaining,
         newZones: newHexes,
         stolenZones: stolenHexes,
         totalOwned: totalOwned ?? 0,
@@ -329,6 +347,7 @@ Deno.serve(async (req) => {
     );
   } catch (e) {
     console.error("process-territory error", e);
+    await admin.rpc("unlock_territory", { _uid: user.id });
     return new Response(JSON.stringify({ error: String(e) }), { status: 500, headers: corsHeaders });
   }
 });

@@ -36,57 +36,53 @@
 
 @layer base {
   :root {
-    --background: 90 13% 97%;
-    --foreground: 147 16% 11%;
+    --background: 0 0% 97%;
+    --foreground: 0 0% 10%;
 
     --card: 0 0% 100%;
-    --card-foreground: 147 16% 11%;
+    --card-foreground: 0 0% 10%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 147 16% 11%;
+    --popover-foreground: 0 0% 10%;
 
-    --primary: 147 71% 32%;
+    --primary: 142 64% 40%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 143 37% 93%;
-    --secondary-foreground: 147 28% 22%;
+    --secondary: 0 0% 95%;
+    --secondary-foreground: 0 0% 30%;
 
-    --muted: 120 9% 93%;
-    --muted-foreground: 145 8% 42%;
+    --muted: 0 0% 93%;
+    --muted-foreground: 0 0% 45%;
 
-    --accent: 143 37% 93%;
-    --accent-foreground: 147 16% 11%;
+    --accent: 0 0% 95%;
+    --accent-foreground: 0 0% 10%;
 
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 140 14% 87%;
-    --input: 140 14% 87%;
-    --ring: 147 71% 32%;
+    --border: 0 0% 88%;
+    --input: 0 0% 88%;
+    --ring: 142 64% 40%;
 
     --radius: 0.625rem;
-
-    --surface-soft: 143 37% 93%;
-    --surface-raised: 0 0% 100%;
-    --nav-background: 90 13% 97%;
 
     --score-bg: 0 0% 96%;
     --score-text: 0 0% 15%;
     --score-label: 0 72% 50%;
 
-    --tab-active: 147 71% 32%;
-    --tab-inactive: 145 8% 42%;
+    --tab-active: 0 0% 10%;
+    --tab-inactive: 0 0% 55%;
 
     --sidebar-background: 0 0% 98%;
     --sidebar-foreground: 0 0% 10%;
-    --sidebar-primary: 147 71% 32%;
+    --sidebar-primary: 142 64% 40%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 0 0% 95%;
     --sidebar-accent-foreground: 0 0% 10%;
     --sidebar-border: 0 0% 88%;
-    --sidebar-ring: 147 71% 32%;
+    --sidebar-ring: 142 64% 40%;
 
-    --success: 147 71% 32%;
+    --success: 142 64% 40%;
     --warning: 38 92% 50%;
   }
 
@@ -147,13 +143,7 @@
 
   body {
     @apply bg-background text-foreground font-body antialiased;
-      letter-spacing: 0;
-      overscroll-behavior-y: none;
   }
-
-    button, a, input, select, textarea {
-      -webkit-tap-highlight-color: transparent;
-    }
 }
 
 @layer utilities {
@@ -162,32 +152,6 @@
   }
   .font-body {
     font-family: 'Figtree', 'Avenir Next', sans-serif;
-  }
-
-  .native-card {
-    @apply rounded-[10px] border border-border bg-card text-card-foreground;
-    box-shadow: 0 1px 2px hsl(var(--foreground) / 0.035), 0 8px 24px hsl(var(--foreground) / 0.025);
-  }
-
-  .native-section-title {
-    @apply font-display text-lg font-bold leading-tight text-foreground;
-  }
-
-  .native-segmented {
-    @apply flex min-h-11 w-full items-center gap-1 rounded-[10px] bg-muted p-1;
-  }
-
-  .native-icon-button {
-    @apply inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] text-foreground transition-colors active:bg-secondary;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
-    scroll-behavior: auto !important;
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
   }
 }
 

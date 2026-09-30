@@ -1,19 +1,21 @@
 import { cn } from "@/lib/utils";
 
 /**
- * Shared className presets for a compact native segmented switcher.
+ * Shared className presets for an underline-style tab switcher.
  * Use with the shadcn <Tabs> primitive:
  *   <TabsList className={underlineTabsListClass}>
  *     <TabsTrigger className={underlineTabsTriggerClass}>...</TabsTrigger>
  *   </TabsList>
  */
 export const underlineTabsListClass = cn(
-  "native-segmented h-auto justify-start",
+  "w-full h-auto p-0 bg-transparent rounded-none border-b border-border",
+  "justify-start gap-0",
 );
 
 export const underlineTabsTriggerClass = cn(
-  "min-h-9 flex-1 rounded-md bg-transparent px-2 py-2 text-sm font-semibold",
-  "text-muted-foreground transition-colors",
-  "data-[state=active]:bg-card data-[state=active]:text-foreground",
-  "data-[state=active]:shadow-[0_1px_3px_hsl(var(--foreground)/0.08)]",
+  "flex-1 rounded-none bg-transparent px-2 pb-3 pt-2 text-base font-semibold",
+  "text-muted-foreground hover:text-foreground transition-colors",
+  "border-b-2 border-transparent -mb-px",
+  "data-[state=active]:bg-transparent data-[state=active]:shadow-none",
+  "data-[state=active]:text-foreground data-[state=active]:border-foreground",
 );

@@ -167,14 +167,14 @@ const AnalyticsTab = ({ lang }: Props) => {
 
   return (
     <div>
-      <div className="mx-auto max-w-lg px-4 pt-5">
-        <div className="native-segmented mb-2">
+      <div className="px-5 pt-6 max-w-lg mx-auto">
+        <div className="flex w-full border-b border-border mb-2">
           <button
             onClick={() => setSubTab("performance")}
-            className={`min-h-9 flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-2 text-sm font-semibold transition-colors ${
+            className={`flex-1 flex items-center justify-center gap-1.5 pb-3 pt-2 -mb-px border-b-2 text-base font-semibold transition-colors ${
               sub === "performance"
-                ? "bg-card text-foreground shadow-[0_1px_3px_hsl(var(--foreground)/0.08)]"
-                : "text-muted-foreground hover:text-foreground"
+                ? "border-foreground text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground"
             }`}
           >
             <LineChart size={16} />
@@ -182,10 +182,10 @@ const AnalyticsTab = ({ lang }: Props) => {
           </button>
           <button
             onClick={() => setSubTab("posture")}
-            className={`min-h-9 flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-2 text-sm font-semibold transition-colors ${
+            className={`flex-1 flex items-center justify-center gap-1.5 pb-3 pt-2 -mb-px border-b-2 text-base font-semibold transition-colors ${
               sub === "posture"
-                ? "bg-card text-foreground shadow-[0_1px_3px_hsl(var(--foreground)/0.08)]"
-                : "text-muted-foreground hover:text-foreground"
+                ? "border-foreground text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground"
             }`}
           >
             <ScanEye size={16} />
@@ -195,7 +195,7 @@ const AnalyticsTab = ({ lang }: Props) => {
       </div>
 
       <div style={{ display: sub === "performance" ? "block" : "none" }}>
-        <div className="px-4 pt-3 pb-8 max-w-lg mx-auto">
+        <div className="px-4 pt-4 pb-8 max-w-lg mx-auto">
           {!prefsLoaded ? (
             <div className="flex justify-center py-12">
               <Loader2 className="animate-spin text-muted-foreground" size={20} />
@@ -217,7 +217,7 @@ const AnalyticsTab = ({ lang }: Props) => {
                 </div>
                 <button
                   onClick={toggleViewMode}
-                  className="flex min-h-11 shrink-0 items-center gap-1 rounded-[10px] border border-border px-3 text-[11px] font-semibold text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                  className="shrink-0 flex items-center gap-1 px-2 py-1 rounded-md border border-border text-[11px] font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                 >
                   {viewMode === "widgets" ? <List size={12} /> : <LayoutGrid size={12} />}
                   {viewMode === "widgets"
@@ -238,7 +238,7 @@ const AnalyticsTab = ({ lang }: Props) => {
                   />
                   <button
                     onClick={() => setCustomizing(true)}
-                    className="mt-6 flex min-h-11 w-full items-center justify-center gap-2 rounded-[10px] text-sm font-semibold text-primary transition-colors hover:bg-secondary"
+                    className="mt-6 w-full flex items-center justify-center gap-2 py-3 text-sm font-semibold text-primary hover:bg-primary/5 rounded-lg transition-colors"
                   >
                     <Pencil size={14} />
                     {lang === "zh" ? "自訂Dashboard" : "Customize dashboard"}

@@ -2663,8 +2663,8 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
 
   return (
     <div className="pb-8 max-w-lg mx-auto">
-      {/* Native segmented section control */}
-      <div className="native-segmented mx-auto mb-4 mt-5 max-w-[calc(100%-2rem)]">
+      {/* Section toggle (underline style) */}
+      <div className="flex w-full border-b border-border mb-4 px-5 pt-6">
         {([
           { id: "training", label: lang === "zh" ? "配速" : "Paces" },
           { id: "free", label: lang === "zh" ? "免費" : "Free" },
@@ -2674,10 +2674,10 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
           <button
             key={s.id}
             onClick={() => handleSectionSwitch(s.id as any)}
-            className={`min-h-9 flex-1 flex items-center justify-center gap-1 rounded-md px-2 py-2 text-sm font-semibold transition-colors ${
+            className={`flex-1 flex items-center justify-center gap-1 pb-3 pt-2 -mb-px border-b-2 text-base font-semibold transition-colors ${
               section === s.id
-                ? "bg-card text-foreground shadow-[0_1px_3px_hsl(var(--foreground)/0.08)]"
-                : "text-muted-foreground hover:text-foreground"
+                ? "border-foreground text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground"
             }`}
           >
             {(s as any).showLock && <Lock size={12} />}

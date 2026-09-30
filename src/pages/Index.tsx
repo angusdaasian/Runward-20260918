@@ -354,8 +354,16 @@ const Index = () => {
       </div>
       </div>
 
-      <div className="bottom-nav fixed bottom-0 left-0 right-0 border-t border-border/80 bg-nav-background/95 backdrop-blur-xl" style={{ paddingBottom: 'var(--safe-area-bottom, 0px)' }}>
-        <div className="relative flex h-16 max-w-lg items-center justify-around px-1 mx-auto">
+      <div className="bottom-nav fixed bottom-0 left-0 right-0 bg-card border-t border-border" style={{ paddingBottom: 'var(--safe-area-bottom, 0px)' }}>
+        <div className="relative flex justify-around items-center h-16 max-w-lg mx-auto">
+          {/* Sliding active indicator */}
+          <div
+            className="absolute top-2 h-12 rounded-xl bg-muted/70 transition-all duration-300 ease-out pointer-events-none"
+            style={{
+              width: `calc((100% / ${tabs.length}) - 0.5rem)`,
+              left: `calc(((100% / ${tabs.length}) * ${tabs.findIndex(t => t.id === activeTab)}) + 0.25rem)`,
+            }}
+          />
           {tabs.map(({ id, icon: Icon, labelKey }) => (
             <button
               key={id}
@@ -370,14 +378,14 @@ const Index = () => {
                 setShowConnectApps(false);
                 setShowMessaging(false);
               }}
-              className={`relative z-10 flex min-h-12 flex-1 flex-col items-center justify-center gap-0.5 rounded-[10px] px-1 py-1.5 transition-[color,background-color,transform] duration-200 active:scale-[0.97] ${
-                activeTab === id ? "bg-secondary text-tab-active" : "text-tab-inactive"
+              className={`relative z-10 flex flex-1 flex-col items-center gap-0.5 px-3 py-1.5 transition-colors ${
+                activeTab === id ? "text-tab-active" : "text-tab-inactive"
               }`}
             >
               <Icon
                 size={20}
                 strokeWidth={activeTab === id ? 2.5 : 1.5}
-                className="transition-transform duration-200"
+                className={`transition-transform duration-300 ${activeTab === id ? "scale-110" : "scale-100"}`}
               />
               <span className="text-[10px] font-medium">{t(labelKey as any, lang)}</span>
             </button>

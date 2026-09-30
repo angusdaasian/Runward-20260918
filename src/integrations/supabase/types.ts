@@ -582,6 +582,72 @@ export type Database = {
         }
         Relationships: []
       }
+      completed_programs: {
+        Row: {
+          ai_analysis: Json | null
+          ai_model: string | null
+          completed_at: string
+          created_at: string
+          distance: string | null
+          end_date: string | null
+          goal: string | null
+          id: string
+          lang: string | null
+          plan_created_at: string | null
+          plan_data: Json
+          race_date: string | null
+          race_schedule: Json | null
+          report: Json
+          source_plan_id: string
+          start_date: string | null
+          target_time: string | null
+          user_id: string
+          weeks: number | null
+        }
+        Insert: {
+          ai_analysis?: Json | null
+          ai_model?: string | null
+          completed_at?: string
+          created_at?: string
+          distance?: string | null
+          end_date?: string | null
+          goal?: string | null
+          id?: string
+          lang?: string | null
+          plan_created_at?: string | null
+          plan_data?: Json
+          race_date?: string | null
+          race_schedule?: Json | null
+          report?: Json
+          source_plan_id: string
+          start_date?: string | null
+          target_time?: string | null
+          user_id: string
+          weeks?: number | null
+        }
+        Update: {
+          ai_analysis?: Json | null
+          ai_model?: string | null
+          completed_at?: string
+          created_at?: string
+          distance?: string | null
+          end_date?: string | null
+          goal?: string | null
+          id?: string
+          lang?: string | null
+          plan_created_at?: string | null
+          plan_data?: Json
+          race_date?: string | null
+          race_schedule?: Json | null
+          report?: Json
+          source_plan_id?: string
+          start_date?: string | null
+          target_time?: string | null
+          user_id?: string
+          weeks?: number | null
+        }
+        Relationships: []
+      }
       debug_logs: {
         Row: {
           created_at: string | null

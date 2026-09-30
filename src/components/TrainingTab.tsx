@@ -3176,6 +3176,18 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
             </div>
           ) : (
             <>
+              <ProgramCompletion
+                lang={lang}
+                existingPlan={existingPlan}
+                onArchived={async () => {
+                  if (user) {
+                    const { clearCached } = await import("@/lib/offlineCache");
+                    clearCached(CacheKeys.trainingPlan(user.id));
+                  }
+                  notifyPlanChanged();
+                  setProgramStep("details"); setDistance(null); setTargetTime(""); setTargetHours(""); setTargetMinutes(""); setTargetSeconds(""); setRaceDate(""); setStartDate(""); setPlan([]); setExistingPlan(null); setPlanDirty(false);
+                }}
+              />
               {/* Details */}
               {programStep === "details" && (
                 <div>

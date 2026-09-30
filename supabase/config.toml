@@ -180,3 +180,6 @@ verify_jwt = false
 
 [functions.stridee-sync]
 verify_jwt = false
+
+[functions.program-completion-report]
+verify_jwt = false

@@ -3,6 +3,7 @@ import { getTerraCreds, type TerraEnv } from "./terraEnv.ts";
 import { maybeSendTelegramActivityPrompt } from "./telegramActivityPrompt.ts";
 import { maybeSendWhatsappActivityPrompt } from "./whatsappActivityPrompt.ts";
 import { maybeTrainCoachOnce } from "./trainCoachOnce.ts";
+import { getAppLanguage } from "./appLanguage.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -515,7 +516,7 @@ async function pushActivityUploadedNotification(appUserId: string, activityKey: 
     }
     const { data: profile } = await supa
       .from("profiles")
-      .select("activity_notifications")
+      .select("activity_notifications, lang")
       .eq("user_id", appUserId)
       .single();
     if (!profile?.activity_notifications) {
@@ -526,14 +527,7 @@ async function pushActivityUploadedNotification(appUserId: string, activityKey: 
     const onesignalApiKey = Deno.env.get("ONESIGNAL_REST_API_KEY");
     if (!onesignalAppId || !onesignalApiKey) return;
 
-    // Detect language from auth user_metadata
-    let lang: "zh" | "en" = "en";
-    try {
-      const { data } = await supa.auth.admin.getUserById(appUserId);
-      const meta: any = (data?.user as any)?.user_metadata ?? {};
-      const raw = String(meta.lang ?? meta.language ?? meta.locale ?? "").toLowerCase();
-      if (raw.startsWith("zh")) lang = "zh";
-    } catch (_) { /* default en */ }
+    const lang = await getAppLanguage(supa, appUserId, profile.lang);
 
     const title = lang === "zh" ? "新活動已同步" : "New activity synced";
     const message = lang === "zh"

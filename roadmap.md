@@ -1,6 +1,6 @@
 # Roadmap
 
-- [ ] Complete the approved RunWard Fresh native UI refresh across the five mobile tabs
+- [x] Complete the approved RunWard Fresh native UI refresh across the five mobile tabs
 
 - [x] Prevent recalibration from creating duplicate or back-to-back interval sessions
 - [x] Add user-controlled recalibration history clearing

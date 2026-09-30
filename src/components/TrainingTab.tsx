@@ -35,6 +35,7 @@ import {
 } from "@dnd-kit/core";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
 import WeeklyReviewModal from "@/components/training/WeeklyReviewModal";
+import ProgramCompletion from "@/components/training/ProgramCompletion";
 import AutoAdjustCard from "@/components/training/AutoAdjustCard";
 import EditWorkoutDialog from "@/components/training/EditWorkoutDialog";
 import { useSimpleMode } from "@/hooks/use-simple-mode";
@@ -3176,6 +3177,18 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
             </div>
           ) : (
             <>
+              <ProgramCompletion
+                lang={lang}
+                existingPlan={existingPlan}
+                onArchived={async () => {
+                  if (user) {
+                    const { clearCached } = await import("@/lib/offlineCache");
+                    clearCached(CacheKeys.trainingPlan(user.id));
+                  }
+                  notifyPlanChanged();
+                  setProgramStep("details"); setDistance(null); setTargetTime(""); setTargetHours(""); setTargetMinutes(""); setTargetSeconds(""); setRaceDate(""); setStartDate(""); setPlan([]); setExistingPlan(null); setPlanDirty(false);
+                }}
+              />
               {/* Details */}
               {programStep === "details" && (
                 <div>

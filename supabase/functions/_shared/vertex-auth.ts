@@ -84,7 +84,7 @@ export async function getVertexAccessToken(envVarName?: string): Promise<string>
     token: body.access_token,
     expiresAtMs: Date.now() + Math.max(Number(body.expires_in || 3600) - 60, 60) * 1000,
   };
-  cache.set(key, entry);
+  cache.set(cacheKey, entry);
   return entry.token;
 }
 

@@ -4,6 +4,7 @@ import { SUUNTO_API_BASE, refreshSuuntoToken, workoutRow, SuuntoWorkout } from "
 import { fetchSuuntoFit, parseFit } from "../_shared/suunto-fit.ts";
 import { maybeSendTelegramActivityPrompt } from "../_shared/telegramActivityPrompt.ts";
 import { maybeSendWhatsappActivityPrompt } from "../_shared/whatsappActivityPrompt.ts";
+import { getAppLanguage } from "../_shared/appLanguage.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -23,7 +24,7 @@ async function sendActivityUploadedNotification(supabase: any, userId: string, a
     }
     const { data: profile } = await supabase
       .from("profiles")
-      .select("activity_notifications")
+      .select("activity_notifications, lang")
       .eq("user_id", userId)
       .single();
     if (!profile?.activity_notifications) return;
@@ -32,13 +33,7 @@ async function sendActivityUploadedNotification(supabase: any, userId: string, a
     const onesignalApiKey = Deno.env.get("ONESIGNAL_REST_API_KEY");
     if (!onesignalAppId || !onesignalApiKey) return;
 
-    let lang: "zh" | "en" = "en";
-    try {
-      const { data } = await supabase.auth.admin.getUserById(userId);
-      const meta: any = (data?.user as any)?.user_metadata ?? {};
-      const raw = String(meta.lang ?? meta.language ?? meta.locale ?? "").toLowerCase();
-      if (raw.startsWith("zh")) lang = "zh";
-    } catch (_) { /* default en */ }
+    const lang = await getAppLanguage(supabase, userId, profile.lang);
 
     const title = lang === "zh" ? "新活動已同步" : "New activity synced";
     const message = lang === "zh" ? "你的最新活動已上傳。" : "Your latest activity has been uploaded.";

@@ -19,6 +19,8 @@
 - [x] Reposition Garmin attribution on sharing cards
 - [ ] Force a 7-day Terra/Garmin resync for c7a7 — blocked: external Supabase cannot provide an admin session
 
+- [x] Program completion: archive finished AI program, one-time completion report (key sessions by week, race vs target, AI review), past programs list
+
 ## New workspace setup
 - [x] Connect Google Search Console (previous workspace connections no longer apply)
 - [ ] Temporary Garmin/Railway fallback while Terra Garmin is down: direct Garmin connect for Garmin users + 1-minute polling from 2026-09-21T10:40Z (Terra data overwrites later)

@@ -24,53 +24,92 @@ function decodePolyline(encoded: string): [number, number][] {
   return points;
 }
 
+const TIME_BUDGET_MS = 40_000;
+
+async function fetchAll(q: () => any, pageSize = 1000): Promise<any[]> {
+  const out: any[] = [];
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await q().range(from, from + pageSize - 1);
+    if (error || !data || data.length === 0) break;
+    out.push(...data);
+    if (data.length < pageSize) break;
+  }
+  return out;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  const startedAt = Date.now();
 
-  try {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+  const webhookKey = Deno.env.get("WEBHOOK_AUTH_KEY");
+  const admin = createClient(supabaseUrl, serviceKey);
+
+  let userId: string | null = null;
+  let internal = false;
+  let body: any = {};
+  try { body = await req.json(); } catch { /* no body */ }
+
+  const providedKey = req.headers.get("x-webhook-key") || "";
+  if (webhookKey && providedKey === webhookKey && typeof body?.userId === "string") {
+    userId = body.userId;
+    internal = true;
+  } else {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) return new Response(JSON.stringify({ error: "no auth" }), { status: 401, headers: corsHeaders });
-
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
-
     const userClient = createClient(supabaseUrl, anonKey, { global: { headers: { Authorization: authHeader } } });
     const { data: userRes } = await userClient.auth.getUser();
-    const user = userRes?.user;
-    if (!user) return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: corsHeaders });
+    userId = userRes?.user?.id ?? null;
+  }
+  if (!userId) return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: corsHeaders });
+  const user = { id: userId };
 
-    const admin = createClient(supabaseUrl, serviceKey);
+  if (internal && Number(body?.delayMs) > 0) {
+    await new Promise((r) => setTimeout(r, Math.min(Number(body.delayMs), 15000)));
+  }
 
+  // Per-user lock so concurrent triggers never double-count hexes.
+  const { data: locked } = await admin.rpc("try_lock_territory", { _uid: userId, _secs: 90 });
+  if (!locked) {
+    return new Response(JSON.stringify({ processedActivities: 0, newZones: 0, stolenZones: 0, busy: true, remaining: 1 }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+  }
+
+  try {
     // Get display name
     const { data: profile } = await admin.from("profiles").select("display_name").eq("user_id", user.id).maybeSingle();
     const displayName = profile?.display_name ?? "Runner";
 
-    // Already-processed activity ids
-    const { data: processed } = await admin
+    // Already-processed activity ids (paginated — users can have >1000)
+    const processed = await fetchAll(() => admin
       .from("territory_processed_activities")
       .select("activity_source, activity_id")
-      .eq("user_id", user.id);
-    const processedSet = new Set((processed ?? []).map((p: any) => `${p.activity_source}:${p.activity_id}`));
+      .eq("user_id", user.id));
+    const processedSet = new Set(processed.map((p: any) => `${p.activity_source}:${p.activity_id}`));
 
     // Pull activities from all sources
     const sources: Array<{ source: string; table: string; idCol: string; polyCol: string }> = [
       { source: "strava", table: "strava_activities", idCol: "strava_id", polyCol: "summary_polyline" },
       { source: "garmin", table: "garmin_activities", idCol: "garmin_activity_id", polyCol: "summary_polyline" },
       { source: "terra", table: "terra_activities", idCol: "terra_activity_id", polyCol: "summary_polyline" },
+      { source: "suunto", table: "suunto_activities", idCol: "activity_id", polyCol: "summary_polyline" },
+      { source: "intervals", table: "intervals_activities", idCol: "intervals_id", polyCol: "summary_polyline" },
     ];
 
     type Act = { source: string; activity_id: string; polyline: string };
     const activities: Act[] = [];
     for (const s of sources) {
-      const { data } = await admin.from(s.table).select(`${s.idCol}, ${s.polyCol}`).eq("user_id", user.id).not(s.polyCol, "is", null);
-      for (const row of (data ?? []) as any[]) {
+      const data = await fetchAll(() => admin.from(s.table).select(`${s.idCol}, ${s.polyCol}`).eq("user_id", user.id).not(s.polyCol, "is", null).order(s.idCol));
+      for (const row of data as any[]) {
         const aid = String(row[s.idCol]);
         const poly = row[s.polyCol] as string | null;
         if (!poly || processedSet.has(`${s.source}:${aid}`)) continue;
         activities.push({ source: s.source, activity_id: aid, polyline: poly });
       }
     }
+    let processedCount = 0;
 
     let newHexes = 0;
     let stolenHexes = 0;

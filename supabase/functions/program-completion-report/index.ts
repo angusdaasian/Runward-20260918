@@ -281,6 +281,8 @@ Return JSON: {"headline": string (one sentence), "summary": string (2-3 paragrap
       aiModel = res.model;
     } catch (e) {
       console.error("[program-completion-report] AI failed", e);
+      // Don't archive without the analysis — the report can only be generated once.
+      return json({ error: "AI analysis unavailable, please try again later" }, 502);
     }
 
     const { data: saved, error: insErr } = await admin.from("completed_programs").insert({

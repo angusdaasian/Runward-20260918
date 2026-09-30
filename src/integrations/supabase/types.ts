@@ -3349,6 +3349,24 @@ export type Database = {
         }
         Relationships: []
       }
+      territory_sync_state: {
+        Row: {
+          last_fired_at: string
+          locked_until: string
+          user_id: string
+        }
+        Insert: {
+          last_fired_at?: string
+          locked_until?: string
+          user_id: string
+        }
+        Update: {
+          last_fired_at?: string
+          locked_until?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       training_plans: {
         Row: {
           auto_adjust_enabled: boolean
@@ -4224,6 +4242,11 @@ export type Database = {
         Args: { p_source: string; p_source_id: string }
         Returns: string
       }
+      try_lock_territory: {
+        Args: { _secs: number; _uid: string }
+        Returns: boolean
+      }
+      unlock_territory: { Args: { _uid: string }; Returns: undefined }
       unschedule_cron_job: { Args: { job_name: string }; Returns: undefined }
       unschedule_terra_today_oneoff: { Args: never; Returns: undefined }
       unschedule_terra_webhook_cleanup: { Args: never; Returns: undefined }

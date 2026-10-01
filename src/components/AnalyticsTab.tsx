@@ -24,6 +24,7 @@ import TrainingLoadChart from "@/components/activities/TrainingLoadChart";
 import TrendsCard from "@/components/activities/TrendsCard";
 import ActivityYearHeatmap from "@/components/activities/ActivityYearHeatmap";
 import { useTerraDailyHealth } from "@/hooks/use-terra-daily-health";
+import PaceZonesCard from "@/components/analytics/PaceZonesCard";
 
 const PostureTab = lazy(() => import("@/components/PostureTab"));
 const PerformanceTab = lazy(() => import("@/components/PerformanceTab"));
@@ -249,6 +250,9 @@ const AnalyticsTab = ({ lang }: Props) => {
                   <PerformanceTab lang={lang} />
                 </Suspense>
               )}
+              <div className="mt-6">
+                <PaceZonesCard lang={lang} />
+              </div>
             </>
 
           )}

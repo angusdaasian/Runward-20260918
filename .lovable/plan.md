@@ -1,35 +1,30 @@
-# UI Refresh: "RunWard Fresh"
+# Reduce OneSignal MAU and clean up unregistered devices
 
-A single visual direction for the whole app, based on the choices you already locked in during the audit.
+## Audit findings
+- The app only links a phone to an account after sign-in (`setonesignalplayerid` with the account ID), and never before. So the website code does not create the extra users.
+- The extra ~1,000 come from the iPhone/Android app wrapper (Despia): it starts OneSignal as soon as the app opens, so every install, including people who never sign up, becomes an anonymous OneSignal user and counts toward MAU.
+- Signing out never unlinks the phone, so a shared or reinstalled phone can stay attached to an old account.
+- All notifications are sent by account ID (`include_external_user_ids`), so anonymous devices never receive anything. Deleting them loses nothing.
 
-## The look
+## 1. One-off cleanup (admin-only, dry run first)
+- New admin-only server function `onesignal-cleanup`:
+  1. Requests a OneSignal CSV export of all subscriptions (the export API in the delete-users guide), downloads it and reads it.
+  2. Sorts each row into: linked to a current account / linked to a deleted account / no account (anonymous).
+  3. **Dry run (default):** returns the counts only. Nothing is deleted.
+  4. **Delete run:** removes the anonymous and deleted-account users one by one with `DELETE /apps/{app_id}/users/by/onesignal_id/{id}`, with throttling, batches that continue on their own, and a report at the end.
+- Admin Panel → Notifications gets a "Clean up OneSignal" card with "Check" (dry run) and "Delete N unregistered" buttons.
+- Deleted-account users are also removed going forward: the delete-account function will delete that account's OneSignal user (`/users/by/external_id/{uid}`).
 
-- **Light only.** Page background #F7F8F6, soft green surface #E7F4EC for cards that carry data, primary green #178A4B, ink #18211C for text.
-- **Type.** Outfit for headings and numbers, Figtree for body text — already loaded in the app.
-- **Shape language.** One radius scale everywhere: 10px for small controls, 16px for cards, 24px for sheets. No more mix of sharp and very round boxes.
-- **Bento layout.** Data screens become a tidy grid of differently sized tiles: one big tile for the headline number, smaller paired tiles beside it, wide tiles for charts. Fewer borders, more breathing room, quiet shadows instead of outlines.
-- **Native feel.** 44px minimum tap targets, segmented pill tabs instead of underlined web tabs, sheets that slide from the bottom, short spring transitions, tactile press states.
+## 2. Future registration: only after sign-up
+- Turn off "auto-register for push on launch" / the startup permission prompt in Despia's OneSignal settings (a dashboard setting you change; I'll give the exact steps). OneSignal then won't create a user until the app asks for it.
+- After sign-in, the app links the account first, then asks for notification permission (Despia's push permission request), so the prompt shows only for real accounts.
+- On sign-out, the phone is unlinked from the account (Despia's OneSignal logout, if available), so it stops getting that person's notifications.
 
-## What changes, screen by screen
+## Notes
+- MAU already counted this month won't go down until next month's billing period, even after deletes.
+- Deletes in OneSignal can't be undone, so the dry-run counts are shown before anything is removed.
+- Requires the OneSignal REST key to be a current "App API key" (the deletion API rejects old legacy keys); I'll check it and ask you for a new one if needed.
 
-1. **Home** — hero greeting and today's headline stat in one large tile; steps, sleep, resting HR, HRV as small tiles; recent activity and map as wide tiles. Friendlier empty and loading states.
-2. **Analytics** — widget grid adopts the bento sizes (big/small/wide) instead of uniform squares; sub-tabs become segmented pills; detail sheets get the new sheet styling.
-3. **Training / Programs** — week strip and workout cards restyled on the new surface and radius scale; clearer distinction between planned and completed.
-4. **Community** — feed cards, group rows and leaderboard rows unified to one card style.
-5. **More / settings** — grouped list rows in the iOS style: rounded group containers, inset dividers, right-aligned chevrons.
-6. **Shell** — five bottom tabs with the new active-state treatment; headers get consistent height and title weight.
-
-## Technical notes
-
-- All colors, radii and shadows go in as semantic tokens in `src/index.css` plus `tailwind.config.ts`; components stop using ad-hoc values.
-- New shared primitives: `BentoTile`, `SegmentedTabs`, `ListGroup`/`ListRow`, `StatTile`, and standard empty/skeleton states, so screens converge instead of each being restyled by hand.
-- Dark mode tokens stay in the file but the app stays light-only for now.
-- No business logic, data fetching, sync, or notification code is touched — this is presentation only.
-
-## Order of work
-
-1. Tokens + primitives.
-2. Shell (tabs, headers) and Home.
-3. Analytics.
-4. Training, Community.
-5. More/settings, then a pass over empty/loading states.
+## Technical details
+- Files: new `supabase/functions/onesignal-cleanup/index.ts` (admin check via `has_role`, self-chaining with `EdgeRuntime.waitUntil`), `src/components/admin/NotificationManager.tsx` card, `supabase/functions/delete-account/index.ts`, `src/contexts/AuthContext.tsx` (permission request after linking, unlink on sign-out).
+- Matching uses `profiles.user_id` / auth user IDs against each subscription's `external_user_id`.

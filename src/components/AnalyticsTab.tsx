@@ -41,6 +41,7 @@ const widgetLabel = (id: WidgetId, lang: Lang): string => {
     case "hrv": return zh ? "HRV 與訓練準備度" : "HRV & Readiness";
     case "health": return zh ? "每日健康" : "Daily Health";
     case "hr_zones": return zh ? "心率區間" : "Heart rate zones";
+    case "pace_zones": return zh ? "配速區間" : "Pace zones";
     case "race_predictor": return zh ? "比賽預測" : "Race predictor";
     case "training_load": return zh ? "訓練負荷" : "Training load";
     case "trends": return zh ? "趨勢" : "Trends";
@@ -102,11 +103,11 @@ const AnalyticsTab = ({ lang }: Props) => {
 
   const labels = useMemo(() => {
     const out: Record<WidgetId, string> = {} as any;
-    (["hrv","health","hr_zones","race_predictor","training_load","trends","year_heatmap","steps_today","calories_today","sleep_last_night","sleep_score","rhr","duration_week","injury_risk","load_balance"] as WidgetId[]).forEach((id) => {
+    prefs.order.forEach((id) => {
       out[id] = widgetLabel(id, lang);
     });
     return out;
-  }, [lang]);
+  }, [lang, prefs.order]);
 
   // Build details
   const loadActivities = useMemo(
@@ -138,6 +139,8 @@ const AnalyticsTab = ({ lang }: Props) => {
         return <HealthStatsCard lang={lang} />;
       case "hr_zones":
         return <HrZonesWeekCard lang={lang} />;
+      case "pace_zones":
+        return <PaceZonesCard lang={lang} />;
       case "race_predictor":
         return <RacePredictorCard lang={lang} />;
       case "training_load":
@@ -250,9 +253,6 @@ const AnalyticsTab = ({ lang }: Props) => {
                   <PerformanceTab lang={lang} />
                 </Suspense>
               )}
-              <div className="mt-6">
-                <PaceZonesCard lang={lang} />
-              </div>
             </>
 
           )}

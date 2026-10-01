@@ -4,7 +4,7 @@ import { useActivities } from "@/hooks/use-activities";
 import { useTerraDailyHealth } from "@/hooks/use-terra-daily-health";
 import {
   Activity, Flame, Footprints, HeartPulse, Moon, Timer, Sparkles, Heart,
-  LineChart, TrendingUp, CalendarDays, Trophy, ShieldAlert, Scale,
+  LineChart, TrendingUp, CalendarDays, Trophy, ShieldAlert, Scale, Gauge,
 } from "lucide-react";
 import WidgetTile from "../WidgetTile";
 import { WidgetId } from "@/lib/analyticsWidgets";
@@ -17,6 +17,8 @@ import { useTerraConnections } from "@/hooks/use-terra-daily-health";
 import { usePremium } from "@/contexts/PremiumContext";
 import { loadForActivity, isCardio, isRunning, buildWeeklyLoadSeries } from "@/lib/trainingLoad";
 import { computeInjuryRisk, injuryBand as injuryBandFn } from "@/lib/analyticsExplain";
+import { computePaceZones, fmtPace, ZONE_KEYS } from "@/lib/paceZones";
+import { ZONE_LABELS } from "@/lib/hrZones";
 
 interface Props {
   id: WidgetId;
@@ -344,6 +346,20 @@ const Tile = ({ id, lang, onOpen }: Props) => {
           <ZonesPreview lang={lang} />
         </WidgetTile>
       );
+    case "pace_zones": {
+      const zones = computePaceZones(activities as any[], profile as any);
+      return (
+        <WidgetTile
+          title={zh(lang) ? "配速區間" : "Pace Zones"}
+          subtitle={zones ? (zh(lang) ? `${zones.runCount} 次跑步` : `${zones.runCount} runs`) : (zh(lang) ? "累積跑步紀錄" : "Accumulated runs")}
+          icon={<Gauge size={16} className="text-primary" />}
+          onClick={onOpen}
+          lang={lang}
+        >
+          {zones ? <PaceZonesPreview zones={zones} /> : <Big value="—" sub={zh(lang) ? "尚無足夠資料" : "Not enough data yet"} />}
+        </WidgetTile>
+      );
+    }
     case "race_predictor":
       return (
         <WidgetTile
@@ -464,5 +480,19 @@ const ZonesPreview = ({ lang }: { lang: Lang }) => {
     </div>
   );
 };
+
+const PaceZonesPreview = ({ zones }: { zones: NonNullable<ReturnType<typeof computePaceZones>> }) => (
+  <div className="space-y-1.5 pt-0.5">
+    {ZONE_KEYS.map((key, index) => (
+      <div key={key} className="grid grid-cols-[1.25rem_minmax(0,1fr)_2.75rem] items-center gap-1.5">
+        <span className="text-[9px] font-semibold text-muted-foreground">Z{index + 1}</span>
+        <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+          <div className="h-full w-full rounded-full opacity-80" style={{ backgroundColor: ZONE_LABELS[index].color }} />
+        </div>
+        <span className="text-right text-[9px] font-mono font-semibold tabular-nums">{fmtPace(zones.pace[key])}</span>
+      </div>
+    ))}
+  </div>
+);
 
 export default Tile;

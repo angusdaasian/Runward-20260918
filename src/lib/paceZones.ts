@@ -38,7 +38,7 @@ export function hrToZone(bpm: number, profile: ProfileLike | null | undefined): 
   return "z5";
 }
 
-const isRun = (t?: string | null) => /run/i.test(t || "") && !/virtual|treadmill/i.test(t || "") || /run/i.test(t || "");
+const isRun = (t?: string | null) => /run/i.test(t || "");
 
 const median = (arr: number[]) => {
   const s = [...arr].sort((a, b) => a - b);

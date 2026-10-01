@@ -100,6 +100,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           // Register OneSignal player ID with the user's Supabase UID
           try {
             despia(`setonesignalplayerid://?user_id=${newSession.user.id}`);
+            requestPushAfterLink();
           } catch (e) {
             console.warn("[Push] Failed to set OneSignal player ID:", e);
           }
@@ -178,6 +179,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         preloadHeaderProfile(initialSession.user.id);
         try {
           despia(`setonesignalplayerid://?user_id=${initialSession.user.id}`);
+          requestPushAfterLink();
         } catch (e) {
           console.warn("[Push] Failed to set OneSignal player ID:", e);
         }

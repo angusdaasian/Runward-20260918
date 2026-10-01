@@ -1,6 +1,7 @@
-// Pace zones derived from the user's own last-90-day runs: the typical pace
-// they hold in each heart rate zone (Z1..Z5). Zone boundaries are the
-// midpoints between neighbouring zone paces.
+// Pace zones derived from all of the user's available runs: the typical pace
+// they hold in each heart rate zone (Z1..Z5). A new Stridee connection begins
+// with its 30-day backfill, then later runs keep accumulating into the same
+// baseline. Zone boundaries are the midpoints between neighbouring paces.
 import { estimateMaxHr, estimateRestingHr, isValidCustomZones, ZonePct } from "@/lib/hrZones";
 
 export type ZoneKey = keyof ZonePct;
@@ -46,14 +47,12 @@ const median = (arr: number[]) => {
   return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
 };
 
-/** Build pace zones from activities in the last 90 days. Uses laps when present. */
+/** Build pace zones from all available activities. Uses laps when present. */
 export function computePaceZones(activities: any[], profile: ProfileLike | null | undefined): PaceZones | null {
-  const cutoff = Date.now() - 90 * 86400_000;
   const buckets: Record<ZoneKey, number[]> = { z1: [], z2: [], z3: [], z4: [], z5: [] };
   let runCount = 0;
   for (const a of activities) {
     if (!isRun(a.sport_type)) continue;
-    if (new Date(a.start_date).getTime() < cutoff) continue;
     let used = false;
     const laps = Array.isArray(a.laps) ? a.laps : [];
     for (const lap of laps) {
@@ -117,8 +116,9 @@ export function computePaceZones(activities: any[], profile: ProfileLike | null 
 /** Bucket a pace (sec/km) into a pace zone. */
 export function paceToZone(secPerKm: number, pz: PaceZones): ZoneKey {
   for (let i = 0; i < 4; i++) {
-    const fb = pz.fastBound[ZONE_KEYS[i]]!;
-    if (secPerKm > fb) return ZONE_KEYS[i];
+    const key = ZONE_KEYS[i];
+    const fb = pz.fastBound[key];
+    if (fb != null && secPerKm > fb) return key;
   }
   return "z5";
 }

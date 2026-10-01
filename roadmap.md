@@ -33,4 +33,4 @@
 - [ ] Close Garmin's Stridee OAuth browser automatically — blocked until Stridee redirects the visible consent page to the registered return URI after Garmin app authorization
 
 - [x] City Hunter auto-sync on every new/backfilled activity
-- [x] Pace zone chart (90-day HR-zone paces) in Analytics + per-activity pace zone time
+- [x] Pace zone widget using accumulated running history after the initial 30-day backfill, plus per-activity time in zone

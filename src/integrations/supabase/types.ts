@@ -1418,6 +1418,48 @@ export type Database = {
           },
         ]
       }
+      onesignal_cleanup_runs: {
+        Row: {
+          created_at: string
+          csv_url: string
+          deleted: number
+          failed: number
+          id: string
+          last_error: string | null
+          processed: number
+          skipped_linked: number
+          status: string
+          total_candidates: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          csv_url: string
+          deleted?: number
+          failed?: number
+          id?: string
+          last_error?: string | null
+          processed?: number
+          skipped_linked?: number
+          status?: string
+          total_candidates?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          csv_url?: string
+          deleted?: number
+          failed?: number
+          id?: string
+          last_error?: string | null
+          processed?: number
+          skipped_linked?: number
+          status?: string
+          total_candidates?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       pending_races: {
         Row: {
           ai_verification_result: string | null

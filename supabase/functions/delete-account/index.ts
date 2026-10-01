@@ -35,6 +35,21 @@ Deno.serve(async (req) => {
 
     const userId = userData.user.id;
     const admin = createClient(SUPABASE_URL, SERVICE_ROLE);
+
+    // Remove this account's OneSignal user so it no longer counts toward MAU.
+    try {
+      const appId = Deno.env.get("ONESIGNAL_APP_ID");
+      const key = Deno.env.get("ONESIGNAL_REST_API_KEY") ?? "";
+      if (appId && key) {
+        const auth = key.startsWith("os_v2_") ? `Key ${key}` : `Basic ${key}`;
+        const r = await fetch(`https://api.onesignal.com/apps/${appId}/users/by/external_id/${userId}`, {
+          method: "DELETE", headers: { Authorization: auth },
+        });
+        console.log(`[delete-account] OneSignal delete ${r.status}`);
+      }
+    } catch (e) {
+      console.warn("[delete-account] OneSignal delete failed", e);
+    }
     const { error: delErr } = await admin.auth.admin.deleteUser(userId);
     if (delErr) {
       return new Response(JSON.stringify({ error: delErr.message }), {

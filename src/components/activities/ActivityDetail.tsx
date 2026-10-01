@@ -921,7 +921,8 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
     return null;
   }, [activity.hr_samples, activity.laps, activity.average_heartrate, activity.moving_time, activity.elapsed_time, profileMaxHr, profileAge, profileRestingHr, profileCustomZones, streams]);
 
-  // Pace zones (from the last 90 days) and time spent in each for this run.
+  // Pace zones from all available history (beginning with the provider's
+  // initial 30-day backfill) and time spent in each for this run.
   const { activities: allActivities } = useActivities();
   const paceZones = useMemo(() => computePaceZones(allActivities as any[], {
     age: profileAge, max_heartrate: profileMaxHr, resting_heartrate: profileRestingHr, custom_hr_zones: profileCustomZones,

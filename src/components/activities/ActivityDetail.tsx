@@ -1644,6 +1644,12 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
         </div>
       )}
 
+      {paceZones && paceZoneTime && (
+        <div className="mt-4">
+          <PaceZoneBars lang={lang} zones={paceZones} time={paceZoneTime} />
+        </div>
+      )}
+
       {/* Non-running notice */}
       {!isRunningActivity && (
         <div className="bg-card border border-border rounded-xl p-4 mt-4">

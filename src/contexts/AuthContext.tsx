@@ -5,6 +5,17 @@ import { preloadHeaderProfile } from "@/components/AppHeader";
 import despia from "despia-native";
 import { syncPlatformToProfile } from "@/lib/detectPlatform";
 
+// Ask for push permission only after the device is linked to a signed-in
+// account, so OneSignal subscriptions always belong to registered users.
+let pushRequested = false;
+function requestPushAfterLink() {
+  if (pushRequested) return;
+  pushRequested = true;
+  setTimeout(() => {
+    try { despia("registerpush://"); } catch (e) { console.warn("[Push] permission request failed", e); }
+  }, 1500);
+}
+
 const LAST_ACTIVE_KEY = "runward_last_active";
 const WARM_RESUME_MS = 5 * 60 * 1000; // 5 minutes
 

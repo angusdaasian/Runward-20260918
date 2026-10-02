@@ -79,9 +79,9 @@ export default function StrideeTestCard({ lang, blockedByOther = false, onBefore
       return;
     }
     if (isDespiaUA()) {
-      const bridge = `${window.location.origin}/stridee-bridge?` +
-        new URLSearchParams({ url: data.connect_url, sid: data.stridee_user_id ?? "" }).toString();
-      despia(`oauth://?url=${encodeURIComponent(bridge)}`);
+      // COROS/Polar/Fitbit/Zepp: open the consent page directly in Despia's
+      // OAuth browser; /stridee-return/native deep-links back and closes it.
+      despia(`oauth://?url=${encodeURIComponent(data.connect_url)}`);
       return;
     }
     window.open(data.connect_url, "_blank");

@@ -7,7 +7,10 @@ export default function StrideeReturn() {
   const status = params.get("status") ?? "error";
   const isResume = status === "resume";
   const strideeUserId = params.get("user_id") ?? "";
-  const isNativeReturn = window.location.pathname.endsWith("/native");
+  const segs = window.location.pathname.split("/").filter(Boolean);
+  const isNativeReturn = segs.includes("native");
+  const NAMES: Record<string, string> = { garmin: "Garmin", coros: "COROS", polar: "Polar", fitbit: "Fitbit", zepp: "Zepp (Amazfit)" };
+  const brand = NAMES[(params.get("provider") ?? segs[segs.length - 1] ?? "").toLowerCase()] ?? "Watch";
   const [done, setDone] = useState(false);
   const [external, setExternal] = useState(false);
 
@@ -46,7 +49,7 @@ export default function StrideeReturn() {
     })();
    }, [status, strideeUserId, isNativeReturn, isResume]);
 
-  const msg = status === "success" ? "Garmin connected ✓" : isResume ? "Returning to RunWard…" : status === "denied" ? "Connection cancelled" : "Connection failed";
+  const msg = status === "success" ? `${brand} connected successfully ✓ 已成功連接` : isResume ? "Returning to RunWard…" : status === "denied" ? "Connection cancelled" : "Connection failed";
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-6">
       <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-6 text-center space-y-3">

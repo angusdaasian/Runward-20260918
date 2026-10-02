@@ -153,6 +153,40 @@ Deno.serve(async (req) => {
       return json({ ok: true });
     }
 
+    // Hourly cron: start deleting from the export requested last hour, then
+    // request a fresh export for the next run. No-op while a run is active.
+    if (mode === "auto") {
+      if (req.headers.get("x-webhook-key") !== Deno.env.get("WEBHOOK_AUTH_KEY")) return json({ error: "Unauthorized" }, 401);
+      const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+      const { data: active } = await admin.from("onesignal_cleanup_runs").select("id")
+        .eq("status", "running").gt("updated_at", new Date(Date.now() - 30 * 60e3).toISOString()).limit(1);
+      if (active?.length) return json({ skipped: "run in progress" });
+      const { data: pend } = await admin.from("onesignal_cleanup_runs").select("id, csv_url")
+        .eq("status", "exporting").order("created_at", { ascending: false }).limit(1);
+      let started: string | null = null;
+      if (pend?.[0]) {
+        const csv = await loadCsv(pend[0].csv_url);
+        if (!csv.notReady) {
+          await admin.from("onesignal_cleanup_runs").update({ status: "running" }).eq("id", pend[0].id);
+          EdgeRuntime.waitUntil(processChunk(pend[0].id));
+          started = pend[0].id;
+        } else if (!started) {
+          await admin.from("onesignal_cleanup_runs").update({ status: "error", last_error: "export not ready" }).eq("id", pend[0].id);
+        }
+      }
+      const res = await fetch(`https://api.onesignal.com/players/csv_export?app_id=${APP_ID}`, {
+        method: "POST",
+        headers: { Authorization: osAuth(), "Content-Type": "application/json" },
+        body: JSON.stringify({ extra_fields: ["external_user_id"] }),
+      });
+      const out = await res.json().catch(() => ({}));
+      if (res.ok && out?.csv_file_url) {
+        await admin.from("onesignal_cleanup_runs").insert({ csv_url: out.csv_file_url, status: "exporting" });
+      } else console.error("[onesignal-cleanup] auto export", res.status, out);
+      return json({ started, exported: !!out?.csv_file_url });
+    }
+
+
     // Admin check
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) return json({ error: "Missing authorization" }, 401);

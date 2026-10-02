@@ -4,6 +4,7 @@ import { Lang } from "@/lib/i18n";
 import type { StravaActivity, PlannedWorkout } from "@/hooks/use-activities";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { isRunning } from "@/lib/trainingLoad";
 
 interface Props {
   lang: Lang;
@@ -68,6 +69,7 @@ const MonthlyRoadQuest = ({ lang, activities, plannedWorkouts }: Props) => {
     const m = now.getMonth();
     let total = 0;
     for (const act of activities) {
+      if (!isRunning((act as any).sport_type)) continue; // match calendar: runs only
       const d = new Date(act.start_date);
       if (d.getFullYear() === y && d.getMonth() === m) {
         total += act.distance / 1000;

@@ -55,8 +55,19 @@ Deno.serve(async (req) => {
     }
 
     if (action === "disconnect") {
-      await admin.from("stridee_connections").delete().eq("user_id", user.id);
-      return json({ ok: true });
+      // Only remove the chosen brand; drop the whole link when none remain.
+      const which = typeof body.provider === "string" ? body.provider : null;
+      const { data: cur } = await admin.from("stridee_connections").select("provider, providers").eq("user_id", user.id).maybeSingle();
+      const list: string[] = cur?.providers?.length ? cur.providers : cur?.provider ? [cur.provider] : [];
+      const rest = which ? list.filter((p) => p !== which) : [];
+      if (!rest.length) {
+        await admin.from("stridee_connections").delete().eq("user_id", user.id);
+      } else {
+        await admin.from("stridee_connections").update({
+          providers: rest, provider: rest.includes(cur?.provider) ? cur!.provider : rest[0], updated_at: new Date().toISOString(),
+        }).eq("user_id", user.id);
+      }
+      return json({ ok: true, remaining: rest });
     }
 
     const { data: existing } = await admin.from("stridee_connections")
@@ -85,8 +96,8 @@ Deno.serve(async (req) => {
     // Stridee appends `?status=...&user_id=...` to this value. Keep the native
     // marker in the path so its query string cannot corrupt the deeplink scheme.
     const returnUri = native
-      ? "https://angustest.site/stridee-return/native"
-      : "https://angustest.site/stridee-return";
+      ? `https://angustest.site/stridee-return/native/${provider}`
+      : `https://angustest.site/stridee-return/${provider}`;
     const res = await strideeFetch("POST", "/v1/connect", {
       provider,
       external_user_id: user.id,

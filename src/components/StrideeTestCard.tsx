@@ -96,7 +96,7 @@ export default function StrideeTestCard({ lang, blockedByOther = false, onBefore
   };
   const disconnect = async (provider: string) => {
     setBusy(provider);
-    await supabase.functions.invoke("stridee-connect", { body: { action: "disconnect" } });
+    await supabase.functions.invoke("stridee-connect", { body: { action: "disconnect", provider } });
     setBusy(null);
     void load();
   };

@@ -503,6 +503,30 @@ const MonthlyActivityList = ({
 };
 
 // ---------- All Activities View (progressive month reveal) ----------
+// Activity types as tagged by Stridee (FIT sport/sub-sport, snake_case, e.g.
+// running, track_running, treadmill_running, trail_running, mountaineering)
+// plus Strava/Terra spellings (Run, TrailRun, Hike, Walk, Ride…).
+type ActivityCategory = "run" | "trail" | "treadmill" | "track" | "hike" | "walk" | "ride" | "swim" | "strength" | "other";
+const CATEGORY_ORDER: ActivityCategory[] = ["run", "trail", "track", "treadmill", "hike", "walk", "ride", "swim", "strength", "other"];
+const CATEGORY_LABELS: Record<ActivityCategory | "all", [string, string]> = {
+  all: ["All", "全部"], run: ["Running", "跑步"], trail: ["Trail running", "越野跑"], track: ["Track", "田徑場"],
+  treadmill: ["Treadmill", "跑步機"], hike: ["Hiking", "登山 / 遠足"], walk: ["Walking", "步行"], ride: ["Cycling", "單車"],
+  swim: ["Swimming", "游泳"], strength: ["Strength", "力量訓練"], other: ["Other", "其他"],
+};
+function activityCategory(sport?: string | null): ActivityCategory {
+  const s = String(sport ?? "").toLowerCase().replace(/[\s-]/g, "_");
+  if (/trail/.test(s)) return "trail";
+  if (/treadmill|indoor_run|virtual_?run/.test(s)) return "treadmill";
+  if (/track/.test(s)) return "track";
+  if (/run|jog/.test(s)) return "run";
+  if (/hik|mountaineer|climb/.test(s)) return "hike";
+  if (/walk/.test(s)) return "walk";
+  if (/ride|cycl|bik/.test(s)) return "ride";
+  if (/swim/.test(s)) return "swim";
+  if (/strength|weight|gym/.test(s)) return "strength";
+  return "other";
+}
+
 const AllActivitiesView = ({
   lang,
   activities,
@@ -522,10 +546,23 @@ const AllActivitiesView = ({
   onBack: () => void;
   onSelect: (a: StravaActivity) => void;
 }) => {
+  const [typeFilter, setTypeFilter] = useState<ActivityCategory | "all">("all");
+  const categories = useMemo(() => {
+    const counts = new Map<ActivityCategory, number>();
+    for (const a of activities) {
+      const c = activityCategory(a.sport_type);
+      counts.set(c, (counts.get(c) ?? 0) + 1);
+    }
+    return CATEGORY_ORDER.filter((c) => counts.has(c)).map((c) => ({ c, n: counts.get(c)! }));
+  }, [activities]);
+  const filtered = useMemo(
+    () => (typeFilter === "all" ? activities : activities.filter((a) => activityCategory(a.sport_type) === typeFilter)),
+    [activities, typeFilter],
+  );
   // Group activities by year-month to enable progressive reveal.
   const monthBuckets = useMemo(() => {
     const map = new Map<string, StravaActivity[]>();
-    for (const a of activities) {
+    for (const a of filtered) {
       const d = new Date(a.start_date);
       const key = `${d.getFullYear()}-${String(d.getMonth()).padStart(2, "0")}`;
       if (!map.has(key)) map.set(key, []);
@@ -533,14 +570,14 @@ const AllActivitiesView = ({
     }
     // Most-recent month first.
     return Array.from(map.entries()).sort((a, b) => (a[0] < b[0] ? 1 : -1));
-  }, [activities]);
+  }, [filtered]);
 
   const [visibleMonths, setVisibleMonths] = useState(1);
 
   // Reset when activities reload (e.g. background prefetch finishes).
   useEffect(() => {
     setVisibleMonths(1);
-  }, [monthBuckets.length === 0]);
+  }, [monthBuckets.length === 0, typeFilter]);
 
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
@@ -584,6 +621,26 @@ const AllActivitiesView = ({
           <RefreshCw size={14} className="animate-spin" />
           {lang === "zh" ? "載入所有活動中…" : "Loading all activities…"}
         </div>
+      )}
+      {categories.length > 1 && (
+        <div className="flex gap-1.5 overflow-x-auto pb-3 -mx-5 px-5 scrollbar-none">
+          {[{ c: "all" as const, n: activities.length }, ...categories].map(({ c, n }) => (
+            <button
+              key={c}
+              onClick={() => setTypeFilter(c)}
+              className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                typeFilter === c ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+              }`}
+            >
+              {CATEGORY_LABELS[c][lang === "zh" ? 1 : 0]} · {n}
+            </button>
+          ))}
+        </div>
+      )}
+      {!loading && filtered.length === 0 && activities.length > 0 && (
+        <p className="text-center text-xs text-muted-foreground py-6">
+          {lang === "zh" ? "沒有此類活動" : "No activities of this type"}
+        </p>
       )}
       <MonthlyActivityList
         activities={visibleActivities}

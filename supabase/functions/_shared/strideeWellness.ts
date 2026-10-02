@@ -12,7 +12,7 @@ const num = (...vals: unknown[]): number | null => {
 /** Upsert one Stridee wellness record; only fills fields the record carries. */
 export async function ingestStrideeWellness(admin: any, userId: string, w: any): Promise<boolean> {
   const kind = w?.kind;
-  if (kind !== "daily" && kind !== "hrv" && kind !== "sleep") return false;
+  if (kind !== "daily" && kind !== "hrv" && kind !== "sleep" && kind !== "fitness") return false;
   const date = String(w.calendar_date ?? "").slice(0, 10);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return false;
   const provider = String(w.provider ?? "garmin").toUpperCase();
@@ -28,6 +28,10 @@ export async function ingestStrideeWellness(admin: any, userId: string, w: any):
     if (rhr != null) patch.resting_hr = Math.round(rhr);
     if (cal != null) patch.calories = Math.round(cal);
     if (dist != null) patch.distance_metres = Math.round(dist);
+  } else if (kind === "fitness") {
+    // VO2max is only present on days the watch computed one.
+    const vo2 = num(m.vo2_max, m.vo2max, s.vo2Max, s.vo2MaxPreciseValue);
+    if (vo2 != null) patch.vo2max = Math.round(vo2 * 10) / 10;
   } else if (kind === "hrv") {
     const hrv = num(m.hrv_avg, m.last_night_avg, m.hrv, s.lastNightAvg, s.hrvAvg);
     if (hrv != null) patch.hrv = Math.round(hrv);
@@ -61,7 +65,7 @@ export async function syncStrideeWellness(admin: any, userId: string, stridreeUs
   const from = new Date(Date.now() - Math.min(days, 400) * 86400_000).toISOString().slice(0, 10);
   const to = new Date(Date.now() + 86400_000).toISOString().slice(0, 10);
   let stored = 0;
-  for (const kind of ["daily", "hrv", "sleep"]) {
+  for (const kind of ["daily", "hrv", "sleep", "fitness"]) {
     let cursor: string | undefined;
     for (let page = 0; page < 10; page++) {
       const qs = new URLSearchParams({ kind, from_date: from, to_date: to, limit: "200" });

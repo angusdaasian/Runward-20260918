@@ -49,6 +49,7 @@ import { useGarminDailyHealth } from "@/hooks/use-garmin-daily-health";
 import { useSimpleMode } from "@/hooks/use-simple-mode";
 import GarminAttribution from "@/components/brand/GarminAttribution";
 import ServiceStatusBanner from "@/components/ServiceStatusBanner";
+import AnnouncementBanner from "@/components/AnnouncementBanner";
 
 
 
@@ -1491,6 +1492,7 @@ const ActivitiesTab = ({ lang, resetSignal }: Props) => {
   return (
     <FadeIn className="px-5 pt-6 max-w-lg mx-auto">
 
+      <AnnouncementBanner lang={lang} />
       <ServiceStatusBanner lang={lang} />
 
       {/* Today Stats: wearable (Terra) daily data wins, Apple Health as fallback */}

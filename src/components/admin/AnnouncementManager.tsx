@@ -11,6 +11,22 @@ import { Badge } from "@/components/ui/badge";
 import { Megaphone, Plus, Trash2, Pencil, X, Check } from "lucide-react";
 import { toast } from "sonner";
 
+type Level = "info" | "important" | "urgent";
+const LEVELS: { value: Level; label: string; cls: string }[] = [
+  { value: "info", label: "Info", cls: "bg-primary text-primary-foreground" },
+  { value: "important", label: "Important", cls: "bg-warning text-warning-foreground" },
+  { value: "urgent", label: "Urgent (can't dismiss)", cls: "bg-destructive text-destructive-foreground" },
+];
+const LevelPicker = ({ value, onChange }: { value: Level; onChange: (l: Level) => void }) => (
+  <div className="flex flex-wrap gap-2">
+    {LEVELS.map((l) => (
+      <Button key={l.value} type="button" size="sm" variant={value === l.value ? "default" : "outline"} onClick={() => onChange(l.value)}>
+        {l.label}
+      </Button>
+    ))}
+  </div>
+);
+
 interface Announcement {
   id: string;
   title: string;
@@ -18,6 +34,7 @@ interface Announcement {
   title_zh: string | null;
   message_zh: string | null;
   is_active: boolean;
+  level: Level;
   created_at: string;
 }
 
@@ -29,6 +46,8 @@ const AnnouncementManager = () => {
   const [message, setMessage] = useState("");
   const [titleZh, setTitleZh] = useState("");
   const [messageZh, setMessageZh] = useState("");
+  const [level, setLevel] = useState<Level>("info");
+  const [editLevel, setEditLevel] = useState<Level>("info");
   const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
@@ -37,9 +56,9 @@ const AnnouncementManager = () => {
   const [editMessageZh, setEditMessageZh] = useState("");
 
   const fetchAnnouncements = async () => {
-    const { data } = await supabase
+    const { data } = await (supabase as any)
       .from("announcements")
-      .select("id, title, message, title_zh, message_zh, is_active, created_at")
+      .select("id, title, message, title_zh, message_zh, is_active, level, created_at")
       .order("created_at", { ascending: false });
     setAnnouncements((data as Announcement[]) || []);
     setLoading(false);
@@ -53,9 +72,8 @@ const AnnouncementManager = () => {
     if (!title.trim() || !message.trim() || !user) return;
     setSaving(true);
 
-    await supabase.from("announcements").update({ is_active: false }).eq("is_active", true);
-
-    const { error } = await supabase.from("announcements").insert({
+    const { error } = await (supabase as any).from("announcements").insert({
+      level,
       title: title.trim(),
       message: message.trim(),
       title_zh: titleZh.trim() || null,
@@ -73,14 +91,12 @@ const AnnouncementManager = () => {
       setMessage("");
       setTitleZh("");
       setMessageZh("");
+      setLevel("info");
       fetchAnnouncements();
     }
   };
 
   const handleToggle = async (id: string, isActive: boolean) => {
-    if (isActive) {
-      await supabase.from("announcements").update({ is_active: false }).eq("is_active", true);
-    }
     const { error } = await supabase.from("announcements").update({ is_active: isActive }).eq("id", id);
     if (error) {
       toast.error("Failed to update");
@@ -105,6 +121,7 @@ const AnnouncementManager = () => {
     setEditMessage(a.message);
     setEditTitleZh(a.title_zh || "");
     setEditMessageZh(a.message_zh || "");
+    setEditLevel(a.level || "info");
   };
 
   const cancelEditing = () => {
@@ -113,9 +130,10 @@ const AnnouncementManager = () => {
 
   const handleSaveEdit = async () => {
     if (!editingId || !editTitle.trim() || !editMessage.trim()) return;
-    const { error } = await supabase
+    const { error } = await (supabase as any)
       .from("announcements")
       .update({
+        level: editLevel,
         title: editTitle.trim(),
         message: editMessage.trim(),
         title_zh: editTitleZh.trim() || null,
@@ -142,6 +160,8 @@ const AnnouncementManager = () => {
       <CardContent className="space-y-6">
         <div className="space-y-3 p-4 bg-muted/50 rounded-lg border border-border">
           <h3 className="text-sm font-semibold text-foreground">New Announcement</h3>
+          <p className="text-xs text-muted-foreground">Shows as a card at the top of Home for everyone. Several can be active at once.</p>
+          <LevelPicker value={level} onChange={setLevel} />
           <div className="space-y-1">
             <Label className="text-xs text-muted-foreground">Title (English)</Label>
             <Input placeholder="e.g. New Feature!" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={100} />
@@ -175,6 +195,7 @@ const AnnouncementManager = () => {
             {announcements.map((a) =>
               editingId === a.id ? (
                 <div key={a.id} className="p-3 rounded-lg border-2 border-primary bg-card space-y-2">
+                  <LevelPicker value={editLevel} onChange={setEditLevel} />
                   <div className="space-y-1">
                     <Label className="text-xs text-muted-foreground">Title (English)</Label>
                     <Input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} maxLength={100} />
@@ -205,6 +226,7 @@ const AnnouncementManager = () => {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       <span className="font-medium text-sm text-foreground truncate">{a.title}</span>
+                      <Badge className={`text-[10px] ${(LEVELS.find((l) => l.value === a.level) ?? LEVELS[0]).cls}`}>{(a.level || "info").replace(/^./, (c) => c.toUpperCase())}</Badge>
                       {a.is_active && <Badge className="bg-primary text-primary-foreground text-[10px]">Active</Badge>}
                     </div>
                     <p className="text-xs text-muted-foreground line-clamp-2">{a.message}</p>

@@ -61,7 +61,7 @@ export default function StrideeTestCard({ lang, blockedByOther = false, onBefore
     if (!isAdmin && onBeforeConnect) await onBeforeConnect();
     const { data, error } = await supabase.functions.invoke("stridee-connect", {
       // Garmin: Safari-only flow — no in-app window, plain return page.
-      body: { action: "connect", native: isDespiaUA() && provider !== "garmin", provider },
+      body: { action: "connect", native: isDespiaUA() && provider !== "garmin", provider, origin: window.location.origin },
     });
     setBusy(null);
     if (error) { toast.error(zh ? "連結失敗" : "Connect failed"); console.error(error, data); return; }

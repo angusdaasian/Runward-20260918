@@ -639,7 +639,7 @@ const ConnectApps = ({ lang, onBack }: Props) => {
         )}
         <StrideeTestCard
           lang={lang}
-          blockedByOther={stravaConnected || suuntoConnected || intervalsConnected}
+          blockedByOther={stravaConnected || intervalsConnected}
           onBeforeConnect={async () => {
             for (const prov of Object.keys(terraConns)) {
               await supabase.functions.invoke("terra-disconnect", { body: { provider: prov } }).catch(() => undefined);

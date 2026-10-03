@@ -13,6 +13,69 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { callRailway } from "../_shared/garminRailway.ts";
 import { decryptString } from "../_shared/garminCrypto.ts";
+import { maybeSendTelegramActivityPrompt } from "../_shared/telegramActivityPrompt.ts";
+import { maybeSendWhatsappActivityPrompt } from "../_shared/whatsappActivityPrompt.ts";
+import { getAppLanguage } from "../_shared/appLanguage.ts";
+
+function isRunning(type: unknown, name: unknown): boolean {
+  const t = `${String(type ?? "")} ${String(name ?? "")}`.toLowerCase();
+  if (/run|jog|trail|treadmill|跑/.test(t)) return true;
+  // Unknown/blank type from the backup service: assume run.
+  return !t.trim();
+}
+
+// Mirrors the Terra webhook push: one notification per new activity, deduped
+// through activity_push_log, respecting the user's notification preference.
+async function pushActivityUploadedNotification(
+  supabase: any,
+  appUserId: string,
+  activityKey: string,
+) {
+  try {
+    const { data: claim, error: claimErr } = await supabase
+      .from("activity_push_log")
+      .insert({ user_id: appUserId, activity_key: activityKey })
+      .select("id")
+      .maybeSingle();
+    if (claimErr || !claim) {
+      console.log(`[garmin-poll] push already sent for ${appUserId} ${activityKey}, skipping`);
+      return;
+    }
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("activity_notifications, lang")
+      .eq("user_id", appUserId)
+      .maybeSingle();
+    if (!profile?.activity_notifications) return;
+
+    const onesignalAppId = Deno.env.get("ONESIGNAL_APP_ID");
+    const onesignalApiKey = Deno.env.get("ONESIGNAL_REST_API_KEY");
+    if (!onesignalAppId || !onesignalApiKey) return;
+
+    const lang = await getAppLanguage(supabase, appUserId, profile.lang);
+
+    const title = lang === "zh" ? "新活動已同步" : "New activity synced";
+    const message = lang === "zh"
+      ? "你的最新活動已上傳。"
+      : "Your latest activity has been uploaded.";
+
+    await fetch("https://onesignal.com/api/v1/notifications", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Basic ${onesignalApiKey}`,
+      },
+      body: JSON.stringify({
+        app_id: onesignalAppId,
+        include_external_user_ids: [appUserId],
+        headings: { en: title },
+        contents: { en: message },
+      }),
+    });
+  } catch (e) {
+    console.error("[garmin-poll] push notification failed", e);
+  }
+}
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -199,12 +262,43 @@ serve(async (req) => {
         .filter((r) => r.garmin_activity_id && r.start_time && new Date(r.start_time) >= floor);
 
       let synced = 0;
+      let notified = 0;
       if (rows.length > 0) {
+        // Which of these already exist? Anything else is new and should trigger
+        // the same notifications Terra sends.
+        const { data: existingRows } = await supabase
+          .from("garmin_activities")
+          .select("garmin_activity_id")
+          .eq("user_id", userId)
+          .in("garmin_activity_id", rows.map((r) => r.garmin_activity_id));
+        const existingIds = new Set((existingRows ?? []).map((r: any) => String(r.garmin_activity_id)));
+
         const { error: upErr } = await supabase
           .from("garmin_activities")
           .upsert(rows, { onConflict: "garmin_activity_id,user_id", ignoreDuplicates: false });
         if (upErr) console.error(`[garmin-poll] upsert failed user=${userId}`, upErr);
-        else synced = rows.length;
+        else {
+          synced = rows.length;
+          const newRows = rows.filter(
+            (r) => !existingIds.has(String(r.garmin_activity_id)) && (Number(r.distance_meters) || 0) > 0,
+          );
+          for (const r of newRows) {
+            await pushActivityUploadedNotification(supabase, userId, `garmin:${r.garmin_activity_id}`);
+            notified++;
+            if (isRunning(r.activity_type, r.activity_name)) {
+              const prompt = {
+                userId,
+                source: "garmin" as const,
+                activityKey: String(r.garmin_activity_id),
+                distanceMeters: Number(r.distance_meters) || null,
+                durationSeconds: Number(r.duration_seconds) || null,
+                sportType: "run",
+              };
+              await maybeSendTelegramActivityPrompt(prompt);
+              await maybeSendWhatsappActivityPrompt(prompt);
+            }
+          }
+        }
       }
 
       // Fill in laps / route for the newest activities that still lack them.
@@ -270,7 +364,7 @@ serve(async (req) => {
       }
 
 
-      results.push({ user_id: userId, synced, details_fetched: detailsFetched });
+      results.push({ user_id: userId, synced, details_fetched: detailsFetched, notified });
     }
 
     return new Response(

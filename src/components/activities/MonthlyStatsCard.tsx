@@ -9,6 +9,7 @@ import {
   type ClassifierContext,
 } from "@/lib/runClassifier";
 import { shareMonthlyStats } from "@/lib/shareMonthlyStats";
+import { isRunning } from "@/lib/trainingLoad";
 
 interface Props {
   lang: Lang;
@@ -58,6 +59,8 @@ const MonthlyStatsCard = ({ lang, year, month, activities, classifierCtx }: Prop
   const monthActs = useMemo(
     () =>
       activities.filter((a) => {
+        // Match the calendar's monthly km: running activities only.
+        if (!isRunning((a as any).sport_type)) return false;
         const d = new Date(a.start_date);
         return d.getFullYear() === year && d.getMonth() === month;
       }),

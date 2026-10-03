@@ -165,6 +165,38 @@ async function loadActivityForAnalyze(
         extras: { summaryPolyline: data.summary_polyline ?? undefined },
       };
     }
+    if (source === "garmin") {
+      const { data } = await supabase
+        .from("garmin_activities")
+        .select("*")
+        .eq("id", activityDbId)
+        .maybeSingle();
+      if (!data) return null;
+      const distance = Number(data.distance_meters) || 0;
+      const duration = Number(data.duration_seconds) || 0;
+      return {
+        activity: {
+          name: data.activity_name || "Run",
+          distance,
+          moving_time: duration,
+          elapsed_time: duration,
+          total_elevation_gain: data.elevation_gain,
+          start_date: data.start_time,
+          average_speed: data.average_speed,
+          max_speed: null,
+          average_heartrate: data.average_hr,
+          max_heartrate: data.max_hr,
+          source: "Garmin",
+          laps: data.laps,
+          hr_samples: data.hr_samples,
+          distance_samples: data.distance_samples,
+          elevation_samples: data.elevation_samples,
+          cadence_samples: data.cadence_samples,
+          avg_cadence: data.avg_cadence,
+        },
+        extras: { summaryPolyline: data.summary_polyline ?? undefined },
+      };
+    }
     if (source === "apple_health") {
       const { data } = await supabase
         .from("apple_health_activities")

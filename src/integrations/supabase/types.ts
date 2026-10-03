@@ -362,8 +362,10 @@ export type Database = {
         Row: {
           created_at: string
           created_by: string
+          display_order: number
           id: string
           is_active: boolean
+          level: string
           message: string
           message_zh: string | null
           title: string
@@ -373,8 +375,10 @@ export type Database = {
         Insert: {
           created_at?: string
           created_by: string
+          display_order?: number
           id?: string
           is_active?: boolean
+          level?: string
           message: string
           message_zh?: string | null
           title: string
@@ -384,8 +388,10 @@ export type Database = {
         Update: {
           created_at?: string
           created_by?: string
+          display_order?: number
           id?: string
           is_active?: boolean
+          level?: string
           message?: string
           message_zh?: string | null
           title?: string
@@ -582,6 +588,72 @@ export type Database = {
         }
         Relationships: []
       }
+      completed_programs: {
+        Row: {
+          ai_analysis: Json | null
+          ai_model: string | null
+          completed_at: string
+          created_at: string
+          distance: string | null
+          end_date: string | null
+          goal: string | null
+          id: string
+          lang: string | null
+          plan_created_at: string | null
+          plan_data: Json
+          race_date: string | null
+          race_schedule: Json | null
+          report: Json
+          source_plan_id: string
+          start_date: string | null
+          target_time: string | null
+          user_id: string
+          weeks: number | null
+        }
+        Insert: {
+          ai_analysis?: Json | null
+          ai_model?: string | null
+          completed_at?: string
+          created_at?: string
+          distance?: string | null
+          end_date?: string | null
+          goal?: string | null
+          id?: string
+          lang?: string | null
+          plan_created_at?: string | null
+          plan_data?: Json
+          race_date?: string | null
+          race_schedule?: Json | null
+          report?: Json
+          source_plan_id: string
+          start_date?: string | null
+          target_time?: string | null
+          user_id: string
+          weeks?: number | null
+        }
+        Update: {
+          ai_analysis?: Json | null
+          ai_model?: string | null
+          completed_at?: string
+          created_at?: string
+          distance?: string | null
+          end_date?: string | null
+          goal?: string | null
+          id?: string
+          lang?: string | null
+          plan_created_at?: string | null
+          plan_data?: Json
+          race_date?: string | null
+          race_schedule?: Json | null
+          report?: Json
+          source_plan_id?: string
+          start_date?: string | null
+          target_time?: string | null
+          user_id?: string
+          weeks?: number | null
+        }
+        Relationships: []
+      }
       debug_logs: {
         Row: {
           created_at: string | null
@@ -620,6 +692,42 @@ export type Database = {
         }
         Update: {
           last_fired_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      deduplicated_activities: {
+        Row: {
+          created_at: string
+          id: string
+          kept_id: string | null
+          kept_source: string | null
+          reason: string | null
+          row_data: Json
+          source_id: string
+          source_table: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          kept_id?: string | null
+          kept_source?: string | null
+          reason?: string | null
+          row_data: Json
+          source_id: string
+          source_table: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          kept_id?: string | null
+          kept_source?: string | null
+          reason?: string | null
+          row_data?: Json
+          source_id?: string
+          source_table?: string
           user_id?: string
         }
         Relationships: []
@@ -1315,6 +1423,48 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      onesignal_cleanup_runs: {
+        Row: {
+          created_at: string
+          csv_url: string
+          deleted: number
+          failed: number
+          id: string
+          last_error: string | null
+          processed: number
+          skipped_linked: number
+          status: string
+          total_candidates: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          csv_url: string
+          deleted?: number
+          failed?: number
+          id?: string
+          last_error?: string | null
+          processed?: number
+          skipped_linked?: number
+          status?: string
+          total_candidates?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          csv_url?: string
+          deleted?: number
+          failed?: number
+          id?: string
+          last_error?: string | null
+          processed?: number
+          skipped_linked?: number
+          status?: string
+          total_candidates?: number
+          updated_at?: string
+        }
+        Relationships: []
       }
       pending_races: {
         Row: {
@@ -2273,6 +2423,66 @@ export type Database = {
           },
         ]
       }
+      stridee_connections: {
+        Row: {
+          auto_sync_enabled: boolean
+          connected_at: string | null
+          created_at: string
+          id: string
+          last_synced_at: string | null
+          provider: string
+          providers: string[]
+          status: string
+          stridee_user_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          auto_sync_enabled?: boolean
+          connected_at?: string | null
+          created_at?: string
+          id?: string
+          last_synced_at?: string | null
+          provider?: string
+          providers?: string[]
+          status?: string
+          stridee_user_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          auto_sync_enabled?: boolean
+          connected_at?: string | null
+          created_at?: string
+          id?: string
+          last_synced_at?: string | null
+          provider?: string
+          providers?: string[]
+          status?: string
+          stridee_user_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      stridee_sync_state: {
+        Row: {
+          id: string
+          last_received_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          id: string
+          last_received_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          last_received_at?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       support_feedback: {
         Row: {
           admin_response: string | null
@@ -3187,6 +3397,24 @@ export type Database = {
         }
         Relationships: []
       }
+      territory_sync_state: {
+        Row: {
+          last_fired_at: string
+          locked_until: string
+          user_id: string
+        }
+        Insert: {
+          last_fired_at?: string
+          locked_until?: string
+          user_id: string
+        }
+        Update: {
+          last_fired_at?: string
+          locked_until?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       training_plans: {
         Row: {
           auto_adjust_enabled: boolean
@@ -4062,6 +4290,11 @@ export type Database = {
         Args: { p_source: string; p_source_id: string }
         Returns: string
       }
+      try_lock_territory: {
+        Args: { _secs: number; _uid: string }
+        Returns: boolean
+      }
+      unlock_territory: { Args: { _uid: string }; Returns: undefined }
       unschedule_cron_job: { Args: { job_name: string }; Returns: undefined }
       unschedule_terra_today_oneoff: { Args: never; Returns: undefined }
       unschedule_terra_webhook_cleanup: { Args: never; Returns: undefined }

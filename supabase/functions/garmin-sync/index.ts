@@ -191,7 +191,14 @@ serve(async (req) => {
       // Jan 2026 up to the current month. If so, the previous sync clearly worked
       // and we can skip the expensive wipe-and-repull, just mark the flag done
       // and fall through to the normal incremental path.
-      let needsFullResync = !conn.full_resync_done;
+      // Explicit small-window sync (e.g. Home tab "sync past 7 days"): skip
+      // the full-resync logic entirely and just pull the requested window.
+      const requestedDays =
+        typeof (body as any)?.days === "number" && (body as any).days > 0
+          ? Math.min(Math.floor((body as any).days), 30)
+          : null;
+
+      let needsFullResync = !conn.full_resync_done && !requestedDays;
       let isFirstSync = false;
       let windowStart: Date;
 
@@ -257,6 +264,9 @@ serve(async (req) => {
         }
         isFirstSync = true;
         windowStart = firstSyncStart;
+      } else if (requestedDays) {
+        windowStart = new Date(today.getTime() - requestedDays * 24 * 60 * 60 * 1000);
+        if (windowStart < minWindowStart) windowStart = minWindowStart;
       } else {
         const { data: latestRow } = await supabase
           .from("garmin_activities")

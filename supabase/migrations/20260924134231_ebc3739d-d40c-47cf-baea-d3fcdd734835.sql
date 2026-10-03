@@ -1,0 +1,2 @@
+ALTER TABLE public.stridee_connections ADD COLUMN IF NOT EXISTS providers text[] NOT NULL DEFAULT '{}';
+UPDATE public.stridee_connections SET providers = ARRAY[provider] WHERE status = 'connected' AND providers = '{}';

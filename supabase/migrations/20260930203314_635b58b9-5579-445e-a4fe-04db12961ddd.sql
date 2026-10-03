@@ -1,0 +1,1 @@
+REVOKE ALL ON FUNCTION public.tg_trigger_territory_sync() FROM public, anon, authenticated;

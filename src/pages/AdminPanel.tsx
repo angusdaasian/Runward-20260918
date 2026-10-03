@@ -48,6 +48,7 @@ import RaceManager from "@/components/admin/RaceManager";
 import PendingRaceManager from "@/components/admin/PendingRaceManager";
 import RewardCodeManager from "@/components/admin/RewardCodeManager";
 import NotificationManager from "@/components/admin/NotificationManager";
+import OneSignalCleanupCard from "@/components/admin/OneSignalCleanupCard";
 import TerraSyncTester from "@/components/admin/TerraSyncTester";
 import StravaAppsManager from "@/components/admin/StravaAppsManager";
 import SuuntoSyncTester from "@/components/admin/SuuntoSyncTester";
@@ -429,7 +430,12 @@ const AdminPanel = () => {
       case "llama":
         return <AdminLlamaTraining />;
       case "notifications":
-        return <NotificationManager />;
+        return (
+          <div className="space-y-4">
+            <NotificationManager />
+            <OneSignalCleanupCard />
+          </div>
+        );
       case "status":
         return <ServiceStatusManager />;
       case "announcements":

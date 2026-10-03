@@ -1,6 +1,7 @@
 import { Lang } from "@/lib/i18n";
 import { ZonePct, ZONE_LABELS } from "@/lib/hrZones";
 import { Pencil } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 interface Props {
   zones: ZonePct;
@@ -20,34 +21,37 @@ const HrZoneBars = ({ zones, lang, title, subtitle, onEdit }: Props) => {
   };
 
   return (
-    <div className="bg-white rounded-2xl p-5 shadow-[0_4px_20px_-8px_rgba(15,23,42,0.15)] ring-1 ring-slate-200/70">
+    <div className="bg-card text-card-foreground rounded-2xl p-5 shadow-sm ring-1 ring-border">
       <div className="mb-3 flex items-start justify-between gap-2">
         <div>
-          <h3 className="font-display font-bold text-slate-900 text-sm">
+          <h3 className="font-display font-bold text-sm">
             {title ?? (lang === "zh" ? "心率區間" : "Heart Rate Zones")}
           </h3>
-          {subtitle && <p className="text-[11px] text-slate-500 mt-0.5">{subtitle}</p>}
+          {subtitle && <p className="text-[11px] text-muted-foreground mt-0.5">{subtitle}</p>}
         </div>
         {onEdit && (
-          <button
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
             onClick={onEdit}
-            className="shrink-0 inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-[11px] font-medium text-slate-600 hover:bg-slate-50 transition-colors"
+            className="shrink-0 h-8 px-2.5 gap-1 text-[11px] text-muted-foreground"
             aria-label={lang === "zh" ? "編輯心率" : "Edit heart rate"}
           >
             <Pencil size={11} />
             {lang === "zh" ? "編輯" : "Edit"}
-          </button>
+          </Button>
         )}
       </div>
       <div className="space-y-2">
         {ZONE_LABELS.map((z) => {
           const pct = zones[z.key];
           return (
-            <div key={z.key} className="flex items-center gap-3">
-              <div className="w-20 text-[11px] font-semibold text-slate-700 shrink-0">
+            <div key={z.key} className="grid grid-cols-[6.5rem_minmax(0,1fr)_3.5rem] items-center gap-3 min-h-7">
+              <div className="text-[11px] font-semibold text-foreground">
                 {lang === "zh" ? z.labelZh : z.label}
               </div>
-              <div className="flex-1 h-4 rounded-full bg-slate-100 overflow-hidden">
+              <div className="h-4 rounded-full bg-muted overflow-hidden">
                 <div
                   className="h-full rounded-full transition-all"
                   style={{
@@ -56,7 +60,7 @@ const HrZoneBars = ({ zones, lang, title, subtitle, onEdit }: Props) => {
                   }}
                 />
               </div>
-              <div className="w-10 text-right text-[11px] font-mono font-semibold text-slate-700 tabular-nums">
+              <div className="text-right text-[11px] font-mono font-semibold text-foreground tabular-nums">
                 {pct.toFixed(0)}%
               </div>
             </div>

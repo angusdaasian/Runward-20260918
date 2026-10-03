@@ -19,8 +19,18 @@
 - [x] Reposition Garmin attribution on sharing cards
 - [ ] Force a 7-day Terra/Garmin resync for c7a7 — blocked: external Supabase cannot provide an admin session
 
+- [x] Program completion: archive finished AI program, one-time completion report (key sessions by week, race vs target, AI review), past programs list
+
 ## New workspace setup
 - [x] Connect Google Search Console (previous workspace connections no longer apply)
 - [ ] Temporary Garmin/Railway fallback while Terra Garmin is down: direct Garmin connect for Garmin users + 1-minute polling from 2026-09-21T10:40Z (Terra data overwrites later)
 - [x] Stop the Garmin poller during database recovery and remove full-history Terra sample downloads from list views
 - [x] Add problems-only service status updates on Home with admin-managed bilingual messages
+- [x] Restore the original direct-navigation Stridee connection flow
+- [x] Restore Stridee's normal browser connection flow with an explicit return-to-RunWard prompt
+- [x] Dismiss the Stridee sign-in window immediately when RunWard resumes
+- [x] Hard-refresh Fitness Apps when returning from native Garmin connection
+- [ ] Close Garmin's Stridee OAuth browser automatically — blocked until Stridee redirects the visible consent page to the registered return URI after Garmin app authorization
+
+- [x] City Hunter auto-sync on every new/backfilled activity
+- [x] Pace zone widget using accumulated running history after the initial 30-day backfill, plus per-activity time in zone

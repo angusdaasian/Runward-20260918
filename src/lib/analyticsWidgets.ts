@@ -4,6 +4,7 @@ export type WidgetId =
   | "hrv"
   | "health"
   | "hr_zones"
+  | "pace_zones"
   | "race_predictor"
   | "training_load"
   | "trends"
@@ -28,6 +29,7 @@ export const ALL_WIDGETS: WidgetId[] = [
   "training_load",
   "race_predictor",
   "hr_zones",
+  "pace_zones",
   "trends",
   "year_heatmap",
   "steps_today",

@@ -37,6 +37,9 @@ import { loadForActivity, isRunning } from "@/lib/trainingLoad";
 import { calculateRunningScore } from "@/lib/vdot";
 import { computeZonePct, computeZonePctWeighted, estimateMaxHr, estimateRestingHr, zoneBoundaries, ZONE_LABELS, isValidCustomZones } from "@/lib/hrZones";
 import HrZoneBars from "./HrZoneBars";
+import PaceZoneBars from "./PaceZoneBars";
+import { computePaceZones, timeInPaceZones } from "@/lib/paceZones";
+import { useActivities } from "@/hooks/use-activities";
 import RpeSlider from "./RpeSlider";
 import PlanNextWorkoutCard from "./PlanNextWorkoutCard";
 import PlanComparisonDialog from "@/components/PlanComparisonDialog";
@@ -504,7 +507,7 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
               elapsed_time: elapsed,
               moving_time: Number(lap.moving_time ?? lap.duration_seconds) || elapsed,
               average_speed: avgSpeed,
-              average_heartrate: lap.avg_hr ?? lap.average_hr ?? undefined,
+              average_heartrate: lap.avg_hr ?? lap.average_hr ?? lap.average_heartrate ?? undefined,
               elevation_difference:
                 Number(lap.elevation_gain ?? lap.total_ascent_meters ?? lap.total_ascent) || 0,
               split: lap.split_number ?? lap.lap_index ?? idx + 1,
@@ -917,6 +920,35 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
     }
     return null;
   }, [activity.hr_samples, activity.laps, activity.average_heartrate, activity.moving_time, activity.elapsed_time, profileMaxHr, profileAge, profileRestingHr, profileCustomZones, streams]);
+
+  // Pace zones from all available history (beginning with the provider's
+  // initial 30-day backfill) and time spent in each for this run.
+  const { activities: allActivities } = useActivities();
+  const paceZones = useMemo(() => computePaceZones(allActivities as any[], {
+    age: profileAge, max_heartrate: profileMaxHr, resting_heartrate: profileRestingHr, custom_hr_zones: profileCustomZones,
+  }), [allActivities, profileAge, profileMaxHr, profileRestingHr, profileCustomZones]);
+  const paceZoneTime = useMemo(() => {
+    if (!paceZones || !isRunningActivity) return null;
+    const pts = chartData.filter((d: any) => typeof d.time === "number");
+    const entries: Array<{ pace: number; seconds: number }> = [];
+    for (let i = 1; i < pts.length; i++) {
+      const p = pts[i] as any;
+      const dt = p.time - (pts[i - 1] as any).time;
+      if (typeof p.pace === "number" && dt > 0 && dt < 600) entries.push({ pace: p.pace * 60, seconds: dt });
+    }
+    let t = timeInPaceZones(entries, paceZones);
+    if (!t && Array.isArray(activity.laps)) {
+      t = timeInPaceZones(activity.laps.map((lap: any) => {
+        const secs = Number(lap.moving_time ?? lap.elapsed_time ?? lap.duration_seconds) || 0;
+        const dist = Number(lap.distance ?? lap.distance_meters) || 0;
+        return { pace: dist > 0 ? secs / (dist / 1000) : 0, seconds: secs };
+      }), paceZones);
+    }
+    if (!t && activity.average_speed > 0) {
+      t = timeInPaceZones([{ pace: 1000 / activity.average_speed, seconds: Number(activity.moving_time) || 0 }], paceZones);
+    }
+    return t;
+  }, [paceZones, chartData, activity.laps, activity.average_speed, activity.moving_time, isRunningActivity]);
 
   // Per-point HR zone color stops for the HR chart gradient, so the curve
   // visually matches the zone distribution (Z1 grey, Z2 blue, Z3 green, ...).
@@ -1610,6 +1642,12 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
                     : `Max ${estimateMaxHr(profileAge ?? null, profileMaxHr ?? null)} / rest ${estimateRestingHr(profileRestingHr ?? null)} bpm`)
             }
           />
+        </div>
+      )}
+
+      {paceZones && paceZoneTime && (
+        <div className="mt-4">
+          <PaceZoneBars lang={lang} zones={paceZones} time={paceZoneTime} />
         </div>
       )}
 

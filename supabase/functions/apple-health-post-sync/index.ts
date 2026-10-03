@@ -3,6 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { maybeSendTelegramActivityPrompt } from "../_shared/telegramActivityPrompt.ts";
 import { maybeSendWhatsappActivityPrompt } from "../_shared/whatsappActivityPrompt.ts";
 import { maybeTrainCoachOnce } from "../_shared/trainCoachOnce.ts";
+import { getAppLanguage } from "../_shared/appLanguage.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -228,7 +229,7 @@ async function sendActivityNotification(
   try {
     const { data: profile } = await supabase
       .from("profiles")
-      .select("activity_notifications")
+      .select("activity_notifications, lang")
       .eq("user_id", userId)
       .single();
 
@@ -248,7 +249,11 @@ async function sendActivityNotification(
         ? `${hours}h${String(mins).padStart(2, "0")}m${String(secs).padStart(2, "0")}s`
         : `${mins}m${String(secs).padStart(2, "0")}s`;
 
-    const message = `You ran ${km}km in ${timeStr}. You earned ${xpGained} XP! Your Training Score: ${trainingScore}.`;
+    const lang = await getAppLanguage(supabase, userId, profile.lang);
+    const title = lang === "zh" ? "跑步完成！🏃‍♂️" : "Run Completed! 🏃‍♂️";
+    const message = lang === "zh"
+      ? `你跑了 ${km} 公里，用時 ${timeStr}。你獲得了 ${xpGained} XP！你的訓練分數：${trainingScore}。`
+      : `You ran ${km}km in ${timeStr}. You earned ${xpGained} XP! Your Training Score: ${trainingScore}.`;
 
     const res = await fetch("https://onesignal.com/api/v1/notifications", {
       method: "POST",
@@ -259,7 +264,7 @@ async function sendActivityNotification(
       body: JSON.stringify({
         app_id: onesignalAppId,
         include_external_user_ids: [userId],
-        headings: { en: "Run Completed! 🏃‍♂️" },
+        headings: { en: title },
         contents: { en: message },
       }),
     });

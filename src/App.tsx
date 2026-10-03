@@ -29,6 +29,8 @@ const Guide = lazy(() => import("./pages/Guide.tsx"));
 const Privacy = lazy(() => import("./pages/Privacy.tsx"));
 const DeleteAccount = lazy(() => import("./pages/DeleteAccount.tsx"));
 const TerraReturn = lazy(() => import("./pages/TerraReturn.tsx"));
+const StrideeReturn = lazy(() => import("./pages/StrideeReturn.tsx"));
+const StrideeBridge = lazy(() => import("./pages/StrideeBridge.tsx"));
 const SuuntoReturn = lazy(() => import("./pages/SuuntoReturn.tsx"));
 const PolarReturn = lazy(() => import("./pages/PolarReturn.tsx"));
 const Dashboard = lazy(() => import("./pages/Dashboard.tsx"));
@@ -118,6 +120,8 @@ const App = () => (
                 <Route path="/privacy" element={<Privacy />} />
                 <Route path="/delete-account" element={<DeleteAccount />} />
                 <Route path="/terra-return" element={<TerraReturn />} />
+                <Route path="/stridee-return/*" element={<StrideeReturn />} />
+                <Route path="/stridee-bridge" element={<StrideeBridge />} />
                 <Route path="/suunto-return" element={<SuuntoReturn />} />
                 <Route path="/suunto/callback" element={<SuuntoReturn />} />
                 <Route path="/polar-return" element={<PolarReturn />} />

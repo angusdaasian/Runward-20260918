@@ -144,6 +144,7 @@ function unregisterPreview(release: Release) {
 const ActivityMap = ({ polyline, className, lang }: Props) => {
   const previewRef = useRef<HTMLDivElement>(null);
   const previewMapRef = useRef<mapboxgl.Map | null>(null);
+  const releaseRef = useRef<Release | null>(null);
   const fullRef = useRef<HTMLDivElement>(null);
   const fullMapRef = useRef<mapboxgl.Map | null>(null);
   const [open, setOpen] = useState(false);
@@ -171,14 +172,13 @@ const ActivityMap = ({ polyline, className, lang }: Props) => {
     return () => observer.disconnect();
   }, []);
 
-  // Preview map
+  // Preview map — created once when first scrolled near the viewport and kept
+  // alive afterwards, so sliding back to this activity does not reload the
+  // style, glyphs, or tiles. The LRU pool may still release off-screen maps
+  // under WebGL pressure; those rebuild when scrolled back into view.
   useEffect(() => {
     if (!previewRef.current || !polyline || !visible) return;
-
-    if (previewMapRef.current) {
-      previewMapRef.current.remove();
-      previewMapRef.current = null;
-    }
+    if (previewMapRef.current) return; // already loaded — reuse it
 
     const coords = decodePolyline(polyline);
     if (coords.length === 0) return;
@@ -191,10 +191,9 @@ const ActivityMap = ({ polyline, className, lang }: Props) => {
         previewMapRef.current.remove();
         previewMapRef.current = null;
       }
-      setVisible(false);
+      unregisterPreview(release);
       return true;
     };
-
 
     void createRouteMap(container, coords, lang, false, 14)
       .then((map) => {
@@ -204,18 +203,29 @@ const ActivityMap = ({ polyline, className, lang }: Props) => {
         }
         previewMapRef.current = map;
         registerPreview(release);
+        releaseRef.current = release;
       })
       .catch((error) => console.error("Activity map failed to load", error));
 
     return () => {
       cancelled = true;
-      unregisterPreview(release);
+    };
+  }, [polyline, lang, visible]);
+
+  // Tear the preview map down only when the route changes or the component
+  // unmounts — never on visibility toggles.
+  useEffect(() => {
+    return () => {
+      if (releaseRef.current) {
+        unregisterPreview(releaseRef.current);
+        releaseRef.current = null;
+      }
       if (previewMapRef.current) {
         previewMapRef.current.remove();
         previewMapRef.current = null;
       }
     };
-  }, [polyline, lang, visible]);
+  }, [polyline, lang]);
 
   // Fullscreen map (mounted only when overlay opens)
   useEffect(() => {

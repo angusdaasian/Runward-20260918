@@ -14,12 +14,14 @@ import {
   Flame,
   Timer,
   Loader2,
+  Lock,
 } from "lucide-react";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Lang, t } from "@/lib/i18n";
 import { useAuth } from "@/contexts/AuthContext";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { getAppEnvironment } from "@/lib/environment";
 import { toast } from "sonner";
@@ -47,6 +49,7 @@ import { useGarminDailyHealth } from "@/hooks/use-garmin-daily-health";
 import { useSimpleMode } from "@/hooks/use-simple-mode";
 import GarminAttribution from "@/components/brand/GarminAttribution";
 import ServiceStatusBanner from "@/components/ServiceStatusBanner";
+import AnnouncementBanner from "@/components/AnnouncementBanner";
 
 
 
@@ -501,6 +504,30 @@ const MonthlyActivityList = ({
 };
 
 // ---------- All Activities View (progressive month reveal) ----------
+// Activity types as tagged by Stridee (FIT sport/sub-sport, snake_case, e.g.
+// running, track_running, treadmill_running, trail_running, mountaineering)
+// plus Strava/Terra spellings (Run, TrailRun, Hike, Walk, Ride…).
+type ActivityCategory = "run" | "trail" | "treadmill" | "track" | "hike" | "walk" | "ride" | "swim" | "strength" | "other";
+const CATEGORY_ORDER: ActivityCategory[] = ["run", "trail", "track", "treadmill", "hike", "walk", "ride", "swim", "strength", "other"];
+const CATEGORY_LABELS: Record<ActivityCategory | "all", [string, string]> = {
+  all: ["All", "全部"], run: ["Running", "跑步"], trail: ["Trail running", "越野跑"], track: ["Track", "田徑場"],
+  treadmill: ["Treadmill", "跑步機"], hike: ["Hiking", "登山 / 遠足"], walk: ["Walking", "步行"], ride: ["Cycling", "單車"],
+  swim: ["Swimming", "游泳"], strength: ["Strength", "力量訓練"], other: ["Other", "其他"],
+};
+function activityCategory(sport?: string | null): ActivityCategory {
+  const s = String(sport ?? "").toLowerCase().replace(/[\s-]/g, "_");
+  if (/trail/.test(s)) return "trail";
+  if (/treadmill|indoor_run|virtual_?run/.test(s)) return "treadmill";
+  if (/track/.test(s)) return "track";
+  if (/run|jog/.test(s)) return "run";
+  if (/hik|mountaineer|climb/.test(s)) return "hike";
+  if (/walk/.test(s)) return "walk";
+  if (/ride|cycl|bik/.test(s)) return "ride";
+  if (/swim/.test(s)) return "swim";
+  if (/strength|weight|gym/.test(s)) return "strength";
+  return "other";
+}
+
 const AllActivitiesView = ({
   lang,
   activities,
@@ -520,10 +547,23 @@ const AllActivitiesView = ({
   onBack: () => void;
   onSelect: (a: StravaActivity) => void;
 }) => {
+  const [typeFilter, setTypeFilter] = useState<ActivityCategory | "all">("all");
+  const categories = useMemo(() => {
+    const counts = new Map<ActivityCategory, number>();
+    for (const a of activities) {
+      const c = activityCategory(a.sport_type);
+      counts.set(c, (counts.get(c) ?? 0) + 1);
+    }
+    return CATEGORY_ORDER.filter((c) => counts.has(c)).map((c) => ({ c, n: counts.get(c)! }));
+  }, [activities]);
+  const filtered = useMemo(
+    () => (typeFilter === "all" ? activities : activities.filter((a) => activityCategory(a.sport_type) === typeFilter)),
+    [activities, typeFilter],
+  );
   // Group activities by year-month to enable progressive reveal.
   const monthBuckets = useMemo(() => {
     const map = new Map<string, StravaActivity[]>();
-    for (const a of activities) {
+    for (const a of filtered) {
       const d = new Date(a.start_date);
       const key = `${d.getFullYear()}-${String(d.getMonth()).padStart(2, "0")}`;
       if (!map.has(key)) map.set(key, []);
@@ -531,14 +571,14 @@ const AllActivitiesView = ({
     }
     // Most-recent month first.
     return Array.from(map.entries()).sort((a, b) => (a[0] < b[0] ? 1 : -1));
-  }, [activities]);
+  }, [filtered]);
 
   const [visibleMonths, setVisibleMonths] = useState(1);
 
   // Reset when activities reload (e.g. background prefetch finishes).
   useEffect(() => {
     setVisibleMonths(1);
-  }, [monthBuckets.length === 0]);
+  }, [monthBuckets.length === 0, typeFilter]);
 
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
@@ -583,6 +623,26 @@ const AllActivitiesView = ({
           {lang === "zh" ? "載入所有活動中…" : "Loading all activities…"}
         </div>
       )}
+      {categories.length > 1 && (
+        <div className="flex gap-1.5 overflow-x-auto pb-3 -mx-5 px-5 scrollbar-none">
+          {[{ c: "all" as const, n: activities.length }, ...categories].map(({ c, n }) => (
+            <button
+              key={c}
+              onClick={() => setTypeFilter(c)}
+              className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                typeFilter === c ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+              }`}
+            >
+              {CATEGORY_LABELS[c][lang === "zh" ? 1 : 0]} · {n}
+            </button>
+          ))}
+        </div>
+      )}
+      {!loading && filtered.length === 0 && activities.length > 0 && (
+        <p className="text-center text-xs text-muted-foreground py-6">
+          {lang === "zh" ? "沒有此類活動" : "No activities of this type"}
+        </p>
+      )}
       <MonthlyActivityList
         activities={visibleActivities}
         lang={lang}
@@ -607,6 +667,7 @@ const AllActivitiesView = ({
 const ActivitiesTab = ({ lang, resetSignal }: Props) => {
   const { user } = useAuth();
   const { isPremium, loading: premiumLoading } = usePremium();
+  const navigate = useNavigate();
   const [simpleMode] = useSimpleMode();
   // Homepage shows ONLY the latest activity → tiny, fast query.
   // The full history is loaded in the background and used by the calendar,
@@ -1023,17 +1084,58 @@ const ActivitiesTab = ({ lang, resetSignal }: Props) => {
     }
   }, []);
 
-  const detectProviders = useCallback(async (): Promise<{ terra: boolean; strava: boolean; suunto: boolean }> => {
-    if (!user) return { terra: false, strava: false, suunto: false };
-    const [terraRes, stravaRes, suuntoRes] = await Promise.all([
+  const invokeGarminRailwaySync = useCallback(async (days: number): Promise<number> => {
+    try {
+      const { data, error } = await supabase.functions.invoke("garmin-sync", {
+        body: { action: "sync", days },
+      });
+      if (error || !(data as any)?.success) {
+        console.warn("Garmin/Railway sync failed:", error ?? data);
+        return 0;
+      }
+      return typeof (data as any)?.synced === "number" ? (data as any).synced : 0;
+    } catch (e) {
+      console.warn("Garmin/Railway sync error:", e);
+      return 0;
+    }
+  }, []);
+
+  const invokeStrideeSync = useCallback(async (days: number, all = false): Promise<number> => {
+    let total = 0;
+    try {
+      for (let i = 0; i < 200; i++) {
+        const { data, error } = await supabase.functions.invoke("stridee-sync", { body: { days, all } });
+        if (error || !(data as any)?.ok) { console.warn("Stridee sync failed:", error ?? data); break; }
+        total += (data as any).stored ?? 0;
+        if (!((data as any).remaining > 0) || !((data as any).stored > 0)) break;
+      }
+    } catch (e) { console.warn("Stridee sync error:", e); }
+    return total;
+  }, []);
+
+  const detectProviders = useCallback(async (): Promise<{ terra: boolean; strava: boolean; suunto: boolean; garmin: boolean; stridee: boolean }> => {
+    if (!user) return { terra: false, strava: false, suunto: false, garmin: false, stridee: false };
+    const [terraRes, stravaRes, suuntoRes, garminRes, strideeRes] = await Promise.all([
       supabase.from("terra_connections").select("user_id").eq("user_id", user.id).eq("active", true).limit(1).maybeSingle(),
       supabase.from("strava_connections").select("user_id").eq("user_id", user.id).limit(1).maybeSingle(),
       supabase.from("suunto_connections").select("user_id").eq("user_id", user.id).limit(1).maybeSingle(),
+      supabase
+        .from("garmin_connections")
+        .select("user_id")
+        .eq("user_id", user.id)
+        .not("oauth1_token_encrypted", "is", null)
+        .not("oauth2_token_encrypted", "is", null)
+        .or("needs_reauth.is.null,needs_reauth.eq.false")
+        .limit(1)
+        .maybeSingle(),
+      supabase.from("stridee_connections").select("status").eq("user_id", user.id).eq("status", "connected").maybeSingle(),
     ]);
     return {
+      stridee: !!strideeRes.data,
       terra: !!terraRes.data,
       strava: !!stravaRes.data,
       suunto: !!suuntoRes.data,
+      garmin: !!garminRes.data,
     };
   }, [user]);
 
@@ -1067,15 +1169,17 @@ const ActivitiesTab = ({ lang, resetSignal }: Props) => {
         ? invokeStravaSync(accessToken, { after: afterSec, perPage: 30, environment: getAppEnvironment() })
         : Promise.resolve(0);
       const suuntoPromise = providers.suunto ? invokeSuuntoSync(1) : Promise.resolve(0);
+      const garminPromise = providers.garmin ? invokeGarminRailwaySync(1) : Promise.resolve(0);
+      const strideeCount = providers.stridee ? await invokeStrideeSync(1) : 0;
 
-      const [terraRes, stravaCount, suuntoCount] = await Promise.all([terraPromise, stravaPromise, suuntoPromise]);
+      const [terraRes, stravaCount, suuntoCount, garminCount] = await Promise.all([terraPromise, stravaPromise, suuntoPromise, garminPromise]);
       const result = terraRes ? await terraRes.json().catch(() => null) : null;
       if (terraRes && !terraRes.ok && terraRes.status !== 404) {
         throw new Error(result?.error ?? `Sync failed (${terraRes.status})`);
       }
       invalidateAll();
       const terraCount = result?.activities ?? 0;
-      const count = terraCount + stravaCount + suuntoCount;
+      const count = terraCount + stravaCount + suuntoCount + garminCount + strideeCount;
       const msg = lang === "zh" ? result?.message_zh : result?.message_en;
       if (result?.rateLimited && stravaCount === 0 && suuntoCount === 0) {
         toast.info(msg ?? (lang === "zh" ? "請稍後再試" : "Please try again later"));
@@ -1090,7 +1194,7 @@ const ActivitiesTab = ({ lang, resetSignal }: Props) => {
     }
     setFetchingToday(false);
 
-  }, [user, fetchingToday, invalidateAll, lang, invokeStravaSync, invokeSuuntoSync, detectProviders]);
+  }, [user, fetchingToday, invalidateAll, lang, invokeStravaSync, invokeSuuntoSync, invokeGarminRailwaySync, invokeStrideeSync, detectProviders]);
 
   const handleFetchWeekOnly = useCallback(async () => {
     if (!user || fetchingToday) return;
@@ -1119,8 +1223,10 @@ const ActivitiesTab = ({ lang, resetSignal }: Props) => {
         ? invokeStravaSync(accessToken, { after: afterSec, perPage: 100, environment: getAppEnvironment() })
         : Promise.resolve(0);
       const suuntoPromise = providers.suunto ? invokeSuuntoSync(7) : Promise.resolve(0);
+      const garminPromise = providers.garmin ? invokeGarminRailwaySync(7) : Promise.resolve(0);
+      const strideeCount = providers.stridee ? await invokeStrideeSync(7) : 0;
 
-      const [terraRes, stravaCount, suuntoCount] = await Promise.all([terraPromise, stravaPromise, suuntoPromise]);
+      const [terraRes, stravaCount, suuntoCount, garminCount] = await Promise.all([terraPromise, stravaPromise, suuntoPromise, garminPromise]);
       const result = terraRes ? await terraRes.json().catch(() => null) : null;
       if (terraRes && !terraRes.ok && terraRes.status !== 404) {
         throw new Error(result?.error ?? `Sync failed (${terraRes.status})`);
@@ -1128,7 +1234,7 @@ const ActivitiesTab = ({ lang, resetSignal }: Props) => {
       invalidateAll();
       const providersResult = Array.isArray(result?.providers) ? result.providers : [];
       const terraIngested = providersResult.reduce((s: number, p: any) => s + (p?.ingested ?? 0), 0);
-      const ingested = terraIngested + stravaCount + suuntoCount;
+      const ingested = terraIngested + stravaCount + suuntoCount + garminCount + strideeCount;
       const msg = lang === "zh" ? result?.message_zh : result?.message_en;
       if (result?.rateLimited && stravaCount === 0 && suuntoCount === 0) {
         toast.info(msg ?? (lang === "zh" ? "請稍後再試" : "Please try again later"));
@@ -1143,7 +1249,7 @@ const ActivitiesTab = ({ lang, resetSignal }: Props) => {
       toast.error(lang === "zh" ? "同步失敗" : "Sync failed");
     }
     setFetchingToday(false);
-  }, [user, fetchingToday, invalidateAll, lang, invokeStravaSync, invokeSuuntoSync, detectProviders]);
+  }, [user, fetchingToday, invalidateAll, lang, invokeStravaSync, invokeSuuntoSync, invokeGarminRailwaySync, invokeStrideeSync, detectProviders]);
 
 
   const handleFetchStrava30Days = useCallback(async () => {
@@ -1200,6 +1306,28 @@ const ActivitiesTab = ({ lang, resetSignal }: Props) => {
     }
     setFetchingToday(false);
   }, [user, fetchingToday, invalidateAll, lang, invokeStravaSync, isPremium, strava2026Key]);
+
+  const [hasStridee, setHasStridee] = useState(false);
+  useEffect(() => {
+    if (!user) return;
+    supabase.from("stridee_connections").select("status").eq("user_id", user.id).eq("status", "connected").maybeSingle()
+      .then(({ data }) => setHasStridee(!!data));
+  }, [user]);
+
+  const handleStrideeHistory = useCallback(async (all: boolean) => {
+    if (!user || fetchingToday) return;
+    if (all && !isPremium) { setUpgradeOpen(true); return; }
+    setFetchingToday(true);
+    toast.info(lang === "zh" ? "正在同步 Garmin 活動，可能需要幾分鐘…" : "Syncing Garmin activities — this can take a few minutes…", { duration: 6000 });
+    const n = await invokeStrideeSync(all ? 1830 : 30, all);
+    invalidateAll();
+    if (all) {
+      toast.success(lang === "zh" ? `已同步 ${n} 個過往活動` : `Synced ${n} past activities`);
+    } else {
+      toast.success(lang === "zh" ? `已同步 ${n} 個近 30 天活動` : `Synced ${n} activities from the past 30 days`);
+    }
+    setFetchingToday(false);
+  }, [user, fetchingToday, lang, invokeStrideeSync, invalidateAll, isPremium]);
 
   const handleFetchYear2026 = useCallback(async () => {
     if (!user || fetchingToday) return;
@@ -1351,16 +1479,20 @@ const ActivitiesTab = ({ lang, resetSignal }: Props) => {
         steps: terraToday?.steps ?? appleToday?.steps ?? 0,
         caloriesBurned: terraToday?.caloriesBurned ?? appleToday?.caloriesBurned ?? 0,
         walkRunDistanceKm: terraToday?.walkRunDistanceKm ?? appleToday?.walkRunDistanceKm ?? 0,
+        // Sleep: Stridee/watch rows first, Apple Health as fallback.
         sleepMinutes:
-          garminSleepMinutes > 0
-            ? garminSleepMinutes
-            : terraToday?.sleepMinutes ?? appleToday?.sleepMinutes ?? 0,
+          terraToday?.sleepMinutes && terraToday.sleepMinutes > 0
+            ? terraToday.sleepMinutes
+            : garminSleepMinutes > 0
+              ? garminSleepMinutes
+              : appleToday?.sleepMinutes ?? 0,
       }
     : null;
 
   return (
     <FadeIn className="px-5 pt-6 max-w-lg mx-auto">
 
+      <AnnouncementBanner lang={lang} />
       <ServiceStatusBanner lang={lang} />
 
       {/* Today Stats: wearable (Terra) daily data wins, Apple Health as fallback */}
@@ -1407,6 +1539,17 @@ const ActivitiesTab = ({ lang, resetSignal }: Props) => {
                   <DropdownMenuItem onClick={handleFetchWeekOnly} disabled={fetchingToday}>
                     {lang === "zh" ? "同步近 7 天活動" : "Sync past 7 days"}
                   </DropdownMenuItem>
+                  {hasStridee && (
+                    <DropdownMenuItem onClick={() => handleStrideeHistory(false)} disabled={fetchingToday}>
+                      {lang === "zh" ? "同步近 30 天活動" : "Sync past 30 days"}
+                    </DropdownMenuItem>
+                  )}
+                  {hasStridee && (
+                    <DropdownMenuItem onClick={() => handleStrideeHistory(true)} disabled={fetchingToday}>
+                      <Lock className={isPremium ? "opacity-0" : ""} style={{ width: 14, height: 14, marginRight: 6 }} />
+                      {lang === "zh" ? "同步全部過往活動" : "Sync all past activities"}
+                    </DropdownMenuItem>
+                  )}
                   {false && isPremium && !year2026Used && (
                     <DropdownMenuItem onClick={handleFetchYear2026} disabled={fetchingToday}>
                       {lang === "zh" ? "同步 2026 全年活動" : "Sync all 2026 activities"}
@@ -1449,11 +1592,17 @@ const ActivitiesTab = ({ lang, resetSignal }: Props) => {
               <h3 className="text-base font-semibold text-foreground mb-1">
                 {lang === "zh" ? "連結健身應用以同步活動" : "Connect a Fitness App to Sync Activities"}
               </h3>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm text-muted-foreground mb-4">
                 {lang === "zh"
-                  ? "前往設定 → 連結應用來連結 Strava 或其他健身平台。"
-                  : "Go to Settings → Connect Apps to link Strava or other fitness platforms."}
+                  ? "連結 Strava 或其他健身平台即可開始同步。"
+                  : "Link Strava or another fitness platform to start syncing."}
               </p>
+              <button
+                onClick={() => navigate({ search: "?page=connect-apps" })}
+                className="inline-flex items-center gap-2 h-10 px-5 rounded-full bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors"
+              >
+                {lang === "zh" ? "前往連結應用" : "Connect Apps"}
+              </button>
             </div>
           ) : (
             <div className="text-center py-8">

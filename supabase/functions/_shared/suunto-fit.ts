@@ -1,6 +1,13 @@
 // Fetch a Suunto workout FIT file and parse out per-sample streams + polyline.
-import FitParser from "npm:fit-file-parser@1.20.1";
+import FitParserModule from "npm:fit-file-parser@1.21.0";
 import { SUUNTO_API_BASE } from "./suunto.ts";
+
+// The package is published as transpiled CommonJS with the constructor under
+// `default` in the Edge runtime.
+const FitParser = ((FitParserModule as unknown as { default?: unknown }).default
+  ?? FitParserModule) as new (options: Record<string, unknown>) => {
+    parse: (input: Uint8Array, callback: (error: unknown, data: unknown) => void) => void;
+  };
 
 type LatLng = [number, number];
 
@@ -66,7 +73,7 @@ export async function fetchSuuntoFit(
 export function parseFit(buffer: ArrayBuffer): Promise<FitDetails> {
   return new Promise((resolve) => {
     try {
-      const parser = new (FitParser as any)({
+      const parser = new FitParser({
         force: true,
         speedUnit: "m/s",
         lengthUnit: "m",

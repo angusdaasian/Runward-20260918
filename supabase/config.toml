@@ -177,3 +177,12 @@ verify_jwt = false
 
 [functions.garmin-poll]
 verify_jwt = false
+
+[functions.stridee-sync]
+verify_jwt = false
+
+[functions.program-completion-report]
+verify_jwt = false
+
+[functions.process-territory]
+verify_jwt = false

@@ -1,7 +1,10 @@
-import { useState, useEffect, useRef, useCallback } from "react";
-import { Megaphone } from "lucide-react";
+import { useEffect, useState } from "react";
+import { AlertOctagon, Info, Megaphone, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Lang } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
+
+export type AnnouncementLevel = "info" | "important" | "urgent";
 
 interface Announcement {
   id: string;
@@ -9,125 +12,76 @@ interface Announcement {
   message: string;
   title_zh: string | null;
   message_zh: string | null;
+  level: AnnouncementLevel;
 }
 
-interface Props {
-  lang: Lang;
-}
+const DISMISS_KEY = "rw_dismissed_announcements";
 
-const AnnouncementBanner = ({ lang }: Props) => {
-  const [announcement, setAnnouncement] = useState<Announcement | null>(null);
-  const [expanded, setExpanded] = useState(false);
-  const [read, setRead] = useState(false);
-  const popoverRef = useRef<HTMLDivElement>(null);
+const readDismissed = (): string[] => {
+  try { return JSON.parse(localStorage.getItem(DISMISS_KEY) || "[]"); } catch { return []; }
+};
 
-  // Drag state
-  const [position, setPosition] = useState({ x: 16, y: 16 });
-  const dragState = useRef<{ dragging: boolean; startX: number; startY: number; origX: number; origY: number }>({
-    dragging: false, startX: 0, startY: 0, origX: 16, origY: 16,
-  });
-  const movedRef = useRef(false);
+const styles: Record<AnnouncementLevel, { box: string; icon: string; Icon: typeof Info }> = {
+  info: { box: "border-primary/35 bg-primary/10", icon: "bg-primary/15 text-primary", Icon: Megaphone },
+  important: { box: "border-warning/35 bg-warning/10", icon: "bg-warning/20 text-warning", Icon: Info },
+  urgent: { box: "border-destructive/35 bg-destructive/10", icon: "bg-destructive/15 text-destructive", Icon: AlertOctagon },
+};
 
-  useEffect(() => {
-    const fetchAnnouncement = async () => {
-      const { data } = await supabase
-        .from("announcements")
-        .select("id, title, message, title_zh, message_zh")
-        .eq("is_active", true)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (data) setAnnouncement(data as Announcement);
-    };
-    fetchAnnouncement();
-  }, []);
+const AnnouncementBanner = ({ lang }: { lang: Lang }) => {
+  const [items, setItems] = useState<Announcement[]>([]);
+  const [dismissed, setDismissed] = useState<string[]>(readDismissed);
 
   useEffect(() => {
-    if (!expanded) return;
-    const handleClickOutside = (e: MouseEvent) => {
-      if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) {
-        setExpanded(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [expanded]);
-
-  const onTouchStart = useCallback((e: React.TouchEvent) => {
-    const touch = e.touches[0];
-    dragState.current = {
-      dragging: true,
-      startX: touch.clientX,
-      startY: touch.clientY,
-      origX: position.x,
-      origY: position.y,
-    };
-    movedRef.current = false;
-  }, [position]);
-
-  const onTouchMove = useCallback((e: React.TouchEvent) => {
-    if (!dragState.current.dragging) return;
-    const touch = e.touches[0];
-    const dx = touch.clientX - dragState.current.startX;
-    const dy = touch.clientY - dragState.current.startY;
-    if (Math.abs(dx) > 4 || Math.abs(dy) > 4) movedRef.current = true;
-    const newX = Math.max(0, Math.min(window.innerWidth - 48, dragState.current.origX + dx));
-    const newY = Math.max(0, Math.min(window.innerHeight - 48, dragState.current.origY + dy));
-    setPosition({ x: newX, y: newY });
+    let active = true;
+    (supabase as any)
+      .from("announcements")
+      .select("id, title, message, title_zh, message_zh, level, display_order, created_at")
+      .eq("is_active", true)
+      .order("display_order", { ascending: true })
+      .order("created_at", { ascending: false })
+      .then(({ data, error }: any) => {
+        if (active && !error) setItems((data as Announcement[]) ?? []);
+      });
+    return () => { active = false; };
   }, []);
 
-  const onTouchEnd = useCallback(() => {
-    dragState.current.dragging = false;
-  }, []);
-
-  const handleClick = () => {
-    if (!movedRef.current) {
-      setExpanded((v) => !v);
-      if (!read) setRead(true);
-    }
+  const dismiss = (id: string) => {
+    const next = [...dismissed, id];
+    setDismissed(next);
+    localStorage.setItem(DISMISS_KEY, JSON.stringify(next));
   };
 
-  if (!announcement) return null;
-
-  const displayTitle = (lang === "zh" && announcement.title_zh) ? announcement.title_zh : announcement.title;
-  const displayMessage = (lang === "zh" && announcement.message_zh) ? announcement.message_zh : announcement.message;
+  // Urgent alerts can't be dismissed so they stay visible until an admin turns them off.
+  const visible = items.filter((a) => a.level === "urgent" || !dismissed.includes(a.id));
+  if (visible.length === 0) return null;
 
   return (
-    <div
-      ref={popoverRef}
-      className="fixed z-50"
-      style={{ left: position.x, top: position.y }}
-    >
-      <button
-        onTouchStart={onTouchStart}
-        onTouchMove={onTouchMove}
-        onTouchEnd={onTouchEnd}
-        onClick={handleClick}
-        className="flex items-center justify-center w-10 h-10 rounded-full bg-primary text-primary-foreground shadow-lg hover:bg-primary/90 transition-all touch-none"
-      >
-        <Megaphone size={18} />
-        {!read && <span className="absolute top-0 right-0 w-2.5 h-2.5 rounded-full bg-destructive animate-pulse" />}
-      </button>
-
-      {expanded && (
-        <div
-          className="absolute top-12 w-72 animate-in fade-in slide-in-from-top-2 bg-card border border-border rounded-xl shadow-lg p-4"
-          style={{
-            left: position.x + 288 > window.innerWidth ? undefined : 0,
-            right: position.x + 288 > window.innerWidth ? 0 : undefined,
-          }}
-        >
-          <div className="flex items-start gap-3">
-            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-              <Megaphone size={16} className="text-primary" />
+    <div className="mb-5 space-y-3">
+      {visible.map((a) => {
+        const s = styles[a.level] ?? styles.info;
+        const title = lang === "zh" && a.title_zh ? a.title_zh : a.title;
+        const message = lang === "zh" && a.message_zh ? a.message_zh : a.message;
+        return (
+          <div key={a.id} className={cn("flex items-start gap-3 rounded-lg border px-3.5 py-3", s.box)}>
+            <div className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-full", s.icon)}>
+              <s.Icon className="h-4 w-4" />
             </div>
-            <div>
-              <h3 className="font-semibold text-foreground text-sm">{displayTitle}</h3>
-              <p className="text-xs text-muted-foreground mt-1 whitespace-pre-wrap">{displayMessage}</p>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-foreground">{title}</p>
+              <p className="mt-0.5 whitespace-pre-wrap text-xs leading-relaxed text-muted-foreground">{message}</p>
             </div>
+            {a.level !== "urgent" && (
+              <button
+                onClick={() => dismiss(a.id)}
+                aria-label={lang === "zh" ? "關閉" : "Dismiss"}
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-muted"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
           </div>
-        </div>
-      )}
+        );
+      })}
     </div>
   );
 };

@@ -17,6 +17,7 @@ type Src =
   | "suunto"
   | "polar"
   | "strava"
+  | "stridee"
   | "terra"
   | "apple_health"
   | "intervals";
@@ -34,6 +35,7 @@ interface Row {
 
 // Higher = prefer to keep. Terra is highest — richest normalized data.
 const SOURCE_PRIORITY: Record<Src, number> = {
+  stridee: 110, // Stridee (Garmin FIT) is the preferred data source
   terra: 100,
   garmin: 90,
   suunto: 80,
@@ -67,7 +69,7 @@ async function loadUserActivities(supabase: any, userId: string, sinceIso: strin
     supabase.from("strava_activities").select("id,distance,moving_time,start_date,sport_type,name,average_heartrate,total_elevation_gain,summary_polyline").eq("user_id", userId).gte("start_date", sinceIso),
     supabase.from("apple_health_activities").select("id,distance,moving_time,start_date,sport_type,name,average_heartrate,total_elevation_gain,calories").eq("user_id", userId).gte("start_date", sinceIso),
     supabase.from("garmin_activities").select("id,distance_meters,duration_seconds,start_time,activity_type,activity_name,average_hr,elevation_gain,summary_polyline,has_gps").eq("user_id", userId).gte("start_time", sinceIso),
-    supabase.from("terra_activities").select("id,distance_meters,duration_seconds,start_time,activity_type,activity_name,average_hr,elevation_gain,summary_polyline,has_gps,provider").eq("user_id", userId).gte("start_time", sinceIso),
+    supabase.from("terra_activities").select("id,distance_meters,duration_seconds,start_time,activity_type,activity_name,average_hr,elevation_gain,summary_polyline,has_gps,provider,terra_activity_id").eq("user_id", userId).gte("start_time", sinceIso),
     supabase.from("suunto_activities").select("id,distance,moving_time,start_date,sport_type,name,average_heartrate,summary_polyline,total_elevation_gain,has_details").eq("user_id", userId).gte("start_date", sinceIso),
     supabase.from("polar_activities").select("id,distance,duration,start_date,sport_type,average_heart_rate,has_route,training_load,calories").eq("user_id", userId).gte("start_date", sinceIso),
     supabase.from("intervals_activities").select("id,distance,moving_time,start_date,sport_type,name,average_heartrate,summary_polyline,total_elevation_gain").eq("user_id", userId).gte("start_date", sinceIso),
@@ -100,7 +102,7 @@ async function loadUserActivities(supabase: any, userId: string, sinceIso: strin
   (strava.data || []).forEach((r: any) => push("strava", r, "start_date", "distance", "moving_time", "sport_type"));
   (apple.data || []).forEach((r: any) => push("apple_health", r, "start_date", "distance", "moving_time", "sport_type"));
   (garmin.data || []).forEach((r: any) => push("garmin", r, "start_time", "distance_meters", "duration_seconds", "activity_type"));
-  (terra.data || []).forEach((r: any) => push("terra", r, "start_time", "distance_meters", "duration_seconds", "activity_type"));
+  (terra.data || []).forEach((r: any) => push(String(r.terra_activity_id ?? "").startsWith("stridee_") ? "stridee" : "terra", r, "start_time", "distance_meters", "duration_seconds", "activity_type"));
   (suunto.data || []).forEach((r: any) => push("suunto", r, "start_date", "distance", "moving_time", "sport_type"));
   (polar.data || []).forEach((r: any) => push("polar", r, "start_date", "distance", "duration", "sport_type"));
   (intervals.data || []).forEach((r: any) => push("intervals", r, "start_date", "distance", "moving_time", "sport_type"));
@@ -162,6 +164,7 @@ const TABLE_FOR: Record<Src, string> = {
   apple_health: "apple_health_activities",
   garmin: "garmin_activities",
   terra: "terra_activities",
+  stridee: "terra_activities",
   suunto: "suunto_activities",
   polar: "polar_activities",
   intervals: "intervals_activities",
@@ -249,6 +252,18 @@ async function dedupUser(supabase: any, userId: string, sinceIso: string, dryRun
       const table = TABLE_FOR[src];
       for (let k = 0; k < ids.length; k += 100) {
         const chunk = ids.slice(k, k + 100);
+        // Archive the full original row before removing it from the visible list,
+        // so no source data is ever lost.
+        const { data: full } = await supabase.from(table).select("*").eq("user_id", userId).in("id", chunk);
+        const archive = (full || []).map((r: any) => {
+          const d = details.find((x) => x.drop === `${src}:${r.id}`);
+          const [ks, ki] = (d?.keep || ":").split(":");
+          return { user_id: userId, source_table: table, source_id: String(r.id), kept_source: ks || null, kept_id: ki || null, reason: d?.reason ?? null, row_data: r };
+        });
+        if (archive.length) {
+          const { error: aErr } = await supabase.from("deduplicated_activities").upsert(archive, { onConflict: "source_table,source_id" });
+          if (aErr) { console.error(`[dedup] archive failed table=${table}`, aErr); continue; }
+        }
         const { error } = await supabase.from(table).delete().eq("user_id", userId).in("id", chunk);
         if (error) {
           console.error(`[dedup] delete failed table=${table} user=${userId}`, error);

@@ -362,8 +362,10 @@ export type Database = {
         Row: {
           created_at: string
           created_by: string
+          display_order: number
           id: string
           is_active: boolean
+          level: string
           message: string
           message_zh: string | null
           title: string
@@ -373,8 +375,10 @@ export type Database = {
         Insert: {
           created_at?: string
           created_by: string
+          display_order?: number
           id?: string
           is_active?: boolean
+          level?: string
           message: string
           message_zh?: string | null
           title: string
@@ -384,8 +388,10 @@ export type Database = {
         Update: {
           created_at?: string
           created_by?: string
+          display_order?: number
           id?: string
           is_active?: boolean
+          level?: string
           message?: string
           message_zh?: string | null
           title?: string

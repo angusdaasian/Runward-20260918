@@ -14,7 +14,7 @@ import { toast } from "sonner";
 type Level = "info" | "important" | "urgent";
 const LEVELS: { value: Level; label: string; cls: string }[] = [
   { value: "info", label: "Info", cls: "bg-primary text-primary-foreground" },
-  { value: "important", label: "Important", cls: "bg-warning text-warning-foreground" },
+  { value: "important", label: "Important", cls: "bg-warning text-foreground" },
   { value: "urgent", label: "Urgent (can't dismiss)", cls: "bg-destructive text-destructive-foreground" },
 ];
 const LevelPicker = ({ value, onChange }: { value: Level; onChange: (l: Level) => void }) => (

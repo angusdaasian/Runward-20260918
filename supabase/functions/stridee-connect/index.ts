@@ -95,9 +95,12 @@ Deno.serve(async (req) => {
     const native = body?.native === true;
     // Stridee appends `?status=...&user_id=...` to this value. Keep the native
     // marker in the path so its query string cannot corrupt the deeplink scheme.
+    // Return to whichever site the person connected from (validated https origin).
+    const rawOrigin = typeof body?.origin === "string" ? body.origin : "";
+    const site = /^https:\/\/[a-z0-9.-]+(:\d+)?$/i.test(rawOrigin) ? rawOrigin : "https://angustest.site";
     const returnUri = native
-      ? `https://angustest.site/stridee-return/native/${provider}`
-      : `https://angustest.site/stridee-return/${provider}`;
+      ? `${site}/stridee-return/native/${provider}`
+      : `${site}/stridee-return/${provider}`;
     const res = await strideeFetch("POST", "/v1/connect", {
       provider,
       external_user_id: user.id,

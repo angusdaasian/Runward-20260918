@@ -1545,9 +1545,14 @@ const ActivitiesTab = ({ lang, resetSignal }: Props) => {
                     </DropdownMenuItem>
                   )}
                   {hasStridee && (
-                    <DropdownMenuItem onClick={() => handleStrideeHistory(true)} disabled={fetchingToday}>
-                      <Lock className={isPremium ? "opacity-0" : ""} style={{ width: 14, height: 14, marginRight: 6 }} />
-                      {lang === "zh" ? "同步全部過往活動" : "Sync all past activities"}
+                    <DropdownMenuItem onClick={() => handleStrideeHistory(true)} disabled={fetchingToday} className="flex-col items-start gap-0.5">
+                      <span className="flex items-center">
+                        <Lock className={isPremium ? "opacity-0" : ""} style={{ width: 14, height: 14, marginRight: 6 }} />
+                        {lang === "zh" ? "同步全部過往活動" : "Sync all past activities"}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        {lang === "zh" ? "約需 10–20 分鐘" : "Takes around 10–20 mins"}
+                      </span>
                     </DropdownMenuItem>
                   )}
                   {false && isPremium && !year2026Used && (

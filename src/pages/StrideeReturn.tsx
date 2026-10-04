@@ -10,7 +10,9 @@ export default function StrideeReturn() {
   const segs = window.location.pathname.split("/").filter(Boolean);
   const isNativeReturn = segs.includes("native");
   const NAMES: Record<string, string> = { garmin: "Garmin", coros: "COROS", polar: "Polar", fitbit: "Fitbit", zepp: "Zepp (Amazfit)" };
-  const brand = NAMES[(params.get("provider") ?? segs[segs.length - 1] ?? "").toLowerCase()] ?? "Watch";
+  let pending = "";
+  try { pending = localStorage.getItem("rw_pending_stridee_provider") ?? ""; } catch { /* ignore */ }
+  const brand = NAMES[(params.get("provider") ?? (segs.length > 1 ? segs[segs.length - 1] : pending) ?? "").toLowerCase()] ?? "Watch";
   const [done, setDone] = useState(false);
   const [external, setExternal] = useState(false);
 

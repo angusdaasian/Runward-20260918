@@ -114,7 +114,12 @@ Deno.serve(async (req) => {
     const REGISTERED_SITES = ["https://runward.site", "https://angustest.site"];
     const rawOrigin = typeof body?.origin === "string" ? body.origin.replace(/\/$/, "") : "";
     const site = REGISTERED_SITES.includes(rawOrigin) ? rawOrigin : "https://runward.site";
-    const returnUri = native
+    // App-scheme return (Stridee 2026-09-28): the consent sheet closes straight
+    // back into the Despia app. Must exactly match a registered Return URI.
+    const APP_SCHEME_RETURN = "runward://oauth/stridee-return";
+    const returnUri = body?.app_scheme === true
+      ? APP_SCHEME_RETURN
+      : native
       ? `${site}/stridee-return/native/${provider}`
       : `${site}/stridee-return/${provider}`;
     // Consent-page language: Stridee accepts lang on POST /v1/connect; any zh

@@ -57,6 +57,7 @@ import DeveloperAppsManager from "@/components/admin/DeveloperAppsManager";
 import AdminLlamaTraining from "@/components/admin/AdminLlamaTraining";
 import BlogManager from "@/components/admin/BlogManager";
 import ServiceStatusManager from "@/components/admin/ServiceStatusManager";
+import DataStatusManager from "@/components/admin/DataStatusManager";
 
 interface UserRow {
   user_id: string;
@@ -77,6 +78,7 @@ type TabKey =
   | "llama"
   | "notifications"
   | "status"
+  | "data"
   | "announcements"
   | "promo"
   | "rewards"
@@ -95,6 +97,7 @@ const TABS: { key: TabKey; label: string; icon: React.ComponentType<{ className?
   { key: "llama", label: "Llama Training", icon: Brain },
   { key: "notifications", label: "Notifications", icon: Bell },
   { key: "status", label: "Service Status", icon: ActivityIcon },
+  { key: "data", label: "Data Status", icon: ActivityIcon },
   { key: "announcements", label: "Announcements", icon: Megaphone },
   { key: "promo", label: "Promo Banners", icon: ImageIcon },
   { key: "rewards", label: "Reward Codes", icon: Gift },
@@ -123,6 +126,8 @@ const AdminPanel = () => {
   const navigate = useNavigate();
   const [users, setUsers] = useState<UserRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [pageSize, setPageSize] = useState<"10" | "50" | "all">("10");
+  const [page, setPage] = useState(0);
   const [activeTab, setActiveTab] = useState<TabKey>(() => initialAdminTab());
   const [restoring, setRestoring] = useState(false);
   const [grantTarget, setGrantTarget] = useState<UserRow | null>(null);
@@ -329,7 +334,7 @@ const AdminPanel = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {users.map((u) => {
+                  {(pageSize === "all" ? users : users.slice(page * Number(pageSize), (page + 1) * Number(pageSize))).map((u) => {
                     const active = isPremiumActive(u.premium_expires);
                     const method = u.is_trial
                       ? "Trial"
@@ -377,6 +382,27 @@ const AdminPanel = () => {
                   })}
                 </TableBody>
               </Table>
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-4">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  Show
+                  <Select value={pageSize} onValueChange={(v) => { setPageSize(v as any); setPage(0); }}>
+                    <SelectTrigger className="w-20 h-8"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="10">10</SelectItem>
+                      <SelectItem value="50">50</SelectItem>
+                      <SelectItem value="all">All</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  of {users.length}
+                </div>
+                {pageSize !== "all" && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <Button size="sm" variant="outline" disabled={page === 0} onClick={() => setPage((p) => p - 1)}>Previous</Button>
+                    <span className="text-muted-foreground">Page {page + 1} / {Math.max(1, Math.ceil(users.length / Number(pageSize)))}</span>
+                    <Button size="sm" variant="outline" disabled={(page + 1) * Number(pageSize) >= users.length} onClick={() => setPage((p) => p + 1)}>Next</Button>
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </CardContent>
@@ -438,6 +464,8 @@ const AdminPanel = () => {
         );
       case "status":
         return <ServiceStatusManager />;
+      case "data":
+        return <DataStatusManager />;
       case "announcements":
         return <AnnouncementManager />;
       case "promo":

@@ -119,6 +119,11 @@ Deno.serve(async (req) => {
     // Stridee wants a reverse-domain scheme (com.despia.runward). Must exactly
     // match a registered Return URI.
     const APP_SCHEME_RETURN = "com.despia.runward:/oauth/stridee-return";
+    const returnUri = body?.app_scheme === true
+      ? APP_SCHEME_RETURN
+      : native
+      ? `${site}/stridee-return/native/${provider}`
+      : `${site}/stridee-return/${provider}`;
     // Consent-page language: Stridee accepts lang on POST /v1/connect; any zh
     // tag (zh-TW included) gets Simplified Chinese. English is the default.
     const lang = typeof body?.lang === "string" && /^zh(-|$)/i.test(body.lang) ? "zh-TW" : "en";

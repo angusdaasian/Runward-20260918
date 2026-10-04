@@ -60,7 +60,8 @@ export default function StrideeTestCard({ lang, blockedByOther = false, onBefore
     setBusy(provider);
     if (!isAdmin && onBeforeConnect) await onBeforeConnect();
     // Testing (admins, Garmin): return straight into the app via runward:// scheme.
-    const appScheme = isDespiaUA() && isAdmin && provider === "garmin";
+    // App-scheme return disabled (didn't reopen app); Garmin uses the Safari web return flow.
+    const appScheme = false;
     try { localStorage.setItem("rw_pending_stridee_provider", provider); } catch { /* ignore */ }
     const { data, error } = await supabase.functions.invoke("stridee-connect", {
       // Garmin: Safari-only flow — no in-app window, plain return page.

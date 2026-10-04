@@ -46,7 +46,7 @@ import PlanComparisonDialog from "@/components/PlanComparisonDialog";
 import ActivityShoePicker from "./ActivityShoePicker";
 import ActivityPhotos from "./ActivityPhotos";
 import { useActivityPhotos } from "@/hooks/use-activity-photos";
-import { detectIntervals, formatRepDistance } from "@/lib/detectIntervals";
+import { detectIntervals, isIntervalSession, formatRepDistance } from "@/lib/detectIntervals";
 import GarminAttribution from "@/components/brand/GarminAttribution";
 
 
@@ -862,8 +862,10 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
   // per-second distance samples, independent of the watch's auto-laps.
   const smartReps = useMemo(() => {
     if (!isRunningActivity) return null;
-    return detectIntervals(activity.distance_samples, activity.hr_samples);
-  }, [activity.distance_samples, activity.hr_samples, isRunningActivity]);
+    const result = detectIntervals(activity.distance_samples, activity.hr_samples);
+    // Only show the smart-interval view on genuine interval runs.
+    return isIntervalSession(result, { name: activityName, laps: splits }) ? result : null;
+  }, [activity.distance_samples, activity.hr_samples, isRunningActivity, activityName, splits]);
 
   useEffect(() => {
     if (splitView === "reps" && !smartReps) setSplitView("laps");

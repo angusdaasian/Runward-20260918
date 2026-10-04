@@ -115,8 +115,10 @@ Deno.serve(async (req) => {
     const rawOrigin = typeof body?.origin === "string" ? body.origin.replace(/\/$/, "") : "";
     const site = REGISTERED_SITES.includes(rawOrigin) ? rawOrigin : "https://runward.site";
     // App-scheme return (Stridee 2026-09-28): the consent sheet closes straight
-    // back into the Despia app. Must exactly match a registered Return URI.
-    const APP_SCHEME_RETURN = "runward://oauth/stridee-return";
+    // back into the Despia app. Single-word schemes like runward:// are refused;
+    // Stridee wants a reverse-domain scheme (com.despia.runward). Must exactly
+    // match a registered Return URI.
+    const APP_SCHEME_RETURN = "com.despia.runward:/oauth/stridee-return";
     const returnUri = body?.app_scheme === true
       ? APP_SCHEME_RETURN
       : native

@@ -42,6 +42,13 @@ function polyfillGeoJSON(geom: any): string[] {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
+  // Internal-only: called by process-territory with the service key.
+  const svc = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+  const bearer = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
+  if (!svc || (bearer !== svc && req.headers.get("apikey") !== svc)) {
+    return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: corsHeaders });
+  }
+
   try {
     const { hex_id } = await req.json();
     if (!hex_id || typeof hex_id !== "string") {
@@ -111,7 +118,9 @@ Deno.serve(async (req) => {
 
     return new Response(JSON.stringify({ slug }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (e) {
-    console.error("resolve-city error", e);
-    return new Response(JSON.stringify({ error: String(e) }), { status: 500, headers: corsHeaders });
+    // Map-lookup hiccups (e.g. OpenStreetMap rate limits) are not fatal: the
+    // hex is simply retried on a later run.
+    console.warn("resolve-city skipped", String(e).slice(0, 200));
+    return new Response(JSON.stringify({ slug: null, reason: "lookup_failed" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 });

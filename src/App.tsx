@@ -19,7 +19,7 @@ const Landing = lazy(() => import("./pages/Landing.tsx"));
 const ReviewLanding = lazy(() => import("./pages/ReviewLanding.tsx"));
 const Blog = lazy(() => import("./pages/Blog.tsx"));
 const BlogPost = lazy(() => import("./pages/BlogPost.tsx"));
-
+const Changelog = lazy(() => import("./pages/Changelog.tsx"));
 const NotFound = lazy(() => import("./pages/NotFound.tsx"));
 const AdminPanel = lazy(() => import("./pages/AdminPanel.tsx"));
 const AppleCallback = lazy(() => import("./pages/AppleCallback.tsx"));
@@ -111,6 +111,7 @@ const App = () => (
                 <Route path="/blog" element={<Blog />} />
                 <Route path="/blog/:slug" element={<BlogPost />} />
                 <Route path="/guide" element={<Guide />} />
+                <Route path="/changelog" element={<Changelog />} />
                 
 
                 <Route path="/callback/apple" element={<AppleCallback />} />
@@ -121,6 +122,7 @@ const App = () => (
                 <Route path="/delete-account" element={<DeleteAccount />} />
                 <Route path="/terra-return" element={<TerraReturn />} />
                 <Route path="/stridee-return/*" element={<StrideeReturn />} />
+                <Route path="/oauth/stridee-return/*" element={<StrideeReturn />} />
                 <Route path="/stridee-bridge" element={<StrideeBridge />} />
                 <Route path="/suunto-return" element={<SuuntoReturn />} />
                 <Route path="/suunto/callback" element={<SuuntoReturn />} />

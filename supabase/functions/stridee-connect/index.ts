@@ -6,6 +6,19 @@ import { strideeFetch } from "../_shared/stridee.ts";
 const json = (b: unknown, status = 200) =>
   new Response(JSON.stringify(b), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
+// New connections: import the past 30 days in the background (auto-sync stays on).
+function kickoff30(userId: string) {
+  const key = Deno.env.get("WEBHOOK_AUTH_KEY");
+  if (!key) return;
+  const p = fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/stridee-sync`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-webhook-key": key },
+    body: JSON.stringify({ user_id: userId, days: 30, chain: true }),
+  }).catch((e) => console.warn("[stridee-connect] backfill kickoff", e));
+  // @ts-ignore EdgeRuntime exists on Supabase Edge
+  try { EdgeRuntime.waitUntil(p); } catch { /* detached */ }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   try {
@@ -21,6 +34,7 @@ Deno.serve(async (req) => {
       await adminPub.from("stridee_connections")
         .update({ status: "connected", providers: list, connected_at: new Date().toISOString(), updated_at: new Date().toISOString() })
         .eq("user_id", row.user_id);
+      kickoff30(row.user_id);
       return json({ ok: true });
     }
     if (pre?.action === "status_public" && typeof pre.stridee_user_id === "string" && pre.stridee_user_id) {
@@ -51,6 +65,7 @@ Deno.serve(async (req) => {
         user_id: user.id, stridee_user_id: sid, status: "connected", providers: list, auto_sync_enabled: true,
         connected_at: new Date().toISOString(), updated_at: new Date().toISOString(),
       }, { onConflict: "user_id" });
+      kickoff30(user.id);
       return json({ ok: true });
     }
 
@@ -95,16 +110,28 @@ Deno.serve(async (req) => {
     const native = body?.native === true;
     // Stridee appends `?status=...&user_id=...` to this value. Keep the native
     // marker in the path so its query string cannot corrupt the deeplink scheme.
-    // Return to whichever site the person connected from (validated https origin).
-    const rawOrigin = typeof body?.origin === "string" ? body.origin : "";
-    const site = /^https:\/\/[a-z0-9.-]+(:\d+)?$/i.test(rawOrigin) ? rawOrigin : "https://angustest.site";
-    const returnUri = native
+    // Return to the connecting site only if it's registered with Stridee; otherwise use runward.site.
+    const REGISTERED_SITES = ["https://runward.site", "https://angustest.site"];
+    const rawOrigin = typeof body?.origin === "string" ? body.origin.replace(/\/$/, "") : "";
+    const site = REGISTERED_SITES.includes(rawOrigin) ? rawOrigin : "https://runward.site";
+    // App-scheme return (Stridee 2026-09-28): the consent sheet closes straight
+    // back into the Despia app. Single-word schemes like runward:// are refused;
+    // Stridee wants a reverse-domain scheme (com.despia.runward). Must exactly
+    // match a registered Return URI.
+    const APP_SCHEME_RETURN = "com.despia.runward:/oauth/stridee-return";
+    const returnUri = body?.app_scheme === true
+      ? APP_SCHEME_RETURN
+      : native
       ? `${site}/stridee-return/native/${provider}`
       : `${site}/stridee-return/${provider}`;
+    // Consent-page language: Stridee accepts lang on POST /v1/connect; any zh
+    // tag (zh-TW included) gets Simplified Chinese. English is the default.
+    const lang = typeof body?.lang === "string" && /^zh(-|$)/i.test(body.lang) ? "zh-TW" : "en";
     const res = await strideeFetch("POST", "/v1/connect", {
       provider,
       external_user_id: user.id,
       return_uri: returnUri,
+      lang,
     });
     const text = await res.text();
     if (!res.ok) {

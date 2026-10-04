@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, lazy, Suspense } from "react";
 import { Lang, t } from "@/lib/i18n";
+const RoutesSection = lazy(() => import("@/components/training/RoutesSection"));
 import { getMainPaces, predictTime, formatTime, raceDistances } from "@/lib/vdot";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -1519,7 +1520,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
   const mainPaces = activeScore ? getMainPaces(activeScore) : [];
 
   // Program section
-  const [section, setSection] = useState<"training" | "free" | "program" | "custom">("training");
+  const [section, setSection] = useState<"training" | "free" | "program" | "custom" | "routes">("training");
   const [showPlanConflict, setShowPlanConflict] = useState(false);
   const [pendingSection, setPendingSection] = useState<"free" | "program" | "custom" | null>(null);
 
@@ -2500,7 +2501,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
 
   // Section switch — allow free browsing, no conflict checks here
   const hasAnyPlan = !!(existingPlan || customExistingPlan);
-  const handleSectionSwitch = (target: "training" | "free" | "program" | "custom") => {
+  const handleSectionSwitch = (target: "training" | "free" | "program" | "custom" | "routes") => {
     setSection(target);
   };
 
@@ -2671,6 +2672,7 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
           { id: "free", label: lang === "zh" ? "免費" : "Free" },
           { id: "program", label: "AI", showLock: !isPremium },
           ...(simpleMode ? [] : [{ id: "custom" as const, label: lang === "zh" ? "自訂" : "Custom" }]),
+          { id: "routes", label: lang === "zh" ? "路線" : "Routes" },
         ] as const).map((s) => (
           <button
             key={s.id}
@@ -2686,6 +2688,10 @@ const TrainingTab = ({ score, setScore, lang, onLoginRequest }: Props) => {
           </button>
         ))}
       </div>
+
+      {section === "routes" && (
+        <Suspense fallback={null}><RoutesSection lang={lang} /></Suspense>
+      )}
 
       {/* ═══════════ SECTION: PACES (Calculator + Paces) ═══════════ */}
       {section === "training" && (

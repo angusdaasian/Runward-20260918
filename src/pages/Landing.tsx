@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { CURRENT_VERSION } from "@/data/changelog";
 import { Globe, Smartphone, ChevronRight, CheckCircle2, Check, X, Crown, Sparkles, Target, KeyRound } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -499,6 +500,9 @@ const Landing = () => {
             <img src={poweredByStrava.url} alt="Powered by Strava" className="h-5" />
           </div>
           <div className="flex gap-6">
+            <Link to="/changelog" className="hover:text-foreground transition-colors">
+              {zh ? `更新日誌 v${CURRENT_VERSION}` : `Changelog v${CURRENT_VERSION}`}
+            </Link>
             <Link to="/blog" className="hover:text-foreground transition-colors">
               {zh ? "跑步文章" : "Blog"}
             </Link>

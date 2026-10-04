@@ -45,16 +45,27 @@ Deno.serve(async (req) => {
     const premium = await isPremium(admin, user.id);
     const wantAll = body?.all === true;
     if (wantAll && !premium) return json({ error: "premium_required" }, 402);
+    if (wantAll && !internal) {
+      // Full history already imported once — refuse repeats to protect the database.
+      const { data: old } = await admin.from("terra_activities").select("id").eq("user_id", user.id)
+        .like("terra_activity_id", "stridee_%").lt("start_time", "2026-01-01").limit(1);
+      if (old?.length) return json({ ok: true, connected: true, premium, stored: 0, remaining: 0, already_done: true });
+    }
     let days = wantAll ? ALL_DAYS : Math.max(1, Math.min(Number(body?.days) || 7, ALL_DAYS));
     if (!premium) days = Math.min(days, FREE_DAYS);
     const cutoff = Date.now() - days * 86400_000;
 
     // History replays are "received" recently even for old runs, so list by a
     // wide received window and filter on the run's own start time.
+    // SAFETY: an unscoped list returns every connected account's activities.
+    // Require the provider user id, query by it, and drop any row not owned by it.
+    const sid = (conn as any).stridee_user_id as string | null;
+    if (!sid) return json({ error: "missing_provider_user", stored: 0 }, 409);
     const all: any[] = [];
     let cursor: string | undefined;
     for (let page = 0; page < 25; page++) {
       const qs = new URLSearchParams({
+        user_id: sid,
         external_user_id: user.id,
         since: new Date(Date.now() - ALL_DAYS * 86400_000).toISOString(),
         until: new Date().toISOString(),
@@ -69,7 +80,15 @@ Deno.serve(async (req) => {
       cursor = b.has_more ? b.next_starting_after : undefined;
       if (!cursor) break;
     }
-    const inWindow = all.filter((a) => {
+    const owned = all.filter((a) => {
+      const owner = a.user_id ?? a.user?.id ?? null;
+      const ext = a.external_user_id ?? a.user?.external_user_id ?? null;
+      if (ext) return ext === user.id;
+      return owner === sid;
+    });
+    console.log("[stridee-sync] list", user.id.slice(0,8), "all", all.length, "owned", owned.length, "sample", JSON.stringify(Object.keys(all[0] ?? {})));
+    if (owned.length !== all.length) console.warn("[stridee-sync] dropped foreign activities", all.length - owned.length);
+    const inWindow = owned.filter((a) => {
       const t = Date.parse(a.start_time ?? a.received_at ?? "");
       return Number.isFinite(t) && t >= cutoff;
     });
@@ -91,16 +110,17 @@ Deno.serve(async (req) => {
     if (!internal) { try { wellness = await syncStrideeWellness(admin, user.id, (conn as any).stridee_user_id ?? null, Math.min(days, 60)); } catch (e) { console.error("[stridee-sync] wellness", e); } }
     const remaining = Math.max(0, todo.length - batch.length);
     const patch: Record<string, unknown> = { last_synced_at: new Date().toISOString() };
-    if (wantAll && remaining === 0) patch.auto_sync_enabled = true;
+    const chain = wantAll || (internal && body?.chain === true);
+    if ((wantAll || chain) && remaining === 0) patch.auto_sync_enabled = true;
     await admin.from("stridee_connections").update(patch).eq("user_id", user.id);
     if (stored > 0) triggerCrossPlatformDedup(user.id, days * 24);
 
     // Full-history backfill continues server-side in the background.
-    if (wantAll && remaining > 0 && whKey && (stored > 0 || failed < batch.length)) {
+    if (chain && remaining > 0 && whKey && (stored > 0 || failed < batch.length)) {
       const next = fetch(`${url}/functions/v1/stridee-sync`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-webhook-key": whKey },
-        body: JSON.stringify({ all: true, user_id: user.id }),
+        body: JSON.stringify(wantAll ? { all: true, user_id: user.id } : { days, chain: true, user_id: user.id }),
       }).catch((e) => console.warn("[stridee-sync] chain failed", e));
       // @ts-ignore EdgeRuntime exists on Supabase Edge
       try { EdgeRuntime.waitUntil(next); } catch { /* detached */ }

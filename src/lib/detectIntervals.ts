@@ -269,3 +269,47 @@ export function detectIntervals(
   if (repCount < MIN_REPS) return null;
   return { segments, repCount };
 }
+
+const INTERVAL_NAME_RE = /interval|repeat|fartlek|track|speed ?work|\d+\s*[x×]\s*\d+|間歇|間隔|間跑|法特雷克|變速|配速跑|田徑場|跑道/i;
+
+export interface IntervalGateInput {
+  name?: string | null;
+  /** Watch laps (any unit), each with average_speed in m/s. */
+  laps?: { average_speed?: number | null; distance?: number | null }[] | null;
+}
+
+/**
+ * Decides whether a detection result is a genuine interval session, so the
+ * smart-interval view only appears on real interval runs. Easy runs with
+ * traffic-light stops or hills must not qualify.
+ * Accepts when ANY holds:
+ *  1. Activity name says interval/repeats/fartlek/track/NxM (EN + 中文).
+ *  2. Watch laps already show work/rest structure (fastest/slowest lap ≥ 1.4, ≥ 3 laps).
+ *  3. Pace pattern alone: ≥ 3 reps and either
+ *     a. a warm-up or cool-down exists and reps are ≥ 10% faster than it, or
+ *     b. recoveries are moving (jog, ≥ 1.2 m/s) and reps are ≥ 25% faster than them.
+ *  Recoveries that are just stops with no warm-up contrast are rejected.
+ */
+export function isIntervalSession(result: DetectIntervalsResult | null, input: IntervalGateInput = {}): boolean {
+  if (!result) return false;
+  if (input.name && INTERVAL_NAME_RE.test(input.name)) return true;
+
+  const lapSpeeds = (input.laps ?? [])
+    .filter((l) => (l.distance ?? 0) > 0)
+    .map((l) => Number(l.average_speed) || 0)
+    .filter((v) => v > 0);
+  if (lapSpeeds.length >= 3 && Math.max(...lapSpeeds) / Math.min(...lapSpeeds) >= 1.4) return true;
+
+  if (result.repCount < 3) return false;
+  const speedOf = (kinds: RepKind[]) => {
+    let d = 0, t = 0;
+    for (const s of result.segments) if (kinds.includes(s.kind)) { d += s.distance; t += s.elapsed_time; }
+    return t > 0 ? d / t : 0;
+  };
+  const rep = speedOf(["rep"]);
+  const warmCool = speedOf(["warmup", "cooldown"]);
+  const rest = speedOf(["rest"]);
+  if (warmCool > 0 && rep >= warmCool * 1.1) return true;
+  if (rest >= 1.2 && rep >= rest * 1.25) return true;
+  return false;
+}

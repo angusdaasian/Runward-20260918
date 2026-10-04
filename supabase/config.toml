@@ -22,7 +22,8 @@ verify_jwt = false
 [functions.terra-tick-all]
 verify_jwt = false
 
-[functions.terra-today-oneoff-tick]
+
+[functions.resolve-city]
 verify_jwt = false
 
 [functions.terra-webhook-test]
@@ -185,4 +186,7 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.process-territory]
+verify_jwt = false
+
+[functions.admin-data-status]
 verify_jwt = false

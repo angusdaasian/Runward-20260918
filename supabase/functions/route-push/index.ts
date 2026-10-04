@@ -6,6 +6,15 @@ import { strideeFetch } from "../_shared/stridee.ts";
 const json = (b: unknown, status = 200) =>
   new Response(JSON.stringify(b), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
+function toBase64(value: string) {
+  const bytes = new TextEncoder().encode(value);
+  let binary = "";
+  for (let index = 0; index < bytes.length; index += 8192) {
+    binary += String.fromCharCode(...bytes.subarray(index, index + 8192));
+  }
+  return btoa(binary);
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   try {
@@ -30,7 +39,7 @@ Deno.serve(async (req) => {
       return json({ error: "no_garmin", message: "Connect a Garmin watch to send routes" }, 409);
     }
 
-    const file = btoa(String.fromCharCode(...new TextEncoder().encode(gpx)));
+    const file = toBase64(gpx);
     const res = await strideeFetch("POST", "/v1/routes", {
       user_id: conn.stridee_user_id, file, name: name || "RunWard route", sport: "running", provider: "garmin",
     });

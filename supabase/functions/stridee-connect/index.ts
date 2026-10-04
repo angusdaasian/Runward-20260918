@@ -102,10 +102,14 @@ Deno.serve(async (req) => {
     const returnUri = native
       ? `${site}/stridee-return/native/${provider}`
       : `${site}/stridee-return/${provider}`;
+    // Consent-page language: Stridee accepts lang on POST /v1/connect; any zh
+    // tag (zh-TW included) gets Simplified Chinese. English is the default.
+    const lang = typeof body?.lang === "string" && /^zh(-|$)/i.test(body.lang) ? "zh-TW" : "en";
     const res = await strideeFetch("POST", "/v1/connect", {
       provider,
       external_user_id: user.id,
       return_uri: returnUri,
+      lang,
     });
     const text = await res.text();
     if (!res.ok) {

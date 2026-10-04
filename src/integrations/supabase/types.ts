@@ -2426,6 +2426,7 @@ export type Database = {
       stridee_connections: {
         Row: {
           auto_sync_enabled: boolean
+          backfill_notice_pending: boolean
           connected_at: string | null
           created_at: string
           id: string
@@ -2439,6 +2440,7 @@ export type Database = {
         }
         Insert: {
           auto_sync_enabled?: boolean
+          backfill_notice_pending?: boolean
           connected_at?: string | null
           created_at?: string
           id?: string
@@ -2452,6 +2454,7 @@ export type Database = {
         }
         Update: {
           auto_sync_enabled?: boolean
+          backfill_notice_pending?: boolean
           connected_at?: string | null
           created_at?: string
           id?: string
@@ -3964,6 +3967,7 @@ export type Database = {
         Args: { p_message_id: string }
         Returns: undefined
       }
+      dismiss_stridee_backfill_notice: { Args: never; Returns: undefined }
       gen_group_invite_code: { Args: never; Returns: string }
       get_activity_comments: {
         Args: { p_source: string; p_source_id: string }

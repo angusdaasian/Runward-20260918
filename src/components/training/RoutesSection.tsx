@@ -90,18 +90,18 @@ function RouteMap({ pts }: { pts: [number, number][] }) {
 
   if (!scene) return <div className="h-32 w-full bg-muted" />;
   return (
-    <div className="relative h-32 w-full overflow-hidden bg-muted">
-      {scene.tiles.map((tile) => (
-        <img
-          key={`${tile.x}-${tile.y}`}
-          src={`https://tile.openstreetmap.org/${scene.zoom}/${tile.x}/${tile.y}.png`}
-          alt=""
-          loading="lazy"
-          className="pointer-events-none absolute max-w-none"
-          style={{ width: TILE_SIZE / 2, height: TILE_SIZE / 2, left: tile.left / 2, top: tile.top / 2 }}
-        />
-      ))}
-      <svg viewBox={`0 0 ${MAP_WIDTH} ${MAP_HEIGHT}`} className="absolute inset-0 h-full w-full" aria-hidden="true">
+    <div className="relative aspect-[30/13] w-full overflow-hidden bg-muted">
+      <svg viewBox={`0 0 ${MAP_WIDTH} ${MAP_HEIGHT}`} className="absolute inset-0 h-full w-full" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+        {scene.tiles.map((tile) => (
+          <image
+            key={`${tile.x}-${tile.y}`}
+            href={`https://tile.openstreetmap.org/${scene.zoom}/${tile.x}/${tile.y}.png`}
+            x={tile.left}
+            y={tile.top}
+            width={TILE_SIZE}
+            height={TILE_SIZE}
+          />
+        ))}
         <path d={scene.path} fill="none" stroke="hsl(var(--background))" strokeWidth={12} strokeLinejoin="round" strokeLinecap="round" />
         <path d={scene.path} fill="none" stroke="hsl(var(--primary))" strokeWidth={7} strokeLinejoin="round" strokeLinecap="round" />
       </svg>

@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { decodePolyline } from "@/lib/territory";
 import { toast } from "sonner";
-import { Download, Watch, Loader2, Globe2 } from "lucide-react";
+import { Download, Watch, Loader2, Globe2, ZoomIn, ZoomOut, Expand } from "lucide-react";
 
 type Route = {
   source: string; source_id: string; user_id: string; display_name: string | null; started_at: string;

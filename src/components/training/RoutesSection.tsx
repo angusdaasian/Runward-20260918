@@ -187,6 +187,7 @@ function RouteMap({ pts, onExpand }: { pts: [number, number][]; onExpand: () => 
 export default function RoutesSection({ lang }: { lang: "en" | "zh" | string }) {
   const zh = lang === "zh";
   const [routes, setRoutes] = useState<Route[] | null>(null);
+  const [zoomPts, setZoomPts] = useState<[number, number][] | null>(null);
   const [cities, setCities] = useState<TerritoryCity[]>([]);
   const [q, setQ] = useState("");
   const [bucket, setBucket] = useState("all");
@@ -334,7 +335,7 @@ export default function RoutesSection({ lang }: { lang: "en" | "zh" | string }) 
             const pts = trimmedPoints(r.summary_polyline);
             return (
               <div key={key} className="overflow-hidden rounded-lg border border-border bg-card">
-                <RouteMap pts={pts} />
+                <RouteMap pts={pts} onExpand={() => setZoomPts(pts)} />
                 <div className="p-3">
                   <div className="min-w-0">
                     <p className="truncate font-semibold text-foreground">{r.activity_name || (zh ? "路線" : "Route")}</p>

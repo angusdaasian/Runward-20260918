@@ -19,6 +19,8 @@ Deno.serve(async (req) => {
     const gpx = typeof body?.gpx === "string" ? body.gpx : "";
     const name = typeof body?.name === "string" ? body.name.slice(0, 80).trim() : "";
     if (gpx.length < 50 || gpx.length > 5_000_000 || !gpx.includes("<trkpt")) return json({ error: "Invalid route file" }, 400);
+    const pointCount = (gpx.match(/<trkpt\s/gi) ?? []).length;
+    if (pointCount < 2) return json({ error: "invalid_points", point_count: pointCount }, 422);
 
     const admin = createClient(url, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
     const { data: conn } = await admin.from("stridee_connections").select("stridee_user_id, status, providers, provider")
@@ -28,7 +30,7 @@ Deno.serve(async (req) => {
       return json({ error: "no_garmin", message: "Connect a Garmin watch to send routes" }, 409);
     }
 
-    const file = btoa(unescape(encodeURIComponent(gpx)));
+    const file = btoa(String.fromCharCode(...new TextEncoder().encode(gpx)));
     const res = await strideeFetch("POST", "/v1/routes", {
       user_id: conn.stridee_user_id, file, name: name || "RunWard route", sport: "running", provider: "garmin",
     });

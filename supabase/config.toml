@@ -22,8 +22,6 @@ verify_jwt = false
 [functions.terra-tick-all]
 verify_jwt = false
 
-[functions.terra-today-oneoff-tick]
-verify_jwt = false
 
 [functions.resolve-city]
 verify_jwt = false

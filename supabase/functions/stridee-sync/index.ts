@@ -93,7 +93,6 @@ Deno.serve(async (req) => {
     const patch: Record<string, unknown> = { last_synced_at: new Date().toISOString() };
     const chain = wantAll || (internal && body?.chain === true);
     if ((wantAll || chain) && remaining === 0) patch.auto_sync_enabled = true;
-    if (internal && body?.notice === true && remaining === 0) patch.backfill_notice_pending = true;
     await admin.from("stridee_connections").update(patch).eq("user_id", user.id);
     if (stored > 0) triggerCrossPlatformDedup(user.id, days * 24);
 
@@ -102,7 +101,7 @@ Deno.serve(async (req) => {
       const next = fetch(`${url}/functions/v1/stridee-sync`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-webhook-key": whKey },
-        body: JSON.stringify(wantAll ? { all: true, user_id: user.id } : { days, chain: true, notice: body?.notice === true, user_id: user.id }),
+        body: JSON.stringify(wantAll ? { all: true, user_id: user.id } : { days, chain: true, user_id: user.id }),
       }).catch((e) => console.warn("[stridee-sync] chain failed", e));
       // @ts-ignore EdgeRuntime exists on Supabase Edge
       try { EdgeRuntime.waitUntil(next); } catch { /* detached */ }

@@ -66,7 +66,14 @@ export default function StrideeTestCard({ lang, blockedByOther = false, onBefore
       // Garmin: Safari-only flow — no in-app window, plain return page.
       body: { action: "connect", native: isDespiaUA() && provider !== "garmin", app_scheme: appScheme, provider, origin: window.location.origin, lang: zh ? "zh-TW" : "en" },
     });
-...
+    setBusy(null);
+    if (error) { toast.error(zh ? "連結失敗" : "Connect failed"); console.error(error, data); return; }
+    if (data?.already_connected) {
+      await load();
+      toast.success(zh ? "已連結，毋須再次授權" : "Already connected — no approval needed");
+      return;
+    }
+    if (!data?.connect_url) { toast.error(zh ? "連結失敗" : "Connect failed"); console.error(data); return; }
     if (appScheme) {
       despia(`oauth://?url=${encodeURIComponent(data.connect_url)}`);
       return;

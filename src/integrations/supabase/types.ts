@@ -4157,6 +4157,20 @@ export type Database = {
           total_count: number
         }[]
       }
+      get_public_routes: {
+        Args: { p_limit?: number }
+        Returns: {
+          activity_name: string
+          display_name: string
+          distance_km: number
+          elevation_m: number
+          source: string
+          source_id: string
+          started_at: string
+          summary_polyline: string
+          user_id: string
+        }[]
+      }
       get_social_activity_detail: {
         Args: { p_source: string; p_source_id: string }
         Returns: {

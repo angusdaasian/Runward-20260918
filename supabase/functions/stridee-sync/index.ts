@@ -86,6 +86,7 @@ Deno.serve(async (req) => {
       if (ext) return ext === user.id;
       return owner === sid;
     });
+    console.log("[stridee-sync] list", user.id.slice(0,8), "all", all.length, "owned", owned.length, "sample", JSON.stringify(Object.keys(all[0] ?? {})));
     if (owned.length !== all.length) console.warn("[stridee-sync] dropped foreign activities", all.length - owned.length);
     const inWindow = owned.filter((a) => {
       const t = Date.parse(a.start_time ?? a.received_at ?? "");

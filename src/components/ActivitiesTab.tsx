@@ -50,6 +50,7 @@ import { useSimpleMode } from "@/hooks/use-simple-mode";
 import GarminAttribution from "@/components/brand/GarminAttribution";
 import ServiceStatusBanner from "@/components/ServiceStatusBanner";
 import AnnouncementBanner from "@/components/AnnouncementBanner";
+import StrideeBackfillNotice from "@/components/StrideeBackfillNotice";
 
 
 
@@ -1493,6 +1494,7 @@ const ActivitiesTab = ({ lang, resetSignal }: Props) => {
     <FadeIn className="px-5 pt-6 max-w-lg mx-auto">
 
       <AnnouncementBanner lang={lang} />
+      <StrideeBackfillNotice lang={lang} onUpgrade={() => setUpgradeOpen(true)} />
       <ServiceStatusBanner lang={lang} />
 
       {/* Today Stats: wearable (Terra) daily data wins, Apple Health as fallback */}

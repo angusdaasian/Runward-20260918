@@ -6,6 +6,19 @@ import { strideeFetch } from "../_shared/stridee.ts";
 const json = (b: unknown, status = 200) =>
   new Response(JSON.stringify(b), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
+// New connections: import the past 30 days in the background (auto-sync stays on).
+function kickoff30(userId: string) {
+  const key = Deno.env.get("WEBHOOK_AUTH_KEY");
+  if (!key) return;
+  const p = fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/stridee-sync`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-webhook-key": key },
+    body: JSON.stringify({ user_id: userId, days: 30, chain: true }),
+  }).catch((e) => console.warn("[stridee-connect] backfill kickoff", e));
+  // @ts-ignore EdgeRuntime exists on Supabase Edge
+  try { EdgeRuntime.waitUntil(p); } catch { /* detached */ }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   try {
@@ -21,6 +34,7 @@ Deno.serve(async (req) => {
       await adminPub.from("stridee_connections")
         .update({ status: "connected", providers: list, connected_at: new Date().toISOString(), updated_at: new Date().toISOString() })
         .eq("user_id", row.user_id);
+      kickoff30(row.user_id);
       return json({ ok: true });
     }
     if (pre?.action === "status_public" && typeof pre.stridee_user_id === "string" && pre.stridee_user_id) {
@@ -51,6 +65,7 @@ Deno.serve(async (req) => {
         user_id: user.id, stridee_user_id: sid, status: "connected", providers: list, auto_sync_enabled: true,
         connected_at: new Date().toISOString(), updated_at: new Date().toISOString(),
       }, { onConflict: "user_id" });
+      kickoff30(user.id);
       return json({ ok: true });
     }
 

@@ -91,16 +91,18 @@ Deno.serve(async (req) => {
     if (!internal) { try { wellness = await syncStrideeWellness(admin, user.id, (conn as any).stridee_user_id ?? null, Math.min(days, 60)); } catch (e) { console.error("[stridee-sync] wellness", e); } }
     const remaining = Math.max(0, todo.length - batch.length);
     const patch: Record<string, unknown> = { last_synced_at: new Date().toISOString() };
-    if (wantAll && remaining === 0) patch.auto_sync_enabled = true;
+    const chain = wantAll || (internal && body?.chain === true);
+    if ((wantAll || chain) && remaining === 0) patch.auto_sync_enabled = true;
+    if (internal && body?.notice === true && remaining === 0) patch.backfill_notice_pending = true;
     await admin.from("stridee_connections").update(patch).eq("user_id", user.id);
     if (stored > 0) triggerCrossPlatformDedup(user.id, days * 24);
 
     // Full-history backfill continues server-side in the background.
-    if (wantAll && remaining > 0 && whKey && (stored > 0 || failed < batch.length)) {
+    if (chain && remaining > 0 && whKey && (stored > 0 || failed < batch.length)) {
       const next = fetch(`${url}/functions/v1/stridee-sync`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-webhook-key": whKey },
-        body: JSON.stringify({ all: true, user_id: user.id }),
+        body: JSON.stringify(wantAll ? { all: true, user_id: user.id } : { days, chain: true, notice: body?.notice === true, user_id: user.id }),
       }).catch((e) => console.warn("[stridee-sync] chain failed", e));
       // @ts-ignore EdgeRuntime exists on Supabase Edge
       try { EdgeRuntime.waitUntil(next); } catch { /* detached */ }

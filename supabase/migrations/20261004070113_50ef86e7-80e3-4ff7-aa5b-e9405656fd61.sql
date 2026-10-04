@@ -1,0 +1,1 @@
+REVOKE EXECUTE ON FUNCTION public.dismiss_stridee_backfill_notice() FROM PUBLIC, anon;

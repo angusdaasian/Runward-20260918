@@ -69,10 +69,22 @@ export default function RoutesSection({ lang }: { lang: "en" | "zh" | string }) 
   const [busy, setBusy] = useState<string | null>(null);
 
   useEffect(() => {
-    (supabase.rpc as any)("get_public_routes", { p_limit: 200 }).then(({ data, error }: any) => {
-      if (error) console.error(error);
-      setRoutes((data as Route[]) ?? []);
-    });
+    let cancelled = false;
+    const load = async (attempt = 0): Promise<void> => {
+      // Wait for the signed-in session; calling before it restores runs as a guest and returns nothing.
+      const { data: s } = await supabase.auth.getSession();
+      if (!s.session && attempt < 5) { await new Promise((r) => setTimeout(r, 800)); return load(attempt + 1); }
+      const { data, error } = await (supabase.rpc as any)("get_public_routes", { p_limit: 300 });
+      if (cancelled) return;
+      if (error) {
+        console.error("[routes]", error);
+        if (attempt < 5) { await new Promise((r) => setTimeout(r, 1200)); return load(attempt + 1); }
+      }
+      const rows = ((data as Route[]) ?? []).sort((a, b) => (b.started_at > a.started_at ? 1 : -1));
+      setRoutes(rows);
+    };
+    load();
+    return () => { cancelled = true; };
   }, []);
 
   const list = useMemo(() => {

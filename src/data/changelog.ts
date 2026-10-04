@@ -12,6 +12,7 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  { version: "6.11", date: "2026-10-04", en: { title: "Route maps", items: ["Routes now show on fast OpenStreetMap previews", "Filter shared routes by country or region"] }, zh: { title: "路線地圖", items: ["路線加入快速 OpenStreetMap 地圖預覽", "可按國家或地區篩選公開路線"] } },
   { version: "6.10", date: "2026-10-04", en: { title: "Faster connection return", items: ["The consent page now closes straight back into the app after connecting"] }, zh: { title: "更快的連接返回", items: ["授權頁面完成後直接返回應用程式"] } },
   { version: "6.9", date: "2026-10-04", en: { title: "Routes", items: ["New Routes page in Training with routes shared publicly by runners", "Send a route to your Garmin watch or download the GPX"] }, zh: { title: "路線", items: ["訓練新增「路線」頁面，瀏覽跑者公開分享的路線", "可傳送路線到 Garmin 手錶或下載 GPX"] } },
   { version: "6.8", date: "2026-10-04", en: { title: "Smarter interval detection", items: ["Fixed the smart interval detection"] }, zh: { title: "智能間歇偵測修正", items: ["修正智能間歇偵測"] } },

@@ -4,12 +4,19 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { decodePolyline } from "@/lib/territory";
 import { toast } from "sonner";
-import { Download, Watch, MapPin, Loader2 } from "lucide-react";
+import { Download, Watch, Loader2, Globe2 } from "lucide-react";
 
 type Route = {
   source: string; source_id: string; user_id: string; display_name: string | null; started_at: string;
   activity_name: string | null; distance_km: number; elevation_m: number | null; summary_polyline: string;
 };
+
+type TerritoryCity = {
+  country: string | null;
+  bbox: [number, number, number, number] | number[];
+};
+
+type LocatedRoute = Route & { country: string };
 
 const BUCKETS = [
   { id: "all", en: "All", zh: "全部", min: 0, max: 1e9 },
@@ -42,30 +49,76 @@ function toGpx(name: string, pts: [number, number][]) {
   return `<?xml version="1.0" encoding="UTF-8"?><gpx version="1.1" creator="RunWard" xmlns="http://www.topografix.com/GPX/1/1"><metadata><name>${esc(name)}</name></metadata><trk><name>${esc(name)}</name><type>running</type><trkseg>${seg}</trkseg></trk></gpx>`;
 }
 
-function Thumb({ pts }: { pts: [number, number][] }) {
-  const path = useMemo(() => {
-    if (pts.length < 2) return "";
-    const lats = pts.map((p) => p[0]), lons = pts.map((p) => p[1]);
-    const [a, b, c, d] = [Math.min(...lats), Math.max(...lats), Math.min(...lons), Math.max(...lons)];
-    const span = Math.max(b - a, (d - c) * Math.cos((a * Math.PI) / 180), 1e-6);
-    return pts.map(([la, lo], i) => {
-      const x = 8 + (((lo - c) * Math.cos((a * Math.PI) / 180)) / span) * 84;
-      const y = 92 - ((la - a) / span) * 84;
-      return `${i ? "L" : "M"}${x.toFixed(1)},${y.toFixed(1)}`;
-    }).join("");
+const MAP_WIDTH = 600;
+const MAP_HEIGHT = 260;
+const TILE_SIZE = 256;
+
+function worldPoint([lat, lng]: [number, number], zoom: number) {
+  const scale = TILE_SIZE * 2 ** zoom;
+  const sin = Math.sin(Math.max(-85.0511, Math.min(85.0511, lat)) * Math.PI / 180);
+  return {
+    x: ((lng + 180) / 360) * scale,
+    y: (0.5 - Math.log((1 + sin) / (1 - sin)) / (4 * Math.PI)) * scale,
+  };
+}
+
+function RouteMap({ pts }: { pts: [number, number][] }) {
+  const scene = useMemo(() => {
+    if (pts.length < 2) return null;
+    let zoom = 15;
+    let projected = pts.map((point) => worldPoint(point, zoom));
+    while (zoom > 2) {
+      const xs = projected.map((p) => p.x), ys = projected.map((p) => p.y);
+      if (Math.max(...xs) - Math.min(...xs) <= MAP_WIDTH - 80 && Math.max(...ys) - Math.min(...ys) <= MAP_HEIGHT - 60) break;
+      zoom -= 1;
+      projected = pts.map((point) => worldPoint(point, zoom));
+    }
+    const xs = projected.map((p) => p.x), ys = projected.map((p) => p.y);
+    const centerX = (Math.min(...xs) + Math.max(...xs)) / 2;
+    const centerY = (Math.min(...ys) + Math.max(...ys)) / 2;
+    const left = centerX - MAP_WIDTH / 2;
+    const top = centerY - MAP_HEIGHT / 2;
+    const path = projected.map((p, index) => `${index ? "L" : "M"}${(p.x - left).toFixed(1)},${(p.y - top).toFixed(1)}`).join("");
+    const tiles = [];
+    for (let x = Math.floor(left / TILE_SIZE); x <= Math.floor((left + MAP_WIDTH) / TILE_SIZE); x += 1) {
+      for (let y = Math.floor(top / TILE_SIZE); y <= Math.floor((top + MAP_HEIGHT) / TILE_SIZE); y += 1) {
+        tiles.push({ x, y, left: x * TILE_SIZE - left, top: y * TILE_SIZE - top });
+      }
+    }
+    return { zoom, path, tiles };
   }, [pts]);
+
+  if (!scene) return <div className="h-32 w-full bg-muted" />;
   return (
-    <svg viewBox="0 0 100 100" className="h-20 w-20 shrink-0 rounded-xl bg-muted">
-      <path d={path} fill="none" stroke="hsl(var(--primary))" strokeWidth={3} strokeLinejoin="round" strokeLinecap="round" />
-    </svg>
+    <div className="relative h-32 w-full overflow-hidden bg-muted">
+      {scene.tiles.map((tile) => (
+        <img
+          key={`${tile.x}-${tile.y}`}
+          src={`https://tile.openstreetmap.org/${scene.zoom}/${tile.x}/${tile.y}.png`}
+          alt=""
+          loading="lazy"
+          className="pointer-events-none absolute max-w-none"
+          style={{ width: TILE_SIZE / 2, height: TILE_SIZE / 2, left: tile.left / 2, top: tile.top / 2 }}
+        />
+      ))}
+      <svg viewBox={`0 0 ${MAP_WIDTH} ${MAP_HEIGHT}`} className="absolute inset-0 h-full w-full" aria-hidden="true">
+        <path d={scene.path} fill="none" stroke="hsl(var(--background))" strokeWidth={12} strokeLinejoin="round" strokeLinecap="round" />
+        <path d={scene.path} fill="none" stroke="hsl(var(--primary))" strokeWidth={7} strokeLinejoin="round" strokeLinecap="round" />
+      </svg>
+      <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer" className="absolute bottom-0.5 right-1 bg-background/80 px-1 text-[9px] text-muted-foreground">
+        © OpenStreetMap
+      </a>
+    </div>
   );
 }
 
 export default function RoutesSection({ lang }: { lang: "en" | "zh" | string }) {
   const zh = lang === "zh";
   const [routes, setRoutes] = useState<Route[] | null>(null);
+  const [cities, setCities] = useState<TerritoryCity[]>([]);
   const [q, setQ] = useState("");
   const [bucket, setBucket] = useState("all");
+  const [country, setCountry] = useState("all");
   const [busy, setBusy] = useState<string | null>(null);
 
   useEffect(() => {
@@ -74,25 +127,41 @@ export default function RoutesSection({ lang }: { lang: "en" | "zh" | string }) 
       // Wait for the signed-in session; calling before it restores runs as a guest and returns nothing.
       const { data: s } = await supabase.auth.getSession();
       if (!s.session && attempt < 5) { await new Promise((r) => setTimeout(r, 800)); return load(attempt + 1); }
-      const { data, error } = await (supabase.rpc as any)("get_public_routes", { p_limit: 300 });
+      const [{ data, error }, { data: cityRows }] = await Promise.all([
+        (supabase.rpc as any)("get_public_routes", { p_limit: 300 }),
+        supabase.from("territory_cities").select("country,bbox"),
+      ]);
       if (cancelled) return;
       if (error) {
         console.error("[routes]", error);
         if (attempt < 5) { await new Promise((r) => setTimeout(r, 1200)); return load(attempt + 1); }
       }
       const rows = ((data as Route[]) ?? []).sort((a, b) => (b.started_at > a.started_at ? 1 : -1));
+      setCities(((cityRows as TerritoryCity[] | null) ?? []).filter((city) => city.country && Array.isArray(city.bbox)));
       setRoutes(rows);
     };
     load();
     return () => { cancelled = true; };
   }, []);
 
+  const locatedRoutes = useMemo<LocatedRoute[]>(() => (routes ?? []).map((route) => {
+    const first = decodePolyline(route.summary_polyline)[0];
+    const match = first && cities.find((city) => {
+      const [minLat, minLng, maxLat, maxLng] = city.bbox;
+      return first[0] >= minLat && first[0] <= maxLat && first[1] >= minLng && first[1] <= maxLng;
+    });
+    return { ...route, country: match?.country ?? "" };
+  }), [routes, cities]);
+
+  const countries = useMemo(() => [...new Set(locatedRoutes.map((route) => route.country).filter(Boolean))].sort(), [locatedRoutes]);
+
   const list = useMemo(() => {
     const b = BUCKETS.find((x) => x.id === bucket)!;
     const s = q.trim().toLowerCase();
-    return (routes ?? []).filter((r) => r.distance_km >= b.min && r.distance_km < b.max &&
-      (!s || (r.activity_name ?? "").toLowerCase().includes(s) || (r.display_name ?? "").toLowerCase().includes(s)));
-  }, [routes, q, bucket]);
+    return locatedRoutes.filter((r) => r.distance_km >= b.min && r.distance_km < b.max &&
+      (country === "all" || r.country === country) &&
+      (!s || (r.activity_name ?? "").toLowerCase().includes(s) || r.country.toLowerCase().includes(s)));
+  }, [locatedRoutes, q, bucket, country]);
 
   const nameOf = (r: Route) => `${r.activity_name || (zh ? "路線" : "Route")} · ${Number(r.distance_km).toFixed(1)} km`;
 
@@ -130,7 +199,14 @@ export default function RoutesSection({ lang }: { lang: "en" | "zh" | string }) 
           {zh ? "其他跑者公開分享的路線，可傳送到手錶或下載 GPX。" : "Routes shared publicly by other runners. Send one to your watch or download the GPX."}
         </p>
       </div>
-      <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={zh ? "搜尋路線或跑者" : "Search routes or runners"} />
+       <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={zh ? "搜尋路線" : "Search routes"} />
+       <label className="flex items-center gap-2 text-sm text-muted-foreground">
+         <Globe2 size={16} />
+         <select value={country} onChange={(event) => setCountry(event.target.value)} className="min-w-0 flex-1 rounded-md border border-border bg-background px-3 py-2 text-foreground">
+           <option value="all">{zh ? "所有國家或地區" : "All countries and regions"}</option>
+           {countries.map((value) => <option key={value} value={value}>{value}</option>)}
+         </select>
+       </label>
       <div className="flex gap-2 overflow-x-auto pb-1">
         {BUCKETS.map((b) => (
           <button key={b.id} onClick={() => setBucket(b.id)}
@@ -149,19 +225,16 @@ export default function RoutesSection({ lang }: { lang: "en" | "zh" | string }) 
             const key = r.source + r.source_id;
             const pts = trimmedPoints(r.summary_polyline);
             return (
-              <div key={key} className="rounded-2xl border border-border bg-card p-3">
-                <div className="flex gap-3">
-                  <Thumb pts={pts} />
-                  <div className="min-w-0 flex-1">
+              <div key={key} className="overflow-hidden rounded-lg border border-border bg-card">
+                <RouteMap pts={pts} />
+                <div className="p-3">
+                  <div className="min-w-0">
                     <p className="truncate font-semibold text-foreground">{r.activity_name || (zh ? "路線" : "Route")}</p>
                     <p className="text-sm text-muted-foreground">
                       {Number(r.distance_km).toFixed(1)} km{r.elevation_m ? ` · ↑${Math.round(Number(r.elevation_m))} m` : ""}
                     </p>
-                    <p className="flex items-center gap-1 truncate text-xs text-muted-foreground">
-                      <MapPin size={12} /> {r.display_name || (zh ? "跑者" : "Runner")}
-                    </p>
+                    {r.country && <p className="text-xs text-muted-foreground">{r.country}</p>}
                   </div>
-                </div>
                 <div className="mt-3 grid grid-cols-2 gap-2">
                   <Button size="sm" onClick={() => send(r)} disabled={busy === key}>
                     {busy === key ? <Loader2 size={14} className="animate-spin" /> : <Watch size={14} />}
@@ -170,6 +243,7 @@ export default function RoutesSection({ lang }: { lang: "en" | "zh" | string }) 
                   <Button size="sm" variant="outline" onClick={() => download(r)}>
                     <Download size={14} /> GPX
                   </Button>
+                </div>
                 </div>
               </div>
             );

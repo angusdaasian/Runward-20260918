@@ -57,10 +57,15 @@ Deno.serve(async (req) => {
 
     // History replays are "received" recently even for old runs, so list by a
     // wide received window and filter on the run's own start time.
+    // SAFETY: an unscoped list returns every connected account's activities.
+    // Require the provider user id, query by it, and drop any row not owned by it.
+    const sid = (conn as any).stridee_user_id as string | null;
+    if (!sid) return json({ error: "missing_provider_user", stored: 0 }, 409);
     const all: any[] = [];
     let cursor: string | undefined;
     for (let page = 0; page < 25; page++) {
       const qs = new URLSearchParams({
+        user_id: sid,
         external_user_id: user.id,
         since: new Date(Date.now() - ALL_DAYS * 86400_000).toISOString(),
         until: new Date().toISOString(),
@@ -75,7 +80,14 @@ Deno.serve(async (req) => {
       cursor = b.has_more ? b.next_starting_after : undefined;
       if (!cursor) break;
     }
-    const inWindow = all.filter((a) => {
+    const owned = all.filter((a) => {
+      const owner = a.user_id ?? a.user?.id ?? null;
+      const ext = a.external_user_id ?? a.user?.external_user_id ?? null;
+      if (ext) return ext === user.id;
+      return owner === sid;
+    });
+    if (owned.length !== all.length) console.warn("[stridee-sync] dropped foreign activities", all.length - owned.length);
+    const inWindow = owned.filter((a) => {
       const t = Date.parse(a.start_time ?? a.received_at ?? "");
       return Number.isFinite(t) && t >= cutoff;
     });

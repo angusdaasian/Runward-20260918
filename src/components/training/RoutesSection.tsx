@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { decodePolyline } from "@/lib/territory";
 import { toast } from "sonner";
-import { Download, Watch, Loader2, Globe2 } from "lucide-react";
+import { Download, Watch, Loader2, Globe2, ZoomIn, ZoomOut, Expand } from "lucide-react";
 
 type Route = {
   source: string; source_id: string; user_id: string; display_name: string | null; started_at: string;
@@ -72,49 +73,95 @@ function worldPoint([lat, lng]: [number, number], zoom: number) {
   };
 }
 
-function RouteMap({ pts }: { pts: [number, number][] }) {
-  const scene = useMemo(() => {
-    if (pts.length < 2) return null;
-    let zoom = 15;
-    let projected = pts.map((point) => worldPoint(point, zoom));
-    while (zoom > 2) {
-      const xs = projected.map((p) => p.x), ys = projected.map((p) => p.y);
-      if (Math.max(...xs) - Math.min(...xs) <= MAP_WIDTH - 80 && Math.max(...ys) - Math.min(...ys) <= MAP_HEIGHT - 60) break;
-      zoom -= 1;
-      projected = pts.map((point) => worldPoint(point, zoom));
-    }
+function fitView(pts: [number, number][], width: number, height: number) {
+  let zoom = 15;
+  let projected = pts.map((point) => worldPoint(point, zoom));
+  while (zoom > 2) {
     const xs = projected.map((p) => p.x), ys = projected.map((p) => p.y);
-    const centerX = (Math.min(...xs) + Math.max(...xs)) / 2;
-    const centerY = (Math.min(...ys) + Math.max(...ys)) / 2;
-    const left = centerX - MAP_WIDTH / 2;
-    const top = centerY - MAP_HEIGHT / 2;
-    const path = projected.map((p, index) => `${index ? "L" : "M"}${(p.x - left).toFixed(1)},${(p.y - top).toFixed(1)}`).join("");
-    const tiles = [];
-    for (let x = Math.floor(left / TILE_SIZE); x <= Math.floor((left + MAP_WIDTH) / TILE_SIZE); x += 1) {
-      for (let y = Math.floor(top / TILE_SIZE); y <= Math.floor((top + MAP_HEIGHT) / TILE_SIZE); y += 1) {
-        tiles.push({ x, y, left: x * TILE_SIZE - left, top: y * TILE_SIZE - top });
-      }
-    }
-    return { zoom, path, tiles };
-  }, [pts]);
+    if (Math.max(...xs) - Math.min(...xs) <= width - 80 && Math.max(...ys) - Math.min(...ys) <= height - 60) break;
+    zoom -= 1;
+    projected = pts.map((point) => worldPoint(point, zoom));
+  }
+  const xs = projected.map((p) => p.x), ys = projected.map((p) => p.y);
+  return { zoom, cx: (Math.min(...xs) + Math.max(...xs)) / 2, cy: (Math.min(...ys) + Math.max(...ys)) / 2 };
+}
 
-  if (!scene) return <div className="h-32 w-full bg-muted" />;
+function buildScene(pts: [number, number][], zoom: number, cx: number, cy: number, width: number, height: number) {
+  const left = cx - width / 2;
+  const top = cy - height / 2;
+  const projected = pts.map((point) => worldPoint(point, zoom));
+  const path = projected.map((p, index) => `${index ? "L" : "M"}${(p.x - left).toFixed(1)},${(p.y - top).toFixed(1)}`).join("");
+  const tiles = [];
+  for (let x = Math.floor(left / TILE_SIZE); x <= Math.floor((left + width) / TILE_SIZE); x += 1) {
+    for (let y = Math.floor(top / TILE_SIZE); y <= Math.floor((top + height) / TILE_SIZE); y += 1) {
+      tiles.push({ x, y, left: x * TILE_SIZE - left, top: y * TILE_SIZE - top });
+    }
+  }
+  return { path, tiles };
+}
+
+function MapSvg({ pts, zoom, cx, cy, width, height }: { pts: [number, number][]; zoom: number; cx: number; cy: number; width: number; height: number }) {
+  const scene = useMemo(() => buildScene(pts, zoom, cx, cy, width, height), [pts, zoom, cx, cy, width, height]);
   return (
-    <div className="relative aspect-[30/13] w-full overflow-hidden bg-muted">
-      <svg viewBox={`0 0 ${MAP_WIDTH} ${MAP_HEIGHT}`} className="absolute inset-0 h-full w-full" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
-        {scene.tiles.map((tile) => (
-          <image
-            key={`${tile.x}-${tile.y}`}
-            href={`https://tile.openstreetmap.org/${scene.zoom}/${tile.x}/${tile.y}.png`}
-            x={tile.left}
-            y={tile.top}
-            width={TILE_SIZE}
-            height={TILE_SIZE}
-          />
-        ))}
-        <path d={scene.path} fill="none" stroke="hsl(var(--background))" strokeWidth={12} strokeLinejoin="round" strokeLinecap="round" />
-        <path d={scene.path} fill="none" stroke="hsl(var(--primary))" strokeWidth={7} strokeLinejoin="round" strokeLinecap="round" />
-      </svg>
+    <svg viewBox={`0 0 ${width} ${height}`} className="absolute inset-0 h-full w-full" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+      {scene.tiles.map((tile) => (
+        <image
+          key={`${zoom}-${tile.x}-${tile.y}`}
+          href={`https://tile.openstreetmap.org/${zoom}/${tile.x}/${tile.y}.png`}
+          x={tile.left}
+          y={tile.top}
+          width={TILE_SIZE}
+          height={TILE_SIZE}
+        />
+      ))}
+      <path d={scene.path} fill="none" stroke="hsl(var(--background))" strokeWidth={12} strokeLinejoin="round" strokeLinecap="round" />
+      <path d={scene.path} fill="none" stroke="hsl(var(--primary))" strokeWidth={7} strokeLinejoin="round" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+const BIG_W = 800;
+const BIG_H = 520;
+
+function InteractiveRouteMap({ pts }: { pts: [number, number][] }) {
+  const fit = useMemo(() => fitView(pts, BIG_W, BIG_H), [pts]);
+  const [view, setView] = useState<{ zoom: number; cx: number; cy: number } | null>(null);
+  const drag = useRef<{ x: number; y: number; cx: number; cy: number } | null>(null);
+  const wrap = useRef<HTMLDivElement>(null);
+  const v = view ?? fit;
+
+  const zoomBy = (delta: number) => {
+    const next = Math.max(2, Math.min(18, v.zoom + delta));
+    if (next === v.zoom) return;
+    const factor = 2 ** (next - v.zoom);
+    setView({ zoom: next, cx: v.cx * factor, cy: v.cy * factor });
+  };
+
+  return (
+    <div
+      ref={wrap}
+      className="relative aspect-[20/13] w-full touch-none overflow-hidden bg-muted"
+      onPointerDown={(e) => {
+        drag.current = { x: e.clientX, y: e.clientY, cx: v.cx, cy: v.cy };
+        (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+      }}
+      onPointerMove={(e) => {
+        if (!drag.current || !wrap.current) return;
+        const scale = BIG_W / wrap.current.getBoundingClientRect().width;
+        setView({
+          zoom: v.zoom,
+          cx: drag.current.cx - (e.clientX - drag.current.x) * scale,
+          cy: drag.current.cy - (e.clientY - drag.current.y) * scale,
+        });
+      }}
+      onPointerUp={() => { drag.current = null; }}
+      onPointerCancel={() => { drag.current = null; }}
+    >
+      <MapSvg pts={pts} zoom={v.zoom} cx={v.cx} cy={v.cy} width={BIG_W} height={BIG_H} />
+      <div className="absolute right-2 top-2 flex flex-col gap-1">
+        <Button size="icon" variant="secondary" className="h-8 w-8" onClick={() => zoomBy(1)} aria-label="Zoom in"><ZoomIn size={16} /></Button>
+        <Button size="icon" variant="secondary" className="h-8 w-8" onClick={() => zoomBy(-1)} aria-label="Zoom out"><ZoomOut size={16} /></Button>
+      </div>
       <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer" className="absolute bottom-0.5 right-1 bg-background/80 px-1 text-[9px] text-muted-foreground">
         © OpenStreetMap
       </a>
@@ -122,9 +169,25 @@ function RouteMap({ pts }: { pts: [number, number][] }) {
   );
 }
 
+function RouteMap({ pts, onExpand }: { pts: [number, number][]; onExpand: () => void }) {
+  const view = useMemo(() => (pts.length < 2 ? null : fitView(pts, MAP_WIDTH, MAP_HEIGHT)), [pts]);
+
+  if (!view) return <div className="h-32 w-full bg-muted" />;
+  return (
+    <button type="button" onClick={onExpand} className="relative block aspect-[30/13] w-full overflow-hidden bg-muted" aria-label="View route map">
+      <MapSvg pts={pts} zoom={view.zoom} cx={view.cx} cy={view.cy} width={MAP_WIDTH} height={MAP_HEIGHT} />
+      <span className="absolute right-2 top-2 rounded-md bg-background/80 p-1.5 text-muted-foreground">
+        <Expand size={14} />
+      </span>
+      <span className="absolute bottom-0.5 right-1 bg-background/80 px-1 text-[9px] text-muted-foreground">© OpenStreetMap</span>
+    </button>
+  );
+}
+
 export default function RoutesSection({ lang }: { lang: "en" | "zh" | string }) {
   const zh = lang === "zh";
   const [routes, setRoutes] = useState<Route[] | null>(null);
+  const [zoomPts, setZoomPts] = useState<[number, number][] | null>(null);
   const [cities, setCities] = useState<TerritoryCity[]>([]);
   const [q, setQ] = useState("");
   const [bucket, setBucket] = useState("all");
@@ -272,7 +335,7 @@ export default function RoutesSection({ lang }: { lang: "en" | "zh" | string }) 
             const pts = trimmedPoints(r.summary_polyline);
             return (
               <div key={key} className="overflow-hidden rounded-lg border border-border bg-card">
-                <RouteMap pts={pts} />
+                <RouteMap pts={pts} onExpand={() => setZoomPts(pts)} />
                 <div className="p-3">
                   <div className="min-w-0">
                     <p className="truncate font-semibold text-foreground">{r.activity_name || (zh ? "路線" : "Route")}</p>
@@ -296,6 +359,11 @@ export default function RoutesSection({ lang }: { lang: "en" | "zh" | string }) 
           })}
         </div>
       )}
+      <Dialog open={zoomPts !== null} onOpenChange={(open) => { if (!open) setZoomPts(null); }}>
+        <DialogContent className="max-w-3xl p-2">
+          {zoomPts && <InteractiveRouteMap pts={zoomPts} />}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

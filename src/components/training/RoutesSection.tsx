@@ -45,8 +45,18 @@ function trimmedPoints(poly: string): [number, number][] {
 
 function toGpx(name: string, pts: [number, number][]) {
   const esc = (s: string) => s.replace(/[<>&"']/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;", "'": "&apos;" }[c]!));
-  const seg = pts.map(([la, lo]) => `<trkpt lat="${la.toFixed(6)}" lon="${lo.toFixed(6)}"/>`).join("");
-  return `<?xml version="1.0" encoding="UTF-8"?><gpx version="1.1" creator="RunWard" xmlns="http://www.topografix.com/GPX/1/1"><metadata><name>${esc(name)}</name></metadata><trk><name>${esc(name)}</name><type>running</type><trkseg>${seg}</trkseg></trk></gpx>`;
+  const seg = pts.map(([la, lo]) => `      <trkpt lat="${la.toFixed(6)}" lon="${lo.toFixed(6)}"></trkpt>`).join("\n");
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<gpx xmlns="http://www.topografix.com/GPX/1/1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd" version="1.1" creator="RunWard">
+  <metadata><name>${esc(name)}</name></metadata>
+  <trk>
+    <name>${esc(name)}</name>
+    <type>running</type>
+    <trkseg>
+${seg}
+    </trkseg>
+  </trk>
+</gpx>`;
 }
 
 const MAP_WIDTH = 600;
@@ -176,14 +186,20 @@ export default function RoutesSection({ lang }: { lang: "en" | "zh" | string }) 
 
   const send = async (r: Route) => {
     const key = r.source + r.source_id;
+    const points = trimmedPoints(r.summary_polyline);
+    if (points.length < 2) {
+      toast.error(zh ? "此路線沒有足夠的地圖資料" : "This route doesn't have enough map data");
+      return;
+    }
     setBusy(key);
     const { data, error } = await supabase.functions.invoke("route-push", {
-      body: { name: nameOf(r).slice(0, 80), gpx: toGpx(nameOf(r), trimmedPoints(r.summary_polyline)) },
+      body: { name: nameOf(r).slice(0, 80), gpx: toGpx(nameOf(r), points) },
     });
     setBusy(null);
     const code = (data as any)?.error ?? (error as any)?.context?.status;
     if (code === "no_garmin" || code === 409) { toast.error(zh ? "請先連結 Garmin 手錶，或下載 GPX" : "Connect a Garmin watch first, or download the GPX"); return; }
-    if (error || !data?.ok) { toast.error(zh ? "傳送失敗" : "Couldn't send route"); return; }
+    if (code === "invalid_points") { toast.error(zh ? "此路線沒有足夠的地圖資料" : "This route doesn't have enough map data"); return; }
+    if (error || !data?.ok) { toast.error(zh ? "Garmin 未能接收此路線，請稍後再試" : "Garmin couldn't receive this route. Please try again later"); return; }
     if (data.status === "failed" && data.reason === "not_permitted") {
       toast.error(zh ? "請在 Garmin 授權「課程匯入」後重新連結" : "Allow “Course Import” for Garmin, then reconnect your watch");
       return;

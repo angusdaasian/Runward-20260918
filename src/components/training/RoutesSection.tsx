@@ -156,12 +156,26 @@ export default function RoutesSection({ lang }: { lang: "en" | "zh" | string }) 
 
   const locatedRoutes = useMemo<LocatedRoute[]>(() => (routes ?? []).map((route) => {
     const first = decodePolyline(route.summary_polyline)[0];
-    const match = first && cities.find((city) => {
+    if (!first) return { ...route, country: "" };
+    const [lat, lng] = first;
+    // Special regions: never fold HK / Macau into CN
+    if (lat >= 22.13 && lat <= 22.58 && lng >= 113.82 && lng <= 114.45) return { ...route, country: "HK" };
+    if (lat >= 22.10 && lat <= 22.22 && lng >= 113.52 && lng <= 113.61) return { ...route, country: "MO" };
+    const matches = cities.filter((city) => {
       const [minLat, minLng, maxLat, maxLng] = city.bbox;
-      return first[0] >= minLat && first[0] <= maxLat && first[1] >= minLng && first[1] <= maxLng;
+      return lat >= minLat && lat <= maxLat && lng >= minLng && lng <= maxLng;
     });
+    const area = (c: TerritoryCity) => (c.bbox[2] - c.bbox[0]) * (c.bbox[3] - c.bbox[1]);
+    const match = matches.sort((a, b) => area(a) - area(b))[0];
     return { ...route, country: match?.country ?? "" };
   }), [routes, cities]);
+
+  const regionName = useMemo(() => {
+    let dn: Intl.DisplayNames | null = null;
+    try { dn = new Intl.DisplayNames([zh ? "zh-Hant-TW" : "en"], { type: "region" }); } catch { /* ignore */ }
+    const overrides: Record<string, string> = zh ? { HK: "香港", MO: "澳門", TW: "台灣", CN: "中國" } : { HK: "Hong Kong", MO: "Macau", TW: "Taiwan" };
+    return (code: string) => overrides[code] ?? (/^[A-Z]{2}$/.test(code) ? dn?.of(code) ?? code : code);
+  }, [zh]);
 
   const countries = useMemo(() => [...new Set(locatedRoutes.map((route) => route.country).filter(Boolean))].sort(), [locatedRoutes]);
 
@@ -170,18 +184,34 @@ export default function RoutesSection({ lang }: { lang: "en" | "zh" | string }) 
     const s = q.trim().toLowerCase();
     return locatedRoutes.filter((r) => r.distance_km >= b.min && r.distance_km < b.max &&
       (country === "all" || r.country === country) &&
-      (!s || (r.activity_name ?? "").toLowerCase().includes(s) || r.country.toLowerCase().includes(s)));
-  }, [locatedRoutes, q, bucket, country]);
+      (!s || (r.activity_name ?? "").toLowerCase().includes(s) || regionName(r.country).toLowerCase().includes(s)));
+  }, [locatedRoutes, q, bucket, country, regionName]);
 
   const nameOf = (r: Route) => `${r.activity_name || (zh ? "路線" : "Route")} · ${Number(r.distance_km).toFixed(1)} km`;
 
-  const download = (r: Route) => {
-    const blob = new Blob([toGpx(nameOf(r), trimmedPoints(r.summary_polyline))], { type: "application/gpx+xml" });
+  const download = async (r: Route) => {
+    const points = trimmedPoints(r.summary_polyline);
+    if (points.length < 2) { toast.error(zh ? "此路線沒有足夠的地圖資料" : "This route doesn't have enough map data"); return; }
+    const gpx = toGpx(nameOf(r), points);
+    const filename = `${(r.activity_name || "route").replace(/[^\w\u4e00-\u9fff-]+/g, "_")}.gpx`;
+    // In-app (iOS webview) blob downloads are blocked — use the share sheet ("Save to Files") when available
+    try {
+      const file = new File([gpx], filename, { type: "application/gpx+xml" });
+      const nav = navigator as Navigator & { canShare?: (d: ShareData) => boolean };
+      if (nav.share && nav.canShare?.({ files: [file] })) {
+        await nav.share({ files: [file], title: filename });
+        return;
+      }
+    } catch (e) {
+      if ((e as Error)?.name === "AbortError") return;
+    }
     const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = `${(r.activity_name || "route").replace(/[^\w\u4e00-\u9fff-]+/g, "_")}.gpx`;
+    a.href = `data:application/gpx+xml;charset=utf-8,${encodeURIComponent(gpx)}`;
+    a.download = filename;
+    a.target = "_blank";
+    document.body.appendChild(a);
     a.click();
-    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    a.remove();
   };
 
   const send = async (r: Route) => {

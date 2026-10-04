@@ -59,18 +59,18 @@ export default function StrideeTestCard({ lang, blockedByOther = false, onBefore
     }
     setBusy(provider);
     if (!isAdmin && onBeforeConnect) await onBeforeConnect();
+    // Testing (admins, Garmin): return straight into the app via runward:// scheme.
+    const appScheme = isDespiaUA() && isAdmin && provider === "garmin";
+    try { localStorage.setItem("rw_pending_stridee_provider", provider); } catch { /* ignore */ }
     const { data, error } = await supabase.functions.invoke("stridee-connect", {
       // Garmin: Safari-only flow — no in-app window, plain return page.
-      body: { action: "connect", native: isDespiaUA() && provider !== "garmin", provider, origin: window.location.origin, lang: zh ? "zh-TW" : "en" },
+      body: { action: "connect", native: isDespiaUA() && provider !== "garmin", app_scheme: appScheme, provider, origin: window.location.origin, lang: zh ? "zh-TW" : "en" },
     });
-    setBusy(null);
-    if (error) { toast.error(zh ? "連結失敗" : "Connect failed"); console.error(error, data); return; }
-    if (data?.already_connected) {
-      await load();
-      toast.success(zh ? "已連結，毋須再次授權" : "Already connected — no approval needed");
+...
+    if (appScheme) {
+      despia(`oauth://?url=${encodeURIComponent(data.connect_url)}`);
       return;
     }
-    if (!data?.connect_url) { toast.error(zh ? "連結失敗" : "Connect failed"); console.error(data); return; }
     if (isDespiaUA() && provider === "garmin") {
       // api.stridee.com is in Despia External Links, so navigating there opens
       // Safari. The return page in Safari then deep-links back into RunWard.

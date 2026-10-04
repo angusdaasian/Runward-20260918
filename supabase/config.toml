@@ -25,6 +25,9 @@ verify_jwt = false
 [functions.terra-today-oneoff-tick]
 verify_jwt = false
 
+[functions.resolve-city]
+verify_jwt = false
+
 [functions.terra-webhook-test]
 verify_jwt = false
 

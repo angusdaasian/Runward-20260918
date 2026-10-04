@@ -359,6 +359,11 @@ export default function RoutesSection({ lang }: { lang: "en" | "zh" | string }) 
           })}
         </div>
       )}
+      <Dialog open={zoomPts !== null} onOpenChange={(open) => { if (!open) setZoomPts(null); }}>
+        <DialogContent className="max-w-3xl p-2">
+          {zoomPts && <InteractiveRouteMap pts={zoomPts} />}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

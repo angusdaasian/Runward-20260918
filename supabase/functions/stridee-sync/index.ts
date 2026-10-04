@@ -45,6 +45,12 @@ Deno.serve(async (req) => {
     const premium = await isPremium(admin, user.id);
     const wantAll = body?.all === true;
     if (wantAll && !premium) return json({ error: "premium_required" }, 402);
+    if (wantAll && !internal) {
+      // Full history already imported once — refuse repeats to protect the database.
+      const { data: old } = await admin.from("terra_activities").select("id").eq("user_id", user.id)
+        .like("terra_activity_id", "stridee_%").lt("start_time", "2026-01-01").limit(1);
+      if (old?.length) return json({ ok: true, connected: true, premium, stored: 0, remaining: 0, already_done: true });
+    }
     let days = wantAll ? ALL_DAYS : Math.max(1, Math.min(Number(body?.days) || 7, ALL_DAYS));
     if (!premium) days = Math.min(days, FREE_DAYS);
     const cutoff = Date.now() - days * 86400_000;

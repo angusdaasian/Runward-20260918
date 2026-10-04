@@ -1308,10 +1308,15 @@ const ActivitiesTab = ({ lang, resetSignal }: Props) => {
   }, [user, fetchingToday, invalidateAll, lang, invokeStravaSync, isPremium, strava2026Key]);
 
   const [hasStridee, setHasStridee] = useState(false);
+  const [historyDone, setHistoryDone] = useState(false);
   useEffect(() => {
     if (!user) return;
     supabase.from("stridee_connections").select("status").eq("user_id", user.id).eq("status", "connected").maybeSingle()
       .then(({ data }) => setHasStridee(!!data));
+    // Full history already imported (runs before 2026, before the app existed) → hide the option.
+    supabase.from("terra_activities").select("id").eq("user_id", user.id).like("terra_activity_id", "stridee_%")
+      .lt("start_time", "2026-01-01").limit(1)
+      .then(({ data }) => setHistoryDone(!!data?.length));
   }, [user]);
 
   const handleStrideeHistory = useCallback(async (all: boolean) => {
@@ -1544,7 +1549,7 @@ const ActivitiesTab = ({ lang, resetSignal }: Props) => {
                       {lang === "zh" ? "同步近 30 天活動" : "Sync past 30 days"}
                     </DropdownMenuItem>
                   )}
-                  {hasStridee && (
+                  {hasStridee && !historyDone && (
                     <DropdownMenuItem onClick={() => handleStrideeHistory(true)} disabled={fetchingToday} className="flex-col items-start gap-0.5">
                       <span className="flex items-center">
                         <Lock className={isPremium ? "opacity-0" : ""} style={{ width: 14, height: 14, marginRight: 6 }} />

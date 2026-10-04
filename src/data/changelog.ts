@@ -12,6 +12,7 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  { version: "6.9", date: "2026-10-04", en: { title: "Routes", items: ["New Routes page in Training with routes shared publicly by runners", "Send a route to your Garmin watch or download the GPX"] }, zh: { title: "路線", items: ["訓練新增「路線」頁面，瀏覽跑者公開分享的路線", "可傳送路線到 Garmin 手錶或下載 GPX"] } },
   { version: "6.8", date: "2026-10-04", en: { title: "Smarter interval detection", items: ["Fixed the smart interval detection"] }, zh: { title: "智能間歇偵測修正", items: ["修正智能間歇偵測"] } },
   { version: "6.7", date: "2026-10-04", en: { title: "Smoother watch connections", items: ["New watch connections import your past 30 days automatically with auto sync on", "Consent page follows your in-app language", "Suunto can now be connected alongside your watch", "Full-history import hidden once it has completed"] }, zh: { title: "更順暢的手錶連接", items: ["新連接手錶時自動匯入過去 30 天活動並開啟自動同步", "授權頁面跟隨應用程式語言", "Suunto 可與手錶同時連接", "完成全部歷史匯入後隱藏該選項"] } },
   { version: "6.6", date: "2026-10-02", en: { title: "Announcements", items: ["Info, Important and Urgent announcements on Home", "Activity type filter in All Activities", "Monthly challenge and share card count runs only"] }, zh: { title: "公告系統", items: ["首頁顯示一般、重要及緊急公告", "全部活動可按類型篩選", "每月挑戰及分享卡只計算跑步"] } },

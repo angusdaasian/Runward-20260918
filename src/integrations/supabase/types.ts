@@ -1816,6 +1816,7 @@ export type Database = {
           is_premium: boolean
           is_trial: boolean
           lang: string
+          last_active_at: string | null
           last_check_in_date: string | null
           last_login: string | null
           lifetime_xp: number
@@ -1862,6 +1863,7 @@ export type Database = {
           is_premium?: boolean
           is_trial?: boolean
           lang?: string
+          last_active_at?: string | null
           last_check_in_date?: string | null
           last_login?: string | null
           lifetime_xp?: number
@@ -1908,6 +1910,7 @@ export type Database = {
           is_premium?: boolean
           is_trial?: boolean
           lang?: string
+          last_active_at?: string | null
           last_check_in_date?: string | null
           last_login?: string | null
           lifetime_xp?: number
@@ -4304,6 +4307,7 @@ export type Database = {
         Args: { p_source: string; p_source_id: string }
         Returns: string
       }
+      touch_last_active: { Args: never; Returns: undefined }
       try_lock_territory: {
         Args: { _secs: number; _uid: string }
         Returns: boolean

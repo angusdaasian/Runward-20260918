@@ -1,18 +1,23 @@
-# Fix: free accounts getting full history on first watch connect
+# Inactivity reminders and auto-disconnect for watch connections (Stridee)
 
-## What happened
-Two new watch connections today (00:05 and 01:17 UTC) imported full history — 509 runs back to Apr 2024 and 91 runs back to May 2026 — even though neither account is premium. Free accounts should only get the last 30 days. Ownership filtering is working (no runs shared between accounts).
+## What users will see
+- A free user who hasn't opened the app for 25 days gets a daily push: "Your watch connection will disconnect in N day(s). Open the app to keep it — or upgrade to Premium to keep it forever."
+- One push per day on days 25, 26, 27, 28, 29 (5, 4, 3, 2, 1 days left), in the user's in-app language (Traditional Chinese or English).
+- On day 30 of inactivity, the watch connection is disconnected automatically.
+- Opening the app at any point resets the countdown (based on last login).
+- Premium users are always exempt, same as Terra.
 
 ## Steps
-1. **Find the gap** in `supabase/functions/stridee-sync/index.ts`: the first-connect backfill path apparently doesn't apply the 30-day cap for non-premium users (or the premium check fails/defaults to full history).
-2. **Fix the cap**: on first connect, non-premium users get `days: 30` only; full history requires an active premium subscription (checked server-side).
-3. **Clean up the two affected accounts** (one at a time, no parallel load):
-   - 69319b95-d6da-4242-8cb4-bf4a032d53c7: delete imported runs older than 30 days, keep the recent ones.
-   - 6b65b4ef-ae61-4e3c-9c89-ab9bb4ea09e5: same.
-4. **Verify**: re-check both accounts' earliest run dates, confirm no cross-user duplicates, and confirm a fresh test import respects the cap.
-5. **Changelog**: add a minor entry (x.N) describing it generically as a watch-sync history fix — no provider names.
+1. New daily job `stridee-inactivity-sweep`, run once a day at 00:00 HK time (same time as the Terra sweep).
+2. For each active watch connection of a non-premium user:
+   - inactive 25–29 days → send the reminder push (language from profiles.lang)
+   - inactive 30+ days → disconnect (revoke with the provider, mark the connection inactive / remove it, stop auto-sync) and send a short "disconnected" push
+3. Supports a dry-run mode so I can check who would be affected before it goes live; I'll run a dry run first and report the list.
+4. Changelog entry (minor version), worded generically: "Inactive free accounts now get daily reminders before watch connections are disconnected after 30 days."
 
 ## Technical details
-- Tables: terra_activities, premium_subscriptions (plan/expires_at/is_trial), stridee_connections.
-- Premium check must treat expired subscriptions as free.
-- Cleanup done sequentially per the one-account-at-a-time rule.
+- New edge function `supabase/functions/stridee-inactivity-sweep/index.ts`, modeled on `terra-inactivity-sweep`: reads `stridee_connections` + `profiles (is_premium, last_login, lang)`, OneSignal send via existing `ONESIGNAL_APP_ID` / `ONESIGNAL_REST_API_KEY`, language via `_shared/appLanguage.ts`.
+- Disconnect reuses the existing Stridee disconnect logic (from `stridee-connect`) so behavior matches a manual disconnect.
+- Daily pg_cron at 16:00 UTC calling the function (1 run/day).
+- Terra sweep left unchanged (still monthly cycle).
+- Processing is sequential, one connection at a time, to keep database load low.

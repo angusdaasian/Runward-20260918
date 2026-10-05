@@ -72,15 +72,15 @@ export default function DataStats({ lang }: Props) {
         transition={{ duration: 0.5 }}
         className="mx-auto max-w-4xl"
       >
-        <div className="flex min-h-52 flex-col items-center justify-center rounded-lg border border-foreground/35 bg-foreground px-4 py-12 text-center shadow-[0_5px_0_hsl(var(--foreground)/0.18)] sm:min-h-64 sm:px-8">
+        <div className="flex min-h-52 flex-col items-center justify-center px-4 py-12 text-center sm:min-h-64 sm:px-8">
           {display == null ? (
-            <div className="h-14 w-56 animate-pulse rounded bg-background/20 sm:h-20 sm:w-80" aria-label={zh ? "載入數據" : "Loading data"} />
+            <div className="h-14 w-56 animate-pulse rounded bg-foreground/20 sm:h-20 sm:w-80" aria-label={zh ? "載入數據" : "Loading data"} />
           ) : (
-            <div className="font-display text-5xl font-bold text-background tabular-nums sm:text-7xl md:text-8xl">
+            <div className="font-display text-5xl font-bold text-foreground tabular-nums sm:text-7xl md:text-8xl">
               {display.toLocaleString()}
             </div>
           )}
-          <p className="mt-5 text-base text-background/80 sm:text-xl">
+          <p className="mt-5 text-base text-muted-foreground sm:text-xl">
             {zh ? "已處理的活動及健康數據" : "Activities & health data processed"}
           </p>
         </div>

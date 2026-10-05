@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { decodePolyline } from "@/lib/territory";
 import { toast } from "sonner";
-import { Download, Watch, Loader2, Globe2, ZoomIn, ZoomOut, Expand } from "lucide-react";
+import { Download, Watch, Loader2, Globe2, ZoomIn, ZoomOut, Expand, Mountain } from "lucide-react";
 
 type Route = {
   source: string; source_id: string; user_id: string; display_name: string | null; started_at: string;
@@ -262,8 +262,8 @@ function ElevationProfile({ pts, zh }: { pts: [number, number][]; zh: boolean })
     return () => { cancelled = true; };
   }, [pts]);
 
-  const title = zh ? "海拔變化" : "Elevation profile";
-  if (failed) return <p className="px-2 py-3 text-sm text-muted-foreground">{zh ? "暫時未能載入海拔資料" : "Elevation data isn't available right now"}</p>;
+  const title = zh ? "高度圖" : "Elevation profile";
+  if (failed) return <p className="px-2 py-3 text-sm text-muted-foreground">{zh ? "暫時未能載入高度資料" : "Elevation data isn't available right now"}</p>;
   if (!data) return <div className="flex items-center gap-2 px-2 py-4 text-sm text-muted-foreground"><Loader2 size={14} className="animate-spin" />{title}</div>;
 
   let up = 0, down = 0;

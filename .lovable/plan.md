@@ -1,15 +1,19 @@
-# Terra data check: no changes needed
+# Organize Routes by place and district
 
-## Findings
-- The Terra receiving code has not changed since Sep 30. The only edit since then (Oct 2) was to watch health data, not Terra.
-- Every message Terra sent has been received and processed. There's no backlog and no errors. Terra disconnect notices still come in every day, which shows our receiver is up and working.
-- Most of the 45 remaining Terra Garmin users stopped getting new data from Terra around Sep 21. That happened before the watch-connection changes and before Oct 2.
-- The last Terra run arrived Oct 2, from the single Polar user. One Garmin user still got daily health data today (Oct 5).
-- Only 7 of the 45 have signed in during the past week.
+## What will change
+- Replace the long flat route list with a location-first browser: country/region, then district, then routes.
+- For Hong Kong, categorize routes into 香港島 / Hong Kong Island, 九龍 / Kowloon, and 新界 / New Territories using the route’s geographic center; Hong Kong remains separate from China.
+- Show district choices with route counts, keep the existing search and distance filters, and only render the selected district’s routes to reduce scrolling.
+- Keep each route’s map preview, enlarged map, GPX download, and Send to watch actions unchanged.
+- For places without district data, keep a single “All areas” view rather than guessing district names.
 
-## Conclusion
-Terra really has stopped sending data. Nothing in our app is blocking it. The cutoff happened on Terra's side, mostly for Garmin, around Sep 21.
+## Interface
+- Use compact location and district selectors above the route results.
+- Add a clear results heading and count so users always know which area they are viewing.
+- Preserve the existing RunWard styling and bilingual Traditional Chinese/English labels.
 
-## Suggested next step
-- Check the Terra dashboard to see whether its Garmin access is still active until Oct 10. You can also ask Terra support. I can't see their side.
-- No code changes in the app.
+## Verification
+- Confirm Hong Kong routes appear under the correct district and never under China.
+- Confirm search and distance filters update district counts and results together.
+- Confirm map expansion, GPX download, and Send to watch still work from a filtered list.
+- Check the Routes screen at mobile and desktop widths and confirm the project remains healthy.

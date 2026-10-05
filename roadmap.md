@@ -37,3 +37,4 @@
 - [x] Confirm Terra activity, daily-health, and sleep webhooks resumed on Oct 5
 - [x] Schedule all remaining Terra connections for sequential deauthorization after Oct 10, then stop Terra inactivity sweeps
 - [x] Match the landing-page live data counter to the reference and never flash zero
+- [ ] Improve Routes browsing with place and district grouping (Hong Kong: 香港島、九龍、新界)

@@ -5,7 +5,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import {
   base64url, compactDecrypt, createRemoteJWKSet, decodeProtectedHeader, flattenedVerify, importPKCS8,
 } from "npm:jose@5.9.6";
-import { ingestStrideeActivity } from "../_shared/strideeIngest.ts";
+import { ingestStrideeActivity, isPremium } from "../_shared/strideeIngest.ts";
 import { triggerCrossPlatformDedup } from "../_shared/triggerDedup.ts";
 import { maybeSendTelegramActivityPrompt } from "../_shared/telegramActivityPrompt.ts";
 import { maybeSendWhatsappActivityPrompt } from "../_shared/whatsappActivityPrompt.ts";

@@ -6,37 +6,69 @@ interface Props {
   lang: "en" | "zh";
 }
 
+const POLL_MS = 60_000;
+
 export default function DataStats({ lang }: Props) {
   const zh = lang === "zh";
   const [total, setTotal] = useState<number | null>(null);
   const [display, setDisplay] = useState(0);
   const ref = useRef<HTMLDivElement>(null);
   const inView = useInView(ref, { once: true, margin: "-80px" });
+  const animatedOnce = useRef(false);
 
+  // Fetch on load, then poll so the count updates as new data arrives
   useEffect(() => {
-    const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/data-stats`;
-    fetch(url, { headers: { apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY } })
-      .then((r) => r.json())
-      .then((d) => {
-        if (typeof d?.total === "number" && d.total > 0) setTotal(d.total);
-      })
-      .catch(() => {});
+    let cancelled = false;
+    const load = () => {
+      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/data-stats`;
+      fetch(url, { headers: { apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY } })
+        .then((r) => r.json())
+        .then((d) => {
+          if (!cancelled && typeof d?.total === "number" && d.total > 0) setTotal(d.total);
+        })
+        .catch(() => {});
+    };
+    load();
+    const t = setInterval(load, POLL_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(t);
+    };
   }, []);
 
-  // Count-up animation once visible
+  // Fallback: if the scroll-into-view trigger never fires, just show the number
+  useEffect(() => {
+    if (total == null || inView) return;
+    const t = setTimeout(() => {
+      if (!animatedOnce.current) {
+        animatedOnce.current = true;
+        setDisplay(total);
+      }
+    }, 2500);
+    return () => clearTimeout(t);
+  }, [total, inView]);
+
+  // Animate toward the latest total (first time: count up; later: quick catch-up)
   useEffect(() => {
     if (!inView || total == null) return;
-    const duration = 1600;
+    const from = animatedOnce.current ? display : 0;
+    animatedOnce.current = true;
+    if (from === total) {
+      setDisplay(total);
+      return;
+    }
+    const duration = animatedOnce.current && from > 0 ? 800 : 1600;
     const start = performance.now();
     let raf: number;
     const tick = (now: number) => {
       const p = Math.min((now - start) / duration, 1);
       const eased = 1 - Math.pow(1 - p, 3);
-      setDisplay(Math.round(total * eased));
+      setDisplay(Math.round(from + (total - from) * eased));
       if (p < 1) raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inView, total]);
 
   if (total == null) return null;

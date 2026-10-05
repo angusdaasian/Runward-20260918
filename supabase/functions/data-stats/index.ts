@@ -20,7 +20,7 @@ const ACTIVITY_TABLES = [
 ];
 const DAILY_TABLES = ["terra_daily_health", "garmin_daily_health"];
 
-const CACHE_MS = 6 * 60 * 60 * 1000;
+const CACHE_MS = 60 * 1000;
 let cache: { total: number; at: number } | null = null;
 
 Deno.serve(async (req) => {

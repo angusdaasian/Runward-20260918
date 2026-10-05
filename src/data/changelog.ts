@@ -1,6 +1,7 @@
 /**
  * RunWard changelog. Newest first.
  * Versioning: big changes bump the major number (X.0); small tweaks bump the minor (x.N).
+ * Changes shipped on the same date share one version entry — never split across versions.
  * Only user-facing changes (new features, visible behaviour) get an entry here —
  * backend / infrastructure work is not listed.
  */

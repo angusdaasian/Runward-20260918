@@ -13,7 +13,7 @@ import {
   getBandMeta,
   selectProviderRows,
 } from "@/lib/hrvReadiness";
-import { useTerraConnections } from "@/hooks/use-terra-daily-health";
+import { useTerraConnections, useTerraTodayStats } from "@/hooks/use-terra-daily-health";
 import { usePremium } from "@/contexts/PremiumContext";
 import { loadForActivity, isCardio, isRunning, buildWeeklyLoadSeries } from "@/lib/trainingLoad";
 import { computeInjuryRisk, injuryBand as injuryBandFn } from "@/lib/analyticsExplain";
@@ -50,6 +50,7 @@ const Tile = ({ id, lang, onOpen }: Props) => {
   const { data: history } = useTerraDailyHealth();
   const { data: conns } = useTerraConnections();
   const { isPremium } = usePremium();
+  const { stats: todayStats } = useTerraTodayStats();
 
   const hrZonesLocked = !isPremium && id === "hr_zones";
 
@@ -297,19 +298,23 @@ const Tile = ({ id, lang, onOpen }: Props) => {
     }
     case "calories_today": {
       const todayKey = new Date().toISOString().slice(0, 10);
-      const cal = activities
+      // Follow the Daily Health card: watch daily total first, then today's
+      // stored daily row, then summed activity calories as a last resort.
+      const todayRow = (history ?? []).find((r) => r.date === todayKey && r.calories != null);
+      const actCal = activities
         .filter((a) => a.start_date.slice(0, 10) === todayKey)
         .reduce((s, a) => s + ((a as any).calories ?? 0), 0);
+      const cal = todayStats?.caloriesBurned ?? (todayRow?.calories != null ? Number(todayRow.calories) : null) ?? actCal;
       return (
         <WidgetTile
           title={zh(lang) ? "卡路里" : "Calories"}
-          subtitle={zh(lang) ? "今日活動" : "Today's activities"}
+          subtitle={zh(lang) ? "今日" : "Today"}
           icon={<Flame size={16} className="text-orange-500" />}
           onClick={onOpen}
           readonly
           lang={lang}
         >
-          <Big value={cal > 0 ? Math.round(cal).toLocaleString() : "—"} unit="kcal" sub={cal === 0 ? (zh(lang) ? "尚無活動" : "No activity yet") : undefined} />
+          <Big value={cal > 0 ? Math.round(cal).toLocaleString() : "—"} unit="kcal" sub={cal === 0 ? (zh(lang) ? "尚無資料" : "No data") : undefined} />
         </WidgetTile>
       );
     }

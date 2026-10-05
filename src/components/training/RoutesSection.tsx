@@ -148,13 +148,18 @@ function buildScene(pts: [number, number][], zoom: number, cx: number, cy: numbe
   const top = cy - height / 2;
   const projected = pts.map((point) => worldPoint(point, zoom));
   const path = projected.map((p, index) => `${index ? "L" : "M"}${(p.x - left).toFixed(1)},${(p.y - top).toFixed(1)}`).join("");
+  // Tiles only exist at integer zoom levels; render the nearest lower level scaled up.
+  const tz = Math.max(0, Math.min(19, Math.floor(zoom + 1e-6)));
+  const size = TILE_SIZE * 2 ** (zoom - tz);
+  const max = 2 ** tz;
   const tiles = [];
-  for (let x = Math.floor(left / TILE_SIZE); x <= Math.floor((left + width) / TILE_SIZE); x += 1) {
-    for (let y = Math.floor(top / TILE_SIZE); y <= Math.floor((top + height) / TILE_SIZE); y += 1) {
-      tiles.push({ x, y, left: x * TILE_SIZE - left, top: y * TILE_SIZE - top });
+  for (let x = Math.floor(left / size); x <= Math.floor((left + width) / size); x += 1) {
+    for (let y = Math.floor(top / size); y <= Math.floor((top + height) / size); y += 1) {
+      if (y < 0 || y >= max) continue;
+      tiles.push({ x: ((x % max) + max) % max, y, left: x * size - left, top: y * size - top });
     }
   }
-  return { path, tiles };
+  return { path, tiles, tz, size };
 }
 
 function MapSvg({ pts, zoom, cx, cy, width, height }: { pts: [number, number][]; zoom: number; cx: number; cy: number; width: number; height: number }) {
@@ -163,12 +168,12 @@ function MapSvg({ pts, zoom, cx, cy, width, height }: { pts: [number, number][];
     <svg viewBox={`0 0 ${width} ${height}`} className="absolute inset-0 h-full w-full" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
       {scene.tiles.map((tile) => (
         <image
-          key={`${zoom}-${tile.x}-${tile.y}`}
-          href={`https://tile.openstreetmap.org/${zoom}/${tile.x}/${tile.y}.png`}
+          key={`${scene.tz}-${tile.x}-${tile.y}-${tile.left.toFixed(0)}`}
+          href={`https://tile.openstreetmap.org/${scene.tz}/${tile.x}/${tile.y}.png`}
           x={tile.left}
           y={tile.top}
-          width={TILE_SIZE}
-          height={TILE_SIZE}
+          width={scene.size + 0.5}
+          height={scene.size + 0.5}
         />
       ))}
       <path d={scene.path} fill="none" stroke="hsl(var(--background))" strokeWidth={12} strokeLinejoin="round" strokeLinecap="round" />

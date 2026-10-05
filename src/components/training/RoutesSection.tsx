@@ -156,7 +156,7 @@ function buildScene(pts: [number, number][], zoom: number, cx: number, cy: numbe
   for (let x = Math.floor(left / size); x <= Math.floor((left + width) / size); x += 1) {
     for (let y = Math.floor(top / size); y <= Math.floor((top + height) / size); y += 1) {
       if (y < 0 || y >= max) continue;
-      tiles.push({ x: ((x % max) + max) % max, y, left: x * size - left, top: y * size - top });
+      tiles.push({ wx: x, x: ((x % max) + max) % max, y, left: x * size - left, top: y * size - top });
     }
   }
   return { path, tiles, tz, size };
@@ -168,7 +168,7 @@ function MapSvg({ pts, zoom, cx, cy, width, height }: { pts: [number, number][];
     <svg viewBox={`0 0 ${width} ${height}`} className="absolute inset-0 h-full w-full" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
       {scene.tiles.map((tile) => (
         <image
-          key={`${scene.tz}-${tile.x}-${tile.y}-${tile.left - (tile.left % 1)}`}
+          key={`${scene.tz}-${tile.x}-${tile.y}-${tile.wx}`}
           href={`https://tile.openstreetmap.org/${scene.tz}/${tile.x}/${tile.y}.png`}
           x={tile.left}
           y={tile.top}

@@ -184,6 +184,8 @@ function InteractiveRouteMap({ pts }: { pts: [number, number][] }) {
   const fit = useMemo(() => fitView(pts, BIG_W, BIG_H), [pts]);
   const [view, setView] = useState<{ zoom: number; cx: number; cy: number } | null>(null);
   const drag = useRef<{ x: number; y: number; cx: number; cy: number } | null>(null);
+  const pointers = useRef<Map<number, { x: number; y: number }>>(new Map());
+  const pinch = useRef<{ dist: number; wx: number; wy: number; zoom: number; k: number } | null>(null);
   const wrap = useRef<HTMLDivElement>(null);
   const v = view ?? fit;
 
@@ -194,15 +196,51 @@ function InteractiveRouteMap({ pts }: { pts: [number, number][] }) {
     setView({ zoom: next, cx: v.cx * factor, cy: v.cy * factor });
   };
 
+  const startPinch = () => {
+    const rect = wrap.current?.getBoundingClientRect();
+    if (!rect) return;
+    const [a, b] = [...pointers.current.values()];
+    if (!a || !b) return;
+    const k = BIG_W / rect.width;
+    const mx = (a.x + b.x) / 2 - rect.left;
+    const my = (a.y + b.y) / 2 - rect.top;
+    pinch.current = {
+      dist: Math.hypot(a.x - b.x, a.y - b.y),
+      wx: v.cx - BIG_W / 2 + mx * k,
+      wy: v.cy - BIG_H / 2 + my * k,
+      zoom: v.zoom,
+      k,
+    };
+    drag.current = null;
+  };
+
+  const handlePinch = () => {
+    const p = pinch.current;
+    const rect = wrap.current?.getBoundingClientRect();
+    if (!p || !rect) return;
+    const [a, b] = [...pointers.current.values()];
+    if (!a || !b) return;
+    const next = Math.max(2, Math.min(18, p.zoom + Math.log2(Math.max(1, Math.hypot(a.x - b.x, a.y - b.y) / p.dist))));
+    const factor = 2 ** (next - p.zoom);
+    const mx = (a.x + b.x) / 2 - rect.left;
+    const my = (a.y + b.y) / 2 - rect.top;
+    setView({ zoom: next, cx: BIG_W / 2 - mx * p.k + p.wx * factor, cy: BIG_H / 2 - my * p.k + p.wy * factor });
+  };
+
   return (
     <div
       ref={wrap}
       className="relative aspect-[20/13] w-full touch-none overflow-hidden bg-muted"
       onPointerDown={(e) => {
+        pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        if (pointers.current.size >= 2) { startPinch(); return; }
         drag.current = { x: e.clientX, y: e.clientY, cx: v.cx, cy: v.cy };
         (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
       }}
       onPointerMove={(e) => {
+        if (!pointers.current.has(e.pointerId)) return;
+        pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        if (pointers.current.size >= 2) { handlePinch(); return; }
         if (!drag.current || !wrap.current) return;
         const scale = BIG_W / wrap.current.getBoundingClientRect().width;
         setView({
@@ -211,8 +249,16 @@ function InteractiveRouteMap({ pts }: { pts: [number, number][] }) {
           cy: drag.current.cy - (e.clientY - drag.current.y) * scale,
         });
       }}
-      onPointerUp={() => { drag.current = null; }}
-      onPointerCancel={() => { drag.current = null; }}
+      onPointerUp={(e) => {
+        pointers.current.delete(e.pointerId);
+        if (pointers.current.size < 2) pinch.current = null;
+        drag.current = null;
+      }}
+      onPointerCancel={(e) => {
+        pointers.current.delete(e.pointerId);
+        if (pointers.current.size < 2) pinch.current = null;
+        drag.current = null;
+      }}
     >
       <MapSvg pts={pts} zoom={v.zoom} cx={v.cx} cy={v.cy} width={BIG_W} height={BIG_H} />
       <div className="absolute right-2 top-2 flex flex-col gap-1">

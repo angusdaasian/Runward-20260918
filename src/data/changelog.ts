@@ -12,6 +12,7 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  { version: "6.11", date: "2026-10-05", en: { title: "Watch connection reminders", items: ["Inactive free accounts get daily reminders before watch connections disconnect after 30 days"] }, zh: { title: "手錶連線提醒", items: ["免費帳戶 30 天未使用前會每日收到提醒，之後手錶連線將自動解除"] } },
   { version: "6.10", date: "2026-10-05", en: { title: "Watch sync fix", items: ["Free accounts now correctly keep only the past 30 days when a watch sends older history"] }, zh: { title: "手錶同步修正", items: ["修正免費帳戶在手錶傳送舊紀錄時只保留過去 30 天活動"] } },
   { version: "6.9", date: "2026-10-04", en: { title: "Routes", items: ["New Routes page in Training with routes shared publicly by runners", "Tap the map to zoom in and explore the route", "Filter shared routes by country or region, with Chinese region names", "Send a route to your Garmin watch or download the GPX"] }, zh: { title: "路線", items: ["訓練新增「路線」頁面，瀏覽跑者公開分享的路線", "點擊地圖可放大檢視路線", "可按國家或地區篩選公開路線，地區名稱以中文顯示", "可傳送路線到 Garmin 手錶或下載 GPX"] } },
   { version: "6.8", date: "2026-10-04", en: { title: "Smarter interval detection", items: ["Fixed the smart interval detection"] }, zh: { title: "智能間歇偵測修正", items: ["修正智能間歇偵測"] } },

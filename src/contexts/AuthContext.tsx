@@ -220,6 +220,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     return () => {
       subscription.unsubscribe();
+      document.removeEventListener("visibilitychange", pingActive);
       document.removeEventListener("visibilitychange", onVisChange);
       clearInterval(interval);
     };

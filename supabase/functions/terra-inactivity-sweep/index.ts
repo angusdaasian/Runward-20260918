@@ -110,7 +110,7 @@ Deno.serve(async (req) => {
   const userIds = Array.from(new Set(conns.map((c) => c.user_id)));
   const { data: profiles, error: profErr } = await admin
     .from("profiles")
-    .select("user_id, is_premium, last_login, lang")
+    .select("user_id, is_premium, last_login, last_active_at, lang")
     .in("user_id", userIds);
   if (profErr) return json({ error: profErr.message }, 500);
   const profByUser = new Map<string, any>();
@@ -125,7 +125,7 @@ Deno.serve(async (req) => {
     if (!prof) continue;
     if (prof.is_premium) continue; // premium exempt always
     if (!prof.last_login) continue;
-    const days = Math.floor((nowMs - new Date(prof.last_login).getTime()) / dayMs);
+    const days = Math.floor((nowMs - Math.max(new Date(prof.last_login).getTime(), new Date(prof.last_active_at ?? 0).getTime())) / dayMs);
 
     if (mode === "deauth" && days >= DEAUTH_THRESHOLD) {
       planned.push({ conn, profile: prof, days });

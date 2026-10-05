@@ -134,6 +134,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     );
 
+    // Record "app opened" (at most hourly) so inactivity jobs know the user is still around.
+    const pingActive = async () => {
+      if (document.visibilityState === "hidden") return;
+      const last = Number(localStorage.getItem("runward_active_ping") || 0);
+      if (Date.now() - last < 60 * 60 * 1000) return;
+      const { data } = await supabase.auth.getSession();
+      if (!data.session) return;
+      localStorage.setItem("runward_active_ping", String(Date.now()));
+      const { error } = await supabase.rpc("touch_last_active" as any);
+      if (error) console.warn("[Auth] touch_last_active failed:", error.message);
+    };
+    setTimeout(pingActive, 1500);
+    document.addEventListener("visibilitychange", pingActive);
+
     const finishOAuthReturn = async () => {
       if (!hasOAuthReturnParams()) return null;
 
@@ -206,6 +220,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     return () => {
       subscription.unsubscribe();
+      document.removeEventListener("visibilitychange", pingActive);
       document.removeEventListener("visibilitychange", onVisChange);
       clearInterval(interval);
     };

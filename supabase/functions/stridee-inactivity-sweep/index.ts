@@ -38,7 +38,7 @@ Deno.serve(async (req) => {
   if (!ids.length) return json({ ok: true, connections: 0 });
 
   const connAt = new Map((conns ?? []).map((c: any) => [c.user_id, c.created_at]));
-  const { data: profs } = await admin.from("profiles").select("user_id, is_premium, last_login, lang").in("user_id", ids);
+  const { data: profs } = await admin.from("profiles").select("user_id, is_premium, last_login, last_active_at, lang").in("user_id", ids);
   const { data: subs } = await admin.from("premium_subscriptions").select("user_id, expires_at").in("user_id", ids);
   const premium = new Set((subs ?? []).filter((s: any) => !s.expires_at || new Date(s.expires_at) > new Date()).map((s: any) => s.user_id));
 
@@ -57,7 +57,7 @@ Deno.serve(async (req) => {
   for (const p of profs ?? []) {
     if (p.is_premium || premium.has(p.user_id) || !p.last_login) continue;
     // Count from the later of last sign-in and when the watch was connected.
-    const since = Math.max(new Date(p.last_login).getTime(), new Date(connAt.get(p.user_id) ?? 0).getTime());
+    const since = Math.max(new Date(p.last_login).getTime(), new Date(p.last_active_at ?? 0).getTime(), new Date(connAt.get(p.user_id) ?? 0).getTime());
     const days = Math.floor((Date.now() - since) / 86400e3);
     if (days < WARN_DAYS) continue;
     const lang: "zh" | "en" = p.lang === "zh" ? "zh" : "en";

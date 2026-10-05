@@ -34,3 +34,6 @@
 
 - [x] City Hunter auto-sync on every new/backfilled activity
 - [x] Pace zone widget using accumulated running history after the initial 30-day backfill, plus per-activity time in zone
+- [x] Confirm Terra activity, daily-health, and sleep webhooks resumed on Oct 5
+- [ ] Deauthorize all remaining Terra connections after Oct 10, sequentially, then stop Terra inactivity sweeps
+- [x] Match the landing-page live data counter to the reference and never flash zero

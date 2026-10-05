@@ -289,8 +289,8 @@ export default function RoutesSection({ lang }: { lang: "en" | "zh" | string }) 
       const [minLat, minLng, maxLat, maxLng] = city.bbox;
       return lat >= minLat && lat <= maxLat && lng >= minLng && lng <= maxLng;
     });
-    const area = (c: TerritoryCity) => (c.bbox[2] - c.bbox[0]) * (c.bbox[3] - c.bbox[1]);
-    const match = matches.sort((a, b) => area(a) - area(b))[0];
+    const bboxArea = (city: TerritoryCity) => (city.bbox[2] - city.bbox[0]) * (city.bbox[3] - city.bbox[1]);
+    const match = matches.sort((a, b) => bboxArea(a) - bboxArea(b))[0];
     const countryCode = match?.country ?? "";
     const area = countryCode === "TW" ? (match?.admin1 || match?.display_name || "") : "";
     return { ...route, country: countryCode, area, areaZh: match?.display_name_zh || TAIWAN_AREA_ZH[area] || area };

@@ -226,6 +226,79 @@ function InteractiveRouteMap({ pts }: { pts: [number, number][] }) {
   );
 }
 
+function haversineKm(a: [number, number], b: [number, number]) {
+  const R = 6371, rad = Math.PI / 180;
+  const dLat = (b[0] - a[0]) * rad, dLng = (b[1] - a[1]) * rad;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(a[0] * rad) * Math.cos(b[0] * rad) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+
+const elevCache = new Map<string, { d: number; e: number }[]>();
+
+function ElevationProfile({ pts, zh }: { pts: [number, number][]; zh: boolean }) {
+  const [data, setData] = useState<{ d: number; e: number }[] | null>(null);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    if (pts.length < 2) { setFailed(true); return; }
+    const n = Math.min(100, pts.length);
+    const sample = Array.from({ length: n }, (_, i) => pts[Math.round((i * (pts.length - 1)) / (n - 1))]);
+    const key = sample.map((p) => p.join(",")).join("|");
+    if (elevCache.has(key)) { setData(elevCache.get(key)!); return; }
+    let cancelled = false;
+    setData(null); setFailed(false);
+    const lat = sample.map((p) => p[0].toFixed(5)).join(",");
+    const lng = sample.map((p) => p[1].toFixed(5)).join(",");
+    fetch(`https://api.open-meteo.com/v1/elevation?latitude=${lat}&longitude=${lng}`)
+      .then((r) => r.json())
+      .then((j) => {
+        const elev: number[] = j?.elevation;
+        if (!Array.isArray(elev) || elev.length !== sample.length) throw new Error("bad");
+        let d = 0;
+        const out = sample.map((p, i) => { if (i > 0) d += haversineKm(sample[i - 1], p); return { d, e: elev[i] }; });
+        elevCache.set(key, out);
+        if (!cancelled) setData(out);
+      })
+      .catch(() => { if (!cancelled) setFailed(true); });
+    return () => { cancelled = true; };
+  }, [pts]);
+
+  const title = zh ? "海拔變化" : "Elevation profile";
+  if (failed) return <p className="px-2 py-3 text-sm text-muted-foreground">{zh ? "暫時未能載入海拔資料" : "Elevation data isn't available right now"}</p>;
+  if (!data) return <div className="flex items-center gap-2 px-2 py-4 text-sm text-muted-foreground"><Loader2 size={14} className="animate-spin" />{title}</div>;
+
+  let up = 0, down = 0;
+  for (let i = 1; i < data.length; i++) { const diff = data[i].e - data[i - 1].e; if (diff > 0) up += diff; else down -= diff; }
+  const W = 600, H = 160, P = 4;
+  const maxD = data[data.length - 1].d || 1;
+  const es = data.map((p) => p.e);
+  const minE = Math.min(...es), maxE = Math.max(...es);
+  const span = Math.max(10, maxE - minE);
+  const x = (d: number) => P + (d / maxD) * (W - 2 * P);
+  const y = (e: number) => H - P - ((e - minE) / span) * (H - 2 * P);
+  const line = data.map((p, i) => `${i ? "L" : "M"}${x(p.d).toFixed(1)},${y(p.e).toFixed(1)}`).join(" ");
+  const area = `${line} L${x(maxD)},${H - P} L${x(0)},${H - P} Z`;
+
+  return (
+    <div className="space-y-2 px-2 pb-2 pt-3">
+      <div className="flex items-baseline justify-between gap-2">
+        <p className="font-semibold text-foreground">{title}</p>
+        <p className="text-sm text-muted-foreground">↑{Math.round(up)} m · ↓{Math.round(down)} m</p>
+      </div>
+      <div className="relative">
+        <svg viewBox={`0 0 ${W} ${H}`} className="h-36 w-full" preserveAspectRatio="none">
+          <path d={area} className="fill-primary/20" />
+          <path d={line} className="fill-none stroke-primary" strokeWidth={2} vectorEffect="non-scaling-stroke" />
+        </svg>
+        <span className="absolute left-1 top-0 text-xs text-muted-foreground">{Math.round(maxE)} m</span>
+        <span className="absolute bottom-0 left-1 text-xs text-muted-foreground">{Math.round(minE)} m</span>
+      </div>
+      <div className="flex justify-between text-xs text-muted-foreground">
+        <span>0 km</span><span>{maxD.toFixed(1)} km</span>
+      </div>
+    </div>
+  );
+}
+
 function RouteMap({ pts, onExpand }: { pts: [number, number][]; onExpand: () => void }) {
   const view = useMemo(() => (pts.length < 2 ? null : fitView(pts, MAP_WIDTH, MAP_HEIGHT)), [pts]);
 
@@ -304,6 +377,12 @@ export default function RoutesSection({ lang }: { lang: "en" | "zh" | string }) 
   }, [zh]);
 
   const countries = useMemo(() => [...new Set(locatedRoutes.map((route) => route.country).filter(Boolean))].sort(), [locatedRoutes]);
+  const autoPicked = useRef(false);
+  useEffect(() => {
+    if (autoPicked.current || countries.length === 0) return;
+    autoPicked.current = true;
+    if (countries.includes("HK")) setCountry("HK");
+  }, [countries]);
 
   const [area, setArea] = useState("all");
 
@@ -462,8 +541,9 @@ export default function RoutesSection({ lang }: { lang: "en" | "zh" | string }) 
         </div>
       )}
       <Dialog open={zoomPts !== null} onOpenChange={(open) => { if (!open) setZoomPts(null); }}>
-        <DialogContent className="max-w-3xl p-2">
+        <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto p-2">
           {zoomPts && <InteractiveRouteMap pts={zoomPts} />}
+          {zoomPts && <ElevationProfile pts={zoomPts} zh={zh} />}
         </DialogContent>
       </Dialog>
     </div>

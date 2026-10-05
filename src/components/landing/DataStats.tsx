@@ -36,6 +36,18 @@ export default function DataStats({ lang }: Props) {
     };
   }, []);
 
+  // Fallback: if the scroll-into-view trigger never fires, just show the number
+  useEffect(() => {
+    if (total == null || inView) return;
+    const t = setTimeout(() => {
+      if (!animatedOnce.current) {
+        animatedOnce.current = true;
+        setDisplay(total);
+      }
+    }, 2500);
+    return () => clearTimeout(t);
+  }, [total, inView]);
+
   // Animate toward the latest total (first time: count up; later: quick catch-up)
   useEffect(() => {
     if (!inView || total == null) return;

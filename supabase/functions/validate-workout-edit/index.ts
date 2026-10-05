@@ -178,7 +178,7 @@ Rules:
 
     const vRes = await callVertex({
       apiKey: VERTEX_API_KEY,
-      model: "gemini-flash-lite-latest",
+      model: "gemini-3.8-flash",
       systemPrompt,
       userPrompt,
       jsonMode: true,

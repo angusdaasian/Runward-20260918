@@ -29,7 +29,7 @@ const DEFAULT_BRANDS = [
 ];
 
 async function callGemini(apiKey: string, prompt: string, timeoutMs = 180_000): Promise<string> {
-  const model = "gemini-3.1-pro-preview";
+  const model = "gemini-3.8-flash";
   const baseUrl = `https://aiplatform.googleapis.com/v1/projects/${getVertexProjectId()}/locations/${getVertexLocation()}/publishers/google/models/${model}:generateContent`;
   const { url, headers } = await buildVertexAuth(baseUrl, apiKey);
   const body: any = {

@@ -24,7 +24,7 @@ function getVertexLocation(): string {
   return Deno.env.get("GOOGLE_VERTEX_LOCATION") || "global";
 }
 
-const MODEL = "gemini-3.1-pro-preview";
+const MODEL = "gemini-3.8-flash";
 
 type ThinkingLevel = "minimal" | "low" | "medium" | "high";
 

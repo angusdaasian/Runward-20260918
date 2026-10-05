@@ -299,10 +299,10 @@ async function scrapeWithFirecrawl(url: string, apiKey: string): Promise<string>
 
 async function callVertexAIRaw(opts: { apiKey: string; model?: string; messages: Array<{ role: string; content: any }> }): Promise<{ ok: boolean; status: number; text: string; json?: any }> {
   const VERTEX_MODEL_MAP: Record<string, string> = {
-    "google/gemini-3.1-flash-lite-preview": "gemini-flash-lite-latest",
-    "google/gemini-3-flash-preview": "gemini-flash-lite-latest",
+    "gemini-3.8-flash": "gemini-3.8-flash",
+    "gemini-3.8-flash": "gemini-3.8-flash",
   };
-  const model = VERTEX_MODEL_MAP[opts.model || ""] || (opts.model || "gemini-flash-lite-latest").replace(/^google\//, "");
+  const model = VERTEX_MODEL_MAP[opts.model || ""] || (opts.model || "gemini-3.8-flash").replace(/^google\//, "");
   const __baseUrl = `https://aiplatform.googleapis.com/v1/projects/${getVertexProjectId()}/locations/${getVertexLocation()}/publishers/google/models/${model}:generateContent`;
   const { url, headers: __vxHeaders } = await buildVertexAuth(__baseUrl, opts.apiKey);
   const systemParts: any[] = [];
@@ -332,7 +332,7 @@ async function callAI(apiKey: string, systemPrompt: string, userPrompt: string):
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     const res = await callVertexAIRaw({
       apiKey,
-      model: "google/gemini-3.1-flash-lite-preview",
+      model: "gemini-3.8-flash",
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },

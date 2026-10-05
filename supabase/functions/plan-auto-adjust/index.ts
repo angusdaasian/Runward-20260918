@@ -75,7 +75,7 @@ function vertexLocation() {
   return Deno.env.get("GOOGLE_VERTEX_LOCATION") || "global";
 }
 
-async function callGemini(system: string, user: string, model = "gemini-3-flash-preview", temperature = 0.6): Promise<string> {
+async function callGemini(system: string, user: string, model = "gemini-3.8-flash", temperature = 0.6): Promise<string> {
   const apiKey = Deno.env.get("GOOGLE_VERTEX_API_KEY");
   if (!apiKey) throw new Error("GOOGLE_VERTEX_API_KEY not configured");
   const base = `https://aiplatform.googleapis.com/v1/projects/${vertexProject()}/locations/${vertexLocation()}/publishers/google/models/${model}:generateContent`;
@@ -579,7 +579,7 @@ ${commonRules}`;
   }
 
   // temperature 0 → same inputs give the same rebuild.
-  const raw = await callGemini(system, userPrompt, "gemini-3-flash-preview", 0);
+  const raw = await callGemini(system, userPrompt, "gemini-3.8-flash", 0);
   const parsed = parseJsonLoose(raw.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim());
   const aiWeeks: any[] = Array.isArray(parsed) ? parsed : Array.isArray(parsed?.weeks) ? parsed.weeks : [];
   if (aiWeeks.length === 0) {

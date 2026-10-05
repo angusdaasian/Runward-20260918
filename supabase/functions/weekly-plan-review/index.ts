@@ -28,7 +28,7 @@ function getVertexLocation(): string {
   return Deno.env.get("GOOGLE_VERTEX_LOCATION") || "global";
 }
 
-const MODEL = "gemini-flash-lite-latest";
+const MODEL = "gemini-3.8-flash";
 
 interface PlannedDay {
   date: string;

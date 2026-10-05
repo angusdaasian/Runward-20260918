@@ -28,7 +28,7 @@ const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 const VERTEX_API_KEY = Deno.env.get("GOOGLE_VERTEX_API_KEY") || "";
 
 // Higher-tier model for the one-off in-depth analysis, with fallbacks if unavailable.
-const MODELS = ["gemini-3.8-flash", "gemini-3.1-pro-preview", "gemini-3-flash-preview"];
+const MODELS = ["gemini-3.8-flash", "gemini-3.8-flash", "gemini-3.8-flash"];
 
 const projectId = () =>
   Deno.env.get("GOOGLE_VERTEX_PROJECT_ID") || Deno.env.get("GOOGLE_CLOUD_PROJECT") || "inbound-isotope-500908-n8";

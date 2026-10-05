@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { decodePolyline } from "@/lib/territory";
 import { toast } from "sonner";
-import { Download, Watch, Loader2, Globe2, ZoomIn, ZoomOut, Expand } from "lucide-react";
+import { Download, Watch, Loader2, Globe2, ZoomIn, ZoomOut, Expand, Mountain } from "lucide-react";
 
 type Route = {
   source: string; source_id: string; user_id: string; display_name: string | null; started_at: string;
@@ -262,8 +262,8 @@ function ElevationProfile({ pts, zh }: { pts: [number, number][]; zh: boolean })
     return () => { cancelled = true; };
   }, [pts]);
 
-  const title = zh ? "海拔變化" : "Elevation profile";
-  if (failed) return <p className="px-2 py-3 text-sm text-muted-foreground">{zh ? "暫時未能載入海拔資料" : "Elevation data isn't available right now"}</p>;
+  const title = zh ? "高度圖" : "Elevation profile";
+  if (failed) return <p className="px-2 py-3 text-sm text-muted-foreground">{zh ? "暫時未能載入高度資料" : "Elevation data isn't available right now"}</p>;
   if (!data) return <div className="flex items-center gap-2 px-2 py-4 text-sm text-muted-foreground"><Loader2 size={14} className="animate-spin" />{title}</div>;
 
   let up = 0, down = 0;
@@ -299,15 +299,19 @@ function ElevationProfile({ pts, zh }: { pts: [number, number][]; zh: boolean })
   );
 }
 
-function RouteMap({ pts, onExpand }: { pts: [number, number][]; onExpand: () => void }) {
+function RouteMap({ pts, zh, onExpand }: { pts: [number, number][]; zh: boolean; onExpand: () => void }) {
   const view = useMemo(() => (pts.length < 2 ? null : fitView(pts, MAP_WIDTH, MAP_HEIGHT)), [pts]);
 
   if (!view) return <div className="h-32 w-full bg-muted" />;
   return (
-    <button type="button" onClick={onExpand} className="relative block aspect-[30/13] w-full overflow-hidden bg-muted" aria-label="View route map">
+    <button type="button" onClick={onExpand} className="group relative block aspect-[30/13] w-full overflow-hidden bg-muted" aria-label="View route map">
       <MapSvg pts={pts} zoom={view.zoom} cx={view.cx} cy={view.cy} width={MAP_WIDTH} height={MAP_HEIGHT} />
       <span className="absolute right-2 top-2 rounded-md bg-background/80 p-1.5 text-muted-foreground">
         <Expand size={14} />
+      </span>
+      <span className="absolute bottom-2 left-2 flex items-center gap-1 rounded-full bg-background/80 px-2 py-0.5 text-[10px] text-muted-foreground backdrop-blur-sm">
+        <Mountain size={10} className="animate-pulse" />
+        {zh ? "點擊查看高度圖" : "Tap for elevation"}
       </span>
       <span className="absolute bottom-0.5 right-1 bg-background/80 px-1 text-[9px] text-muted-foreground">© OpenStreetMap</span>
     </button>
@@ -516,7 +520,7 @@ export default function RoutesSection({ lang }: { lang: "en" | "zh" | string }) 
             const pts = trimmedPoints(r.summary_polyline);
             return (
               <div key={key} className="overflow-hidden rounded-lg border border-border bg-card">
-                <RouteMap pts={pts} onExpand={() => setZoomPts(pts)} />
+                <RouteMap pts={pts} zh={zh} onExpand={() => setZoomPts(pts)} />
                 <div className="p-3">
                   <div className="min-w-0">
                     <p className="truncate font-semibold text-foreground">{r.activity_name || (zh ? "路線" : "Route")}</p>

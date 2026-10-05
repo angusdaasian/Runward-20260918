@@ -187,50 +187,61 @@ const BIG_H = 520;
 
 function InteractiveRouteMap({ pts }: { pts: [number, number][] }) {
   const fit = useMemo(() => fitView(pts, BIG_W, BIG_H), [pts]);
-  const [view, setView] = useState<{ zoom: number; cx: number; cy: number } | null>(null);
-  const drag = useRef<{ x: number; y: number; cx: number; cy: number } | null>(null);
+  const [view, setViewState] = useState<{ zoom: number; cx: number; cy: number } | null>(null);
+  const viewRef = useRef<{ zoom: number; cx: number; cy: number } | null>(null);
   const pointers = useRef<Map<number, { x: number; y: number }>>(new Map());
-  const pinch = useRef<{ dist: number; wx: number; wy: number; zoom: number; k: number } | null>(null);
+  // Previous gesture sample (midpoint in client px + finger distance) — updated every move.
+  const last = useRef<{ x: number; y: number; dist: number } | null>(null);
   const wrap = useRef<HTMLDivElement>(null);
   const v = view ?? fit;
+  const cur = () => viewRef.current ?? fit;
+  const setView = (next: { zoom: number; cx: number; cy: number }) => { viewRef.current = next; setViewState(next); };
+
+  // Zoom by `dz` keeping the client point (px, py) fixed on screen.
+  const zoomAt = (dz: number, px: number, py: number) => {
+    const rect = wrap.current?.getBoundingClientRect();
+    const c = cur();
+    if (!rect) return;
+    const next = Math.max(2, Math.min(18, c.zoom + dz));
+    const f = 2 ** (next - c.zoom);
+    const k = BIG_W / rect.width;
+    const sx = (px - rect.left) * k - BIG_W / 2; // offset from map centre in map units
+    const sy = (py - rect.top) * k - BIG_H / 2;
+    setView({ zoom: next, cx: (c.cx + sx) * f - sx, cy: (c.cy + sy) * f - sy });
+  };
 
   const zoomBy = (delta: number) => {
-    const next = Math.max(2, Math.min(18, v.zoom + delta));
-    if (next === v.zoom) return;
-    const factor = 2 ** (next - v.zoom);
-    setView({ zoom: next, cx: v.cx * factor, cy: v.cy * factor });
+    const rect = wrap.current?.getBoundingClientRect();
+    if (rect) zoomAt(delta, rect.left + rect.width / 2, rect.top + rect.height / 2);
   };
 
-  const startPinch = () => {
-    const rect = wrap.current?.getBoundingClientRect();
-    if (!rect) return;
-    const [a, b] = [...pointers.current.values()];
-    if (!a || !b) return;
+  const sample = () => {
+    const pts2 = [...pointers.current.values()];
+    if (pts2.length === 0) return null;
+    if (pts2.length === 1) return { x: pts2[0].x, y: pts2[0].y, dist: 0 };
+    const [a, b] = pts2;
+    return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, dist: Math.hypot(a.x - b.x, a.y - b.y) };
+  };
+
+  const onMove = () => {
+    const s2 = sample();
+    const prev = last.current;
+    last.current = s2;
+    if (!s2 || !prev || !wrap.current) return;
+    const rect = wrap.current.getBoundingClientRect();
     const k = BIG_W / rect.width;
-    const mx = (a.x + b.x) / 2 - rect.left;
-    const my = (a.y + b.y) / 2 - rect.top;
-    pinch.current = {
-      dist: Math.hypot(a.x - b.x, a.y - b.y),
-      wx: v.cx - BIG_W / 2 + mx * k,
-      wy: v.cy - BIG_H / 2 + my * k,
-      zoom: v.zoom,
-      k,
-    };
-    drag.current = null;
+    const c = cur();
+    // Pan by midpoint movement.
+    const next = { zoom: c.zoom, cx: c.cx - (s2.x - prev.x) * k, cy: c.cy - (s2.y - prev.y) * k };
+    viewRef.current = next;
+    if (s2.dist > 0 && prev.dist > 0) {
+      zoomAt(Math.log2(s2.dist / prev.dist), s2.x, s2.y);
+      return;
+    }
+    setView(next);
   };
 
-  const handlePinch = () => {
-    const p = pinch.current;
-    const rect = wrap.current?.getBoundingClientRect();
-    if (!p || !rect) return;
-    const [a, b] = [...pointers.current.values()];
-    if (!a || !b) return;
-    const next = Math.max(2, Math.min(18, p.zoom + Math.log2(Math.max(0.05, Math.hypot(a.x - b.x, a.y - b.y)) / Math.max(1, p.dist))));
-    const factor = 2 ** (next - p.zoom);
-    const mx = (a.x + b.x) / 2 - rect.left;
-    const my = (a.y + b.y) / 2 - rect.top;
-    setView({ zoom: next, cx: BIG_W / 2 - mx * p.k + p.wx * factor, cy: BIG_H / 2 - my * p.k + p.wy * factor });
-  };
+  const reset = () => { last.current = sample(); };
 
   return (
     <div
@@ -239,38 +250,16 @@ function InteractiveRouteMap({ pts }: { pts: [number, number][] }) {
       onPointerDown={(e) => {
         pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
         e.currentTarget.setPointerCapture?.(e.pointerId);
-        if (pointers.current.size >= 2) { startPinch(); return; }
-        drag.current = { x: e.clientX, y: e.clientY, cx: v.cx, cy: v.cy };
+        reset();
       }}
       onPointerMove={(e) => {
         if (!pointers.current.has(e.pointerId)) return;
         pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
-        if (pointers.current.size >= 2) { handlePinch(); return; }
-        if (!drag.current || !wrap.current) return;
-        const scale = BIG_W / wrap.current.getBoundingClientRect().width;
-        setView({
-          zoom: v.zoom,
-          cx: drag.current.cx - (e.clientX - drag.current.x) * scale,
-          cy: drag.current.cy - (e.clientY - drag.current.y) * scale,
-        });
+        onMove();
       }}
-      onPointerUp={(e) => {
-        pointers.current.delete(e.pointerId);
-        pinch.current = null;
-        drag.current = null;
-        // Continue panning smoothly with the remaining finger.
-        const rest = [...pointers.current.values()][0];
-        if (rest) drag.current = { x: rest.x, y: rest.y, cx: v.cx, cy: v.cy };
-      }}
-      onLostPointerCapture={(e) => { if (pointers.current.has(e.pointerId)) { pointers.current.delete(e.pointerId); pinch.current = null; drag.current = null; } }}
-      onPointerCancel={(e) => {
-        pointers.current.delete(e.pointerId);
-        pinch.current = null;
-        drag.current = null;
-        // Continue panning smoothly with the remaining finger.
-        const rest = [...pointers.current.values()][0];
-        if (rest) drag.current = { x: rest.x, y: rest.y, cx: v.cx, cy: v.cy };
-      }}
+      onPointerUp={(e) => { pointers.current.delete(e.pointerId); reset(); }}
+      onPointerCancel={(e) => { pointers.current.delete(e.pointerId); reset(); }}
+      onLostPointerCapture={(e) => { if (pointers.current.delete(e.pointerId)) reset(); }}
     >
       <MapSvg pts={pts} zoom={v.zoom} cx={v.cx} cy={v.cy} width={BIG_W} height={BIG_H} />
       <div className="absolute right-2 top-2 flex flex-col gap-1">

@@ -168,7 +168,7 @@ function MapSvg({ pts, zoom, cx, cy, width, height }: { pts: [number, number][];
     <svg viewBox={`0 0 ${width} ${height}`} className="absolute inset-0 h-full w-full" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
       {scene.tiles.map((tile) => (
         <image
-          key={`${scene.tz}-${tile.x}-${tile.y}-${tile.left.toFixed(0)}`}
+          key={`${scene.tz}-${tile.x}-${tile.y}-${tile.left - (tile.left % 1)}`}
           href={`https://tile.openstreetmap.org/${scene.tz}/${tile.x}/${tile.y}.png`}
           x={tile.left}
           y={tile.top}
@@ -225,7 +225,7 @@ function InteractiveRouteMap({ pts }: { pts: [number, number][] }) {
     if (!p || !rect) return;
     const [a, b] = [...pointers.current.values()];
     if (!a || !b) return;
-    const next = Math.max(2, Math.min(18, p.zoom + Math.log2(Math.max(1, Math.hypot(a.x - b.x, a.y - b.y) / p.dist))));
+    const next = Math.max(2, Math.min(18, p.zoom + Math.log2(Math.max(0.05, Math.hypot(a.x - b.x, a.y - b.y)) / Math.max(1, p.dist))));
     const factor = 2 ** (next - p.zoom);
     const mx = (a.x + b.x) / 2 - rect.left;
     const my = (a.y + b.y) / 2 - rect.top;
@@ -238,9 +238,9 @@ function InteractiveRouteMap({ pts }: { pts: [number, number][] }) {
       className="relative aspect-[20/13] w-full touch-none overflow-hidden bg-muted"
       onPointerDown={(e) => {
         pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        e.currentTarget.setPointerCapture?.(e.pointerId);
         if (pointers.current.size >= 2) { startPinch(); return; }
         drag.current = { x: e.clientX, y: e.clientY, cx: v.cx, cy: v.cy };
-        (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
       }}
       onPointerMove={(e) => {
         if (!pointers.current.has(e.pointerId)) return;
@@ -256,13 +256,20 @@ function InteractiveRouteMap({ pts }: { pts: [number, number][] }) {
       }}
       onPointerUp={(e) => {
         pointers.current.delete(e.pointerId);
-        if (pointers.current.size < 2) pinch.current = null;
+        pinch.current = null;
         drag.current = null;
+        // Continue panning smoothly with the remaining finger.
+        const rest = [...pointers.current.values()][0];
+        if (rest) drag.current = { x: rest.x, y: rest.y, cx: v.cx, cy: v.cy };
       }}
+      onLostPointerCapture={(e) => { if (pointers.current.has(e.pointerId)) { pointers.current.delete(e.pointerId); pinch.current = null; drag.current = null; } }}
       onPointerCancel={(e) => {
         pointers.current.delete(e.pointerId);
-        if (pointers.current.size < 2) pinch.current = null;
+        pinch.current = null;
         drag.current = null;
+        // Continue panning smoothly with the remaining finger.
+        const rest = [...pointers.current.values()][0];
+        if (rest) drag.current = { x: rest.x, y: rest.y, cx: v.cx, cy: v.cy };
       }}
     >
       <MapSvg pts={pts} zoom={v.zoom} cx={v.cx} cy={v.cy} width={BIG_W} height={BIG_H} />

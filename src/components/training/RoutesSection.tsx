@@ -13,11 +13,68 @@ type Route = {
 };
 
 type TerritoryCity = {
+  slug: string;
+  display_name: string;
+  display_name_zh: string | null;
   country: string | null;
+  admin1: string | null;
   bbox: [number, number, number, number] | number[];
 };
 
-type LocatedRoute = Route & { country: string };
+type LocatedRoute = Route & { country: string; area: string; areaZh: string };
+
+type GeoPoint = [number, number];
+
+const HK_AREAS = [
+  {
+    id: "hong-kong-island",
+    en: "Hong Kong Island",
+    zh: "香港島",
+    polygon: [[22.194, 114.115], [22.208, 114.09], [22.284, 114.11], [22.303, 114.178], [22.291, 114.263], [22.218, 114.253]] as GeoPoint[],
+  },
+  {
+    id: "kowloon",
+    en: "Kowloon",
+    zh: "九龍",
+    polygon: [[22.278, 114.126], [22.287, 114.11], [22.354, 114.126], [22.361, 114.235], [22.329, 114.257], [22.281, 114.224]] as GeoPoint[],
+  },
+];
+
+const TAIWAN_AREA_ZH: Record<string, string> = {
+  "Baisha Township": "白沙鄉", "Changhua City": "彰化市", Hsinchu: "新竹", "Hualien City": "花蓮市",
+  "Huxi Township": "湖西鄉", "Ji'an": "吉安鄉", Jiuru: "九如鄉", Kaohsiung: "高雄市",
+  "Magong City": "馬公市", Neipu: "內埔鄉", "New Taipei": "新北市", "Su'ao Township": "蘇澳鎮",
+  Taichung: "台中市", Tainan: "台南市", Taipei: "台北市", "Taitung City": "台東市",
+  "Taoyuan City": "桃園市", Tongluo: "銅鑼鄉", Xiulin: "秀林鄉", "Zhubei City": "竹北市", Zhudong: "竹東鎮",
+};
+
+function pointInPolygon([lat, lng]: GeoPoint, polygon: GeoPoint[]) {
+  let inside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const [latI, lngI] = polygon[i];
+    const [latJ, lngJ] = polygon[j];
+    if ((latI > lat) !== (latJ > lat) && lng < ((lngJ - lngI) * (lat - latI)) / (latJ - latI) + lngI) inside = !inside;
+  }
+  return inside;
+}
+
+function representativePoints(poly: string): GeoPoint[] {
+  const points = decodePolyline(poly);
+  if (points.length <= 3) return points;
+  return [points[0], points[Math.floor(points.length / 4)], points[Math.floor(points.length / 2)], points[Math.floor(points.length * 0.75)], points[points.length - 1]];
+}
+
+function hongKongArea(points: GeoPoint[]) {
+  const votes = new Map<string, number>();
+  points.forEach((point) => {
+    const match = HK_AREAS.find((area) => pointInPolygon(point, area.polygon));
+    const id = match?.id ?? "new-territories";
+    votes.set(id, (votes.get(id) ?? 0) + 1);
+  });
+  const id = [...votes].sort((a, b) => b[1] - a[1])[0]?.[0] ?? "new-territories";
+  const match = HK_AREAS.find((area) => area.id === id);
+  return match ?? { id: "new-territories", en: "New Territories", zh: "新界" };
+}
 
 const BUCKETS = [
   { id: "all", en: "All", zh: "全部", min: 0, max: 1e9 },
@@ -202,7 +259,7 @@ export default function RoutesSection({ lang }: { lang: "en" | "zh" | string }) 
       if (!s.session && attempt < 5) { await new Promise((r) => setTimeout(r, 800)); return load(attempt + 1); }
       const [{ data, error }, { data: cityRows }] = await Promise.all([
         (supabase.rpc as any)("get_public_routes", { p_limit: 300 }),
-        supabase.from("territory_cities").select("country,bbox"),
+        supabase.from("territory_cities").select("slug,display_name,display_name_zh,country,admin1,bbox"),
       ]);
       if (cancelled) return;
       if (error) {
@@ -218,19 +275,25 @@ export default function RoutesSection({ lang }: { lang: "en" | "zh" | string }) 
   }, []);
 
   const locatedRoutes = useMemo<LocatedRoute[]>(() => (routes ?? []).map((route) => {
-    const first = decodePolyline(route.summary_polyline)[0];
-    if (!first) return { ...route, country: "" };
+    const points = representativePoints(route.summary_polyline);
+    const first = points[0];
+    if (!first) return { ...route, country: "", area: "", areaZh: "" };
     const [lat, lng] = first;
     // Special regions: never fold HK / Macau into CN
-    if (lat >= 22.13 && lat <= 22.58 && lng >= 113.82 && lng <= 114.45) return { ...route, country: "HK" };
-    if (lat >= 22.10 && lat <= 22.22 && lng >= 113.52 && lng <= 113.61) return { ...route, country: "MO" };
+    if (points.some(([pointLat, pointLng]) => pointLat >= 22.13 && pointLat <= 22.58 && pointLng >= 113.82 && pointLng <= 114.45)) {
+      const area = hongKongArea(points);
+      return { ...route, country: "HK", area: area.en, areaZh: area.zh };
+    }
+    if (lat >= 22.10 && lat <= 22.22 && lng >= 113.52 && lng <= 113.61) return { ...route, country: "MO", area: "", areaZh: "" };
     const matches = cities.filter((city) => {
       const [minLat, minLng, maxLat, maxLng] = city.bbox;
       return lat >= minLat && lat <= maxLat && lng >= minLng && lng <= maxLng;
     });
     const area = (c: TerritoryCity) => (c.bbox[2] - c.bbox[0]) * (c.bbox[3] - c.bbox[1]);
     const match = matches.sort((a, b) => area(a) - area(b))[0];
-    return { ...route, country: match?.country ?? "" };
+    const countryCode = match?.country ?? "";
+    const area = countryCode === "TW" ? (match?.admin1 || match?.display_name || "") : "";
+    return { ...route, country: countryCode, area, areaZh: match?.display_name_zh || TAIWAN_AREA_ZH[area] || area };
   }), [routes, cities]);
 
   const regionName = useMemo(() => {
@@ -242,13 +305,33 @@ export default function RoutesSection({ lang }: { lang: "en" | "zh" | string }) 
 
   const countries = useMemo(() => [...new Set(locatedRoutes.map((route) => route.country).filter(Boolean))].sort(), [locatedRoutes]);
 
-  const list = useMemo(() => {
-    const b = BUCKETS.find((x) => x.id === bucket)!;
+  const [area, setArea] = useState("all");
+
+  const filteredBeforeArea = useMemo(() => {
+    const b = BUCKETS.find((x) => x.id === bucket) ?? BUCKETS[0];
     const s = q.trim().toLowerCase();
     return locatedRoutes.filter((r) => r.distance_km >= b.min && r.distance_km < b.max &&
       (country === "all" || r.country === country) &&
-      (!s || (r.activity_name ?? "").toLowerCase().includes(s) || regionName(r.country).toLowerCase().includes(s)));
+      (!s || (r.activity_name ?? "").toLowerCase().includes(s) || regionName(r.country).toLowerCase().includes(s) ||
+        r.area.toLowerCase().includes(s) || r.areaZh.includes(s)));
   }, [locatedRoutes, q, bucket, country, regionName]);
+
+  const areas = useMemo(() => {
+    const counts = new Map<string, { en: string; zh: string; count: number }>();
+    filteredBeforeArea.forEach((route) => {
+      if (!route.area) return;
+      const current = counts.get(route.area);
+      counts.set(route.area, { en: route.area, zh: route.areaZh || route.area, count: (current?.count ?? 0) + 1 });
+    });
+    return [...counts.values()].sort((a, b) => (zh ? a.zh : a.en).localeCompare(zh ? b.zh : b.en, zh ? "zh-Hant" : "en"));
+  }, [filteredBeforeArea, zh]);
+
+  useEffect(() => {
+    if (area !== "all" && !areas.some((item) => item.en === area)) setArea("all");
+  }, [area, areas]);
+
+  const list = useMemo(() => filteredBeforeArea.filter((route) => area === "all" || route.area === area), [filteredBeforeArea, area]);
+  const selectedArea = areas.find((item) => item.en === area);
 
   const nameOf = (r: Route) => `${r.activity_name || (zh ? "路線" : "Route")} · ${Number(r.distance_km).toFixed(1)} km`;
 
@@ -311,9 +394,9 @@ export default function RoutesSection({ lang }: { lang: "en" | "zh" | string }) 
        <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={zh ? "搜尋路線" : "Search routes"} />
        <label className="flex items-center gap-2 text-sm text-muted-foreground">
          <Globe2 size={16} />
-         <select value={country} onChange={(event) => setCountry(event.target.value)} className="min-w-0 flex-1 rounded-md border border-border bg-background px-3 py-2 text-foreground">
+          <select value={country} onChange={(event) => { setCountry(event.target.value); setArea("all"); }} className="min-w-0 flex-1 rounded-md border border-border bg-background px-3 py-2 text-foreground">
            <option value="all">{zh ? "所有國家或地區" : "All countries and regions"}</option>
-           {countries.map((value) => <option key={value} value={value}>{value}</option>)}
+            {countries.map((value) => <option key={value} value={value}>{regionName(value)}</option>)}
          </select>
        </label>
       <div className="flex gap-2 overflow-x-auto pb-1">
@@ -324,12 +407,30 @@ export default function RoutesSection({ lang }: { lang: "en" | "zh" | string }) 
           </button>
         ))}
       </div>
+      {areas.length > 0 && (
+        <div className="flex gap-2 overflow-x-auto pb-1" aria-label={zh ? "地區" : "Areas"}>
+          <Button size="sm" variant={area === "all" ? "default" : "outline"} className="shrink-0" onClick={() => setArea("all")}>
+            {zh ? "全部地區" : "All areas"} · {filteredBeforeArea.length}
+          </Button>
+          {areas.map((item) => (
+            <Button key={item.en} size="sm" variant={area === item.en ? "default" : "outline"} className="shrink-0" onClick={() => setArea(item.en)}>
+              {zh ? item.zh : item.en} · {item.count}
+            </Button>
+          ))}
+        </div>
+      )}
       {routes === null ? (
         <div className="flex justify-center py-10"><Loader2 className="animate-spin text-muted-foreground" /></div>
       ) : list.length === 0 ? (
         <p className="py-10 text-center text-sm text-muted-foreground">{zh ? "暫時沒有路線" : "No routes yet"}</p>
       ) : (
         <div className="space-y-3">
+          <div className="flex items-baseline justify-between gap-3">
+            <h3 className="font-semibold text-foreground">
+              {selectedArea ? (zh ? selectedArea.zh : selectedArea.en) : country === "all" ? (zh ? "所有路線" : "All routes") : regionName(country)}
+            </h3>
+            <span className="text-sm text-muted-foreground">{zh ? `${list.length} 條` : `${list.length} routes`}</span>
+          </div>
           {list.map((r) => {
             const key = r.source + r.source_id;
             const pts = trimmedPoints(r.summary_polyline);
@@ -342,7 +443,7 @@ export default function RoutesSection({ lang }: { lang: "en" | "zh" | string }) 
                     <p className="text-sm text-muted-foreground">
                       {Number(r.distance_km).toFixed(1)} km{r.elevation_m ? ` · ↑${Math.round(Number(r.elevation_m))} m` : ""}
                     </p>
-                    {r.country && <p className="text-xs text-muted-foreground">{r.country}</p>}
+                    {r.country && <p className="text-xs text-muted-foreground">{[regionName(r.country), zh ? r.areaZh : r.area].filter(Boolean).join(" · ")}</p>}
                   </div>
                 <div className="mt-3 grid grid-cols-2 gap-2">
                   <Button size="sm" onClick={() => send(r)} disabled={busy === key}>

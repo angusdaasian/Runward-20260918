@@ -5,7 +5,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import {
   base64url, compactDecrypt, createRemoteJWKSet, decodeProtectedHeader, flattenedVerify, importPKCS8,
 } from "npm:jose@5.9.6";
-import { ingestStrideeActivity } from "../_shared/strideeIngest.ts";
+import { ingestStrideeActivity, isPremium } from "../_shared/strideeIngest.ts";
 import { triggerCrossPlatformDedup } from "../_shared/triggerDedup.ts";
 import { maybeSendTelegramActivityPrompt } from "../_shared/telegramActivityPrompt.ts";
 import { maybeSendWhatsappActivityPrompt } from "../_shared/whatsappActivityPrompt.ts";
@@ -112,6 +112,13 @@ Deno.serve(async (req) => {
       uid = conn.user_id;
       if (!conn.auto_sync_enabled) {
         return console.log("[stridee-webhook] auto sync off, skipped", uid);
+      }
+      // Free accounts keep the last 30 days only; history replays arrive as
+      // activity.created events, so enforce the cap here too.
+      const startMs = Date.parse(event.data.start_time ?? "");
+      if (Number.isFinite(startMs) && Date.now() - startMs > 30 * 86400_000) {
+        const premium = await isPremium(admin, uid!);
+        if (!premium) return console.log("[stridee-webhook] old activity skipped (free tier)", uid, event.data.id);
       }
       await ingestStrideeActivity(admin, uid!, { ...event.data, received_at: event.created });
       await admin.from("stridee_connections").update({ last_synced_at: new Date().toISOString() }).eq("user_id", uid);

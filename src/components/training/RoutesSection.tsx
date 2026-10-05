@@ -232,7 +232,7 @@ function InteractiveRouteMap({ pts }: { pts: [number, number][] }) {
     const k = BIG_W / rect.width;
     const c = cur();
     // Pan by midpoint movement.
-    let next = { zoom: c.zoom, cx: c.cx - (s2.x - prev.x) * k, cy: c.cy - (s2.y - prev.y) * k };
+    const next = { zoom: c.zoom, cx: c.cx - (s2.x - prev.x) * k, cy: c.cy - (s2.y - prev.y) * k };
     viewRef.current = next;
     if (s2.dist > 0 && prev.dist > 0) {
       zoomAt(Math.log2(s2.dist / prev.dist), s2.x, s2.y);

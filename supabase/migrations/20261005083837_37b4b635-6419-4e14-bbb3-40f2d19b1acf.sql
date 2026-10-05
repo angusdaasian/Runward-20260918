@@ -1,0 +1,1 @@
+UPDATE public.terra_activities SET provider = 'ZEPP' WHERE terra_activity_id LIKE 'stridee_%' AND provider = 'GARMIN' AND device_model ILIKE '%huami%'

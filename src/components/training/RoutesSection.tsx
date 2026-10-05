@@ -317,6 +317,7 @@ export default function RoutesSection({ lang }: { lang: "en" | "zh" | string }) 
   }, [locatedRoutes, q, bucket, country, regionName]);
 
   const areas = useMemo(() => {
+    if (country === "all") return [];
     const counts = new Map<string, { en: string; zh: string; count: number }>();
     filteredBeforeArea.forEach((route) => {
       if (!route.area) return;
@@ -324,7 +325,7 @@ export default function RoutesSection({ lang }: { lang: "en" | "zh" | string }) 
       counts.set(route.area, { en: route.area, zh: route.areaZh || route.area, count: (current?.count ?? 0) + 1 });
     });
     return [...counts.values()].sort((a, b) => (zh ? a.zh : a.en).localeCompare(zh ? b.zh : b.en, zh ? "zh-Hant" : "en"));
-  }, [filteredBeforeArea, zh]);
+  }, [country, filteredBeforeArea, zh]);
 
   useEffect(() => {
     if (area !== "all" && !areas.some((item) => item.en === area)) setArea("all");

@@ -113,6 +113,13 @@ Deno.serve(async (req) => {
       if (!conn.auto_sync_enabled) {
         return console.log("[stridee-webhook] auto sync off, skipped", uid);
       }
+      // Free accounts keep the last 30 days only; history replays arrive as
+      // activity.created events, so enforce the cap here too.
+      const startMs = Date.parse(event.data.start_time ?? "");
+      if (Number.isFinite(startMs) && Date.now() - startMs > 30 * 86400_000) {
+        const premium = await isPremium(admin, uid!);
+        if (!premium) return console.log("[stridee-webhook] old activity skipped (free tier)", uid, event.data.id);
+      }
       await ingestStrideeActivity(admin, uid!, { ...event.data, received_at: event.created });
       await admin.from("stridee_connections").update({ last_synced_at: new Date().toISOString() }).eq("user_id", uid);
       triggerCrossPlatformDedup(uid!, 72);

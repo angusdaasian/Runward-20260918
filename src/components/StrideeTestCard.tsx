@@ -18,6 +18,8 @@ const PROVIDERS = [
 ];
 import despia from "despia-native";
 import { isDespiaUA } from "@/lib/despiaOAuth";
+import WatchIntroSheet from "@/components/WatchIntroSheet";
+import { Button } from "@/components/ui/button";
 
 // Watch connections via Stridee. Non-admins may link one brand; admins can link several for testing.
 // Renders one section box per provider, matching the other Connect Apps rows.
@@ -26,6 +28,7 @@ export default function StrideeTestCard({ lang, blockedByOther = false, onBefore
   const [isAdmin, setIsAdmin] = useState(false);
   const [conn, setConn] = useState<{ status: string; last_synced_at: string | null; provider?: string; providers?: string[] } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [introProvider, setIntroProvider] = useState<typeof PROVIDERS[number] | null>(null);
   const zh = lang === "zh";
 
   const load = async () => {
@@ -166,13 +169,14 @@ export default function StrideeTestCard({ lang, blockedByOther = false, onBefore
               ) : isPending ? (
                 <div className="flex items-center gap-2">
                   {busy === p.id && <RefreshCw size={14} className="animate-spin text-muted-foreground" />}
-                  <button
-                    onClick={() => connect(p.id)}
+                  <Button
+                    size="sm"
+                    onClick={() => setIntroProvider(p)}
                     disabled={!!busy}
                     className="text-xs font-medium px-3 py-1 rounded-full bg-primary text-primary-foreground disabled:opacity-50"
                   >
                     {busy === p.id ? "..." : (zh ? "重試" : "Try again")}
-                  </button>
+                  </Button>
                   <button
                     onClick={() => disconnect(p.id)}
                     disabled={!!busy}
@@ -182,8 +186,9 @@ export default function StrideeTestCard({ lang, blockedByOther = false, onBefore
                   </button>
                 </div>
               ) : (
-                <button
-                  onClick={() => connect(p.id)}
+                <Button
+                  size="sm"
+                  onClick={() => setIntroProvider(p)}
                   disabled={!!busy || disabled}
                   className={`text-xs font-medium px-3 py-1 rounded-full disabled:cursor-not-allowed ${
                     disabled
@@ -192,12 +197,24 @@ export default function StrideeTestCard({ lang, blockedByOther = false, onBefore
                   }`}
                 >
                   {busy === p.id ? "..." : (zh ? "連結" : "Connect")}
-                </button>
+                </Button>
               )}
             </div>
           </div>
         );
       })}
+      <WatchIntroSheet
+        providerName={introProvider?.name ?? ""}
+        lang={lang}
+        open={introProvider !== null}
+        onOpenChange={(open) => { if (!open) setIntroProvider(null); }}
+        onContinue={() => {
+          if (!introProvider) return;
+          const provider = introProvider.id;
+          setIntroProvider(null);
+          void connect(provider);
+        }}
+      />
     </>
   );
 }

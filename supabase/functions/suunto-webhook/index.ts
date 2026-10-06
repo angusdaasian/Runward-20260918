@@ -1,7 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { SUUNTO_API_BASE, refreshSuuntoToken, workoutRow, SuuntoWorkout } from "../_shared/suunto.ts";
-import { fetchSuuntoFit, parseFit } from "../_shared/suunto-fit.ts";
+import { fetchSuuntoFit } from "../_shared/suunto-fit.ts";
+import { parseFit as parseFitFull, mapActivity } from "../_shared/strideeIngest.ts";
 import { maybeSendTelegramActivityPrompt } from "../_shared/telegramActivityPrompt.ts";
 import { maybeSendWhatsappActivityPrompt } from "../_shared/whatsappActivityPrompt.ts";
 import { getAppLanguage } from "../_shared/appLanguage.ts";
@@ -146,15 +147,25 @@ serve(async (req) => {
         }
         const fitBuf = await fetchSuuntoFit(accessToken, subKey, w.workoutKey);
         if (fitBuf) {
-          const details = await parseFit(fitBuf);
+          // Parse with the same mapper as the other watch connections so laps,
+          // cadence (steps/min), elevation keys and samples line up exactly.
+          const fit = await parseFitFull(fitBuf);
+          const m = mapActivity({ id: w.workoutKey, provider: "SUUNTO", sport: "running", name: w.workoutName, start_time: w.startTime ? new Date(w.startTime).toISOString() : null, device: (fit?.device_infos ?? []).map((d: any) => d.product_name).find(Boolean) ?? null }, fit);
+          const details = { hr_samples: m.hr_samples, has_gps: m.has_gps };
           await supabase
             .from('suunto_activities')
             .update({
-              hr_samples: details.hr_samples,
-              distance_samples: details.distance_samples,
-              elevation_samples: details.elevation_samples,
-              cadence_samples: details.cadence_samples,
-              summary_polyline: details.summary_polyline,
+              hr_samples: m.hr_samples,
+              distance_samples: m.distance_samples,
+              elevation_samples: m.elevation_samples,
+              cadence_samples: m.cadence_samples,
+              summary_polyline: m.summary_polyline,
+              laps: m.laps,
+              calories: m.calories,
+              avg_cadence: m.avg_cadence,
+              device_model: m.device_model,
+              ...(m.average_hr ? { average_heartrate: m.average_hr } : {}),
+              ...(m.max_hr ? { max_heartrate: m.max_hr } : {}),
               has_details: true,
             })
             .eq('suunto_workout_key', String(w.workoutKey))

@@ -65,7 +65,7 @@ const ConnectApps = ({ lang, onBack }: Props) => {
 
   // A fitness app = Strava or native Suunto connection (legacy direct Garmin rows are ignored).
   // Users can only have one of: Strava | native Suunto | Terra (any provider).
-  const hasFitnessApp = stravaConnected || suuntoConnected;
+  const hasFitnessApp = stravaConnected; // Suunto no longer blocks other connections
 
   const checkConnections = useCallback(async () => {
     if (!user) { setLoading(false); return; }

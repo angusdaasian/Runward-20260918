@@ -891,6 +891,34 @@ Return ONLY a JSON array. Each item: {"type":"preference|goal|challenge|achievem
           .limit(1),
       ]);
 
+    // Pre-2026 notable runs (long runs + races, ≥15 km) so the coach can compare past years.
+    let pastBlock = "None on record.";
+    try {
+      const { data: pastRows } = await admin
+        .from("terra_activities")
+        .select("start_time, distance_meters, duration_seconds, average_hr, activity_type")
+        .eq("user_id", user.id)
+        .lt("start_time", lookbackIso)
+        .gte("distance_meters", 15000)
+        .order("start_time", { ascending: false })
+        .limit(300);
+      const seen = new Set<string>();
+      const lines: string[] = [];
+      for (const a of pastRows || []) {
+        const day = String(a.start_time).slice(0, 10);
+        const km = Number(a.distance_meters) / 1000;
+        const key = `${day}-${Math.round(km)}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        const sec = Number(a.duration_seconds) || 0;
+        const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = Math.floor(sec % 60);
+        const pace = km > 0 && sec > 0 ? `${Math.floor(sec / km / 60)}:${String(Math.round((sec / km) % 60)).padStart(2, "0")}/km` : "";
+        lines.push(`${day} ${km.toFixed(2)}km ${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")} ${pace}${a.average_hr ? ` HR${Math.round(a.average_hr)}` : ""}`);
+      }
+      if (lines.length) pastBlock = lines.join("\n");
+    } catch (_) { /* non-fatal */ }
+
+
     const prefs = prefsR.data;
     const history = historyR.data || [];
     const insights = insightsR.data || [];

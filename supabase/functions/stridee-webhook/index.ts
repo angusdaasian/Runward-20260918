@@ -7,6 +7,7 @@ import {
 } from "npm:jose@5.9.6";
 import { ingestStrideeActivity, isPremium } from "../_shared/strideeIngest.ts";
 import { triggerCrossPlatformDedup } from "../_shared/triggerDedup.ts";
+import { maybeTrainCoachOnce } from "../_shared/trainCoachOnce.ts";
 import { maybeSendTelegramActivityPrompt } from "../_shared/telegramActivityPrompt.ts";
 import { maybeSendWhatsappActivityPrompt } from "../_shared/whatsappActivityPrompt.ts";
 import { getAppLanguage } from "../_shared/appLanguage.ts";
@@ -121,6 +122,7 @@ Deno.serve(async (req) => {
         if (!premium) return console.log("[stridee-webhook] old activity skipped (free tier)", uid, event.data.id);
       }
       await ingestStrideeActivity(admin, uid!, { ...event.data, received_at: event.created });
+      await maybeTrainCoachOnce(admin, uid!);
       await admin.from("stridee_connections").update({ last_synced_at: new Date().toISOString() }).eq("user_id", uid);
       triggerCrossPlatformDedup(uid!, 72);
       await notifyNewActivity(admin, uid!, String(event.data.id));

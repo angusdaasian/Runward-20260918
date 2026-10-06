@@ -65,7 +65,7 @@ const ConnectApps = ({ lang, onBack }: Props) => {
 
   // A fitness app = Strava or native Suunto connection (legacy direct Garmin rows are ignored).
   // Users can only have one of: Strava | native Suunto | Terra (any provider).
-  const hasFitnessApp = stravaConnected || suuntoConnected;
+  const hasFitnessApp = stravaConnected; // Suunto no longer blocks other connections
 
   const checkConnections = useCallback(async () => {
     if (!user) { setLoading(false); return; }
@@ -177,10 +177,6 @@ const ConnectApps = ({ lang, onBack }: Props) => {
 
   const handleConnectSuunto = async () => {
     if (!user) return;
-    if (hasFitnessApp || hasTerraConn) {
-      toast.error(lang === "zh" ? "請先中斷現有健身應用再連接新的" : "Please disconnect the current fitness app before connecting a new one");
-      return;
-    }
     setSuuntoBusy("connect");
     try {
       const native = isDespiaUA();
@@ -651,7 +647,7 @@ const ConnectApps = ({ lang, onBack }: Props) => {
 
         {/* Suunto (official Suunto Cloud API) */}
         {(() => {
-          const suuntoDisabledByOther = (stravaConnected || hasTerraConn) && !suuntoConnected;
+          const suuntoDisabledByOther = false; // Suunto can run alongside any other connection
           return (
             <div className={`bg-card border border-border rounded-xl p-4 ${suuntoDisabledByOther ? "opacity-50" : ""}`}>
               <div className="flex items-center justify-between">
@@ -696,7 +692,7 @@ const ConnectApps = ({ lang, onBack }: Props) => {
 
         {/* Strava */}
         {(() => {
-          const stravaDisabledByOther = (suuntoConnected || hasTerraConn) && !stravaConnected;
+          const stravaDisabledByOther = (hasTerraConn) && !stravaConnected;
           return (
             <div className={`bg-card border border-border rounded-xl p-4 ${stravaDisabledByOther ? "opacity-50" : ""}`}>
               <div className="flex items-center justify-between">
@@ -758,7 +754,7 @@ const ConnectApps = ({ lang, onBack }: Props) => {
 
         {/* intervals.icu */}
         {(() => {
-          const intervalsDisabledByOther = (stravaConnected || suuntoConnected || hasTerraConn) && !intervalsConnected;
+          const intervalsDisabledByOther = (stravaConnected || hasTerraConn) && !intervalsConnected;
           return (
         <>
         <div className={`bg-card border border-border rounded-xl p-4 ${intervalsDisabledByOther ? "opacity-50" : ""}`}>

@@ -40,7 +40,7 @@ Deno.serve(async (req) => {
     }
     if (!user) return json({ error: "Unauthorized" }, 401);
 
-    const { data: conn } = await admin.from("stridee_connections").select("status, stridee_user_id").eq("user_id", user.id).maybeSingle();
+    const { data: conn } = await admin.from("stridee_connections").select("status, stridee_user_id, created_at").eq("user_id", user.id).maybeSingle();
     if (!conn || conn.status !== "connected") return json({ ok: true, stored: 0, remaining: 0, connected: false });
 
     const premium = await isPremium(admin, user.id);

@@ -105,7 +105,7 @@ Deno.serve(async (req) => {
     const work = (async () => {
       const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
       let uid: string | null = event.data.external_user_id ?? event.external_user_id ?? null;
-      const q = admin.from("stridee_connections").select("user_id, auto_sync_enabled");
+      const q = admin.from("stridee_connections").select("user_id, auto_sync_enabled, created_at");
       const { data: conn } = uid
         ? await q.eq("user_id", uid).maybeSingle()
         : await q.eq("stridee_user_id", event.user_id).maybeSingle();

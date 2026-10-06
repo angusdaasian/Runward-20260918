@@ -59,6 +59,9 @@ verify_jwt = false
 [functions.terra-admin-deauth]
 verify_jwt = false
 
+[functions.terra-final-shutdown]
+verify_jwt = false
+
 [functions.suunto-callback]
 verify_jwt = false
 

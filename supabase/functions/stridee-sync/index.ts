@@ -10,6 +10,7 @@ import { strideeFetch } from "../_shared/stridee.ts";
 import { ingestStrideeActivity, isPremium } from "../_shared/strideeIngest.ts";
 import { syncStrideeWellness } from "../_shared/strideeWellness.ts";
 import { triggerCrossPlatformDedup } from "../_shared/triggerDedup.ts";
+import { maybeTrainCoachOnce } from "../_shared/trainCoachOnce.ts";
 
 const json = (b: unknown, status = 200) =>
   new Response(JSON.stringify(b), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -39,7 +40,7 @@ Deno.serve(async (req) => {
     }
     if (!user) return json({ error: "Unauthorized" }, 401);
 
-    const { data: conn } = await admin.from("stridee_connections").select("status, stridee_user_id").eq("user_id", user.id).maybeSingle();
+    const { data: conn } = await admin.from("stridee_connections").select("status, stridee_user_id, created_at").eq("user_id", user.id).maybeSingle();
     if (!conn || conn.status !== "connected") return json({ ok: true, stored: 0, remaining: 0, connected: false });
 
     const premium = await isPremium(admin, user.id);
@@ -114,6 +115,8 @@ Deno.serve(async (req) => {
     if ((wantAll || chain) && remaining === 0) patch.auto_sync_enabled = true;
     await admin.from("stridee_connections").update(patch).eq("user_id", user.id);
     if (stored > 0) triggerCrossPlatformDedup(user.id, days * 24);
+    // Train the AI coach once the import has finished (idempotent, same as other providers).
+    if (remaining === 0) await maybeTrainCoachOnce(admin, user.id, (conn as any).created_at ?? null);
 
     // Full-history backfill continues server-side in the background.
     if (chain && remaining > 0 && whKey && (stored > 0 || failed < batch.length)) {

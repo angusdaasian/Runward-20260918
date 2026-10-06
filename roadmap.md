@@ -1,5 +1,8 @@
 # Roadmap
 
+- [x] Add a friendly pre-connection watch guide, including optional historical-data permission and the free 30-day limit
+- [x] Restyle the homepage live data count after the supplied reference, keeping a transparent background and no zero flash
+
 - [x] Prevent recalibration from creating duplicate or back-to-back interval sessions
 - [x] Add user-controlled recalibration history clearing
 - [x] Validate edge function, database access, and frontend behavior
@@ -34,3 +37,7 @@
 
 - [x] City Hunter auto-sync on every new/backfilled activity
 - [x] Pace zone widget using accumulated running history after the initial 30-day backfill, plus per-activity time in zone
+- [x] Confirm Terra activity, daily-health, and sleep webhooks resumed on Oct 5
+- [x] Schedule all remaining Terra connections for sequential deauthorization after Oct 10, then stop Terra inactivity sweeps
+- [x] Match the landing-page live data counter to the reference and never flash zero
+- [x] Improve Routes browsing with place and district grouping (Hong Kong: 香港島、九龍、新界; Taiwan: city/county)

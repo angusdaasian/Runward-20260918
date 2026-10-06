@@ -13,6 +13,7 @@ import heroZh from "@/assets/appstore/hero-zh.png.asset.json";
 import AppStoreScreenshots from "@/components/landing/AppStoreScreenshots";
 import DashboardPreview from "@/components/landing/DashboardPreview";
 import BrandStrip from "@/components/landing/BrandStrip";
+import DataStats from "@/components/landing/DataStats";
 
 
 const APP_STORE_URL = "https://apps.apple.com/us/app/runward/id6761060757";
@@ -189,6 +190,10 @@ const Landing = () => {
 
       {/* ─── Brand logos strip ─── */}
       <BrandStrip lang={lang} />
+
+      {/* ─── Data processed counter ─── */}
+      <DataStats lang={lang} />
+
 
 
 

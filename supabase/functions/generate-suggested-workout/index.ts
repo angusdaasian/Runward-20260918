@@ -75,9 +75,9 @@ function isRunningActivity(activityType?: unknown, activityName?: unknown): bool
 // ── Vertex AI helper ──
 async function callVertexAI(opts: { apiKey: string; model?: string; messages: Array<{ role: string; content: any }>; timeoutMs?: number; thinkingLevel?: "minimal" | "low" | "medium" | "high" }): Promise<Response> {
   const VERTEX_MODEL_MAP: Record<string, string> = {
-    "google/gemini-3.1-flash-lite-preview": "gemini-flash-lite-latest",
+    "gemini-3.8-flash": "gemini-3.8-flash",
   };
-  const model = VERTEX_MODEL_MAP[opts.model || ""] || (opts.model || "gemini-flash-lite-latest").replace(/^google\//, "");
+  const model = VERTEX_MODEL_MAP[opts.model || ""] || (opts.model || "gemini-3.8-flash").replace(/^google\//, "");
   const __baseUrl = `https://aiplatform.googleapis.com/v1/projects/${getVertexProjectId()}/locations/${getVertexLocation()}/publishers/google/models/${model}:generateContent`;
   const { url, headers: __vxHeaders } = await buildVertexAuth(__baseUrl, opts.apiKey);
   const systemParts: any[] = [];
@@ -182,7 +182,7 @@ serve(async (req) => {
         : `You are a professional translator. Translate the following running workout suggestion Markdown into natural English. Preserve all Markdown structure, headings, lists, bold, and pace numbers (e.g. keep "5:30 /km" verbatim). Output only the translation, no preamble.`;
       const tResp = await callVertexAI({
         apiKey: VERTEX_API_KEY,
-        model: "google/gemini-3.1-flash-lite-preview",
+        model: "gemini-3.8-flash",
         messages: [
           { role: "system", content: sysT },
           { role: "user", content: body.existingSuggestion },
@@ -468,7 +468,7 @@ Format:
 
     const aiResp = await callVertexAI({
       apiKey: VERTEX_API_KEY,
-      model: "google/gemini-3-flash-preview",
+      model: "gemini-3.8-flash",
       thinkingLevel: "minimal",
       timeoutMs: 90_000,
       messages: [
@@ -496,7 +496,7 @@ Format:
         : `You are a professional translator. Translate the following running workout suggestion Markdown into natural English. Preserve all Markdown structure, headings, lists, bold, and pace numbers (e.g. keep "5:30 /km" verbatim). Output only the translation, no preamble.`;
       const tResp = await callVertexAI({
         apiKey: VERTEX_API_KEY,
-        model: "google/gemini-3.1-flash-lite-preview",
+        model: "gemini-3.8-flash",
         timeoutMs: 30_000,
         messages: [
           { role: "system", content: sysT },

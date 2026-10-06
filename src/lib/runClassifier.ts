@@ -50,9 +50,17 @@ export function classifyRun(
   const avg = typeof act.average_heartrate === "number" ? act.average_heartrate : null;
   const max = typeof act.max_heartrate === "number" ? act.max_heartrate : null;
 
+  // Rules:
+  //  Long     — 18 km+, averaging no higher than Z3 (usually Z2–Z3)
+  //  Interval — fluctuating HR: peaks into Z5 / big spikes above the average
+  //  Tempo    — sustained Z4 average
+  //  Recovery — mostly Z1
+  //  Easy     — Z2 (Z3 allowed), typically up to ~12 km
+  const LONG_KM = 18;
+
   // No HR data — distance-only fallback.
   if (!avg || avg <= 30) {
-    if (km >= Math.max(15, longestKmInScope * 0.75)) return "Long";
+    if (km >= LONG_KM) return "Long";
     if (km < 4) return "Recovery";
     return "Easy";
   }
@@ -61,10 +69,13 @@ export function classifyRun(
   const maxZone = max ? zoneOf(max, b) : avgZone;
   const spike = max && avg ? max - avg : 0;
 
-  if (maxZone >= 5 || (maxZone === 4 && spike >= 25)) return "Interval";
+  if (km >= LONG_KM && avgZone <= 3) return "Long";
+  // Sustained Z4 with a steady HR → tempo; large swings above the average → intervals.
+  if (avgZone >= 4 && spike < 20) return "Tempo";
+  if (maxZone >= 5 && spike >= 20) return "Interval";
+  if (maxZone >= 4 && spike >= 25 && avgZone <= 3) return "Interval";
   if (avgZone >= 4) return "Tempo";
-  if (km >= Math.max(15, longestKmInScope * 0.75) && avgZone <= 3) return "Long";
-  if (avgZone <= 1 || (km < 4 && avgZone <= 2)) return "Recovery";
+  if (avgZone <= 1) return "Recovery";
   return "Easy";
 }
 

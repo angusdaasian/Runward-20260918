@@ -1,42 +1,33 @@
-# Routes + mobile return link
+# Security warnings review (102 findings)
 
-## Part 1 — Return link straight back into the app (Stridee 28 Sep)
+No changes have been made yet. The findings fall into four risk levels.
 
-Stridee now accepts an app link (like `com.runward.app:/stridee-callback`) instead of only a website address. After approving on the consent page, the browser sheet closes and drops the user back inside the app — no more stuck consent browser on iPhone.
+## Critical: anyone on the internet can do these (no sign-in needed)
+1. **Read the Strava app secrets.** `get_strava_app_secrets` returns the decrypted client secret and verify token for any Strava app ID.
+2. **Overwrite the Strava app secrets.** With `set_strava_app_secret`, anyone could replace them and break Strava sync.
+3. **Stop scheduled jobs.** `unschedule_cron_job` takes any job name, so anyone could turn off syncs, pushes or sweeps. The three `unschedule_terra_*` functions can each stop one fixed job.
+4. **Trigger a leaderboard season reset.** `invoke_reset_season` calls the reset endpoint with the internal webhook key.
 
-**What you need to do (cannot be done from here):**
-1. In Despia, find your app's link scheme / bundle ID (e.g. `com.runward.app`) and tell me the exact value.
-2. In the Stridee dashboard → Return URIs, add `<your-bundle-id>:/stridee-callback`.
-3. Confirm Despia opens the app when that link is called (Despia "deep link / URL scheme" setting).
+## Medium: leaks a little information
+- `get_group_push_recipients`: given any user ID, it lists that person's group mates and their app language.
+- `get_posture_averages`, `get_leaderboard`, `get_social_feed`, `get_activity_comments` / `likes` / `social_counts`: callable without signing in. Most check permissions inside, but this should be confirmed one by one.
+- `consume_rate_limit`: anyone could use up an OAuth partner app's request allowance.
 
-**What I will do once you send the scheme:**
-- On the phone app, send that app link as the return address; the website keeps using the current runward.site / angustest.site addresses.
-- When the app reopens from that link, finish the connection and show the "connected successfully" message for the right brand.
-- Garmin keeps its current Safari flow until we confirm the new link works for it too.
+## Low: safe in practice (noise)
+- Trigger-only functions: `handle_new_user`, `assign_admin_role`, `prevent_trial_reset`, `guard_oauth_apps_update`, `enforce_single_fitness_provider_*`, `tg_*`. They only run when data changes, and calling them directly does nothing.
+- `has_role`, `user_has_other_fitness_provider`, `gen_group_invite_code`, `can_view_social_activity`, `social_activity_owner`: helpers that only return yes/no answers or codes.
+- 62 "signed-in users can run" warnings on group, leaderboard, chat and routes functions. These are meant to be called by the app and check the user inside.
 
-## Part 2 — Shared routes (Stridee 24 Sep)
+## Info: 7 internal tables with no access rules
+`territory_sync_state`, `terra_webhook_queue`, `oauth_auth_codes`, `terra_today_oneoff_queue`, `bot_pending_plan_suggestions`, `dedup_debounce`, `stridee_sync_state`. These are blocked to the app by default, and only the server reaches them. This is correct; no fix is needed.
 
-**Who gets saved:** runs with a map route from people whose activities are public (Community sharing switched on). If someone turns sharing off, their routes disappear from the list.
-
-**New "Routes" section in the Training tab** (next to Training / Free / Program / Custom):
-- List of routes: name, map preview, distance, climb, city, who ran it, how many times run.
-- Filters: near me, distance (e.g. <5 km, 5–10, 10–21, 21+), search by name.
-- Route page: full map, elevation profile, details.
-- Buttons:
-  - **Send to my watch** — puts it on the watch as a Course (Garmin via the watch connection; needs the user to allow "Course Import" when asked).
-  - **Download GPX** — for any watch (COROS, Suunto, Apple, etc.) to import manually.
-- Same run from the same place repeated many times is shown once (merged by start point + distance).
-
-**Gating (please confirm):** browsing free for everyone; Send to watch and Download GPX for Premium only?
-
-**Privacy:** start/finish trimmed by ~200 m so home addresses aren't exposed; owner can hide any of their routes.
-
-**Changelog:** one minor entry ("New Routes library in Training") once shipped — no provider names.
+## Proposed fix (after your approval)
+1. Lock the critical functions so only the server can call them: Strava secrets, cron unschedulers and season reset.
+2. Remove public access from `get_group_push_recipients` and `consume_rate_limit`.
+3. Remove direct call access from trigger-only functions. The triggers keep working.
+4. Check the remaining public social functions one at a time, and restrict any that the signed-out pages don't need.
+5. Run the linter again and confirm the app, leaderboard, groups and Strava sync still work.
 
 ## Technical details
-
-- Table `shared_routes` (id, user_id, source_activity_id unique, name, polyline, distance_m, elevation_gain_m, start_lat/lng, city_slug, run_count, hidden, created_at) with GRANTs + RLS: anyone signed in can read rows whose owner has `social_opt_in` and `hidden=false`; owner can update `hidden`.
-- Fill it from existing activity tables via the trigger path already used for City Hunter; one-off backfill run one account at a time (dedup-style sequential rule).
-- Edge function `route-gpx`: builds GPX from the polyline (trimmed ends) and returns it.
-- Edge function `route-push`: builds GPX, base64, signed `POST /v1/routes` to Stridee with name/sport=running; returns status/reason; respects the 60/min push limit.
-- Mobile return: `stridee-connect` accepts an allow-listed app scheme when called from the Despia app; new handling for the deep link in the app shell.
+- `REVOKE EXECUTE ... FROM anon, authenticated, public; GRANT EXECUTE ... TO service_role` for the critical, medium and trigger groups.
+- Before revoking, search `src/` for `.rpc(` calls, so nothing the browser uses gets locked.

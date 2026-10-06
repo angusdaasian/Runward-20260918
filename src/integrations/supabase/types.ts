@@ -1816,6 +1816,7 @@ export type Database = {
           is_premium: boolean
           is_trial: boolean
           lang: string
+          last_active_at: string | null
           last_check_in_date: string | null
           last_login: string | null
           lifetime_xp: number
@@ -1862,6 +1863,7 @@ export type Database = {
           is_premium?: boolean
           is_trial?: boolean
           lang?: string
+          last_active_at?: string | null
           last_check_in_date?: string | null
           last_login?: string | null
           lifetime_xp?: number
@@ -1908,6 +1910,7 @@ export type Database = {
           is_premium?: boolean
           is_trial?: boolean
           lang?: string
+          last_active_at?: string | null
           last_check_in_date?: string | null
           last_login?: string | null
           lifetime_xp?: number
@@ -2530,8 +2533,11 @@ export type Database = {
           activity_id: number | null
           average_heartrate: number | null
           average_speed: number | null
+          avg_cadence: number | null
           cadence_samples: Json | null
+          calories: number | null
           created_at: string
+          device_model: string | null
           distance: number | null
           distance_samples: Json | null
           elapsed_time: number | null
@@ -2540,6 +2546,7 @@ export type Database = {
           has_details: boolean
           hr_samples: Json | null
           id: string
+          laps: Json | null
           max_heartrate: number | null
           max_speed: number | null
           moving_time: number | null
@@ -2555,8 +2562,11 @@ export type Database = {
           activity_id?: number | null
           average_heartrate?: number | null
           average_speed?: number | null
+          avg_cadence?: number | null
           cadence_samples?: Json | null
+          calories?: number | null
           created_at?: string
+          device_model?: string | null
           distance?: number | null
           distance_samples?: Json | null
           elapsed_time?: number | null
@@ -2565,6 +2575,7 @@ export type Database = {
           has_details?: boolean
           hr_samples?: Json | null
           id?: string
+          laps?: Json | null
           max_heartrate?: number | null
           max_speed?: number | null
           moving_time?: number | null
@@ -2580,8 +2591,11 @@ export type Database = {
           activity_id?: number | null
           average_heartrate?: number | null
           average_speed?: number | null
+          avg_cadence?: number | null
           cadence_samples?: Json | null
+          calories?: number | null
           created_at?: string
+          device_model?: string | null
           distance?: number | null
           distance_samples?: Json | null
           elapsed_time?: number | null
@@ -2590,6 +2604,7 @@ export type Database = {
           has_details?: boolean
           hr_samples?: Json | null
           id?: string
+          laps?: Json | null
           max_heartrate?: number | null
           max_speed?: number | null
           moving_time?: number | null
@@ -4304,6 +4319,7 @@ export type Database = {
         Args: { p_source: string; p_source_id: string }
         Returns: string
       }
+      touch_last_active: { Args: never; Returns: undefined }
       try_lock_territory: {
         Args: { _secs: number; _uid: string }
         Returns: boolean

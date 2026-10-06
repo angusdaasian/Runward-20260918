@@ -54,6 +54,18 @@ export async function downloadFile(fileUrl: string): Promise<ArrayBuffer | null>
 }
 
 export function mapActivity(a: any, fit: any) {
+// Brand from the provider field first, then the watch model; default GARMIN.
+function inferProvider(provider: unknown, device: unknown): string {
+  const p = String(provider ?? "").toUpperCase();
+  if (["GARMIN", "COROS", "ZEPP", "POLAR", "SUUNTO", "FITBIT"].includes(p)) return p;
+  const d = String(device ?? "").toLowerCase();
+  if (/coros|pace|apex|vertix/.test(d)) return "COROS";
+  if (/huami|amazfit|zepp/.test(d)) return "ZEPP";
+  if (/polar|vantage|grit|pacer/.test(d)) return "POLAR";
+  if (/suunto/.test(d)) return "SUUNTO";
+  if (/fitbit|versa|sense|charge/.test(d)) return "FITBIT";
+  return "GARMIN";
+}
   const session = fit?.sessions?.[0] ?? {};
   const records: any[] = fit?.records ?? [];
   const t0 = records[0]?.timestamp ? new Date(records[0].timestamp).getTime() : 0;
@@ -85,7 +97,7 @@ export function mapActivity(a: any, fit: any) {
   const sport = String(a.sport ?? session.sport ?? "running").toLowerCase();
   return {
     terra_activity_id: `stridee_${a.id}`,
-    provider: String(a.provider ?? "garmin").toUpperCase(),
+    provider: inferProvider(a.provider, a.device),
     activity_name: a.name ?? null,
     activity_type: sport === "run" ? "running" : sport,
     start_time: a.start_time ?? session.start_time ?? null,

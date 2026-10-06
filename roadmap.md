@@ -1,5 +1,8 @@
 # Roadmap
 
+- [ ] Add a friendly pre-connection watch guide, including optional historical-data permission and the free 30-day limit
+- [ ] Restyle the homepage live data count after the supplied reference, keeping a transparent background and no zero flash
+
 - [x] Prevent recalibration from creating duplicate or back-to-back interval sessions
 - [x] Add user-controlled recalibration history clearing
 - [x] Validate edge function, database access, and frontend behavior

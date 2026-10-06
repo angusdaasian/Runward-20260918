@@ -122,7 +122,7 @@ Deno.serve(async (req) => {
         if (!premium) return console.log("[stridee-webhook] old activity skipped (free tier)", uid, event.data.id);
       }
       await ingestStrideeActivity(admin, uid!, { ...event.data, received_at: event.created });
-      await maybeTrainCoachOnce(admin, uid!);
+      await maybeTrainCoachOnce(admin, uid!, conn?.created_at ?? null);
       await admin.from("stridee_connections").update({ last_synced_at: new Date().toISOString() }).eq("user_id", uid);
       triggerCrossPlatformDedup(uid!, 72);
       await notifyNewActivity(admin, uid!, String(event.data.id));

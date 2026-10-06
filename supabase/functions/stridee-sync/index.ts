@@ -116,7 +116,7 @@ Deno.serve(async (req) => {
     await admin.from("stridee_connections").update(patch).eq("user_id", user.id);
     if (stored > 0) triggerCrossPlatformDedup(user.id, days * 24);
     // Train the AI coach once the import has finished (idempotent, same as other providers).
-    if (remaining === 0) await maybeTrainCoachOnce(admin, user.id);
+    if (remaining === 0) await maybeTrainCoachOnce(admin, user.id, (conn as any).created_at ?? null);
 
     // Full-history backfill continues server-side in the background.
     if (chain && remaining > 0 && whKey && (stored > 0 || failed < batch.length)) {

@@ -334,6 +334,10 @@ async function fetchSuuntoActivities(userId: string, limit?: number): Promise<St
     distance_samples: a.distance_samples || null,
     elevation_samples: a.elevation_samples || null,
     cadence_samples: a.cadence_samples || null,
+    laps: a.laps || [],
+    calories: a.calories ?? null,
+    avg_cadence: a.avg_cadence ?? null,
+    device_model: a.device_model ?? null,
     source: "Suunto",
     provenance: "terra" as const, // reuse existing literal; UI just reads `source`
   })) as StravaActivity[];

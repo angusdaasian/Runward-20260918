@@ -2533,8 +2533,11 @@ export type Database = {
           activity_id: number | null
           average_heartrate: number | null
           average_speed: number | null
+          avg_cadence: number | null
           cadence_samples: Json | null
+          calories: number | null
           created_at: string
+          device_model: string | null
           distance: number | null
           distance_samples: Json | null
           elapsed_time: number | null
@@ -2543,6 +2546,7 @@ export type Database = {
           has_details: boolean
           hr_samples: Json | null
           id: string
+          laps: Json | null
           max_heartrate: number | null
           max_speed: number | null
           moving_time: number | null
@@ -2558,8 +2562,11 @@ export type Database = {
           activity_id?: number | null
           average_heartrate?: number | null
           average_speed?: number | null
+          avg_cadence?: number | null
           cadence_samples?: Json | null
+          calories?: number | null
           created_at?: string
+          device_model?: string | null
           distance?: number | null
           distance_samples?: Json | null
           elapsed_time?: number | null
@@ -2568,6 +2575,7 @@ export type Database = {
           has_details?: boolean
           hr_samples?: Json | null
           id?: string
+          laps?: Json | null
           max_heartrate?: number | null
           max_speed?: number | null
           moving_time?: number | null
@@ -2583,8 +2591,11 @@ export type Database = {
           activity_id?: number | null
           average_heartrate?: number | null
           average_speed?: number | null
+          avg_cadence?: number | null
           cadence_samples?: Json | null
+          calories?: number | null
           created_at?: string
+          device_model?: string | null
           distance?: number | null
           distance_samples?: Json | null
           elapsed_time?: number | null
@@ -2593,6 +2604,7 @@ export type Database = {
           has_details?: boolean
           hr_samples?: Json | null
           id?: string
+          laps?: Json | null
           max_heartrate?: number | null
           max_speed?: number | null
           moving_time?: number | null

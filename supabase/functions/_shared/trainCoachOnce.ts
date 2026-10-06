@@ -7,16 +7,19 @@
 export async function maybeTrainCoachOnce(
   admin: any,
   userId: string | null | undefined,
+  // Optional: retrain when the existing marker is older than this moment
+  // (e.g. a new watch connection brought in fresh history).
+  retrainIfBefore?: string | null,
 ): Promise<void> {
   if (!userId) return;
   try {
     const { data: existing } = await admin
       .from("ai_coach_insights")
-      .select("id")
+      .select("id, insight_value")
       .eq("user_id", userId)
       .eq("insight_key", "_trained_2026_at")
       .maybeSingle();
-    if (existing) return;
+    if (existing && !(retrainIfBefore && !(new Date(existing.insight_value) >= new Date(retrainIfBefore)))) return;
 
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
     const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;

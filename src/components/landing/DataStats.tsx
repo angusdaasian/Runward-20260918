@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { motion, useInView } from "framer-motion";
+import { motion, useInView, useReducedMotion } from "framer-motion";
 
 interface Props {
   lang: "en" | "zh";
@@ -14,6 +14,7 @@ export default function DataStats({ lang }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const inView = useInView(ref, { once: true, margin: "-80px" });
   const animatedOnce = useRef(false);
+  const reducedMotion = useReducedMotion();
 
   // Fetch on load, then poll so the count updates as new data arrives
   useEffect(() => {
@@ -38,7 +39,7 @@ export default function DataStats({ lang }: Props) {
   // Show the first real value immediately, then animate only later live updates.
   useEffect(() => {
     if (total == null) return;
-    if (!animatedOnce.current || display == null || !inView) {
+    if (!animatedOnce.current || display == null || !inView || reducedMotion) {
       animatedOnce.current = true;
       setDisplay(total);
       return;
@@ -60,31 +61,24 @@ export default function DataStats({ lang }: Props) {
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [inView, total]);
+  }, [inView, total, reducedMotion]);
 
   return (
-    <section className="border-y border-border bg-primary/5 px-6 py-14 md:py-20">
-      <motion.div
-        ref={ref}
-        initial={{ opacity: 0, y: 20 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true, margin: "-80px" }}
-        transition={{ duration: 0.5 }}
-        className="mx-auto max-w-4xl"
-      >
-        <div className="flex min-h-52 flex-col items-center justify-center px-4 py-12 text-center sm:min-h-64 sm:px-8">
-          {display == null ? (
-            <div className="h-14 w-56 animate-pulse rounded bg-foreground/20 sm:h-20 sm:w-80" aria-label={zh ? "載入數據" : "Loading data"} />
-          ) : (
-            <div className="font-display text-5xl font-bold text-foreground tabular-nums sm:text-7xl md:text-8xl">
-              {display.toLocaleString()}
-            </div>
-          )}
-          <p className="mt-5 text-base text-muted-foreground sm:text-xl">
-            {zh ? "已處理的活動及健康數據" : "Activities & health data processed"}
+    <section aria-label={zh ? "已處理數據" : "Data processed"} className="px-6 py-6 md:py-8">
+      <div ref={ref} className="mx-auto flex max-w-4xl flex-wrap items-baseline justify-center gap-x-2 gap-y-1 text-center text-sm sm:text-base">
+          <p className="font-medium text-foreground">
+            {zh ? "已處理的活動及健康數據：" : "Activities & health data processed:"}
           </p>
-        </div>
-      </motion.div>
+          {display == null ? (
+            <span className="inline-block min-w-[7ch] text-left text-muted-foreground" aria-label={zh ? "載入數據" : "Loading data"}>—</span>
+          ) : (
+            <span className="inline-flex min-w-[7ch] overflow-hidden text-left font-medium leading-normal text-muted-foreground tabular-nums" aria-label={display.toLocaleString("en-US")}>
+              {display.toLocaleString("en-US").split("").map((digit, index) => (
+                <motion.span key={`${index}-${digit}`} initial={false} animate={{ opacity: 1 }} transition={{ duration: reducedMotion ? 0 : 0.2 }} aria-hidden="true">{digit}</motion.span>
+              ))}
+            </span>
+          )}
+      </div>
     </section>
   );
 }

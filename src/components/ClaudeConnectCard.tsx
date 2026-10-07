@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 
-const MCP_BASE = "https://mcp.runward.site/mcp";
+const MCP_BASE = "https://mcp.runwardapp.com/mcp";
 
 type Row = { id: string; label: string | null; created_at: string; last_used_at: string | null };
 

@@ -10,12 +10,12 @@ Each user creates a private link in RunWard → More → "Connect Claude".
    - `SUPABASE_URL` = https://kbghvclwhxnjeskdodeh.supabase.co
    - `SUPABASE_SERVICE_ROLE_KEY` = Supabase dashboard → Project Settings → API → service_role key (keep secret!)
    Redeploy after adding them.
-4. Domain: Netlify → Domain management → Add domain `mcp.runward.site`.
+4. Domain: Netlify → Domain management → Add domain `mcp.runwardapp.com`.
    At your DNS provider add: CNAME `mcp` → `<your-site>.netlify.app`. Netlify issues HTTPS automatically.
 
 ## Use in Claude
 Settings → Connectors → Add custom connector → paste
-`https://mcp.runward.site/mcp?key=rw_...` (from the app).
+`https://mcp.runwardapp.com/mcp?key=rw_...` (from the app).
 
 ## Tools
 - list_runs(from?, to?, min_km?, limit?)
@@ -24,6 +24,6 @@ Settings → Connectors → Add custom connector → paste
 - training_summary(from?, to?)
 
 ## Test
-curl -X POST "https://mcp.runward.site/mcp?key=rw_..." -H "Content-Type: application/json" \
+curl -X POST "https://mcp.runwardapp.com/mcp?key=rw_..." -H "Content-Type: application/json" \
   -H "Accept: application/json, text/event-stream" \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'

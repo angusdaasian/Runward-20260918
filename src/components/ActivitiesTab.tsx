@@ -29,6 +29,7 @@ import ActivityCalendar from "@/components/activities/ActivityCalendar";
 import MonthlyRoadQuest from "@/components/activities/MonthlyRoadQuest";
 import MonthlyStatsCard from "@/components/activities/MonthlyStatsCard";
 import BulkFitExportButton from "@/components/activities/BulkFitExportButton";
+import ExportToAiButton from "@/components/activities/ExportToAiButton";
 import PlanComparisonDialog from "@/components/PlanComparisonDialog";
 
 // Heavy: pulls in leaflet + leaflet.css. Only needed when an activity card has a polyline.
@@ -615,7 +616,10 @@ const AllActivitiesView = ({
             {lang === "zh" ? "所有活動" : "All Activities"}
           </h1>
         </div>
-        <BulkFitExportButton lang={lang} activities={activities} isPremium={isPremium} />
+        <div className="flex items-center gap-2">
+          <ExportToAiButton lang={lang} activities={activities} />
+          <BulkFitExportButton lang={lang} activities={activities} isPremium={isPremium} />
+        </div>
       </div>
       {loading && activities.length === 0 && (
         <div className="flex items-center justify-center py-6 text-xs text-muted-foreground gap-2">

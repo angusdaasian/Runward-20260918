@@ -9,3 +9,4 @@
 - Public-route geography is classified client-side from representative polyline points; use explicit Hong Kong areas and cached territory-city data elsewhere so browsing requires no route data migration.
 - Suunto is exempt from the single-fitness-provider lock (UI and DB triggers) and its FIT files are parsed with the shared watch-connection mapper, so details match other watch runs.
 - AI coach training runs once per watch connection: watch-connection syncs retrain when the coach's training marker predates the connection; bulk retraining goes strictly one user at a time with pacing and self-chaining.
+- MCP server lives in a separate Netlify project (mcp.runward.site); per-user access uses hashed tokens in mcp_tokens, because the Supabase instance is external and cannot host app MCP functions.

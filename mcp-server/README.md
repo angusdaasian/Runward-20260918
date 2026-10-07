@@ -24,6 +24,6 @@ Settings → Connectors → Add custom connector → paste
 - training_summary(from?, to?)
 
 ## Test
-curl -X POST "https://mcp.runward.site/mcp?key=rw_..." -H "Content-Type: application/json" \
+curl -X POST "https://mcp.runwardapp.com/mcp?key=rw_..." -H "Content-Type: application/json" \
   -H "Accept: application/json, text/event-stream" \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'

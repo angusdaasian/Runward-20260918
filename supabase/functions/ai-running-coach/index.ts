@@ -916,6 +916,7 @@ Return ONLY a JSON array. Each item: {"type":"preference|goal|challenge|achievem
         lines.push(`${day} ${km.toFixed(2)}km ${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")} ${pace}${a.average_hr ? ` HR${Math.round(a.average_hr)}` : ""}`);
       }
       if (lines.length) pastBlock = lines.join("\n");
+      console.log("[ai-coach] pre-2026 runs in context:", lines.length);
     } catch (_) { /* non-fatal */ }
 
 
@@ -1111,8 +1112,11 @@ USER PROFILE:${prefsBlock}
 LEARNED INSIGHTS:
 ${insightsBlock}
 
-FULL 2026 ACTIVITY HISTORY (most recent first — use this as the complete record; do not claim missing data if a run appears here):
+2026 ACTIVITY HISTORY (most recent first; older years are listed further below in PRE-2026 LONG RUNS & RACES — do not claim missing data if a run appears in either list):
 ${buildActivitySummary(allActs, units)}
+
+PRE-2026 LONG RUNS & RACES — REAL synced watch data for 2024–2025. You DO have access to these runs; if earlier replies in this conversation said 2025 data was unavailable, those replies were wrong — correct yourself and use this list. (≥15 km, HKT-ish UTC date, distance, time, pace, HR; marathons in Jan/Feb are likely the Standard Chartered Hong Kong Marathon):
+${pastBlock}
 
 NOTE on activity lines: a trailing "[INTERVAL: …]" tag means the run was an interval/fartlek workout — NOT an easy run. The tag shows work vs rest lap counts, paces, HR, and the per-set structure (e.g. "set1=2000m(2000), set2=1600m(1600)"). When the user asks about that run, treat it as the structured workout shown — never call it an easy/tempo run.
 

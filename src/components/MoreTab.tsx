@@ -35,6 +35,7 @@ import StartRunningGuide from "@/components/StartRunningGuide";
 import FuelingGuide from "@/components/FuelingGuide";
 import HomeWidgetDialog from "@/components/HomeWidgetDialog";
 import CommunityPrivacy from "@/components/community/CommunityPrivacy";
+import ClaudeConnectCard from "@/components/ClaudeConnectCard";
 
 interface Props {
   lang: Lang;
@@ -376,6 +377,7 @@ const MoreTab = ({ lang, setLang, onLoginRequest, onNavigateConnectApps, onNavig
             {!adminLoading && isAdmin && <MenuRow icon={Shield} label={lang === "zh" ? "管理員" : "Admin Panel"} onClick={() => navigate("/admin", { state: { from: currentRoute } })} />}
             {!adminLoading && isAdmin && user && <MenuRow icon={KeyRound} label={lang === "zh" ? "已連結的應用程式" : "Connected apps"} detail={lang === "zh" ? "第三方應用程式存取" : "Third-party app access"} onClick={() => navigate("/settings/connected-apps", { state: { from: currentRoute } })} />}
           </div>
+          {user && <ClaudeConnectCard lang={lang} userId={user.id} />}
           {user && <Button variant="ghost" className="w-full text-muted-foreground" onClick={signOut}><LogOut size={18} />{lang === "zh" ? "登出" : "Sign Out"}</Button>}
         </div>
       ) : (

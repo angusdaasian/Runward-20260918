@@ -77,17 +77,16 @@ export default function ClaudeConnectCard({ lang, userId }: { lang: "en" | "zh" 
       key: "gemini",
       name: "Gemini",
       steps: zh
-        ? ["Gemini 暫時唔支援直接加入 MCP 連結", "你可以用 app 內嘅「Export to AI」功能", "喺 All Activities 頁面一鍵匯出你嘅跑步同健康數據", "將匯出嘅文字貼到 Gemini 對話中即可"]
+        ? ["Gemini 目前不支援直接加入 MCP 連結", "你可以使用應用程式內的「匯出給 AI」功能", "在「所有活動」頁面一鍵匯出你的跑步及健康數據", "將匯出的文字貼到 Gemini 對話中即可"]
         : ["Gemini doesn't support adding MCP links directly yet", "Use the “Export to AI” feature in the app instead", "In All Activities, export your runs and health data in one tap", "Paste the exported text into your Gemini chat"],
     },
   ];
 
   return (
-    <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+    <div>
       <div className="flex items-start gap-3">
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><Bot size={20} /></div>
         <div className="min-w-0 flex-1">
-          <p className="font-display text-sm font-semibold">{zh ? "連接 AI 助手" : "Connect an AI assistant"}</p>
           <p className="mt-0.5 text-xs text-muted-foreground">
             {zh ? "產生私人連結，讓 Claude、ChatGPT 等 AI 助手直接讀取你的跑步及健康數據（只讀）。" : "Create a private link so AI assistants like Claude or ChatGPT can read your runs and health data (read-only)."}
           </p>
@@ -97,14 +96,15 @@ export default function ClaudeConnectCard({ lang, userId }: { lang: "en" | "zh" 
       <div className="mt-3 divide-y divide-border rounded-xl border border-border">
         {guides.map((g) => (
           <div key={g.key}>
-            <button
+            <Button
+              variant="ghost"
               type="button"
-              className="flex w-full items-center justify-between px-3 py-2.5 text-left text-xs font-medium"
+              className="h-auto w-full justify-between rounded-none px-3 py-2.5 text-left text-xs font-medium"
               onClick={() => setOpen(open === g.key ? null : g.key)}
             >
               {g.name}
               <ChevronDown size={14} className={`text-muted-foreground transition-transform ${open === g.key ? "rotate-180" : ""}`} />
-            </button>
+            </Button>
             {open === g.key && (
               <ol className="space-y-1.5 px-3 pb-3 pt-1 text-xs text-muted-foreground">
                 {g.steps.map((s, i) => (

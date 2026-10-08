@@ -15,7 +15,7 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
 
-  { version: "6.11", date: "2026-10-08", en: { title: "Connect any AI assistant", items: ["The Connect card in More now covers Claude, ChatGPT and Gemini with step-by-step setup guides", "Create one private link and use it with the assistant of your choice"] }, zh: { title: "連接任何 AI 助手", items: ["「更多」的連接卡現支援 Claude、ChatGPT 及 Gemini，附逐步設定教學", "產生一條私人連結，即可配合你喜歡的 AI 助手使用"] } },
+  { version: "6.11", date: "2026-10-08", en: { title: "Connect any AI assistant", items: ["Open AI assistant connections from the MCP row below Support in More, with setup guides for Claude and ChatGPT and export instructions for Gemini", "Gemini instructions now use standard written Traditional Chinese"] }, zh: { title: "連接任何 AI 助手", items: ["在「更多」點擊「支援與幫助」下方的 MCP 選項，開啟獨立頁面，查看 Claude、ChatGPT 連接教學及 Gemini 匯出指引", "Gemini 教學改用標準書面繁體中文"] } },
 
 
   { version: "6.10", date: "2026-10-07", en: { title: "Export to AI & connect Claude", items: ["One tap in All Activities exports your full running history and daily health data as a file to share with ChatGPT, Claude or Gemini", "Connect Claude in More: create a private link so Claude can read your runs and health data directly"] }, zh: { title: "匯出給 AI 及連接 Claude", items: ["在「所有活動」一按即可匯出完整跑步紀錄及每日健康數據，分享給 ChatGPT、Claude 或 Gemini 分析", "在「更多」連接 Claude：產生私人連結，Claude 可直接讀取你的跑步及健康數據"] } },

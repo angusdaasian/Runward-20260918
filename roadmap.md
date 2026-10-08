@@ -1,5 +1,7 @@
 # Roadmap
 
+- [ ] Use standard Traditional Chinese for Gemini and move MCP connections to a separate page opened below Support
+
 - [x] Add a friendly pre-connection watch guide, including optional historical-data permission and the free 30-day limit
 - [x] Restyle the homepage live data count after the supplied reference, keeping a transparent background and no zero flash
 

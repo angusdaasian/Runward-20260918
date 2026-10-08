@@ -13,7 +13,9 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const auth = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
-  let ok = auth === serviceKey || req.headers.get("x-admin-secret") === serviceKey;
+  const wk = Deno.env.get("WEBHOOK_AUTH_KEY");
+  let ok = auth === serviceKey || req.headers.get("x-admin-secret") === serviceKey ||
+    (!!wk && req.headers.get("x-webhook-key") === wk);
   if (!ok && auth) {
     const a = createClient(Deno.env.get("SUPABASE_URL")!, serviceKey);
     const { data: u } = await a.auth.getUser(auth);

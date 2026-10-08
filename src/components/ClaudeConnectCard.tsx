@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Bot, Copy, Trash2 } from "lucide-react";
+import { Bot, Copy, Trash2, ChevronDown } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -7,6 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 const MCP_BASE = "https://mcp.runwardapp.com/mcp";
 
 type Row = { id: string; label: string | null; created_at: string; last_used_at: string | null };
+type Assistant = "claude" | "chatgpt" | "gemini";
 
 async function sha256Hex(s: string) {
   const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
@@ -25,6 +26,7 @@ export default function ClaudeConnectCard({ lang, userId }: { lang: "en" | "zh" 
   const [rows, setRows] = useState<Row[]>([]);
   const [newLink, setNewLink] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [open, setOpen] = useState<Assistant | null>(null);
 
   const load = async () => {
     const { data } = await (supabase as any).from("mcp_tokens").select("id,label,created_at,last_used_at").order("created_at", { ascending: false });
@@ -37,7 +39,7 @@ export default function ClaudeConnectCard({ lang, userId }: { lang: "en" | "zh" 
     try {
       const token = randomToken();
       const token_hash = await sha256Hex(token);
-      const { error } = await (supabase as any).from("mcp_tokens").insert({ user_id: userId, token_hash, label: "Claude" });
+      const { error } = await (supabase as any).from("mcp_tokens").insert({ user_id: userId, token_hash, label: "AI assistant" });
       if (error) throw error;
       setNewLink(`${MCP_BASE}?key=${token}`);
       load();
@@ -56,16 +58,65 @@ export default function ClaudeConnectCard({ lang, userId }: { lang: "en" | "zh" 
     try { await navigator.clipboard.writeText(newLink); toast({ title: zh ? "已複製連結" : "Link copied" }); } catch { /* ignore */ }
   };
 
+  const guides: { key: Assistant; name: string; steps: string[] }[] = [
+    {
+      key: "claude",
+      name: "Claude",
+      steps: zh
+        ? ["打開 Claude → 設定 → Connectors", "點「新增自訂 connector」", "貼上你的私人連結並儲存", "之後就可以直接問 Claude 你的跑步數據"]
+        : ["Open Claude → Settings → Connectors", "Tap “Add custom connector”", "Paste your private link and save", "Then ask Claude about your runs directly"],
+    },
+    {
+      key: "chatgpt",
+      name: "ChatGPT",
+      steps: zh
+        ? ["打開 ChatGPT → 設定 → Connectors → 進階設定，開啟「開發者模式」", "回到 Connectors，點「建立」新增 connector", "名稱隨意（例如 RunWard），MCP Server URL 貼上你的私人連結", "認證選「無認證」，儲存後即可在對話中使用"]
+        : ["Open ChatGPT → Settings → Connectors → Advanced, enable “Developer mode”", "Back in Connectors, tap “Create”", "Name it anything (e.g. RunWard) and paste your private link as the MCP Server URL", "Choose “No authentication”, save, and use it in chats"],
+    },
+    {
+      key: "gemini",
+      name: "Gemini",
+      steps: zh
+        ? ["Gemini 暫時唔支援直接加入 MCP 連結", "你可以用 app 內嘅「Export to AI」功能", "喺 All Activities 頁面一鍵匯出你嘅跑步同健康數據", "將匯出嘅文字貼到 Gemini 對話中即可"]
+        : ["Gemini doesn't support adding MCP links directly yet", "Use the “Export to AI” feature in the app instead", "In All Activities, export your runs and health data in one tap", "Paste the exported text into your Gemini chat"],
+    },
+  ];
+
   return (
     <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
       <div className="flex items-start gap-3">
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><Bot size={20} /></div>
         <div className="min-w-0 flex-1">
-          <p className="font-display text-sm font-semibold">{zh ? "連接 Claude / AI 助手" : "Connect Claude / AI assistants"}</p>
+          <p className="font-display text-sm font-semibold">{zh ? "連接 AI 助手" : "Connect an AI assistant"}</p>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            {zh ? "產生私人連結，貼到 Claude 設定 → Connectors，Claude 便可直接讀取你的跑步及健康數據（只讀）。" : "Create a private link and paste it into Claude → Settings → Connectors so Claude can read your runs and health data (read-only)."}
+            {zh ? "產生私人連結，讓 Claude、ChatGPT 等 AI 助手直接讀取你的跑步及健康數據（只讀）。" : "Create a private link so AI assistants like Claude or ChatGPT can read your runs and health data (read-only)."}
           </p>
         </div>
+      </div>
+
+      <div className="mt-3 divide-y divide-border rounded-xl border border-border">
+        {guides.map((g) => (
+          <div key={g.key}>
+            <button
+              type="button"
+              className="flex w-full items-center justify-between px-3 py-2.5 text-left text-xs font-medium"
+              onClick={() => setOpen(open === g.key ? null : g.key)}
+            >
+              {g.name}
+              <ChevronDown size={14} className={`text-muted-foreground transition-transform ${open === g.key ? "rotate-180" : ""}`} />
+            </button>
+            {open === g.key && (
+              <ol className="space-y-1.5 px-3 pb-3 pt-1 text-xs text-muted-foreground">
+                {g.steps.map((s, i) => (
+                  <li key={i} className="flex gap-2">
+                    <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-semibold text-primary">{i + 1}</span>
+                    <span>{s}</span>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </div>
+        ))}
       </div>
 
       {newLink && (
@@ -81,7 +132,7 @@ export default function ClaudeConnectCard({ lang, userId }: { lang: "en" | "zh" 
           {rows.map((r) => (
             <div key={r.id} className="flex items-center justify-between px-3 py-2 text-xs">
               <div>
-                <p className="font-medium">{r.label || "Claude"} · {new Date(r.created_at).toLocaleDateString()}</p>
+                <p className="font-medium">{r.label || "AI assistant"} · {new Date(r.created_at).toLocaleDateString()}</p>
                 <p className="text-muted-foreground">{r.last_used_at ? `${zh ? "最後使用" : "Last used"} ${new Date(r.last_used_at).toLocaleString()}` : (zh ? "未使用" : "Not used yet")}</p>
               </div>
               <Button variant="ghost" size="sm" onClick={() => revoke(r.id)} aria-label={zh ? "撤銷" : "Revoke"}><Trash2 size={14} />{zh ? "撤銷" : "Revoke"}</Button>

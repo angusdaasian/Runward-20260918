@@ -12,7 +12,17 @@ const json = (b: unknown, s = 200) =>
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  if (req.headers.get("x-admin-secret") !== serviceKey) return json({ error: "unauthorized" }, 401);
+  const auth = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
+  let ok = auth === serviceKey || req.headers.get("x-admin-secret") === serviceKey;
+  if (!ok && auth) {
+    const a = createClient(Deno.env.get("SUPABASE_URL")!, serviceKey);
+    const { data: u } = await a.auth.getUser(auth);
+    if (u?.user) {
+      const { data: isAdmin } = await a.rpc("has_role", { _user_id: u.user.id, _role: "admin" });
+      ok = isAdmin === true;
+    }
+  }
+  if (!ok) return json({ error: "unauthorized" }, 401);
 
   let body: { dryRun?: boolean } = {};
   try { body = await req.json(); } catch { /* */ }

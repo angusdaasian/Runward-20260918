@@ -35,7 +35,7 @@ import ActivityMap from "./ActivityMap";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from "recharts";
 import { loadForActivity, isRunning } from "@/lib/trainingLoad";
 import { calculateRunningScore } from "@/lib/vdot";
-import { computeZonePct, computeZonePctWeighted, estimateMaxHr, estimateRestingHr, zoneBoundaries, ZONE_LABELS, isValidCustomZones } from "@/lib/hrZones";
+import { computeZonePct, computeZonePctWeighted, estimateMaxHr, estimateRestingHr, zoneBoundaries, ZONE_LABELS, ZONE_CSS, isValidCustomZones } from "@/lib/hrZones";
 import HrZoneBars from "./HrZoneBars";
 import PaceZoneBars from "./PaceZoneBars";
 import { computePaceZones, timeInPaceZones } from "@/lib/paceZones";
@@ -161,14 +161,20 @@ function extendChartToActivityDistance(data: any[], splits: Split[] | null, acti
   return [...withSplitTail, { ...last, distance_km: totalKm }];
 }
 
-const StatBox = ({ icon: Icon, label, value, unit, iconColor }: {
-  icon: any; label: string; value: string; unit?: string; iconColor?: string;
+const StatBox = ({ icon: Icon, label, value, unit, iconColor, emphasis }: {
+  icon: any; label: string; value: string; unit?: string; iconColor?: string; emphasis?: boolean;
 }) => (
-  <div className="bg-muted/50 rounded-lg p-3 flex flex-col items-center text-center">
-    <Icon size={16} className={iconColor || "text-primary"} />
-    <span className="text-[10px] text-muted-foreground mt-1">{label}</span>
-    <span className="text-sm font-bold text-foreground">{value}</span>
-    {unit && <span className="text-[10px] text-muted-foreground">{unit}</span>}
+  <div className="flex flex-col items-center rounded-xl bg-surface-2 p-3 text-center">
+    <Icon size={16} className={iconColor || "text-muted-foreground"} />
+    <span className="mt-1 text-caption text-muted-foreground">{label}</span>
+    <span
+      className={`tnum font-display font-bold text-foreground ${
+        emphasis ? "text-num-md" : "text-num-sm"
+      }`}
+    >
+      {value}
+    </span>
+    {unit && <span className="text-caption text-muted-foreground">{unit}</span>}
   </div>
 );
 
@@ -979,7 +985,10 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
         else if (pct >= 0.6) key = "z2";
         else key = "z1";
       }
-      return ZONE_LABELS.find(z => z.key === key)!.color;
+      const idx = ZONE_LABELS.findIndex(z => z.key === key);
+      // Token-backed so the HR curve follows the theme. These stops are SVG in
+      // the DOM (not canvas), so CSS custom properties resolve fine here.
+      return ZONE_CSS[idx >= 0 ? idx : 0];
     };
     const xs = pts.map((p: any) => p.distance_km);
     const minX = xs[0];
@@ -1400,7 +1409,7 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
         )}
         <p className="text-sm text-muted-foreground mt-0.5">{dateStr} {timeStr}</p>
         {isAppleHealth && (
-          <span className="text-[10px] text-white bg-red-500 px-2 py-0.5 rounded-full mt-1 inline-block">
+          <span className="mt-1 inline-block rounded-full bg-destructive px-2 py-0.5 text-caption font-semibold text-destructive-foreground">
             ❤️ {activity.source}
           </span>
         )}
@@ -1431,7 +1440,7 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
             </div>
           )}
           <div className="grid grid-cols-3 gap-2 mb-4">
-            <StatBox icon={MapPin} label={lang === "zh" ? "距離" : "Distance"} value={(activity.distance / 1000).toFixed(2)} unit="km" />
+            <StatBox emphasis icon={MapPin} label={lang === "zh" ? "距離" : "Distance"} value={(activity.distance / 1000).toFixed(2)} unit="km" />
             <StatBox icon={Clock} label={lang === "zh" ? "時間" : "Time"} value={formatDuration(activity.moving_time)} />
             <StatBox icon={Zap} label={lang === "zh" ? "配速" : "Pace"} value={formatPace(activity.average_speed)} unit="/km" />
           </div>
@@ -1444,7 +1453,7 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
             <div className="grid grid-cols-3 gap-2 mb-4">
               <StatBox
                 icon={Flame}
-                iconColor="text-orange-500"
+                iconColor="text-load"
                 label={lang === "zh" ? "訓練負荷" : "Training Load"}
                 value={(() => {
                   const l = loadForActivity({ start_date: activity.start_date, moving_time: activity.moving_time, average_heartrate: activity.average_heartrate, max_heartrate: activity.max_heartrate, sport_type: activity.sport_type });
@@ -1459,13 +1468,13 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
         <>
           {/* Strava / Garmin / Coros: stats grid first, then map */}
           <div className="grid grid-cols-3 gap-2 mb-4">
-            <StatBox icon={MapPin} label={lang === "zh" ? "距離" : "Distance"} value={(activity.distance / 1000).toFixed(2)} unit="km" />
+            <StatBox emphasis icon={MapPin} label={lang === "zh" ? "距離" : "Distance"} value={(activity.distance / 1000).toFixed(2)} unit="km" />
             <StatBox icon={Clock} label={lang === "zh" ? "時間" : "Duration"} value={formatDuration(activity.moving_time)} />
             <StatBox icon={Zap} label={lang === "zh" ? "配速" : "Avg Pace"} value={formatPace(activity.average_speed)} unit="/km" />
           </div>
           <div className="grid grid-cols-3 gap-2 mb-4">
             <StatBox icon={TrendingUp} label={lang === "zh" ? "訓練分數" : "Training Score"} value={displayScore != null ? displayScore.toString() : "--"} />
-            <StatBox icon={Heart} label={lang === "zh" ? "平均心率" : "Avg HR"} value={activity.average_heartrate ? Math.round(activity.average_heartrate).toString() : "--"} unit="bpm" iconColor="text-destructive" />
+            <StatBox icon={Heart} label={lang === "zh" ? "平均心率" : "Avg HR"} value={activity.average_heartrate ? Math.round(activity.average_heartrate).toString() : "--"} unit="bpm" iconColor="text-hr" />
             <StatBox icon={Mountain} label={lang === "zh" ? "爬升" : "Elevation"} value={Math.round(activity.total_elevation_gain).toString()} unit="m" />
           </div>
           {(isPremium || (activity.avg_cadence && activity.avg_cadence > 0)) && (
@@ -1473,7 +1482,7 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
               {isPremium && (
                 <StatBox
                   icon={Flame}
-                  iconColor="text-orange-500"
+                  iconColor="text-load"
                   label={lang === "zh" ? "訓練負荷" : "Training Load"}
                   value={(() => {
                     const l = loadForActivity({ start_date: activity.start_date, moving_time: activity.moving_time, average_heartrate: activity.average_heartrate, max_heartrate: activity.max_heartrate, sport_type: activity.sport_type, garmin_training_load: (activity as any).training_load ?? null });
@@ -1485,7 +1494,7 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
               {activity.avg_cadence != null && activity.avg_cadence > 0 && (
                 <StatBox
                   icon={Footprints}
-                  iconColor="text-violet-500"
+                  iconColor="text-cadence"
                   label={lang === "zh" ? "平均步頻" : "Avg Cadence"}
                   value={Math.round(activity.avg_cadence).toString()}
                   unit="spm"
@@ -1532,16 +1541,16 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
           </span>
         </div>
       ) : chartData.length > 0 && chartTabs.length > 0 ? (
-        <div className="bg-white rounded-2xl p-5 shadow-[0_4px_20px_-8px_rgba(15,23,42,0.15)] ring-1 ring-slate-200/70">
+        <div className="bg-card border border-border shadow-card rounded-2xl p-5">
           <div className="flex gap-1.5 mb-4">
             {chartTabs.map(tab => (
               <button
                 key={tab.key}
                 onClick={() => setActiveChart(tab.key)}
-                className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition-colors ${
+                className={`rounded-full px-3.5 py-1.5 text-caption font-semibold transition-colors ${
                   activeChart === tab.key
-                    ? "bg-slate-900 text-white"
-                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted text-muted-foreground hover:bg-accent"
                 }`}
               >
                 {tab.label}
@@ -1552,22 +1561,22 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
             <ResponsiveContainer width="100%" height="100%">
               {activeChart === "pace" ? (
                 <LineChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
-                  <XAxis dataKey="distance_km" type="number" domain={[0, 'dataMax']} allowDecimals={false} tick={{ fontSize: 10, fill: "#64748B" }} tickFormatter={(v) => `${Math.round(v)}`}
-                    label={{ value: "km", position: "insideBottomRight", offset: -5, fontSize: 10, fill: "#64748B" }} />
-                  <YAxis reversed tick={{ fontSize: 10, fill: "#64748B" }} tickFormatter={(v) => formatPaceFromMinutes(v)} domain={['auto', 'auto']} width={52}
-                    label={{ value: "min/km", angle: -90, position: "insideLeft", fontSize: 10, fill: "#64748B" }} />
-                  <Tooltip contentStyle={{ backgroundColor: "#FFFFFF", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 12, color: "#0F172A" }}
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis dataKey="distance_km" type="number" domain={[0, 'dataMax']} allowDecimals={false} tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} tickFormatter={(v) => `${Math.round(v)}`}
+                    label={{ value: "km", position: "insideBottomRight", offset: -5, fontSize: 10, fill: "hsl(var(--muted-foreground))" }} />
+                  <YAxis reversed tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} tickFormatter={(v) => formatPaceFromMinutes(v)} domain={['auto', 'auto']} width={52}
+                    label={{ value: "min/km", angle: -90, position: "insideLeft", fontSize: 10, fill: "hsl(var(--muted-foreground))" }} />
+                  <Tooltip contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 12, fontSize: 12, color: "hsl(var(--card-foreground))" }}
                     formatter={(value: number) => [`${formatPaceFromMinutes(value)} min/km`, lang === "zh" ? "配速" : "Pace"]} labelFormatter={(v) => `${v} km`} />
-                  <Line type="monotone" dataKey="pace" stroke="#FC4C02" strokeWidth={2.5} dot={false} connectNulls />
+                  <Line type="monotone" dataKey="pace" stroke="hsl(var(--pace))" strokeWidth={2.5} dot={false} connectNulls />
                 </LineChart>
               ) : activeChart === "heartrate" ? (
                 <AreaChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
-                  <XAxis dataKey="distance_km" type="number" domain={[0, 'dataMax']} allowDecimals={false} tick={{ fontSize: 10, fill: "#64748B" }} tickFormatter={(v) => `${Math.round(v)}`} />
-                  <YAxis tick={{ fontSize: 10, fill: "#64748B" }} domain={['auto', 'auto']}
-                    label={{ value: "bpm", angle: -90, position: "insideLeft", fontSize: 10, fill: "#64748B" }} />
-                  <Tooltip contentStyle={{ backgroundColor: "#FFFFFF", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 12, color: "#0F172A" }}
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis dataKey="distance_km" type="number" domain={[0, 'dataMax']} allowDecimals={false} tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} tickFormatter={(v) => `${Math.round(v)}`} />
+                  <YAxis tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} domain={['auto', 'auto']}
+                    label={{ value: "bpm", angle: -90, position: "insideLeft", fontSize: 10, fill: "hsl(var(--muted-foreground))" }} />
+                  <Tooltip contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 12, fontSize: 12, color: "hsl(var(--card-foreground))" }}
                     formatter={(value: number) => [Math.round(value), "bpm"]} labelFormatter={(v) => `${v} km`} />
                   <defs>
                     <linearGradient id="hrGradient" x1="0" y1="0" x2="1" y2="0">
@@ -1577,8 +1586,8 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
                           ))
                         : (
                           <>
-                            <stop offset="5%" stopColor="#EF4444" stopOpacity={0.35} />
-                            <stop offset="95%" stopColor="#EF4444" stopOpacity={0} />
+                            <stop offset="5%" stopColor="hsl(var(--hr))" stopOpacity={0.35} />
+                            <stop offset="95%" stopColor="hsl(var(--hr))" stopOpacity={0} />
                           </>
                         )}
                     </linearGradient>
@@ -1587,36 +1596,36 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
                         ? hrGradientStops.map((s, i) => (
                             <stop key={i} offset={`${s.offset}%`} stopColor={s.color} stopOpacity={1} />
                           ))
-                        : <stop offset="0%" stopColor="#EF4444" stopOpacity={1} />}
+                        : <stop offset="0%" stopColor="hsl(var(--hr))" stopOpacity={1} />}
                     </linearGradient>
                   </defs>
                   <Area type="monotone" dataKey="heartrate" stroke="url(#hrStrokeGradient)" fill="url(#hrGradient)" strokeWidth={2.5} dot={false} />
                 </AreaChart>
               ) : activeChart === "altitude" ? (
                 <AreaChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
-                  <XAxis dataKey="distance_km" type="number" domain={[0, 'dataMax']} allowDecimals={false} tick={{ fontSize: 10, fill: "#64748B" }} tickFormatter={(v) => `${Math.round(v)}`} />
-                  <YAxis tick={{ fontSize: 10, fill: "#64748B" }} domain={['auto', 'auto']}
-                    label={{ value: "m", angle: -90, position: "insideLeft", fontSize: 10, fill: "#64748B" }} />
-                  <Tooltip contentStyle={{ backgroundColor: "#FFFFFF", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 12, color: "#0F172A" }}
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis dataKey="distance_km" type="number" domain={[0, 'dataMax']} allowDecimals={false} tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} tickFormatter={(v) => `${Math.round(v)}`} />
+                  <YAxis tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} domain={['auto', 'auto']}
+                    label={{ value: "m", angle: -90, position: "insideLeft", fontSize: 10, fill: "hsl(var(--muted-foreground))" }} />
+                  <Tooltip contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 12, fontSize: 12, color: "hsl(var(--card-foreground))" }}
                     formatter={(value: number) => [`${Math.round(value)}m`, lang === "zh" ? "海拔" : "Altitude"]} labelFormatter={(v) => `${v} km`} />
                   <defs>
                     <linearGradient id="altGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#0EA5E9" stopOpacity={0.35} />
-                      <stop offset="95%" stopColor="#0EA5E9" stopOpacity={0} />
+                      <stop offset="5%" stopColor="hsl(var(--elevation))" stopOpacity={0.35} />
+                      <stop offset="95%" stopColor="hsl(var(--elevation))" stopOpacity={0} />
                     </linearGradient>
                   </defs>
-                  <Area type="monotone" dataKey="altitude" stroke="#0EA5E9" fill="url(#altGradient)" strokeWidth={2.5} dot={false} />
+                  <Area type="monotone" dataKey="altitude" stroke="hsl(var(--elevation))" fill="url(#altGradient)" strokeWidth={2.5} dot={false} />
                 </AreaChart>
               ) : (
                 <LineChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
-                  <XAxis dataKey="distance_km" type="number" domain={[0, 'dataMax']} allowDecimals={false} tick={{ fontSize: 10, fill: "#64748B" }} tickFormatter={(v) => `${Math.round(v)}`} />
-                  <YAxis tick={{ fontSize: 10, fill: "#64748B" }} domain={['auto', 'auto']} width={42}
-                    label={{ value: "spm", angle: -90, position: "insideLeft", fontSize: 10, fill: "#64748B" }} />
-                  <Tooltip contentStyle={{ backgroundColor: "#FFFFFF", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 12, color: "#0F172A" }}
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis dataKey="distance_km" type="number" domain={[0, 'dataMax']} allowDecimals={false} tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} tickFormatter={(v) => `${Math.round(v)}`} />
+                  <YAxis tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} domain={['auto', 'auto']} width={42}
+                    label={{ value: "spm", angle: -90, position: "insideLeft", fontSize: 10, fill: "hsl(var(--muted-foreground))" }} />
+                  <Tooltip contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 12, fontSize: 12, color: "hsl(var(--card-foreground))" }}
                     formatter={(value: number) => [`${Math.round(value)} spm`, lang === "zh" ? "步頻" : "Cadence"]} labelFormatter={(v) => `${v} km`} />
-                  <Line type="monotone" dataKey="cadence" stroke="#8B5CF6" strokeWidth={2.5} dot={false} connectNulls />
+                  <Line type="monotone" dataKey="cadence" stroke="hsl(var(--cadence))" strokeWidth={2.5} dot={false} connectNulls />
                 </LineChart>
               )}
             </ResponsiveContainer>
@@ -1672,9 +1681,9 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
       {/* Intervals Table — Garmin-style */}
       {isRunningActivity && splits && splits.length > 0 && (
 
-        <div className="bg-white rounded-2xl overflow-hidden mt-4 shadow-[0_4px_20px_-8px_rgba(15,23,42,0.15)] ring-1 ring-slate-200/70">
+        <div className="bg-card border border-border shadow-card rounded-2xl overflow-hidden mt-4">
           <div className="px-5 pt-4 pb-3 flex items-center justify-between">
-            <h3 className="font-display font-bold text-slate-900 text-sm">
+            <h3 className="font-display text-h3 font-semibold text-card-foreground">
               {lang === "zh" ? "分段" : "Intervals"}
             </h3>
             {(() => {
@@ -1689,9 +1698,9 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
               const showRepsOption = !!smartReps;
               if (!showKmOption && !showRepsOption) return null;
               const btn = (active: boolean) =>
-                `px-2.5 py-1 rounded-md transition-colors ${active ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`;
+                `rounded-full px-2.5 py-1 transition-colors ${active ? "bg-card text-foreground shadow-sm" : "text-muted-foreground"}`;
               return (
-                <div className="flex rounded-lg bg-slate-100 p-0.5 text-[11px] font-semibold">
+                <div className="flex rounded-full bg-surface-2 p-0.5 text-caption font-semibold">
                   <button onClick={() => setSplitView("laps")} className={btn(splitView === "laps")}>
                     {lang === "zh" ? "每圈" : "Laps"}
                   </button>
@@ -1710,17 +1719,17 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
             })()}
           </div>
           {/* Header row */}
-          <div className="grid grid-cols-[36px_1fr_1fr_1fr_1fr_56px] items-end gap-2 px-5 py-2 text-[10px] font-semibold uppercase tracking-wide text-slate-500 border-b border-slate-200">
+          <div className="grid grid-cols-[36px_1fr_1fr_1fr_1fr_56px] items-end gap-2 border-b border-border px-5 py-2 text-caption font-semibold uppercase tracking-[0.08em] text-muted-foreground">
             <span>Int</span>
             <span>{lang === "zh" ? "類型" : "Type"}</span>
             <span className="text-right">{lang === "zh" ? "時間" : "Time"}</span>
             <span className="text-right">
               {lang === "zh" ? "距離" : "Dist"}
-              <span className="block text-[9px] font-normal normal-case text-slate-400">m</span>
+              <span className="block text-caption font-normal normal-case text-muted-foreground">m</span>
             </span>
             <span className="text-right">
               {lang === "zh" ? "平均配速" : "Avg Pace"}
-              <span className="block text-[9px] font-normal normal-case text-slate-400">min/km</span>
+              <span className="block text-caption font-normal normal-case text-muted-foreground">min/km</span>
             </span>
             <span className="text-right">HR</span>
           </div>
@@ -1817,26 +1826,26 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
               return (
                 <div
                   key={idx}
-                  className={`grid grid-cols-[36px_1fr_1fr_1fr_1fr_56px] items-center gap-2 px-5 py-3 text-xs border-b border-slate-100 last:border-0 ${
-                    isRest ? "bg-slate-50" : "bg-white"
+                  className={`grid grid-cols-[36px_1fr_1fr_1fr_1fr_56px] items-center gap-2 border-b border-border px-5 py-3 text-caption last:border-0 ${
+                    isRest ? "bg-surface-2" : "bg-card"
                   }`}
                 >
-                  <span className={`font-semibold tabular-nums ${isRest ? "text-slate-400" : "text-slate-900"}`}>
+                  <span className={`tnum font-semibold ${isRest ? "text-muted-foreground" : "text-foreground"}`}>
                     {isRest ? "" : runNum}
                   </span>
-                  <span className={`${isRest ? "text-slate-400 font-normal" : "text-slate-900 font-semibold"}`}>
+                  <span className={`${isRest ? "font-normal text-muted-foreground" : "font-semibold text-foreground"}`}>
                     {typeLabel}
                   </span>
-                  <span className={`text-right tabular-nums ${isRest ? "text-slate-400" : "text-slate-900 font-semibold"}`}>
+                  <span className={`tnum text-right ${isRest ? "text-muted-foreground" : "font-semibold text-foreground"}`}>
                     {formatDuration(split.elapsed_time)}
                   </span>
-                  <span className={`text-right tabular-nums ${isRest ? "text-slate-400" : "text-slate-900 font-semibold"}`}>
+                  <span className={`tnum text-right ${isRest ? "text-muted-foreground" : "font-semibold text-foreground"}`}>
                     {Math.round(distMeters)}
                   </span>
-                  <span className={`text-right tabular-nums ${isRest ? "text-slate-400" : "text-slate-900 font-semibold"}`}>
+                  <span className={`tnum text-right ${isRest ? "text-muted-foreground" : "font-semibold text-foreground"}`}>
                     {pace}
                   </span>
-                  <span className={`text-right tabular-nums ${isRest ? "text-slate-400" : "text-slate-900"}`}>
+                  <span className={`tnum text-right ${isRest ? "text-muted-foreground" : "text-foreground"}`}>
                     {hr ?? "--"}
                   </span>
                 </div>
@@ -1845,13 +1854,13 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
             return (
               <>
                 {rows}
-                <div className="grid grid-cols-[36px_1fr_1fr_1fr_1fr_56px] items-center gap-2 px-5 py-3.5 text-xs bg-slate-100 border-t border-slate-200">
-                  <span className="font-bold text-slate-900">Σ</span>
-                  <span className="font-bold text-slate-900">{lang === "zh" ? "總計" : "Total"}</span>
-                  <span className="text-right tabular-nums font-bold text-slate-900">{formatDuration(totalTime)}</span>
-                  <span className="text-right tabular-nums font-bold text-slate-900">{Math.round(totalDist)}</span>
-                  <span className="text-right tabular-nums font-bold text-slate-900">{formatPace(avgSpeedTotal)}</span>
-                  <span className="text-right tabular-nums font-bold text-slate-900">{avgHrTotal ?? "--"}</span>
+                <div className="grid grid-cols-[36px_1fr_1fr_1fr_1fr_56px] items-center gap-2 border-t border-border bg-surface-2 px-5 py-3.5 text-caption">
+                  <span className="font-bold text-foreground">Σ</span>
+                  <span className="font-bold text-foreground">{lang === "zh" ? "總計" : "Total"}</span>
+                  <span className="tnum text-right font-bold text-foreground">{formatDuration(totalTime)}</span>
+                  <span className="tnum text-right font-bold text-foreground">{Math.round(totalDist)}</span>
+                  <span className="tnum text-right font-bold text-foreground">{formatPace(avgSpeedTotal)}</span>
+                  <span className="tnum text-right font-bold text-foreground">{avgHrTotal ?? "--"}</span>
                 </div>
               </>
             );
@@ -1980,7 +1989,7 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
                     toast.error(lang === "zh" ? "複製失敗" : "Failed to copy");
                   }
                 }}
-                className="flex items-center gap-1 px-2 py-1 rounded-md text-[11px] text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
+                className="flex items-center gap-1 rounded-md px-2 py-1 text-caption text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
                 aria-label={lang === "zh" ? "複製分析" : "Copy analysis"}
               >
                 {aiCopied ? <><Check size={12} /> {lang === "zh" ? "已複製" : "Copied"}</> : <><Copy size={12} /> {lang === "zh" ? "複製" : "Copy"}</>}
@@ -1996,7 +2005,7 @@ const ActivityDetail = ({ activity, lang, onBack, onDeleted, isPremium, training
                   analysis: aiAnalysis,
                   lang,
                 })}
-                className="flex items-center gap-1 px-2 py-1 rounded-md text-[11px] text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
+                className="flex items-center gap-1 rounded-md px-2 py-1 text-caption text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
                 aria-label={lang === "zh" ? "分享分析" : "Share analysis"}
               >
                 <Share2 size={12} /> {lang === "zh" ? "分享" : "Share"}

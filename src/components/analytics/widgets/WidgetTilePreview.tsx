@@ -4,7 +4,7 @@ import { useActivities } from "@/hooks/use-activities";
 import { useTerraDailyHealth } from "@/hooks/use-terra-daily-health";
 import {
   Activity, Flame, Footprints, HeartPulse, Moon, Timer, Sparkles, Heart,
-  LineChart, TrendingUp, CalendarDays, Trophy, ShieldAlert, Scale, Gauge,
+  LineChart, TrendingUp, CalendarDays, Trophy, ShieldAlert, Scale, Gauge, ChevronRight,
 } from "lucide-react";
 import WidgetTile from "../WidgetTile";
 import { WidgetId } from "@/lib/analyticsWidgets";
@@ -15,10 +15,10 @@ import {
 } from "@/lib/hrvReadiness";
 import { useTerraConnections, useTerraTodayStats } from "@/hooks/use-terra-daily-health";
 import { usePremium } from "@/contexts/PremiumContext";
-import { loadForActivity, isCardio, isRunning, buildWeeklyLoadSeries } from "@/lib/trainingLoad";
+import { loadForActivity, isCardio, isRunning, buildWeeklyLoadSeries, type LoadActivity } from "@/lib/trainingLoad";
 import { computeInjuryRisk, injuryBand as injuryBandFn } from "@/lib/analyticsExplain";
 import { computePaceZones, fmtPace, ZONE_KEYS } from "@/lib/paceZones";
-import { ZONE_LABELS } from "@/lib/hrZones";
+import { ZONE_LABELS, ZONE_CLASSES } from "@/lib/hrZones";
 
 interface Props {
   id: WidgetId;
@@ -31,10 +31,22 @@ const zh = (lang: Lang) => lang === "zh";
 const Big = ({ value, unit, sub, cls }: { value: string; unit?: string; sub?: string; cls?: string }) => (
   <div>
     <div className="flex items-baseline gap-1">
-      <span className={`text-2xl font-bold ${cls ?? "text-foreground"}`}>{value}</span>
-      {unit && <span className="text-[10px] text-muted-foreground">{unit}</span>}
+      <span className={`tnum font-display text-num-md font-bold ${cls ?? "text-foreground"}`}>{value}</span>
+      {unit && <span className="text-caption text-muted-foreground">{unit}</span>}
     </div>
-    {sub && <div className="text-[10px] text-muted-foreground mt-0.5">{sub}</div>}
+    {sub && <div className="mt-0.5 text-caption leading-snug text-muted-foreground">{sub}</div>}
+  </div>
+);
+
+/** For tiles that have no single number to show: an explicit navigation
+ *  affordance instead of putting the word "View" in the numeral slot. */
+const OpenHint = ({ label, sub }: { label: string; sub?: string }) => (
+  <div className="pt-1">
+    <div className="flex items-center gap-1 text-label font-semibold text-primary">
+      <span className="truncate">{label}</span>
+      <ChevronRight size={15} className="shrink-0" />
+    </div>
+    {sub && <div className="mt-0.5 text-caption leading-snug text-muted-foreground">{sub}</div>}
   </div>
 );
 
@@ -343,7 +355,7 @@ const Tile = ({ id, lang, onOpen }: Props) => {
         <WidgetTile
           title={zh(lang) ? "心率區間" : "HR Zones"}
           subtitle={zh(lang) ? "本週" : "This week"}
-          icon={<Activity size={16} className="text-amber-500" />}
+          icon={<Activity size={16} className="text-hr" />}
           onClick={onOpen}
           locked={hrZonesLocked}
           lang={lang}
@@ -370,12 +382,15 @@ const Tile = ({ id, lang, onOpen }: Props) => {
         <WidgetTile
           title={zh(lang) ? "比賽預測" : "Race Predictor"}
           subtitle="5K · 10K · HM"
-          icon={<Trophy size={16} className="text-yellow-500" />}
+          icon={<Trophy size={16} className="text-gold" />}
           onClick={onOpen}
           locked={hrZonesLocked}
           lang={lang}
         >
-          <Big value={zh(lang) ? "查看" : "View"} sub={zh(lang) ? "點擊查看預測時間" : "Tap to see predicted times"} />
+          <OpenHint
+            label={zh(lang) ? "預測時間" : "Predicted times"}
+            sub="5K · 10K · HM"
+          />
         </WidgetTile>
       );
     case "training_load":
@@ -396,12 +411,15 @@ const Tile = ({ id, lang, onOpen }: Props) => {
         <WidgetTile
           title={zh(lang) ? "趨勢" : "Trends"}
           subtitle={zh(lang) ? "本週 vs 上週" : "Week over week"}
-          icon={<TrendingUp size={16} className="text-violet-500" />}
+          icon={<TrendingUp size={16} className="text-chart-4" />}
           onClick={onOpen}
           locked={hrZonesLocked}
           lang={lang}
         >
-          <Big value={zh(lang) ? "查看" : "View"} sub={zh(lang) ? "距離、配速、心率" : "Distance, pace, HR"} />
+          <OpenHint
+            label={zh(lang) ? "週對週趨勢" : "Week over week"}
+            sub={zh(lang) ? "距離、配速、心率" : "Distance, pace, HR"}
+          />
         </WidgetTile>
       );
     case "year_heatmap":
@@ -409,12 +427,15 @@ const Tile = ({ id, lang, onOpen }: Props) => {
         <WidgetTile
           title={zh(lang) ? "年度熱力圖" : "Year Heatmap"}
           subtitle={zh(lang) ? "活動紀錄" : "Activity history"}
-          icon={<CalendarDays size={16} className="text-emerald-500" />}
+          icon={<CalendarDays size={16} className="text-heat-4" />}
           onClick={onOpen}
           locked={hrZonesLocked}
           lang={lang}
         >
-          <Big value={zh(lang) ? "查看" : "View"} sub={zh(lang) ? "365 天熱力圖" : "365-day map"} />
+          <OpenHint
+            label={zh(lang) ? "365 天紀錄" : "365-day history"}
+            sub={zh(lang) ? "點擊查看熱力圖" : "Tap to open the heatmap"}
+          />
         </WidgetTile>
       );
     case "injury_risk":
@@ -457,44 +478,64 @@ const Tile = ({ id, lang, onOpen }: Props) => {
 };
 
 // --- inline small previews ---
-const TrainingLoadPreview = ({ lang }: { lang: Lang }) => {
-  const { activities } = useActivities();
-  const count = useMemo(() => {
-    const cutoff = Date.now() - 7 * 24 * 3600 * 1000;
-    return activities.filter((a) => new Date(a.start_date).getTime() >= cutoff).length;
-  }, [activities]);
-  return <Big value={String(count)} sub={lang === "zh" ? "本週活動數" : "Activities this week"} />;
-};
 
-const ZonesPreview = ({ lang }: { lang: Lang }) => {
-  // Simple visual preview only
+/** Show the real latest form (TSB) rather than an activity count — the tile
+ *  advertises "CTL · ATL · TSB" and previously printed an unrelated number. */
+const TrainingLoadPreview = ({ lang }: { lang: Lang }) => {
+  const { activities, profile } = useActivities();
+  const series = useMemo(
+    () =>
+      buildWeeklyLoadSeries(
+        activities as unknown as LoadActivity[],
+        (profile as { age?: number | null } | null)?.age ?? null,
+        26
+      ),
+    [activities, profile],
+  );
+  const last = series[series.length - 1];
+  if (!last) {
+    return <Big value="—" sub={lang === "zh" ? "尚無足夠資料" : "Not enough data yet"} />;
+  }
   return (
-    <div>
-      <div className="flex items-end gap-1 h-12 mt-1">
-        {[0.2, 0.45, 0.65, 0.35, 0.15].map((h, i) => (
-          <div
-            key={i}
-            className={`flex-1 rounded-sm ${
-              ["bg-zinc-400", "bg-sky-400", "bg-emerald-400", "bg-amber-400", "bg-rose-400"][i]
-            }`}
-            style={{ height: `${h * 100}%`, opacity: 0.85 }}
-          />
-        ))}
-      </div>
-      <div className="text-[10px] text-muted-foreground mt-1">{lang === "zh" ? "點擊查看詳情" : "Tap for details"}</div>
-    </div>
+    <Big
+      value={last.form.toFixed(1)}
+      unit="TSB"
+      sub={
+        lang === "zh"
+          ? `體能 ${last.fitness.toFixed(0)} · 疲勞 ${last.fatigue.toFixed(0)}`
+          : `Fitness ${last.fitness.toFixed(0)} · Fatigue ${last.fatigue.toFixed(0)}`
+      }
+    />
   );
 };
+
+/** A zone *legend*, not fabricated data. This tile has no distribution until
+ *  the detail view loads it, so bar heights here were invented numbers
+ *  presented as "this week". */
+const ZonesPreview = ({ lang }: { lang: Lang }) => (
+  <div className="space-y-1.5 pt-1">
+    {ZONE_LABELS.map((z, i) => (
+      <div key={z.key} className="flex items-center gap-2">
+        <span className={`h-2 w-2 shrink-0 rounded-[2px] ${ZONE_CLASSES[i]}`} aria-hidden />
+        <span className="truncate text-caption text-muted-foreground">
+          {lang === "zh" ? z.labelZh : z.label}
+        </span>
+      </div>
+    ))}
+  </div>
+);
 
 const PaceZonesPreview = ({ zones }: { zones: NonNullable<ReturnType<typeof computePaceZones>> }) => (
   <div className="space-y-1.5 pt-0.5">
     {ZONE_KEYS.map((key, index) => (
-      <div key={key} className="grid grid-cols-[1.25rem_minmax(0,1fr)_2.75rem] items-center gap-1.5">
-        <span className="text-[9px] font-semibold text-muted-foreground">Z{index + 1}</span>
-        <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-          <div className="h-full w-full rounded-full opacity-80" style={{ backgroundColor: ZONE_LABELS[index].color }} />
+      <div key={key} className="flex items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-1.5">
+          <span className={`h-2 w-2 shrink-0 rounded-[2px] ${ZONE_CLASSES[index]}`} aria-hidden />
+          <span className="text-caption font-semibold text-muted-foreground">Z{index + 1}</span>
         </div>
-        <span className="text-right text-[9px] font-mono font-semibold tabular-nums">{fmtPace(zones.pace[key])}</span>
+        <span className="tnum text-caption font-semibold text-foreground">
+          {fmtPace(zones.pace[key])}
+        </span>
       </div>
     ))}
   </div>

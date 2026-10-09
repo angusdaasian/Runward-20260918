@@ -232,11 +232,7 @@ const PoseOverlay = ({ videoUrl, lang }: Props) => {
           {error}
         </div>
       )}
-      {!loading && !error && (
-        <div className="absolute top-2 right-2 bg-primary/80 text-primary-foreground text-xs px-2 py-1 rounded-md">
-          🦴 MoveNet
-        </div>
-      )}
+      {/* The pose-model name badge was developer telemetry; it shipped to users. */}
     </div>
   );
 };

@@ -13,6 +13,31 @@ export const ZONE_LABELS: Array<{ key: keyof ZonePct; label: string; labelZh: st
   { key: "z5", label: "Z5 Max",       labelZh: "Z5 極限",   color: "#EF4444" },
 ];
 
+// `color` above stays a concrete hex on purpose: it is used by canvas-based
+// share-card rendering, which cannot resolve CSS custom properties.
+//
+// For DOM surfaces prefer these token-backed values so the zone ramp follows
+// the theme (the hardcoded hex ramp above was duplicated verbatim in three
+// files and never responded to dark mode).
+export const ZONE_CLASSES = [
+  "bg-zone-1", "bg-zone-2", "bg-zone-3", "bg-zone-4", "bg-zone-5",
+] as const;
+
+export const ZONE_CLASS_TEXT = [
+  "text-zone-1", "text-zone-2", "text-zone-3", "text-zone-4", "text-zone-5",
+] as const;
+
+/** CSS-variable colour per zone, for inline `style` on DOM elements. */
+export const ZONE_CSS = [
+  "hsl(var(--zone-1))",
+  "hsl(var(--zone-2))",
+  "hsl(var(--zone-3))",
+  "hsl(var(--zone-4))",
+  "hsl(var(--zone-5))",
+] as const;
+
+export const ZONE_ORDER: Array<keyof ZonePct> = ["z1", "z2", "z3", "z4", "z5"];
+
 /** Resolve max HR. Priority: explicit profile value > 220 - age > 190. */
 export function estimateMaxHr(age?: number | null, profileMaxHr?: number | null): number {
   if (profileMaxHr && profileMaxHr > 100 && profileMaxHr < 230) return profileMaxHr;

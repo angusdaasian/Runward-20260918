@@ -1,6 +1,7 @@
 import { Lang } from "@/lib/i18n";
-import { ZONE_LABELS } from "@/lib/hrZones";
+import { ZONE_LABELS, ZONE_CLASSES, ZONE_ORDER } from "@/lib/hrZones";
 import { fmtPace, PaceZones, ZONE_KEYS, ZoneKey } from "@/lib/paceZones";
+import { SurfaceCard } from "@/components/ui/SurfaceCard";
 
 interface Props {
   lang: Lang;
@@ -30,42 +31,59 @@ const rangeLabel = (zones: PaceZones, k: ZoneKey) => {
 const PaceZoneBars = ({ lang, zones, time, title, subtitle }: Props) => {
   const zh = lang === "zh";
   const total = time ? ZONE_KEYS.reduce((s, k) => s + time[k], 0) : 0;
+
   return (
-    <div className="bg-card text-card-foreground rounded-2xl p-5 shadow-sm ring-1 ring-border">
+    <SurfaceCard>
       <div className="mb-3">
-        <h3 className="font-display font-bold text-sm">{title ?? (zh ? "配速區間" : "Pace Zones")}</h3>
-        <p className="text-[11px] text-muted-foreground mt-0.5">
+        <h3 className="font-display text-h3 font-semibold text-card-foreground">
+          {title ?? (zh ? "配速區間" : "Pace Zones")}
+        </h3>
+        <p className="mt-0.5 text-caption text-muted-foreground">
           {subtitle ?? (zh ? `根據所有可用紀錄 · ${zones.runCount} 次跑步` : `All available history · ${zones.runCount} runs`)}
         </p>
       </div>
       <div className="space-y-2">
-        {ZONE_LABELS.map((z) => {
+        {ZONE_LABELS.map((z, i) => {
           const k = z.key as ZoneKey;
           const pct = time && total > 0 ? (time[k] / total) * 100 : null;
           return (
-            <div key={k} className="grid grid-cols-[6.5rem_minmax(0,1fr)_3.5rem] items-center gap-3 min-h-10">
+            <div key={k} className="grid min-h-10 grid-cols-[6.5rem_minmax(0,1fr)_3.5rem] items-center gap-3">
               <div className="min-w-0">
-                <div className="text-[11px] font-semibold">{zh ? z.labelZh : z.label}</div>
-                <div className="text-[10px] text-muted-foreground font-mono tabular-nums leading-tight">{rangeLabel(zones, k)} /km</div>
+                <div className="flex items-center gap-1.5">
+                  {/* Colour carried by a dot so the track is never a fake bar. */}
+                  <span className={`h-2 w-2 shrink-0 rounded-[2px] ${ZONE_CLASSES[i]}`} aria-hidden />
+                  <div className="truncate text-caption font-semibold text-foreground">
+                    {zh ? z.labelZh : z.label}
+                  </div>
+                </div>
+                <div className="tnum mt-0.5 text-caption leading-tight text-muted-foreground">
+                  {rangeLabel(zones, k)} /km
+                </div>
               </div>
+
               {pct != null ? (
                 <>
-                  <div className="h-4 rounded-full bg-muted overflow-hidden">
-                    <div className="h-full rounded-full transition-all" style={{ width: `${Math.max(pct, pct > 0 ? 2 : 0)}%`, backgroundColor: z.color }} />
+                  <div className="h-2 overflow-hidden rounded-full bg-muted">
+                    <div
+                      className={`h-full rounded-full transition-[width] duration-500 ease-out ${ZONE_CLASSES[i]}`}
+                      style={{ width: `${pct > 0 ? Math.max(pct, 2) : 0}%` }}
+                    />
                   </div>
-                  <div className="text-right text-[11px] font-mono font-semibold tabular-nums">
+                  <div className="tnum text-right text-caption font-semibold tabular-nums text-foreground">
                     {fmtDur(time?.[k] ?? 0)}
-                    <div className="text-[10px] text-muted-foreground font-normal">{pct.toFixed(0)}%</div>
+                    <div className="text-caption font-normal text-muted-foreground">
+                      {pct.toFixed(0)}%
+                    </div>
                   </div>
                 </>
               ) : (
                 <>
-                  <div className="h-4 rounded-full bg-muted overflow-hidden">
-                    <div className="h-full w-full rounded-full opacity-80" style={{ backgroundColor: z.color }} />
-                  </div>
-                  <div className="text-right text-[11px] font-mono font-semibold tabular-nums leading-tight">
+                  {/* No distribution data for this activity — show an empty
+                      track rather than a full-width bar that encodes nothing. */}
+                  <div className="h-2 rounded-full bg-muted/60" />
+                  <div className="tnum text-right text-caption font-semibold leading-tight text-foreground">
                     {fmtPace(zones.pace[k])}
-                    <div className="text-[10px] text-muted-foreground font-normal">
+                    <div className="text-caption font-normal text-muted-foreground">
                       {zones.samples[k] === 0 ? (zh ? "估算 /km" : "est. /km") : "/km"}
                     </div>
                   </div>
@@ -75,7 +93,7 @@ const PaceZoneBars = ({ lang, zones, time, title, subtitle }: Props) => {
           );
         })}
       </div>
-    </div>
+    </SurfaceCard>
   );
 };
 

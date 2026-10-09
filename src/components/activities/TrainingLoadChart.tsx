@@ -16,6 +16,8 @@ import {
   type LoadActivity,
   type LoadStatusKey,
 } from "@/lib/trainingLoad";
+import { SurfaceCard } from "@/components/ui/SurfaceCard";
+import { DeltaChip } from "@/components/ui/DeltaChip";
 
 interface Props {
   lang: Lang;
@@ -23,13 +25,15 @@ interface Props {
   profileAge?: number | null;
 }
 
+/* Token-backed status colours (were text-red-500 / text-orange-500 /
+   text-emerald-500 / text-sky-400 / text-yellow-500). */
 const STATUS_LABELS: Record<LoadStatusKey, { en: string; zh: string; color: string }> = {
-  overreaching: { en: "Overreaching", zh: "過度訓練", color: "text-red-500" },
-  productive: { en: "Productive overreach", zh: "有效強度", color: "text-orange-500" },
-  building: { en: "Building fitness", zh: "建立體能", color: "text-emerald-500" },
-  fresh: { en: "Fresh / tapered", zh: "狀態良好", color: "text-sky-400" },
+  overreaching: { en: "Overreaching", zh: "過度訓練", color: "text-destructive" },
+  productive: { en: "Productive overreach", zh: "有效強度", color: "text-warning" },
+  building: { en: "Building fitness", zh: "建立體能", color: "text-success" },
+  fresh: { en: "Fresh / tapered", zh: "狀態良好", color: "text-chart-2" },
   maintenance: { en: "Maintenance", zh: "維持", color: "text-muted-foreground" },
-  detraining: { en: "Detraining", zh: "退步中", color: "text-yellow-500" },
+  detraining: { en: "Detraining", zh: "退步中", color: "text-elevation" },
 };
 
 const STATUS_DESC: Record<LoadStatusKey, { en: string; zh: string }> = {
@@ -65,6 +69,19 @@ const TrainingLoadChart = ({ lang, activities, profileAge }: Props) => {
     [activities, profileAge],
   );
 
+  /* Split form at y=0 so the fill actually reads positive/negative. Previously
+     a red `formNeg` gradient was defined and never referenced, while the Area
+     always filled green — so the chart contradicted its own copy. */
+  const chartData = useMemo(
+    () =>
+      series.map((s) => ({
+        ...s,
+        formPos: s.form > 0 ? s.form : 0,
+        formNeg: s.form < 0 ? s.form : 0,
+      })),
+    [series],
+  );
+
   const last = series[series.length - 1];
   const prev = series[Math.max(0, series.length - 5)];
   const status = classifyLoadStatus(series);
@@ -88,41 +105,41 @@ const TrainingLoadChart = ({ lang, activities, profileAge }: Props) => {
 
   if (!hasData) {
     return (
-      <div className="bg-card border border-border rounded-xl p-4 mb-5">
-        <h3 className="text-xs font-semibold text-muted-foreground tracking-wider uppercase mb-2">
+      <SurfaceCard className="mb-5">
+        <h3 className="mb-2 text-caption font-semibold uppercase tracking-[0.1em] text-muted-foreground">
           {lang === "zh" ? "訓練負荷" : "Training Load"}
         </h3>
-        <p className="text-sm text-muted-foreground py-8 text-center">
+        <p className="py-8 text-center text-label text-muted-foreground">
           {lang === "zh"
             ? "需要更多含心率的活動才能計算訓練負荷曲線"
             : "Sync more activities with heart-rate data to see your load curve"}
         </p>
-      </div>
+      </SurfaceCard>
     );
   }
 
   return (
-    <div className="bg-card border border-border rounded-xl p-4 mb-5">
+    <SurfaceCard className="mb-5">
       {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
-        <h3 className="text-xs font-semibold text-muted-foreground tracking-wider uppercase">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <h3 className="text-caption font-semibold uppercase tracking-[0.1em] text-muted-foreground">
           {lang === "zh" ? "訓練負荷" : "Training Load"}
         </h3>
-        <div className="flex items-center gap-3 text-xs">
+        <div className="flex items-center gap-3 text-caption">
           <div className="flex items-center gap-1.5">
-            <span className="inline-block w-2.5 h-0.5 bg-sky-400" />
+            <span className="inline-block h-0.5 w-2.5 bg-chart-2" />
             <span className="text-muted-foreground">{lang === "zh" ? "體能" : "Fitness"}</span>
-            <span className="font-bold text-foreground">{last.fitness.toFixed(1)}</span>
+            <span className="tnum font-bold text-foreground">{last.fitness.toFixed(1)}</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="inline-block w-2.5 h-0.5 bg-orange-400" />
+            <span className="inline-block h-0.5 w-2.5 bg-chart-3" />
             <span className="text-muted-foreground">{lang === "zh" ? "疲勞" : "Fatigue"}</span>
-            <span className="font-bold text-foreground">{last.fatigue.toFixed(1)}</span>
+            <span className="tnum font-bold text-foreground">{last.fatigue.toFixed(1)}</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="inline-block w-2.5 h-0.5 bg-rose-400" />
+            <span className="inline-block h-0.5 w-2.5 bg-chart-1" />
             <span className="text-muted-foreground">{lang === "zh" ? "狀態" : "Form"}</span>
-            <span className="font-bold text-foreground">{last.form.toFixed(1)}</span>
+            <span className="tnum font-bold text-foreground">{last.form.toFixed(1)}</span>
           </div>
         </div>
       </div>
@@ -130,15 +147,15 @@ const TrainingLoadChart = ({ lang, activities, profileAge }: Props) => {
       {/* Chart */}
       <div className="h-48">
         <ResponsiveContainer width="100%" height="100%">
-          <ComposedChart data={series} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+          <ComposedChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
             <defs>
               <linearGradient id="formPos" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="hsl(142 71% 45%)" stopOpacity={0.35} />
-                <stop offset="100%" stopColor="hsl(142 71% 45%)" stopOpacity={0} />
+                <stop offset="0%" stopColor="hsl(var(--chart-1))" stopOpacity={0.35} />
+                <stop offset="100%" stopColor="hsl(var(--chart-1))" stopOpacity={0} />
               </linearGradient>
               <linearGradient id="formNeg" x1="0" y1="1" x2="0" y2="0">
-                <stop offset="0%" stopColor="hsl(0 72% 51%)" stopOpacity={0.35} />
-                <stop offset="100%" stopColor="hsl(0 72% 51%)" stopOpacity={0} />
+                <stop offset="0%" stopColor="hsl(var(--destructive))" stopOpacity={0.35} />
+                <stop offset="100%" stopColor="hsl(var(--destructive))" stopOpacity={0} />
               </linearGradient>
             </defs>
             <XAxis
@@ -157,35 +174,45 @@ const TrainingLoadChart = ({ lang, activities, profileAge }: Props) => {
             <ReferenceLine y={0} stroke="hsl(var(--border))" strokeDasharray="2 2" />
             <Tooltip
               contentStyle={{
-                background: "hsl(var(--background))",
+                background: "hsl(var(--card))",
                 border: "1px solid hsl(var(--border))",
-                borderRadius: 8,
+                borderRadius: 12,
                 fontSize: 11,
+                boxShadow: "var(--shadow-raised)",
               }}
               labelStyle={{ color: "hsl(var(--muted-foreground))", fontSize: 10 }}
-              formatter={(value: number, name: string) => {
+              formatter={((value: number, name: string) => {
+                if (name === "formPos" || name === "formNeg") return null;
                 const labels: Record<string, string> = {
                   fitness: lang === "zh" ? "體能 (CTL)" : "Fitness (CTL)",
                   fatigue: lang === "zh" ? "疲勞 (ATL)" : "Fatigue (ATL)",
                   form: lang === "zh" ? "狀態 (TSB)" : "Form (TSB)",
                 };
                 return [value.toFixed(1), labels[name] || name];
-              }}
+              }) as never}
               labelFormatter={(l) => `${lang === "zh" ? "週" : "Wk of"} ${l}`}
             />
-            {/* Form area filled green when positive, red when negative */}
+            {/* Form split at zero: green above, red below */}
             <Area
               type="monotone"
-              dataKey="form"
+              dataKey="formPos"
               stroke="none"
               fill="url(#formPos)"
+              isAnimationActive={false}
+              activeDot={false}
+            />
+            <Area
+              type="monotone"
+              dataKey="formNeg"
+              stroke="none"
+              fill="url(#formNeg)"
               isAnimationActive={false}
               activeDot={false}
             />
             <Line
               type="monotone"
               dataKey="fitness"
-              stroke="hsl(199 89% 60%)"
+              stroke="hsl(var(--chart-2))"
               strokeWidth={2}
               dot={false}
               isAnimationActive={false}
@@ -193,7 +220,7 @@ const TrainingLoadChart = ({ lang, activities, profileAge }: Props) => {
             <Line
               type="monotone"
               dataKey="fatigue"
-              stroke="hsl(25 95% 60%)"
+              stroke="hsl(var(--chart-3))"
               strokeWidth={2}
               dot={false}
               isAnimationActive={false}
@@ -201,7 +228,7 @@ const TrainingLoadChart = ({ lang, activities, profileAge }: Props) => {
             <Line
               type="monotone"
               dataKey="form"
-              stroke="hsl(0 72% 60%)"
+              stroke="hsl(var(--chart-1))"
               strokeWidth={1.5}
               dot={false}
               isAnimationActive={false}
@@ -211,51 +238,48 @@ const TrainingLoadChart = ({ lang, activities, profileAge }: Props) => {
       </div>
 
       {/* Status */}
-      <div className="mt-2 flex items-baseline gap-2 flex-wrap text-xs">
+      <div className="mt-2 flex flex-wrap items-center gap-2 text-caption">
         <span className={`font-bold uppercase tracking-wide ${statusLabel.color}`}>
           {lang === "zh" ? statusLabel.zh : statusLabel.en}
         </span>
-        <span className="text-muted-foreground">
+        <span className="tnum text-muted-foreground">
           CTL {last.fitness.toFixed(1)} · ATL {last.fatigue.toFixed(1)} · TSB {last.form.toFixed(1)}
         </span>
         {fitnessTrendPct !== 0 && (
-          <span className={fitnessTrendPct > 0 ? "text-emerald-500 font-medium" : "text-yellow-500 font-medium"}>
-            {lang === "zh" ? "體能" : "fitness"} {fitnessTrendPct > 0 ? "↑" : "↓"}
-            {Math.abs(fitnessTrendPct)}%
-          </span>
+          <DeltaChip pct={fitnessTrendPct} suffix={lang === "zh" ? "體能" : "fitness"} />
         )}
       </div>
-      <p className="mt-1.5 text-xs text-foreground leading-relaxed">
+      <p className="mt-1.5 text-caption leading-relaxed text-foreground">
         {lang === "zh" ? statusDesc.zh : statusDesc.en}
       </p>
-      <div className="mt-3 pt-3 border-t border-border space-y-1.5 text-[11px] text-muted-foreground leading-relaxed">
+      <div className="mt-3 space-y-1.5 border-t border-border pt-3 text-caption leading-relaxed text-muted-foreground">
         {lang === "zh" ? (
           <>
             <p>
-              <span className="font-semibold text-sky-400">體能</span>：你長期累積的耐力底子(過去約6週的訓練量平均)。數字越高代表你越「練得起來」。
+              <span className="font-semibold text-chart-2">體能</span>：你長期累積的耐力底子(過去約6週的訓練量平均)。數字越高代表你越「練得起來」。
             </p>
             <p>
-              <span className="font-semibold text-orange-400">疲勞</span>：你身體最近的累積壓力(過去約一週的訓練量)。數字越高代表你越累。
+              <span className="font-semibold text-chart-3">疲勞</span>：你身體最近的累積壓力(過去約一週的訓練量)。數字越高代表你越累。
             </p>
             <p>
-              <span className="font-semibold text-rose-400">狀態</span>：體能減去疲勞。正值=狀態好、適合比賽;負值=疲勞中、需要恢復。
+              <span className="font-semibold text-chart-1">狀態</span>：體能減去疲勞。正值=狀態好、適合比賽;負值=疲勞中、需要恢復。
             </p>
           </>
         ) : (
           <>
             <p>
-              <span className="font-semibold text-sky-400">Fitness</span>: your long-term endurance base — how much training you've absorbed over the past ~6 weeks. Higher = stronger aerobic engine.
+              <span className="font-semibold text-chart-2">Fitness</span>: your long-term endurance base — how much training you've absorbed over the past ~6 weeks. Higher = stronger aerobic engine.
             </p>
             <p>
-              <span className="font-semibold text-orange-400">Fatigue</span>: how tired your body is right now from recent training (past ~1 week). Higher = more accumulated stress.
+              <span className="font-semibold text-chart-3">Fatigue</span>: how tired your body is right now from recent training (past ~1 week). Higher = more accumulated stress.
             </p>
             <p>
-              <span className="font-semibold text-rose-400">Form</span>: fitness minus fatigue. Positive = fresh and race-ready; negative = fatigued and needing recovery.
+              <span className="font-semibold text-chart-1">Form</span>: fitness minus fatigue. Positive = fresh and race-ready; negative = fatigued and needing recovery.
             </p>
           </>
         )}
       </div>
-    </div>
+    </SurfaceCard>
   );
 };
 

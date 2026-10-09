@@ -1,4 +1,5 @@
 import { Lang } from "@/lib/i18n";
+import { SurfaceCard } from "@/components/ui/SurfaceCard";
 
 interface SectionScore {
   score: number;
@@ -25,16 +26,19 @@ interface Props {
   lang: Lang;
 }
 
+/* Token-backed. Previously bg-green-50 / bg-yellow-50 / bg-red-50 with
+   text-green-600 / text-yellow-600 / text-red-500 and no dark variants, so
+   the hero rendered as a pale light-mode block on a 7%-lightness page. */
 function scoreColor(score: number): string {
-  if (score >= 80) return "text-green-600";
-  if (score >= 60) return "text-yellow-600";
-  return "text-red-500";
+  if (score >= 80) return "text-success";
+  if (score >= 60) return "text-warning";
+  return "text-destructive";
 }
 
-function scoreBg(score: number): string {
-  if (score >= 80) return "bg-green-50 border-green-200";
-  if (score >= 60) return "bg-yellow-50 border-yellow-200";
-  return "bg-red-50 border-red-200";
+function scoreSurface(score: number): string {
+  if (score >= 80) return "border-success/30 bg-success/10";
+  if (score >= 60) return "border-warning/30 bg-warning/10";
+  return "border-destructive/30 bg-destructive/10";
 }
 
 const PostureScoreCard = ({ overallScore, sections, averages, lang }: Props) => {
@@ -53,36 +57,42 @@ const PostureScoreCard = ({ overallScore, sections, averages, lang }: Props) => 
   return (
     <div className="space-y-4">
       {/* Overall score hero */}
-      <div className={`flex items-center justify-center flex-col rounded-2xl border-2 p-6 ${scoreBg(overallScore)}`}>
-        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">{labels.overall}</p>
-        <p className={`text-5xl font-display font-bold ${scoreColor(overallScore)}`}>{overallScore}</p>
-        <p className="text-xs text-muted-foreground mt-1">/100</p>
+      <div className={`flex flex-col items-center justify-center rounded-2xl border p-6 ${scoreSurface(overallScore)}`}>
+        <p className="mb-1 text-caption font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+          {labels.overall}
+        </p>
+        <p className={`tnum font-display text-num-hero font-bold ${scoreColor(overallScore)}`}>
+          {overallScore}
+        </p>
+        <p className="mt-1 text-caption text-muted-foreground">/100</p>
       </div>
 
       {/* Section scores table */}
-      <div className="bg-card border border-border rounded-xl overflow-hidden">
-        <div className="grid grid-cols-[1fr_auto_auto] gap-x-3 px-4 py-2 bg-muted/50 text-xs font-medium text-muted-foreground">
+      <SurfaceCard bare className="overflow-hidden">
+        <div className="grid grid-cols-[1fr_auto_auto] gap-x-3 bg-surface-2 px-4 py-2 text-caption font-semibold uppercase tracking-[0.08em] text-muted-foreground">
           <span>{labels.section}</span>
-          <span className="text-center w-12">{labels.you}</span>
-          {averages && <span className="text-center w-12">{labels.avg}</span>}
+          <span className="w-12 text-center">{labels.you}</span>
+          {averages && <span className="w-12 text-center">{labels.avg}</span>}
         </div>
         {sectionEntries.map(({ key, label, avgKey }) => (
-          <div key={key} className="grid grid-cols-[1fr_auto_auto] gap-x-3 px-4 py-3 border-t border-border items-start">
+          <div key={key} className="grid grid-cols-[1fr_auto_auto] items-start gap-x-3 border-t border-border px-4 py-3">
             <div>
-              <p className="text-sm font-medium text-foreground">{label}</p>
-              <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{sections[key].feedback}</p>
+              <p className="text-label font-semibold text-foreground">{label}</p>
+              <p className="mt-0.5 text-caption leading-relaxed text-muted-foreground">
+                {sections[key].feedback}
+              </p>
             </div>
-            <span className={`text-sm font-bold text-center w-12 ${scoreColor(sections[key].score)}`}>
+            <span className={`tnum w-12 text-center text-label font-bold ${scoreColor(sections[key].score)}`}>
               {sections[key].score}
             </span>
             {averages && (
-              <span className="text-sm text-muted-foreground text-center w-12">
+              <span className="tnum w-12 text-center text-label text-muted-foreground">
                 {averages[avgKey]}
               </span>
             )}
           </div>
         ))}
-      </div>
+      </SurfaceCard>
     </div>
   );
 };

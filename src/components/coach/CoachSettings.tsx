@@ -203,7 +203,7 @@ const CoachSettings = ({ open, onOpenChange, prefs, insights, onSave, onResetMem
                     <span className="text-primary">•</span>
                     <span>
                       <span className="text-foreground font-medium">
-                        {i.insight_key.replace(/_/g, " ")}:
+                        {i.insight_key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}:
                       </span>{" "}
                       {i.insight_value}
                     </span>

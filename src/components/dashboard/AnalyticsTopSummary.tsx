@@ -61,7 +61,7 @@ function pctDelta(curr: number, prev: number) {
 function deltaColor(pct: number, higherIsBetter: boolean) {
   if (Math.abs(pct) < 1) return "text-muted-foreground";
   const good = higherIsBetter ? pct > 0 : pct < 0;
-  return good ? "text-emerald-600" : "text-rose-500";
+  return good ? "text-success" : "text-destructive";
 }
 
 /* ---------- main ---------- */
@@ -316,7 +316,7 @@ export default function AnalyticsTopSummary({ lang }: Props) {
   return (
     <div className="space-y-3 mb-6">
       {/* ---------- Row 1: KPI strip ---------- */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-0 rounded-xl border border-border bg-card overflow-hidden">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-0 rounded-xl border border-border bg-card overflow-hidden shadow-card">
         <KpiCell
           label={zhT("Fitness · CTL", "體能 · CTL", lang)}
           value={ctl.toFixed(0)}
@@ -343,11 +343,6 @@ export default function AnalyticsTopSummary({ lang }: Props) {
           value={fmtHours(volSec7)}
           sub={`${sessions7} ${zhT("sessions", "次", lang)}`}
         />
-        <KpiCell
-          label={zhT("Weight", "體重", lang)}
-          value="—"
-          sub={zhT("latest reading", "最新讀數", lang)}
-        />
       </div>
 
       {/* ---------- Row 2: Readiness / Injury / Load balance ---------- */}
@@ -359,12 +354,12 @@ export default function AnalyticsTopSummary({ lang }: Props) {
             infoText={tInfo("readiness", lang)}
           >
             <span
-              className={`text-[10px] font-semibold tracking-wider px-2 py-0.5 rounded ${
+              className={`rounded px-2 py-0.5 text-caption font-semibold tracking-wider ${
                 trainingReadiness.band === "primed" || trainingReadiness.band === "balanced"
-                  ? "bg-emerald-100 text-emerald-700"
+                  ? "bg-success/15 text-success"
                   : trainingReadiness.band === "moderate"
-                    ? "bg-amber-100 text-amber-700"
-                    : "bg-rose-100 text-rose-700"
+                    ? "bg-warning/15 text-warning"
+                    : "bg-destructive/15 text-destructive"
               }`}
             >
               {trainingReadiness.band === "primed"

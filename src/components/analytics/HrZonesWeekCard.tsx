@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
-import { Heart, Lock, Sparkles } from "lucide-react";
+import { Heart } from "lucide-react";
 import { Lang } from "@/lib/i18n";
 import { useActivities } from "@/hooks/use-activities";
 import { usePremium } from "@/contexts/PremiumContext";
 import { supabase } from "@/integrations/supabase/client";
-import { combineZonePct, estimateMaxHr, estimateRestingHr, ZonePct, ZONE_LABELS } from "@/lib/hrZones";
+import { combineZonePct, estimateMaxHr, estimateRestingHr, ZonePct } from "@/lib/hrZones";
+import { SurfaceCard } from "@/components/ui/SurfaceCard";
+import { ZoneBars } from "@/components/ui/ZoneBars";
 
 interface Props {
   lang: Lang;
@@ -100,62 +102,35 @@ const HrZonesWeekCard = ({ lang }: Props) => {
   }
 
   return (
-    <div className="bg-white rounded-2xl p-5 shadow-[0_4px_20px_-8px_rgba(15,23,42,0.15)] ring-1 ring-slate-200/70 mb-4">
-      <div className="flex items-center gap-2 mb-3">
-        <Heart size={16} className="text-destructive" />
-        <h3 className="font-display font-bold text-slate-900 text-sm">
+    <SurfaceCard className="mb-4">
+      <div className="mb-3 flex items-center gap-2">
+        <Heart size={16} className="text-hr" />
+        <h3 className="font-display text-h3 font-semibold text-card-foreground">
           {lang === "zh" ? "本週心率區間" : "Weekly HR Zones"}
         </h3>
       </div>
 
       {loading ? (
         <div className="flex items-center justify-center py-6">
-          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary" />
+          <div className="h-5 w-5 animate-spin rounded-full border-b-2 border-primary" />
         </div>
-      ) : !zones ? (
-        <p className="text-xs text-slate-500 py-4 text-center">
-          {lang === "zh"
-            ? "過去 7 天沒有可用的心率資料。"
-            : "No heart rate data available for the past 7 days."}
-        </p>
       ) : (
         <>
-          <p className="text-[11px] text-slate-500 mb-3">
-            {profileCustomZones && profileCustomZones.length === 5
-              ? (lang === "zh"
-                  ? `自訂心率區間 · 基於 ${activityCount} 次活動`
-                  : `Custom HR zones · ${activityCount} activities`)
-              : (lang === "zh"
-                  ? `基於 ${activityCount} 次活動 · 最大 ${estimateMaxHr(age, profileMaxHr)} / 靜息 ${estimateRestingHr(profileRestingHr)} bpm`
-                  : `${activityCount} activities · max ${estimateMaxHr(age, profileMaxHr)} / rest ${estimateRestingHr(profileRestingHr)} bpm`)}
-          </p>
-          <div className="space-y-2">
-            {ZONE_LABELS.map((z) => {
-              const pct = zones[z.key];
-              return (
-                <div key={z.key} className="flex items-center gap-3">
-                  <div className="w-20 text-[11px] font-semibold text-slate-700 shrink-0">
-                    {lang === "zh" ? z.labelZh : z.label}
-                  </div>
-                  <div className="flex-1 h-4 rounded-full bg-slate-100 overflow-hidden">
-                    <div
-                      className="h-full rounded-full transition-all"
-                      style={{
-                        width: `${Math.max(pct, pct > 0 ? 2 : 0)}%`,
-                        backgroundColor: z.color,
-                      }}
-                    />
-                  </div>
-                  <div className="w-10 text-right text-[11px] font-mono font-semibold text-slate-700 tabular-nums">
-                    {pct.toFixed(0)}%
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+          {zones ? (
+            <p className="mb-3 text-caption text-muted-foreground">
+              {profileCustomZones && profileCustomZones.length === 5
+                ? (lang === "zh"
+                    ? `自訂心率區間 · 基於 ${activityCount} 次活動`
+                    : `Custom HR zones · ${activityCount} activities`)
+                : (lang === "zh"
+                    ? `基於 ${activityCount} 次活動 · 最大 ${estimateMaxHr(age, profileMaxHr)} / 靜息 ${estimateRestingHr(profileRestingHr)} bpm`
+                    : `${activityCount} activities · max ${estimateMaxHr(age, profileMaxHr)} / rest ${estimateRestingHr(profileRestingHr)} bpm`)}
+            </p>
+          ) : null}
+          <ZoneBars zones={zones} variant="hr" lang={lang} />
         </>
       )}
-    </div>
+    </SurfaceCard>
   );
 };
 

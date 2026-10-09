@@ -682,7 +682,7 @@ const ConnectApps = ({ lang, onBack }: Props) => {
                     disabled={!!suuntoBusy || suuntoDisabledByOther}
                     className={`text-xs font-medium px-3 py-1 rounded-full ${suuntoDisabledByOther ? "bg-muted text-muted-foreground cursor-not-allowed" : "text-primary-foreground bg-primary"} disabled:opacity-50`}
                   >
-                    {suuntoBusy === "connect" ? "..." : (lang === "zh" ? "連結" : "Connect")}
+                    {suuntoBusy === "connect" ? (lang === "zh" ? "連結中…" : "Connecting…") : (lang === "zh" ? "連結" : "Connect")}
                   </button>
                 )}
               </div>
@@ -801,7 +801,7 @@ const ConnectApps = ({ lang, onBack }: Props) => {
                     : "bg-primary text-primary-foreground disabled:opacity-50"
                 }`}
               >
-                {intervalsBusy === "connect" ? "..." : (lang === "zh" ? "連結" : "Connect")}
+                {intervalsBusy === "connect" ? (lang === "zh" ? "連結中…" : "Connecting…") : (lang === "zh" ? "連結" : "Connect")}
               </button>
             )}
           </div>

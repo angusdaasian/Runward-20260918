@@ -201,9 +201,10 @@ const PromoBanner = ({ lang, userId, forceShow = false, triggerKey = 0, onClose 
               const inner = (
                 <div className="w-full h-full shrink-0 bg-card flex items-center justify-center">
                   {failed ? (
-                    <div className="w-full aspect-[4/5] flex flex-col items-center justify-center text-muted-foreground p-6 text-center">
-                      <span className="text-sm">Image failed to load</span>
-                      <span className="text-[10px] mt-1 break-all opacity-60">{b.image_url}</span>
+                    <div className="flex aspect-[4/5] w-full flex-col items-center justify-center p-6 text-center text-muted-foreground">
+                      <span className="text-label">
+                        {lang === "zh" ? "推廣內容暫時無法顯示" : "This promotion isn't available right now"}
+                      </span>
                     </div>
                   ) : (
                     <img

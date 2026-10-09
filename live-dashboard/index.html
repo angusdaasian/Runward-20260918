@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex" />
+<title>RunWard · Live Data</title>
+<style>
+  :root { --bg:#0d1117; --card:#161b22; --line:#30363d; --fg:#e6edf3; --mut:#8b949e; --ok:#3fb950; --bad:#f85149; --acc:#58a6ff; --warn:#d29922; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:14px/1.45 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif; background:var(--bg); color:var(--fg); }
+  header { display:flex; align-items:center; gap:12px; padding:14px 24px; border-bottom:1px solid var(--line); position:sticky; top:0; background:var(--bg); z-index:2; }
+  h1 { font-size:16px; margin:0; }
+  .dot { width:10px; height:10px; border-radius:50%; background:var(--mut); }
+  .dot.live { background:var(--ok); box-shadow:0 0 0 0 var(--ok); animation:pulse 2s infinite; }
+  .dot.err { background:var(--bad); }
+  @keyframes pulse { 0%{box-shadow:0 0 0 0 rgba(63,185,80,.6)} 70%{box-shadow:0 0 0 8px rgba(63,185,80,0)} 100%{box-shadow:0 0 0 0 rgba(63,185,80,0)} }
+  .mut { color:var(--mut); }
+  main { display:grid; grid-template-columns: 380px 1fr; gap:20px; padding:20px 24px; }
+  @media (max-width:1000px){ main{grid-template-columns:1fr} }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:14px; }
+  .sum { display:grid; gap:10px; }
+  .sum .card h3 { margin:0 0 6px; font-size:14px; display:flex; justify-content:space-between; }
+  .badge { font-size:11px; padding:2px 8px; border-radius:99px; border:1px solid var(--line); color:var(--mut); }
+  .badge.fresh { color:var(--ok); border-color:var(--ok); }
+  .badge.stale { color:var(--warn); border-color:var(--warn); }
+  .w { display:flex; justify-content:space-between; font-size:12px; color:var(--mut); }
+  .filters { display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap; }
+  .filters button { background:transparent; color:var(--mut); border:1px solid var(--line); border-radius:99px; padding:4px 12px; cursor:pointer; }
+  .filters button.on { color:var(--fg); border-color:var(--acc); }
+  .stats { display:flex; gap:24px; margin-bottom:12px; }
+  .stats b { font-size:22px; display:block; }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th, td { text-align:left; padding:7px 8px; border-bottom:1px solid var(--line); vertical-align:top; }
+  th { color:var(--mut); font-weight:500; position:sticky; top:57px; background:var(--card); }
+  tr.new { animation:flash 2.5s ease-out; }
+  @keyframes flash { from { background:rgba(88,166,255,.25);} to { background:transparent; } }
+  .k { font-size:11px; padding:1px 7px; border-radius:4px; background:#21262d; }
+  .k.webhook { color:var(--acc); } .k.activity { color:var(--ok); } .k.daily { color:var(--warn); }
+  .bad { color:var(--bad); }
+  form { max-width:340px; margin:12vh auto; display:grid; gap:10px; }
+  input { background:var(--card); border:1px solid var(--line); color:var(--fg); padding:10px; border-radius:8px; font-size:14px; }
+  .btn { background:var(--acc); color:#0d1117; border:0; padding:10px; border-radius:8px; font-weight:600; cursor:pointer; }
+  .link { background:none; border:0; color:var(--mut); cursor:pointer; margin-left:auto; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script type="module">
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+const sb = createClient("https://kbghvclwhxnjeskdodeh.supabase.co",
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtiZ2h2Y2x3aHhuamVza2RvZGVoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUzNTE0MDQsImV4cCI6MjA5MDkyNzQwNH0.ymRqbqpdRssDmDI_zCWsKNFKAOQGfns76JnSmTsIaBM");
+
+const NAMES = { stridee:"Stridee", terra:"Terra", railway:"Railway (Garmin)", strava:"Strava", suunto:"Suunto", intervals:"Intervals.icu", apple:"Apple Watch", polar:"Polar", watch:"Watch daily" };
+const app = document.getElementById("app");
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" }[c]));
+const ago = (s) => { if (!s) return "never"; const m = Math.round((Date.now()-new Date(s))/60000); return m<1?"just now":m<60?`${m}m ago`:m<2880?`${Math.round(m/60)}h ago`:`${Math.round(m/1440)}d ago`; };
+const time = (s) => new Date(s).toLocaleTimeString([], { hour:"2-digit", minute:"2-digit", second:"2-digit" });
+
+let events = [], seen = new Set(), cursor = null, filter = "all", summary = [], status = "", timers = [];
+
+function login(msg = "") {
+  timers.forEach(clearInterval); timers = [];
+  app.innerHTML = `<form id="f"><h1>RunWard · Live Data</h1><p class="mut">Admin sign-in</p>
+    <input id="e" type="email" placeholder="Email" required><input id="p" type="password" placeholder="Password" required>
+    <button class="btn">Sign in</button><p class="bad">${esc(msg)}</p></form>`;
+  document.getElementById("f").onsubmit = async (ev) => {
+    ev.preventDefault();
+    const { error } = await sb.auth.signInWithPassword({ email: e.value, password: p.value });
+    error ? login(error.message) : start();
+  };
+}
+
+async function poll() {
+  const { data, error } = await sb.functions.invoke("admin-live-feed", { body: { since: cursor } });
+  if (error || data?.error) { status = "err"; render(); if (String(data?.error ?? "").includes("Admin")) login("This account is not an admin."); return; }
+  status = "live"; cursor = data.now;
+  const fresh = data.events.filter((x) => !seen.has(x.id));
+  fresh.forEach((x) => { seen.add(x.id); x._new = events.length > 0; });
+  events = [...fresh, ...events].sort((a,b) => b.at.localeCompare(a.at)).slice(0, 500);
+  if (fresh.length && document.hidden) document.title = `(${fresh.length}) RunWard · Live Data`;
+  render();
+}
+async function loadSummary() {
+  const { data } = await sb.functions.invoke("admin-data-status", { body: { limit: 50 } });
+  if (data?.summary) { summary = data.summary; render(); }
+}
+document.addEventListener("visibilitychange", () => { if (!document.hidden) document.title = "RunWard · Live Data"; });
+
+function render() {
+  const lastHour = events.filter((x) => Date.now() - new Date(x.at) < 3600_000);
+  const shown = events.filter((x) => filter === "all" || x.kind === filter || x.source === filter);
+  const sumHtml = summary.map((s) => {
+    const last = [s.last_activity, s.last_daily].filter(Boolean).sort().pop();
+    const freshCls = last && Date.now()-new Date(last) < 3*3600_000 ? "fresh" : "stale";
+    return `<div class="card"><h3>${esc(NAMES[s.source] ?? s.source)}<span class="badge ${freshCls}">${ago(last)}</span></h3>
+      <div class="w"><span>Activities ${s.activities}</span><span>Daily ${s.daily}</span></div>
+      ${(s.watches||[]).map((w) => `<div class="w"><span>${esc(w.watch)}</span><span>${w.activities} act · ${w.daily} daily · ${ago(w.last_activity)}</span></div>`).join("")}</div>`;
+  }).join("") || `<p class="mut">Loading totals…</p>`;
+  const f = ["all","webhook","activity","daily","stridee","terra","railway","strava","suunto","intervals","apple","polar"];
+  app.innerHTML = `<header><span class="dot ${status}"></span><h1>RunWard · Live Data</h1>
+    <span class="mut">${status === "live" ? "Live · updates every 5 s" : status === "err" ? "Connection problem, retrying…" : "Connecting…"}</span>
+    <button class="link" id="out">Sign out</button></header>
+    <main><section class="sum">${sumHtml}</section>
+    <section class="card">
+      <div class="stats"><div><b>${lastHour.length}</b><span class="mut">items last hour</span></div>
+        <div><b>${lastHour.filter((x)=>x.kind==="webhook").length}</b><span class="mut">webhooks last hour</span></div>
+        <div><b class="${lastHour.some((x)=>!x.ok)?"bad":""}">${lastHour.filter((x)=>!x.ok).length}</b><span class="mut">errors last hour</span></div></div>
+      <div class="filters">${f.map((k) => `<button data-f="${k}" class="${filter===k?"on":""}">${k === "all" ? "All" : NAMES[k] ?? k[0].toUpperCase()+k.slice(1)}</button>`).join("")}</div>
+      <table><thead><tr><th>Time</th><th>Type</th><th>Provider</th><th>Watch</th><th>User</th><th>Details</th></tr></thead><tbody>
+      ${shown.map((x) => `<tr class="${x._new?"new":""}"><td class="mut">${time(x.at)}<br><small>${ago(x.at)}</small></td>
+        <td><span class="k ${x.kind}">${x.kind}</span></td><td>${esc(NAMES[x.source] ?? x.source)}</td><td>${esc(x.watch ?? "—")}</td>
+        <td>${esc(x.user_name || (x.user_id ? x.user_id.slice(0,8) : "—"))}</td>
+        <td><b>${esc(x.title)}</b> <span class="mut">${esc(x.detail)}</span>${x.error ? `<div class="bad">${esc(x.error)}</div>` : ""}</td></tr>`).join("")
+        || `<tr><td colspan="6" class="mut">Nothing received in the last 6 hours yet — new data will appear here automatically.</td></tr>`}
+      </tbody></table></section></main>`;
+  events.forEach((x) => (x._new = false));
+  document.getElementById("out").onclick = async () => { await sb.auth.signOut(); login(); };
+  app.querySelectorAll("[data-f]").forEach((b) => (b.onclick = () => { filter = b.dataset.f; render(); }));
+}
+
+function start() {
+  render(); poll(); loadSummary();
+  timers.push(setInterval(poll, 5000), setInterval(loadSummary, 60000), setInterval(render, 30000));
+}
+const { data: { session } } = await sb.auth.getSession();
+session ? start() : login();
+</script>
+</body>
+</html>

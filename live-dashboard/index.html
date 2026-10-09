@@ -82,7 +82,7 @@ async function isAdmin() {
 
 async function poll() {
   const { data, error } = await sb.functions.invoke("admin-live-feed", { body: { since: cursor } });
-  if (error || data?.error) { status = "err"; render(); if (String(data?.error ?? "").includes("Admin")) login("This account is not an admin."); return; }
+  if (error || data?.error) { status = "err"; render(); if (String(data?.error ?? "").includes("Admin")) { await sb.auth.signOut(); login("This account is not an admin."); } return; }
   status = "live"; cursor = data.now;
   const fresh = data.events.filter((x) => !seen.has(x.id));
   fresh.forEach((x) => { seen.add(x.id); x._new = events.length > 0; });

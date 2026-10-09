@@ -162,12 +162,16 @@ function render() {
   app.querySelectorAll("[data-f]").forEach((b) => (b.onclick = () => { filter = b.dataset.f; render(); }));
 }
 
-function start() {
+function start(initial) {
+  cursor = initial.now;
+  events = (initial.events ?? []).slice(0, 500);
+  events.forEach((x) => seen.add(x.id));
   render(); poll(); loadSummary();
   timers.push(setInterval(poll, 5000), setInterval(loadSummary, 60000), setInterval(render, 30000));
 }
 const { data: { session } } = await sb.auth.getSession();
-if (session && await isAdmin()) start();
+const initial = session ? await isAdmin() : null;
+if (initial) start(initial);
 else { if (session) await sb.auth.signOut(); login(session ? "This account is not an admin." : ""); }
 </script>
 </body>

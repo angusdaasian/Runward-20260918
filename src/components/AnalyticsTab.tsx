@@ -25,6 +25,7 @@ import TrendsCard from "@/components/activities/TrendsCard";
 import ActivityYearHeatmap from "@/components/activities/ActivityYearHeatmap";
 import { useTerraDailyHealth } from "@/hooks/use-terra-daily-health";
 import PaceZonesCard from "@/components/analytics/PaceZonesCard";
+import MobileKpiStrip from "@/components/analytics/MobileKpiStrip";
 
 const PostureTab = lazy(() => import("@/components/PostureTab"));
 const PerformanceTab = lazy(() => import("@/components/PerformanceTab"));
@@ -200,6 +201,7 @@ const AnalyticsTab = ({ lang }: Props) => {
 
       <div style={{ display: sub === "performance" ? "block" : "none" }}>
         <div className="px-4 pt-4 pb-8 max-w-lg mx-auto">
+          <MobileKpiStrip lang={lang} />
           {!prefsLoaded ? (
             <div className="flex justify-center py-12">
               <Loader2 className="animate-spin text-muted-foreground" size={20} />

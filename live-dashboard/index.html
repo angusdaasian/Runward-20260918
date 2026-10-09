@@ -133,7 +133,8 @@ function start() {
   timers.push(setInterval(poll, 5000), setInterval(loadSummary, 60000), setInterval(render, 30000));
 }
 const { data: { session } } = await sb.auth.getSession();
-session ? start() : login();
+if (session && await isAdmin()) start();
+else { if (session) await sb.auth.signOut(); login(session ? "This account is not an admin." : ""); }
 </script>
 </body>
 </html>

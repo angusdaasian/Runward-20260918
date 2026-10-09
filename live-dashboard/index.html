@@ -61,6 +61,8 @@
   .k.daily { color:var(--warn); background:var(--warn-soft); }
   .bad { color:var(--bad); }
   .empty { padding:48px 20px; text-align:center; }
+  .card.conn { background:linear-gradient(180deg,#f7fbff,#ffffff); border-color:#d9e7fb; }
+  .card.conn .badge.fresh { color:var(--acc); background:var(--acc-soft); }
   form { max-width:360px; margin:14vh auto; display:grid; gap:12px; background:var(--card); border:1px solid var(--line); border-radius:16px; padding:32px 28px; box-shadow:var(--shadow-lift); }
   form h1 { font-size:18px; }
   form .sub { margin:-4px 0 8px; }
@@ -85,7 +87,7 @@ const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&":"&#38;","<":
 const ago = (s) => { if (!s) return "never"; const m = Math.round((Date.now()-new Date(s))/60000); return m<1?"just now":m<60?`${m}m ago`:m<2880?`${Math.round(m/60)}h ago`:`${Math.round(m/1440)}d ago`; };
 const time = (s) => new Date(s).toLocaleTimeString([], { hour:"2-digit", minute:"2-digit", second:"2-digit" });
 
-let events = [], seen = new Set(), cursor = null, filter = "all", summary = [], status = "", timers = [];
+let events = [], seen = new Set(), cursor = null, filter = "all", summary = [], status = "", timers = [], connections = {}, connUsers = 0;
 
 function login(msg = "") {
   timers.forEach(clearInterval); timers = [];
@@ -96,16 +98,16 @@ function login(msg = "") {
     ev.preventDefault();
     const { error } = await sb.auth.signInWithPassword({ email: e.value, password: p.value });
     if (error) return login(error.message);
-    if (await isAdmin()) start();
+    const d = await isAdmin();
+    if (d) start(d);
     else { await sb.auth.signOut(); login("This account is not an admin."); }
   };
 }
 
 async function isAdmin() {
   const { data, error } = await sb.functions.invoke("admin-live-feed", { body: { since: null } });
-  if (error || data?.error) return false;
-  cursor = data.now;
-  return true;
+  if (error || data?.error) return null;
+  return data;
 }
 
 async function poll() {
@@ -120,18 +122,24 @@ async function poll() {
 }
 async function loadSummary() {
   const { data } = await sb.functions.invoke("admin-data-status", { body: { limit: 50 } });
-  if (data?.summary) { summary = data.summary; render(); }
+  if (data?.summary) { summary = data.summary; connections = data.connections ?? {}; connUsers = data.connection_users ?? 0; render(); }
 }
 document.addEventListener("visibilitychange", () => { if (!document.hidden) document.title = "RunWard · Live Data"; });
 
 function render() {
   const lastHour = events.filter((x) => Date.now() - new Date(x.at) < 3600_000);
   const shown = events.filter((x) => filter === "all" || x.kind === filter || x.source === filter);
+  const connText = (src) => { const c = connections[src]; if (!c) return "—"; return c.total !== c.live ? `${c.live} <span class="mut">/ ${c.total}</span>` : `${c.live}`; };
+  const connOrder = Object.keys(connections).sort((a, b) => (connections[b]?.live ?? 0) - (connections[a]?.live ?? 0));
+  const connTotal = connOrder.reduce((n, k) => n + (connections[k]?.live ?? 0), 0);
+  const connCard = connOrder.length ? `<div class="card conn"><h3>Connections<span class="badge fresh">${connTotal} live · ${connUsers} users</span></h3>
+    ${connOrder.map((k) => `<div class="w"><span>${esc(NAMES[k] ?? k)}</span><b>${connText(k)}</b></div>`).join("")}</div>` : "";
   const sumHtml = summary.map((s) => {
     const last = [s.last_activity, s.last_daily].filter(Boolean).sort().pop();
     const freshCls = last && Date.now()-new Date(last) < 3*3600_000 ? "fresh" : "stale";
     const watches = (s.watches||[]);
     return `<div class="card"><h3>${esc(NAMES[s.source] ?? s.source)}<span class="badge ${freshCls}">${ago(last)}</span></h3>
+      <div class="w"><span>Connections</span><b>${connText(s.source)}</b></div>
       <div class="w"><span>Activities</span><b>${s.activities}</b></div>
       <div class="w"><span>Daily health</span><b>${s.daily}</b></div>
       ${watches.length ? `<div class="watches">${watches.map((w) => `<div class="w"><span>${esc(w.watch)}</span><span>${w.activities} act · ${w.daily} daily · ${ago(w.last_activity)}</span></div>`).join("")}</div>` : ""}</div>`;
@@ -140,7 +148,7 @@ function render() {
   app.innerHTML = `<header><span class="mark">R</span><h1>RunWard · Live Data</h1>
     <span class="dot ${status}"></span><span class="mut status-label">${status === "live" ? "Live · updates every 5 s" : status === "err" ? "Connection problem, retrying…" : "Connecting…"}</span>
     <button class="link" id="out">Sign out</button></header>
-    <main><section class="sum">${sumHtml}</section>
+    <main><section class="sum">${connCard}${sumHtml}</section>
     <section class="card panel">
       <div class="panel-inner">
         <div class="stats">
@@ -162,12 +170,16 @@ function render() {
   app.querySelectorAll("[data-f]").forEach((b) => (b.onclick = () => { filter = b.dataset.f; render(); }));
 }
 
-function start() {
+function start(initial) {
+  cursor = initial.now;
+  events = (initial.events ?? []).slice(0, 500);
+  events.forEach((x) => seen.add(x.id));
   render(); poll(); loadSummary();
   timers.push(setInterval(poll, 5000), setInterval(loadSummary, 60000), setInterval(render, 30000));
 }
 const { data: { session } } = await sb.auth.getSession();
-if (session && await isAdmin()) start();
+const initial = session ? await isAdmin() : null;
+if (initial) start(initial);
 else { if (session) await sb.auth.signOut(); login(session ? "This account is not an admin." : ""); }
 </script>
 </body>

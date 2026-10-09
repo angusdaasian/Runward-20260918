@@ -94,6 +94,25 @@ Deno.serve(async (req) => {
     await single("apple", "apple_health_activities");
     await single("polar", "polar_activities");
 
+    // Live connection counts per provider, for the dashboard reference panel.
+    const connTables: [string, string][] = [
+      ["stridee", "stridee_connections"], ["terra", "terra_connections"], ["railway", "garmin_connections"],
+      ["strava", "strava_connections"], ["suunto", "suunto_connections"], ["intervals", "intervals_connections"],
+      ["apple", "apple_health_connections"], ["polar", "polar_connections"],
+    ];
+    const connections: Record<string, { total: number; live: number }> = {};
+    const connUsers = new Set<string>();
+    for (const [src, table] of connTables) {
+      const { data } = await db.from(table).select("user_id");
+      const rows = data ?? [];
+      for (const r of rows) connUsers.add(r.user_id);
+      let live = rows.length;
+      if (src === "stridee") live = (await db.from(table).select("user_id", { count: "exact", head: true }).eq("status", "connected")).count ?? 0;
+      if (src === "terra") live = (await db.from(table).select("user_id", { count: "exact", head: true }).eq("active", true)).count ?? 0;
+      connections[src] = { total: rows.length, live };
+    }
+    for (const s of summary) s.connections = connections[s.source] ?? { total: 0, live: 0 };
+
     // Recent rows
     const rows: Row[] = [];
     const wantA = kind !== "daily", wantD = kind !== "activity";
@@ -180,7 +199,7 @@ Deno.serve(async (req) => {
       const { data } = await db.from("profiles").select("user_id,display_name").in("user_id", ids);
       for (const p of data ?? []) names[p.user_id] = p.display_name;
     }
-    return json({ summary, rows: trimmed.map((r) => ({ ...r, user_name: names[r.user_id] ?? null })) });
+    return json({ summary, connections, connection_users: connUsers.size, rows: trimmed.map((r) => ({ ...r, user_name: names[r.user_id] ?? null })) });
   } catch (e) {
     console.error("[admin-data-status]", e);
     return json({ error: String((e as Error).message ?? e) }, 500);

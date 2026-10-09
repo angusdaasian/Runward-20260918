@@ -2,7 +2,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 
-const SEND_AFTER = "2026-10-08T16:00:00Z"; // 00:00 HKT, 9 Oct
+const SEND_AFTER = "2026-10-09T04:00:00Z"; // 12:00 HKT, 9 Oct
 const TITLE = "請重新連接你的手錶";
 const MESSAGE = "為確保你的跑步紀錄繼續自動同步，請前往 RunWard 重新連接你的手錶（Garmin、COROS、Suunto 等）。只需一分鐘即可完成！";
 

@@ -96,16 +96,16 @@ function login(msg = "") {
     ev.preventDefault();
     const { error } = await sb.auth.signInWithPassword({ email: e.value, password: p.value });
     if (error) return login(error.message);
-    if (await isAdmin()) start();
+    const d = await isAdmin();
+    if (d) start(d);
     else { await sb.auth.signOut(); login("This account is not an admin."); }
   };
 }
 
 async function isAdmin() {
   const { data, error } = await sb.functions.invoke("admin-live-feed", { body: { since: null } });
-  if (error || data?.error) return false;
-  cursor = data.now;
-  return true;
+  if (error || data?.error) return null;
+  return data;
 }
 
 async function poll() {

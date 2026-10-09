@@ -17,6 +17,7 @@ import {
   type LoadStatusKey,
 } from "@/lib/trainingLoad";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
+import { SectionHeader } from "@/components/ui/SectionHeader";
 import { DeltaChip } from "@/components/ui/DeltaChip";
 
 interface Props {
@@ -106,9 +107,11 @@ const TrainingLoadChart = ({ lang, activities, profileAge }: Props) => {
   if (!hasData) {
     return (
       <SurfaceCard className="mb-5">
-        <h3 className="mb-2 text-caption font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-          {lang === "zh" ? "訓練負荷" : "Training Load"}
-        </h3>
+        <SectionHeader
+          variant="eyebrow"
+          className="mb-2"
+          title={lang === "zh" ? "訓練負荷" : "Training Load"}
+        />
         <p className="py-8 text-center text-label text-muted-foreground">
           {lang === "zh"
             ? "需要更多含心率的活動才能計算訓練負荷曲線"
@@ -121,28 +124,30 @@ const TrainingLoadChart = ({ lang, activities, profileAge }: Props) => {
   return (
     <SurfaceCard className="mb-5">
       {/* Header */}
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <h3 className="text-caption font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-          {lang === "zh" ? "訓練負荷" : "Training Load"}
-        </h3>
-        <div className="flex items-center gap-3 text-caption">
-          <div className="flex items-center gap-1.5">
-            <span className="inline-block h-0.5 w-2.5 bg-chart-2" />
-            <span className="text-muted-foreground">{lang === "zh" ? "體能" : "Fitness"}</span>
-            <span className="tnum font-bold text-foreground">{last.fitness.toFixed(1)}</span>
+      <SectionHeader
+        variant="eyebrow"
+        className="mb-3 flex-wrap"
+        title={lang === "zh" ? "訓練負荷" : "Training Load"}
+        action={
+          <div className="flex items-center gap-3 text-caption">
+            <div className="flex items-center gap-1.5">
+              <span className="inline-block h-0.5 w-2.5 bg-chart-2" />
+              <span className="text-muted-foreground">{lang === "zh" ? "體能" : "Fitness"}</span>
+              <span className="tnum font-bold text-foreground">{last.fitness.toFixed(1)}</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="inline-block h-0.5 w-2.5 bg-chart-3" />
+              <span className="text-muted-foreground">{lang === "zh" ? "疲勞" : "Fatigue"}</span>
+              <span className="tnum font-bold text-foreground">{last.fatigue.toFixed(1)}</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="inline-block h-0.5 w-2.5 bg-chart-1" />
+              <span className="text-muted-foreground">{lang === "zh" ? "狀態" : "Form"}</span>
+              <span className="tnum font-bold text-foreground">{last.form.toFixed(1)}</span>
+            </div>
           </div>
-          <div className="flex items-center gap-1.5">
-            <span className="inline-block h-0.5 w-2.5 bg-chart-3" />
-            <span className="text-muted-foreground">{lang === "zh" ? "疲勞" : "Fatigue"}</span>
-            <span className="tnum font-bold text-foreground">{last.fatigue.toFixed(1)}</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="inline-block h-0.5 w-2.5 bg-chart-1" />
-            <span className="text-muted-foreground">{lang === "zh" ? "狀態" : "Form"}</span>
-            <span className="tnum font-bold text-foreground">{last.form.toFixed(1)}</span>
-          </div>
-        </div>
-      </div>
+        }
+      />
 
       {/* Chart */}
       <div className="h-48">

@@ -6,6 +6,7 @@ import { usePremium } from "@/contexts/PremiumContext";
 import { supabase } from "@/integrations/supabase/client";
 import { combineZonePct, estimateMaxHr, estimateRestingHr, ZonePct } from "@/lib/hrZones";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
+import { SectionHeader } from "@/components/ui/SectionHeader";
 import { ZoneBars } from "@/components/ui/ZoneBars";
 
 interface Props {
@@ -103,32 +104,29 @@ const HrZonesWeekCard = ({ lang }: Props) => {
 
   return (
     <SurfaceCard className="mb-4">
-      <div className="mb-3 flex items-center gap-2">
-        <Heart size={16} className="text-hr" />
-        <h3 className="font-display text-h3 font-semibold text-card-foreground">
-          {lang === "zh" ? "本週心率區間" : "Weekly HR Zones"}
-        </h3>
-      </div>
+      <SectionHeader
+        className="mb-3"
+        icon={Heart}
+        title={lang === "zh" ? "本週心率區間" : "Weekly HR Zones"}
+        subtitle={
+          zones
+            ? profileCustomZones && profileCustomZones.length === 5
+              ? (lang === "zh"
+                  ? `自訂心率區間 · 基於 ${activityCount} 次活動`
+                  : `Custom HR zones · ${activityCount} activities`)
+              : (lang === "zh"
+                  ? `基於 ${activityCount} 次活動 · 最大 ${estimateMaxHr(age, profileMaxHr)} / 靜息 ${estimateRestingHr(profileRestingHr)} bpm`
+                  : `${activityCount} activities · max ${estimateMaxHr(age, profileMaxHr)} / rest ${estimateRestingHr(profileRestingHr)} bpm`)
+            : undefined
+        }
+      />
 
       {loading ? (
         <div className="flex items-center justify-center py-6">
           <div className="h-5 w-5 animate-spin rounded-full border-b-2 border-primary" />
         </div>
       ) : (
-        <>
-          {zones ? (
-            <p className="mb-3 text-caption text-muted-foreground">
-              {profileCustomZones && profileCustomZones.length === 5
-                ? (lang === "zh"
-                    ? `自訂心率區間 · 基於 ${activityCount} 次活動`
-                    : `Custom HR zones · ${activityCount} activities`)
-                : (lang === "zh"
-                    ? `基於 ${activityCount} 次活動 · 最大 ${estimateMaxHr(age, profileMaxHr)} / 靜息 ${estimateRestingHr(profileRestingHr)} bpm`
-                    : `${activityCount} activities · max ${estimateMaxHr(age, profileMaxHr)} / rest ${estimateRestingHr(profileRestingHr)} bpm`)}
-            </p>
-          ) : null}
-          <ZoneBars zones={zones} variant="hr" lang={lang} />
-        </>
+        <ZoneBars zones={zones} variant="hr" lang={lang} />
       )}
     </SurfaceCard>
   );

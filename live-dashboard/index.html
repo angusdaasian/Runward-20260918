@@ -81,7 +81,7 @@ const sb = createClient("https://kbghvclwhxnjeskdodeh.supabase.co",
 
 const NAMES = { stridee:"Stridee", terra:"Terra", railway:"Railway (Garmin)", strava:"Strava", suunto:"Suunto", intervals:"Intervals.icu", apple:"Apple Watch", polar:"Polar", watch:"Watch daily" };
 const app = document.getElementById("app");
-const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&":"&","<":"<",">":">",'"':""" }[c]));
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&":"&#38;","<":"&#60;",">":"&#62;",'"':"&#34;" }[c]));
 const ago = (s) => { if (!s) return "never"; const m = Math.round((Date.now()-new Date(s))/60000); return m<1?"just now":m<60?`${m}m ago`:m<2880?`${Math.round(m/60)}h ago`:`${Math.round(m/1440)}d ago`; };
 const time = (s) => new Date(s).toLocaleTimeString([], { hour:"2-digit", minute:"2-digit", second:"2-digit" });
 

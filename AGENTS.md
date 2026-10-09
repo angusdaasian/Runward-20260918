@@ -11,3 +11,5 @@
 - AI coach training runs once per watch connection: watch-connection syncs retrain when the coach's training marker predates the connection; bulk retraining goes strictly one user at a time with pacing and self-chaining.
 - MCP server lives in a separate Netlify project (mcp.runwardapp.com); per-user access uses hashed tokens in mcp_tokens, because the Supabase instance is external and cannot host app MCP functions.
 - AI connection management uses a dedicated More hub subpage and the shared connection view, keeping credentials and instructions off the main settings list.
+
+- Live data dashboard lives in `live-dashboard/` as a static Netlify site and polls the admin-only `admin-live-feed` function, because the external Supabase cannot host app pages and polling avoids adding realtime publications on large tables.

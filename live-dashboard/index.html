@@ -67,8 +67,17 @@ function login(msg = "") {
   document.getElementById("f").onsubmit = async (ev) => {
     ev.preventDefault();
     const { error } = await sb.auth.signInWithPassword({ email: e.value, password: p.value });
-    error ? login(error.message) : start();
+    if (error) return login(error.message);
+    if (await isAdmin()) start();
+    else { await sb.auth.signOut(); login("This account is not an admin."); }
   };
+}
+
+async function isAdmin() {
+  const { data, error } = await sb.functions.invoke("admin-live-feed", { body: { since: null } });
+  if (error || data?.error) return false;
+  cursor = data.now;
+  return true;
 }
 
 async function poll() {

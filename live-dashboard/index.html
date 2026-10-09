@@ -96,16 +96,16 @@ function login(msg = "") {
     ev.preventDefault();
     const { error } = await sb.auth.signInWithPassword({ email: e.value, password: p.value });
     if (error) return login(error.message);
-    if (await isAdmin()) start();
+    const d = await isAdmin();
+    if (d) start(d);
     else { await sb.auth.signOut(); login("This account is not an admin."); }
   };
 }
 
 async function isAdmin() {
   const { data, error } = await sb.functions.invoke("admin-live-feed", { body: { since: null } });
-  if (error || data?.error) return false;
-  cursor = data.now;
-  return true;
+  if (error || data?.error) return null;
+  return data;
 }
 
 async function poll() {
@@ -162,12 +162,16 @@ function render() {
   app.querySelectorAll("[data-f]").forEach((b) => (b.onclick = () => { filter = b.dataset.f; render(); }));
 }
 
-function start() {
+function start(initial) {
+  cursor = initial.now;
+  events = (initial.events ?? []).slice(0, 500);
+  events.forEach((x) => seen.add(x.id));
   render(); poll(); loadSummary();
   timers.push(setInterval(poll, 5000), setInterval(loadSummary, 60000), setInterval(render, 30000));
 }
 const { data: { session } } = await sb.auth.getSession();
-if (session && await isAdmin()) start();
+const initial = session ? await isAdmin() : null;
+if (initial) start(initial);
 else { if (session) await sb.auth.signOut(); login(session ? "This account is not an admin." : ""); }
 </script>
 </body>

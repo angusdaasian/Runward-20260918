@@ -1,7 +1,8 @@
 import { useMemo } from "react";
 import { Lang } from "@/lib/i18n";
 import { useActivities } from "@/hooks/use-activities";
-import { StatTile } from "@/components/ui/StatTile";
+import { Clock3, Gauge, Route } from "lucide-react";
+import { DeltaChip } from "@/components/ui/DeltaChip";
 
 /**
  * Mobile KPI strip.
@@ -68,39 +69,34 @@ export function MobileKpiStrip({ lang }: Props) {
   const hasAny = stats.sessions7 > 0;
 
   return (
-    <div className="mb-4 space-y-3">
-      <StatTile
-        label={zh ? "本週距離" : "Distance · 7 days"}
-        value={hasAny ? stats.km7.toFixed(1) : "—"}
-        unit={hasAny ? "km" : undefined}
-        size="hero"
-        tone="primary"
-        variant="surface"
-        trend={{ pct: stats.deltaPct, higherIsBetter: true }}
-        sub={
-          hasAny
-            ? zh
-              ? `${stats.sessions7} 次跑步`
-              : `${stats.sessions7} ${stats.sessions7 === 1 ? "run" : "runs"}`
-            : zh
-              ? "本週尚無紀錄"
-              : "No runs logged this week"
-        }
-      />
-      <div className="grid grid-cols-2 gap-3">
-        <StatTile
-          label={zh ? "時間" : "Time"}
-          value={hasAny ? fmtDuration(stats.sec7) : "—"}
-          size="md"
-        />
-        <StatTile
-          label={zh ? "平均配速" : "Avg pace"}
-          value={stats.avgPaceSecPerKm ? fmtPace(stats.avgPaceSecPerKm) : "—"}
-          unit={stats.avgPaceSecPerKm ? "/km" : undefined}
-          size="md"
-        />
+    <section aria-label={zh ? "近 7 天概覽" : "Last 7 days summary"} className="mb-6 border-b border-border px-1 pb-5">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold text-foreground">{zh ? "近 7 天" : "Last 7 days"}</h2>
+        <span className="text-xs text-muted-foreground">
+          {hasAny ? zh ? `${stats.sessions7} 次跑步` : `${stats.sessions7} ${stats.sessions7 === 1 ? "run" : "runs"}` : zh ? "尚無跑步紀錄" : "No runs logged"}
+        </span>
       </div>
-    </div>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <div className="mb-2 flex items-center gap-1.5 text-xs text-muted-foreground"><Route size={14} className="text-primary" />{zh ? "總距離" : "Distance"}</div>
+          <div className="flex items-baseline gap-2">
+            <span className="font-display text-5xl font-semibold leading-none tabular-nums text-primary">{hasAny ? stats.km7.toFixed(1) : "—"}</span>
+            {hasAny && <span className="text-sm text-muted-foreground">km</span>}
+          </div>
+        </div>
+        {stats.deltaPct != null && <div className="space-y-1 pb-1 text-right"><DeltaChip pct={stats.deltaPct} higherIsBetter /><p className="text-[11px] text-muted-foreground">{zh ? "較前 7 天" : "vs previous 7 days"}</p></div>}
+      </div>
+      <dl className="mt-5 grid grid-cols-2 divide-x divide-border">
+        <div className="min-w-0 pr-3">
+          <dt className="flex items-center gap-1.5 text-xs text-muted-foreground"><Clock3 size={13} />{zh ? "時間" : "Time"}</dt>
+          <dd className="mt-1.5 font-display text-2xl font-semibold leading-tight tabular-nums text-foreground">{hasAny ? fmtDuration(stats.sec7) : "—"}</dd>
+        </div>
+        <div className="min-w-0 pl-4">
+          <dt className="flex items-center gap-1.5 text-xs text-muted-foreground"><Gauge size={13} />{zh ? "平均配速" : "Avg pace"}</dt>
+          <dd className="mt-1.5 flex items-baseline gap-1 font-display text-2xl font-semibold leading-tight tabular-nums text-foreground">{stats.avgPaceSecPerKm ? fmtPace(stats.avgPaceSecPerKm) : "—"}{stats.avgPaceSecPerKm && <span className="font-sans text-xs font-normal text-muted-foreground">/km</span>}</dd>
+        </div>
+      </dl>
+    </section>
   );
 }
 

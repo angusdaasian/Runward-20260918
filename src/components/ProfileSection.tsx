@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
-import { Camera, Save, LogOut, Trash2, Mail, Pencil, Zap, Sparkles, Loader2, X, Heart, Trophy, ChevronRight, ChevronLeft /*, Award */ } from "lucide-react";
+import { Camera, Save, LogOut, Trash2, Mail, Pencil, Zap, Sparkles, Loader2, X, Heart, Trophy, ChevronRight, ChevronLeft, Footprints /*, Award */ } from "lucide-react";
 // import BadgesPage from "@/components/BadgesPage";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Lang, t } from "@/lib/i18n";
@@ -87,7 +87,21 @@ interface PB {
   hours: number;
   minutes: number;
   seconds: number;
+  race_date?: string | null;
 }
+
+// Runna-style hexagonal record badges: coloured shell, dark core, distance label inside.
+const HEX_CLIP = "polygon(50% 0%, 95% 25%, 95% 75%, 50% 100%, 5% 75%, 5% 25%)";
+
+const PB_BADGE_STYLE: Record<string, { ring: string; fill: string; text: string; short: string }> = {
+  "1 Mile": { ring: "bg-slate-400", fill: "bg-slate-700", text: "text-white", short: "1MI" },
+  "3000m": { ring: "bg-rose-500", fill: "bg-rose-800", text: "text-white", short: "3K" },
+  "5K": { ring: "bg-blue-500", fill: "bg-blue-800", text: "text-white", short: "5K" },
+  "10K": { ring: "bg-amber-500", fill: "bg-amber-700", text: "text-white", short: "10K" },
+  "Half Marathon": { ring: "bg-teal-500", fill: "bg-teal-800", text: "text-white", short: "21.1K" },
+  "Marathon": { ring: "bg-red-600", fill: "bg-red-900", text: "text-white", short: "42.2K" },
+  default: { ring: "bg-foreground/40", fill: "bg-foreground/75", text: "text-background", short: "PB" },
+};
 
 export type ProfileSubpage = "main" | "hr-zones" | "personal-bests" | "edit-profile" /* | "badges" */;
 
@@ -265,6 +279,7 @@ const ProfileSection = ({ lang, subpage = "main", onNavigate, compact = false, d
       hours: parseInt(newH) || 0,
       minutes: parseInt(newM) || 0,
       seconds: parseInt(newS) || 0,
+      race_date: new Date().toISOString().slice(0, 10),
     }).select().single();
 
     if (error) {
@@ -304,22 +319,26 @@ const ProfileSection = ({ lang, subpage = "main", onNavigate, compact = false, d
 
     // For each distance category, find best actual time from activities
     // that are within ±5% of the target distance
-    const detected: Record<string, { seconds: number }> = {};
+    const detected: Record<string, { seconds: number; date: string | null }> = {};
     for (const dist of DISTANCES) {
       const targetMeters = DISTANCE_TO_METERS[dist];
       if (!targetMeters) continue;
       const minMeters = targetMeters * 0.95;
       const maxMeters = targetMeters * 1.05;
       let bestSeconds = Infinity;
+      let bestDate: string | null = null;
       for (const a of runs) {
         if (a.distance < minMeters || a.distance > maxMeters) continue;
         // Use actual moving time, no recalculation
-        if (a.moving_time > 0 && a.moving_time < bestSeconds) bestSeconds = a.moving_time;
+        if (a.moving_time > 0 && a.moving_time < bestSeconds) {
+          bestSeconds = a.moving_time;
+          bestDate = (a.start_date || "").slice(0, 10) || null;
+        }
       }
       // Skip if faster than world record (data error)
       const wr = PB_WORLD_RECORDS[dist];
       if (bestSeconds !== Infinity && (!wr || bestSeconds >= wr)) {
-        detected[dist] = { seconds: Math.round(bestSeconds) };
+        detected[dist] = { seconds: Math.round(bestSeconds), date: bestDate };
       }
     }
 
@@ -333,8 +352,8 @@ const ProfileSection = ({ lang, subpage = "main", onNavigate, compact = false, d
     }
 
     // Compare with existing PBs and only upsert improvements
-    const updates: { distance: string; h: number; m: number; s: number }[] = [];
-    for (const [dist, { seconds }] of Object.entries(detected)) {
+    const updates: { distance: string; h: number; m: number; s: number; date: string | null }[] = [];
+    for (const [dist, { seconds, date }] of Object.entries(detected)) {
       const existing = pbs.find((p) => p.distance === dist);
       const existingSec = existing
         ? existing.hours * 3600 + existing.minutes * 60 + existing.seconds
@@ -344,7 +363,7 @@ const ProfileSection = ({ lang, subpage = "main", onNavigate, compact = false, d
         const h = Math.floor(total / 3600);
         const m = Math.floor((total % 3600) / 60);
         const s = total % 60;
-        updates.push({ distance: dist, h, m, s });
+        updates.push({ distance: dist, h, m, s, date });
       }
     }
 
@@ -372,6 +391,7 @@ const ProfileSection = ({ lang, subpage = "main", onNavigate, compact = false, d
           hours: u.h,
           minutes: u.m,
           seconds: u.s,
+          race_date: u.date || null,
         }))
       )
       .select();
@@ -440,20 +460,35 @@ const ProfileSection = ({ lang, subpage = "main", onNavigate, compact = false, d
 
         <div className="p-4">
           {pbs.length > 0 ? (
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-              {pbs.map((pb, index) => (
-                <div
-                  key={pb.id}
-                  className="animate-pb-pop relative overflow-hidden rounded-xl border border-warning/25 bg-gradient-to-b from-warning/10 to-transparent px-3 py-2.5 shadow-sm transition-transform duration-200 hover:-translate-y-0.5 hover:shadow-md"
-                  style={{ animationDelay: `${index * 90}ms` }}
-                >
-                  <p className="flex items-center gap-1 text-[11px] font-semibold uppercase text-warning">
-                    <Trophy size={10} />
-                    {pb.distance}
-                  </p>
-                  <p className="mt-1 font-display text-lg font-bold tabular-nums text-foreground">{formatTime(pb.hours, pb.minutes, pb.seconds)}</p>
-                </div>
-              ))}
+            <div className="grid grid-cols-3 gap-x-2 gap-y-4 sm:grid-cols-4">
+              {pbs.map((pb, index) => {
+                const badge = PB_BADGE_STYLE[pb.distance] || PB_BADGE_STYLE.default;
+                const rawDate = pb.race_date || null;
+                const dateStr = rawDate
+                  ? new Date(`${rawDate}T00:00:00`).toLocaleDateString(
+                      lang === "zh" ? "zh-TW" : "en-GB",
+                      { day: "numeric", month: "short", year: "numeric" },
+                    )
+                  : null;
+                return (
+                  <div
+                    key={pb.id}
+                    className="animate-pb-pop flex flex-col items-center"
+                    style={{ animationDelay: `${index * 90}ms` }}
+                  >
+                    <div className="relative h-16 w-16">
+                      <div className={`absolute inset-0 ${badge.ring}`} style={{ clipPath: HEX_CLIP }} />
+                      <div className={`absolute inset-[3px] ${badge.fill}`} style={{ clipPath: HEX_CLIP }} />
+                      <div className="absolute inset-0 flex flex-col items-center justify-center gap-1">
+                        <span className={`font-display text-[11px] font-bold leading-none ${badge.text}`}>{badge.short}</span>
+                        <Footprints size={10} className={`${badge.text} opacity-80`} />
+                      </div>
+                    </div>
+                    <p className="mt-1.5 font-display text-sm font-bold tabular-nums text-foreground">{formatTime(pb.hours, pb.minutes, pb.seconds)}</p>
+                    {dateStr && <p className="mt-0.5 text-center text-[10px] leading-tight text-muted-foreground">{dateStr}</p>}
+                  </div>
+                );
+              })}
             </div>
           ) : (
             <div className="py-2 text-center">

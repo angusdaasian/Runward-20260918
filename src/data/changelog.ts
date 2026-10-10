@@ -15,6 +15,8 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
 
+  { version: "6.12", date: "2026-10-10", en: { title: "Clearer analytics summary", items: ["Redesigned the top analytics numbers with clearer hierarchy, compact time and pace, and a cleaner training snapshot"] }, zh: { title: "更清晰的分析概覽", items: ["重新設計分析頁頂部數據，更突出距離、精簡時間與配速排列，並清晰呈現訓練概覽"] } },
+
   { version: "6.11", date: "2026-10-08", en: { title: "Connect any AI assistant", items: ["Open AI assistant connections from the MCP row below Support in More, with setup guides for Claude and ChatGPT and export instructions for Gemini", "Gemini instructions now use standard written Traditional Chinese"] }, zh: { title: "連接任何 AI 助手", items: ["在「更多」點擊「支援與幫助」下方的 MCP 選項，開啟獨立頁面，查看 Claude、ChatGPT 連接教學及 Gemini 匯出指引", "Gemini 教學改用標準書面繁體中文"] } },
 
 

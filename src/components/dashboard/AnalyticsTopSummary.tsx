@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Info } from "lucide-react";
+import { Info, Activity, Battery, Timer, TrendingUp, type LucideIcon } from "lucide-react";
 import { Lang } from "@/lib/i18n";
 import { useActivities } from "@/hooks/use-activities";
 import { useAuth } from "@/contexts/AuthContext";
@@ -316,18 +316,26 @@ export default function AnalyticsTopSummary({ lang }: Props) {
   return (
     <div className="space-y-3 mb-6">
       {/* ---------- Row 1: KPI strip ---------- */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-0 rounded-xl border border-border bg-card overflow-hidden shadow-card">
+      <section aria-label={zhT("Training snapshot", "訓練概覽", lang)} className="border-b border-border pb-5">
+        <h3 className="mb-4 text-sm font-semibold text-foreground">{zhT("Training snapshot", "訓練概覽", lang)}</h3>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-y-5">
         <KpiCell
+          icon={TrendingUp}
+          tone="text-primary"
           label={zhT("Fitness · CTL", "體能 · CTL", lang)}
           value={ctl.toFixed(0)}
           sub={zhT("42-day load", "42 天負荷", lang)}
         />
         <KpiCell
+          icon={Activity}
+          tone="text-load"
           label={zhT("Fatigue · ATL", "疲勞 · ATL", lang)}
           value={atl.toFixed(0)}
           sub={zhT("7-day rolling", "7 天滾動", lang)}
         />
         <KpiCell
+          icon={Battery}
+          tone="text-cadence"
           label={zhT("Form · TSB", "狀態 · TSB", lang)}
           value={`${tsb > 0 ? "+" : ""}${tsb.toFixed(0)}`}
           sub={
@@ -339,11 +347,14 @@ export default function AnalyticsTopSummary({ lang }: Props) {
           }
         />
         <KpiCell
+          icon={Timer}
+          tone="text-elevation"
           label={zhT("Volume · 7D", "週量 · 7D", lang)}
           value={fmtHours(volSec7)}
           sub={`${sessions7} ${zhT("sessions", "次", lang)}`}
         />
-      </div>
+        </div>
+      </section>
 
       {/* ---------- Row 2: Readiness / Injury / Load balance ---------- */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -607,17 +618,17 @@ export default function AnalyticsTopSummary({ lang }: Props) {
 
 /* ---------- subcomponents ---------- */
 
-function KpiCell({ label, value, sub }: { label: string; value: string; sub?: string }) {
+function KpiCell({ label, value, sub, icon: Icon, tone }: { label: string; value: string; sub?: string; icon: LucideIcon; tone: string }) {
   return (
-    <div className="p-4 border-r last:border-r-0 border-b md:border-b-0 border-border">
-      <div className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground flex items-center gap-1">
+    <div className="min-w-0 px-4 first:pl-0 border-border even:border-l md:[&:not(:first-child)]:border-l md:[&:nth-child(3)]:pl-4 [&:nth-child(3)]:pl-0">
+      <div className="text-xs text-muted-foreground flex items-center gap-1.5">
+        <Icon size={14} className={`shrink-0 ${tone}`} />
         {label}
-        <Info size={10} className="opacity-50" />
       </div>
-      <div className="text-3xl font-display font-bold mt-1 tabular-nums leading-none">
+      <div className="text-4xl font-display font-semibold mt-3 tabular-nums leading-none text-foreground">
         {value}
       </div>
-      {sub && <div className="text-[11px] text-muted-foreground mt-1.5">{sub}</div>}
+      {sub && <div className="text-xs text-muted-foreground mt-2">{sub}</div>}
     </div>
   );
 }
